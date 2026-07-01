@@ -58,6 +58,14 @@ Ingest Processor exposes no public REST API for live status, `doctor` and
 `status` are offline aliases of `validate` (render plus structural validation);
 they do not query a live tenant.
 
+`--dry-run` parses and reports the complete plan without creating, deleting, or
+rewriting the output directory. Refused destinations (including Splunk
+Enterprise/HEC targets and S3 Object Lock) emit their concrete handoff and
+return nonzero in every phase; a rendered handoff is not a successful setup.
+Normal rendering replaces only an empty directory or one carrying this skill's
+ownership marker/legacy README; it refuses to recursively delete an unrelated
+nonempty path.
+
 Validate the skill offline:
 
 ```bash

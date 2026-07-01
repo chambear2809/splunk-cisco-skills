@@ -26,7 +26,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _apply_state import append_step, has_step, read_secret_file, redact  # noqa: E402
+from _apply_state import append_step, read_secret_file, redact  # noqa: E402
 
 
 _RETRYABLE_STATUSES = {429, 502, 503, 504}
@@ -133,19 +133,19 @@ def _load_cred_hashes(state_dir: Path) -> dict[str, str]:
     if not p.exists():
         return {}
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+        payload = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ApiError(f"credential hash state is unreadable or invalid: {p}: {exc}") from exc
+    if not isinstance(payload, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in payload.items()):
+        raise ApiError(f"credential hash state must be a string mapping: {p}")
+    return payload
 
 
 def _save_cred_hashes(state_dir: Path, hashes: dict[str, str]) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     p = state_dir / "credential-hashes.json"
     p.write_text(json.dumps(hashes, indent=2) + "\n", encoding="utf-8")
-    try:
-        os.chmod(p, 0o600)
-    except OSError:
-        pass
+    os.chmod(p, 0o600)
 
 
 def check_credential_drift(
@@ -234,8 +234,6 @@ def upsert(
     if not name:
         raise ApiError("payload.name is required")
     idempotency_key = f"azure-upsert:{name}"
-    if has_step(state_dir, idempotency_key):
-        return {"result": "skipped", "name": name, "reason": "idempotency-key already recorded"}
 
     # Resolve actual credentials from files.
     if app_id_file:
@@ -258,14 +256,14 @@ def upsert(
     if match:
         merged = {**match, **payload}
         merged["id"] = match["id"]
-        merged.setdefault("enabled", True)
+        merged["enabled"] = bool(payload.get("enabled", True))
         result = update_integration(realm, token, match["id"], merged)
         append_step(state_dir, "integration", "update", idempotency_key, "success", redact(result))
         _record_credential_hashes(state_dir, app_id_file, secret_file)
         return {"result": "updated", "name": name, "id": match["id"]}
 
-    payload_disabled = {**payload, "enabled": False}
-    result = create_integration(realm, token, payload_disabled)
+    payload_enabled = {**payload, "enabled": bool(payload.get("enabled", True))}
+    result = create_integration(realm, token, payload_enabled)
     append_step(state_dir, "integration", "create", idempotency_key, "success", redact(result))
     _record_credential_hashes(state_dir, app_id_file, secret_file)
     return {"result": "created", "name": name, "id": result.get("id")}
@@ -301,6 +299,8 @@ def discover(realm: str, token: str, output_path: Path | None, state_dir: Path) 
 
 
 def disable_by_name(realm: str, token: str, name: str, state_dir: Path) -> dict[str, Any]:
+    if not name:
+        raise ApiError("payload.name is required for disable-by-name")
     existing = list_azure_integrations(realm, token)
     match = next((i for i in existing if i.get("name") == name), None)
     if not match:
@@ -311,6 +311,8 @@ def disable_by_name(realm: str, token: str, name: str, state_dir: Path) -> dict[
 
 
 def delete_by_name(realm: str, token: str, name: str, state_dir: Path) -> dict[str, Any]:
+    if not name:
+        raise ApiError("payload.name is required for delete-by-name")
     existing = list_azure_integrations(realm, token)
     match = next((i for i in existing if i.get("name") == name), None)
     if not match:
@@ -397,20 +399,28 @@ def main() -> int:
             print(json.dumps(result, indent=2))
 
         elif args.command == "disable":
-            if not args.integration_id:
-                raise ApiError("--integration-id is required for `disable`")
-            result = disable_integration(args.realm, token, args.integration_id)
-            append_step(state_dir, "integration", "disable",
-                        f"azure-disable:{args.integration_id}", "success", redact(result))
-            print(json.dumps(redact(result), indent=2))
+            if args.integration_id:
+                result = disable_integration(args.realm, token, args.integration_id)
+                append_step(state_dir, "integration", "disable",
+                            f"azure-disable:{args.integration_id}", "success", redact(result))
+                print(json.dumps(redact(result), indent=2))
+            elif args.payload_file:
+                payload = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
+                print(json.dumps(disable_by_name(args.realm, token, str(payload.get("name", "")), state_dir), indent=2))
+            else:
+                raise ApiError("--integration-id or --payload-file is required for `disable`")
 
         elif args.command == "delete":
-            if not args.integration_id:
-                raise ApiError("--integration-id is required for `delete`")
-            delete_integration(args.realm, token, args.integration_id)
-            append_step(state_dir, "integration", "delete",
-                        f"azure-delete:{args.integration_id}", "success", {})
-            print(json.dumps({"result": "deleted", "id": args.integration_id}, indent=2))
+            if args.integration_id:
+                delete_integration(args.realm, token, args.integration_id)
+                append_step(state_dir, "integration", "delete",
+                            f"azure-delete:{args.integration_id}", "success", {})
+                print(json.dumps({"result": "deleted", "id": args.integration_id}, indent=2))
+            elif args.payload_file:
+                payload = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
+                print(json.dumps(delete_by_name(args.realm, token, str(payload.get("name", "")), state_dir), indent=2))
+            else:
+                raise ApiError("--integration-id or --payload-file is required for `delete`")
 
         elif args.command == "discover":
             output_path = Path(args.output) if args.output else None

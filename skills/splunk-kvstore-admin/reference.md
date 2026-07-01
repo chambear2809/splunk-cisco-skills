@@ -27,8 +27,9 @@ state, Enterprise Security, ITSI, and many apps.
 - Backups are point-in-time; schedule them around heavy write windows.
 - The archive name should be unique and descriptive (for example, include the
   date). This skill validates the name characters.
-- Authenticate against splunkd. Pass `-auth user:<password-from-file>` only from
-  a file you control; never paste the password into chat or argv.
+- Authenticate against splunkd with an interactive `splunk login` before
+  running lifecycle scripts; never place the password in argv, chat, or
+  rendered files.
 
 ## Restore
 
@@ -39,18 +40,24 @@ data with the archive contents. Guardrails the rendered `restore.sh` enforces:
 - Always take a fresh backup first.
 - On an SHC, restore is performed on the captain and replicated outward; do not
   restore on multiple members concurrently.
+- The SHC script enables maintenance mode before restore and disables it only
+  after success; a failed restore leaves maintenance mode enabled for review.
 - After restore, re-run `status.sh` and confirm collection counts and
   replication.
 
 ## Storage-Engine Migration
 
 Current Splunk releases use the WiredTiger storage engine. Legacy deployments
-on the older engine must migrate with `splunk migrate migrate-kvstore`:
+on the older engine follow topology-specific behavior:
 
 - The migration is one-way and requires a maintenance window.
 - Take a fresh backup first.
-- On an SHC, follow the documented per-member sequence; do not migrate all
-  members at once.
+- On an SHC, run
+  `splunk start-shcluster-migration kvstore -storageEngine wiredTiger -isDryRun true`
+  first, then the same command without `-isDryRun` after review.
+- Standalone migration is performed by the supported Splunk Enterprise binary
+  upgrade workflow; the live migrate phase returns a handoff instead of running
+  an obsolete CLI verb.
 - KV Store and the bundled MongoDB are version-coupled to the Splunk release.
   Validate version compatibility before and after a Splunk upgrade.
 
@@ -65,8 +72,8 @@ on the older engine must migrate with `splunk migrate migrate-kvstore`:
   are Cloud-only doc trains.
 
 The optional rendered `server.conf` sets `[kvstore] storageEngine = wiredTiger`
-for documentation/intent; the actual conversion is performed by the migrate
-verb, not by the conf alone.
+for documentation/intent; the actual SHC conversion is performed by
+`start-shcluster-migration`, not by the conf alone.
 
 ## SHC Member Resync
 
@@ -78,7 +85,7 @@ state):
 2. Take a backup on the captain.
 3. On the affected member only: `splunk stop`, `splunk clean kvstore --local`,
    `splunk start`. The member rejoins and re-replicates from the captain.
-4. If required, run `splunk resync kvstore` on the member.
+4. Run `splunk resync kvstore` on the member and verify verbose status.
 
 Never run `clean kvstore --local` on the captain or on multiple members at once.
 

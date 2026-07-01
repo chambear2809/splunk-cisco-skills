@@ -846,13 +846,39 @@ deployment_set_app_visible() {
     local uri="${2:-}"
     local app_name="${3:-}"
     local visible_value="${4:-true}"
+    local response http_code actual
 
     if deployment_should_manage_search_config_via_bundle; then
         deployment_bundle_set_conf_for_current_target "${app_name}" "app" "ui" "is_visible=${visible_value}"
         return $?
     fi
 
-    splunk_curl "${sk}" -X POST \
+    response="$(splunk_curl "${sk}" -X POST \
         "${uri}/services/apps/local/${app_name}" \
-        -d "visible=${visible_value}" -d "output_mode=json" >/dev/null 2>&1
+        -d "visible=${visible_value}" -d "output_mode=json" \
+        -w '\n%{http_code}')" || return 1
+    http_code="$(printf '%s\n' "${response}" | tail -n 1)"
+    case "${http_code}" in
+        200|201) ;;
+        *)
+            echo "ERROR: setting ${app_name} visibility failed (HTTP ${http_code:-unknown})" >&2
+            return 1
+            ;;
+    esac
+
+    actual="$(splunk_curl "${sk}" \
+        "${uri}/services/apps/local/${app_name}?output_mode=json" \
+        | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+entry = payload.get("entry") or []
+if not entry or not isinstance(entry[0].get("content"), dict):
+    raise SystemExit("app metadata response did not contain entry[0].content")
+value = entry[0]["content"].get("visible")
+print("true" if value is True or str(value).lower() in {"true", "1"} else "false")
+')" || return 1
+    [[ "${actual}" == "${visible_value,,}" ]] || {
+        echo "ERROR: ${app_name} visibility readback is ${actual}, expected ${visible_value}" >&2
+        return 1
+    }
 }

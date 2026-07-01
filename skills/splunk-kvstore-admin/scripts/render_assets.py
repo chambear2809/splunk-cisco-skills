@@ -97,9 +97,9 @@ Order of operations:
 2. `./backup.sh` to take a fresh backup.
 3. Only then run restore, migrate, or resync, one member at a time on an SHC.
 
-All verbs authenticate against splunkd. Authenticate interactively or pass
-`-auth user:<password-from-file>` from a file you control. Never paste the
-password into chat or argv.
+All verbs authenticate against splunkd. Run `splunk login` interactively first
+and use the CLI's local authenticated session. Never place a password in argv,
+rendered files, or chat.
 """
 
 
@@ -121,7 +121,7 @@ def render_backup(args: argparse.Namespace) -> str:
     return make_script(
         f"""splunk={splunk}
 archive_name={archive}
-# Add -auth user:"$(cat /path/to/secret)" if not authenticating interactively.
+# Authenticate first with: "${splunk}" login
 "${{splunk}}" backup kvstore -archiveName "${{archive_name}}"
 echo "Backup archive '${{archive_name}}' created under \\$SPLUNK_HOME/var/lib/splunk/kvstorebackup/."
 """
@@ -132,6 +132,11 @@ def render_restore(args: argparse.Namespace) -> str:
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
     restore_name = args.restore_archive_name or args.archive_name
     restore = shell_quote(restore_name)
+    maintenance_before = ""
+    maintenance_after = ""
+    if args.deployment == "shc":
+        maintenance_before = '"${splunk}" enable kvstore-maintenance-mode\n'
+        maintenance_after = '"${splunk}" disable kvstore-maintenance-mode\n'
     return make_script(
         f"""splunk={splunk}
 splunk_home={shell_quote(args.splunk_home)}
@@ -143,8 +148,10 @@ echo "About to restore KV Store from archive: ${{archive_name}}"
 echo "This OVERWRITES current KV Store collection data. A fresh backup is strongly advised."
 read -r -p "Type RESTORE to continue: " confirm
 [[ "${{confirm}}" == "RESTORE" ]] || {{ echo "Aborted."; exit 1; }}
-# Add -auth user:"$(cat /path/to/secret)" if not authenticating interactively.
+# Authenticate first with: "${splunk}" login
+{maintenance_before}
 "${{splunk}}" restore kvstore -archiveName "${{archive_name}}"
+{maintenance_after}
 echo "Restore requested. Re-run status.sh to confirm collections and replication."
 """
     )
@@ -152,16 +159,27 @@ echo "Restore requested. Re-run status.sh to confirm collections and replication
 
 def render_migrate(args: argparse.Namespace) -> str:
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
+    if args.deployment != "shc":
+        return make_script(
+            f"""splunk={splunk}
+"${{splunk}}" show kvstore-status --verbose
+echo "ERROR: Standalone storage-engine migration is automatic during the supported Splunk Enterprise upgrade workflow." >&2
+echo "HANDOFF: Take a backup, complete the supported binary upgrade, then run status.sh." >&2
+exit 1
+"""
+        )
     return make_script(
         f"""splunk={splunk}
 echo "Current KV Store engine:"
-"${{splunk}}" show kvstore-status --verbose | grep -i -E 'storageEngine|serverVersion' || true
+"${{splunk}}" show kvstore-status --verbose
 echo
 echo "Migrating the KV Store storage engine to WiredTiger is ONE-WAY and requires a"
 echo "maintenance window. Take a fresh backup first (./backup.sh)."
+echo "Running the supported SHC migration dry run first."
+"${{splunk}}" start-shcluster-migration kvstore -storageEngine wiredTiger -isDryRun true
 read -r -p "Type MIGRATE to continue: " confirm
 [[ "${{confirm}}" == "MIGRATE" ]] || {{ echo "Aborted."; exit 1; }}
-"${{splunk}}" migrate migrate-kvstore
+"${{splunk}}" start-shcluster-migration kvstore -storageEngine wiredTiger
 echo "Migration requested. Re-run status.sh to confirm storageEngine = wiredTiger."
 """
     )
@@ -169,22 +187,27 @@ echo "Migration requested. Re-run status.sh to confirm storageEngine = wiredTige
 
 def render_resync(args: argparse.Namespace) -> str:
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
-    standalone_note = (
-        ""
-        if args.deployment == "shc"
-        else 'echo "NOTE: resync is for search head cluster members; this host is rendered as standalone."\n'
-    )
+    if args.deployment != "shc":
+        return make_script(
+            f"""splunk={splunk}
+"${{splunk}}" show kvstore-status --verbose
+echo "ERROR: Resync is only valid for a stale, non-captain SHC member." >&2
+echo "HANDOFF: Do not clean standalone KV Store data as an SHC resync." >&2
+exit 1
+"""
+        )
     return make_script(
         f"""splunk={splunk}
-{standalone_note}echo "Resync rebuilds this member's KV Store from the SHC captain."
+echo "Resync rebuilds this member's KV Store from the SHC captain."
 echo "Run this on ONE stale member at a time, never on the captain, and only after a backup."
 read -r -p "Type RESYNC to continue: " confirm
 [[ "${{confirm}}" == "RESYNC" ]] || {{ echo "Aborted."; exit 1; }}
 "${{splunk}}" stop
 "${{splunk}}" clean kvstore --local
 "${{splunk}}" start
-echo "Member cleaned and restarted; it will re-replicate from the captain."
-echo "If the cluster requires it, run: splunk resync kvstore -auth ... on this member."
+"${{splunk}}" resync kvstore
+"${{splunk}}" show kvstore-status --verbose
+echo "Member cleaned, restarted, and KV Store resync requested; monitor replication until healthy."
 """
     )
 
@@ -196,7 +219,7 @@ def render_server(args: argparse.Namespace) -> str:
             [
                 "[kvstore]",
                 f"storageEngine = {args.storage_engine}",
-                "# storageEngine changes require splunk migrate migrate-kvstore; see migrate.sh.",
+                "# SHC storageEngine changes use start-shcluster-migration; see migrate.sh.",
                 "",
             ]
         )

@@ -188,7 +188,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash skills/cisco-spaces-setup/scripts/validate.sh
+bash skills/cisco-spaces-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, index, stream configuration, inputs, data flow, settings.
@@ -221,3 +221,10 @@ Checks: app installation, index, stream configuration, inputs, data flow, settin
 8. **No sudo needed**: Scripts run fine as the `splunk` OS user.
 9. **SHC replication**: The TA ships `server.conf` entries for SHC conf replication
    of `ta_cisco_spaces_settings` and `ta_cisco_spaces_stream`.
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require a stream stanza, enabled input, index, events, and sourcetypes. The
+Cisco Spaces TA ships no dashboards; the consuming dashboard/content handoff
+is therefore explicit rather than inferred.

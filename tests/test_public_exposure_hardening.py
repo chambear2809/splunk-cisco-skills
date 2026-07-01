@@ -1414,11 +1414,9 @@ def test_renderer_rejects_unlimited_ldap_network_timeout(tmp_path: Path) -> None
     assert "unlimited" in combined.lower() or "-1" in combined
 
 
-def test_apply_search_head_does_not_unconditionally_assign_unused_pass4_var() -> None:
-    """Regression: an earlier version of the cluster-manager helper read the
-    pass4SymmKey value into a shell variable (pass4="$(cat ...)") that was then
-    immediately unset and never used. The renderer should rely on
-    -auth-passphrase-file alone."""
+def test_apply_cluster_manager_fails_closed_without_secret_argv() -> None:
+    """Cluster-manager apply must fail closed instead of inventing an
+    undocumented secret-file CLI option or exposing `-secret` on argv."""
     render_module_local = render_module
     # Inspect the source of the cluster-manager renderer.
     import inspect
@@ -1426,3 +1424,5 @@ def test_apply_search_head_does_not_unconditionally_assign_unused_pass4_var() ->
     assert "pass4=\"$(cat" not in src, (
         "render_apply_cluster_manager should not read pass4SymmKey into a shell variable"
     )
+    assert "auth-passphrase-file" not in src
+    assert "exit 2" in src

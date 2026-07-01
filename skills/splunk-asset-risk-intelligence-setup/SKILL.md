@@ -12,6 +12,14 @@ description: >-
 
 # Splunk Asset and Risk Intelligence Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture applicable configuration, data/readiness, and
+shipped-view evidence, or explicit package evidence that no dashboards ship.
+
 Use this skill for Splunk Asset and Risk Intelligence (ARI). It is
 setup-plus-handoff coverage, not ARI config-as-code.
 

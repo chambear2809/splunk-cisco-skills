@@ -114,6 +114,11 @@ bash skills/splunk-connect-for-snmp-setup/scripts/setup.sh \
   --write-hec-token-file /tmp/sc4snmp_hec_token
 ```
 
+If Splunk cannot return that requested token value, preparation exits nonzero
+and emits a rotate/create handoff; it does not report a usable token file.
+Visible Selected Indexes restrictions must include every SC4SNMP event and
+metrics index; otherwise preparation and validation fail with a token handoff.
+
 ### Step 3: Render Docker Compose Assets
 
 ```bash
@@ -160,6 +165,11 @@ bash skills/splunk-connect-for-snmp-setup/scripts/setup.sh \
 ```
 
 ### Step 5: Optionally Apply Rendered Assets
+
+Live Compose or Kubernetes apply requires a nonempty, owner-only
+`--hec-token-file` (no group/other permission bits). A
+single combined run may instead use `--splunk-prep --write-hec-token-file PATH`;
+apply is blocked if preparation does not produce a nonempty token file.
 
 Compose:
 

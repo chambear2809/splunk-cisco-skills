@@ -164,11 +164,29 @@ def test_secret_like_destination_fields_are_rejected(tmp_path: Path) -> None:
 
 
 def test_splunk_enterprise_destination_is_refused_handoff(tmp_path: Path) -> None:
-    out = run_renderer(
-        tmp_path,
-        "--destinations",
-        "enterprise=type=splunk_enterprise;host=idx.example.com",
+    out = tmp_path / "rendered"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(RENDERER),
+            "--phase",
+            "all",
+            "--output-dir",
+            str(out),
+            "--subscription-tier",
+            "premier",
+            "--destinations",
+            "enterprise=type=splunk_enterprise;host=idx.example.com",
+            "--pipelines",
+            "",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
     )
+    assert result.returncode != 0
+    assert "IP-DESTINATION-REFUSED" in result.stderr
     findings = json.loads((out / "findings.json").read_text())
     assert any(finding["code"] == "IP-DESTINATION-REFUSED" for finding in findings)
     destination = json.loads((out / "destinations/enterprise.json").read_text())

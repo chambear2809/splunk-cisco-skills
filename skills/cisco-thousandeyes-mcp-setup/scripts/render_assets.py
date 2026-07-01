@@ -361,10 +361,10 @@ def render_readme(args: argparse.Namespace, clients: list[str], accept_write_too
         lines.extend(
             [
                 "",
-                "`--accept-te-mcp-write-tools` was set. Clients that support",
-                "per-tool gating render with the write group enabled. Review the",
-                "per-client config and confirm before pointing the AI assistant",
-                "at production.",
+                "`--accept-te-mcp-write-tools` was set, recording explicit operator",
+                "acknowledgement of write/Instant-Test risk. Client permissions are",
+                "still configured manually; review each tool approval before pointing",
+                "the AI assistant at production.",
             ]
         )
     else:

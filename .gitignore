@@ -95,6 +95,8 @@ projects/tmp-*
 /splunk-observability-cisco-ai-pod-rendered/
 /splunk-observability-cisco-intersight-rendered/
 /splunk-observability-cisco-nexus-rendered/
+/splunk-observability-coding-agent-instrumentation-rendered/
+/splunk-observability-codex-instrumentation-rendered/
 /splunk-observability-cloud-integration-rendered/
 /splunk-observability-dashboard-rendered/
 /splunk-observability-database-monitoring-rendered/
@@ -104,6 +106,7 @@ projects/tmp-*
 /splunk-observability-k8s-auto-instrumentation-rendered/
 /splunk-observability-k8s-frontend-rum-rendered/
 /splunk-observability-metrics-pipeline-rendered/
+/splunk-observability-mobile-rum-rendered/
 /splunk-observability-native-rendered/
 /splunk-observability-nvidia-gpu-rendered/
 /splunk-observability-otel-rendered/
@@ -118,6 +121,7 @@ projects/tmp-*
 /splunk-smartstore-rendered/
 /splunk-soar-rendered/
 /splunk-spl2-pipeline-kit-rendered/
+/splunk-supported-addons-rendered/
 /splunk-universal-forwarder-rendered/
 /splunk-workload-management-rendered/
 /splunk-kvstore-admin-rendered/

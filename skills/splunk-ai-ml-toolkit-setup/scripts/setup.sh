@@ -98,6 +98,15 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${JSON_OUTPUT}" == "true" && "${MODE}" != "render" ]]; then
+    log "ERROR: --json is supported only with render mode; action and validator output is not a single JSON document."
+    exit 1
+fi
+if [[ "${MODE}" == "install" && "${DRY_RUN}" != "true" ]]; then
+    require_current_skill_role_supported
+    require_search_tier_target_role "AI Toolkit, PSC, and DSDL package installation"
+fi
+
 renderer_args=(--spec "${SPEC}" --output-dir "${OUTPUT_DIR}")
 if [[ -n "${PLATFORM}" ]]; then
     renderer_args+=(--platform "${PLATFORM}")

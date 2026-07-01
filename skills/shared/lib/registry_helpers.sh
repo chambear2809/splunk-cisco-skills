@@ -260,6 +260,26 @@ warn_if_cloud_pairing_missing_for_skill() {
     log "         Continuing, but manage or validate the paired runtime separately."
 }
 
+require_cloud_pairing_for_skill() {
+    local skill_name="${1:-}"
+    local pairing_json primary_role paired_role pairing_summary platform_hint
+
+    [[ -n "${skill_name}" ]] || return 0
+    platform_hint="$(_resolve_target_role_platform_hint 2>/dev/null || true)"
+    [[ "${platform_hint}" == "cloud" ]] || return 0
+    pairing_json="$(shared_registry_skill_cloud_pairing_json_by_skill "${skill_name}")"
+    [[ -n "${pairing_json}" && "${pairing_json}" != "[]" ]] || return 0
+    primary_role="$(resolve_primary_splunk_target_role)"
+    paired_role="$(resolve_search_splunk_target_role)"
+    if _cloud_pairing_is_satisfied "${pairing_json}" "${primary_role}" "${paired_role}"; then
+        return 0
+    fi
+    pairing_summary="$(_registry_role_list_summary "${pairing_json}")"
+    log "ERROR: Completion requires a paired Cloud runtime role: ${pairing_summary:-declared in the registry}."
+    log "       No qualifying paired role is configured for skill '${skill_name}'."
+    return 1
+}
+
 warn_if_role_unsupported_for_app_id() {
     local app_id="${1:-}"
     local role support label reasons subject
@@ -360,4 +380,89 @@ warn_if_current_skill_role_unsupported() {
 
     warn_if_role_unsupported_for_skill "${skill_name}"
     warn_if_cloud_pairing_missing_for_skill "${skill_name}"
+}
+
+# Fail only when both the target role and registry metadata are known and the
+# current skill explicitly declares that role unsupported. Unknown roles or
+# missing metadata retain the existing warning-only behavior so callers can
+# introduce this safely on mutating paths without breaking legacy setups.
+require_skill_role_supported() {
+    local skill_name="${1:-}" role support notes subject
+
+    [[ -n "${skill_name}" ]] || return 0
+    role="$(resolve_splunk_target_role)"
+    [[ -n "${role}" ]] || return 0
+    support="$(shared_registry_skill_role_support_by_skill "${skill_name}" "${role}")"
+    if [[ -z "${support}" ]]; then
+        _warn_role_metadata_missing "skill '${skill_name}'"
+        return 0
+    fi
+    if [[ "${support}" == "none" ]]; then
+        subject="Skill '${skill_name}'"
+        notes="$(shared_registry_skill_notes_by_skill "${skill_name}")"
+        log "ERROR: ${subject} is not modeled for role '${role}'."
+        if [[ -n "${notes}" ]]; then
+            log "       Registry guidance: ${notes}"
+        fi
+        log "ERROR: Refusing mutation on unsupported target role '${role}'."
+        return 1
+    fi
+    return 0
+}
+
+require_current_skill_role_supported() {
+    local skill_name
+    skill_name="$(current_skill_name_from_script_dir)"
+    require_skill_role_supported "${skill_name}"
+}
+
+check_skill_role_for_validation() {
+    local skill_name="${1:-}" completion="${2:-false}"
+    if [[ "${completion}" == "true" ]]; then
+        require_skill_role_supported "${skill_name}" || return 1
+        require_cloud_pairing_for_skill "${skill_name}"
+    else
+        warn_if_role_unsupported_for_skill "${skill_name}"
+        warn_if_cloud_pairing_missing_for_skill "${skill_name}"
+    fi
+}
+
+check_current_skill_role_for_validation() {
+    local completion="${1:-false}" skill_name
+    skill_name="$(current_skill_name_from_script_dir)"
+    check_skill_role_for_validation "${skill_name}" "${completion}"
+}
+
+require_index_management_target_role() {
+    local role
+    role="$(resolve_splunk_target_role)"
+    case "${role}" in
+        heavy-forwarder|universal-forwarder|external-collector)
+            log "ERROR: Refusing index creation on role '${role}'; target a search/index management endpoint instead."
+            return 1
+            ;;
+        *) return 0 ;;
+    esac
+}
+
+require_splunk_management_target_role() {
+    local role
+    role="$(resolve_splunk_target_role)"
+    if [[ "${role}" == "external-collector" ]]; then
+        log "ERROR: This action requires a Splunk management endpoint, not an external-collector target."
+        return 1
+    fi
+    return 0
+}
+
+require_search_tier_target_role() {
+    local label="${1:-This action}" role
+    role="$(resolve_splunk_target_role)"
+    case "${role}" in
+        ""|search-tier) return 0 ;;
+        *)
+            log "ERROR: ${label} belongs on the search tier, not role '${role}'."
+            return 1
+            ;;
+    esac
 }

@@ -39,6 +39,13 @@ bash skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh --render \
 Review `inputs.local.conf.template` for host-local file monitors and
 `transport-handoff.md` for appliance/syslog profiles.
 
+To install the selected packages through the shared installer after rendering:
+
+```bash
+bash skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh --install \
+  --products apache,nginx,iis,tomcat,haproxy,bluecoat
+```
+
 ```bash
 bash skills/splunk-syslog-web-proxy-ta-setup/scripts/validate.sh --index web --syslog-index netproxy
 ```

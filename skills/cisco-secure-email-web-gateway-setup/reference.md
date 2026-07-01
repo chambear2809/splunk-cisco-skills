@@ -58,3 +58,9 @@ SC4S product key: `cisco_wsa`
   on search heads for users of the data source.
 - If Splunk indexers or heavy forwarders parse raw logs directly, install the TA
   on that parsing tier as well as the search tier.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` exits nonzero when a selected ESA/WSA app,
+index, macro, or event stream is missing. Direct no-flag validation remains
+diagnostic. These parser TAs ship no standalone dashboards.

@@ -83,18 +83,9 @@ create_indexes() {
 
 ensure_app_visible() {
     ensure_search_api_session
-    local visible
-    visible=$(splunk_curl "${SK}" \
-        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
-        | python3 -c "
-import json, sys
-try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
-except: print('True')
-" 2>/dev/null || echo "True")
-    if [[ "${visible}" == "False" ]]; then
-        log "Setting ${APP_NAME} visible=true..."
-        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
-    fi
+    log "Ensuring ${APP_NAME} is visible..."
+    deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" \
+        || { log "ERROR: Failed to make ${APP_NAME} visible."; return 1; }
 }
 
 create_macros() {
@@ -116,13 +107,24 @@ enable_audit_alarms_inputs() {
 
     log "Enabling Audit & Alarms inputs for account='${account}' index='${index}'..."
 
-    local body
-    body=$(form_urlencode_pairs \
+    local audit_body alarms_body
+    audit_body=$(form_urlencode_pairs \
         global_account "${account}" \
         index "${index}" \
         interval "900" \
         date_input "7" \
         enable_aaa_audit_records "1" \
+        enable_alarms "0" \
+        acknowledge "0" \
+        suppressed "0" \
+        info_alarms "0" \
+        disabled "0")
+    alarms_body=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "900" \
+        date_input "7" \
+        enable_aaa_audit_records "0" \
         enable_alarms "1" \
         acknowledge "1" \
         suppressed "1" \
@@ -131,14 +133,14 @@ enable_audit_alarms_inputs() {
 
     local failures=0
 
-    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_audit_logs" "${body}"; then
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_audit_logs" "${audit_body}"; then
         log "  Added: audit_alarms://${account}_audit_logs"
     else
         log "  ERROR: Failed to create audit_alarms://${account}_audit_logs"
         failures=$((failures + 1))
     fi
 
-    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_alarms" "${body}"; then
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_alarms" "${alarms_body}"; then
         log "  Added: audit_alarms://${account}_alarms"
     else
         log "  ERROR: Failed to create audit_alarms://${account}_alarms"
@@ -298,7 +300,7 @@ main() {
     create_indexes
     create_macros
     ensure_app_visible
-    log "Setup complete."
+    log "Index/macro setup complete; onboarding remains incomplete until account, input, event, and dashboard validation passes."
     log "$(log_platform_restart_guidance "index or macro changes")"
 
     [[ -t 0 ]] || return 0
@@ -342,7 +344,7 @@ main() {
 
     rm -f "${secret_file}" 2>/dev/null || true
     log ""
-    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh --completion' to prove deployment completion."
 }
 
 main

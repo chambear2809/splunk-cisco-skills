@@ -158,9 +158,12 @@ archive="$(mktemp "/tmp/${skill}.XXXXXX.tgz")"
 tar -C "${output_dir}" -czf "${archive}" "${rendered_subdir}"
 remote_archive="$(hbs_stage_file_for_execution ssh "${archive}" "${skill}.$$.tgz")"
 rm -f "${archive}"
-remote_dir="/tmp/${skill}.$$"
+remote_dir="$(hbs_capture_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join mktemp -d "/tmp/${skill}.XXXXXX")")")"
+if [[ -z "${remote_dir}" ]]; then
+  echo "ERROR: failed to create a remote staging directory" >&2
+  exit 1
+fi
 cleanup_cmd="$(hbs_prefix_with_sudo ssh "$(hbs_shell_join rm -rf "${remote_dir}" "${remote_archive}")")"
-hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join mkdir -p "${remote_dir}")")"
 hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join tar -xzf "${remote_archive}" -C "${remote_dir}")")"
 hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join chown -R "${service_user}:${service_user}" "${remote_dir}")")" >/dev/null 2>&1 || true
 remote_workdir="${remote_dir}/${rendered_subdir}"
@@ -273,8 +276,8 @@ if [[ -z "${SPLUNK_O11Y_REALM:-}" ]]; then
   echo '{"ok":false,"reason":"missing SPLUNK_O11Y_REALM"}'
   exit 2
 fi
-if [[ -z "${SPLUNK_O11Y_TOKEN_FILE:-}" || ! -r "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
-  echo '{"ok":false,"reason":"missing or unreadable SPLUNK_O11Y_TOKEN_FILE"}'
+if [[ -z "${SPLUNK_O11Y_TOKEN_FILE:-}" || ! -f "${SPLUNK_O11Y_TOKEN_FILE:-}" || -L "${SPLUNK_O11Y_TOKEN_FILE:-}" || ! -r "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
+  echo '{"ok":false,"reason":"missing, unreadable, or symlink SPLUNK_O11Y_TOKEN_FILE"}'
   exit 2
 fi
 mode="$(stat -f '%A' "${SPLUNK_O11Y_TOKEN_FILE}" 2>/dev/null || stat -c '%a' "${SPLUNK_O11Y_TOKEN_FILE}")"
@@ -283,15 +286,26 @@ if [[ "${mode}" != "600" ]]; then
   exit 2
 fi
 url="https://api.${SPLUNK_O11Y_REALM}.observability.splunkcloud.com/v2/organization"
+body_file="$(mktemp "${TMPDIR:-/tmp}/codex-o11y-live-validation.XXXXXX")"
+token_value="$(cat "${SPLUNK_O11Y_TOKEN_FILE}")"
+if [[ -z "${token_value}" || "${token_value}" == *$'\n'* || "${token_value}" == *$'\r'* ]]; then
+  echo '{"ok":false,"reason":"empty or multiline SPLUNK_O11Y_TOKEN_FILE"}'
+  exit 2
+fi
+token_value="${token_value//\\/\\\\}"
+token_value="${token_value//\"/\\\"}"
+trap 'rm -f "${body_file}"' EXIT
 http_code="$(
   curl -sS --connect-timeout 10 --max-time 30 \
-    -K <(printf 'header = "X-SF-Token: %s"\n' "$(tr -d '\r\n' < "${SPLUNK_O11Y_TOKEN_FILE}")") \
-    -o /tmp/codex-o11y-live-validation-body.$$ \
+    -K <(printf 'header = "X-SF-Token: %s"\n' "${token_value}") \
+    -o "${body_file}" \
     -w '%{http_code}' \
     "${url}" || true
 )"
-body="$(head -c 4096 /tmp/codex-o11y-live-validation-body.$$ 2>/dev/null || true)"
-rm -f /tmp/codex-o11y-live-validation-body.$$
+unset token_value
+body="$(head -c 4096 "${body_file}" 2>/dev/null || true)"
+rm -f "${body_file}"
+trap - EXIT
 python3 - "${http_code}" "${SPLUNK_O11Y_REALM}" <<'PY'
 import json
 import sys
@@ -1817,6 +1831,7 @@ def main(argv: list[str] | None = None) -> int:
 
     iteration = 1
     stop = False
+    last_payload: dict[str, Any] | None = None
 
     def _handle_signal(signum: int, _frame: Any) -> None:
         nonlocal stop
@@ -1828,6 +1843,7 @@ def main(argv: list[str] | None = None) -> int:
 
     while not stop:
         payload = run_once(args, iteration=iteration)
+        last_payload = payload
         if args.once:
             return 0 if payload.get("totals", {}).get("fail", 0) == 0 else 1
         if args.max_iterations and iteration >= args.max_iterations:
@@ -1841,7 +1857,9 @@ def main(argv: list[str] | None = None) -> int:
             if stop:
                 break
             time.sleep(1)
-    return 0
+    if last_payload is None:
+        return 1
+    return 0 if last_payload.get("totals", {}).get("fail", 0) == 0 else 1
 
 
 if __name__ == "__main__":

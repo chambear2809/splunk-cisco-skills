@@ -118,20 +118,21 @@ python3 skills/galileo-mcp-server-setup/scripts/probe_mcp.py \
 
 ## CLI Contract
 
-`setup.sh` supports `--render`, `--validate`, `--doctor`, `--probe`,
+`setup.sh` supports `--render`, `--validate`, `--doctor`, `--probe`, `--apply`,
 `--dry-run`, `--json`, `--client`, `--spec`, `--output-dir`, `--mcp-url`,
 `--galileo-console-url`, `--galileo-api-key-file`,
 `--accept-galileo-mcp-write-tools`, and `--allow-loose-key-perms`.
 Client aliases include `all`, `claude-code`, `vs-code`, and `aws-kiro`.
 
-There is no `--apply` mode in v1. Rendered files explain the install commands,
-but the setup script never copies files into real client config paths.
+`--apply --client codex` writes a local file-backed bridge environment and runs
+the rendered Codex registration helper. Cursor, VS Code, Claude, and Kiro config
+merges remain explicit reviewed handoffs and fail closed under automated apply.
 
 ## Secret Handling
 
 Use file-based or client-side secret injection only:
 
-- `--galileo-api-key-file` for optional validation/probe checks
+- `--galileo-api-key-file` for optional validation/probe checks and Codex apply
 - `${env:GALILEO_API_KEY}` for Cursor and local bridge workflows
 - `${input:galileo-api-key}` for VS Code prompt-string workflows
 - `.env.galileo-mcp` local-only bridge file for Codex, Claude Code, and Kiro

@@ -13,6 +13,8 @@ SK=""
 
 PARAM_KEYS=()
 PARAM_VALUES=()
+DIRECT_SET_KEYS=()
+SECRET_FILE_KEYS=()
 
 usage() {
     cat <<EOF
@@ -155,6 +157,7 @@ while [[ $# -gt 0 ]]; do
             fi
             validate_param_key "$2"
             append_param "$2" "$3"
+            DIRECT_SET_KEYS+=("$2")
             shift 3
             ;;
         --secret-file)
@@ -165,6 +168,7 @@ while [[ $# -gt 0 ]]; do
             fi
             validate_param_key "$2"
             append_param "$2" "$(read_secret_file "$3")"
+            SECRET_FILE_KEYS+=("$2")
             shift 3
             ;;
         --disable) DISABLED_FLAG="1"; shift ;;
@@ -177,7 +181,60 @@ done
 [[ -n "${INPUT_TYPE}" ]] || { log "ERROR: --input-type is required."; exit 1; }
 [[ -n "${INPUT_NAME}" ]] || { log "ERROR: --name is required."; exit 1; }
 required_fields_for_type "${INPUT_TYPE}" >/dev/null
-ensure_required_fields
+
+for direct_key in "${DIRECT_SET_KEYS[@]}"; do
+    if python3 - "${SCRIPT_DIR}/../products.json" "${INPUT_TYPE}" "${direct_key}" <<'PY'
+import json
+import sys
+
+products = json.load(open(sys.argv[1], encoding="utf-8"))
+input_type, field = sys.argv[2], sys.argv[3]
+for entry in products.values():
+    if entry.get("input_type") == input_type:
+        raise SystemExit(0 if field in set(entry.get("secret_fields") or []) else 1)
+raise SystemExit(1)
+PY
+    then
+        log "ERROR: Secret field '${direct_key}' must use --secret-file, not --set."
+        exit 1
+    fi
+done
+if [[ "${DISABLED_FLAG}" != "1" ]]; then
+    ensure_required_fields
+    python3 - "${SCRIPT_DIR}/../products.json" "${INPUT_TYPE}" "${#PARAM_KEYS[@]}" "${#SECRET_FILE_KEYS[@]}" \
+        "${PARAM_KEYS[@]}" "${PARAM_VALUES[@]}" "${SECRET_FILE_KEYS[@]}" <<'PY'
+import json
+import sys
+
+products = json.load(open(sys.argv[1], encoding="utf-8"))
+input_type = sys.argv[2]
+field_count = int(sys.argv[3])
+secret_count = int(sys.argv[4])
+args = sys.argv[5:]
+keys = args[:field_count]
+values = args[field_count : field_count * 2]
+secret_keys = set(args[field_count * 2 : field_count * 2 + secret_count])
+params = dict(zip(keys, values))
+entry = next((item for item in products.values() if item.get("input_type") == input_type), None)
+if entry is None:
+    raise SystemExit(0)
+errors = []
+for key in entry.get("required_secret_fields") or []:
+    if key not in secret_keys:
+        errors.append(f"missing required --secret-file {key} PATH")
+for rule in entry.get("conditional_required_secret_fields") or []:
+    field = str(rule.get("field") or "")
+    expected = str(rule.get("value") or "")
+    if str(params.get(field, "")).strip().lower() == expected.strip().lower():
+        for key in rule.get("secret_keys") or []:
+            if key not in secret_keys:
+                errors.append(f"field '{field}={params.get(field)}' requires --secret-file {key} PATH")
+if errors:
+    for message in errors:
+        print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+fi
 
 ensure_session
 if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then

@@ -65,9 +65,20 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage; exit 1 ;;
     esac
 done
+validate_splunk_index_name "${EVENT_INDEX}" || exit 1
+validate_splunk_index_name "${ESXI_INDEX}" || exit 1
+validate_splunk_index_name "${METRICS_INDEX}" || exit 1
 
 if [[ "${RENDER}" == "false" && "${#INSTALL_PACKAGES[@]}" -eq 0 ]]; then
     RENDER=true
+fi
+if [[ "${JSON_OUTPUT}" == "true" && "${#INSTALL_PACKAGES[@]}" -gt 0 ]]; then
+    echo "ERROR: --json cannot be combined with --install-package." >&2
+    exit 1
+fi
+if [[ "${#INSTALL_PACKAGES[@]}" -gt 0 ]]; then
+    require_current_skill_role_supported
+    require_splunk_management_target_role
 fi
 
 for package in "${INSTALL_PACKAGES[@]}"; do

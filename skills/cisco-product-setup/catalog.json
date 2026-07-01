@@ -4162,7 +4162,8 @@
         "index",
         "interval",
         "name",
-        "port"
+        "port",
+        "sourcetype"
       ],
       "addon": "CiscoSecurityCloud",
       "addon_label": "Cisco Security Cloud",
@@ -4214,7 +4215,8 @@
       "optional_non_secret_keys": [
         "index",
         "interval",
-        "port"
+        "port",
+        "sourcetype"
       ],
       "prereq_apps": [],
       "prereq_labels": [],
@@ -4226,7 +4228,8 @@
         "defaults": {
           "index": "cisco_isovalent",
           "interval": "300",
-          "port": "8088"
+          "port": "8088",
+          "sourcetype": "cisco:isovalent"
         },
         "product_key": "isovalent"
       },
@@ -4272,7 +4275,8 @@
         "index",
         "interval",
         "name",
-        "port"
+        "port",
+        "sourcetype"
       ],
       "addon": "CiscoSecurityCloud",
       "addon_label": "Cisco Security Cloud",
@@ -4319,7 +4323,8 @@
       "optional_non_secret_keys": [
         "index",
         "interval",
-        "port"
+        "port",
+        "sourcetype"
       ],
       "prereq_apps": [],
       "prereq_labels": [],
@@ -4331,7 +4336,8 @@
         "defaults": {
           "index": "cisco_isovalent",
           "interval": "300",
-          "port": "8088"
+          "port": "8088",
+          "sourcetype": "cisco:isovalent:edge_processor"
         },
         "product_key": "isovalent_edge_processor"
       },
@@ -7760,6 +7766,7 @@
       "accepted_non_secret_keys": [
         "account",
         "account_group",
+        "alert_rules",
         "hec_token",
         "index",
         "input_type",
@@ -7835,6 +7842,7 @@
       "notes": "",
       "optional_non_secret_keys": [
         "account",
+        "alert_rules",
         "index",
         "input_type",
         "hec_token",

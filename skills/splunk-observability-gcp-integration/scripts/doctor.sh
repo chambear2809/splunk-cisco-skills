@@ -14,11 +14,12 @@ fi
 
 OUTPUT_DIR=""
 REALM="${SPLUNK_O11Y_REALM:-}"
+WIF_CONFIG_FILE=""
 JSON_OUTPUT=false
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") --output-dir PATH [--realm REALM] [--json]
+Usage: $(basename "$0") --output-dir PATH [--realm REALM] [--wif-config-file PATH] [--json]
 EOF
     exit "${1:-0}"
 }
@@ -27,6 +28,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --output-dir) OUTPUT_DIR="$2"; shift ;;
         --realm) REALM="$2"; shift ;;
+        --wif-config-file) WIF_CONFIG_FILE="$2"; shift ;;
         --json) JSON_OUTPUT=true ;;
         -h|--help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
@@ -51,22 +53,76 @@ infos=()
 
 # 1. rest/create.json exists and has expected shape.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    "${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/create.json" <<'PY'
+    if "${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/create.json" <<'PY'
 import json, sys
 data = json.loads(open(sys.argv[1]).read())
 assert data.get('type') == 'GCP', 'type must be GCP'
 poll_rate = data.get('pollRate', 0)
 assert 60000 <= poll_rate <= 600000, f'pollRate {poll_rate} outside 60000-600000 ms'
-assert 'authMethod' in data, 'authMethod missing'
+auth = data.get('authMethod')
+assert auth in ('SERVICE_ACCOUNT_KEY', 'WORKLOAD_IDENTITY_FEDERATION'), 'invalid authMethod'
+projects = data.get('projects')
+assert isinstance(projects, dict), 'projects must be an object'
+assert projects.get('syncMode') in ('ALL', 'SELECTED'), 'projects.syncMode missing or invalid'
+project_ids = projects.get('projectIds', [])
+assert isinstance(project_ids, list) and all(isinstance(item, str) and item for item in project_ids), 'projects.projectIds must be a string list'
+if projects['syncMode'] == 'ALL':
+    assert not project_ids, 'projects.projectIds must be empty for ALL'
+else:
+    assert project_ids, 'projects.projectIds is required for SELECTED'
+if auth == 'WORKLOAD_IDENTITY_FEDERATION':
+    value = data.get('workloadIdentityFederationConfig')
+    assert isinstance(value, str) and value, 'workloadIdentityFederationConfig missing'
+    assert 'workloadIdentityPoolId' not in data, 'legacy workloadIdentityPoolId is invalid'
+    assert 'workloadIdentityProviderId' not in data, 'legacy workloadIdentityProviderId is invalid'
 PY
-    # shellcheck disable=SC2181
-    if [[ $? -eq 0 ]]; then
-        infos+=("rest/create.json: type=GCP, pollRate in range, authMethod present")
+    then
+        infos+=("rest/create.json: type=GCP, pollRate, authMethod, and projects.syncMode are valid")
     else
-        fails+=("rest/create.json: shape validation failed (type, pollRate, authMethod)")
+        fails+=("rest/create.json: shape validation failed (type, pollRate, authMethod, projects.syncMode, or WIF contract)")
     fi
 else
     fails+=("rest/create.json not found — run --render first")
+fi
+
+# WIF uses only Splunk's official generated configuration document. Validate
+# the referenced file without copying its contents into the rendered tree.
+auth_method=""
+if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
+    auth_method="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/create.json" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("authMethod", ""))
+PY
+)"
+fi
+if [[ "${auth_method}" == "WORKLOAD_IDENTITY_FEDERATION" ]]; then
+    if [[ -z "${WIF_CONFIG_FILE}" && -f "${OUTPUT_DIR}/rest/wif-config-file-manifest.json" ]]; then
+        WIF_CONFIG_FILE="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/wif-config-file-manifest.json" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("configFile", ""))
+PY
+)"
+    fi
+    if "${PYTHON_BIN}" - "${WIF_CONFIG_FILE}" <<'PY'
+import json
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]) if sys.argv[1] else None
+assert path is not None, "WIF config path missing"
+metadata = path.lstat()
+assert path.name == "gcp_wif_config.json", "WIF config filename must be gcp_wif_config.json"
+assert stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode), "WIF config must be a regular non-symlink file"
+assert stat.S_IMODE(metadata.st_mode) == 0o600, "WIF config must have mode 600"
+payload = json.loads(path.read_text(encoding="utf-8"))
+assert isinstance(payload, dict) and payload, "WIF config must be a non-empty JSON object"
+PY
+    then
+        infos+=("gcp_wif_config.json: official file reference is present, valid JSON, and mode 600")
+    else
+        fails+=("gcp_wif_config.json: missing, corrupt, insecure, renamed, or not a regular file")
+    fi
 fi
 
 # 2. Poll rate check.
@@ -122,12 +178,13 @@ if [[ -f "${OUTPUT_DIR}/state/credential-hashes.json" ]]; then
 import json
 h = json.loads(open('${OUTPUT_DIR}/state/credential-hashes.json').read())
 pks = h.get('project_key_sha256', {})
-print(len(pks))
+wif = h.get('wif_config_sha256', {})
+print(len(pks) + len(wif))
 " 2>/dev/null || echo "0")"
     if [[ "${hash_count}" == "0" ]]; then
-        warns+=("state/credential-hashes.json has no stored key hashes. Apply has not been run yet, or hashes were not recorded.")
+        warns+=("state/credential-hashes.json has no stored credential hashes. Apply has not been run yet, or hashes were not recorded.")
     else
-        infos+=("state/credential-hashes.json: ${hash_count} key hash(es) recorded from last apply")
+        infos+=("state/credential-hashes.json: ${hash_count} credential hash(es) recorded from last apply")
     fi
 fi
 
@@ -157,7 +214,7 @@ Generated at $(date -u +"%Y-%m-%dT%H:%M:%SZ") — realm: ${REALM}
 | Services empty (explicit mode) | No services listed | Add services or set services.mode=all_built_in |
 | namedToken changed | ForceNew: integration recreated | Expected; old integration stops flowing data immediately |
 | Rate limited | Poll rate too fast | Increase poll_rate_seconds (300+ recommended) |
-| WIF auth failure | Wrong principal or pool/provider | Check wif-splunk-principals.json for realm; verify pool/provider IDs |
+| WIF auth failure | Missing, modified, malformed, or stale generated config | Download a fresh official gcp_wif_config.json from Splunk; store it unchanged with mode 600 and re-apply |
 | useMetricSourceProjectForQuota 403 | Missing roles/serviceusage.serviceUsageConsumer | Add the role or set flag to false |
 | Custom metric not appearing | Not in customMetricTypeDomains | Add the metric type prefix |
 | 401 / token error | Token expired or wrong scope | Admin user API access token required (not org token) |

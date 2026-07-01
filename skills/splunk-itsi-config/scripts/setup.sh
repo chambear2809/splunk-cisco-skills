@@ -108,8 +108,11 @@ if [[ "${BACKUP_FORMAT}" != "json" && "${BACKUP_FORMAT}" != "yaml" ]]; then
   echo "Unsupported --backup-format: ${BACKUP_FORMAT}" >&2
   exit 1
 fi
+if [[ "${APPLY}" == true || "${MODE_OVERRIDE}" == "cleanup-apply" ]]; then
+  require_current_skill_role_supported
+fi
 
-load_splunk_connection_settings >/dev/null 2>&1 || true
+load_splunk_connection_settings
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
 fi
@@ -117,6 +120,7 @@ if [[ -n "${SPLUNK_PASS:-}" ]]; then
   SPLUNK_PASSWORD="${SPLUNK_PASS}"
 fi
 export SPLUNK_PLATFORM SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SESSION_KEY SPLUNK_USERNAME SPLUNK_PASSWORD SPLUNK_VERIFY_SSL
+export SPLUNK_SSH_HOST SPLUNK_SSH_PORT SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_SSH_KNOWN_HOSTS_FILE
 
 SPEC_JSON="$(mktemp)"
 trap 'rm -f "${SPEC_JSON}"' EXIT

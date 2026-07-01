@@ -5,6 +5,14 @@ description: Skill for previewing, applying, and validating native ITSI objects,
 
 # Splunk ITSI Config
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off an ITSI content pack
+or other registry-listed app, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable data inputs, objects, and shipped
+views, or record explicit evidence that no dashboards ship.
+
 This skill is rooted in `skills/splunk-itsi-config/` and supports these workflow paths:
 
 - Native ITSI automation for entities, services, KPIs, service dependencies, and custom NEAPs.
@@ -82,6 +90,14 @@ file/environment:
 - `connection.username_env` or `SPLUNK_USERNAME`
 - `connection.password_env` or `SPLUNK_PASSWORD`
 - `connection.verify_ssl` or `SPLUNK_VERIFY_SSL`
+- `connection.ca_cert_file` or `SPLUNK_CA_CERT` for a private CA bundle
+- `connection.allow_insecure_http: true` only for an explicitly accepted lab
+  endpoint that cannot serve HTTPS
+
+TLS verification defaults to `true` in every starter spec. For a private CA,
+set `SPLUNK_CA_CERT` to its CA bundle. Set `verify_ssl: false` only as an
+explicit, short-lived lab exception; never use it for production apply or
+completion evidence.
 
 Use a session key when possible. If you use username/password, keep the secret
 values in the credential file; the wrappers prefer Splunk REST credentials from

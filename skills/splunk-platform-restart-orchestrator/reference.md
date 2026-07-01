@@ -30,6 +30,14 @@
 | Deployment server config | `splunk reload deploy-server` |
 | Workload management pools/rules | Workload `_reload` endpoints |
 
+Only `acs`, `systemd-cli`, `cli`, and explicitly selected REST decisions are
+executable by this wrapper. `handoff*`, indexer-cluster delegation, SHC rolling
+restart, and an Enterprise `acs` selection fail closed with concrete operator
+commands. `--plan-restart` remains a successful planning-only command.
+After an Enterprise restart, requested `--expected-port` values must accept a
+TCP connection on the target host's loopback interface. Cloud expected-port
+checks require an external probe and are refused before ACS mutation.
+
 ## Partial Shutdown Detection
 
 Report a partial shutdown when the restart request was accepted but:

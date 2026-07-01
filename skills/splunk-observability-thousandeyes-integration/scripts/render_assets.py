@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -225,6 +226,22 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "item"
 
 
+def public_realm(realm: str) -> str:
+    """Translate the disambiguated GCP spec label to the public O11y realm."""
+    return "us2" if realm == "us2-gcp" else realm
+
+
+def require_unique_slugs(label: str, entries: list[dict[str, Any]]) -> None:
+    seen: dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        slug = entry["slug"]
+        if slug in seen:
+            raise SpecError(
+                f"{label}[{index}] collides with {label}[{seen[slug]}] after slugification: {slug!r}"
+            )
+        seen[slug] = index
+
+
 def load_spec(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
@@ -294,7 +311,13 @@ def stream_payload(spec: dict[str, Any], realm: str) -> dict[str, Any] | None:
     data_model_version = block.get("data_model_version", "v2")
     if data_model_version not in {"v1", "v2"}:
         raise SpecError(f"stream.data_model_version must be v1 or v2; got {data_model_version!r}")
-    endpoint_url = block.get("endpoint_url") or default_ingest_url(realm, endpoint_type)
+    canonical_endpoint_url = default_ingest_url(realm, endpoint_type)
+    endpoint_url = str(block.get("endpoint_url") or canonical_endpoint_url).strip()
+    if endpoint_url != canonical_endpoint_url:
+        raise SpecError(
+            "stream.endpoint_url must be the canonical Splunk Observability endpoint "
+            f"{canonical_endpoint_url!r}; refusing to send an ingest token to an override origin."
+        )
     custom_headers = {
         # Splunk ingest endpoint authenticates via X-SF-Token. The actual
         # token value is supplied at apply time from --o11y-ingest-token-file
@@ -316,9 +339,9 @@ def stream_payload(spec: dict[str, Any], realm: str) -> dict[str, Any] | None:
     test_types = filters_block.get("test_types") or []
     mode = (block.get("mode") or "").lower()
     selectors_used = sum(bool(x) for x in (test_match, test_types, mode == "all"))
-    if selectors_used == 0:
+    if selectors_used != 1:
         raise SpecError(
-            "stream selection is required: provide stream.test_match[] OR "
+            "choose exactly one stream selector: stream.test_match[] OR "
             "stream.filters.test_types[] OR stream.mode='all'."
         )
     if mode == "all":
@@ -351,13 +374,14 @@ def stream_payload(spec: dict[str, Any], realm: str) -> dict[str, Any] | None:
 
 
 def default_ingest_url(realm: str, endpoint_type: str) -> str:
+    realm = public_realm(realm)
     if endpoint_type == "http":
         return f"https://ingest.{realm}.signalfx.com/v2/datapoint/otlp"
     return f"https://ingest.{realm}.signalfx.com:443"
 
 
 def default_api_url(realm: str) -> str:
-    return f"https://api.{realm}.signalfx.com"
+    return f"https://api.{public_realm(realm)}.signalfx.com"
 
 
 def apm_connector_payload(spec: dict[str, Any], realm: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
@@ -366,13 +390,19 @@ def apm_connector_payload(spec: dict[str, Any], realm: str) -> tuple[dict[str, A
         return None
     name = block.get("connector_name", "Splunk Observability APM")
     op_name = block.get("operation_name", "Splunk Observability APM")
-    target_url = block.get("api_url") or default_api_url(realm)
+    canonical_target_url = default_api_url(realm)
+    target_url = str(block.get("api_url") or canonical_target_url).rstrip("/")
+    if target_url != canonical_target_url:
+        raise SpecError(
+            "apm_connector.api_url must be the canonical Splunk Observability endpoint "
+            f"{canonical_target_url!r}; refusing to send a User API token to an override origin."
+        )
     connector = {
         "type": "generic",
         "name": name,
         # The TE generic-connector model holds the URL on `target` and any
         # custom headers under `headers[]`.
-        "target": target_url.rstrip("/"),
+        "target": target_url,
         "headers": [{"name": "X-SF-Token", "value": "${O11Y_API_TOKEN}"}],
     }
     operation = {
@@ -734,6 +764,8 @@ def template_payloads(spec: dict[str, Any]) -> list[dict[str, Any]]:
         if not name:
             raise SpecError(f"templates[{index}].name is required.")
         body = {"name": name, "description": raw.get("description", "")}
+        if "template_body" not in raw or not isinstance(raw["template_body"], dict) or not raw["template_body"]:
+            raise SpecError(f"templates[{index}].template_body must be a non-empty mapping.")
         if "template_body" in raw:
             template_body = raw["template_body"]
             # Enforce Handlebars placeholders for credentials. We walk the
@@ -853,12 +885,24 @@ def render_apply_script(
     name: str,
     *,
     body: str,
+    account_group_id: str,
     requires_te_token: bool = False,
     requires_o11y_ingest: bool = False,
     requires_o11y_api: bool = False,
     requires_mutation_gate: bool = False,
 ) -> str:
-    head = ["#!/usr/bin/env bash", "set -euo pipefail", "", f"# {name}"]
+    head = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        f"# {name}",
+        'PYTHON_BIN="${PYTHON_BIN:-python3}"',
+        'TE_API_CLIENT="$(dirname "${BASH_SOURCE[0]}")/te-api-client.py"',
+        'TE_STATE_DIR="$(dirname "${BASH_SOURCE[0]}")/../state"',
+        f'TE_ACCOUNT_GROUP_ID="{account_group_id}"',
+        '[[ -f "${TE_API_CLIENT}" ]] || { echo "ERROR: rendered TE API client is missing: ${TE_API_CLIENT}" >&2; exit 2; }',
+        "",
+    ]
     if requires_mutation_gate:
         head.extend(
             [
@@ -872,23 +916,19 @@ def render_apply_script(
     if requires_te_token:
         head.extend(
             [
-                'if [[ -z "${TE_TOKEN_FILE:-}" || ! -r "${TE_TOKEN_FILE}" ]]; then',
-                "    echo \"ERROR: TE_TOKEN_FILE must point at a readable token file.\" >&2",
-                "    exit 1",
+                'if [[ -z "${TE_TOKEN_FILE:-}" ]]; then',
+                "    echo \"ERROR: TE_TOKEN_FILE must point at a mode-600 token file.\" >&2",
+                "    exit 2",
                 "fi",
-                'TE_CURL_CONFIG="$(mktemp)"',
-                'chmod 600 "${TE_CURL_CONFIG}"',
-                '{ printf \'header = "Authorization: Bearer \'; tr -d \'\\r\\n\' < "${TE_TOKEN_FILE}"; printf \'"\\n\'; } > "${TE_CURL_CONFIG}"',
-                'trap \'rm -f "${TE_CURL_CONFIG}"\' EXIT',
                 "",
             ]
         )
     if requires_o11y_ingest:
         head.extend(
             [
-                'if [[ -z "${O11Y_INGEST_TOKEN_FILE:-}" || ! -r "${O11Y_INGEST_TOKEN_FILE}" ]]; then',
-                "    echo \"ERROR: O11Y_INGEST_TOKEN_FILE must point at a readable token file.\" >&2",
-                "    exit 1",
+                'if [[ -z "${O11Y_INGEST_TOKEN_FILE:-}" ]]; then',
+                "    echo \"ERROR: O11Y_INGEST_TOKEN_FILE must point at a mode-600 token file.\" >&2",
+                "    exit 2",
                 "fi",
                 "",
             ]
@@ -896,9 +936,9 @@ def render_apply_script(
     if requires_o11y_api:
         head.extend(
             [
-                'if [[ -z "${O11Y_API_TOKEN_FILE:-}" || ! -r "${O11Y_API_TOKEN_FILE}" ]]; then',
-                "    echo \"ERROR: O11Y_API_TOKEN_FILE must point at a readable token file.\" >&2",
-                "    exit 1",
+                'if [[ -z "${O11Y_API_TOKEN_FILE:-}" ]]; then',
+                "    echo \"ERROR: O11Y_API_TOKEN_FILE must point at a mode-600 token file.\" >&2",
+                "    exit 2",
                 "fi",
                 "",
             ]
@@ -908,212 +948,150 @@ def render_apply_script(
 
 
 APPLY_STREAM_BODY = """\
-# Apply: POST /v7/streams (or PUT if --te-stream-id supplied).
-# Substitutes the X-SF-Token placeholder in stream.json with the live token.
-# The substituted payload carries the live Splunk ingest token, so it is written
-# to a chmod-600 temp file and sent with --data-binary @file (never on argv).
+# Apply one OpenTelemetry stream with identity/readback convergence.
 PAYLOAD_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/stream.json"
-# The substituted payload and the API response can both contain token-shaped
-# values, so they go in chmod-600 temp files that are removed on exit (never a
-# predictable world-readable /tmp path).
-SUBST_FILE="$(mktemp)"
-RESP_FILE="$(mktemp)"
-chmod 600 "${SUBST_FILE}" "${RESP_FILE}"
-trap 'rm -f "${TE_CURL_CONFIG}" "${SUBST_FILE}" "${RESP_FILE}"' EXIT
-python3 -c "import json,sys;
-data=json.load(open(sys.argv[1]));
-data['customHeaders']['X-SF-Token']=open(sys.argv[2]).read().strip();
-open(sys.argv[3],'w').write(json.dumps(data))" "${PAYLOAD_FILE}" "${O11Y_INGEST_TOKEN_FILE}" "${SUBST_FILE}"
+[[ -f "${PAYLOAD_FILE}" ]] || { echo "ERROR: stream was selected but ${PAYLOAD_FILE} is missing." >&2; exit 2; }
+COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
 if [[ -n "${TE_STREAM_ID:-}" ]]; then
-    METHOD=PUT
-    URL="https://api.thousandeyes.com/v7/streams/${TE_STREAM_ID}"
+    [[ "${TE_STREAM_ID}" =~ ^[A-Za-z0-9._~-]+$ ]] || { echo "ERROR: TE_STREAM_ID contains unsafe characters." >&2; exit 2; }
+    "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-put \\
+        --key stream --preflight-path streams --resource-path "streams/${TE_STREAM_ID}" \\
+        --payload-file "${PAYLOAD_FILE}" --require-existing \\
+        --verify-fields type,signal,endpointType,streamEndpointUrl,dataModelVersion,enabled \\
+        --secret-placeholder '${O11Y_INGEST_TOKEN}' --secret-file "${O11Y_INGEST_TOKEN_FILE}"
 else
-    METHOD=POST
-    URL="https://api.thousandeyes.com/v7/streams"
+    "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
+        --key stream --collection-path streams --create-path streams \\
+        --identity-fields '' --id-keys id,streamId \\
+        --payload-file "${PAYLOAD_FILE}" \\
+        --secret-placeholder '${O11Y_INGEST_TOKEN}' --secret-file "${O11Y_INGEST_TOKEN_FILE}"
 fi
-curl -sS -X "${METHOD}" "${URL}" \\
-    -K "${TE_CURL_CONFIG}" \\
-    -H "Content-Type: application/json" \\
-    --data-binary @"${SUBST_FILE}" \\
-    -o "${RESP_FILE}" -w '%{http_code}\\n'
 """
 
 APPLY_APM_CONNECTOR_BODY = """\
-# Apply: POST /v7/connectors/generic, then enable splunk-observability-apm operation.
+# Apply/adopt a generic connector, then converge the APM operation.
 CONNECTOR_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/connector.json"
 OPERATION_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/apm-operation.json"
-# The connector payload carries the live Splunk API token, so it is written to a
-# chmod-600 temp file and sent with --data-binary @file (never on argv).
-SUBST_CONNECTOR_FILE="$(mktemp)"
-# The connector POST response can echo back the X-SF-Token header value, so it is
-# captured into a chmod-600 temp file (not a predictable /tmp path) and parsed
-# from that file rather than passed on argv. The operation response file is held
-# the same way.
-CONNECTOR_RESPONSE_FILE="$(mktemp)"
-OPERATION_RESPONSE_FILE="$(mktemp)"
-chmod 600 "${SUBST_CONNECTOR_FILE}" "${CONNECTOR_RESPONSE_FILE}" "${OPERATION_RESPONSE_FILE}"
-trap 'rm -f "${TE_CURL_CONFIG}" "${SUBST_CONNECTOR_FILE}" "${CONNECTOR_RESPONSE_FILE}" "${OPERATION_RESPONSE_FILE}"' EXIT
-python3 -c "import json,sys;
-data=json.load(open(sys.argv[1]));
-for h in data.get('headers', []):
-    if h.get('name')=='X-SF-Token':
-        h['value']=open(sys.argv[2]).read().strip();
-open(sys.argv[3],'w').write(json.dumps(data))" "${CONNECTOR_FILE}" "${O11Y_API_TOKEN_FILE}" "${SUBST_CONNECTOR_FILE}"
-curl -sS -X POST 'https://api.thousandeyes.com/v7/connectors/generic' \\
-    -K "${TE_CURL_CONFIG}" \\
-    -H "Content-Type: application/json" \\
-    --data-binary @"${SUBST_CONNECTOR_FILE}" \\
-    -o "${CONNECTOR_RESPONSE_FILE}"
-CONNECTOR_ID="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('id',''))" "${CONNECTOR_RESPONSE_FILE}")"
-if [[ -z "${CONNECTOR_ID}" ]]; then
-    echo "ERROR: connector POST did not return an id." >&2
-    exit 1
-fi
-SUBST_OPERATION="$(python3 -c "import json,sys;
-data=json.load(open(sys.argv[1]));
-data['connectorId']=sys.argv[2];
-print(json.dumps(data))" "${OPERATION_FILE}" "${CONNECTOR_ID}")"
-curl -sS -X PUT "https://api.thousandeyes.com/v7/operations/splunk-observability-apm/${CONNECTOR_ID}" \\
-    -K "${TE_CURL_CONFIG}" \\
-    -H "Content-Type: application/json" \\
-    --data-binary "${SUBST_OPERATION}" \\
-    -o "${OPERATION_RESPONSE_FILE}" -w '%{http_code}\\n'
+[[ -f "${CONNECTOR_FILE}" && -f "${OPERATION_FILE}" ]] || { echo "ERROR: APM was selected but connector/operation payloads are missing." >&2; exit 2; }
+COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
+CONNECTOR_ID="$("${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
+    --key apm-connector --collection-path connectors/generic --create-path connectors/generic \\
+    --identity-fields '' --id-keys id,connectorId \\
+    --payload-file "${CONNECTOR_FILE}" \\
+    --secret-placeholder '${O11Y_API_TOKEN}' --secret-file "${O11Y_API_TOKEN_FILE}")"
+[[ "${CONNECTOR_ID}" =~ ^[A-Za-z0-9._~-]+$ ]] || { echo "ERROR: connector readback returned an unsafe or empty ID." >&2; exit 2; }
+"${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-put \\
+    --key apm-operation --preflight-path operations \\
+    --resource-path "operations/splunk-observability-apm/${CONNECTOR_ID}" \\
+    --payload-file "${OPERATION_FILE}" \\
+    --verify-fields type,name,enabled,connectorId \\
+    --value-placeholder '${TE_CONNECTOR_ID}' --value "${CONNECTOR_ID}"
 """
 
 APPLY_TESTS_BODY = """\
-# Apply: POST /v7/tests/{type} for each rendered test payload.
+# Apply each rendered test once and verify its testId in GET /v7/tests.
 PAYLOADS_DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/tests"
-if [[ ! -d "${PAYLOADS_DIR}" ]]; then
-    echo "No tests/ payloads directory; nothing to apply."
-    exit 0
-fi
 INDEX_FILE="${PAYLOADS_DIR}/_index.json"
-if [[ ! -f "${INDEX_FILE}" ]]; then
-    echo "ERROR: ${INDEX_FILE} missing; cannot resolve test types." >&2
-    exit 1
-fi
-python3 - "${INDEX_FILE}" <<'PY'
+[[ -f "${INDEX_FILE}" ]] || { echo "ERROR: tests were selected but ${INDEX_FILE} is missing." >&2; exit 2; }
+"${PYTHON_BIN}" - "${INDEX_FILE}" "${TE_API_CLIENT}" "${TE_TOKEN_FILE}" "${TE_ACCOUNT_GROUP_ID}" "${TE_STATE_DIR}" <<'PY'
 import json
 import os
 import subprocess
 import sys
 
-items = json.load(open(sys.argv[1], encoding="utf-8"))
+index_file, client, token_file, account_group_id, state_dir = sys.argv[1:]
+with open(index_file, encoding="utf-8") as handle:
+    items = json.load(handle)
+if not isinstance(items, list) or not items:
+    raise SystemExit("ERROR: tests were selected but the rendered index is empty")
 for item in items:
-    payload_file = os.path.join(os.path.dirname(sys.argv[1]), item["file"])
-    url = f"https://api.thousandeyes.com/v7/tests/{item['type']}"
+    payload_file = os.path.join(os.path.dirname(index_file), item["file"])
+    if not os.path.isfile(payload_file):
+        raise SystemExit(f"ERROR: rendered test payload is missing: {payload_file}")
     cmd = [
-        "curl",
-        "-sS",
-        "-X",
-        "POST",
-        url,
-        "-K",
-        os.environ["TE_CURL_CONFIG"],
-        "-H",
-        "Content-Type: application/json",
-        "--data-binary",
-        f"@{payload_file}",
-        "-o",
-        f"/tmp/te-test-{item['slug']}.json",
-        "-w",
-        "%{http_code}\\n",
+        sys.executable, client,
+        "--token-file", token_file,
+        "--account-group-id", account_group_id,
+        "--state-dir", state_dir,
+        "ensure-create",
+        "--key", f"test:{item['type']}:{item['slug']}",
+        "--collection-path", "tests",
+        "--create-path", f"tests/{item['type']}",
+        "--identity-fields", "",
+        "--id-keys", "testId,id",
+        "--payload-file", payload_file,
     ]
-    print(item["slug"], end=": ")
-    sys.stdout.flush()
     subprocess.run(cmd, check=True)
 PY
 """
 
 APPLY_ALERT_RULES_BODY = """\
-# Apply: POST /v7/alerts/rules for each rendered alert rule payload.
+# Apply each alert rule once and verify its ruleId in collection readback.
 PAYLOADS_DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/alert-rules"
-if [[ ! -d "${PAYLOADS_DIR}" ]]; then
-    echo "No alert-rules/ payloads directory; nothing to apply."
-    exit 0
-fi
-for payload in "${PAYLOADS_DIR}"/*.json; do
-    [[ -f "${payload}" ]] || continue
-    echo "$(basename "${payload}"): "
-    curl -sS -X POST 'https://api.thousandeyes.com/v7/alerts/rules' \\
-        -K "${TE_CURL_CONFIG}" \\
-        -H "Content-Type: application/json" \\
-        --data-binary @"${payload}" \\
-        -o "/tmp/te-alert-rule-$(basename "${payload}")" -w '%{http_code}\\n'
+shopt -s nullglob
+payloads=("${PAYLOADS_DIR}"/*.json)
+(( ${#payloads[@]} > 0 )) || { echo "ERROR: alert_rules was selected but no payloads were rendered." >&2; exit 2; }
+COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
+for payload in "${payloads[@]}"; do
+    slug="$(basename "${payload}" .json)"
+    "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
+        --key "alert-rule:${slug}" --collection-path alerts/rules --create-path alerts/rules \\
+        --identity-fields '' --id-keys ruleId,id --payload-file "${payload}"
 done
 """
 
 APPLY_LABELS_TAGS_BODY = """\
-# Apply: POST /v7/labels and /v7/tags.
-for kind in labels tags; do
-    DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/${kind}"
-    [[ -d "${DIR}" ]] || continue
-    for payload in "${DIR}"/*.json; do
-        [[ -f "${payload}" ]] || continue
-        echo "${kind}/$(basename "${payload}"): "
-        curl -sS -X POST "https://api.thousandeyes.com/v7/${kind}" \\
-            -K "${TE_CURL_CONFIG}" \\
-            -H "Content-Type: application/json" \\
-            --data-binary @"${payload}" \\
-            -o "/tmp/te-${kind}-$(basename "${payload}")" -w '%{http_code}\\n'
-    done
-done
+# The checked-in references do not establish label/tag ID and item-readback
+# schemas. Fail before mutation instead of issuing an unverifiable blind POST.
+case "${ASSET_KIND:-}" in labels|tags) ;; *) echo "ERROR: ASSET_KIND must be labels or tags." >&2; exit 2 ;; esac
+echo "ERROR: automated ${ASSET_KIND} apply is disabled until authoritative ID/readback schemas are encoded; no changes were made." >&2
+exit 2
 """
 
 APPLY_TE_DASHBOARDS_BODY = """\
-# Apply: POST /v7/dashboards.
-PAYLOADS_DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/te-dashboards"
-[[ -d "${PAYLOADS_DIR}" ]] || { echo "No te-dashboards/ payloads; nothing to apply."; exit 0; }
-for payload in "${PAYLOADS_DIR}"/*.json; do
-    [[ -f "${payload}" ]] || continue
-    echo "$(basename "${payload}"): "
-    curl -sS -X POST 'https://api.thousandeyes.com/v7/dashboards' \\
-        -K "${TE_CURL_CONFIG}" \\
-        -H "Content-Type: application/json" \\
-        --data-binary @"${payload}" \\
-        -o "/tmp/te-te-dashboard-$(basename "${payload}")" -w '%{http_code}\\n'
-done
+# The checked-in references do not establish dashboard ID and item-readback
+# schemas. Fail before mutation instead of reporting a blind POST as success.
+echo "ERROR: automated te_dashboards apply is disabled until authoritative ID/readback schemas are encoded; no changes were made." >&2
+exit 2
 """
 
 APPLY_TEMPLATE_BODY = """\
-# Apply: POST /v7/templates and (optionally) /v7/templates/{id}/deploy.
+# Create each template once by retained server ID; optionally deploy once.
 PAYLOADS_DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/templates"
-[[ -d "${PAYLOADS_DIR}" ]] || { echo "No templates/ payloads; nothing to apply."; exit 0; }
-for payload in "${PAYLOADS_DIR}"/*.json; do
-    [[ -f "${payload}" ]] || continue
-    echo "create $(basename "${payload}"): "
-    RESPONSE="$(curl -sS -X POST 'https://api.thousandeyes.com/v7/templates' \\
-        -K "${TE_CURL_CONFIG}" \\
-        -H "Content-Type: application/json" \\
-        --data-binary @"${payload}")"
-    TEMPLATE_ID="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('id',''))" "${RESPONSE}")"
-    if [[ -n "${TEMPLATE_ID:-}" && "${DEPLOY_TEMPLATES:-false}" == "true" ]]; then
-        echo "  deploy ${TEMPLATE_ID}: "
-        curl -sS -X POST "https://api.thousandeyes.com/v7/templates/${TEMPLATE_ID}/deploy" \\
-            -K "${TE_CURL_CONFIG}" \\
-            -H "Content-Type: application/json" \\
-            -d '{}' \\
-            -o "/tmp/te-template-deploy-${TEMPLATE_ID}.json" -w '%{http_code}\\n'
+shopt -s nullglob
+payloads=("${PAYLOADS_DIR}"/*.json)
+(( ${#payloads[@]} > 0 )) || { echo "ERROR: templates was selected but no payloads were rendered." >&2; exit 2; }
+COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
+for payload in "${payloads[@]}"; do
+    slug="$(basename "${payload}" .json)"
+    TEMPLATE_ID="$("${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
+        --key "template:${slug}" --collection-path templates --create-path templates \\
+        --identity-fields '' --id-keys id,templateId --payload-file "${payload}")"
+    [[ "${TEMPLATE_ID}" =~ ^[A-Za-z0-9._~-]+$ ]] || { echo "ERROR: template readback returned an unsafe or empty ID." >&2; exit 2; }
+    if [[ "${DEPLOY_TEMPLATES:-false}" == "true" ]]; then
+        "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" post-action \\
+            --key "template-deploy:${TEMPLATE_ID}" \\
+            --action-path "templates/${TEMPLATE_ID}/deploy" \\
+            --readback-path "templates/${TEMPLATE_ID}"
     fi
 done
 """
 
 
-def list_helper(name: str, description: str, url_path: str) -> str:
+def list_helper(name: str, description: str, url_path: str, account_group_id: str) -> str:
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n\n"
         f"# {description}\n"
-        'if [[ -z "${TE_TOKEN_FILE:-}" || ! -r "${TE_TOKEN_FILE}" ]]; then\n'
-        '    echo "ERROR: TE_TOKEN_FILE must point at a readable token file." >&2\n'
-        "    exit 1\n"
+        'if [[ -z "${TE_TOKEN_FILE:-}" ]]; then\n'
+        '    echo "ERROR: TE_TOKEN_FILE must point at a mode-600 token file." >&2\n'
+        "    exit 2\n"
         "fi\n"
-        'TE_CURL_CONFIG="$(mktemp)"\n'
-        'chmod 600 "${TE_CURL_CONFIG}"\n'
-        '{ printf \'header = "Authorization: Bearer \'; tr -d \'\\r\\n\' < "${TE_TOKEN_FILE}"; printf \'"\\n\'; } > "${TE_CURL_CONFIG}"\n'
-        'trap \'rm -f "${TE_CURL_CONFIG}"\' EXIT\n\n'
-        f'curl -sS -K "${{TE_CURL_CONFIG}}" "https://api.thousandeyes.com/v7/{url_path}" \\\n'
-        '    -H "Accept: application/json"\n'
+        'PYTHON_BIN="${PYTHON_BIN:-python3}"\n'
+        'TE_API_CLIENT="$(dirname "${BASH_SOURCE[0]}")/te-api-client.py"\n'
+        f'"${{PYTHON_BIN}}" "${{TE_API_CLIENT}}" --token-file "${{TE_TOKEN_FILE}}" '
+        f'--account-group-id "{account_group_id}" --state-dir "$(dirname "${{BASH_SOURCE[0]}}")/../state" '
+        f'get --path "{url_path}"\n'
     )
 
 
@@ -1121,28 +1099,44 @@ VALIDATE_SIGNALFLOW_BODY = """\
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Probe Splunk Observability Cloud for the per-test-type metrics we ship.
-# Uses a SignalFlow WebSocket-style query via curl + the v2/signalflow
-# endpoint (REST surface). For deeper validation, switch to a Node.js
-# WebSocket client (the network-streaming-app reference uses
-# wss://stream.<realm>.signalfx.com/v2/signalflow/connect; that pattern is
-# documented in references/signalflow-validation.md).
+# Read-only metric-catalog reachability probe. This does not compile or execute
+# the rendered SignalFlow programs; use the documented WebSocket handoff for that.
 REALM="${REALM:?REALM env var required}"
-if [[ -z "${O11Y_API_TOKEN_FILE:-}" || ! -r "${O11Y_API_TOKEN_FILE}" ]]; then
-    echo "ERROR: O11Y_API_TOKEN_FILE must point at a readable token file." >&2
-    exit 1
+[[ "${REALM}" == "us2-gcp" ]] && REALM="us2"
+case "${REALM}" in us0|us1|us2|eu0|eu1|eu2|au0|jp0|sg0) ;; *) echo "ERROR: unsupported REALM: ${REALM}" >&2; exit 2 ;; esac
+if [[ -z "${O11Y_API_TOKEN_FILE:-}" || -L "${O11Y_API_TOKEN_FILE}" || ! -f "${O11Y_API_TOKEN_FILE}" ]]; then
+    echo "ERROR: O11Y_API_TOKEN_FILE must point at a regular, non-symlink mode-600 token file." >&2
+    exit 2
 fi
+TOKEN_MODE="$(stat -f '%A' "${O11Y_API_TOKEN_FILE}" 2>/dev/null || stat -c '%a' "${O11Y_API_TOKEN_FILE}")"
+[[ "${TOKEN_MODE}" == "600" ]] || { echo "ERROR: O11Y_API_TOKEN_FILE must have mode 600 (found ${TOKEN_MODE})." >&2; exit 2; }
+python3 - "${O11Y_API_TOKEN_FILE}" <<'PY'
+from pathlib import Path
+import sys
+try:
+    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+except (OSError, UnicodeError):
+    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE is not readable UTF-8")
+if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE must contain exactly one non-empty line")
+PY
 O11Y_CURL_CONFIG="$(mktemp)"
-chmod 600 "${O11Y_CURL_CONFIG}"
+RESPONSE_FILE="$(mktemp)"
+chmod 600 "${O11Y_CURL_CONFIG}" "${RESPONSE_FILE}"
 { printf 'header = "X-SF-Token: '; tr -d '\\r\\n' < "${O11Y_API_TOKEN_FILE}"; printf '"\\n'; } > "${O11Y_CURL_CONFIG}"
-trap 'rm -f "${O11Y_CURL_CONFIG}"' EXIT
-SPECS_DIR="$(dirname "${BASH_SOURCE[0]}")/../dashboards"
-for spec in "${SPECS_DIR}"/*.signalflow.yaml; do
-    [[ -f "${spec}" ]] || continue
-    echo "Probing $(basename "${spec}") via api.${REALM}.signalfx.com ..."
-    curl -sS -K "${O11Y_CURL_CONFIG}" "https://api.${REALM}.signalfx.com/v2/metric?query=thousandeyes&limit=1" \\
-        -o /tmp/sfx-probe.json -w 'http=%{http_code}\\n' || true
-done
+trap 'rm -f "${O11Y_CURL_CONFIG}" "${RESPONSE_FILE}"' EXIT
+echo "Probing the ThousandEyes metric catalog via api.${REALM}.signalfx.com ..."
+curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \\
+    -K "${O11Y_CURL_CONFIG}" \\
+    "https://api.${REALM}.signalfx.com/v2/metric?query=thousandeyes&limit=1" \\
+    -o "${RESPONSE_FILE}"
+python3 - "${RESPONSE_FILE}" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    json.load(handle)
+print("Metric catalog endpoint returned valid JSON.")
+PY
 """
 
 
@@ -1203,11 +1197,23 @@ def main() -> int:
         tags = tag_payloads(spec)
         te_dashboards = te_dashboard_payloads(spec)
         templates = template_payloads(spec)
+        for label, entries in (
+            ("tests", tests),
+            ("alert_rules", alerts),
+            ("labels", labels),
+            ("tags", tags),
+            ("te_dashboards", te_dashboards),
+            ("templates", templates),
+        ):
+            require_unique_slugs(label, entries)
     except SpecError as exc:
         print(f"ERROR: {exc}", file=__import__("sys").stderr)
         return 1
 
     account_group_id = str(spec.get("account_group_id", "")).strip()
+    if account_group_id and not account_group_id.isdigit():
+        print("ERROR: account_group_id must contain digits only.", file=__import__("sys").stderr)
+        return 1
     test_types_for_handoff = collect_test_types_for_handoff(spec)
     detector_thresholds = (spec.get("detectors") or {}).get("thresholds") or {}
 
@@ -1238,6 +1244,15 @@ def main() -> int:
 
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    # These directories are fully renderer-owned. Clear them so removed spec
+    # entries cannot survive as stale payloads and be applied later. Preserve
+    # state/ separately for retained remote IDs and idempotent reruns.
+    for managed_name in ("te-payloads", "dashboards", "detectors", "scripts"):
+        managed = out / managed_name
+        if managed.is_symlink() or managed.is_file():
+            managed.unlink()
+        elif managed.is_dir():
+            shutil.rmtree(managed)
 
     if stream is not None:
         write_json(out / "te-payloads/stream.json", stream)
@@ -1280,44 +1295,54 @@ def main() -> int:
 
     write_text(
         out / "scripts/apply-stream.sh",
-        render_apply_script("apply-stream.sh", body=APPLY_STREAM_BODY, requires_te_token=True, requires_o11y_ingest=True),
+        render_apply_script("apply-stream.sh", body=APPLY_STREAM_BODY, account_group_id=account_group_id, requires_te_token=True, requires_o11y_ingest=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-apm-connector.sh",
-        render_apply_script("apply-apm-connector.sh", body=APPLY_APM_CONNECTOR_BODY, requires_te_token=True, requires_o11y_api=True),
+        render_apply_script("apply-apm-connector.sh", body=APPLY_APM_CONNECTOR_BODY, account_group_id=account_group_id, requires_te_token=True, requires_o11y_api=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-tests.sh",
-        render_apply_script("apply-tests.sh", body=APPLY_TESTS_BODY, requires_te_token=True, requires_mutation_gate=True),
+        render_apply_script("apply-tests.sh", body=APPLY_TESTS_BODY, account_group_id=account_group_id, requires_te_token=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-alert-rules.sh",
-        render_apply_script("apply-alert-rules.sh", body=APPLY_ALERT_RULES_BODY, requires_te_token=True, requires_mutation_gate=True),
+        render_apply_script("apply-alert-rules.sh", body=APPLY_ALERT_RULES_BODY, account_group_id=account_group_id, requires_te_token=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-labels-tags.sh",
-        render_apply_script("apply-labels-tags.sh", body=APPLY_LABELS_TAGS_BODY, requires_te_token=True, requires_mutation_gate=True),
+        render_apply_script("apply-labels-tags.sh", body=APPLY_LABELS_TAGS_BODY, account_group_id=account_group_id, requires_te_token=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-te-dashboards.sh",
-        render_apply_script("apply-te-dashboards.sh", body=APPLY_TE_DASHBOARDS_BODY, requires_te_token=True, requires_mutation_gate=True),
+        render_apply_script("apply-te-dashboards.sh", body=APPLY_TE_DASHBOARDS_BODY, account_group_id=account_group_id, requires_te_token=True, requires_mutation_gate=True),
         executable=True,
     )
     write_text(
         out / "scripts/apply-template.sh",
-        render_apply_script("apply-template.sh", body=APPLY_TEMPLATE_BODY, requires_te_token=True, requires_mutation_gate=True),
+        render_apply_script("apply-template.sh", body=APPLY_TEMPLATE_BODY, account_group_id=account_group_id, requires_te_token=True, requires_mutation_gate=True),
         executable=True,
     )
 
-    write_text(out / "scripts/list-account-groups.sh", list_helper("list-account-groups.sh", "List TE account groups.", "account-groups"), executable=True)
-    write_text(out / "scripts/list-agents.sh", list_helper("list-agents.sh", "List TE Cloud + Enterprise agents.", "agents"), executable=True)
-    write_text(out / "scripts/list-tests.sh", list_helper("list-tests.sh", "List TE tests.", "tests"), executable=True)
-    write_text(out / "scripts/list-templates.sh", list_helper("list-templates.sh", "List TE templates.", "templates"), executable=True)
+    helper_source = Path(__file__).with_name("te_api_client.py")
+    if not helper_source.is_file():
+        print(f"ERROR: TE API client helper is missing: {helper_source}", file=__import__("sys").stderr)
+        return 1
+    write_text(
+        out / "scripts/te-api-client.py",
+        helper_source.read_text(encoding="utf-8"),
+        executable=True,
+    )
+
+    write_text(out / "scripts/list-account-groups.sh", list_helper("list-account-groups.sh", "List TE account groups.", "account-groups", ""), executable=True)
+    write_text(out / "scripts/list-agents.sh", list_helper("list-agents.sh", "List TE Cloud + Enterprise agents.", "agents", account_group_id), executable=True)
+    write_text(out / "scripts/list-tests.sh", list_helper("list-tests.sh", "List TE tests.", "tests", account_group_id), executable=True)
+    write_text(out / "scripts/list-templates.sh", list_helper("list-templates.sh", "List TE templates.", "templates", account_group_id), executable=True)
     write_text(out / "scripts/validate-signalflow.sh", VALIDATE_SIGNALFLOW_BODY, executable=True)
 
     handoffs = spec.get("handoffs") or {}

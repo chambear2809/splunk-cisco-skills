@@ -2,7 +2,14 @@
 
 This skill exists for discoverability and focused SLO intake. It delegates
 public API validation and apply planning to
-`splunk-observability-deep-native-workflows`.
+`splunk-observability-deep-native-workflows`. The generated delegate accepts
+`--render` or `--apply`; pass `--dry-run` to preview actions and `--token-file`
+for a live apply.
+
+The focused wrapper can construct a complete request-based SLO payload from an
+APM service and environment. Endpoint, custom-metric, and Synthetics SLI modes
+remain explicit completion handoffs because their SignalFlow inputs need
+additional source-specific fields.
 
 ## Required SLO Decisions
 

@@ -1,8 +1,8 @@
 ---
 name: splunk-fraud-analytics-setup
 description: >-
-  Render and validate Splunk App for Fraud Analytics readiness, including ES
-  dependency checks, Lookup File Editing prerequisite, fraud use-case intake,
+  Render, install, and validate Splunk App for Fraud Analytics readiness,
+  including ES dependency checks, Lookup File Editing prerequisite, fraud use-case intake,
   risk index and RBA prerequisites, correlation-search review, data-model
   prerequisites, package handoff, and validation SPL. Use when the user asks to
   install, plan, configure, or validate Splunk Fraud Analytics.
@@ -12,8 +12,9 @@ description: >-
 
 Render-first workflow for Splunk App for Fraud Analytics. It emits prerequisite
 checks, use-case intake, ES/RBA and lookup-editor handoffs, correlation-search
-review, data-model validation SPL, and readiness evidence. It does not install
-the package or enable detections.
+review, data-model validation SPL, and readiness evidence. Its explicit
+`--install` and `--all` modes install an operator-supplied local package; it
+does not enable detections or mutate ES/RBA and lookup content.
 
 ## Workflow
 

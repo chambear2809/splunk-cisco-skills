@@ -1,7 +1,7 @@
 ---
 name: splunk-appdynamics-controller-admin-setup
 description: >-
-  Render, validate, and optionally apply API-backed Splunk AppDynamics
+  Render and validate Splunk AppDynamics
   Controller administration workflows, including SaaS and on-prem account
   checks, API clients, OAuth token-file flow, users, groups, roles, SAML, LDAP,
   account permissions, licensing, license rules, sensitive data collection
@@ -14,8 +14,10 @@ description: >-
 
 # Splunk AppDynamics Controller Admin Setup
 
-Controller administration uses documented APIs where available and renders
-runbooks for IdP-side, tenant-side, or UI-only operations.
+Controller administration renders documented API/UI runbooks and read-only
+probes. This wrapper does not mutate users, groups, roles, API clients, license
+rules, identity providers, or privacy controls; `--apply` fails closed. The
+license-usage reporter is the concrete read-only action path.
 
 ```bash
 bash skills/splunk-appdynamics-controller-admin-setup/scripts/setup.sh --render

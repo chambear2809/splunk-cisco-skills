@@ -204,11 +204,12 @@ apply_live() {
     fi
 
     if [[ "${RULE_TYPE}" == "route-s3" ]]; then
-        log "RFS S3 destination is configured. Create the 'Route to Destination' rule for"
+        log "RFS S3 destination is configured, but the ruleset was not applied. Create the 'Route to Destination' rule for"
         log "source type ${RULESET_SOURCETYPE} in Splunk Web (Settings > Data > Ingest Actions)"
         log "or via /services/data/ingest/rulesets, selecting destination ${S3_DESTINATION_NAME}."
         log "$(log_platform_restart_guidance "Ingest Actions destination changes")"
-        return 0
+        log "ERROR: route-s3 ruleset apply has no verified live transport in this workflow; refusing partial success."
+        return 2
     fi
 
     local stanza tbody

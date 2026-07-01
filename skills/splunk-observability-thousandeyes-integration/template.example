@@ -25,9 +25,8 @@ stream:
   signal: metric                  # metric (default) | trace | log
   endpoint_type: http             # http (default; OTLP/HTTP protobuf) | grpc
   data_model_version: v2          # v1 | v2 (default)
-  # Override the auto-derived ingest URL. Leave blank to use the canonical
-  # https://ingest.<realm>.signalfx.com/v2/datapoint/otlp form for HTTP, or
-  # https://ingest.<realm>.signalfx.com:443 for grpc.
+  # Reserved for the exact auto-derived canonical URL. Non-canonical origins
+  # are rejected so an O11y ingest token cannot be sent elsewhere.
   endpoint_url: ""
   # Test selection. Use exactly one of the three modes below.
   test_match: []                  # list of {id: "<int>", domain: cea|endpoint}
@@ -42,15 +41,16 @@ apm_connector:
   enabled: true
   connector_name: "Splunk Observability APM"
   operation_name: "Splunk Observability APM"
-  # Override the auto-derived API URL. Leave blank to use the canonical
-  # https://api.<realm>.signalfx.com form.
+  # Reserved for the exact auto-derived canonical URL. Non-canonical origins
+  # are rejected so an O11y User API token cannot be sent elsewhere.
   api_url: ""
 
-# --- TE asset lifecycle (optional) ----------------------------------------
-# Each block below is independently render-and-apply-able. Apply gates
-# behind --i-accept-te-mutations.
+# --- TE assets (optional) -------------------------------------------------
+# Tests, alert rules, and templates have guarded create/readback apply flows.
+# Labels, tags, and TE dashboards render for handoff but fail closed on apply.
+# Every live apply is gated by --i-accept-te-mutations.
 
-# Tests to create or update via POST /v7/tests/{type}.
+# Tests to create once via POST /v7/tests/{type}, with retained-ID readback.
 tests: []
 # Each entry shape:
 #   - type: http-server            # one of the canonical TE test types
@@ -62,24 +62,24 @@ tests: []
 #     agents: []                    # list of agent IDs (use list-agents.sh)
 #     alert_rules: []               # list of alert rule IDs
 
-# Alert rules to create or update via POST /v7/alerts/rules.
+# Alert rules to create once via POST /v7/alerts/rules, with retained-ID readback.
 alert_rules: []
 # Each entry shape:
 #   - name: "agent-to-server latency p95"
 #     test_type: agent-to-server
-#     severity: Warning             # Info | Warning | Major | Critical
-#     direction: increase           # increase | decrease
-#     threshold: 200                # value
-#     window_seconds: 120
+#     expression: "((avgLatency > 200 ms))"
+#     severity: major               # info | minor | major | critical | unknown
 #     min_sources: 1
-#     notifications: []             # list of notification objects
+#     rounds_violating_required: 3
+#     rounds_violating_out_of: 5
+#     notifications: {}             # TE v7 notification object
 
-# Labels and tags for organizing TE tests.
+# Labels and tags for organizing TE tests (render-only API handoff).
 labels: []                          # [{ name: "checkout", color: "#0066cc" }]
 tags: []                            # [{ name: "tier:1" }]
 
-# TE-side dashboards (POST /v7/dashboards). Distinct from Splunk O11y
-# dashboards (those are handed off to splunk-observability-dashboard-builder).
+# TE-side dashboard payload handoff (automated apply is disabled). Distinct
+# from Splunk O11y dashboards, which are handed to the dashboard-builder skill.
 te_dashboards: []                   # [{ name, description, widgets: [...] }]
 
 # TE Templates. Credentials in template_body MUST be Handlebars placeholders;

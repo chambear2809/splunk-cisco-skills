@@ -1,8 +1,8 @@
 # Error Catalog and Doctor Matrix
 
-Every check the `--doctor` mode runs, with severity (FAIL / WARN / INFO)
-and the exact remediation command the skill renders. Operators see a
-prioritized fix list — no raw API errors.
+Static review catalog rendered by `--doctor`, with severity (FAIL / WARN /
+INFO) and remediation or handoff. These rows are not evidence that live state
+was queried; use the explicitly implemented readbacks for live evidence.
 
 ## Doctor Matrix
 
@@ -13,18 +13,18 @@ prioritized fix list — no raw API errors.
 | 3   | `edit_tokens_settings` capability present                                                            | FAIL        | `setup.sh --enable-token-auth`                                                                                            |
 | 4   | Token authentication enabled (`disabled=false`)                                                      | FAIL        | `setup.sh --enable-token-auth`                                                                                            |
 | 5   | Realm <-> region match (using fixed AWS region map)                                                  | FAIL / WARN | "Cross-region pairing requires Splunk Account team — see `<rendered>/support-tickets/cross-region-pairing.md`"            |
-| 6   | FedRAMP / GovCloud / GCP gating for UID                                                              | FAIL        | "UID not supported in this region — use Service Account pairing; `setup.sh --apply pairing --pairing.mode service_account`" |
+| 6   | FedRAMP / GovCloud / GCP gating for UID                                                              | FAIL        | Set `pairing.mode: service_account` in the reviewed spec, then run `setup.sh --apply pairing --spec <path> --token-file <path>` |
 | 7   | Pairing exists for target realm                                                                      | INFO        | (no fix needed; idempotency handles re-apply)                                                                             |
-| 8   | Pairing status is `SUCCESS` (poll `GET .../sso-pairing/{id}`)                                        | FAIL        | `setup.sh --apply pairing --resume`                                                                                       |
-| 9   | `o11y_access` custom role exists and is assigned                                                     | FAIL        | `setup.sh --apply centralized_rbac`                                                                                       |
-| 10  | All UID-mapped users have an `o11y_*` role (precondition for `enable-centralized-rbac`)              | FAIL        | "Assign `o11y_*` role to: user1, user2 ... before `--i-accept-rbac-cutover`"                                              |
-| 11  | `read_o11y_content` / `write_o11y_content` capabilities assigned to required roles                   | WARN        | `setup.sh --apply related_content`                                                                                        |
+| 8   | Pairing status is `SUCCESS` (poll `GET .../sso-pairing/{id}`)                                        | FAIL        | Re-run `setup.sh --apply pairing` with the same reviewed spec and file-backed credentials                                 |
+| 9   | `o11y_access` custom role exists and is assigned                                                     | FAIL        | Apply role creation, then complete the rendered downstream role-assignment handoff                                        |
+| 10  | All UID-mapped users have an `o11y_*` role (precondition for `enable-centralized-rbac`)              | FAIL        | Assign an `o11y_*` role to every listed user before the approved-admin cutover handoff                                    |
+| 11  | `read_o11y_content` / `write_o11y_content` capabilities assigned to required roles                   | WARN        | Review `05-related-content.md`; safe role-capability merge is an operator handoff                                         |
 | 12  | Discover Splunk Observability Cloud app installed and accessible                                     | FAIL        | "Splunk Cloud upgrade required: 10.1.2507+" or "Open Apps > Manage Apps" deeplink                                         |
-| 13  | LOC realm IPs present in `search-api` allowlist                                                      | FAIL        | `setup.sh --apply log_observer_connect` (delegates to `splunk-cloud-acs-admin-setup`)                                 |
+| 13  | LOC realm IPs present in `search-api` allowlist                                                      | FAIL        | Run the rendered `apply-acs-allowlist-loc.sh` handoff after review                                                        |
 | 14  | LOC service-account user + role + workload rule exist                                                | FAIL        | `setup.sh --apply log_observer_connect`                                                                                   |
 | 15  | `Splunk_TA_sim` (Splunkbase 5247) installed on search heads                                          | FAIL        | `setup.sh --apply sim_addon`                                                                                              |
-| 16  | SIM Add-on account exists, default flag set, `Check Connection` passes                               | FAIL / WARN | `setup.sh --apply sim_addon`                                                                                              |
-| 17  | Splunk Cloud Victoria-stack search-head HEC allowlist contains the search-head IP                    | FAIL        | `setup.sh --apply sim_addon` (delegates to `splunk-cloud-acs-admin-setup --features hec`)                             |
+| 16  | SIM Add-on account fields converge and `Check Connection` passes                                     | FAIL / WARN | `setup.sh --apply sim_addon`                                                                                              |
+| 17  | Splunk Cloud Victoria-stack search-head HEC allowlist contains the search-head IP                    | FAIL        | Run the rendered `apply-acs-allowlist-hec.sh` handoff after review                                                        |
 | 18  | SIM modular inputs are running, no `ANALYTICS_JOB_MTS_LIMIT_HIT` errors, MTS-per-input under 250,000 | FAIL / WARN | "Reduce SignalFlow scope or split modular input — see `<rendered>/sim-addon/mts-sizing.md`"                               |
 | 19  | Multi-org default-org set in Discover app Configurations                                             | INFO        | "Open Discover app Configurations > 3-dot menu > Make Default — see `<rendered>/04-discover-app.md`"                      |
 | 20  | `uBlock Origin` browser extension warning surface (informational)                                    | INFO        | docs link                                                                                                                 |

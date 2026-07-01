@@ -78,12 +78,17 @@ bash skills/splunk-search-head-cluster-setup/scripts/setup.sh \
   --admin-password-file /tmp/splunk_admin_password
 ```
 
+Bundle CLI helpers require a pre-existing local `splunk login` session for the
+Splunk OS user on the deployer. They never expand an admin password into
+`-auth`.
+
 Searchable rolling restart with health-check loop:
 
 ```bash
 bash skills/splunk-search-head-cluster-setup/scripts/setup.sh \
   --phase rolling-restart \
   --rolling-restart-mode searchable \
+  --captain-uri https://sh01.example.com:8089 \
   --deployer-host deployer01.example.com \
   --admin-password-file /tmp/splunk_admin_password
 ```
@@ -115,7 +120,7 @@ Decommission a member from the SHC:
 bash skills/splunk-search-head-cluster-setup/scripts/setup.sh \
   --phase decommission-member \
   --captain-uri https://sh01.example.com:8089 \
-  --member-host sh04.example.com \
+  --member-guid '<guid-from-shcluster-members>' \
   --admin-password-file /tmp/splunk_admin_password
 ```
 
@@ -176,7 +181,7 @@ Under `splunk-search-head-cluster-rendered/shc/`:
 |-------|---------|
 | `render` | Produce all config and script assets; no live changes. |
 | `preflight` | Check quorum math, version skew, deployer reachability. |
-| `bootstrap` | Run `bootstrap/sequenced-bootstrap.sh` on all hosts. |
+| `bootstrap` | Fail-closed CLI handoff for member initialization and captain bootstrap; secrets are never placed in CLI/SSH argv. |
 | `bundle-validate` | `splunk validate shcluster-bundle` on deployer. |
 | `bundle-status` | Show per-member bundle generation and SHA. |
 | `bundle-apply` | Validate then `apply shcluster-bundle`; rolling by default. |
@@ -184,7 +189,7 @@ Under `splunk-search-head-cluster-rendered/shc/`:
 | `bundle-rollback` | Restore previous bundle from `$SPLUNK_HOME/etc/shcluster-deploy-apps/`. |
 | `rolling-restart` | Restart members one at a time while maintaining search capability. |
 | `transfer-captain` | `splunk transfer shcluster-captain -mgmt_uri <target>` (CLI; no REST endpoint exists). |
-| `add-member` | Non-disruptive join with quorum preflight. |
+| `add-member` | Fail-closed CLI handoff for a non-disruptive join; the admin password and pass4SymmKey remain interactive/file-managed. |
 | `decommission-member` | Graceful decommission → `GracefulShutdown`. |
 | `remove-member` | Administrative removal after decommission. |
 | `kvstore-status` | `splunk show kvstore-status` + lag assessment on all members. |

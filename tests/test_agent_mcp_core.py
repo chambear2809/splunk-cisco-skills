@@ -78,6 +78,7 @@ class AgentMCPCoreTests(unittest.TestCase):
             set_values={
                 "account_group": "Default",
                 "hec_token": "custom_token_name",
+                "alert_rules": "12345",
             },
         )
 

@@ -235,7 +235,7 @@ def render_preflight(args: argparse.Namespace) -> str:
         return make_script(
             f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
-"${{splunk_home}}/bin/splunk" btool inputs list http --debug >/dev/null || true
+"${{splunk_home}}/bin/splunk" btool inputs list http --debug >/dev/null
 """
         )
     return make_script(
@@ -255,8 +255,20 @@ def render_enterprise_apply(args: argparse.Namespace, token_path: str) -> str:
     splunk_home = shell_quote(args.splunk_home)
     app_name = shell_quote(args.app_name)
     token_file = shell_quote(token_path)
+    restart_orchestrator = shell_quote(
+        Path(__file__).resolve().parents[2]
+        / "splunk-platform-restart-orchestrator/scripts/setup.sh"
+    )
     restart_block = (
-        '"${splunk_home}/bin/splunk" restart\n'
+        f'''restart_orchestrator={restart_orchestrator}
+if [[ ! -x "${{restart_orchestrator}}" ]]; then
+  echo "ERROR: HEC config was written, but the topology-aware restart orchestrator is unavailable." >&2
+  echo "HANDOFF: Restart through the target topology's supported path, then run status-enterprise.sh." >&2
+  exit 1
+fi
+export SPLUNK_HOME="${{splunk_home}}"
+bash "${{restart_orchestrator}}" --restart --accept-restart --operation "HEC inputs.conf activation"
+'''
         if bool_value(args.restart_splunk)
         else 'echo "Splunk restart skipped. Restart is normally required for HEC inputs.conf changes."\n'
     )
@@ -264,31 +276,52 @@ def render_enterprise_apply(args: argparse.Namespace, token_path: str) -> str:
         f"""splunk_home={splunk_home}
 app_name={app_name}
 token_file={token_file}
+target_role="${{SPLUNK_TARGET_ROLE:-standalone}}"
 
+case "${{target_role}}" in
+  indexer|indexer-peer|cluster-manager|deployer|shc-deployer|shc-member)
+    echo "ERROR: Direct HEC file apply is not safe for topology role '${{target_role}}'." >&2
+    echo "HANDOFF: Materialize inputs.conf.template with the secure token file inside the managed bundle workflow, then perform a topology-aware activation." >&2
+    exit 1
+    ;;
+esac
+
+if [[ -L "${{token_file}}" ]]; then
+  echo "ERROR: Refusing symlink HEC token file: ${{token_file}}" >&2
+  exit 1
+fi
 if [[ ! -s "${{token_file}}" ]]; then
   mkdir -p "$(dirname "${{token_file}}")"
+  previous_umask="$(umask)"
+  umask 077
   python3 - <<'PY' > "${{token_file}}"
 import uuid
 print(uuid.uuid4(), end="")
 PY
-  chmod 600 "${{token_file}}"
+  umask "${{previous_umask}}"
 fi
 
 if [[ ! -s "${{token_file}}" ]]; then
   echo "ERROR: HEC token file is empty: ${{token_file}}" >&2
   exit 1
 fi
+chmod 600 "${{token_file}}"
 
 target_dir="${{splunk_home}}/etc/apps/${{app_name}}/local"
 target_file="${{target_dir}}/inputs.conf"
 mkdir -p "${{target_dir}}"
 if [[ -f "${{target_file}}" ]]; then
-  cp "${{target_file}}" "${{target_file}}.bak.$(date +%Y%m%d%H%M%S)"
+  backup_file="${{target_file}}.bak.$(date +%Y%m%d%H%M%S).$$"
+  cp "${{target_file}}" "${{backup_file}}"
+  chmod 600 "${{backup_file}}"
 fi
 
 python3 - "${{token_file}}" inputs.conf.template "${{target_file}}" <<'PY'
 from pathlib import Path
+import os
+import re
 import sys
+import tempfile
 
 token_path = Path(sys.argv[1])
 template_path = Path(sys.argv[2])
@@ -302,7 +335,99 @@ try:
 except Exception:
     raise SystemExit(f"ERROR: HEC token must be a GUID value: {{token_path}}")
 template = template_path.read_text(encoding="utf-8")
-target_path.write_text(template.replace("__HEC_TOKEN_FROM_FILE__", token), encoding="utf-8")
+rendered = template.replace("__HEC_TOKEN_FROM_FILE__", token)
+
+header_re = re.compile(r"^\\s*(\\[[^\\]\\r\\n]+\\])\\s*$")
+
+
+def split_sections(text):
+    preamble = []
+    sections = []
+    current = None
+    for line in text.splitlines():
+        match = header_re.match(line)
+        if match:
+            current = [match.group(1), []]
+            sections.append(current)
+        elif current is None:
+            preamble.append(line)
+        else:
+            current[1].append(line)
+    return preamble, sections
+
+
+def setting_key(line):
+    stripped = line.lstrip()
+    if not stripped or stripped.startswith(("#", ";")) or "=" not in stripped:
+        return ""
+    return stripped.split("=", 1)[0].strip().lower()
+
+
+def setting_keys(lines):
+    keys = set()
+    for line in lines:
+        key = setting_key(line)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def remove_keys(existing, keys):
+    kept = []
+    for line in existing:
+        if setting_key(line) in keys:
+            continue
+        kept.append(line)
+    return kept
+
+
+def merge_body(existing, desired):
+    kept = remove_keys(existing, setting_keys(desired))
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return kept + ([""] if kept else []) + desired
+
+
+preamble, existing_sections = split_sections(
+    target_path.read_text(encoding="utf-8") if target_path.exists() else ""
+)
+_, desired_sections = split_sections(rendered)
+desired_by_header = {{header.lower(): body for header, body in desired_sections}}
+seen = set()
+merged_sections = []
+for header, body in existing_sections:
+    normalized = header.lower()
+    if normalized in desired_by_header:
+        if normalized not in seen:
+            body = merge_body(body, desired_by_header[normalized])
+            seen.add(normalized)
+        else:
+            body = remove_keys(body, setting_keys(desired_by_header[normalized]))
+    merged_sections.append((header, body))
+for header, body in desired_sections:
+    if header.lower() not in seen:
+        merged_sections.append((header, body))
+
+output = list(preamble)
+while output and not output[-1].strip():
+    output.pop()
+for header, body in merged_sections:
+    if output:
+        output.append("")
+    output.append(header)
+    output.extend(body)
+old_umask = os.umask(0o077)
+fd, tmp_name = tempfile.mkstemp(prefix="." + target_path.name + ".", dir=target_path.parent)
+os.close(fd)
+tmp_path = Path(tmp_name)
+try:
+    tmp_path.write_text("\\n".join(output).rstrip() + "\\n", encoding="utf-8")
+    tmp_path.chmod(0o600)
+    os.replace(tmp_path, target_path)
+finally:
+    os.umask(old_umask)
+    if tmp_path.exists():
+        tmp_path.unlink()
 PY
 chmod 600 "${{target_file}}"
 {restart_block}"""
@@ -369,6 +494,26 @@ add_boolean_flag_if_supported() {{
     return 0
   fi
   return 1
+}}
+
+add_ack_flag_if_supported() {{
+  local help_text="$1" value="$2"
+  if grep -q -- "--use-ack" <<< "${{help_text}}"; then
+    ACS_ARGS+=("--use-ack=${{value}}")
+    return 0
+  fi
+  if grep -q -- "--useACK" <<< "${{help_text}}"; then
+    ACS_ARGS+=("--useACK=${{value}}")
+    return 0
+  fi
+  return 1
+}}
+
+unsupported_flag_handoff() {{
+  local field="$1" cmd_group="$2"
+  log_local "ERROR: ACS command group '${{cmd_group}}' cannot enforce requested HEC field '${{field}}'."
+  log_local "HANDOFF: Upgrade ACS CLI or apply acs-hec-token.json in the supported Splunk Cloud HEC management surface, then run status-cloud-acs.sh."
+  exit 1
 }}
 
 add_allowed_indexes_if_supported() {{
@@ -440,13 +585,17 @@ write_token_from_output() {{
   tmp="$(mktemp)"
   chmod 600 "${{tmp}}"
   printf '%s' "${{output}}" > "${{tmp}}"
-  python3 - "${{tmp}}" "${{WRITE_TOKEN_FILE}}" <<'PY'
+  if ! python3 - "${{tmp}}" "${{WRITE_TOKEN_FILE}}" <<'PY'
 from pathlib import Path
 import json
+import os
 import sys
+import tempfile
 
 raw_path = Path(sys.argv[1])
 target_path = Path(sys.argv[2])
+if target_path.is_symlink():
+    raise SystemExit(f"ERROR: refusing symlink token output path: {{target_path}}")
 text = raw_path.read_text(encoding="utf-8")
 
 def structured_payload(value):
@@ -485,11 +634,27 @@ except Exception:
     data = {{}}
 
 token = find_token(data)
-if token:
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(token, encoding="utf-8")
-    target_path.chmod(0o600)
+if not token:
+    raise SystemExit("ERROR: ACS response did not contain a token value")
+target_path.parent.mkdir(parents=True, exist_ok=True)
+old_umask = os.umask(0o077)
+fd, tmp_name = tempfile.mkstemp(prefix="." + target_path.name + ".", dir=target_path.parent)
+os.close(fd)
+temp_path = Path(tmp_name)
+try:
+    temp_path.write_text(token, encoding="utf-8")
+    temp_path.chmod(0o600)
+    os.replace(temp_path, target_path)
+finally:
+    os.umask(old_umask)
+    if temp_path.exists():
+        temp_path.unlink()
 PY
+  then
+    rm -f "${{tmp}}"
+    log_local "ERROR: Unable to parse or persist the ACS HEC token response."
+    return 1
+  fi
   rm -f "${{tmp}}"
 }}
 
@@ -500,6 +665,20 @@ if [[ "${{state}}" == "unknown" ]]; then
   log_local "ERROR: Could not determine whether HEC token '${{TOKEN_NAME}}' already exists. Aborting to avoid duplicate token creation."
   exit 1
 fi
+if [[ "${{state}}" != "missing" && -n "${{WRITE_TOKEN_FILE}}" ]]; then
+  if [[ ! -f "${{WRITE_TOKEN_FILE}}" || -L "${{WRITE_TOKEN_FILE}}" ]] \
+      || ! LC_ALL=C grep -q '[^[:space:]]' "${{WRITE_TOKEN_FILE}}"; then
+    log_local "ERROR: ACS does not return an existing HEC token secret, and no usable local token file exists at '${{WRITE_TOKEN_FILE}}'."
+    log_local "HANDOFF: Rotate/recreate '${{TOKEN_NAME}}', capture its one-time value in that owner-only file, then rerun apply and status."
+    exit 1
+  fi
+  token_mode="$(stat -c '%a' "${{WRITE_TOKEN_FILE}}" 2>/dev/null || stat -f '%Lp' "${{WRITE_TOKEN_FILE}}" 2>/dev/null || true)"
+  if [[ ! "${{token_mode}}" =~ ^[0-7]*00$ ]]; then
+    log_local "ERROR: Existing token file must not have group/other permission bits: ${{WRITE_TOKEN_FILE}}"
+    exit 1
+  fi
+  log_local "Using the existing owner-only local token file; ACS cannot verify or return the stored secret for an existing token."
+fi
 if [[ "${{state}}" == "missing" ]]; then
   if [[ "${{cmd_group}}" == "hec-token" ]]; then
     help_text="$(acs_command hec-token create --help 2>&1 || true)"
@@ -508,30 +687,34 @@ if [[ "${{state}}" == "missing" ]]; then
     help_text="$(acs_command http-event-collectors create --help 2>&1 || true)"
     ACS_ARGS=(http-event-collectors create --name "${{TOKEN_NAME}}")
   fi
-  add_flag_if_supported "${{help_text}}" "--default-index" "${{DEFAULT_INDEX}}" || true
-  add_allowed_indexes_if_supported "${{help_text}}" "${{cmd_group}}" || true
-  add_optional_flag_if_supported "${{help_text}}" "--default-source" "${{DEFAULT_SOURCE}}" || true
-  add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || true
-  add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || true
-  add_boolean_flag_if_supported "${{help_text}}" "--use-ack" "${{USE_ACK}}" || true
-  add_boolean_flag_if_supported "${{help_text}}" "--useACK" "${{USE_ACK}}" || true
+  add_flag_if_supported "${{help_text}}" "--default-index" "${{DEFAULT_INDEX}}" || unsupported_flag_handoff "defaultIndex" "${{cmd_group}}"
+  add_allowed_indexes_if_supported "${{help_text}}" "${{cmd_group}}" || unsupported_flag_handoff "allowedIndexes" "${{cmd_group}}"
+  add_optional_flag_if_supported "${{help_text}}" "--default-source" "${{DEFAULT_SOURCE}}" || unsupported_flag_handoff "defaultSource" "${{cmd_group}}"
+  add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || unsupported_flag_handoff "defaultSourcetype" "${{cmd_group}}"
+  add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || unsupported_flag_handoff "disabled" "${{cmd_group}}"
+  add_ack_flag_if_supported "${{help_text}}" "${{USE_ACK}}" || unsupported_flag_handoff "useACK" "${{cmd_group}}"
   output="$(acs_command "${{ACS_ARGS[@]}}" 2>&1)" || {{ printf '%s\\n' "${{output}}" >&2; exit 1; }}
-  write_token_from_output "${{output}}"
+  if ! write_token_from_output "${{output}}"; then
+    log_local "ERROR: ACS created HEC token '${{TOKEN_NAME}}', but its one-time token value was not returned or could not be written."
+    log_local "HANDOFF: Rotate or recreate the token in the supported Splunk Cloud HEC surface, store it in '${{WRITE_TOKEN_FILE}}', then run status-cloud-acs.sh."
+    exit 1
+  fi
   log_local "Created HEC token '${{TOKEN_NAME}}' via ACS command group '${{cmd_group}}'."
 else
   if [[ "${{cmd_group}}" == "hec-token" ]]; then
     help_text="$(acs_command hec-token update --help 2>&1 || true)"
     ACS_ARGS=(hec-token update "${{TOKEN_NAME}}")
-    add_flag_if_supported "${{help_text}}" "--default-index" "${{DEFAULT_INDEX}}" || true
-    add_allowed_indexes_if_supported "${{help_text}}" "${{cmd_group}}" || true
-    add_optional_flag_if_supported "${{help_text}}" "--default-source" "${{DEFAULT_SOURCE}}" || true
-    add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || true
-    add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || true
-    add_boolean_flag_if_supported "${{help_text}}" "--use-ack" "${{USE_ACK}}" || true
-    add_boolean_flag_if_supported "${{help_text}}" "--useACK" "${{USE_ACK}}" || true
+    add_flag_if_supported "${{help_text}}" "--default-index" "${{DEFAULT_INDEX}}" || unsupported_flag_handoff "defaultIndex" "${{cmd_group}}"
+    add_allowed_indexes_if_supported "${{help_text}}" "${{cmd_group}}" || unsupported_flag_handoff "allowedIndexes" "${{cmd_group}}"
+    add_optional_flag_if_supported "${{help_text}}" "--default-source" "${{DEFAULT_SOURCE}}" || unsupported_flag_handoff "defaultSource" "${{cmd_group}}"
+    add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || unsupported_flag_handoff "defaultSourcetype" "${{cmd_group}}"
+    add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || unsupported_flag_handoff "disabled" "${{cmd_group}}"
+    add_ack_flag_if_supported "${{help_text}}" "${{USE_ACK}}" || unsupported_flag_handoff "useACK" "${{cmd_group}}"
     acs_command "${{ACS_ARGS[@]}}" >/dev/null
-  elif [[ "${{state}}" == "disabled" && "${{DISABLED}}" == "false" ]]; then
-    log_local "HEC token exists but this ACS command group does not expose update; review acs-hec-token.json."
+  else
+    log_local "ERROR: Existing HEC token '${{TOKEN_NAME}}' cannot be reconciled by legacy ACS command group '${{cmd_group}}'."
+    log_local "HANDOFF: Apply acs-hec-token.json in the supported Splunk Cloud HEC management surface, then run status-cloud-acs.sh."
+    exit 1
   fi
   log_local "HEC token '${{TOKEN_NAME}}' already exists with state '${{state}}'."
 fi
@@ -548,7 +731,15 @@ def render_status_enterprise(args: argparse.Namespace) -> str:
     token_name = shell_quote(f"http://{args.token_name}")
     return make_script(
         f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" btool inputs list {token_name} --debug 2>/dev/null | grep -v -E '(^|[[:space:]])token[[:space:]]*=' || true
+output="$("${{splunk_home}}/bin/splunk" btool inputs list {token_name} --debug 2>/dev/null)" || {{
+  echo "ERROR: Unable to query HEC stanza {args.token_name}." >&2
+  exit 1
+}}
+if [[ -z "${{output}}" ]]; then
+  echo "ERROR: HEC stanza {args.token_name} was not found." >&2
+  exit 1
+fi
+printf '%s\\n' "${{output}}" | awk 'tolower($0) !~ /(^|[[:space:]])token[[:space:]]*=/'
 """
     )
 
@@ -563,6 +754,7 @@ TOKEN_NAME={token_name}
 acs_prepare_context
 tmp="$(mktemp)"
 chmod 600 "${{tmp}}"
+trap 'rm -f "${{tmp}}"' EXIT
 if acs_command hec-token describe "${{TOKEN_NAME}}" >"${{tmp}}" 2>/dev/null; then
   cat "${{tmp}}" | acs_extract_http_response_json
 else
@@ -580,11 +772,16 @@ def redact(value):
 
 try:
     data = json.load(sys.stdin)
-except Exception:
-    data = {{}}
+except Exception as exc:
+    print(f"ERROR: ACS returned invalid JSON: {{exc}}", file=sys.stderr)
+    raise SystemExit(1)
+if data in ({{}}, []):
+    print("ERROR: ACS returned an empty HEC token description.", file=sys.stderr)
+    raise SystemExit(1)
 print(json.dumps(redact(data), indent=2, sort_keys=True))
 '
 rm -f "${{tmp}}"
+trap - EXIT
 """
     )
 

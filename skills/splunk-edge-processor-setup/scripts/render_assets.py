@@ -461,7 +461,9 @@ def render_uninstall(args: argparse.Namespace, instance: dict) -> str:
     if instance["mode"] == "systemd":
         body = (
             f"INSTALL_DIR={install_dir}\n"
-            "sudo systemctl disable --now splunk-edge.service || true\n"
+            "if sudo systemctl cat splunk-edge.service >/dev/null 2>&1; then\n"
+            "  sudo systemctl disable --now splunk-edge.service\n"
+            "fi\n"
             "sudo rm -f /etc/systemd/system/splunk-edge.service\n"
             "sudo systemctl daemon-reload\n"
             'sudo rm -rf "${INSTALL_DIR}/splunk-edge"\n'
@@ -476,7 +478,9 @@ def render_uninstall(args: argparse.Namespace, instance: dict) -> str:
     else:
         body = (
             f"INSTALL_DIR={install_dir}\n"
-            'pkill -f "splunk-edge/bin/splunk-edge run" || true\n'
+            'if pgrep -f "splunk-edge/bin/splunk-edge run" >/dev/null; then\n'
+            '  pkill -f "splunk-edge/bin/splunk-edge run"\n'
+            'fi\n'
             'rm -rf "${INSTALL_DIR}/splunk-edge"\n'
             'echo "OK: splunk-edge process stopped and binaries removed."\n'
         )
@@ -491,8 +495,8 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
     # Splunk has not published a stable public REST API base path for EP
     # objects (source types / destinations / pipelines). The variable
     # EP_API_BASE lets the operator point this script at the right base when
-    # one is available for their tenant; otherwise the script falls back to
-    # printing the rendered payloads and the manual UI steps to apply them.
+    # one is available for their tenant; otherwise the script prints the
+    # rendered payload/manual UI steps and fails closed without claiming apply.
     body = (
         _EP_LIB_DIR_BLOCK
         + "# shellcheck disable=SC2034\n"
@@ -525,7 +529,8 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
         + '}\n\n'
         + 'if [[ -z "${EP_API_BASE}" ]]; then\n'
         + '  manual_fallback\n'
-        + '  exit 0\n'
+        + '  echo "ERROR: no supported live control-plane transport was selected; apply was not performed." >&2\n'
+        + '  exit 2\n'
         + 'fi\n\n'
         + 'if [[ -z "${TOKEN_FILE}" || ! -s "${TOKEN_FILE}" ]]; then\n'
         + '  echo "ERROR: EP_API_TOKEN_FILE must point to a non-empty file when EP_API_BASE is set." >&2\n'
@@ -621,7 +626,7 @@ def render_validate(args: argparse.Namespace, instances: list[dict], destination
         + 'TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)\n'
         + 'AUDIT_DIR="$(dirname "$0")/audit/${TIMESTAMP}"\n'
         + 'mkdir -p "${AUDIT_DIR}"\n'
-        + 'chmod 0700 "${AUDIT_DIR}" 2>/dev/null || true\n\n'
+        + 'chmod 0700 "${AUDIT_DIR}"\n\n'
         + '# 1. Default-destination guard. Validate fails if no default destination.\n'
         + 'if [[ -z "${DEFAULT_DEST}" ]]; then\n'
         + '  echo "FAIL: No default destination configured. Unprocessed data will be dropped." >&2\n'
@@ -649,19 +654,18 @@ def render_validate(args: argparse.Namespace, instances: list[dict], destination
         + '# to curl via -K <(...) so it never lands on argv. Output files are\n'
         + '# created with umask 077 by writing through ( umask 077 && ... ).\n'
         + '( umask 077 && ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" GET "/edge-processors/${EP_NAME}" \\\n'
-        + '    > "${AUDIT_DIR}/ep-object.json" 2>/dev/null ) \\\n'
-        + '    || ( umask 077 && echo "{}" > "${AUDIT_DIR}/ep-object.json" )\n'
+        + '    > "${AUDIT_DIR}/ep-object.json" )\n'
         + '( umask 077 && ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" GET "/edge-processors/${EP_NAME}/instances" \\\n'
-        + '    > "${AUDIT_DIR}/instances.json" 2>/dev/null ) \\\n'
-        + '    || ( umask 077 && echo "{}" > "${AUDIT_DIR}/instances.json" )\n'
+        + '    > "${AUDIT_DIR}/instances.json" )\n'
         + '( umask 077 && ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" GET "/edge-processors/${EP_NAME}/pipelines" \\\n'
-        + '    > "${AUDIT_DIR}/pipelines.json" 2>/dev/null ) \\\n'
-        + '    || ( umask 077 && echo "{}" > "${AUDIT_DIR}/pipelines.json" )\n\n'
-        '# 3. Instance health check (best-effort field name parsing).\n'
+        + '    > "${AUDIT_DIR}/pipelines.json" )\n\n'
+        '# 3. Instance health check. Unknown or malformed state is a failure.\n'
         'healthy=$(python3 -c "\n'
         'import json, sys\n'
-        'data = json.load(open(sys.argv[1])) if sys.argv[1] else {}\n'
-        'items = data.get(\\"instances\\", []) if isinstance(data, dict) else []\n'
+        'data = json.load(open(sys.argv[1]))\n'
+        'if not isinstance(data, dict) or not isinstance(data.get(\\"instances\\"), list):\n'
+        '    raise SystemExit(\\"invalid instances response schema\\")\n'
+        'items = data[\\"instances\\"]\n'
         '# Different EP API revisions use status / health / healthStatus keys.\n'
         'def is_healthy(i):\n'
         '    for key in (\\"status\\", \\"health\\", \\"healthStatus\\"):\n'
@@ -670,9 +674,10 @@ def render_validate(args: argparse.Namespace, instances: list[dict], destination
         '            return True\n'
         '    return False\n'
         'print(sum(1 for i in items if is_healthy(i)))\n'
-        '" "${AUDIT_DIR}/instances.json" 2>/dev/null || echo 0)\n'
+        '" "${AUDIT_DIR}/instances.json")\n'
         'if [[ "${healthy}" -lt "${EXPECTED_INSTANCES}" ]]; then\n'
-        '  echo "WARN: Only ${healthy}/${EXPECTED_INSTANCES} EP instances Healthy. See ${AUDIT_DIR}/instances.json." >&2\n'
+        '  echo "FAIL: Only ${healthy}/${EXPECTED_INSTANCES} EP instances Healthy. See ${AUDIT_DIR}/instances.json." >&2\n'
+        '  exit 1\n'
         'fi\n\n'
         f'echo "PASS: EP {args.ep_name} validate complete (default-destination=${{DEFAULT_DEST}}, destinations={dest_names}). Snapshot: ${{AUDIT_DIR}}"\n'
     )

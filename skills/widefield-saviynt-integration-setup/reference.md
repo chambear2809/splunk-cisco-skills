@@ -28,6 +28,12 @@ Evidence should include:
   ownership, human identity posture, connected application risk, AI identity
   access, or authentication/session analysis.
 
+`validate.sh` and `setup.sh --validate` require `--evidence-file`. The file
+must be valid JSON and contain at least one remediation outcome marker matching
+revoke, password reset, micro-certification, or remediation; missing evidence
+or a marker mismatch exits nonzero. Use `--dry-run` to inspect validation
+without supplying evidence.
+
 ## Remediation Coverage
 
 Rendered policy maps cover:

@@ -551,9 +551,19 @@ rest_enable_saved_search() {
     esac
 }
 
+validate_splunk_index_name() {
+    local idx="${1:-}"
+    if [[ ! "${idx}" =~ ^[A-Za-z0-9_-]{1,80}$ ]]; then
+        echo "ERROR: Invalid Splunk index name '${idx}'; use 1-80 letters, numbers, underscores, or hyphens." >&2
+        return 1
+    fi
+    return 0
+}
+
 rest_check_index() {
     local sk="$1" uri="$2" idx="$3"
     local http_code
+    validate_splunk_index_name "${idx}" || return 1
     http_code=$(splunk_curl "${sk}" \
         "${uri}/services/data/indexes/${idx}?output_mode=json" \
         -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
@@ -562,6 +572,7 @@ rest_check_index() {
 
 rest_get_index_datatype() {
     local sk="$1" uri="$2" idx="$3"
+    validate_splunk_index_name "${idx}" || return 1
     splunk_curl "${sk}" \
         "${uri}/services/data/indexes/${idx}?output_mode=json" 2>/dev/null \
         | python3 -c "
@@ -584,6 +595,7 @@ except Exception:
 rest_create_index() {
     local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
     local body http_code resp
+    validate_splunk_index_name "${idx}" || return 1
     case "${index_type}" in
         metric)
             body=$(form_urlencode_pairs name "${idx}" maxTotalDataSizeMB "${max_size}" datatype "metric") || return 1

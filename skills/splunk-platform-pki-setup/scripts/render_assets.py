@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import stat
 import sys
 from pathlib import Path
@@ -149,10 +150,37 @@ VALID_TARGETS = (
 VALID_KEY_ALGORITHMS = ("rsa-2048", "rsa-3072", "rsa-4096", "ecdsa-p256", "ecdsa-p384", "ecdsa-p521")
 VALID_KEY_FORMATS = ("pkcs1", "pkcs8")
 VALID_TLS_POLICIES = ("splunk-modern", "fips-140-3", "stig")
-VALID_TLS_FLOORS = ("tls1.2",)
+VALID_TLS_FLOORS = ("tls1.2", "tls1.3")
 VALID_MTLS = ("none", "s2s", "hec", "splunkd", "all")
 VALID_FIPS_MODES = ("none", "140-2", "140-3")
 VALID_PUBLIC_CAS = ("vault", "acme", "adcs", "ejbca", "other")
+
+
+def _splunk_version_tuple(value: str) -> tuple[int, int, int]:
+    parts = [int(item) for item in re.findall(r"\d+", value)[:3]]
+    return tuple((parts + [0, 0, 0])[:3])  # type: ignore[return-value]
+
+
+def _supports_tls13(args: argparse.Namespace) -> bool:
+    return _splunk_version_tuple(args.splunk_version) >= (10, 4, 0)
+
+
+def _effective_ssl_versions(args: argparse.Namespace) -> str:
+    if args.tls_version_floor == "tls1.3":
+        return "tls1.3"
+    if _supports_tls13(args):
+        return "tls1.2,tls1.3"
+    return "tls1.2"
+
+
+def _tls13_server_block(preset: dict, args: argparse.Namespace) -> str:
+    if "tls1.3" not in _effective_ssl_versions(args).split(","):
+        return ""
+    return (
+        "\n[tls1.3]\n"
+        f"cipherSuite = {preset['tls13_cipher_suite']}\n"
+        f"groups = {preset['tls13_groups']}\n"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -312,22 +340,23 @@ def _validate_args(args: argparse.Namespace, policy: dict) -> None:
     targets = _expand_targets(args.target)
     _expand_mtls(args.enable_mtls)
 
-    # TLS version floor.
-    # `--allow-deprecated-tls` does NOT raise the upper bound (Splunk docs
-    # don't yet support TLS 1.3); it only relaxes the lower bound so the
-    # operator can include ssl3 / tls1.0 / tls1.1 in `sslVersions` for
-    # legacy clients. Even with the relax, the rendered conf still
-    # defaults to `sslVersions = tls1.2` — the relax just stops the
-    # renderer from refusing.
-    allowed_floors = list(policy["tls_version_supported"])
-    if args.allow_deprecated_tls:
-        allowed_floors.extend(policy["tls_version_forbidden"])
-    if args.tls_version_floor not in allowed_floors:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.cert_install_subdir):
         sys.exit(
-            f"ERROR: tls_version_floor={args.tls_version_floor} not in supported set "
-            f"{policy['tls_version_supported']}. Splunk's docs do not yet list TLS 1.3 "
-            f"as a supported sslVersions value; see references/tls-protocol-policy.md. "
-            f"Pass --allow-deprecated-tls to relax (still not recommended)."
+            "ERROR: --cert-install-subdir must be one safe directory name "
+            "(letters, digits, dot, underscore, and hyphen only)"
+        )
+    if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", args.splunk_version):
+        sys.exit("ERROR: --splunk-version must be a numeric version such as 10.4.0")
+
+    if args.allow_deprecated_tls:
+        sys.exit(
+            "ERROR: --allow-deprecated-tls no longer renders SSLv3/TLS 1.0/TLS 1.1. "
+            "Use a documented compensating-control handoff for legacy clients."
+        )
+    if args.tls_version_floor == "tls1.3" and not _supports_tls13(args):
+        sys.exit(
+            f"ERROR: --tls-version-floor tls1.3 requires Splunk Enterprise 10.4+; "
+            f"requested --splunk-version {args.splunk_version}."
         )
 
     # Validity day caps
@@ -344,6 +373,16 @@ def _validate_args(args: argparse.Namespace, policy: dict) -> None:
 
     # Key algorithm vs preset
     preset = policy["presets"][args.tls_policy]
+    if _supports_tls13(args):
+        missing_tls13 = [
+            key for key in ("tls13_cipher_suite", "tls13_groups")
+            if not str(preset.get(key) or "").strip()
+        ]
+        if missing_tls13:
+            sys.exit(
+                f"ERROR: algorithm preset {args.tls_policy!r} is missing "
+                f"required Splunk 10.4 TLS 1.3 fields: {missing_tls13}"
+            )
     if args.key_algorithm not in preset["allowed_key_algorithms"]:
         sys.exit(
             f"ERROR: --key-algorithm {args.key_algorithm} not allowed by --tls-policy "
@@ -1265,6 +1304,7 @@ def _install_leaf_sh(args: argparse.Namespace) -> str:
 #   forwarder   -> write [tcpout] clientCert overlay to system/local/outputs.conf
 #   shc         -> alias for splunkd (SHC member)
 #   core5       -> splunkd + web + s2s + hec on a single SH; writes ALL overlays
+#   ldaps       -> install only the CA bundle and Splunk OpenLDAP trust policy
 #
 # Per-host SSL passphrase handling:
 #   If --ssl-password-file PATH is supplied, install-leaf.sh writes the
@@ -1295,14 +1335,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-for var in TARGET HOST CERT KEY CA; do
+for var in TARGET HOST CA; do
     if [[ -z "${{!var}}" ]]; then
         echo "ERROR: --${{var,,}} is required" >&2
         exit 1
     fi
 done
 
-valid_targets="splunkd web s2s hec replication forwarder shc core5"
+if [[ ! "$HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || [[ "$HOST" == *..* ]]; then
+    echo "ERROR: --host must be a safe hostname without path separators or traversal" >&2
+    exit 1
+fi
+
+if [[ "$TARGET" != "ldaps" ]]; then
+    for var in CERT KEY; do
+        if [[ -z "${{!var}}" ]]; then
+            echo "ERROR: --${{var,,}} is required for target $TARGET" >&2
+            exit 1
+        fi
+    done
+fi
+
+valid_targets="splunkd web s2s hec replication forwarder shc core5 ldaps"
 found=0
 for t in $valid_targets; do
     [[ "$TARGET" == "$t" ]] && found=1
@@ -1312,14 +1366,87 @@ if [[ "$found" -eq 0 ]]; then
     exit 1
 fi
 
+# Validate all inputs before changing the target host. Splunk's documented
+# format for non-Web TLS surfaces is one PEM containing the leaf, its matching
+# private key, and the CA chain. Web keeps a separate private-key path.
+if [[ ! -d "$SPLUNK_HOME" ]] || [[ ! -x "$SPLUNK_HOME/bin/splunk" ]]; then
+    echo "ERROR: SPLUNK_HOME is not a usable Splunk installation: $SPLUNK_HOME" >&2
+    exit 1
+fi
+OPENSSL=("$SPLUNK_HOME/bin/splunk" cmd openssl)
+if [[ ! -r "$CA" ]] || [[ ! -s "$CA" ]]; then
+    echo "ERROR: --ca must be a readable, non-empty PEM bundle" >&2
+    exit 1
+fi
+if ! "${{OPENSSL[@]}}" x509 -in "$CA" -noout >/dev/null 2>&1; then
+    echo "ERROR: --ca does not begin with a parseable PEM certificate" >&2
+    exit 1
+fi
+
+if [[ "$TARGET" != "ldaps" ]]; then
+    for input_file in "$CERT" "$KEY"; do
+        if [[ ! -r "$input_file" ]] || [[ ! -s "$input_file" ]]; then
+            echo "ERROR: certificate and private-key inputs must be readable and non-empty" >&2
+            exit 1
+        fi
+    done
+    PASSIN_ARGS=()
+    if [[ -n "$SSL_PASSWORD_FILE" ]]; then
+        if [[ ! -r "$SSL_PASSWORD_FILE" ]] || [[ ! -s "$SSL_PASSWORD_FILE" ]]; then
+            echo "ERROR: --ssl-password-file must be readable and non-empty" >&2
+            exit 1
+        fi
+        secret_mode="$(stat -c '%a' "$SSL_PASSWORD_FILE" 2>/dev/null || true)"
+        if [[ -z "$secret_mode" ]] || (( (8#$secret_mode & 077) != 0 )); then
+            echo "ERROR: --ssl-password-file must have mode 0600 or stricter" >&2
+            exit 1
+        fi
+        PASSIN_ARGS=(-passin "file:$SSL_PASSWORD_FILE")
+    fi
+    VERIFY_TMP="$(mktemp -d)"
+    cleanup_verify_tmp() {{ rm -rf "$VERIFY_TMP"; }}
+    trap cleanup_verify_tmp EXIT
+    if ! "${{OPENSSL[@]}}" x509 -in "$CERT" -pubkey -noout >"$VERIFY_TMP/cert.pub" \\
+        || ! "${{OPENSSL[@]}}" pkey -in "$KEY" "${{PASSIN_ARGS[@]}}" -pubout >"$VERIFY_TMP/key.pub" \\
+        || ! cmp -s "$VERIFY_TMP/cert.pub" "$VERIFY_TMP/key.pub"; then
+        echo "ERROR: private key does not match the leaf certificate (or its passphrase is wrong)" >&2
+        exit 1
+    fi
+    if ! "${{OPENSSL[@]}}" verify -verbose -x509_strict -CAfile "$CA" "$CERT"; then
+        echo "ERROR: leaf certificate does not validate against the supplied CA bundle" >&2
+        exit 1
+    fi
+    cleanup_verify_tmp
+    trap - EXIT
+fi
+
+SPLUNK_UID="$(stat -c '%u' "$SPLUNK_HOME")"
+SPLUNK_OWNER="$(stat -c '%u:%g' "$SPLUNK_HOME")"
+if [[ "$EUID" -ne 0 && "$EUID" -ne "$SPLUNK_UID" ]]; then
+    echo "ERROR: run as the Splunk service owner (uid $SPLUNK_UID) or root" >&2
+    exit 1
+fi
+
+set_splunk_owner() {{
+    if [[ "$EUID" -eq 0 ]]; then
+        chown "$SPLUNK_OWNER" "$@"
+    fi
+}}
+
 DEST="$SPLUNK_HOME/etc/auth/$INSTALL_SUBDIR/$HOST"
 mkdir -p "$DEST"
+chmod 0750 "$DEST"
+set_splunk_owner "$DEST"
+TRUST_BUNDLE="$SPLUNK_HOME/etc/auth/$INSTALL_SUBDIR/cabundle.pem"
 
 # Backup any existing PEMs
 if compgen -G "$DEST/*.pem" > /dev/null || compgen -G "$DEST/*.key" > /dev/null; then
     BACKUP="$DEST/_backup-$(date -u +%Y%m%dT%H%M%SZ)"
     mkdir -p "$BACKUP"
-    cp -p "$DEST"/*.pem "$DEST"/*.key "$BACKUP"/ 2>/dev/null || true
+    for existing in "$DEST"/*.pem "$DEST"/*.key; do
+        [[ -e "$existing" ]] || continue
+        cp -p "$existing" "$BACKUP"/
+    done
     echo "Backed up existing PEMs to $BACKUP"
 fi
 
@@ -1335,27 +1462,52 @@ case "$TARGET" in
     replication) NAME="$HOST-replication" ;;
     forwarder)   NAME="$HOST-s2s-client" ;;
     core5)       NAME="$HOST-splunkd" ;;  # core5 reuses splunkd PEM for system/local/web.conf
+    ldaps)       NAME="" ;;
 esac
-cp -p "$CERT" "$DEST/$NAME.pem"
-cp -p "$KEY"  "$DEST/$NAME.key"
+
+if [[ "$TARGET" != "ldaps" ]]; then
+    # Normalize the first certificate block, then produce both formats Splunk
+    # needs: a public Web chain and a private-key-bearing combined PEM for
+    # splunkd, S2S, HEC, replication, and forwarding.
+    "${{OPENSSL[@]}}" x509 -in "$CERT" -out "$DEST/$NAME-leaf.pem"
+    cp -p "$KEY" "$DEST/$NAME.key"
+    cat "$DEST/$NAME-leaf.pem" "$CA" >"$DEST/$NAME-cert.pem"
+    cat "$DEST/$NAME-leaf.pem" "$KEY" "$CA" >"$DEST/$NAME.pem"
+fi
 cp -p "$CA"   "$DEST/cabundle.pem"
+if [[ -f "$TRUST_BUNDLE" ]]; then
+    cp -p "$TRUST_BUNDLE" "$TRUST_BUNDLE.pki-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+cp -p "$CA" "$TRUST_BUNDLE"
 
-chmod 0600 "$DEST"/*.key
-chmod 0644 "$DEST"/*.pem
+if compgen -G "$DEST/*.key" > /dev/null; then chmod 0600 "$DEST"/*.key; fi
+if [[ "$TARGET" != "ldaps" ]]; then chmod 0600 "$DEST/$NAME.pem"; fi
+for public_pem in "$DEST"/*-leaf.pem "$DEST"/*-cert.pem "$DEST/cabundle.pem"; do
+    [[ -e "$public_pem" ]] || continue
+    chmod 0644 "$public_pem"
+done
+chmod 0644 "$TRUST_BUNDLE"
+set_splunk_owner "$DEST" "$DEST"/* "$TRUST_BUNDLE"
 
-# Verify the chain before declaring success
-"$SPLUNK_HOME/bin/splunk" cmd openssl verify -verbose -x509_strict \\
-    -CAfile "$DEST/cabundle.pem" \\
-    "$DEST/$NAME.pem"
+# Verify the chain before declaring success. LDAPS installs only a CA trust
+# bundle, so validate that the first certificate parses instead of expecting a
+# local leaf.
+if [[ "$TARGET" == "ldaps" ]]; then
+    "$SPLUNK_HOME/bin/splunk" cmd openssl x509 -in "$TRUST_BUNDLE" -noout
+else
+    "$SPLUNK_HOME/bin/splunk" cmd openssl verify -verbose -x509_strict \\
+        -CAfile "$TRUST_BUNDLE" \\
+        "$DEST/$NAME-leaf.pem"
 
-# Align CLI trust so subsequent `splunk` invocations work
-bash "$(dirname "$0")/align-cli-trust.sh" "$DEST/cabundle.pem"
+    # Align CLI trust so subsequent `splunk` invocations work.
+    bash "$(dirname "$0")/align-cli-trust.sh" "$TRUST_BUNDLE"
+fi
 
 # KV-Store EKU check (splunkd / SHC / single-SH leaves only)
 if [[ "$TARGET" == "splunkd" ]] || [[ "$TARGET" == "shc" ]] || [[ "$TARGET" == "core5" ]]; then
     bash "$(dirname "$0")/kv-store-eku-check.sh" \\
-        --cert "$DEST/$NAME.pem" \\
-        --ca   "$DEST/cabundle.pem"
+        --cert "$DEST/$NAME-leaf.pem" \\
+        --ca   "$TRUST_BUNDLE"
 fi
 
 # Write the per-host overlay snippet to $SPLUNK_HOME/etc/system/local/<conf>.
@@ -1386,7 +1538,12 @@ write_overlay() {{
     {{
         printf '\\n%s\\n%s%s\\n' "$marker_begin" "$body" "$marker_end"
     }} >> "$target_file"
-    chmod 0644 "$target_file"
+    if [[ -n "$SSL_PASSWORD_LINE" ]]; then
+        chmod 0600 "$target_file"
+    else
+        chmod 0644 "$target_file"
+    fi
+    set_splunk_owner "$target_file"
 }}
 
 # Build the sslPassword line if --ssl-password-file was supplied.
@@ -1409,7 +1566,7 @@ $SSL_PASSWORD_LINE
         ;;
     web)
         body="[settings]
-serverCert  = $DEST/$NAME.pem
+serverCert  = $DEST/$NAME-cert.pem
 privKeyPath = $DEST/$NAME.key
 $SSL_PASSWORD_LINE
 "
@@ -1452,19 +1609,55 @@ $SSL_PASSWORD_LINE
         write_overlay "outputs.conf" "$body"
         ;;
     core5)
-        # Single SH that runs splunkd + web + s2s + hec. Re-run install-leaf.sh
-        # for each surface separately if they use different PEMs; this branch
-        # writes only the splunkd overlay.
+        # Single SH that runs splunkd + web + s2s + HEC. This mode deliberately
+        # reuses one certificate for every surface; use the individual targets
+        # when surfaces have distinct certificates.
         body="[sslConfig]
 serverCert  = $DEST/$NAME.pem
 $SSL_PASSWORD_LINE
 "
         write_overlay "server.conf" "$body"
+        body="[settings]
+serverCert  = $DEST/$NAME-cert.pem
+privKeyPath = $DEST/$NAME.key
+$SSL_PASSWORD_LINE
+"
+        write_overlay "web.conf" "$body"
+        body="[SSL]
+serverCert  = $DEST/$NAME.pem
+$SSL_PASSWORD_LINE
+
+[http]
+serverCert  = $DEST/$NAME.pem
+$SSL_PASSWORD_LINE
+"
+        write_overlay "inputs.conf" "$body"
+        ;;
+    ldaps)
+        LDAP_SOURCE="$(dirname "$0")/../distribute/standalone/000_pki_trust/system-files/ldap.conf"
+        if [[ ! -s "$LDAP_SOURCE" ]] || ! grep -q '^TLS_CACERT' "$LDAP_SOURCE"; then
+            echo "ERROR: rendered LDAPS trust policy is missing; re-render with --ldaps true" >&2
+            exit 1
+        fi
+        # Splunk does not read the OS-global OpenLDAP configuration for this
+        # workflow. Its documented client configuration location is fixed.
+        LDAP_DEST="$SPLUNK_HOME/etc/openldap/ldap.conf"
+        mkdir -p "$(dirname "$LDAP_DEST")"
+        if [[ -f "$LDAP_DEST" ]]; then
+            cp -p "$LDAP_DEST" "$LDAP_DEST.pki-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+        fi
+        cp -p "$LDAP_SOURCE" "$LDAP_DEST"
+        chmod 0644 "$LDAP_DEST"
+        set_splunk_owner "$LDAP_DEST"
         ;;
 esac
 
-echo "OK: $TARGET cert installed for $HOST at $DEST"
-echo "    Per-host overlay written to $SYSTEM_LOCAL/<conf>"
+if [[ "$TARGET" == "ldaps" ]]; then
+    echo "OK: LDAPS CA trust installed for $HOST at $LDAP_DEST"
+else
+    echo "OK: $TARGET cert installed for $HOST at $DEST"
+    echo "    Per-host overlay written to $SYSTEM_LOCAL/<conf>"
+fi
 echo "Run 'splunk restart' on this host (or use the rotation runbook for clustered hosts)."
 """)
 
@@ -1789,8 +1982,8 @@ def _shared_ssl_block(preset: dict, args: argparse.Namespace, mtls: set[str], na
 enableSplunkdSSL     = true
 sslRootCAPath        = {ca_path}
 caTrustStore         = splunk
-sslVersions          = {preset['ssl_versions']}
-sslVersionsForClient = {preset['ssl_versions_for_client']}
+sslVersions          = {_effective_ssl_versions(args)}
+sslVersionsForClient = {_effective_ssl_versions(args)}
 cipherSuite          = {preset['cipher_suite']}
 ecdhCurves           = {preset['ecdh_curves']}
 sslVerifyServerCert  = true
@@ -1801,6 +1994,7 @@ requireClientCert    = {require_client}
 # literal file on every host). Each host's etc/system/local/server.conf
 # overlay carries the host-specific serverCert + sslPassword;
 # install-leaf.sh writes that overlay automatically.
+{_tls13_server_block(preset, args)}
 """
 
 
@@ -1808,11 +2002,9 @@ def _shared_web_block(preset: dict, args: argparse.Namespace) -> str:
     """Splunk Web settings safe to ship in a shared bundle. Per-host
     `serverCert` / `privKeyPath` / `sslPassword` go to the per-host
     overlay via install-leaf.sh."""
-    ca_path = f"{args.splunk_home}/etc/auth/{args.cert_install_subdir}/cabundle.pem"
     return f"""[settings]
 enableSplunkWebSSL = true
-caCertPath         = {ca_path}
-sslVersions        = {preset['ssl_versions']}
+sslVersions        = {_effective_ssl_versions(args)}
 cipherSuite        = {preset['cipher_suite']}
 ecdhCurves         = {preset['ecdh_curves']}
 # Per-host serverCert / privKeyPath / sslPassword written by
@@ -1834,7 +2026,7 @@ disabled = 0
 
 [SSL]
 requireClientCert = {require_client}
-sslVersions       = {preset['ssl_versions']}
+sslVersions       = {_effective_ssl_versions(args)}
 cipherSuite       = {preset['cipher_suite']}
 {name_check_block}# Per-host serverCert / sslPassword written by install-leaf.sh to
 # etc/system/local/inputs.conf, NOT to this bundle.
@@ -1848,7 +2040,7 @@ enableSSL             = 1
 requireClientCert     = {require_client}
 allowSslRenegotiation = false
 allowSslCompression   = false
-sslVersions           = {preset['ssl_versions']}
+sslVersions           = {_effective_ssl_versions(args)}
 cipherSuite           = {preset['cipher_suite']}
 # Per-host serverCert / sslPassword written by install-leaf.sh to
 # etc/system/local/inputs.conf, NOT to this bundle.
@@ -1944,7 +2136,7 @@ useClientSSLCompression = true
 sslVerifyServerCert     = true
 sslVerifyServerName     = true
 sslCommonNameToCheck    = {cn_csv}
-sslVersions             = {preset['ssl_versions']}
+sslVersions             = {_effective_ssl_versions(args)}
 cipherSuite             = {preset['cipher_suite']}
 """
     for peer in peers:
@@ -2019,10 +2211,11 @@ SPLUNK_FIPS_VERSION = {args.fips_mode}
 def _standalone_ldap_conf(args: argparse.Namespace, preset: dict) -> str:
     if not _bool(args.ldaps):
         return "# Rendered by splunk-platform-pki-setup.\n# LDAPS not requested via --ldaps; this file is intentionally empty.\n"
+    protocol_min = "3.4" if args.tls_version_floor == "tls1.3" else "3.3"
     return f"""# Rendered by splunk-platform-pki-setup.
-# Drop into /etc/openldap/ldap.conf (RHEL) or /etc/ldap/ldap.conf (Debian).
-# Splunk reads system OpenLDAP TLS settings from this file.
-TLS_PROTOCOL_MIN  {preset['ldap_tls_protocol_min']}
+# Install as $SPLUNK_HOME/etc/openldap/ldap.conf. Splunk does not load this
+# policy from the OS-global /etc/openldap or /etc/ldap location.
+TLS_PROTOCOL_MIN  {protocol_min}
 TLS_CIPHER_SUITE  {preset['ldap_tls_cipher_suite']}
 TLS_CACERT        {args.splunk_home}/etc/auth/{args.cert_install_subdir}/cabundle.pem
 TLS_REQCERT       demand
@@ -2081,9 +2274,28 @@ if [[ -z "$EP_ID" ]] || [[ -z "$ADMIN_PASSWORD_FILE" ]]; then
     exit 1
 fi
 
+password_mode="$(stat -c '%a' "$ADMIN_PASSWORD_FILE" 2>/dev/null || true)"
+if [[ "$password_mode" != "600" && "$password_mode" != "400" ]]; then
+    echo "ERROR: ADMIN_PASSWORD_FILE must have mode 0600 or 0400" >&2
+    exit 1
+fi
+admin_password="$(< "$ADMIN_PASSWORD_FILE")"
+if [[ -z "$admin_password" || "$admin_password" == *$'\\n'* || "$admin_password" == *$'\\r'* ]]; then
+    echo "ERROR: ADMIN_PASSWORD_FILE must contain one non-empty line" >&2
+    exit 1
+fi
+curl_password="${admin_password//\\\\/\\\\\\\\}"
+curl_password="${curl_password//\\\"/\\\\\\\"}"
+curl_config="$(mktemp)"
+chmod 600 "$curl_config"
+trap 'rm -f "$curl_config"' EXIT
+printf 'user = "admin:%s"\\n' "$curl_password" >"$curl_config"
+admin_password=""
+curl_password=""
+
 curl --silent --show-error --fail \\
      --cacert ./ca_cert.pem \\
-     -u "admin:$(< "$ADMIN_PASSWORD_FILE")" \\
+     --config "$curl_config" \\
      -X POST \\
      "$EP_CONTROL_PLANE/services/edge_processor/$EP_ID/certificates" \\
      -F ca_cert=@./ca_cert.pem \\
@@ -2740,22 +2952,26 @@ else
     fail "trust anchor missing at $SPLUNK_HOME/etc/auth/{args.cert_install_subdir}/cabundle.pem (run install-leaf.sh first)"
 fi
 
-# 2. Default-cert refusal
-if [[ -f "$SPLUNK_HOME/etc/auth/server.pem" ]]; then
-    if "$SPLUNK_HOME/bin/splunk" cmd openssl x509 -in "$SPLUNK_HOME/etc/auth/server.pem" -subject -noout 2>/dev/null \\
-        | grep -qE 'SplunkServerDefaultCert|SplunkCommonCA|SplunkWebDefaultCert'; then
-        fail "default Splunk cert still in use at $SPLUNK_HOME/etc/auth/server.pem; replace before declaring ready"
-    else
-        ok "no default Splunk cert in $SPLUNK_HOME/etc/auth/server.pem"
-    fi
+# 2. Effective-cert default refusal. The stock server.pem may remain on disk;
+# readiness depends on the path selected by btool, not that unused file.
+effective_server_cert="$("$SPLUNK_HOME/bin/splunk" cmd btool server list sslConfig 2>/dev/null \\
+    | awk '/^serverCert/ {{print $3}}' | head -1)"
+if [[ -z "$effective_server_cert" || ! -f "$effective_server_cert" ]]; then
+    fail "effective [sslConfig] serverCert is unset or missing: ${{effective_server_cert:-unset}}"
+elif "$SPLUNK_HOME/bin/splunk" cmd openssl x509 -in "$effective_server_cert" -subject -noout 2>/dev/null \\
+    | grep -qE 'SplunkServerDefaultCert|SplunkCommonCA|SplunkWebDefaultCert'; then
+    fail "effective serverCert still uses a default Splunk certificate: $effective_server_cert"
+else
+    ok "effective serverCert is custom: $effective_server_cert"
 fi
 
 # 3. TLS version floor
 sslv="$("$SPLUNK_HOME/bin/splunk" cmd btool server list sslConfig 2>/dev/null | awk '/^sslVersions/ {{print $3}}' | head -1)"
-if [[ -n "$sslv" ]] && [[ "$sslv" != "tls1.2" ]] && [[ "$sslv" != "*"*"-tls1.0,-tls1.1"* ]]; then
-    fail "sslVersions = $sslv (expected tls1.2; Splunk docs do not yet support TLS 1.3)"
+expected_sslv="{_effective_ssl_versions(args)}"
+if [[ "$sslv" != "$expected_sslv" ]]; then
+    fail "sslVersions = ${{sslv:-unset}} (expected $expected_sslv for Splunk {args.splunk_version})"
 else
-    ok "sslVersions floor satisfied"
+    ok "sslVersions policy satisfied ($expected_sslv)"
 fi
 
 # 4. KV Store EKU verify (run the documented openssl verify -x509_strict)
@@ -2806,55 +3022,95 @@ echo "PREFLIGHT PASSED."
 
 
 def _validate_sh(args: argparse.Namespace, targets: set[str]) -> str:
+    admin_password_default = shlex.quote(args.admin_password_file or "")
+    tls_probe_flags = "-tls1_2"
+    if _effective_ssl_versions(args) == "tls1.3":
+        tls_probe_flags = "-tls1_3"
+    elif "tls1.3" in _effective_ssl_versions(args).split(","):
+        tls_probe_flags = "-tls1_2 -tls1_3"
     return _sh(f"""# Live validation probes against an applied deployment. Run after the
 # rotation runbook completes.
 
 SPLUNK_HOME="${{SPLUNK_HOME:-{args.splunk_home}}}"
+ADMIN_PASSWORD_FILE_DEFAULT={admin_password_default}
+ADMIN_PASSWORD_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-$ADMIN_PASSWORD_FILE_DEFAULT}}"
+HEALTH_HOST="${{SPLUNK_HEALTH_HOST:-$(hostname -f)}}"
+HEALTH_CA_BUNDLE="${{SPLUNK_CA_BUNDLE:-$SPLUNK_HOME/etc/auth/{args.cert_install_subdir}/cabundle.pem}}"
 failed=0
 fail() {{ echo "FAIL: $1" >&2; failed=$((failed + 1)); }}
 ok()   {{ echo "OK:   $1"; }}
+TLS_PROBE_FLAGS="{tls_probe_flags}"
+
+probe_tls_port() {{
+    local label="$1" port="$2" tls_flag
+    if [[ ! "$HEALTH_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        fail "$label cannot verify an invalid SPLUNK_HEALTH_HOST"
+        return
+    fi
+    if [[ ! -r "$HEALTH_CA_BUNDLE" || ! -s "$HEALTH_CA_BUNDLE" ]]; then
+        fail "$label cannot verify without a readable SPLUNK_CA_BUNDLE"
+        return
+    fi
+    for tls_flag in $TLS_PROBE_FLAGS; do
+        if "$SPLUNK_HOME/bin/splunk" cmd openssl s_client \\
+            -connect "$HEALTH_HOST:$port" -servername "$HEALTH_HOST" \\
+            -verify_hostname "$HEALTH_HOST" -CAfile "$HEALTH_CA_BUNDLE" \\
+            "$tls_flag" </dev/null 2>/dev/null \\
+            | grep -q 'Verify return code: 0 (ok)'; then
+            ok "$label ${{tls_flag#-}} handshake OK"
+        else
+            fail "$label ${{tls_flag#-}} handshake failed"
+        fi
+    done
+}}
 
 # 1. Splunkd 8089 TLS handshake
-if "$SPLUNK_HOME/bin/splunk" cmd openssl s_client \\
-    -connect localhost:8089 -tls1_2 </dev/null 2>/dev/null \\
-    | grep -q 'Verify return code: 0 (ok)'; then
-    ok "splunkd 8089 handshake OK"
-else
-    fail "splunkd 8089 TLS handshake failed"
-fi
+probe_tls_port "splunkd 8089" 8089
 
 # 2. Splunk Web 8000 TLS handshake (if enabled)
 if ss -tln 2>/dev/null | grep -q ':8000 '; then
-    if "$SPLUNK_HOME/bin/splunk" cmd openssl s_client \\
-        -connect localhost:8000 -tls1_2 </dev/null 2>/dev/null \\
-        | grep -q 'Verify return code: 0 (ok)'; then
-        ok "Splunk Web 8000 handshake OK"
-    else
-        fail "Splunk Web 8000 TLS handshake failed"
-    fi
+    probe_tls_port "Splunk Web 8000" 8000
 fi
 
 # 3. HEC 8088 TLS handshake (if enabled)
 if ss -tln 2>/dev/null | grep -q ':8088 '; then
-    if "$SPLUNK_HOME/bin/splunk" cmd openssl s_client \\
-        -connect localhost:8088 -tls1_2 </dev/null 2>/dev/null \\
-        | grep -q 'Verify return code: 0 (ok)'; then
-        ok "HEC 8088 handshake OK"
-    else
-        fail "HEC 8088 TLS handshake failed"
-    fi
+    probe_tls_port "HEC 8088" 8088
 fi
 
 # 4. /services/server/health/splunkd
-if [[ -n "${{SPLUNK_ADMIN_PASSWORD_FILE:-}}" ]] && [[ -r "$SPLUNK_ADMIN_PASSWORD_FILE" ]]; then
-    health="$(curl -k -s -u "admin:$(< "$SPLUNK_ADMIN_PASSWORD_FILE")" \\
-        https://localhost:8089/services/server/health/splunkd 2>/dev/null \\
-        | grep -oE '"health":"[a-z]+"' | head -1 | cut -d'"' -f4)"
-    if [[ "$health" == "green" ]]; then
-        ok "/services/server/health/splunkd: green"
+if [[ -n "$ADMIN_PASSWORD_FILE" ]] && [[ -r "$ADMIN_PASSWORD_FILE" ]]; then
+    admin_mode="$(stat -c '%a' "$ADMIN_PASSWORD_FILE" 2>/dev/null || true)"
+    if [[ -z "$admin_mode" ]] || (( (8#$admin_mode & 077) != 0 )); then
+        fail "SPLUNK_ADMIN_PASSWORD_FILE must have mode 0600 or stricter"
     else
-        fail "/services/server/health/splunkd: ${{health:-unknown}}"
+        admin_password="$(< "$ADMIN_PASSWORD_FILE")"
+        if [[ "$admin_password" == *$'\\n'* || "$admin_password" == *$'\\r'* ]]; then
+            fail "SPLUNK_ADMIN_PASSWORD_FILE must contain one line"
+        elif [[ ! "$HEALTH_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            fail "SPLUNK_HEALTH_HOST must be a hostname that matches the serving certificate"
+        elif [[ ! -r "$HEALTH_CA_BUNDLE" || ! -s "$HEALTH_CA_BUNDLE" ]]; then
+            fail "SPLUNK_CA_BUNDLE must name a readable, non-empty CA bundle"
+        elif [[ ! "${{SPLUNK_ADMIN_USER:-admin}}" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+            fail "SPLUNK_ADMIN_USER contains unsupported characters"
+        else
+            curl_password="${{admin_password//\\\\/\\\\\\\\}}"
+            curl_password="${{curl_password//\\\"/\\\\\\\"}}"
+            health="$(printf 'user = \"%s:%s\"\\n' "${{SPLUNK_ADMIN_USER:-admin}}" "$curl_password" \\
+                | curl --fail --silent --show-error --proto '=https' \\
+                    --cacert "$HEALTH_CA_BUNDLE" --config - \\
+                    "https://${{HEALTH_HOST}}:8089/services/server/health/splunkd" 2>/dev/null \\
+                | grep -oE '"health":"[a-z]+"' | head -1 | cut -d'"' -f4)"
+            admin_password=""
+            curl_password=""
+            if [[ "$health" == "green" ]]; then
+                ok "/services/server/health/splunkd: green"
+            else
+                fail "/services/server/health/splunkd: ${{health:-unknown}}"
+            fi
+        fi
     fi
+else
+    fail "admin password file is required for the splunkd health probe"
 fi
 
 # 5. splunk show-decrypted round trip on sslPassword
@@ -3027,7 +3283,8 @@ def render(args: argparse.Namespace) -> tuple[Path, set[str]]:
 
 [sslConfig]
 sslRootCAPath = {args.splunk_home}/etc/auth/{args.cert_install_subdir}/cabundle.pem
-sslVersionsForClient = {preset['ssl_versions_for_client']}
+sslVersionsForClient = {_effective_ssl_versions(args)}
+{_tls13_server_block(preset, args)}
 """)
 
     # Edge Processor

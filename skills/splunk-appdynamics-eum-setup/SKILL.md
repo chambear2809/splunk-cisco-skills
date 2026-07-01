@@ -1,7 +1,7 @@
 ---
 name: splunk-appdynamics-eum-setup
 description: >-
-  Render, validate, and gate Splunk AppDynamics End User Monitoring workflows,
+  Render and validate Splunk AppDynamics End User Monitoring workflows,
   including Browser RUM, Mobile RUM, IoT RUM, EUM account and application keys,
   JavaScript injection, iOS, Android, React Native, Flutter, .NET MAUI snippets,
   Browser Session Replay, Mobile Session Replay, mapping, source-map upload, and beacon validation. Use when
@@ -12,9 +12,9 @@ description: >-
 
 # Splunk AppDynamics EUM Setup
 
-EUM source edits are gated by `--accept-eum-source-edit`. Render mode writes
-Browser RUM, mobile SDK, Browser Session Replay, Mobile Session Replay, and
-source-upload runbooks.
+The wrapper does not edit application source or upload mappings; `--apply`
+fails closed. Render mode writes Browser RUM, mobile SDK, Browser Session
+Replay, Mobile Session Replay, and operator/CI source-upload runbooks.
 
 ```bash
 bash skills/splunk-appdynamics-eum-setup/scripts/setup.sh --render

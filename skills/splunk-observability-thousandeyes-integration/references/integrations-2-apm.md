@@ -31,7 +31,7 @@ This is **separate** from the Integration 1.0 OpenTelemetry stream, which sends 
    }
    ```
 
-The skill's `apply-apm-connector.sh` runs both calls in sequence and substitutes the placeholder `${O11Y_API_TOKEN}` from the file referenced by `--o11y-api-token-file`.
+The skill's `apply-apm-connector.sh` preflights the connector collection, creates the connector, retains and verifies its returned ID, then performs GET/PUT/GET verification on the operation. It substitutes `${O11Y_API_TOKEN}` from the file referenced by `--o11y-api-token-file` without placing the secret in argv or rendered state.
 
 ## Required Splunk Observability token scope
 
@@ -56,7 +56,7 @@ After `apply-apm-connector.sh` succeeds:
 
 If the link is missing:
 
-- Confirm the connector was created: `bash scripts/list-templates.sh` (templates list lives in the same Integrations 2.0 surface) or check `/tmp/te-connector-response.json` for the connector ID.
+- Confirm the rendered output's mode-700 `state/` directory contains the connector's retained ID. A successful apply also verifies that ID through the generic-connector collection; if the tenant does not support that inferred collection readback, apply fails closed.
 - Confirm the operation is enabled: GET `/v7/operations/splunk-observability-apm/<connector_id>` should return `enabled: true`.
 - Confirm the target URL matches the operator's realm exactly (e.g. `api.us0.signalfx.com`, not `api.us1.signalfx.com`).
 - Confirm the token has the right scope (User API access token, not Org access token).

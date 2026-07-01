@@ -49,6 +49,7 @@ filter:
 enable_dcgm_pod_labels: false
 dcgm_namespace: nvidia-gpu-operator       # used only when enable_dcgm_pod_labels=true
 dcgm_service_account: nvidia-dcgm-exporter # used only when enable_dcgm_pod_labels=true
+dcgm_daemonset: nvidia-dcgm-exporter      # DaemonSet patched and rollout-checked
 
 # Dashboards: GPU util / memory / temp / power / clocks / PCIe / energy /
 # profiling activity.

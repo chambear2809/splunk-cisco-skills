@@ -107,3 +107,9 @@ location updates).
 On Splunk Cloud, the `ta_cisco_spaces` app must be installed before configuring
 streams. ACS handles installation; streams are configured over search-tier REST
 after installation completes.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` exits nonzero for missing stream, enabled
+input, index, event, or sourcetype evidence. No-flag validation is diagnostic.
+This TA ships no pre-built dashboards.

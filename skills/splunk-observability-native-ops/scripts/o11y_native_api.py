@@ -198,8 +198,11 @@ def apply_plan(
     dry_run: bool,
 ) -> dict[str, Any]:
     plan = load_json(plan_dir / "apply-plan.json")
-    if plan.get("mode") != "native-ops":
-        raise ApiError("Only native-ops apply plans can be applied.")
+    plan_mode = plan.get("mode")
+    if plan_mode not in {"native-ops", "deep-native-workflows"}:
+        raise ApiError(
+            "Only native-ops and deep-native-workflows apply plans can be applied."
+        )
     for index, action in enumerate(plan.get("actions", []), start=1):
         if not isinstance(action, dict):
             raise ApiError(f"action {index} must be a JSON object.")

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shlex
@@ -11,6 +12,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 
 from tests.regression_helpers import REPO_ROOT
 
@@ -19,6 +21,19 @@ from skills.shared.coding_agent_o11y import codex as codex_o11y
 
 PARENT = REPO_ROOT / "skills/splunk-observability-coding-agent-instrumentation-setup/scripts/setup.sh"
 CODEX = REPO_ROOT / "skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh"
+NOTIFY_SPAN = (
+    REPO_ROOT
+    / "skills/splunk-observability-codex-instrumentation-setup/runtime/codex-splunk-o11y-notify-span.py"
+)
+
+
+def load_notify_span_module():
+    spec = importlib.util.spec_from_file_location("codex_notify_span_regression", NOTIFY_SPAN)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -90,12 +105,22 @@ def test_parent_execute_codex_splunk_direct_maps_to_direct() -> None:
     ]
 
 
-def test_codex_local_direct_and_external_profiles_render_valid_toml(tmp_path: Path) -> None:
-    out = tmp_path / "all"
+def test_codex_local_and_external_profiles_render_valid_toml(tmp_path: Path) -> None:
+    local_out = tmp_path / "local"
     run_codex(
         "--render",
         "--destination",
-        "all",
+        "local-collector",
+        "--realm",
+        "us1",
+        "--output-dir",
+        str(local_out),
+    )
+    external_out = tmp_path / "external"
+    run_codex(
+        "--render",
+        "--destination",
+        "external-collector",
         "--realm",
         "us1",
         "--external-trace-endpoint",
@@ -105,13 +130,12 @@ def test_codex_local_direct_and_external_profiles_render_valid_toml(tmp_path: Pa
         "--external-header",
         "x-otlp-routing=codex",
         "--output-dir",
-        str(out),
+        str(external_out),
     )
 
-    local_profile = out / "profiles/codex-o11y-local.config.toml"
-    external_profile = out / "profiles/codex-o11y-external.config.toml"
-    direct_profile = out / "profiles/codex-o11y-direct.config.toml"
-    for profile in (local_profile, external_profile, direct_profile):
+    local_profile = local_out / "profiles/codex-o11y-local.config.toml"
+    external_profile = external_out / "profiles/codex-o11y-external.config.toml"
+    for profile in (local_profile, external_profile):
         assert profile.is_file()
         with profile.open("rb") as handle:
             parsed = tomllib.load(handle)
@@ -121,12 +145,10 @@ def test_codex_local_direct_and_external_profiles_render_valid_toml(tmp_path: Pa
     assert "http://127.0.0.1:14318/v1/traces" in local_profile.read_text(encoding="utf-8")
     assert "http://127.0.0.1:14318/v1/metrics" in local_profile.read_text(encoding="utf-8")
     assert "https://otel-gateway.example.com/v1/traces" in external_profile.read_text(encoding="utf-8")
-    direct_text = direct_profile.read_text(encoding="utf-8")
-    assert "https://ingest.us1.observability.splunkcloud.com/v2/trace/otlp" in direct_text
-    assert "https://ingest.us1.observability.splunkcloud.com/v2/datapoint/otlp" in direct_text
-    assert '"X-SF-TOKEN" = "${SPLUNK_ACCESS_TOKEN}"' in direct_text
-    assert "otlp-grpc" not in direct_text
-    assert 'exporter = "none"' in direct_text
+    assert "CODEX_PROFILE=codex-o11y-local" in (local_out / "bin/codex-o11y-exec").read_text(encoding="utf-8")
+    assert "CODEX_PROFILE=codex-o11y-external" in (external_out / "bin/codex-o11y-exec").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_codex_local_collector_endpoint_is_configurable(tmp_path: Path) -> None:
@@ -148,9 +170,42 @@ def test_codex_local_collector_endpoint_is_configurable(tmp_path: Path) -> None:
     assert "http://localhost:24318/v1/logs" in profile
 
     overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
-    assert 'endpoint: "localhost:24318"' in overlay
+    assert 'endpoint: "0.0.0.0:4318"' in overlay
 
     run_codex("--validate", "--output-dir", str(out))
+
+
+def test_codex_local_collector_receiver_bind_is_independent_and_configurable(tmp_path: Path) -> None:
+    out = tmp_path / "receiver-bind"
+    run_codex(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--local-collector-endpoint",
+        "http://127.0.0.1:14318",
+        "--local-collector-receiver-endpoint",
+        "127.0.0.1:24318",
+        "--output-dir",
+        str(out),
+    )
+
+    profile = (out / "profiles/codex-o11y-local.config.toml").read_text(encoding="utf-8")
+    overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert "http://127.0.0.1:14318/v1/traces" in profile
+    assert 'endpoint: "127.0.0.1:24318"' in overlay
+
+
+def test_codex_local_collector_receiver_bind_rejects_url(tmp_path: Path) -> None:
+    result = run_codex(
+        "--render",
+        "--local-collector-receiver-endpoint",
+        "http://0.0.0.0:4318",
+        "--output-dir",
+        str(tmp_path / "bad-receiver-bind"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "bind address" in result.stdout + result.stderr
 
 
 def test_codex_local_collector_endpoint_rejects_full_signal_path(tmp_path: Path) -> None:
@@ -255,6 +310,10 @@ def test_codex_runtime_env_and_collector_overlay_quote_values(tmp_path: Path) ->
     overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
     assert 'value: "codex cli: prod #1"' in overlay
     assert 'value: "prod blue"' in overlay
+    assert "key: sf_service" in overlay
+    assert "key: sf_environment" in overlay
+    assert overlay.count("action: upsert") == 4
+    assert 'endpoint: "0.0.0.0:4318"' in overlay
     assert 'realm: "us0"' in overlay
     assert 'traces_endpoint: "https://ingest.us0.observability.splunkcloud.com/v2/trace/otlp"' in overlay
     assert 'access_token: "${env:SPLUNK_ACCESS_TOKEN}"' in overlay
@@ -269,41 +328,198 @@ def test_codex_local_native_logs_render_collector_logs_pipeline(tmp_path: Path) 
     assert "http://127.0.0.1:14318/v1/logs" in profile
     overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
     assert "logs/codex:" in overlay
+    assert "/v2/log/otlp" not in overlay
+    assert 'logs_endpoint: "https://ingest.us0.observability.splunkcloud.com/v3/event"' in overlay
+    assert "exporters: [otlphttp/codex_logs]" in overlay
+    assert "exporters: [otlphttp/codex_traces, signalfx/codex]" not in overlay
+    assert "exporters: [otlphttp/codex_traces]" in overlay
+
+
+def test_codex_local_collector_pins_splunk_distribution_native_histograms(tmp_path: Path) -> None:
+    out = tmp_path / "splunk-distribution"
+    run_codex("--render", "--destination", "local-collector", "--output-dir", str(out))
+
+    overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    runner = (out / "collector/run-codex-o11y-local-collector.sh").read_text(encoding="utf-8")
+    image = (
+        "quay.io/signalfx/splunk-otel-collector"
+        "@sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2"
+    )
+
+    assert image in overlay
+    assert image in runner
+    assert "otel/opentelemetry-collector-contrib" not in runner
+    assert "signalfx/codex:" in overlay
     assert "exporters: [signalfx/codex]" in overlay
+    assert "send_otlp_histograms: true" in overlay
+    assert "splunk_otlp_histograms" not in overlay
+    assert "--env SPLUNK_ACCESS_TOKEN" in runner
+    assert "--config=/etc/otel/collector/codex-o11y.yaml" in runner
 
 
-def test_codex_direct_mode_refuses_native_logs_and_grpc(tmp_path: Path) -> None:
-    logs = run_codex(
-        "--render",
-        "--destination",
-        "direct",
-        "--enable-native-logs",
-        "--output-dir",
-        str(tmp_path / "logs"),
-        "--json",
-        check=False,
+def test_codex_validate_rejects_upstream_collector_runner(tmp_path: Path) -> None:
+    out = tmp_path / "wrong-distribution"
+    run_codex("--render", "--destination", "local-collector", "--output-dir", str(out))
+    runner = out / "collector/run-codex-o11y-local-collector.sh"
+    runner.write_text(
+        runner.read_text(encoding="utf-8").replace(
+            "quay.io/signalfx/splunk-otel-collector"
+            "@sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2",
+            "otel/opentelemetry-collector-contrib:0.154.0",
+        ),
+        encoding="utf-8",
     )
-    assert logs.returncode != 0
-    assert "refuses native Codex logs" in logs.stdout + logs.stderr
 
-    grpc = run_codex(
-        "--render",
-        "--destination",
-        "direct",
-        "--external-collector-protocol",
-        "otlp-grpc",
-        "--output-dir",
-        str(tmp_path / "grpc"),
-        "--json",
-        check=False,
+    result = run_codex("--validate", "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must pin the supported Splunk Distribution image" in result.stdout + result.stderr
+    assert "must not use the upstream contrib image" in result.stdout + result.stderr
+
+
+def test_codex_notify_genai_metric_contract_and_delta_temporality() -> None:
+    notify_span = load_notify_span_module()
+
+    class RecordingInstrument:
+        def __init__(self, name: str, unit: str | None, boundaries=()) -> None:
+            self.name = name
+            self.unit = unit
+            self.boundaries = tuple(boundaries)
+            self.points: list[tuple[float | int, dict[str, object]]] = []
+
+        def record(self, value, attributes) -> None:
+            self.points.append((value, dict(attributes)))
+
+        def add(self, value, attributes) -> None:
+            self.points.append((value, dict(attributes)))
+
+    class RecordingMeter:
+        def __init__(self) -> None:
+            self.instruments: dict[str, RecordingInstrument] = {}
+
+        def create_histogram(
+            self,
+            name: str,
+            unit: str = "",
+            explicit_bucket_boundaries_advisory=(),
+        ) -> RecordingInstrument:
+            instrument = RecordingInstrument(name, unit, explicit_bucket_boundaries_advisory)
+            self.instruments[name] = instrument
+            return instrument
+
+        def create_counter(self, name: str, unit: str = "") -> RecordingInstrument:
+            instrument = RecordingInstrument(name, unit)
+            self.instruments[name] = instrument
+            return instrument
+
+    meter = RecordingMeter()
+    provider = SimpleNamespace(get_meter=lambda *_args: meter)
+    notify_span._record_metrics(provider, notify_span.synthetic_turn())
+
+    assert {name: instrument.unit for name, instrument in meter.instruments.items()} == {
+        "gen_ai.workflow.duration": "s",
+        "gen_ai.agent.duration": "s",
+        "gen_ai.client.operation.duration": "s",
+        "gen_ai.client.token.usage": "{token}",
+        "codex.turns": "",
+    }
+    duration_boundaries = (
+        0.01,
+        0.02,
+        0.04,
+        0.08,
+        0.16,
+        0.32,
+        0.64,
+        1.28,
+        2.56,
+        5.12,
+        10.24,
+        20.48,
+        40.96,
+        81.92,
     )
-    assert grpc.returncode != 0
-    assert "gRPC direct mode is refused" in grpc.stdout + grpc.stderr
+    token_boundaries = (
+        1,
+        4,
+        16,
+        64,
+        256,
+        1024,
+        4096,
+        16384,
+        65536,
+        262144,
+        1048576,
+        4194304,
+        16777216,
+        67108864,
+    )
+    for name in (
+        "gen_ai.workflow.duration",
+        "gen_ai.agent.duration",
+        "gen_ai.client.operation.duration",
+    ):
+        assert meter.instruments[name].boundaries == duration_boundaries
+    assert meter.instruments["gen_ai.client.token.usage"].boundaries == token_boundaries
+    for instrument in meter.instruments.values():
+        for _, attributes in instrument.points:
+            assert attributes["gen_ai.agent.name"] == "codex"
+            assert attributes["gen_ai.framework"] == "codex"
+            assert attributes["gen_ai.provider.name"] == "openai"
+            assert attributes["gen_ai.request.model"] == "codex-smoke-model"
+            assert attributes["gen_ai.response.model"] == "codex-smoke-model"
+
+    assert {
+        attributes["gen_ai.token.type"]
+        for _, attributes in meter.instruments["gen_ai.client.token.usage"].points
+    } == {"input", "output"}
+    assert meter.instruments["gen_ai.workflow.duration"].points[0][1]["gen_ai.operation.name"] == "invoke_workflow"
+    assert meter.instruments["gen_ai.agent.duration"].points[0][1]["gen_ai.operation.name"] == "invoke_agent"
+    assert meter.instruments["gen_ai.client.operation.duration"].points[0][1]["gen_ai.operation.name"] == "chat"
+
+    delta = object()
+    fake_metrics_sdk = SimpleNamespace(
+        Histogram=type("Histogram", (), {}),
+    )
+    fake_metrics_export = SimpleNamespace(AggregationTemporality=SimpleNamespace(DELTA=delta))
+    preferences = notify_span._delta_metric_temporality(fake_metrics_sdk, fake_metrics_export)
+    assert set(preferences) == {fake_metrics_sdk.Histogram}
+    assert all(value is delta for value in preferences.values())
+    source = NOTIFY_SPAN.read_text(encoding="utf-8")
+    assert "preferred_temporality=_delta_metric_temporality(metrics_sdk, metrics_export)" in source
+
+
+def test_codex_direct_mode_fails_closed_for_credentials(tmp_path: Path) -> None:
+    # Retain upstream coverage for native-log and gRPC direct requests while
+    # asserting the stricter reviewed behavior: direct mode now fails before
+    # rendering any credential-bearing profile, regardless of legacy options.
+    cases = (
+        ("default", ()),
+        ("native-logs", ("--enable-native-logs",)),
+        ("grpc", ("--external-collector-protocol", "otlp-grpc")),
+    )
+    for name, extra_args in cases:
+        output_dir = tmp_path / name
+        result = run_codex(
+            "--render",
+            "--destination",
+            "direct",
+            *extra_args,
+            "--output-dir",
+            str(output_dir),
+            "--json",
+            check=False,
+        )
+        assert result.returncode != 0
+        output = result.stdout + result.stderr
+        assert "header placeholders literally" in output
+        assert "use local-collector" in output
+        assert not (output_dir / "profiles/codex-o11y-direct.config.toml").exists()
 
 
 def test_codex_reports_apply_plan_strict_config_hooks_and_histograms(tmp_path: Path) -> None:
     out = tmp_path / "rendered"
-    run_codex("--render", "--destination", "direct", "--realm", "us0", "--output-dir", str(out))
+    run_codex("--render", "--destination", "local-collector", "--realm", "us0", "--output-dir", str(out))
 
     required = [
         "apply-plan.json",
@@ -322,11 +538,11 @@ def test_codex_reports_apply_plan_strict_config_hooks_and_histograms(tmp_path: P
         assert (out / rel).is_file(), rel
 
     plan = json.loads((out / "apply-plan.json").read_text(encoding="utf-8"))
-    assert ["codex", "--strict-config", "--profile", "codex-o11y-direct"] in [
+    assert ["codex", "--strict-config", "--profile", "codex-o11y-local"] in [
         profile["strict_config_command"] for profile in plan["profiles"]
     ]
     strict_commands = [" ".join(profile["strict_config_command"]) for profile in plan["profiles"]]
-    assert "codex --strict-config --profile codex-o11y-direct" in strict_commands
+    assert "codex --strict-config --profile codex-o11y-local" in strict_commands
     runtime_commands = [
         command
         for step in plan["steps"]
@@ -393,7 +609,7 @@ def test_codex_apply_uses_concrete_codex_home_installs_runtime_and_merges_hooks(
         "--codex-home",
         str(codex_home),
         "--destination",
-        "direct",
+        "local-collector",
         "--realm",
         "us0",
         "--output-dir",
@@ -403,7 +619,7 @@ def test_codex_apply_uses_concrete_codex_home_installs_runtime_and_merges_hooks(
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
 
-    assert (codex_home / "codex-o11y-direct.config.toml").is_file()
+    assert (codex_home / "codex-o11y-local.config.toml").is_file()
     assert (codex_home / "bin/codex-o11y-exec").is_file()
     assert (codex_home / "bin/codex-o11y-jsonl-to-spans.py").is_file()
     assert (codex_home / "hooks/codex-o11y-stop-hook.py").is_file()
@@ -433,7 +649,7 @@ def test_codex_apply_consumes_reviewed_artifacts_without_rerendering_defaults(tm
     run_codex(
         "--render",
         "--destination",
-        "direct",
+        "local-collector",
         "--realm",
         "us1",
         "--codex-home",
@@ -445,10 +661,10 @@ def test_codex_apply_consumes_reviewed_artifacts_without_rerendering_defaults(tm
     result = run_codex("--apply", "profiles", "--output-dir", str(out), "--json")
     payload = json.loads(result.stdout[result.stdout.index("{") :])
     assert payload["ok"] is True
-    assert (codex_home / "codex-o11y-direct.config.toml").is_file()
-    assert not (codex_home / "codex-o11y-local.config.toml").exists()
-    assert "https://ingest.us1.observability.splunkcloud.com" in (
-        codex_home / "codex-o11y-direct.config.toml"
+    assert (codex_home / "codex-o11y-local.config.toml").is_file()
+    assert not (codex_home / "codex-o11y-external.config.toml").exists()
+    assert "http://127.0.0.1:14318/v1/traces" in (
+        codex_home / "codex-o11y-local.config.toml"
     ).read_text(encoding="utf-8")
 
 
@@ -497,8 +713,7 @@ def test_codex_rejects_secret_flags_and_scans_rendered_token_leaks(tmp_path: Pat
     assert bearer.returncode != 0
     assert "may carry credentials" in bearer.stdout + bearer.stderr
 
-    placeholder = tmp_path / "placeholder-header"
-    run_codex(
+    placeholder = run_codex(
         "--render",
         "--destination",
         "external-collector",
@@ -509,11 +724,12 @@ def test_codex_rejects_secret_flags_and_scans_rendered_token_leaks(tmp_path: Pat
         "--external-header",
         "Authorization=${OTLP_TOKEN}",
         "--output-dir",
-        str(placeholder),
+        str(tmp_path / "placeholder-header"),
+        check=False,
     )
-    assert '"Authorization" = "${OTLP_TOKEN}"' in (
-        placeholder / "profiles/codex-o11y-external.config.toml"
-    ).read_text(encoding="utf-8")
+    assert placeholder.returncode != 0
+    assert "sends OTLP header placeholders literally" in placeholder.stdout + placeholder.stderr
+    assert not (tmp_path / "placeholder-header/profiles/codex-o11y-external.config.toml").exists()
 
 
 def test_codex_exec_json_fixture_parses_dedupe_and_truncates_content() -> None:
@@ -599,6 +815,7 @@ def test_exec_wrapper_preserves_codex_failure_status_and_still_parses_jsonl(tmp_
     codex = bin_dir / "codex"
     codex.write_text(
         "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$@\" > \"$CODEX_ARGS_OUT\"\n"
         "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"t-fail\"}'\n"
         "exit 7\n",
         encoding="utf-8",
@@ -608,6 +825,7 @@ def test_exec_wrapper_preserves_codex_failure_status_and_still_parses_jsonl(tmp_
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["CODEX_O11Y_JSONL"] = str(tmp_path / "events.jsonl")
     env["CODEX_O11Y_SPANS"] = str(tmp_path / "spans.json")
+    env["CODEX_ARGS_OUT"] = str(tmp_path / "codex-args.txt")
 
     result = subprocess.run(
         [str(out / "bin/codex-o11y-exec"), "do work"],
@@ -618,6 +836,13 @@ def test_exec_wrapper_preserves_codex_failure_status_and_still_parses_jsonl(tmp_
         check=False,
     )
     assert result.returncode == 7
+    assert (tmp_path / "codex-args.txt").read_text(encoding="utf-8").splitlines() == [
+        "exec",
+        "--profile",
+        "codex-o11y-local",
+        "--json",
+        "do work",
+    ]
     assert not (tmp_path / "events.jsonl").exists()
     assert not marker.exists()
     spans = json.loads((tmp_path / "spans.json").read_text(encoding="utf-8"))

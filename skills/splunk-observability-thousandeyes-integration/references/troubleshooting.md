@@ -2,7 +2,7 @@
 
 This annex covers the most common failure modes for the ThousandEyes -> Splunk Observability Cloud integration. For type-specific signal questions see `test-types-catalog.md`; for SignalFlow chart issues see `signalflow-validation.md`; for APM trace linking see `integrations-2-apm.md`.
 
-## No `te.*` metrics in Splunk Observability Cloud
+## No ThousandEyes metrics in Splunk Observability Cloud
 
 ### Step 1: confirm the Stream object exists
 
@@ -41,7 +41,7 @@ Confirm the test is `enabled: true` and the `interval` is non-zero. Stopped or d
 In O11y UI, run a SignalFlow query:
 
 ```python
-data('te.test.up', filter=filter('te.account_group.id', '${ACCOUNT_GROUP_ID}')).count().publish()
+data('network.latency', filter=filter('thousandeyes.account.id', '${ACCOUNT_GROUP_ID}')).count().publish()
 ```
 
 If the count is 0, the Stream is forwarding but O11y is not ingesting. Common causes:
@@ -98,29 +98,23 @@ The renderer ships per-type test specs under `te-payloads/tests/<test-id>.json`.
 
 ## Templates apply fails with `credentials must be Handlebars`
 
-ThousandEyes Templates require credentials embedded as Handlebars expressions like `{{ var "MY_TOKEN" }}`, not literal token values. The renderer enforces this for any field that looks token-shaped:
+ThousandEyes Templates require credentials embedded as Handlebars expressions, not literal token values. The renderer enforces this for any field that looks token-shaped. For example:
 
 ```bash
-[2026-05-03 ...] ERROR: Template field 'customHeaders.X-SF-Token' contains a literal token. Templates must reference credentials via Handlebars expressions only. Re-render with --te-token-file pointing at a chmod 600 file containing the token, and the renderer will substitute the {{ var ... }} expression for you.
+ERROR: templates field template_body.customHeaders.X-SF-Token must be a Handlebars placeholder, not a literal credential.
 ```
 
-The fix is in the renderer's prompt; follow it. NEVER hand-edit the rendered template JSON to inline a token; it WILL leak via TE's template export feature.
+Replace the spec value with a declared reference such as `{{te_credentials.api_key}}`. The renderer validates placeholders; it never derives or substitutes one from a token file. Never hand-edit rendered JSON to inline a token.
 
-## SignalFlow validation errors
+## Metric-catalog probe errors
 
-If `validate-signalflow.sh` reports errors:
+If `validate-signalflow.sh` reports an HTTP, authentication, or JSON error, verify the realm and User API token. The helper is only a read-only `/v2/metric` reachability probe; it does not compile the rendered SignalFlow programs.
 
 ```
-ERROR: SignalFlow program validation failed for chart 'TE BGP Peer Up':
-  unknown function: peers_per_aid
+curl: (22) The requested URL returned error: 401
 ```
 
-Fix the SignalFlow program in the rendered chart spec. Common causes:
-
-- Older renderer baseline; PR #45562 (or your renderer version) renamed metric.
-- Custom-edited chart spec with a typo.
-
-The validator runs against O11y's SignalFlow service in dry-run mode; no chart is created if validation fails.
+Use the WebSocket handoff in `signalflow-validation.md` or the downstream dashboard-builder's validation to test actual SignalFlow programs.
 
 ## Per-test-type filter doesn't match
 
@@ -141,7 +135,7 @@ curl -sS -K "$TE_CURL_CONFIG" \
 
 ## Stream is forwarding but only some test types appear
 
-If you see `te.test.up` but NOT `te.test.http.response.time.ms`, the test type's metric set isn't being emitted. Most likely: the test type doesn't support that metric in TE OTel data model v2. See `test-types-catalog.md` for the per-type metric matrix.
+If you see `network.latency` but not an expected metric such as `http.client.request.duration`, verify that the test type supports it in TE OTel data model v2. See `test-types-catalog.md` for the per-type metric matrix.
 
 ## High MTS cost
 
@@ -149,14 +143,14 @@ TE OTel data model v2 emits ~12-30 metrics per test per interval. Default test i
 
 - 100 tests * 20 metrics * 1 sample/min = 2000 datapoints/min = 86.4M datapoints/month.
 
-Within typical O11y org quotas (1B datapoints/month default), but if you have hundreds of tests, consider:
+Compare the result with your organization's current entitlement. If you have hundreds of tests, consider:
 
 - Filtering to only critical test types via `stream.filters.testTypes[]`.
 - Increasing test intervals (TE Web Transactions at 5min vs 1min reduces by 5x).
 
 ## Coordination with cisco-thousandeyes-setup
 
-If you've ALSO run `cisco-thousandeyes-setup` (the Splunk Platform TA path for raw test events), no overlap with this skill. The TA ingests raw test events into Splunk Platform; this skill ingests aggregated metrics into Splunk Observability Cloud. Both can use the same TE OAuth token (read scope is enough).
+If you've ALSO run `cisco-thousandeyes-setup` (the Splunk Platform TA path for raw test events), no overlap with this skill. The TA ingests raw test events into Splunk Platform; this skill ingests aggregated metrics into Splunk Observability Cloud. Use the least-privilege token scope required by each workflow; live asset apply requires mutation privileges.
 
 ## Coordination with cisco-thousandeyes-mcp-setup
 

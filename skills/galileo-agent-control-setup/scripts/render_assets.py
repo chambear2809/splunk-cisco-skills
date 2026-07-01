@@ -17,6 +17,7 @@ from typing import Any
 
 
 SKILL_NAME = "galileo-agent-control-setup"
+SOURCE_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 APPLY_SECTIONS = [
     "server",
     "auth",
@@ -303,8 +304,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${OUTPUT_DIR}/../.." && pwd)}"
-"""
+PROJECT_ROOT="${PROJECT_ROOT:-__SOURCE_PROJECT_ROOT__}"
+""".replace("__SOURCE_PROJECT_ROOT__", shell_double_default(str(SOURCE_PROJECT_ROOT)))
 
 
 def require_file_var(var_name: str, default_path: str, label: str) -> str:
@@ -645,7 +646,9 @@ def render_scripts(output_dir: Path, config: dict[str, Any], sections: list[str]
     }
     for section, message in simple_messages.items():
         script = f"""{script_header()}
-echo {shell_quote(message)}
+echo "ERROR: The '{section}' section is a render-only handoff, not an automated apply." >&2
+echo {shell_quote(message)} >&2
+exit 2
 """
         write_text(scripts_dir / f"apply-{section}.sh", script, executable=True)
         scripts[section] = f"scripts/apply-{section}.sh"
@@ -655,7 +658,7 @@ TARGET_DIR="${{RUNTIME_TARGET_DIR:-{shell_double_default(config["runtime_target_
 if [[ -z "${{TARGET_DIR}}" ]]; then
   echo "Set RUNTIME_TARGET_DIR to copy runtime/python-control.py into an app tree." >&2
   echo "Rendered snippet: ${{OUTPUT_DIR}}/runtime/python-control.py" >&2
-  exit 0
+  exit 1
 fi
 mkdir -p "${{TARGET_DIR}}"
 cp "${{OUTPUT_DIR}}/runtime/python-control.py" "${{TARGET_DIR}}/agent_control_runtime.py"
@@ -669,7 +672,7 @@ TARGET_DIR="${{RUNTIME_TARGET_DIR:-{shell_double_default(config["runtime_target_
 if [[ -z "${{TARGET_DIR}}" ]]; then
   echo "Set RUNTIME_TARGET_DIR to copy runtime/typescript-control.ts into an app tree." >&2
   echo "Rendered snippet: ${{OUTPUT_DIR}}/runtime/typescript-control.ts" >&2
-  exit 0
+  exit 1
 fi
 mkdir -p "${{TARGET_DIR}}"
 cp "${{OUTPUT_DIR}}/runtime/typescript-control.ts" "${{TARGET_DIR}}/agent-control-runtime.ts"

@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import stat
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 VALID_PLATFORMS = ("onprem-single", "onprem-cluster", "cloud")
@@ -28,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--soar-fips", choices=VALID_FIPS, default="auto")
     p.add_argument("--soar-hosts", default="")
     p.add_argument("--soar-ssh-user", default="splunk")
+    p.add_argument("--soar-ssh-known-hosts-file", default="")
     p.add_argument("--external-pg", default="")
     p.add_argument("--external-gluster", default="")
     p.add_argument("--external-es", default="")
@@ -53,6 +56,42 @@ def parse_args() -> argparse.Namespace:
 
 def die(message: str) -> None:
     raise SystemExit(f"ERROR: {message}")
+
+
+def validate_inputs(args: argparse.Namespace) -> None:
+    try:
+        port = int(args.soar_https_port)
+    except ValueError as exc:
+        die(f"SOAR HTTPS port must be an integer: {exc}")
+    if not 1 <= port <= 65535:
+        die("SOAR HTTPS port must be between 1 and 65535")
+    if args.soar_tenant_url:
+        value = args.soar_tenant_url.strip().rstrip("/")
+        if any(character.isspace() for character in value):
+            die("SOAR tenant URL must not contain whitespace")
+        try:
+            parsed = urlsplit(value)
+        except ValueError as exc:
+            die(f"SOAR tenant URL is invalid: {exc}")
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            die("SOAR tenant URL must be an http(s) URL")
+        host = parsed.hostname.lower()
+        if "<" in host or ">" in host or host == "example.com" or host.endswith(".example.com"):
+            die("SOAR tenant URL must use a real tenant host, not a placeholder")
+        if parsed.username or parsed.password:
+            die("SOAR tenant URL must not contain inline credentials")
+        if parsed.query or parsed.fragment:
+            die("SOAR tenant URL must not contain a query or fragment")
+        try:
+            parsed.port
+        except ValueError as exc:
+            die(f"SOAR tenant URL has an invalid port: {exc}")
+        args.soar_tenant_url = value
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", args.soar_ssh_user):
+        die("SOAR SSH user contains unsupported characters")
+    for host in csv_list(args.soar_hosts):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host):
+            die(f"SOAR cluster host contains unsupported characters: {host!r}")
 
 
 def shell_quote(value: object) -> str:
@@ -88,7 +127,7 @@ def make_script(body: str) -> str:
 
 # Runtime locator for skills/shared/lib so the rendered SOAR scripts can
 # source soar_helpers.sh (which keeps the SOAR ph-auth-token and
-# soar_local_admin password off curl's argv via -K <(...) / --netrc-file).
+# soar_local_admin password off curl's argv via process-substituted curl config).
 # Mirrors the pattern used by the license, indexer-cluster, and EP renderers.
 _SOAR_LIB_DIR_BLOCK = (
     '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
@@ -135,8 +174,8 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         'fi\n'
         'sudo firewall-cmd --permanent --zone public --add-port "${HTTPS_PORT}/tcp" >/dev/null\n'
         'sudo firewall-cmd --reload >/dev/null\n\n'
-        'sudo localectl set-locale LANG=en_US.UTF-8 || true\n'
-        'sudo localectl set-keymap us || true\n\n'
+        'sudo localectl set-locale LANG=en_US.UTF-8\n'
+        'sudo localectl set-keymap us\n\n'
         'if [[ -r /proc/sys/crypto/fips_enabled ]]; then\n'
         '  fips_state=$(cat /proc/sys/crypto/fips_enabled)\n'
         'else\n'
@@ -151,7 +190,7 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         '    ;;\n'
         'esac\n\n'
         'mkdir -p "${SOAR_HOME}"\n'
-        'sudo chown "$(whoami):$(whoami)" "${SOAR_HOME}" || true\n'
+        'sudo chown "$(id -un):$(id -gn)" "${SOAR_HOME}"\n'
         'tar -xzf "${SOAR_TGZ}" -C "${SOAR_HOME}"\n'
         'cd "${SOAR_HOME}/splunk-soar"\n\n'
         'PREPARE_ARGS=(--splunk-soar-home "${SOAR_HOME}" --https-port "${HTTPS_PORT}")\n'
@@ -180,7 +219,7 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         "   ```bash\n"
         "   bash splunk-side/install-app-for-soar.sh\n"
         "   bash splunk-side/install-app-for-soar-export.sh\n"
-        "   bash splunk-side/configure-phantom-endpoint.sh\n"
+        "   # Then follow the Mission Control UI handoff in splunk-side/configure-phantom-endpoint.sh.\n"
         "   ```\n"
         "6. Run `validate.sh` to confirm REST endpoints are reachable.\n"
     )
@@ -195,6 +234,7 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
 def render_onprem_cluster(args: argparse.Namespace) -> dict:
     hosts = csv_list(args.soar_hosts)
     soar_ssh = shell_quote(args.soar_ssh_user)
+    known_hosts = shell_quote(args.soar_ssh_known_hosts_file)
     soar_home = shell_quote(args.soar_home)
     https_port = shell_quote(args.soar_https_port)
     soar_tgz = shell_quote(args.soar_tgz)
@@ -210,21 +250,48 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         f"SOAR_HOME={soar_home}\n"
         f"HTTPS_PORT={https_port}\n"
         f"SOAR_TGZ={soar_tgz}\n"
-        f"SSH_USER={soar_ssh}\n\n"
+        f"SSH_USER={soar_ssh}\n"
+        f"SSH_KNOWN_HOSTS_FILE={known_hosts}\n"
+        '[[ -s "${SOAR_TGZ}" ]] || { echo "ERROR: SOAR TGZ missing or empty: ${SOAR_TGZ}" >&2; exit 1; }\n'
+        '[[ -r "${SSH_KNOWN_HOSTS_FILE}" ]] || { echo "ERROR: --soar-ssh-known-hosts-file must be readable." >&2; exit 1; }\n'
+        'SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS_FILE}")\n'
+        'ACTIVE_HOST=""\n'
+        'ACTIVE_DIR=""\n'
+        'cleanup_active() {\n'
+        '  if [[ -n "${ACTIVE_HOST}" && -n "${ACTIVE_DIR}" ]]; then\n'
+        '    ssh "${SSH_OPTS[@]}" "${SSH_USER}@${ACTIVE_HOST}" rm -rf -- "${ACTIVE_DIR}" >/dev/null 2>&1 || true\n'
+        '  fi\n'
+        '}\n'
+        'trap cleanup_active EXIT\n'
+        "trap 'exit 130' INT\n"
+        "trap 'exit 143' TERM\n\n"
         f'for host in {hosts_q}; do\n'
-        '  scp -o StrictHostKeyChecking=accept-new "${SOAR_TGZ}" "${SSH_USER}@${host}:/tmp/soar.tgz"\n'
-        "  ssh -o StrictHostKeyChecking=accept-new \"${SSH_USER}@${host}\" \"\n"
-        "    set -euo pipefail\n"
-        "    sudo mkdir -p ${SOAR_HOME}\n"
-        "    sudo chown ${SSH_USER}:${SSH_USER} ${SOAR_HOME}\n"
-        "    tar -xzf /tmp/soar.tgz -C ${SOAR_HOME}\n"
-        "    cd ${SOAR_HOME}/splunk-soar\n"
-        "    sudo ./soar-prepare-system --splunk-soar-home ${SOAR_HOME} --https-port ${HTTPS_PORT}\n"
-        "    ./soar-install --splunk-soar-home ${SOAR_HOME} --https-port ${HTTPS_PORT}\n"
-        "    cd ${SOAR_HOME}/bin\n"
-        "    phenv python make_cluster_node.pyc\n"
-        "  \"\n"
+        '  remote_dir="$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \'umask 077; mktemp -d /tmp/splunk-soar-install.XXXXXX\')"\n'
+        '  [[ "${remote_dir}" =~ ^/tmp/splunk-soar-install\\.[A-Za-z0-9]+$ ]] || { echo "ERROR: unexpected remote staging path from ${host}: ${remote_dir}" >&2; exit 1; }\n'
+        '  ACTIVE_HOST="${host}"\n'
+        '  ACTIVE_DIR="${remote_dir}"\n'
+        '  scp "${SSH_OPTS[@]}" "${SOAR_TGZ}" "${SSH_USER}@${host}:${remote_dir}/soar.tgz"\n'
+        '  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" bash -s -- "${SOAR_HOME}" "${HTTPS_PORT}" "${remote_dir}/soar.tgz" "${remote_dir}" <<\'REMOTE\'\n'
+        "set -euo pipefail\n"
+        'soar_home="$1"\n'
+        'https_port="$2"\n'
+        'archive="$3"\n'
+        'staging_dir="$4"\n'
+        '[[ "${staging_dir}" =~ ^/tmp/splunk-soar-install\\.[A-Za-z0-9]+$ ]] || { echo "ERROR: invalid remote staging path" >&2; exit 1; }\n'
+        'trap \'rm -rf -- "${staging_dir}"\' EXIT\n'
+        'sudo mkdir -p "${soar_home}"\n'
+        'sudo chown "$(id -un):$(id -gn)" "${soar_home}"\n'
+        'tar -xzf "${archive}" -C "${soar_home}"\n'
+        'cd "${soar_home}/splunk-soar"\n'
+        'sudo ./soar-prepare-system --splunk-soar-home "${soar_home}" --https-port "${https_port}"\n'
+        './soar-install --splunk-soar-home "${soar_home}" --https-port "${https_port}"\n'
+        'cd "${soar_home}/bin"\n'
+        "phenv python make_cluster_node.pyc\n"
+        "REMOTE\n"
+        '  ACTIVE_HOST=""\n'
+        '  ACTIVE_DIR=""\n'
         "done\n"
+        'trap - EXIT INT TERM\n'
         'echo "OK: cluster nodes provisioned. Configure load balancer next via external-services/haproxy.cfg."\n'
     )
     out["make-cluster-node.sh"] = make_script(cluster_body)
@@ -241,7 +308,9 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         f"SOAR_HOME={soar_home}\n"
         f'PRIMARY_HOST="{primary}"\n'
         f"SSH_USER={soar_ssh}\n"
-        'ssh -o StrictHostKeyChecking=accept-new \\\n'
+        f"SSH_KNOWN_HOSTS_FILE={known_hosts}\n"
+        '[[ -r "${SSH_KNOWN_HOSTS_FILE}" ]] || { echo "ERROR: SSH known-hosts file is required." >&2; exit 1; }\n'
+        'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS_FILE}" \\\n'
         '    "${SSH_USER}@${PRIMARY_HOST}" \\\n'
         '    bash -s -- "${SOAR_HOME}" <<\'REMOTE\'\n'
         "set -euo pipefail\n"
@@ -257,8 +326,10 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         f"SOAR_HOME={soar_home}\n"
         f'PRIMARY_HOST="{primary}"\n'
         f"SSH_USER={soar_ssh}\n"
+        f"SSH_KNOWN_HOSTS_FILE={known_hosts}\n"
         'BACKUP_PATH="${BACKUP_PATH:?set BACKUP_PATH=/path/to/phantom_backup_*.tgz on the primary host}"\n'
-        'ssh -o StrictHostKeyChecking=accept-new \\\n'
+        '[[ -r "${SSH_KNOWN_HOSTS_FILE}" ]] || { echo "ERROR: SSH known-hosts file is required." >&2; exit 1; }\n'
+        'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS_FILE}" \\\n'
         '    "${SSH_USER}@${PRIMARY_HOST}" \\\n'
         '    bash -s -- "${SOAR_HOME}" "${BACKUP_PATH}" <<\'REMOTE\'\n'
         "set -euo pipefail\n"
@@ -272,7 +343,6 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
     out["restore.sh"] = make_script(restore_body)
 
     pg_mode = pg.get("mode", "local")
-    pg_host = pg.get("host", "<db-host>")
     pg_port = pg.get("port", "5432")
 
     if pg_mode == "rds":
@@ -298,11 +368,8 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
             "  skip_final_snapshot     = false\n"
             "  apply_immediately       = false\n"
             "}\n\n"
-            "# Provision the pgbouncer user after RDS comes up:\n"
-            f"#   psql --host {pg_host} --port {pg_port} --username postgres --dbname phantom \\\n"
-            "#     --command \"CREATE ROLE pgbouncer WITH PASSWORD '<password>' login;\"\n"
-            f"#   psql --host {pg_host} --port {pg_port} --username postgres --dbname phantom \\\n"
-            "#     --command \"GRANT rds_superuser TO pgbouncer;\"\n"
+            "# Provision the pgbouncer role with a reviewed stdin SQL script and a\n"
+            "# chmod-600 secret file. Never put the role password in psql --command.\n"
         )
     else:
         # Local PostgreSQL install. The pgbouncer password is read from a
@@ -314,14 +381,22 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
             "sudo /usr/pgsql-15/bin/postgresql-15-setup initdb\n"
             "sudo systemctl enable postgresql-15\n"
             "sudo systemctl start postgresql-15\n\n"
-            'PGB_PW_FILE="${PGBOUNCER_PASSWORD_FILE:-/tmp/pgbouncer_password}"\n'
-            'if [[ ! -s "${PGB_PW_FILE}" ]]; then\n'
-            '  echo "ERROR: pgbouncer password file is empty: ${PGB_PW_FILE}" >&2\n'
+            'PGB_PW_FILE="${PGBOUNCER_PASSWORD_FILE:?set PGBOUNCER_PASSWORD_FILE to a chmod-600 one-line file}"\n'
+            'if [[ -L "${PGB_PW_FILE}" || ! -f "${PGB_PW_FILE}" || ! -s "${PGB_PW_FILE}" ]]; then\n'
+            '  echo "ERROR: pgbouncer password file must be a non-empty regular file: ${PGB_PW_FILE}" >&2\n'
             '  exit 1\n'
+            'fi\n'
+            'pw_mode="$(stat -c \'%a\' "${PGB_PW_FILE}" 2>/dev/null || stat -f \'%Lp\' "${PGB_PW_FILE}")"\n'
+            '[[ "${pw_mode}" == "600" ]] || { echo "ERROR: pgbouncer password file must have mode 600 (found ${pw_mode})" >&2; exit 1; }\n'
+            'python3 - "${PGB_PW_FILE}" <<\'PY\'\n'
+            'from pathlib import Path\n'
+            'import sys\n'
+            'lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()\n'
+            'raise SystemExit(0 if len(lines) == 1 and lines[0] and "\\x00" not in lines[0] else 1)\n'
+            'PY\n\n'
+            'if ! sudo -u postgres psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname=\'phantom\'" | grep -qx 1; then\n'
+            '  sudo -u postgres createdb phantom\n'
             'fi\n\n'
-            'sudo -u postgres psql -d postgres <<\'PSQL\'\n'
-            'CREATE DATABASE phantom;\n'
-            'PSQL\n\n'
             "# Build the CREATE USER ... PASSWORD ... statement in shell, then\n"
             "# pipe to psql via stdin. The password value is in the shell's\n"
             "# memory and the SQL stream, but not in any process's argv.\n"
@@ -331,7 +406,12 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
             'pg_pw_value="$(cat "${PGB_PW_FILE}")"\n'
             'pg_pw_quoted="${pg_pw_value//\\\'/\\\'\\\'}"\n'
             'unset pg_pw_value\n'
-            'printf "CREATE USER pgbouncer PASSWORD \'%s\';\\n" "${pg_pw_quoted}" \\\n'
+            'if sudo -u postgres psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname=\'pgbouncer\'" | grep -qx 1; then\n'
+            '  role_verb="ALTER ROLE pgbouncer WITH LOGIN PASSWORD"\n'
+            'else\n'
+            '  role_verb="CREATE USER pgbouncer PASSWORD"\n'
+            'fi\n'
+            'printf "%s \'%s\';\\n" "${role_verb}" "${pg_pw_quoted}" \\\n'
             '  | sudo -u postgres psql --no-readline -d postgres -v ON_ERROR_STOP=1\n'
             'unset pg_pw_quoted\n'
             'echo "OK: local PostgreSQL ready for SOAR cluster."\n'
@@ -345,7 +425,7 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         'VOLUME_NAME="${VOLUME_NAME:-soar_data}"\n'
         'BRICK_DIR="${BRICK_DIR:-/data/glusterfs/${VOLUME_NAME}/brick1}"\n'
         'for peer in ${GLUSTER_PEERS//,/ }; do\n'
-        '  sudo gluster peer probe "${peer}" || true\n'
+        '  sudo gluster peer probe "${peer}"\n'
         'done\n'
         'sudo mkdir -p "${BRICK_DIR}"\n'
         '# Build the brick list as an array so each peer:brick pair is a single arg.\n'
@@ -400,6 +480,7 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
 def render_cloud(args: argparse.Namespace) -> dict:
     out = {}
     tenant = args.soar_tenant_url
+    tenant_q = shell_quote(tenant or "https://<tenant-host>/soar")
     admin = args.soar_cloud_admin_email or "<admin-email>"
 
     out["onboarding-checklist.md"] = (
@@ -410,12 +491,12 @@ def render_cloud(args: argparse.Namespace) -> dict:
         "4. Run `cloud/automation-user.sh` to mint a dedicated `automation` REST user.\n"
         "5. Apply the SOAR Cloud IP allowlist via `cloud/apply-allowlist.sh` (NOT the Splunk Cloud ACS allowlist).\n"
         "6. To reach private network resources, install Automation Broker via `automation-broker/install.sh`.\n"
-        "7. Install Splunk-side apps via `splunk-side/install-*.sh` and configure ES via\n"
-        "   `splunk-side/configure-phantom-endpoint.sh`.\n"
+        "7. Install Splunk-side apps via `splunk-side/install-*.sh`, then follow the\n"
+        "   fail-closed Mission Control UI handoff in `splunk-side/configure-phantom-endpoint.sh`.\n"
     )
 
     jwt_body = (
-        f'TENANT_URL="{tenant or "https://<tenant-host>/soar"}"\n'
+        f"TENANT_URL={tenant_q}\n"
         'TOKEN_FILE="${SOAR_API_TOKEN_FILE:-/tmp/soar_api_token}"\n\n'
         "cat <<EOM\n"
         'Open ${TENANT_URL}/admin/user_management?type=automation in your browser.\n'
@@ -453,28 +534,32 @@ def render_cloud(args: argparse.Namespace) -> dict:
     # process substitution (never via -H or -u on argv).
     apply_allow_body = (
         _SOAR_LIB_DIR_BLOCK
-        + f'TENANT_URL="{tenant or "https://<tenant-host>/soar"}"\n'
+        + f"TENANT_URL={tenant_q}\n"
         + 'TOKEN_FILE="${SOAR_API_TOKEN_FILE:-/tmp/soar_api_token}"\n'
         + 'PLAN_FILE="$(dirname "$0")/ip-allowlist.json"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/credential_helpers.sh"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/soar_helpers.sh"\n\n'
-        + 'if [[ ! -s "${TOKEN_FILE}" ]]; then\n'
+        + 'if [[ ! -f "${TOKEN_FILE}" || ! -r "${TOKEN_FILE}" || ! -s "${TOKEN_FILE}" ]]; then\n'
         + '  echo "ERROR: SOAR API token missing: ${TOKEN_FILE}" >&2\n'
         + '  exit 1\n'
-        + 'fi\n\n'
+        + 'fi\n'
+        + 'token_mode="$(stat -c "%a" "${TOKEN_FILE}" 2>/dev/null || stat -f "%Lp" "${TOKEN_FILE}" 2>/dev/null)"\n'
+        + '[[ "${token_mode}" == "600" ]] || { echo "ERROR: SOAR API token file must be chmod 600." >&2; exit 1; }\n\n'
         + "# SOAR Cloud allowlist managed via SOAR tenant API (NOT ACS).\n"
-        + 'soar_rest_call "${TENANT_URL}" "${TOKEN_FILE}" PUT \\\n'
+        + 'response="$(soar_rest_call "${TENANT_URL}" "${TOKEN_FILE}" PUT \\\n'
         + '  /rest/system_settings/ip_allowlist \\\n'
-        + '  --data-binary @"${PLAN_FILE}"\n'
+        + '  --data-binary @"${PLAN_FILE}" -w "\\n%{http_code}" || printf "\\n000")"\n'
+        + 'http_code="$(printf "%s\\n" "${response}" | tail -1)"\n'
+        + 'case "${http_code}" in 200|201|204) ;; *) echo "ERROR: SOAR allowlist update failed (HTTP ${http_code})." >&2; exit 1 ;; esac\n'
         + 'echo "OK: SOAR Cloud allowlist applied. Run /rest/system_info to confirm."\n'
     )
     out["apply-allowlist.sh"] = make_script(apply_allow_body)
 
     auto_user_body = (
         _SOAR_LIB_DIR_BLOCK
-        + f'TENANT_URL="{tenant or "https://<tenant-host>/soar"}"\n'
+        + f"TENANT_URL={tenant_q}\n"
         + 'ADMIN_PW_FILE="${SOAR_ADMIN_PASSWORD_FILE:-/tmp/soar_admin_password}"\n'
         + 'USERNAME="${SOAR_AUTOMATION_USER:-automation_splunk}"\n'
         + 'NEW_TOKEN_FILE="${NEW_TOKEN_FILE:-/tmp/soar_automation_token}"\n'
@@ -487,7 +572,7 @@ def render_cloud(args: argparse.Namespace) -> dict:
         + '  exit 1\n'
         + 'fi\n\n'
         + "# soar_create_automation_user wraps the 3-step SOAR REST flow\n"
-        + "# (create user -> look up id -> mint token) using --netrc-file via\n"
+        + "# (create user -> look up id -> mint token) using curl config via\n"
         + "# process substitution. The admin password never lands on argv,\n"
         + "# response bodies are mktemp'd at 0600 and unlinked, and the new\n"
         + "# automation token is written under umask 077 with chmod 600.\n"
@@ -649,45 +734,33 @@ def render_splunk_side(args: argparse.Namespace) -> dict:
     if apps.get("app_for_soar_export", "true") == "true":
         out["install-app-for-soar-export.sh"] = install_app_script("3411", "Splunk App for SOAR Export")
 
-    # ES <-> SOAR wiring goes through a YAML spec consumed by
-    # splunk-enterprise-security-config --spec --apply. We render a
-    # ready-to-edit YAML alongside the wrapper script so operators can review
-    # the integration block before apply.
+    # conf-essoar is inventory/preflight-only in the supported ES engine. Keep
+    # this spec read-only and make the companion script fail closed instead of
+    # claiming that tenant pairing was applied through a private write path.
     spec_yaml = (
-        "# Rendered by splunk-soar-setup. Review and edit before --apply.\n"
-        "# splunk-enterprise-security-config consumes this spec via --spec.\n"
+        "# Rendered by splunk-soar-setup for read-only readiness validation.\n"
+        "# ES-to-SOAR tenant pairing remains a Mission Control UI/operator handoff.\n"
         "integrations:\n"
         "  soar:\n"
-        "    phantom_endpoint_env: SOAR_TENANT_URL\n"
-        "    phantom_token_file_env: SOAR_AUTOMATION_TOKEN_FILE\n"
-        "    notable_event_forwarding: true\n"
+        "    enabled: true\n"
+        "    preflight: true\n"
+        "    tenant_pairing_required: true\n"
     )
     out["es-soar-integration.yaml"] = spec_yaml
 
     es_body = (
-        "# Wires SOAR <-> ES via splunk-enterprise-security-config --spec.\n"
-        "# The spec lives next to this script as es-soar-integration.yaml.\n"
+        "# Fail-closed ES <-> SOAR pairing handoff.\n"
         f"ES_CONFIG={es_config_q}\n"
-        'SOAR_TENANT_URL="${SOAR_TENANT_URL:?set SOAR_TENANT_URL=https://...}"\n'
-        'TOKEN_FILE="${SOAR_AUTOMATION_TOKEN_FILE:?set SOAR_AUTOMATION_TOKEN_FILE=/path/to/token}"\n'
-        'SPEC_PATH="$(dirname "$0")/es-soar-integration.yaml"\n\n'
-        'if [[ ! -s "${TOKEN_FILE}" ]]; then\n'
-        '  echo "ERROR: SOAR automation token file missing or empty: ${TOKEN_FILE}" >&2\n'
-        '  exit 1\n'
-        'fi\n'
-        'if [[ ! -x "${ES_CONFIG}" ]]; then\n'
-        '  echo "WARNING: splunk-enterprise-security-config setup script missing; skipping ES wiring." >&2\n'
-        '  echo "         To finish the integration manually:" >&2\n'
-        '  echo "           1. Open Splunk ES > Configure > General > Mission Control / Adaptive Response." >&2\n'
-        '  echo "           2. Set the SOAR endpoint to ${SOAR_TENANT_URL}." >&2\n'
-        '  echo "           3. Paste the token value from ${TOKEN_FILE} into the SOAR token field." >&2\n'
-        '  exit 0\n'
-        'fi\n'
-        '# Preview the YAML spec; operator runs --apply manually after review.\n'
-        'bash "${ES_CONFIG}" --spec "${SPEC_PATH}" --mode preview\n'
-        'echo ""\n'
-        'echo "Preview complete. Re-run with --mode apply --apply when satisfied:"\n'
-        'echo "  bash ${ES_CONFIG} --spec ${SPEC_PATH} --mode apply --apply"\n'
+        'SPEC_PATH="$(dirname "$0")/es-soar-integration.yaml"\n'
+        'echo "ERROR: ES-to-SOAR pairing was not applied." >&2\n'
+        'echo "       The supported ES engine treats conf-essoar as inventory/preflight only." >&2\n'
+        'echo "       Complete these steps in Splunk ES / Mission Control:" >&2\n'
+        'echo "         1. Configure the SOAR endpoint." >&2\n'
+        'echo "         2. Enter the automation token through the supported credential UI." >&2\n'
+        'echo "         3. Enable notable forwarding and verify Adaptive Response actions." >&2\n'
+        'echo "       Optional read-only readiness command:" >&2\n'
+        'printf "         bash %q --spec %q --mode validate\\n" "${ES_CONFIG}" "${SPEC_PATH}" >&2\n'
+        'exit 2\n'
     )
     out["configure-phantom-endpoint.sh"] = make_script(es_body)
 
@@ -695,10 +768,12 @@ def render_splunk_side(args: argparse.Namespace) -> dict:
 
 
 def render_validate(args: argparse.Namespace) -> str:
+    tenant_q = shell_quote(args.soar_tenant_url)
     body = (
         _SOAR_LIB_DIR_BLOCK
         + f'SOAR_PLATFORM="${{SOAR_PLATFORM:-{args.soar_platform}}}"\n'
-        + f'SOAR_TENANT_URL="${{SOAR_TENANT_URL:-{args.soar_tenant_url}}}"\n'
+        + 'SOAR_TENANT_URL="${SOAR_TENANT_URL:-}"\n'
+        + f'[[ -n "${{SOAR_TENANT_URL}}" ]] || SOAR_TENANT_URL={tenant_q}\n'
         + 'TOKEN_FILE="${SOAR_API_TOKEN_FILE:-/tmp/soar_api_token}"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/credential_helpers.sh"\n'
@@ -715,7 +790,7 @@ def render_validate(args: argparse.Namespace) -> str:
         + 'TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)\n'
         + 'AUDIT_DIR="$(dirname "$0")/audit/${TIMESTAMP}"\n'
         + 'mkdir -p "${AUDIT_DIR}"\n'
-        + 'chmod 0700 "${AUDIT_DIR}" 2>/dev/null || true\n\n'
+        + 'chmod 0700 "${AUDIT_DIR}"\n\n'
         + '# Map each REST path to a deterministic, slash-prefixed output filename.\n'
         + '# /rest/system_info -> ${AUDIT_DIR}/rest_system_info.json (note the slash).\n'
         + '# soar_rest_call feeds the ph-auth-token to curl via -K <(...) so it\n'
@@ -725,8 +800,7 @@ def render_validate(args: argparse.Namespace) -> str:
         + '  local out_name\n'
         + '  out_name="$(echo "${path#/}" | tr "/?=&" "____" | sed "s/__*/_/g")"\n'
         + '  local out_path="${AUDIT_DIR}/${out_name}.json"\n'
-        + '  ( umask 077 && soar_rest_call "${SOAR_TENANT_URL}" "${TOKEN_FILE}" GET "${path}" > "${out_path}" 2>/dev/null ) \\\n'
-        + '    || ( umask 077 && echo "{}" > "${out_path}" )\n'
+        + '  ( umask 077 && soar_rest_call "${SOAR_TENANT_URL}" "${TOKEN_FILE}" GET "${path}" > "${out_path}" )\n'
         + '  printf "%s" "${out_path}"\n'
         + '}\n\n'
         'fetch_rest /rest/system_info >/dev/null\n'
@@ -758,6 +832,7 @@ def render_metadata(args: argparse.Namespace) -> str:
             "automation_broker": kv_dict(args.automation_broker),
             "splunk_side_apps": kv_dict(args.splunk_side_apps),
             "es_integration_readiness": args.es_integration_readiness == "true",
+            "es_integration_automation_supported": False,
             "auth_file_ready": bool(args.auth_file and Path(args.auth_file).is_file()),
             "ca_cert_file_ready": bool(args.ca_cert_file and Path(args.ca_cert_file).is_file()),
         },
@@ -802,6 +877,7 @@ def dry_run_payload(args: argparse.Namespace) -> dict:
             "auth_file_ready": bool(args.auth_file and Path(args.auth_file).is_file()),
             "ca_cert_file_ready": bool(args.ca_cert_file and Path(args.ca_cert_file).is_file()),
             "cloud_onboarding": args.soar_platform == "cloud",
+            "es_integration_ui_required": True,
         },
         "rendered_surfaces": [
             "onprem-single",
@@ -829,7 +905,7 @@ def render_readme(args: argparse.Namespace) -> str:
         "- `splunk-side/{install-app-for-soar.sh, install-app-for-soar-export.sh, configure-phantom-endpoint.sh}`\n"
         "- `validate.sh`\n\n"
         "## Next steps\n\n"
-        "1. After SOAR is reachable, run `splunk-side/configure-phantom-endpoint.sh` to wire ES Mission Control.\n"
+        "1. After SOAR is reachable, follow `splunk-side/configure-phantom-endpoint.sh`; it fails closed with the required Mission Control UI handoff and never claims automated pairing.\n"
         "2. If Automation Broker connects to a Splunk Cloud stack, promote the stub at `handoffs/acs-allowlist.json` into a `splunk-cloud-acs-admin-setup` plan and apply it.\n"
     )
 
@@ -894,6 +970,7 @@ def render_all(args: argparse.Namespace) -> dict:
 
 def main() -> None:
     args = parse_args()
+    validate_inputs(args)
     if args.dry_run:
         if args.json:
             print(json.dumps(dry_run_payload(args), indent=2, sort_keys=True))

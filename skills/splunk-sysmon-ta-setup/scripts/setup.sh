@@ -53,6 +53,7 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+validate_splunk_index_name "${INDEX}" || exit 1
 
 if [[ "${MODE}" != "endpoint" && "${MODE}" != "wec" ]]; then
     echo "ERROR: --mode must be endpoint or wec" >&2
@@ -94,6 +95,10 @@ create_index() {
 
 main() {
     warn_if_current_skill_role_unsupported
+    if [[ "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ]]; then
+        require_current_skill_role_supported
+    fi
+    [[ "${CREATE_INDEX}" == "true" ]] && require_index_management_target_role
     [[ "${INSTALL}" == "true" ]] && install_package
     [[ "${CREATE_INDEX}" == "true" ]] && create_index
     [[ "${RENDER}" == "true" ]] && run_render

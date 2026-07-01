@@ -120,6 +120,11 @@ validate_args() {
     validate_choice "${FILTER_TYPE}" whitelist blacklist
     validate_choice "${RESTART_SPLUNKD}" true false
     validate_choice "${CLIENT_RESTART_SPLUNKD}" true false
+    if [[ "${CLIENT_RESTART_SPLUNKD}" != "true" && "${MODE}" == "deployment-client" &&
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: deployment-client apply requires --client-restart-splunkd true; use render-only for staged configuration."
+        exit 2
+    fi
     validate_choice "${STATE_ON_CLIENT}" enabled disabled noop
     validate_choice "${REPOSITORY_LOCATION_POLICY}" acceptSplunkHome acceptAlways rejectAlways
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
@@ -186,8 +191,9 @@ run_apply() {
         agent-manager) run_rendered_script apply-agent-manager.sh ;;
         deployment-client) run_rendered_script apply-deployment-client.sh ;;
         both)
-            run_rendered_script apply-agent-manager.sh
-            run_rendered_script apply-deployment-client.sh
+            log "ERROR: --mode both cannot be applied safely on one host: it would enroll the deployment server as its own deployment client."
+            log "       Apply --mode agent-manager on the deployment server and --mode deployment-client on each intended client separately."
+            exit 2
             ;;
     esac
 }

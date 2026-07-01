@@ -186,6 +186,31 @@ class HostExecutor:
             label=label,
         )
 
+    def read_secret_file(self, path: str, *, sudo: bool | None = None, label: str = "secret file") -> str:
+        """Read a one-line target-side secret without adding its value to an apply report."""
+        quoted = shlex.quote(path)
+        mode_command = (
+            f"mode=$(stat -c '%a' {quoted} 2>/dev/null || stat -f '%Lp' {quoted} 2>/dev/null) && "
+            'test "$mode" = 600'
+        )
+        mode_result = self.run(mode_command, sudo=sudo, label=f"validate {label} permissions")
+        if mode_result.exit_code != 0:
+            raise RuntimeError(f"{target_display(self.target)}: {label} must exist and be chmod 600: {path}")
+
+        if execution_mode(self.target) == "ssh":
+            argv = build_ssh_command(self.target, f"cat {quoted}", sudo=target_sudo(self.target, sudo))
+        else:
+            argv = ["bash", "-lc", f"cat {quoted}"]
+            if target_sudo(self.target, sudo):
+                argv = ["sudo", "-n", *argv]
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
+        if proc.returncode != 0:
+            raise RuntimeError(f"{target_display(self.target)}: could not read {label}: {path}")
+        value = proc.stdout.rstrip("\r\n")
+        if not value or "\n" in value or "\r" in value or "\x00" in value:
+            raise RuntimeError(f"{target_display(self.target)}: {label} must contain exactly one non-empty line")
+        return value
+
     def atomic_write(
         self,
         destination: str,
@@ -372,6 +397,7 @@ class ApplyRecorder:
         self.commands: list[dict[str, Any]] = []
         self.files: list[dict[str, Any]] = []
         self.errors: list[str] = []
+        self.secret_values: set[str] = set()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
@@ -379,6 +405,11 @@ class ApplyRecorder:
         return HostExecutor(target, self.output_dir)
 
     def record_command(self, result: CommandResult) -> None:
+        for secret in self.secret_values:
+            if secret:
+                result.stdout = result.stdout.replace(secret, "<redacted>")
+                result.stderr = result.stderr.replace(secret, "<redacted>")
+                result.command = [part.replace(secret, "<redacted>") for part in result.command]
         self.commands.append(result.to_report())
         if result.exit_code != 0:
             self.errors.append(f"{result.target}: command failed ({result.label or shell_join(result.command)}): exit {result.exit_code}")
@@ -392,6 +423,11 @@ class ApplyRecorder:
         entry = self.executor(target).atomic_write(path, content, backup_dir=self.backup_dir, mode=mode, sudo=sudo, label=label)
         self.files.append(entry)
         return entry
+
+    def read_secret_file(self, target: dict[str, Any], path: str, *, sudo: bool | None = None, label: str = "secret file") -> str:
+        value = self.executor(target).read_secret_file(path, sudo=sudo, label=label)
+        self.secret_values.add(value)
+        return value
 
     def manifest(self) -> dict[str, Any]:
         return {

@@ -60,9 +60,8 @@ indexing and forwarding to use TLS certificates" docs. Frozen in
 
 ```
 enableSplunkWebSSL = true
-serverCert         = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01-web-cert.pem
-privKeyPath        = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01-web-key.pem
-caCertPath         = /opt/splunk/etc/auth/myssl/cabundle.pem
+serverCert         = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01.example.com-web-cert.pem
+privKeyPath        = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01.example.com-web.key
 sslPassword        = <encrypted on first restart>
 cipherSuite        = <from --tls-policy>
 sslVersions        = tls1.2
@@ -75,7 +74,7 @@ ecdhCurves         = prime256v1, secp384r1, secp521r1
 
 ```
 enableSplunkdSSL          = true
-serverCert                = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01-splunkd-cert.pem
+serverCert                = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01.example.com-splunkd.pem
 sslPassword               = <encrypted on first restart>
 sslRootCAPath             = /opt/splunk/etc/auth/myssl/cabundle.pem
 caTrustStore              = splunk            # or splunk,os to merge with OS store
@@ -98,7 +97,7 @@ sslAltNameToCheck         = <CSV of SANs>     # only with requireClientCert=true
 disabled = 0
 
 [SSL]
-serverCert         = /opt/splunk/etc/auth/myssl/idx01.example.com/idx01-s2s-cert.pem
+serverCert         = /opt/splunk/etc/auth/myssl/idx01.example.com/idx01.example.com-s2s.pem
 sslPassword        = <encrypted on first restart>
 requireClientCert  = true                    # default for --enable-mtls=s2s
 sslVersions        = tls1.2
@@ -113,7 +112,7 @@ sslCommonNameToCheck = forwarder01.example.com,forwarder02.example.com
 ```
 [tcpout:idxc_main]
 server                  = idx01.example.com:9997,idx02.example.com:9997,idx03.example.com:9997
-clientCert              = /opt/splunkforwarder/etc/auth/myssl/uf01-s2s-cert.pem
+clientCert              = /opt/splunkforwarder/etc/auth/myssl/uf01.example.com/uf01.example.com-s2s-client.pem
 sslPassword             = <encrypted on first restart>
 useClientSSLCompression = true
 sslVerifyServerCert     = true
@@ -122,8 +121,6 @@ sslCommonNameToCheck    = idx01.example.com,idx02.example.com,idx03.example.com
 
 # per-indexer SAN override (optional, when each indexer presents a different cert)
 [tcpout-server://idx01.example.com:9997]
-sslCommonNameToCheck = idx01.example.com
-
 [tcpout-server://idx02.example.com:9997]
 sslCommonNameToCheck = idx02.example.com
 ```
@@ -135,7 +132,7 @@ sslCommonNameToCheck = idx02.example.com
 ```
 [http]
 enableSSL              = 1
-serverCert             = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01-hec-cert.pem
+serverCert             = /opt/splunk/etc/auth/myssl/sh01.example.com/sh01.example.com-hec.pem
 sslPassword            = <encrypted on first restart>
 requireClientCert      = false               # set to true for --enable-mtls=hec
 allowSslRenegotiation  = false
@@ -189,7 +186,7 @@ form (mutually exclusive):
 ```
 [replication_port-ssl://9887]
 rootCA                = /opt/splunk/etc/auth/myssl/cabundle.pem
-serverCert            = /opt/splunk/etc/auth/myssl/idx01.example.com/idx01-replication-cert.pem
+serverCert            = /opt/splunk/etc/auth/myssl/idx01.example.com/idx01.example.com-replication.pem
 sslPassword           = <encrypted on first restart>
 sslCommonNameToCheck  = idx01.example.com,idx02.example.com,idx03.example.com
 requireClientCert     = true
@@ -330,10 +327,10 @@ the skill emits `pki/distribute/saml-sp/README.md` walkthrough).
 
 ### LDAPS
 
-Splunk reads system OpenLDAP `ldap.conf` for TLS settings:
+Splunk reads `$SPLUNK_HOME/etc/openldap/ldap.conf` for TLS settings:
 
 ```
-TLS_PROTOCOL_MIN  3.3                 # 3.3 = TLS 1.2
+TLS_PROTOCOL_MIN  3.3                 # 3.3 = TLS 1.2; 3.4 = TLS 1.3
 TLS_CIPHER_SUITE  <from --tls-policy>
 TLS_CACERT        /opt/splunk/etc/auth/myssl/cabundle.pem
 TLS_REQCERT       demand              # require + validate server cert
@@ -358,15 +355,14 @@ Coexists with the public-exposure skill's `--ldap-ssl-enabled`.
 
 | Preset | Cipher set summary | TLS versions | Key algos | Sig algos | Source |
 |---|---|---|---|---|---|
-| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites) |
-| `fips-140-3` | NIST AEAD only (no CBC, no SHA-1, no RSA-1024, no anonymous DH) | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips) |
-| `stig` | DISA-STIG-aligned subset of `splunk-modern` | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+ | `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md` |
+| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2 + tls1.3 on 10.4+ | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites) |
+| `fips-140-3` | NIST AEAD only (no CBC, no SHA-1, no RSA-1024, no anonymous DH) | tls1.2 + tls1.3 on 10.4+ | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips) |
+| `stig` | DISA-STIG-aligned subset of `splunk-modern` | tls1.2 + tls1.3 on 10.4+ | RSA-3072+, ECDSA P-384+ | RSA-SHA384+, ECDSA-SHA384+ | `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md` |
 
-Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-lists the supported set as `SSLv3` (deprecated), `TLS1.0`
-(deprecated, 9.4+), `TLS1.1` (deprecated, 9.4+), `TLS1.2`. **TLS 1.3
-is not yet a documented Splunk-supported TLS version.** Pass
-`--allow-deprecated-tls` to relax the floor (not recommended).
+Splunk 10.4 documents TLS 1.2 and TLS 1.3. The default floor emits both;
+`--tls-version-floor tls1.3` emits TLS-1.3-only and is rejected for older
+Splunk versions. SSLv3/TLS 1.0/TLS 1.1 are never rendered; the legacy
+`--allow-deprecated-tls` flag fails closed.
 
 ### FIPS lifecycle
 
@@ -470,8 +466,10 @@ skill's `rotate-splunk-secret.sh` helper.
 
 ## Apply guard
 
-`apply` and `all` require `--accept-pki-rotation`. The flag
-acknowledges that:
+`apply` and `all` require one explicit local-host mutation target
+(`--leaf-target`, `--leaf-host`, `--leaf-ca-bundle-file`, and, except for
+`ldaps`, `--leaf-cert-file` plus `--leaf-private-key-file`) together with
+`--accept-pki-rotation`. The flag acknowledges that:
 
 - The new cert chain has been verified (`verify-leaf.sh` returned
   `OK`).
@@ -479,8 +477,9 @@ acknowledges that:
   (delegated).
 - SAML / LDAPS / Edge Processor / Splunk Cloud handoffs will be
   completed.
-- The operator has a rollback plan (the previous PEM directory is
-  preserved by the renderer at `pki/install/_backup/`).
+- The operator has a rollback plan (the local installer preserves prior PEMs
+  under the target host's `_backup-<timestamp>/` directory and backs up the
+  shared trust bundle/config files before replacement).
 
 The render and preflight phases never need this flag.
 
@@ -534,7 +533,7 @@ rolling rotation."
 - Rolling restart and cluster bundle apply (delegated).
 - Splunk Web HSTS / CSP / browser security headers (owned by
   `splunk-enterprise-public-exposure-hardening`).
-- TLS 1.3 (not yet documented as a Splunk-supported TLS version).
+- Deprecated SSLv3/TLS 1.0/TLS 1.1 enablement.
 - FIPS-validated OpenSSL build (operator owns the FIPS module).
 - Splunk Cloud cert issuance (refuses; UFCP handoff for forwarders;
   Splunk Support ticket for HEC custom-domain BYOC).

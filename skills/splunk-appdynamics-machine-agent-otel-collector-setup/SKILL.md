@@ -30,6 +30,8 @@ bash skills/splunk-appdynamics-machine-agent-otel-collector-setup/scripts/valida
 - Bundled collector config rendering with OTLP gRPC on `127.0.0.1:4317` and
   OTLP HTTP on `127.0.0.1:4318` by default.
 - Splunk Observability token-file and AppDynamics API key-file placeholders.
+- A chmod-600 runtime environment file generated on the target from those
+  secret files, plus a systemd drop-in for Linux service installs.
 - Collector service/container restart, OTLP port checks, exporter health probes,
   backup manifests, and rollback.
 
@@ -40,5 +42,8 @@ bash skills/splunk-appdynamics-machine-agent-otel-collector-setup/scripts/valida
 - `--accept-remote-execution` is required for SSH targets.
 - Direct token, access-token, and API key flags are refused; use file-backed
   fields in the spec.
+- Referenced secret files must be non-empty and mode 600. Docker and Windows
+  targets require an explicit `collector_credentials_ready_command`; a plain
+  container/service restart cannot attach new credentials.
 - Mutation is refused when the expected bundled collector path or service or
   container name cannot be confirmed from the spec and preflight.

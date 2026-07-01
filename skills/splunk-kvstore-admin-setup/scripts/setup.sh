@@ -28,6 +28,8 @@ COLLECTION_REPLICATE="false"
 LOOKUP_DEFINITION_NAME=""
 ACCEPT_KVSTORE_RESTORE=false
 ACCEPT_KVSTORE_CLEAN=false
+ACCEPT_KVSTORE_MIGRATE=false
+ACCEPT_KVSTORE_UPGRADE=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -58,6 +60,8 @@ Options:
   --lookup-definition-name NAME
   --accept-kvstore-restore          (required to run restore)
   --accept-kvstore-clean            (required to run clean)
+  --accept-kvstore-migrate          (required when --migrate-dry-run false)
+  --accept-kvstore-upgrade          (required to run upgrade)
   --help
 
 Examples:
@@ -93,6 +97,8 @@ while [[ $# -gt 0 ]]; do
         --lookup-definition-name) require_arg "$1" $# || exit 1; LOOKUP_DEFINITION_NAME="$2"; shift 2 ;;
         --accept-kvstore-restore) ACCEPT_KVSTORE_RESTORE=true; shift ;;
         --accept-kvstore-clean) ACCEPT_KVSTORE_CLEAN=true; shift ;;
+        --accept-kvstore-migrate) ACCEPT_KVSTORE_MIGRATE=true; shift ;;
+        --accept-kvstore-upgrade) ACCEPT_KVSTORE_UPGRADE=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -125,6 +131,10 @@ validate_args() {
     validate_choice "${MIGRATE_DRY_RUN}" true false
     validate_choice "${DISABLE_STARTUP_UPGRADE}" true false
     validate_choice "${COLLECTION_REPLICATE}" true false
+    if [[ "${APPLY}" == "true" && "${PHASE}" != "render" && "${PHASE}" != "apply" && "${PHASE}" != "all" ]]; then
+        log "ERROR: --apply is valid only with --phase render, apply, or all."
+        exit 1
+    fi
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
         log "ERROR: --json is supported only for render-only or --dry-run workflows."
         exit 1
@@ -176,7 +186,12 @@ run_rendered_script() {
         log "ERROR: Rendered script is missing or not executable: ${dir}/${script_name}"
         exit 1
     fi
-    (cd "${dir}" && "./${script_name}")
+    (cd "${dir}" && \
+        KVSTORE_ACCEPT_RESTORE="${ACCEPT_KVSTORE_RESTORE}" \
+        KVSTORE_ACCEPT_CLEAN="${ACCEPT_KVSTORE_CLEAN}" \
+        KVSTORE_ACCEPT_MIGRATION="${ACCEPT_KVSTORE_MIGRATE}" \
+        KVSTORE_ACCEPT_UPGRADE="${ACCEPT_KVSTORE_UPGRADE}" \
+        "./${script_name}")
 }
 
 apply_collections_via_rest() {
@@ -191,8 +206,20 @@ apply_collections_via_rest() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     local sk
     sk=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
-    local body
+    local body entry name field_type pair
+    local -a _collection_field_parts
     body=$(form_urlencode_pairs replicate "${COLLECTION_REPLICATE}")
+    if [[ -n "${COLLECTION_FIELDS}" ]]; then
+        IFS=',' read -ra _collection_field_parts <<<"${COLLECTION_FIELDS}"
+        for entry in "${_collection_field_parts[@]}"; do
+            name="${entry%%:*}"
+            field_type="${entry#*:}"
+            name="$(printf '%s' "${name}" | tr -d '[:space:]')"
+            field_type="$(printf '%s' "${field_type}" | tr -d '[:space:]')"
+            pair="$(form_urlencode_pairs "field.${name}" "${field_type}")" || exit 1
+            body="${body}&${pair}"
+        done
+    fi
     if ! rest_set_conf "${sk}" "${SPLUNK_URI}" "${APP_NAME}" "collections" "${COLLECTION_NAME}" "${body}"; then
         log "ERROR: Failed to write KV Store collection '${COLLECTION_NAME}'."
         exit 1
@@ -234,24 +261,53 @@ operation_script() {
 apply_operation() {
     case "${OPERATION}" in
         none)
-            log "No --operation selected; rendered assets only. Choose backup|restore|clean|migrate|upgrade|collections to apply."
+            log "ERROR: Apply requested without an operation."
+            log "HANDOFF: Choose --operation backup|restore|clean|migrate|upgrade|collections, or use --phase render without --apply."
+            return 1
             ;;
         collections)
             apply_collections_via_rest
             ;;
         restore)
-            if [[ "${ACCEPT_KVSTORE_RESTORE}" != "true" ]]; then
+            if [[ "${DRY_RUN}" != "true" && "${ACCEPT_KVSTORE_RESTORE}" != "true" ]]; then
                 log "ERROR: restore is destructive. Re-run with --accept-kvstore-restore to proceed."
                 exit 1
             fi
             run_rendered_script restore.sh
             ;;
         clean)
-            if [[ "${ACCEPT_KVSTORE_CLEAN}" != "true" ]]; then
+            if [[ "${DRY_RUN}" != "true" && "${ACCEPT_KVSTORE_CLEAN}" != "true" ]]; then
                 log "ERROR: clean is destructive. Re-run with --accept-kvstore-clean to proceed."
                 exit 1
             fi
             run_rendered_script clean.sh
+            ;;
+        migrate)
+            if [[ "${TOPOLOGY}" == "standalone" ]]; then
+                log "ERROR: Standalone KV Store ${OPERATION} is performed by the supported Splunk Enterprise binary-upgrade workflow, not by this apply path."
+                log "HANDOFF: Take a point-in-time backup, complete the supported Splunk upgrade, then run --phase status to verify KV Store state."
+                return 1
+            fi
+            if [[ "${DRY_RUN}" != "true" && "${MIGRATE_DRY_RUN}" == "false" && "${ACCEPT_KVSTORE_MIGRATE}" != "true" ]]; then
+                log "ERROR: Live KV Store migration requires --accept-kvstore-migrate after a successful dry run and backup."
+                return 1
+            fi
+            run_rendered_script migrate.sh
+            if [[ "${MIGRATE_DRY_RUN}" == "true" ]]; then
+                log "INFO: KV Store migration dry run completed; no storage-engine migration was applied."
+            fi
+            ;;
+        upgrade)
+            if [[ "${TOPOLOGY}" == "standalone" ]]; then
+                log "ERROR: Standalone KV Store ${OPERATION} is performed by the supported Splunk Enterprise binary-upgrade workflow, not by this apply path."
+                log "HANDOFF: Take a point-in-time backup, complete the supported Splunk upgrade, then run --phase status to verify KV Store state."
+                return 1
+            fi
+            if [[ "${DRY_RUN}" != "true" && "${ACCEPT_KVSTORE_UPGRADE}" != "true" ]]; then
+                log "ERROR: KV Store server-version upgrade requires --accept-kvstore-upgrade after a backup and topology review."
+                return 1
+            fi
+            run_rendered_script upgrade.sh
             ;;
         *)
             run_rendered_script "$(operation_script)"
@@ -267,7 +323,7 @@ main() {
             python3 "${RENDERER}" "${RENDER_ARGS[@]}" --dry-run --json
         else
             python3 "${RENDERER}" "${RENDER_ARGS[@]}" --dry-run
-            [[ "${PHASE}" == "apply" || "${PHASE}" == "all" ]] && apply_operation
+            [[ "${PHASE}" == "apply" || "${PHASE}" == "all" || "${APPLY}" == "true" ]] && apply_operation
         fi
         exit 0
     fi

@@ -54,14 +54,21 @@ except (json.JSONDecodeError, ValueError):
     print("ERROR: Could not parse ACS response", file=sys.stderr)
     sys.exit(1)
 
-entries = data.get("apps", [])
+if not isinstance(data, dict) or not isinstance(data.get("apps"), list):
+    print("ERROR: ACS response does not contain an apps list", file=sys.stderr)
+    sys.exit(1)
+entries = data["apps"]
 apps = []
 
 for entry in entries:
-    name = entry.get("name") or entry.get("appID", "")
-    version = entry.get("version", "n/a")
-    label = entry.get("label", name)
-    status = entry.get("status", "unknown")
+    if not isinstance(entry, dict):
+        continue
+    name = str(entry.get("name") or entry.get("appID", ""))
+    version = str(entry.get("version", "n/a"))
+    label = str(entry.get("label", name))
+    status = str(entry.get("status", "unknown"))
+    if not name:
+        continue
 
     if filter_str and filter_str not in name.lower() and filter_str not in label.lower():
         continue
@@ -114,17 +121,24 @@ except (json.JSONDecodeError, ValueError):
     print("ERROR: Could not parse Splunk response", file=sys.stderr)
     sys.exit(1)
 
-entries = data.get("entry", [])
+if not isinstance(data, dict) or not isinstance(data.get("entry"), list):
+    print("ERROR: Splunk response does not contain an entry list", file=sys.stderr)
+    sys.exit(1)
+entries = data["entry"]
 apps = []
 
 for entry in entries:
-    name = entry.get("name", "")
-    content = entry.get("content", {})
-    version = content.get("version", "n/a")
-    label = content.get("label", name)
+    if not isinstance(entry, dict):
+        continue
+    name = str(entry.get("name", ""))
+    content = entry.get("content", {}) if isinstance(entry.get("content", {}), dict) else {}
+    version = str(content.get("version", "n/a"))
+    label = str(content.get("label", name))
     disabled = content.get("disabled", False)
     visible = content.get("visible", True)
     update_available = content.get("update", {})
+    if not name:
+        continue
 
     if filter_str and filter_str not in name.lower() and filter_str not in label.lower():
         continue

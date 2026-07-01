@@ -54,7 +54,7 @@ bash skills/cisco-talos-intelligence-setup/scripts/setup.sh --install
 Validate readiness:
 
 ```bash
-bash skills/cisco-talos-intelligence-setup/scripts/validate.sh
+bash skills/cisco-talos-intelligence-setup/scripts/validate.sh --completion
 ```
 
 Only use file-based service account injection for explicit diagnostics:
@@ -66,3 +66,11 @@ bash skills/cisco-talos-intelligence-setup/scripts/configure_service_account.sh 
 ```
 
 The IP blacklist threatlist stays disabled unless the user explicitly enables it.
+
+## Validation Modes
+
+Run `scripts/validate.sh` for readiness diagnostics. Use `--completion` (alias
+`--strict`) to require the provisioned Talos service-account stanza and
+fingerprint in addition to the required ES app, capabilities, and alert
+actions. Talos provides ES enrichment actions rather than standalone
+dashboards or a continuously enabled event input.

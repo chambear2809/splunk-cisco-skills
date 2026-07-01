@@ -10,6 +10,9 @@ ORG_ID=""
 SK=""
 SKIP_DATA_FLOW=false
 DATA_FLOW_EARLIEST="-1h@h"
+STRICT=false
+DATA_FLOW_CHECKS=0
+DATA_FLOW_EVENTS=0
 
 PASS=0
 FAIL=0
@@ -19,6 +22,7 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 info() { log "  INFO: $*"; }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 usage() {
     cat >&2 <<EOF
@@ -30,6 +34,7 @@ Options:
   --org-id ID                Validate one specific org account
   --skip-data-flow           Skip the per-index 'tstats' event-flow probe
   --data-flow-earliest TIME  Earliest time for the event-flow probe (default: -1h@h)
+  --strict, --completion     Exit nonzero when completion evidence is missing
   --help                     Show this help
 EOF
     exit "${1:-0}"
@@ -40,20 +45,27 @@ while [[ $# -gt 0 ]]; do
         --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
         --skip-data-flow) SKIP_DATA_FLOW=true; shift ;;
         --data-flow-earliest) require_arg "$1" $# || exit 1; DATA_FLOW_EARLIEST="$2"; shift 2 ;;
+        --strict|--completion) STRICT=true; shift ;;
         --help) usage ;;
         *) log "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+if ${STRICT} && ${SKIP_DATA_FLOW}; then
+    log "ERROR: --skip-data-flow cannot be combined with --strict/--completion." >&2
+    exit 1
+fi
 
 probe_index_event_flow() {
     local idx="$1"
     local label="$2"
     [[ -z "${idx}" ]] && return 0
     local count
+    DATA_FLOW_CHECKS=$((DATA_FLOW_CHECKS + 1))
     count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
         "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now" \
         "count" 2>/dev/null || echo "0")
     if [[ "${count}" =~ ^[0-9]+$ ]] && [[ "${count}" -gt 0 ]]; then
+        DATA_FLOW_EVENTS=$((DATA_FLOW_EVENTS + count))
         pass "${label} index '${idx}' has ${count} events since ${DATA_FLOW_EARLIEST}"
     else
         warn "${label} index '${idx}' has no events since ${DATA_FLOW_EARLIEST} (may be normal if just configured)"
@@ -159,8 +171,30 @@ except Exception:
 ")"
         if [[ "${account_count}" -gt 0 ]]; then
             pass "Configured org accounts: ${account_count}"
+            if ! ${SKIP_DATA_FLOW}; then
+                log ""
+                log "--- Data Flow (configured org-account indexes) ---"
+                while IFS='|' read -r label idx; do
+                    [[ -n "${idx}" ]] || continue
+                    probe_index_event_flow "${idx}" "${label}"
+                done < <(printf '%s' "${body}" | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin).get("payload", {})
+    seen = set()
+    for row in payload.get("data", []):
+        for label, key in (("Investigate", "investigate_index"), ("Private Apps", "privateapp_index"), ("App Discovery", "appdiscovery_index")):
+            value = row.get(key, "") or ""
+            marker = (label, value)
+            if value and marker not in seen:
+                seen.add(marker)
+                print(f"{label}|{value}")
+except Exception:
+    pass
+')
+            fi
         else
-            warn "No Secure Access org accounts are configured yet"
+            completion_issue "No Secure Access org accounts are configured yet"
         fi
     else
         fail "Failed to enumerate Secure Access org accounts (HTTP ${http_code})"
@@ -197,7 +231,15 @@ if [[ -n "${global_org_value}" ]]; then
         fail "Requested org '${ORG_ID}' does not match global org '${global_org_value}'"
     fi
 else
-    warn "Global org not configured"
+    completion_issue "Global org not configured"
+fi
+
+view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
 fi
 
 log ""
@@ -304,6 +346,14 @@ if [[ -n "${dns_idx}${proxy_idx}${firewall_idx}${dlp_idx}${ravpn_idx}" ]]; then
     fi
 else
     info "S3-backed dashboard indexes not configured"
+fi
+
+if ${STRICT}; then
+    if [[ "${DATA_FLOW_CHECKS}" -eq 0 ]]; then
+        fail "No configured event index was available for completion data-flow evidence"
+    elif [[ "${DATA_FLOW_EVENTS}" -eq 0 ]]; then
+        fail "No Secure Access events were found in any configured index"
+    fi
 fi
 fi
 

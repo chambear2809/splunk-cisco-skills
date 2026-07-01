@@ -56,14 +56,14 @@ default render/apply selects only:
 - `readiness`
 - `object-lifecycle`
 - `luna-scorers`
-- `observe-runtime`
-- `protect-runtime`
-- `evaluate-assets`
-- `multimodal-assets`
-- `observability-controls`
 - `otel-collector`
 - `dashboards`
 - `detectors`
+
+The runtime snippets and console-only Evaluate, multimodal, and observability
+control assets remain in the rendered packet. They are excluded from the
+default apply set because they need workload-specific inputs or an explicit
+operator handoff.
 
 Explicit Splunk Platform sections (`observe-export`, `splunk-hec`,
 `splunk-otlp`) are rejected when `--o11y-only` is set.

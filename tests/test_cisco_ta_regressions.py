@@ -1360,7 +1360,14 @@ EOF
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
-            server_conf = splunk_home / "etc" / "system" / "local" / "server.conf"
+            server_conf = (
+                splunk_home
+                / "etc"
+                / "apps"
+                / "ZZZ_cisco_skills_enterprise_role"
+                / "local"
+                / "server.conf"
+            )
             self.assertTrue(server_conf.exists())
             server_conf_text = server_conf.read_text(encoding="utf-8")
             self.assertIn("mgmt_uri = https://sh2.example.com:8089", server_conf_text)
@@ -2204,7 +2211,9 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            outputs_conf = (splunk_home / "etc/system/local/outputs.conf").read_text(encoding="utf-8")
+            outputs_conf = (
+                splunk_home / "etc/apps/ZZZ_cisco_skills_forwarding/local/outputs.conf"
+            ).read_text(encoding="utf-8")
             self.assertIn("server = idx01.example.com:9997", outputs_conf)
 
 
@@ -2262,7 +2271,9 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            server_conf = (splunk_home / "etc/system/local/server.conf").read_text(encoding="utf-8")
+            server_conf = (
+                splunk_home / "etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf"
+            ).read_text(encoding="utf-8")
             self.assertIn("mode = manager", server_conf)
 
 

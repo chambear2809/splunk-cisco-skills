@@ -112,11 +112,14 @@ def compute(inputs: dict[str, Any]) -> dict[str, Any]:
     else:
         rf = inputs["replication_factor"] or 1
         sf = inputs["search_factor"] or 1
-    sf = min(sf, rf)
+    if sf > rf:
+        raise ValueError(
+            f"search factor ({sf}) cannot exceed replication factor ({rf})"
+        )
 
     indexer_for_ingest = max(1, ceil_div(effective_daily, per_indexer_ceiling))
     if ha:
-        cluster_min = max(rf, 3)
+        cluster_min = max(rf, 3, sites if multisite else 1)
         indexer_count = max(indexer_for_ingest, cluster_min)
     else:
         indexer_count = indexer_for_ingest
@@ -350,7 +353,7 @@ def build_targets(computed: dict[str, Any]) -> dict[str, Any]:
                 1
                 if (sok_architecture(computed, aio_target) == "s1")
                 else (
-                    computed["indexer_count"] // max(1, computed["sites"])
+                    ceil_div(computed["indexer_count"], max(1, computed["sites"]))
                     if computed["multisite"]
                     else computed["indexer_count"]
                 )
@@ -586,12 +589,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def validate(args: argparse.Namespace) -> None:
-    if args.daily_ingest_gb <= 0:
+    if not math.isfinite(args.daily_ingest_gb) or args.daily_ingest_gb <= 0:
         raise SystemExit("ERROR: --daily-ingest-gb must be greater than 0.")
     if args.retention_days < 1:
         raise SystemExit("ERROR: --retention-days must be at least 1.")
-    if args.growth_pct < 0:
-        raise SystemExit("ERROR: --growth-pct cannot be negative.")
+    if not math.isfinite(args.growth_pct) or args.growth_pct < 0:
+        raise SystemExit("ERROR: --growth-pct must be a finite nonnegative number.")
+    projected_daily = args.daily_ingest_gb * (1 + args.growth_pct / 100.0)
+    if not math.isfinite(projected_daily):
+        raise SystemExit("ERROR: daily ingest plus growth headroom exceeds the supported numeric range.")
+    if args.sites < 1:
+        raise SystemExit("ERROR: --sites must be at least 1.")
     if args.multisite and args.sites < 2:
         raise SystemExit("ERROR: --sites must be at least 2 with --multisite.")
     for name, value in (
@@ -602,6 +610,15 @@ def validate(args: argparse.Namespace) -> None:
     ):
         if value is not None and value < 1:
             raise SystemExit(f"ERROR: {name} must be at least 1.")
+    factor_implies_ha = (args.replication_factor or 1) > 1 or (args.search_factor or 1) > 1
+    effective_ha = args.ha or args.multisite or factor_implies_ha
+    effective_rf = args.replication_factor or (3 if effective_ha else 1)
+    effective_sf = args.search_factor or (2 if effective_ha else 1)
+    if effective_sf > effective_rf:
+        raise SystemExit(
+            "ERROR: --search-factor cannot exceed --replication-factor "
+            f"(effective values: SF={effective_sf}, RF={effective_rf})."
+        )
 
 
 def main(argv: list[str]) -> int:
@@ -615,7 +632,12 @@ def main(argv: list[str]) -> int:
         "search_density": args.search_density,
         "concurrent_searches": args.concurrent_searches,
         "concurrent_users": args.concurrent_users,
-        "ha": args.ha or args.multisite,
+        "ha": (
+            args.ha
+            or args.multisite
+            or (args.replication_factor or 1) > 1
+            or (args.search_factor or 1) > 1
+        ),
         "replication_factor": args.replication_factor,
         "search_factor": args.search_factor,
         "multisite": args.multisite,

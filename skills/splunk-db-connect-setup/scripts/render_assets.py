@@ -512,6 +512,8 @@ This packet does not contain secret values and does not mutate DB Connect object
 
 def render_install_script(spec: dict[str, Any]) -> str:
     ids = collect_install_ids(spec)
+    supported_ids: list[str] = []
+    handoff_lines: list[str] = []
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
@@ -521,17 +523,40 @@ def render_install_script(spec: dict[str, Any]) -> str:
         '  echo "ERROR: splunk-app-install installer not found or not executable: ${INSTALLER}" >&2',
         "  exit 1",
         "fi",
+        "unresolved=0",
         "",
     ]
     for app_id in ids:
         if app_id == "6759":
-            lines.append('echo "SKIP: archived InfluxDB driver 6759 is not installed by the normal workflow."')
+            handoff_lines.extend(
+                [
+                    'echo "HANDOFF: archived InfluxDB driver 6759 requires a separately approved legacy/manual driver workflow." >&2',
+                    "unresolved=$((unresolved + 1))",
+                ]
+            )
             continue
         if app_id != APP_ID:
             entry = DRIVER_CATALOG.get(app_id)
             if entry is None or entry.get("status") != "supported":
-                lines.append(f'echo "SKIP: driver app {app_id} is not in the supported DBX JDBC add-on install catalog."')
+                handoff_lines.extend(
+                    [
+                        f'echo "HANDOFF: driver app {app_id} is not in the supported DBX JDBC add-on install catalog; install and validate it manually." >&2',
+                        "unresolved=$((unresolved + 1))",
+                    ]
+                )
                 continue
+        supported_ids.append(app_id)
+    lines.extend(handoff_lines)
+    lines.extend(
+        [
+            'if (( unresolved > 0 )); then',
+            '  echo "ERROR: One or more requested DB Connect driver installs remain unresolved; no app installs were attempted." >&2',
+            "  exit 1",
+            "fi",
+            "",
+        ]
+    )
+    for app_id in supported_ids:
         lines.extend(
             [
                 f'echo "Installing Splunkbase app {app_id} through splunk-app-install"',
@@ -795,26 +820,20 @@ def render_validation_spl(spec: dict[str, Any]) -> str:
 
 
 def render_rest_checks() -> str:
-    return """#!/usr/bin/env bash
+    return f"""#!/usr/bin/env bash
 set -euo pipefail
 
-: "${SPLUNK_URI:=https://localhost:8089}"
-: "${SPLUNK_USERNAME:=admin}"
+PROJECT_ROOT="${{PROJECT_ROOT:-{q(str(REPO_ROOT))}}}"
+# shellcheck disable=SC1091
+source "${{PROJECT_ROOT}}/skills/shared/lib/credential_helpers.sh"
+load_splunk_connection_settings
+: "${{SPLUNK_SEARCH_API_URI:?configure the Splunk management URI and credentials}}"
 
-if [[ -z "${SPLUNK_PASSWORD:-}" ]]; then
-  echo "INFO: SPLUNK_PASSWORD not set; export it or use this as a command checklist."
-  exit 0
-fi
-
-# Pass credentials via a chmod 600 curl config file so the password is never
-# visible in process args (ps) or shell history.
-CURL_CFG="$(mktemp)"
-chmod 600 "${CURL_CFG}"
-trap 'rm -f "${CURL_CFG}"' EXIT
-printf 'user = "%s:%s"\\n' "${SPLUNK_USERNAME}" "${SPLUNK_PASSWORD}" >"${CURL_CFG}"
-
-curl -sk -K "${CURL_CFG}" "${SPLUNK_URI}/services/apps/local/splunk_app_db_connect?output_mode=json" >/dev/null
-curl -sk -K "${CURL_CFG}" "${SPLUNK_URI}/servicesNS/nobody/splunk_app_db_connect/db_connect/dbxserverstatus?output_mode=json" >/dev/null
+SK="$(get_session_key "${{SPLUNK_SEARCH_API_URI}}")"
+splunk_curl "${{SK}}" --fail-with-body --show-error \
+  "${{SPLUNK_SEARCH_API_URI}}/services/apps/local/splunk_app_db_connect?output_mode=json" >/dev/null
+splunk_curl "${{SK}}" --fail-with-body --show-error \
+  "${{SPLUNK_SEARCH_API_URI}}/servicesNS/nobody/splunk_app_db_connect/db_connect/dbxserverstatus?output_mode=json" >/dev/null
 echo "OK: DB Connect REST probes completed."
 """
 
@@ -825,11 +844,12 @@ set -euo pipefail
 
 : "${SPLUNK_HOME:=/opt/splunk}"
 if [[ ! -x "${SPLUNK_HOME}/bin/splunk" ]]; then
-  echo "INFO: ${SPLUNK_HOME}/bin/splunk not found; use these btool commands on a DBX runtime host."
+  echo "ERROR: ${SPLUNK_HOME}/bin/splunk not found; DB Connect btool validation did not run." >&2
+  echo "HANDOFF: Run this script on a DBX runtime host with SPLUNK_HOME set correctly." >&2
   echo "  splunk btool db_connections list --debug"
   echo "  splunk btool db_inputs list --debug"
   echo "  splunk btool db_outputs list --debug"
-  exit 0
+  exit 1
 fi
 
 "${SPLUNK_HOME}/bin/splunk" btool db_connections list --debug

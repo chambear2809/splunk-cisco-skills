@@ -66,6 +66,9 @@ the surrounding prerequisites and generated artifacts.
      --accept-apply
    ```
 
+   GCP Terraform destroy additionally requires `--accept-destroy`; apply and
+   destroy cannot be enabled in the same reviewed plan.
+
 ## Phases
 
 - `render` - default. Writes deterministic artifacts and never mutates.

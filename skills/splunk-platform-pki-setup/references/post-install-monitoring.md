@@ -55,11 +55,17 @@ splunkd exposes a structured health report at
 and others — many of which surface TLS issues indirectly.
 
 ```bash
+source skills/shared/lib/credential_helpers.sh
+load_splunk_connection_settings
+SK="$(get_session_key "${SPLUNK_SEARCH_API_URI}")"
+
 # JSON output of full health
-curl -k -s -u admin:<pw> https://<host>:8089/services/server/health/splunkd | jq .
+splunk_curl "${SK}" --fail-with-body --show-error \
+  "${SPLUNK_SEARCH_API_URI}/services/server/health/splunkd?output_mode=json" | jq .
 
 # Just the failing features
-curl -k -s -u admin:<pw> https://<host>:8089/services/server/health/splunkd \
+splunk_curl "${SK}" --fail-with-body --show-error \
+  "${SPLUNK_SEARCH_API_URI}/services/server/health/splunkd?output_mode=json" \
   | jq '.entry[].content.features | to_entries[] | select(.value.health != "green")'
 ```
 

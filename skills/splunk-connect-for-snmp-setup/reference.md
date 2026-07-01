@@ -21,6 +21,9 @@ indexes in Splunk too.
 - For Splunk Cloud, the normal target is `https://http-inputs-<stack>.splunkcloud.com:443`.
 - For Splunk Enterprise, the normal target is `https://<host>:8088`.
 - Keep HEC tokens in local-only files. Do not commit them to git.
+- Render-only runs may omit the token to review non-secret assets. A live
+  Compose/Helm apply requires a nonempty owner-only token file, either supplied
+  directly or created earlier in the same run by Splunk preparation.
 
 ## Runtime Notes
 

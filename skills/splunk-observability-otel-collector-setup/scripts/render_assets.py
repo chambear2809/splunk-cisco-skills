@@ -1779,16 +1779,24 @@ set -euo pipefail
 
 SPLUNK_HOME="${{SPLUNK_HOME:-/opt/splunk}}"
 if [[ -x "${{SPLUNK_HOME}}/bin/splunk" ]]; then
+    failures=0
     if [[ "${{#app_roots[@]}}" -eq 0 ]]; then
         app_roots=(Splunk_TA_otel)
     fi
     for app_root in "${{app_roots[@]}}"; do
-        "${{SPLUNK_HOME}}/bin/splunk" btool inputs list "${{app_root}}" --debug || true
-        "${{SPLUNK_HOME}}/bin/splunk" btool inputs list "Splunk_TA_otel://Splunk_TA_otel" --debug || true
-        "${{SPLUNK_HOME}}/bin/splunk" list app "${{app_root}}" || true
+        if ! "${{SPLUNK_HOME}}/bin/splunk" btool inputs list "${{app_root}}" --debug; then
+            echo "ERROR: btool could not read inputs for ${{app_root}}" >&2
+            failures=1
+        fi
+        if ! "${{SPLUNK_HOME}}/bin/splunk" list app "${{app_root}}"; then
+            echo "ERROR: Splunk did not report installed app ${{app_root}}" >&2
+            failures=1
+        fi
     done
+    (( failures == 0 )) || exit 1
 else
-    echo "WARN: ${{SPLUNK_HOME}}/bin/splunk is not executable; set SPLUNK_HOME and rerun."
+    echo "ERROR: ${{SPLUNK_HOME}}/bin/splunk is not executable; set SPLUNK_HOME and rerun." >&2
+    exit 2
 fi
 """,
         executable=True,

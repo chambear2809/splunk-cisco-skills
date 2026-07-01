@@ -1,13 +1,13 @@
 # LDAPS Trust
 
-Splunk uses the system OpenLDAP client library for LDAP. TLS for
+Splunk uses its OpenLDAP client library for LDAP. TLS for
 LDAP is configured in two places:
 
 1. `authentication.conf [<ldap-strategy>]` — Splunk-side toggles
    (host, port, `SSLEnabled`).
-2. System `ldap.conf` (typically `/etc/openldap/ldap.conf` on
-   RHEL or `/etc/ldap/ldap.conf` on Debian) — TLS protocol /
-   cipher / trust anchor settings.
+2. `$SPLUNK_HOME/etc/openldap/ldap.conf` — TLS protocol, cipher, and
+   trust-anchor settings. Splunk does not load this policy from the
+   OS-global `/etc/openldap` or `/etc/ldap` path.
 
 > Anchor:
 > [Secure LDAP authentication with TLS certificates](https://docs.splunk.com/Documentation/Splunk/9.4.1/Security/LDAPwithcertificates).
@@ -26,7 +26,7 @@ SSLEnabled  = true
 supported but not recommended for new deployments — prefer
 LDAPS-from-start.
 
-## System `ldap.conf` (TLS settings)
+## Splunk `ldap.conf` (TLS settings)
 
 ```
 TLS_PROTOCOL_MIN  3.3                    # 3.3 = TLS 1.2
@@ -35,9 +35,9 @@ TLS_CACERT        /opt/splunk/etc/auth/myssl/cabundle.pem
 TLS_REQCERT       demand                 # require + validate server cert
 ```
 
-- `TLS_PROTOCOL_MIN 3.3` corresponds to TLS 1.2 (3.1 = TLS 1.0,
-  3.2 = TLS 1.1, 3.3 = TLS 1.2). OpenLDAP doesn't yet expose
-  TLS 1.3 with the same precision Splunk needs.
+- `TLS_PROTOCOL_MIN 3.3` corresponds to TLS 1.2 and permits TLS 1.3
+  when supported. A TLS-1.3-only render uses `3.4`, as documented for
+  Splunk Enterprise 10.4. Values below 3.3 are never rendered.
 - `TLS_CIPHER_SUITE` mirrors the splunkd cipherSuite.
 - `TLS_CACERT` points to the trust anchor that signs the AD /
   LDAP server's cert. For AD this is typically the AD CS Root
@@ -54,28 +54,15 @@ When `--ldaps=true`, the renderer emits:
 splunk-platform-pki-rendered/pki/distribute/standalone/000_pki_trust/system-files/ldap.conf
 ```
 
-The install helper copies this file to the OS-appropriate path:
+The install helper copies this staged file to Splunk's fixed OpenLDAP path:
 
 ```bash
-case "$(uname -s).$(awk -F= '/^ID=/{print $2}' /etc/os-release | tr -d '"')" in
-  Linux.rhel|Linux.centos|Linux.almalinux|Linux.rocky|Linux.fedora|Linux.amzn)
-    DEST=/etc/openldap/ldap.conf
-    ;;
-  Linux.ubuntu|Linux.debian)
-    DEST=/etc/ldap/ldap.conf
-    ;;
-  *)
-    DEST=/etc/openldap/ldap.conf
-    ;;
-esac
-
+DEST="$SPLUNK_HOME/etc/openldap/ldap.conf"
 cp pki/distribute/standalone/000_pki_trust/system-files/ldap.conf "$DEST"
 chmod 0644 "$DEST"
 ```
 
-`ldap.conf` is system-wide. If other applications on the host
-also use OpenLDAP, the operator should review the existing
-`ldap.conf` before overwriting. The renderer's
+The renderer's
 `install-leaf.sh --target ldaps` backs up the original to
 `<dest>.pki-backup`.
 

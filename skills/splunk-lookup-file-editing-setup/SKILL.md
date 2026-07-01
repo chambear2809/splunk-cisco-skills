@@ -10,6 +10,14 @@ description: >-
 
 # Splunk Lookup File Editing Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off the Lookup File
+Editing app or a dependency, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable lookup operations and shipped views,
+or record explicit evidence that no dashboards ship.
+
 Render-first workflow for the Splunk App for Lookup File Editing. It emits
 install readiness, CSV/KV Store lookup inventory SPL, SHC backup-replication
 notes, app health checks, and handoffs to knowledge-object and KV Store skills.

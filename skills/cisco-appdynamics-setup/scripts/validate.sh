@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-appdynamics-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-appdynamics-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed AppDynamics add-on using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_AppDynamics"
@@ -22,6 +31,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 summarize_and_exit() {
     log ""
@@ -87,13 +97,13 @@ log "--- Index ---"
 if platform_check_index "${SK}" "${SPLUNK_URI}" "${target_index}" 2>/dev/null; then
     pass "Index '${target_index}' exists"
 else
-    warn "Index '${target_index}' not found (may need setup)"
+    completion_issue "Index '${target_index}' not found (may need setup)"
 fi
 
 if [[ "${target_index}" == "appdynamics" ]]; then
     pass "Dashboard default index matches the shipped dashboard forms"
 else
-    warn "Dashboards still default to appdynamics; enter '${target_index}' manually in dashboard forms"
+    completion_issue "Dashboards still default to appdynamics; enter '${target_index}' manually in dashboard forms"
 fi
 
 log ""
@@ -186,6 +196,7 @@ except Exception:
 else
     warn "No analytics connections configured"
 fi
+[[ $((controller_count + analytics_count)) -gt 0 ]] || completion_issue "No controller or analytics connection is configured"
 
 log ""
 log "--- Data Inputs ---"
@@ -215,10 +226,10 @@ if [[ "${total_inputs}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${total_inputs} input stanza(s) exist but all are disabled"
+        completion_issue "${total_inputs} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No inputs configured"
+    completion_issue "No inputs configured"
 fi
 
 if [[ "${analytics_inputs}" -gt 0 && "${analytics_count}" -eq 0 ]]; then
@@ -231,7 +242,7 @@ event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where 
 if [[ "${event_count}" -gt 0 ]]; then
     pass "Index '${target_index}' has ${event_count} events"
 else
-    warn "Index '${target_index}' has no events (may be normal if just configured)"
+    completion_issue "Index '${target_index}' has no events (may be normal if just configured)"
 fi
 
 sourcetype_breakdown_body=$(form_urlencode_pairs \
@@ -258,7 +269,13 @@ fi
 log ""
 log "--- Built-in Views ---"
 if ${APP_INSTALLED}; then
-    pass "Package includes built-in views: status, events, license_usage, audit_log, ingestion_statistics, troubleshooting"
+    view_count=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+        | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+    if [[ "${view_count}" -gt 0 ]]; then
+        pass "Built-in views are visible: ${view_count}"
+    else
+        completion_issue "No built-in dashboard views are visible for ${APP_NAME}"
+    fi
 else
     warn "Built-in views are unavailable until ${APP_NAME} is installed"
 fi

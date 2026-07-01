@@ -195,7 +195,9 @@ extracting each Splunkbase package:
 - Splunkbase **3546** alert-action app (`victorops_app`).
 - Splunkbase **4886** Splunk Add-on for On-Call
   (`TA-splunk-add-on-for-victorops`).
-- Splunkbase **5863** SOAR connector (`splunkoncall`).
+- Splunkbase **5863** SOAR connector (`splunkoncall`) is rendered as a Splunk
+  SOAR install/configuration handoff; the Platform installer does not install
+  or uninstall it.
 
 ## Source anchors
 

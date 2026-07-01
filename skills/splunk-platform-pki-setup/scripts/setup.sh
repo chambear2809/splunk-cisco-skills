@@ -77,6 +77,14 @@ SPLUNK_HOME_VALUE="/opt/splunk"
 SPLUNK_VERSION="$(spv_enterprise_default)"
 CERT_INSTALL_SUBDIR="myssl"
 
+# Explicit local-host leaf apply inputs. Cluster-wide distribution and rolling
+# restart remain delegated; one invocation mutates one local Splunk host.
+LEAF_TARGET=""
+LEAF_HOST=""
+LEAF_CERT_FILE=""
+LEAF_PRIVATE_KEY_FILE=""
+LEAF_CA_BUNDLE_FILE=""
+
 # Secret file paths
 ADMIN_PASSWORD_FILE=""
 IDXC_SECRET_FILE=""
@@ -98,6 +106,13 @@ Usage: $(basename "$0") [OPTIONS]
 Phases:
   --phase render|preflight|apply|rotate|validate|inventory|all   (default: render)
   --accept-pki-rotation                                          Required for apply / all
+
+Local-host leaf apply (required for apply / all):
+  --leaf-target splunkd|web|s2s|hec|replication|forwarder|shc|core5|ldaps
+  --leaf-host FQDN
+  --leaf-cert-file PATH
+  --leaf-private-key-file PATH
+  --leaf-ca-bundle-file PATH
 
 Mode + target:
   --mode private|public                                          (default: private)
@@ -141,8 +156,8 @@ CA distinguished name (Private mode):
 
 Algorithm policy:
   --tls-policy splunk-modern|fips-140-3|stig                     (default: splunk-modern)
-  --tls-version-floor tls1.2                                     (only valid value)
-  --allow-deprecated-tls                                         (relax lower bound; not recommended)
+  --tls-version-floor tls1.2|tls1.3                              (TLS 1.3 requires Splunk 10.4+)
+  --allow-deprecated-tls                                         (legacy flag; fails closed, no deprecated TLS rendered)
   --key-algorithm rsa-2048|rsa-3072|rsa-4096|ecdsa-p256|ecdsa-p384|ecdsa-p521  (default: rsa-2048)
   --key-format pkcs1|pkcs8                                       (default: pkcs1; pkcs8 for EP/DBX)
 
@@ -257,6 +272,11 @@ while [[ $# -gt 0 ]]; do
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --splunk-version) require_arg "$1" $# || exit 1; SPLUNK_VERSION="$2"; shift 2 ;;
         --cert-install-subdir) require_arg "$1" $# || exit 1; CERT_INSTALL_SUBDIR="$2"; shift 2 ;;
+        --leaf-target) require_arg "$1" $# || exit 1; LEAF_TARGET="$2"; shift 2 ;;
+        --leaf-host) require_arg "$1" $# || exit 1; LEAF_HOST="$2"; shift 2 ;;
+        --leaf-cert-file) require_arg "$1" $# || exit 1; LEAF_CERT_FILE="$2"; shift 2 ;;
+        --leaf-private-key-file) require_arg "$1" $# || exit 1; LEAF_PRIVATE_KEY_FILE="$2"; shift 2 ;;
+        --leaf-ca-bundle-file) require_arg "$1" $# || exit 1; LEAF_CA_BUNDLE_FILE="$2"; shift 2 ;;
         --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
         --idxc-secret-file) require_arg "$1" $# || exit 1; IDXC_SECRET_FILE="$2"; shift 2 ;;
         --ca-key-password-file) require_arg "$1" $# || exit 1; CA_KEY_PASSWORD_FILE="$2"; shift 2 ;;
@@ -294,7 +314,7 @@ validate_args() {
     validate_choice "${MODE}" private public
     validate_choice "${PUBLIC_CA_NAME}" vault acme adcs ejbca other
     validate_choice "${TLS_POLICY}" splunk-modern fips-140-3 stig
-    validate_choice "${TLS_VERSION_FLOOR}" tls1.2
+    validate_choice "${TLS_VERSION_FLOOR}" tls1.2 tls1.3
     validate_choice "${KEY_ALGORITHM}" rsa-2048 rsa-3072 rsa-4096 ecdsa-p256 ecdsa-p384 ecdsa-p521
     validate_choice "${KEY_FORMAT}" pkcs1 pkcs8
     validate_choice "${ENCRYPT_REPLICATION_PORT}" true false
@@ -303,6 +323,15 @@ validate_args() {
     validate_choice "${INCLUDE_EDGE_PROCESSOR}" true false
     validate_choice "${INCLUDE_INTERMEDIATE_CA}" true false
     validate_choice "${FIPS_MODE}" none 140-2 140-3
+    if [[ "${ALLOW_DEPRECATED_TLS}" == "true" ]]; then
+        log "ERROR: --allow-deprecated-tls no longer renders SSLv3/TLS 1.0/TLS 1.1."
+        log "       Use an explicit compensating-control handoff for legacy clients."
+        exit 1
+    fi
+    if [[ ! "${CERT_INSTALL_SUBDIR}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        log "ERROR: --cert-install-subdir must be one safe directory name."
+        exit 1
+    fi
 
     if [[ "${PHASE}" == "apply" || "${PHASE}" == "all" ]]; then
         if [[ "${ACCEPT_PKI_ROTATION}" != "true" ]]; then
@@ -310,6 +339,28 @@ validate_args() {
             log "       This skill swaps serving certs and triggers downstream restart."
             log "       Acknowledge the change explicitly."
             exit 1
+        fi
+        validate_choice "${LEAF_TARGET}" splunkd web s2s hec replication forwarder shc core5 ldaps
+        [[ -n "${LEAF_HOST}" ]] || { log "ERROR: --leaf-host is required for --phase=${PHASE}."; exit 1; }
+        if [[ ! "${LEAF_HOST}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ || "${LEAF_HOST}" == *..* ]]; then
+            log "ERROR: --leaf-host must be a safe hostname without path traversal."
+            exit 1
+        fi
+        local apply_file
+        if [[ -z "${LEAF_CA_BUNDLE_FILE}" || ! -r "${LEAF_CA_BUNDLE_FILE}" || ! -s "${LEAF_CA_BUNDLE_FILE}" ]]; then
+            log "ERROR: --leaf-ca-bundle-file must name a readable, non-empty file."
+            exit 1
+        fi
+        if [[ "${LEAF_TARGET}" == "ldaps" ]]; then
+            [[ "${LDAPS}" == "true" ]] \
+                || { log "ERROR: --leaf-target ldaps requires --ldaps true."; exit 1; }
+        else
+            for apply_file in "${LEAF_CERT_FILE}" "${LEAF_PRIVATE_KEY_FILE}"; do
+                if [[ -z "${apply_file}" || ! -r "${apply_file}" || ! -s "${apply_file}" ]]; then
+                    log "ERROR: --leaf-cert-file and --leaf-private-key-file must name readable, non-empty files."
+                    exit 1
+                fi
+            done
         fi
     fi
 
@@ -409,6 +460,32 @@ run_rendered_script() {
     (cd "${dir}" && "./${script_path}")
 }
 
+apply_local_leaf() {
+    local dir install_script
+    local -a install_args
+    dir="$(render_dir)"
+    install_script="${dir}/pki/install/install-leaf.sh"
+    if [[ ! -x "${install_script}" ]]; then
+        log "ERROR: Rendered leaf installer is missing or not executable: ${install_script}"
+        return 1
+    fi
+    install_args=(
+        --target "${LEAF_TARGET}"
+        --host "${LEAF_HOST}"
+        --cert "${LEAF_CERT_FILE}"
+        --key "${LEAF_PRIVATE_KEY_FILE}"
+        --ca "${LEAF_CA_BUNDLE_FILE}"
+    )
+    [[ -n "${LEAF_KEY_PASSWORD_FILE}" ]] \
+        && install_args+=(--ssl-password-file "${LEAF_KEY_PASSWORD_FILE}")
+    log "Applying ${LEAF_TARGET} leaf certificate to local host ${LEAF_HOST}..."
+    SPLUNK_HOME="${SPLUNK_HOME_VALUE}" bash "${install_script}" "${install_args[@]}"
+    if [[ "${FIPS_MODE}" != "none" ]]; then
+        SPLUNK_HOME="${SPLUNK_HOME_VALUE}" \
+            bash "${dir}/pki/install/install-fips-launch-conf.sh" "${FIPS_MODE}"
+    fi
+}
+
 main() {
     validate_args
     build_renderer_args
@@ -429,16 +506,17 @@ main() {
             ;;
         apply)
             render_assets
-            log "apply: cert install is per-host. Stage the rendered cert PEMs"
-            log "        on each target host and run pki/install/install-leaf.sh"
-            log "        per host. Then run the rotation runbook at"
-            log "        $(render_dir)/pki/rotate/plan-rotation.md"
+            apply_local_leaf
+            log "Leaf installation completed on this host. Cluster bundle apply and"
+            log "rolling restart remain delegated by $(render_dir)/pki/rotate/plan-rotation.md."
             ;;
         rotate)
             render_assets
             log "rotate: see $(render_dir)/pki/rotate/plan-rotation.md"
             log "        This skill DOES NOT exec the rolling restart; rolling"
             log "        restart is owned by splunk-indexer-cluster-setup."
+            log "ERROR: no rotation was executed; complete the rendered cluster-aware handoff."
+            exit 2
             ;;
         validate)
             render_assets
@@ -450,10 +528,11 @@ main() {
             ;;
         all)
             render_assets
+            apply_local_leaf
             run_rendered_script preflight.sh
-            log "apply: cert install is per-host. See pki/install/install-leaf.sh."
             log "rotate: see pki/rotate/plan-rotation.md (delegates to splunk-indexer-cluster-setup)."
-            run_rendered_script validate.sh
+            log "ERROR: leaf material is staged, but restart/rotation and post-restart validation remain pending."
+            exit 2
             ;;
     esac
 }

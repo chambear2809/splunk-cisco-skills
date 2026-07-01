@@ -12,6 +12,13 @@ description: >-
 
 # Splunk Security Portfolio Setup
 
+## Shared add-on completion gate
+
+When the selected product resolves to a Splunk app, add-on, or dashboard
+companion, the owning child workflow must satisfy the
+[shared completion gate](../shared/ta_completion_gate.md). An install-only
+route is package delivery, not completed setup.
+
 Use this skill as the security portfolio router before choosing a product
 specific setup skill.
 

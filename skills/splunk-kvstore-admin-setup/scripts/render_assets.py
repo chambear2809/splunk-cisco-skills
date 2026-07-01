@@ -173,7 +173,7 @@ def render_preflight(args: argparse.Namespace) -> str:
         f"""splunk_home={splunk_home}
 # Authenticate first with: "${{splunk_home}}/bin/splunk" login
 test -x "${{splunk_home}}/bin/splunk"
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 df -h "${{splunk_home}}/var/lib/splunk" 2>/dev/null || true
 echo "Preflight complete. Take a backup before any restore, migrate, or upgrade."
 """
@@ -189,7 +189,7 @@ def render_backup(args: argparse.Namespace) -> str:
 # Point-in-time backups (-pointInTime true) are consistent; archives land in
 # $SPLUNK_DB/kvstorebackup. Take one before every restore, migrate, or upgrade.
 "${{splunk_home}}/bin/splunk" backup kvstore {pit}
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
     )
 
@@ -199,10 +199,15 @@ def render_restore(args: argparse.Namespace) -> str:
     archive = shell_quote(args.backup_archive_name) if args.backup_archive_name else "''"
     pit = "-pointInTime true" if bool_value(args.point_in_time) else ""
     maint = ""
+    maint_after = ""
     if args.topology == "shc":
         maint = (
             '"${splunk_home}/bin/splunk" enable kvstore-maintenance-mode\n'
             'echo "Maintenance mode enabled on this SHC member."\n'
+        )
+        maint_after = (
+            '"${splunk_home}/bin/splunk" disable kvstore-maintenance-mode\n'
+            'echo "Maintenance mode disabled after successful restore."\n'
         )
     return make_script(
         f"""splunk_home={splunk_home}
@@ -211,10 +216,15 @@ if [[ -z "${{archive_name}}" ]]; then
   echo "ERROR: backup archive name is required for restore (include the .tar.gz extension)." >&2
   exit 1
 fi
+if [[ "${{KVSTORE_ACCEPT_RESTORE:-false}}" != "true" ]]; then
+  echo "ERROR: restore requires KVSTORE_ACCEPT_RESTORE=true (normally set by --accept-kvstore-restore)." >&2
+  exit 1
+fi
 # DESTRUCTIVE: overwrites current KV Store data. On a search head cluster, run
 # this from the captain; only one restore can run at a time across the cluster.
 {maint}"${{splunk_home}}/bin/splunk" restore kvstore {pit} -archiveName "${{archive_name}}"
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+{maint_after}
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
     )
 
@@ -225,8 +235,12 @@ def render_clean(args: argparse.Namespace) -> str:
     return make_script(
         f"""splunk_home={splunk_home}
 # DESTRUCTIVE: permanently deletes KV Store data. Take a backup first.
+if [[ "${{KVSTORE_ACCEPT_CLEAN:-false}}" != "true" ]]; then
+  echo "ERROR: clean requires KVSTORE_ACCEPT_CLEAN=true (normally set by --accept-kvstore-clean)." >&2
+  exit 1
+fi
 "${{splunk_home}}/bin/splunk" clean kvstore {scope}
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
     )
 
@@ -235,19 +249,27 @@ def render_migrate(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     if args.topology == "shc":
         dry = "-isDryRun true" if bool_value(args.migrate_dry_run) else ""
+        acceptance_gate = ""
+        if not bool_value(args.migrate_dry_run):
+            acceptance_gate = """if [[ "${KVSTORE_ACCEPT_MIGRATION:-false}" != "true" ]]; then
+  echo "ERROR: migration requires KVSTORE_ACCEPT_MIGRATION=true (normally set by --accept-kvstore-migrate)." >&2
+  exit 1
+fi
+"""
         return make_script(
             f"""splunk_home={splunk_home}
 # Migrate the SHC KV Store storage engine. Run the dry run first, then re-run
 # without -isDryRun to perform the migration. Coordinate across all members.
+{acceptance_gate}
 "${{splunk_home}}/bin/splunk" start-shcluster-migration kvstore -storageEngine {args.storage_engine} {dry}
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
         )
     return make_script(
         f"""splunk_home={splunk_home}
 # Single-instance deployments migrate the storage engine automatically during the
 # upgrade to Splunk Enterprise 9.0+. This script reports current status.
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 echo "Storage engine: {args.storage_engine} (single-instance migration is automatic on upgrade)."
 """
     )
@@ -264,17 +286,21 @@ if [[ -z "${{target_version}}" ]]; then
   echo "ERROR: --target-kvstore-version is required to upgrade an SHC KV Store (e.g. 7.0 or 8.0)." >&2
   exit 1
 fi
+if [[ "${{KVSTORE_ACCEPT_UPGRADE:-false}}" != "true" ]]; then
+  echo "ERROR: upgrade requires KVSTORE_ACCEPT_UPGRADE=true (normally set by --accept-kvstore-upgrade)." >&2
+  exit 1
+fi
 # Upgrade the SHC KV Store server version after all members run the same Splunk
 # Enterprise version. Take a backup first.
 "${{splunk_home}}/bin/splunk" start-shcluster-upgrade kvstore -version "${{target_version}}"
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
         )
     return make_script(
         f"""splunk_home={splunk_home}
 # Single-instance deployments auto-upgrade the KV Store server version about 60
 # seconds after the first start on a new Splunk Enterprise version. This reports status.
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 """
     )
 
@@ -283,7 +309,7 @@ def render_status(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     return make_script(
         f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+"${{splunk_home}}/bin/splunk" show kvstore-status
 "${{splunk_home}}/bin/splunk" btool server list kvstore --debug 2>/dev/null || true
 """
     )

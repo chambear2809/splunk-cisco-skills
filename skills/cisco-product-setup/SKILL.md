@@ -9,6 +9,13 @@ description: >-
 
 # Cisco Product Setup
 
+## Shared add-on completion gate
+
+When the selected product resolves to a Splunk TA, add-on, or dashboard
+companion, the delegated child must satisfy the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is never successful product onboarding.
+
 Provides one product-aware entrypoint for Cisco setup requests.
 
 ## What It Does
@@ -79,3 +86,11 @@ output lists for the resolved product.
   `catalog_overrides.json` or refreshing the SCAN package in `splunk-ta/`.
   Without a mode flag the script prints the catalog to stdout instead of
   writing it.
+
+## Completion Validation
+
+The router's validation phase, including `--validate-only`, invokes actionable
+Cisco child validators with `--completion`. Consequently the full router does
+not report onboarding complete when account/input, event-flow, or shipped
+dashboard evidence is missing. Run a child `validate.sh` without that flag when
+only a warning-oriented diagnostic inventory is desired.

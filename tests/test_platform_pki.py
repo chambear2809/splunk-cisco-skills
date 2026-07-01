@@ -8,8 +8,8 @@ GENERATED_FILES manifest:
    file (no surprise files; no stale entries).
 2. Splunk Web emits enableSplunkWebSSL = true.
 3. splunkd server.conf [sslConfig] emits enableSplunkdSSL = true.
-4. sslVersions = tls1.2 (NOT tls1.3) at the floor; sslVersionsForClient
-   the same.
+4. Splunk 10.4 renders TLS 1.2 + TLS 1.3 by default and supports an explicit
+   TLS-1.3-only floor; older trains reject TLS 1.3.
 5. requireClientCert = true only when --enable-mtls covers the surface.
 6. sslVerifyServerName = true on every cluster bundle / SHC drop-in.
 7. KV-Store EKU enforcement script is present and matches the documented
@@ -157,38 +157,39 @@ def test_splunk_web_enables_ssl(tmp_path: Path) -> None:
     assert "enableSplunkWebSSL = true" in web
 
 
-def test_splunkd_enables_ssl_and_floor_is_tls12(tmp_path: Path) -> None:
+def test_splunkd_enables_ssl_and_default_104_protocols(tmp_path: Path) -> None:
     out = tmp_path / "out"
     assert run_render(*_full_cluster_args(out)).returncode == 0
     server = (render_dir(out) / "pki/distribute/cluster-bundle/master-apps/000_pki_trust/local/server.conf").read_text()
     assert "enableSplunkdSSL     = true" in server
-    assert "sslVersions          = tls1.2" in server
-    assert "sslVersionsForClient = tls1.2" in server
-    assert "tls1.3" not in server
+    assert "sslVersions          = tls1.2,tls1.3" in server
+    assert "sslVersionsForClient = tls1.2,tls1.3" in server
+    assert "[tls1.3]" in server
 
 
-def test_tls13_is_refused(tmp_path: Path) -> None:
+def test_tls13_only_is_supported_on_104(tmp_path: Path) -> None:
     out = tmp_path / "out"
     result = run_render(*_core5_args(out, **{"--tls-version-floor": "tls1.3"}))
+    assert result.returncode == 0, result.stderr
+    server = (render_dir(out) / "pki/distribute/standalone/000_pki_trust/local/server.conf").read_text()
+    assert "sslVersions          = tls1.3" in server
+    assert "sslVersionsForClient = tls1.3" in server
+
+
+def test_tls13_is_refused_before_104(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = run_render(*_core5_args(out, **{
+        "--splunk-version": "10.2.0",
+        "--tls-version-floor": "tls1.3",
+    }))
     assert result.returncode != 0
-    # argparse rejects the choice with the value enumeration in the message.
-    combined = (result.stderr + result.stdout).lower()
-    assert "tls1.3" in combined or "tls1.2" in combined
+    assert "requires Splunk Enterprise 10.4+" in (result.stderr + result.stdout)
 
 
-def test_allow_deprecated_tls_relaxes_lower_bound(tmp_path: Path) -> None:
-    """--allow-deprecated-tls must actually be enforced. Without the flag,
-    --tls-version-floor=tls1.0 must be refused. With the flag, it must
-    be accepted (operator escape hatch for legacy clients)."""
-    # argparse only allows tls1.2 at the CLI level; the deprecated-relax
-    # path is exercised inside _validate_args. Confirm both paths.
-    src = (SKILL_ROOT / "scripts/render_assets.py").read_text()
-    assert "args.allow_deprecated_tls" in src, (
-        "--allow-deprecated-tls flag must be acted on; the renderer used to "
-        "accept the flag silently and never apply it."
-    )
-    # The flag is registered; just confirm the policy-aware branch exists.
-    assert "tls_version_forbidden" in src
+def test_allow_deprecated_tls_fails_closed(tmp_path: Path) -> None:
+    result = run_render(*_core5_args(tmp_path / "out"), "--allow-deprecated-tls")
+    assert result.returncode != 0
+    assert "no longer renders" in (result.stderr + result.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -589,13 +590,16 @@ def test_stig_accepts_rsa_3072(tmp_path: Path) -> None:
 def test_algorithm_policy_json_validates() -> None:
     data = json.loads(ALGO_JSON.read_text())
     assert data["tls_version_floor"] == "tls1.2"
-    assert "tls1.3" in data["tls_version_not_yet_supported"]
+    assert "tls1.3" in data["tls_version_supported"]
+    assert data["tls13_minimum_splunk_version"] == "10.4.0"
     assert data["kv_store_required_eku"] == ["serverAuth", "clientAuth"]
     for preset in ("splunk-modern", "fips-140-3", "stig"):
         assert preset in data["presets"]
         body = data["presets"][preset]
-        assert body["ssl_versions"] == "tls1.2"
-        assert body["ssl_versions_for_client"] == "tls1.2"
+        assert body["ssl_versions"] == "tls1.2,tls1.3"
+        assert body["ssl_versions_for_client"] == "tls1.2,tls1.3"
+        assert "tls13_cipher_suite" in body
+        assert "tls13_groups" in body
         assert "cipher_suite" in body
         assert "ecdh_curves" in body
         assert "allowed_key_algorithms" in body

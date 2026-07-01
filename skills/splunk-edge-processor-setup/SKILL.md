@@ -37,9 +37,10 @@ extraction, or pipeline changes. Review generated SPL2 through
 - **Control-plane API base is operator-supplied**: Splunk has not published
   a stable public REST API base path for EP control-plane objects (source
   types, destinations, pipelines). The skill renders the JSON payloads as a
-  source of truth and provides an `apply-objects.sh` that can either (a)
-  apply them via REST when `EP_API_BASE` is set, or (b) print a manual UI
-  checklist when it is not. The same applies to `validate.sh`.
+  source of truth and provides an `apply-objects.sh` that applies them via
+  REST when `EP_API_BASE` is set. Without that operator-supplied transport it
+  prints the manual UI checklist and exits nonzero so `--phase apply` cannot
+  report a mutation that never happened. Offline validation remains available.
 - **Default destination is critical** — without one, unprocessed data is
   silently dropped. The renderer refuses to render a plan with destinations
   but no default destination, and `validate.sh` re-checks at runtime.
@@ -88,8 +89,8 @@ bash skills/splunk-edge-processor-setup/scripts/setup.sh \
   --ep-pipelines "filter_dev=partition=Keep;sourcetype=app:dev;spl2_file=pipelines/filter_dev.spl2;destination=primary"
 ```
 
-Apply to the control plane (REST when `EP_API_BASE` is set; otherwise emits
-a manual UI checklist):
+Apply to the control plane (requires `EP_API_BASE`; without it the command
+emits a manual UI checklist and exits nonzero):
 
 ```bash
 EP_API_BASE=https://<tenant-api-base> EP_API_TOKEN_FILE=/tmp/ep_api_token \
@@ -134,8 +135,8 @@ Under `splunk-edge-processor-rendered/`:
 - `control-plane/pipelines/<name>.spl2` (SPL2 source-of-truth) and
   `pipelines/<name>.json` (API payload).
 - `control-plane/apply-objects.sh` — orchestrates POST/PUT/DELETE in
-  dependency order when `EP_API_BASE` is set; prints a manual UI checklist
-  otherwise.
+  dependency order when `EP_API_BASE` is set; otherwise prints a manual UI
+  checklist and fails closed without mutation.
 - `host/<host>/install-with-systemd.sh` — `cgroup` + service user, splunk-edge service unit; consumes the operator-supplied install command via `EP_INSTALL_CMD_FILE`.
 - `host/<host>/install-without-systemd.sh` — direct nohup install.
 - `host/<host>/install-docker.sh` — Docker compose skeleton (image + env are operator-supplied from the tenant install command).

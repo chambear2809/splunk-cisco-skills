@@ -16,6 +16,7 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-spl2-pipeline-kit-rendered"
+OUTPUT_MARKER = ".splunk-spl2-pipeline-kit-rendered"
 PROFILES = ("ingestProcessor", "edgeProcessor")
 
 BASE_COMMANDS = {
@@ -251,6 +252,44 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def prepare_output_dir(output_dir: Path) -> None:
+    if output_dir.is_symlink():
+        raise ValueError(f"Refusing symlink output directory: {output_dir}")
+    if output_dir.exists():
+        marker = output_dir / OUTPUT_MARKER
+        legacy_readme = output_dir / "README.md"
+        legacy_owned = False
+        if legacy_readme.is_file() and not legacy_readme.is_symlink():
+            legacy_owned = legacy_readme.read_text(encoding="utf-8", errors="ignore").startswith(
+                "# Rendered SPL2 Pipeline Kit"
+            )
+        marker_owned = marker.is_file() and not marker.is_symlink()
+        if any(output_dir.iterdir()) and not marker_owned and not legacy_owned:
+            raise ValueError(
+                f"Refusing to delete nonempty unowned output directory: {output_dir}. "
+                "Choose an empty directory or remove it after manual review."
+            )
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_file(output_dir / OUTPUT_MARKER, "owned by splunk-spl2-pipeline-kit\n")
+
+
+def ensure_output_dir_owned(output_dir: Path) -> None:
+    if output_dir.exists():
+        marker = output_dir / OUTPUT_MARKER
+        legacy_readme = output_dir / "README.md"
+        legacy_owned = legacy_readme.is_file() and not legacy_readme.is_symlink() and legacy_readme.read_text(
+            encoding="utf-8", errors="ignore"
+        ).startswith("# Rendered SPL2 Pipeline Kit")
+        marker_owned = marker.is_file() and not marker.is_symlink()
+        if any(output_dir.iterdir()) and not marker_owned and not legacy_owned:
+            raise ValueError(
+                f"Refusing to write lint reports into nonempty unowned output directory: {output_dir}."
+            )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_file(output_dir / OUTPUT_MARKER, "owned by splunk-spl2-pipeline-kit\n")
+
+
 def strip_comments(text: str) -> str:
     cleaned_lines = []
     for line in text.splitlines():
@@ -346,7 +385,7 @@ def lint_text(text: str, profile: str, *, strict: bool = False) -> list[LintFind
     if re.search(r"\bobject_to_array\s*\(", cleaned):
         findings.append(
             LintFinding(
-                "warning",
+                "error",
                 "SPL2-DEPRECATED-FUNCTION",
                 "`object_to_array()` was replaced by `json_entries()` in SPL2 release notes; update the pipeline before preview/apply.",
             )
@@ -508,6 +547,23 @@ def collect_lint_targets(args: argparse.Namespace, rendered: list[Path]) -> list
 def run_lint(args: argparse.Namespace, targets: list[Path]) -> list[dict]:
     profiles = profiles_for(args.profile)
     reports: list[dict] = []
+    if not targets:
+        return [
+            {
+                "path": "(none)",
+                "profile": args.profile,
+                "status": "FAIL",
+                "commands": [],
+                "imports": [],
+                "findings": [
+                    {
+                        "severity": "error",
+                        "code": "SPL2-NO-TARGETS",
+                        "message": "No pipeline files were found. Pass --pipeline-file or render templates before lint/validate.",
+                    }
+                ],
+            }
+        ]
     for target in targets:
         if not target.is_file():
             reports.append(
@@ -572,11 +628,14 @@ def main(args: argparse.Namespace | None = None) -> int:
     if args.phase == "smoke":
         return run_smoke()
 
-    output_dir = Path(args.output_dir).expanduser().resolve()
+    raw_output_dir = Path(args.output_dir).expanduser()
+    if raw_output_dir.is_symlink():
+        raise ValueError(f"Refusing symlink output directory: {raw_output_dir}")
+    output_dir = raw_output_dir.resolve()
     if args.phase in {"render", "all"}:
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        prepare_output_dir(output_dir)
+    else:
+        ensure_output_dir_owned(output_dir)
 
     rendered: list[Path] = []
     if args.phase in {"render", "all"}:
@@ -602,4 +661,8 @@ def main(args: argparse.Namespace | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None

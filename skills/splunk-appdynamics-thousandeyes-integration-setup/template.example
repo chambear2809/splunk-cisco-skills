@@ -17,7 +17,8 @@ features:
   custom_event_webhook: true
 
 thousandeyes:
-  account_group_id: "1234"
+  # Required before live ThousandEyes apply. Do not leave a sample account ID.
+  account_group_id: ""
   native_appd_integration_id: ""
   custom_webhook_operation_id: ""
   labels:

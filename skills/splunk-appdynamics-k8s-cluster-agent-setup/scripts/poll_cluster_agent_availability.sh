@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -173,7 +174,10 @@ if [[ -z "${CONTROLLER_URL}" ]]; then
     exit 2
 fi
 
-if [[ -n "${TOKEN_FILE}" ]]; then
+if [[ -n "${TOKEN_FILE}" && -n "${CLIENT_SECRET_FILE}" ]]; then
+    echo "FAIL: provide either --token-file or --client-secret-file, not both." >&2
+    exit 2
+elif [[ -n "${TOKEN_FILE}" ]]; then
     appd_assert_secret_file "${TOKEN_FILE}" "AppDynamics OAuth token file"
 elif [[ -n "${CLIENT_SECRET_FILE}" ]]; then
     if [[ -z "${ACCOUNT_NAME}" || -z "${CLIENT_NAME}" ]]; then
@@ -414,6 +418,7 @@ if as_json:
     print(json.dumps({"application_name": app_name, "health_rule_name": health_rule_name, "status": status, "violation_count": len(matches)}, sort_keys=True))
 else:
     print(f"{status}: app={app_name} health_rule={health_rule_name} recent_violations={len(matches)}")
+raise SystemExit(3 if matches else 0)
 PY
 }
 
@@ -502,7 +507,15 @@ for ((iteration = 1; iteration <= ITERATIONS; iteration++)); do
                 --data-urlencode "time-range-type=BEFORE_NOW" \
                 --data-urlencode "duration-in-mins=${VIOLATION_DURATION_MINS}" \
                 --data-urlencode "output=JSON" > "${violations_response}"
-            summarize_violations "${app_name}" "${violations_response}" || true
+            set +e
+            summarize_violations "${app_name}" "${violations_response}"
+            violation_code=$?
+            set -e
+            if [[ "${violation_code}" -eq 3 && "${overall_status}" -eq 0 ]]; then
+                overall_status=3
+            elif [[ "${violation_code}" -ne 0 ]]; then
+                overall_status=1
+            fi
         fi
     done < "${APP_SPECS_FILE}"
 

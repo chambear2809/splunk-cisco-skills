@@ -22,6 +22,8 @@ targets:
     machine_agent_home: /opt/appdynamics/machine-agent
     install_type: rpm
     collector_config_path: /opt/appdynamics/machine-agent/otel-collector/config.yaml
+    # Generated from the two chmod-600 secret files at apply time; never commit it.
+    collector_environment_file: /opt/appdynamics/machine-agent/otel-collector/appd-otel-credentials.env
     collector_service_name: appdynamics-machine-agent
     receiver_bind: 127.0.0.1
     grpc_port: 4317

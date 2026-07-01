@@ -17,6 +17,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 OUTPUT_DIR=""
 LIVE=false
@@ -90,9 +92,18 @@ for f in "shc/bootstrap/sequenced-bootstrap.sh" \
     check "Required file ${f} exists" "[[ -f '${OUTPUT_DIR}/${f}' ]]"
 done
 
-# pass4SymmKey must not be inlined — allow $SHC_SECRET placeholder and file-read patterns
-if grep -rn "pass4SymmKey" "${OUTPUT_DIR}" 2>/dev/null | \
-    grep -v '\$SHC_SECRET\|YOUR_\|cat /tmp/splunk_shc_secret\|splunk_shc_secret' | grep -q .; then
+# pass4SymmKey must not be inlined. Check actual conf assignments and CLI
+# flags, not explanatory prose that merely names the setting.
+inline_pass4=false
+if grep -rInE '^[[:space:]]*pass4SymmKey[[:space:]]*=' "${OUTPUT_DIR}" 2>/dev/null | \
+    grep -Ev '=[[:space:]]*(\$SHC_SECRET|\$\{SHC_SECRET\}|YOUR_|.*cat[[:space:]].*splunk_shc_secret)' | grep -q .; then
+    inline_pass4=true
+fi
+if grep -rIn -- '--pass4SymmKey' "${OUTPUT_DIR}" 2>/dev/null | \
+    grep -Ev '(\$SHC_SECRET|\$\{SHC_SECRET\}|YOUR_|cat[[:space:]].*splunk_shc_secret)' | grep -q .; then
+    inline_pass4=true
+fi
+if [[ "${inline_pass4}" == "true" ]]; then
     echo "FAIL: Inline pass4SymmKey value detected in rendered files." >&2
     ERRORS=$((ERRORS + 1))
 fi
@@ -108,16 +119,19 @@ if [[ "${LIVE}" == "true" ]]; then
     if [[ -z "${SHC_URI}" ]]; then
         echo "WARN: --live specified but --shc-uri not provided; skipping live checks." >&2
     else
-        echo "Live check: ${SHC_URI}/services/shcluster/captain/info"
-        HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' \
-            --insecure \
-            ${ADMIN_PASSWORD_FILE:+-u "admin:$(cat "${ADMIN_PASSWORD_FILE}")"} \
-            "${SHC_URI}/services/shcluster/captain/info" 2>/dev/null || echo "000")"
-        if [[ "${HTTP_CODE}" == "200" ]]; then
-            echo "OK: SHC captain info endpoint reachable"
+        if [[ ! -s "${ADMIN_PASSWORD_FILE}" ]]; then
+            echo "FAIL: --live requires a non-empty --admin-password-file." >&2
+            ERRORS=$((ERRORS + 1))
         else
-            echo "WARN: SHC captain info endpoint returned HTTP ${HTTP_CODE}" >&2
-            WARNINGS=$((WARNINGS + 1))
+            echo "Live check: ${SHC_URI}/services/shcluster/captain/info"
+            if SK="$(get_session_key_from_password_file "${SHC_URI}" "${ADMIN_PASSWORD_FILE}" "${SPLUNK_AUTH_USER:-admin}")" && \
+               splunk_curl "${SK}" --fail-with-body --show-error \
+                 -o /dev/null "${SHC_URI}/services/shcluster/captain/info"; then
+                echo "OK: SHC captain info endpoint reachable"
+            else
+                echo "FAIL: SHC captain info endpoint request failed." >&2
+                ERRORS=$((ERRORS + 1))
+            fi
         fi
     fi
 fi

@@ -10,6 +10,14 @@ description: >-
 
 # Splunk Connect for OTLP Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture applicable configuration, ingest/readiness, and
+shipped-view evidence, or explicit package evidence that no dashboards ship.
+
 Use this skill for the full lifecycle of Splunk Connect for OTLP, the Splunk
 Platform modular input that accepts OTLP logs, metrics, and traces and emits
 HEC-shaped events through Splunk modular-input stdout.
@@ -66,8 +74,16 @@ bash skills/splunk-connect-for-otlp-setup/scripts/setup.sh \
   --index otlp_events \
   --grpc-port 4317 \
   --http-port 4318 \
-  --listen-address 0.0.0.0
+  --listen-address 0.0.0.0 \
+  --enable-ssl true \
+  --server-cert /opt/splunk/etc/auth/otlp/server.pem \
+  --server-key /opt/splunk/etc/auth/otlp/server.key
 ```
+
+Receiver and sender TLS default to enabled. A non-loopback plaintext listener
+or sender is rejected unless the operator supplies
+`--accept-insecure-plaintext-listener`; reserve that exception for an isolated,
+short-lived lab.
 
 4. Render sender assets:
 
@@ -92,6 +108,11 @@ bash skills/splunk-connect-for-otlp-setup/scripts/validate.sh \
 ```bash
 bash skills/splunk-connect-for-otlp-setup/scripts/setup.sh --doctor
 ```
+
+`--repair` returns nonzero when a requested fix can only render a HEC or sender
+handoff. Run the rendered handoff, validate the resulting state, and rerun the
+repair/validation workflow; a rendered packet is not reported as a completed
+live repair.
 
 ## Cloud And Topology
 
@@ -119,6 +140,10 @@ Use the hybrid-gated model:
   - `com.splunk.sourcetype` -> Splunk `sourcetype`
   - `com.splunk.source` -> Splunk `source`
   - `host.name` -> Splunk `host`
+
+The rendered telemetrygen helper intentionally exits nonzero because its OTLP
+header option would expose the HEC token in process arguments. Use the rendered
+Collector or SDK profile for an actionable, file-backed sender path.
 
 Render explicit `com.splunk.index` sender configuration and smoke-test routing
 before claiming default-index behavior. The inspected `0.4.1` binary validates

@@ -1630,30 +1630,33 @@ def render_splunk_side(spec: dict[str, Any], output_dir: Path) -> tuple[list[dic
             object_type="splunk_side_add_on",
             name="TA-splunk-add-on-for-victorops",
             coverage="install_apply",
-            notes="Splunkbase 4886 Add-on; install on heavy forwarder; pre-create 4 indexes.",
+            notes=(
+                "Splunkbase 4886 Add-on installs on the heavy forwarder and pre-creates "
+                "its indexes; modular-input configuration remains a reviewed handoff."
+            ),
             extra={"splunkbase_id": 4886},
         ))
     if splunk_side.get("soar_connector"):
         coverage.append(coverage_entry(
             object_type="splunk_side_soar_connector",
             name="splunkoncall",
-            coverage="install_apply",
-            notes="Splunkbase 5863 SOAR connector; FIPS-compliant.",
+            coverage="handoff",
+            notes="Splunkbase 5863 is a Splunk SOAR connector; install/configure it in Splunk SOAR.",
             extra={"splunkbase_id": 5863},
         ))
     if splunk_side.get("itsi", {}).get("enabled"):
         coverage.append(coverage_entry(
             object_type="splunk_side_itsi",
             name="itsi-neap",
-            coverage="install_apply",
-            notes="ITSI Notable Event Action JSON for Splunk On-Call.",
+            coverage="handoff",
+            notes="ITSI Notable Event Action configuration delegates to the ITSI workflow.",
         ))
     if splunk_side.get("enterprise_security", {}).get("adaptive_response"):
         coverage.append(coverage_entry(
             object_type="splunk_side_es_adaptive_response",
             name="es-adaptive-response",
-            coverage="install_apply",
-            notes="Splunk ES Adaptive Response action backed by [victorops].",
+            coverage="handoff",
+            notes="Splunk ES Adaptive Response configuration delegates to the ES workflow.",
         ))
     if splunk_side.get("observability_handoff"):
         coverage.append(coverage_entry(

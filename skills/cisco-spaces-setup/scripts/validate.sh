@@ -2,14 +2,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-spaces-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-spaces-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco Spaces TA using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero. This TA
+ships no dashboards; completion is based on configuration and event evidence.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="ta_cisco_spaces"
@@ -22,6 +32,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco Spaces TA Validation ==="
 log ""
@@ -54,7 +65,7 @@ log "--- Index ---"
 if platform_check_index "${SK}" "${SPLUNK_URI}" "${DEFAULT_INDEX}" 2>/dev/null; then
     pass "Index '${DEFAULT_INDEX}' exists"
 else
-    warn "Index '${DEFAULT_INDEX}' not found (may need to run setup.sh)"
+    completion_issue "Index '${DEFAULT_INDEX}' not found (may need to run setup.sh)"
 fi
 
 log ""
@@ -85,10 +96,10 @@ except Exception:
     pass
 " 2>/dev/null || true
     else
-        warn "Meta stream conf exists but has no stanzas"
+        completion_issue "Meta stream conf exists but has no stanzas"
     fi
 else
-    warn "No meta stream conf found"
+    completion_issue "No meta stream conf found"
 fi
 
 log ""
@@ -102,10 +113,10 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${input_count} input stanza(s) exist but all are disabled"
+        completion_issue "${input_count} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No inputs configured"
+    completion_issue "No inputs configured"
 fi
 
 log ""
@@ -114,14 +125,14 @@ event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where 
 if [[ "${event_count}" -gt 0 ]]; then
     pass "Index '${DEFAULT_INDEX}' has ${event_count} events"
 else
-    warn "Index '${DEFAULT_INDEX}' has no events (may be normal if just configured)"
+    completion_issue "Index '${DEFAULT_INDEX}' has no events (may be normal if just configured)"
 fi
 
 sourcetype_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats dc(sourcetype) as stcount where index=${DEFAULT_INDEX} | eval stcount=stcount-0" "stcount" 2>/dev/null || echo "0")
 if [[ "${sourcetype_count}" -gt 0 ]]; then
     pass "${sourcetype_count} distinct sourcetype(s) in ${DEFAULT_INDEX} index"
 else
-    warn "No sourcetypes found in ${DEFAULT_INDEX} index yet"
+    completion_issue "No sourcetypes found in ${DEFAULT_INDEX} index yet"
 fi
 
 log ""

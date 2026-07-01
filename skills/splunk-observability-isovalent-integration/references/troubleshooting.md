@@ -60,10 +60,16 @@ You should see `logsEnabled: true` and the HEC endpoint.
 HEC_CURL_CONFIG="$(mktemp)"
 chmod 600 "$HEC_CURL_CONFIG"
 { printf 'header = "Authorization: Splunk '; tr -d '\r\n' < "$HEC_TOKEN_FILE"; printf '"\n'; } > "$HEC_CURL_CONFIG"
+trap 'rm -f "$HEC_CURL_CONFIG"' EXIT
 
-curl -sS -k -K "$HEC_CURL_CONFIG" \
+CURL_TLS_ARGS=(--fail-with-body --silent --show-error)
+if [[ -n "${HEC_CA_CERT:-}" ]]; then
+  CURL_TLS_ARGS+=(--cacert "$HEC_CA_CERT")
+elif [[ "${HEC_VERIFY_SSL:-true}" == "false" ]]; then
+  CURL_TLS_ARGS+=(--insecure)
+fi
+curl "${CURL_TLS_ARGS[@]}" -K "$HEC_CURL_CONFIG" \
     "https://$HEC_HOST:8088/services/collector/health"
-rm -f "$HEC_CURL_CONFIG"
 ```
 
 Should return `{"text":"HEC is healthy","code":17}`.

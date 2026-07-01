@@ -107,6 +107,13 @@ delete_app_via_rest() {
     DELETE_BODY="${body}"
 }
 
+validate_app_name() {
+    if [[ ! "${APP_NAME}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+        log "ERROR: App name '${APP_NAME}' contains unsupported characters."
+        exit 1
+    fi
+}
+
 echo "=== Splunk App Uninstaller ==="
 echo ""
 
@@ -156,6 +163,8 @@ except Exception:
             exit 1
         fi
     fi
+
+    validate_app_name
 
     if [[ "${ASSUME_YES}" == "true" ]]; then
         log "Non-interactive mode (--yes): removing app '${APP_NAME}' without prompting."
@@ -242,12 +251,13 @@ except Exception:
     fi
 
     if (( acs_uninstall_rc == 0 )); then
-        log "WARNING: ACS uninstall completed, but search-tier verification is unavailable."
+        log "ERROR: ACS accepted the uninstall, but completion could not be verified on the search tier."
+        log "HANDOFF: Run 'acs apps describe ${APP_NAME}' and verify the app is absent in Splunk Web/search-tier REST before treating removal as complete."
+        exit 1
     else
         log "ERROR: ACS uninstall failed and search-tier verification is unavailable."
         exit 1
     fi
-    exit 0
 fi
 
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
@@ -306,6 +316,8 @@ except Exception:
         exit 1
     fi
 fi
+
+validate_app_name
 
 if [[ "${ASSUME_YES}" == "true" ]]; then
     log "Non-interactive mode (--yes): removing app '${APP_NAME}' without prompting."
@@ -369,11 +381,18 @@ if ${DELETE_INCOMPLETE_BUT_ABSENT}; then
 fi
 
 if [[ "${http_code}" -eq 200 || "${http_code}" -eq 204 ]]; then
-    log "SUCCESS: App '${APP_NAME}' has been removed"
+    log "Removal request for '${APP_NAME}' was accepted."
     log ""
     log "Note: The app directory may still exist at:"
     log "  ${SPLUNK_HOME}/etc/apps/${APP_NAME}/"
     restart_splunk_or_exit "app removal"
+    post_delete_code="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+    if [[ "${post_delete_code}" != "404" ]]; then
+        log "ERROR: App '${APP_NAME}' is still present or could not be verified after removal (HTTP ${post_delete_code})."
+        log "HANDOFF: Confirm bundle propagation/search-tier state before treating uninstall as complete."
+        exit 1
+    fi
+    log "SUCCESS: App '${APP_NAME}' removal was verified."
 else
     log "ERROR: Failed to remove app '${APP_NAME}' (HTTP ${http_code})"
     error_msg=$(echo "${body}" | python3 -c "

@@ -162,7 +162,7 @@ main() {
 
     update_macros
     enable_saved_searches
-    log "Setup complete. Dashboards will use data from the configured indexes."
+    log "Dashboard prerequisites configured; run '${SCRIPT_DIR}/validate.sh --completion' to prove views and data are ready."
     log "$(log_platform_restart_guidance "saved search or macro changes")"
     log "Tip: Run with --accelerate to enable data model acceleration for production."
 }

@@ -24,7 +24,7 @@ Defaults and target options:
   --hec-source VALUE        HEC source (default: widefield)
   --hec-token-name NAME     HEC token name (default: widefield_security_hec)
   --children LIST           Parent router children
-  --evidence-file PATH      Evidence JSON for offline validation
+  --evidence-file PATH      Evidence JSON (required for Google/Saviynt validation)
 
 Okta options:
   --okta-org-url URL
@@ -168,10 +168,19 @@ widefield_log() {
     fi
 }
 
-widefield_validate_evidence() {
+widefield_validate_evidence_for_kind() {
+    local kind="$1"
     if [[ -z "${EVIDENCE_FILE}" ]]; then
-        widefield_log "WARN: no --evidence-file supplied; offline evidence validation skipped."
-        return 0
+        case "${kind}" in
+            google|saviynt)
+                widefield_log "FAIL: ${kind} validation requires --evidence-file JSON."
+                return 1
+                ;;
+            *)
+                widefield_log "WARN: no --evidence-file supplied; offline evidence validation skipped."
+                return 0
+                ;;
+        esac
     fi
     if [[ ! -f "${EVIDENCE_FILE}" ]]; then
         widefield_log "FAIL: evidence file not found: ${EVIDENCE_FILE}"
@@ -183,11 +192,31 @@ widefield_validate_evidence() {
         widefield_log "FAIL: evidence file is not valid JSON"
         return 1
     fi
-    if grep -q "WIDEFIELD_SECURITY" "${EVIDENCE_FILE}"; then
-        widefield_log "PASS: evidence references Google SecOps WIDEFIELD_SECURITY"
-    else
-        widefield_log "WARN: evidence does not reference WIDEFIELD_SECURITY"
-    fi
+    case "${kind}" in
+        google)
+            if grep -q 'WIDEFIELD_SECURITY' "${EVIDENCE_FILE}"; then
+                widefield_log "PASS: evidence references Google SecOps WIDEFIELD_SECURITY"
+            else
+                widefield_log "FAIL: evidence does not reference Google SecOps log type WIDEFIELD_SECURITY"
+                return 1
+            fi
+            ;;
+        saviynt)
+            if grep -Eiq 'revoke|password[ _-]?reset|micro[ _-]?certification|remediation' "${EVIDENCE_FILE}"; then
+                widefield_log "PASS: evidence contains a Saviynt remediation outcome marker"
+            else
+                widefield_log "FAIL: evidence does not contain a Saviynt revoke, password-reset, micro-certification, or remediation outcome"
+                return 1
+            fi
+            ;;
+        *)
+            widefield_log "PASS: generic evidence validation completed"
+            ;;
+    esac
+}
+
+widefield_validate_evidence() {
+    widefield_validate_evidence_for_kind "${WIDEFIELD_KIND}"
 }
 
 widefield_require_https_url() {
@@ -308,7 +337,7 @@ widefield_validate_saviynt() {
 widefield_validate_doctor() {
     widefield_validate_splunk
     widefield_validate_okta
-    widefield_validate_evidence || true
+    widefield_validate_evidence
 }
 
 widefield_validate() {
@@ -473,7 +502,15 @@ widefield_apply_splunk() {
 
 widefield_apply_parent() {
     local child skill
+    local -a child_array child_cmd
     IFS=',' read -r -a child_array <<< "${CHILDREN}"
+    if [[ "${DRY_RUN}" != "true" ]]; then
+        for child in "${child_array[@]}"; do
+            case "${child}" in
+                google|saviynt) widefield_validate_evidence_for_kind "${child}" ;;
+            esac
+        done
+    fi
     for child in "${child_array[@]}"; do
         case "${child}" in
             okta) skill="widefield-okta-integration-setup" ;;
@@ -487,21 +524,40 @@ widefield_apply_parent() {
         if [[ "${DRY_RUN}" == "true" ]]; then
             widefield_log "DRY RUN: would delegate to skills/${skill}/scripts/setup.sh --render --validate with non-secret target context."
         else
-            bash "${_PROJECT_ROOT}/skills/${skill}/scripts/setup.sh" --render --validate \
-                --output-dir "${OUTPUT_DIR}" \
-                --index "${INDEX}" \
-                --sourcetype "${SOURCETYPE}" \
-                --hec-source "${HEC_SOURCE}" \
-                --hec-token-name "${HEC_TOKEN_NAME}" \
-                --okta-org-url "${OKTA_ORG_URL}" \
-                --receiver-url "${RECEIVER_URL}" \
-                --hook-name "${HOOK_NAME}" \
-                --event-types "${EVENT_TYPES}" \
-                --saviynt-tenant-url "${SAVIYNT_TENANT_URL}" \
-                --google-secops-project "${GOOGLE_SECOPS_PROJECT}" \
-                --google-secops-region "${GOOGLE_SECOPS_REGION}" \
-                --feed-name "${FEED_NAME}" \
-                --evidence-file "${EVIDENCE_FILE}"
+            child_cmd=(bash "${_PROJECT_ROOT}/skills/${skill}/scripts/setup.sh" --render --validate --output-dir "${OUTPUT_DIR}")
+            case "${child}" in
+                okta)
+                    [[ "${OKTA_ORG_URL_SET}" == "true" ]] && child_cmd+=(--okta-org-url "${OKTA_ORG_URL}")
+                    [[ "${RECEIVER_URL_SET}" == "true" ]] && child_cmd+=(--receiver-url "${RECEIVER_URL}")
+                    [[ "${HOOK_NAME_SET}" == "true" ]] && child_cmd+=(--hook-name "${HOOK_NAME}")
+                    [[ "${EVENT_TYPES_SET}" == "true" ]] && child_cmd+=(--event-types "${EVENT_TYPES}")
+                    ;;
+                saviynt)
+                    [[ "${SAVIYNT_TENANT_URL_SET}" == "true" ]] && child_cmd+=(--saviynt-tenant-url "${SAVIYNT_TENANT_URL}")
+                    [[ "${EVIDENCE_FILE_SET}" == "true" ]] && child_cmd+=(--evidence-file "${EVIDENCE_FILE}")
+                    ;;
+                splunk)
+                    [[ "${INDEX_SET}" == "true" ]] && child_cmd+=(--index "${INDEX}")
+                    [[ "${SOURCETYPE_SET}" == "true" ]] && child_cmd+=(--sourcetype "${SOURCETYPE}")
+                    [[ "${HEC_SOURCE_SET}" == "true" ]] && child_cmd+=(--hec-source "${HEC_SOURCE}")
+                    [[ "${HEC_TOKEN_NAME_SET}" == "true" ]] && child_cmd+=(--hec-token-name "${HEC_TOKEN_NAME}")
+                    child_cmd+=(--splunk-platform "${SPLUNK_PLATFORM}")
+                    ;;
+                google)
+                    [[ "${GOOGLE_SECOPS_PROJECT_SET}" == "true" ]] && child_cmd+=(--google-secops-project "${GOOGLE_SECOPS_PROJECT}")
+                    [[ "${GOOGLE_SECOPS_REGION_SET}" == "true" ]] && child_cmd+=(--google-secops-region "${GOOGLE_SECOPS_REGION}")
+                    [[ "${FEED_NAME_SET}" == "true" ]] && child_cmd+=(--feed-name "${FEED_NAME}")
+                    [[ "${EVIDENCE_FILE_SET}" == "true" ]] && child_cmd+=(--evidence-file "${EVIDENCE_FILE}")
+                    ;;
+                doctor)
+                    [[ "${INDEX_SET}" == "true" ]] && child_cmd+=(--index "${INDEX}")
+                    [[ "${SOURCETYPE_SET}" == "true" ]] && child_cmd+=(--sourcetype "${SOURCETYPE}")
+                    [[ "${HEC_TOKEN_NAME_SET}" == "true" ]] && child_cmd+=(--hec-token-name "${HEC_TOKEN_NAME}")
+                    [[ "${OKTA_ORG_URL_SET}" == "true" ]] && child_cmd+=(--okta-org-url "${OKTA_ORG_URL}")
+                    [[ "${EVIDENCE_FILE_SET}" == "true" ]] && child_cmd+=(--evidence-file "${EVIDENCE_FILE}")
+                    ;;
+            esac
+            "${child_cmd[@]}"
         fi
     done
 }

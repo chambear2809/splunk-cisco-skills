@@ -58,7 +58,7 @@ By default, assets are written under `splunk-observability-cisco-ai-pod-rendered
 3. **DCGM dual-label discovery**: the GPU child's discovery rule matches both `app` and `app.kubernetes.io/name`.
 4. **Dual-pipeline filtering**: smarter than the canonical single-pipeline pattern.
 5. **OpenShift requirements**: kubeletstats TLS skip, no certmanager, empty cloudProvider.
-6. **Helm token pattern**: `--reuse-values --set splunkObservability.accessToken="$(cat $TOKEN_FILE)"` so the token never lands in a tracked values file.
+6. **Helm token pattern**: `--reuse-values --set-file splunkObservability.accessToken="$TOKEN_FILE"` so the token never lands in a tracked values file or process arguments.
 
 ## Hand-offs
 

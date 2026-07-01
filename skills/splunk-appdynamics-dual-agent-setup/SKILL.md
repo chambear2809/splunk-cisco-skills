@@ -42,3 +42,6 @@ bash skills/splunk-appdynamics-dual-agent-setup/scripts/validate.sh --output-dir
 - `--accept-full-restart` is required when `restart_strategy: full`.
 - Direct token, access-token, and API key flags are refused; use file-backed
   fields in the spec.
+- Referenced collector secret files must be non-empty and mode 600. Collector
+  apply writes a target-side mode-600 environment file; Docker and Windows
+  targets need an explicit `collector_credentials_ready_command`.

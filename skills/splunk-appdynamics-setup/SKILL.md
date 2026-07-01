@@ -46,11 +46,17 @@ Render output defaults to `splunk-appdynamics-setup-rendered/` and includes:
 ## Modes
 
 - `--render`: render coverage, child routing, and runbooks.
-- `--apply [sections]`: parent renders delegated apply plans only.
-- `--validate [--live]`: validate rendered coverage; live checks are delegated.
-- `--doctor`: summarize coverage and routing health.
+- `--apply`: rejected at the parent. Invoke the routed child skill so its real
+  mutation gate, spec schema, and validation contract are enforced.
+- `--validate`: validate rendered coverage and artifact contracts. `--live`
+  executes only implemented read-only child probes (currently platform,
+  Controller licensing, and Kubernetes/O11y) and fails closed for workflows
+  whose only probe would mutate state or is not implemented.
+- `--doctor`: check taxonomy fields, ownership, wrapper files, and consistency
+  between actionable coverage claims and executable apply paths.
 - `--quickstart`: render and print the validation command.
-- `--rollback [sections]`: render rollback handoff plan.
+- `--rollback`: rejected at the parent; rollback belongs to the child that
+  created the mutation and evidence.
 - `--json`: emit machine-readable result.
 
 ## Coverage Contract

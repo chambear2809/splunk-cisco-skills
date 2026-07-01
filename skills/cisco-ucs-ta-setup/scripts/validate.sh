@@ -2,15 +2,25 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-ucs-ta-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-ucs-ta-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates Cisco UCS TA installation, index, templates, server records, inputs,
 and starter data using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero. This TA
+ships no standalone dashboards.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_cisco-ucs"
@@ -20,6 +30,7 @@ FAIL=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco UCS TA Validation ==="
 warn_if_current_skill_role_unsupported
@@ -44,7 +55,7 @@ if [[ -n "${SK:-}" ]]; then
         pass "Index cisco_ucs exists"
         index_present=true
     else
-        warn "Index cisco_ucs not found"
+        completion_issue "Index cisco_ucs not found"
     fi
 
     if ${app_present}; then
@@ -53,7 +64,7 @@ if [[ -n "${SK:-}" ]]; then
             if [[ -n "${content}" ]]; then
                 pass "Template ${template} exists"
             else
-                warn "Template ${template} not found"
+                completion_issue "Template ${template} not found"
             fi
         done
 
@@ -62,15 +73,17 @@ if [[ -n "${SK:-}" ]]; then
         if [[ "${server_count}" -gt 0 ]]; then
             pass "UCS Manager server records: ${server_count}"
         else
-            warn "No UCS Manager server records configured"
+            completion_issue "No UCS Manager server records configured"
         fi
 
         input_count=$(rest_count_conf_stanzas "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "inputs" "cisco_ucs_task://")
         enabled_inputs=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "0")
-        if [[ "${input_count}" -gt 0 ]]; then
+        if [[ "${input_count}" -gt 0 && "${enabled_inputs}" -gt 0 ]]; then
             pass "cisco_ucs_task input stanzas: ${input_count}, enabled live inputs: ${enabled_inputs}"
+        elif [[ "${input_count}" -gt 0 ]]; then
+            completion_issue "cisco_ucs_task input stanzas exist but none are enabled"
         else
-            warn "No cisco_ucs_task inputs configured"
+            completion_issue "No cisco_ucs_task inputs configured"
         fi
     else
         warn "Skipping UCS template, server, and task checks because ${APP_NAME} is missing"
@@ -81,7 +94,7 @@ if [[ -n "${SK:-}" ]]; then
         if [[ "${event_count}" -gt 0 ]]; then
             pass "cisco_ucs has ${event_count} cisco:ucs event(s)"
         else
-            warn "No cisco:ucs events found in cisco_ucs"
+            completion_issue "No cisco:ucs events found in cisco_ucs"
         fi
     fi
 fi

@@ -190,3 +190,9 @@ Configured in `local/splunk_ta_cisco_meraki_settings.conf`:
 | POST | `/servicesNS/nobody/Splunk_TA_cisco_meraki/Splunk_TA_cisco_meraki_account/<name>` | Update account |
 | DELETE | `/servicesNS/nobody/Splunk_TA_cisco_meraki/Splunk_TA_cisco_meraki_account/<name>` | Delete account |
 | POST/GET | `/servicesNS/nobody/Splunk_TA_cisco_meraki/Splunk_TA_cisco_meraki_settings` | Manage settings |
+
+## Completion Validation
+
+`validate.sh --completion` (alias `--strict`) turns absent account, enabled
+input, event/sourcetype, required index, dashboard macro, and dashboard view
+evidence into failures. The no-flag validator remains diagnostic.

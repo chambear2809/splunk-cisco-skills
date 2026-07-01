@@ -201,9 +201,9 @@ class SplunkSupportedAddonsSetupTests(unittest.TestCase):
             self.assertIn("SPLUNKBASE_APP_ID", commands)
 
         install = self.run_setup("--phase", "install-command", "--profile", "BMC Remedy", "--json")
-        self.assertEqual(install.returncode, 0, msg=install.stdout + install.stderr)
-        install_payload = json.loads(install.stdout)
-        self.assertEqual(install_payload["command"], ["bash", "skills/splunk-app-install/scripts/install_app.sh", "--help"])
+        self.assertNotEqual(install.returncode, 0)
+        self.assertIn("no executable install route", install.stdout + install.stderr)
+        self.assertIn("explicit source", install.stdout + install.stderr)
 
         readiness = self.run_setup("--phase", "readiness-command", "--profile", "Microsoft Windows", "--json")
         self.assertEqual(readiness.returncode, 0, msg=readiness.stdout + readiness.stderr)

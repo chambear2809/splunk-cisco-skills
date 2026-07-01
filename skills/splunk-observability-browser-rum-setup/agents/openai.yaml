@@ -1,3 +1,3 @@
 display_name: "Splunk Browser RUM Setup"
 short_description: "Render generic web app Browser RUM, Session Replay, and source-map assets"
-default_prompt: "Use $splunk-observability-browser-rum-setup to render CDN, npm, framework, source-map, CSP, Session Replay, and RUM-to-APM validation assets."
+default_prompt: "Use $splunk-observability-browser-rum-setup to render CDN, npm, framework, source-map, CSP, Session Replay, and RUM-to-APM validation assets, and to run a reviewed source-map upload when explicitly requested."

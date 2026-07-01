@@ -125,18 +125,18 @@ leave the host on which they were generated.
 # 1. Concatenate the chain (intermediate + root) into the trust bundle.
 cat returned-intermediate.pem returned-root.pem > pki/install/cabundle.pem
 
-# 2. (Optional) concatenate the leaf with intermediates for HEC/Web (some
-#    deployments expect a single chain file rather than separate cert + chain).
-cat returned-leaf.pem returned-intermediate.pem > signed/splunkd-idx01-chain.pem
+# 2. Keep the returned leaf and private key separate as installer inputs.
+#    install-leaf.sh builds Splunk's required leaf + key + CA combined PEM;
+#    it also builds the public leaf + CA chain used by Splunk Web.
 
 # 3. Verify the chain (must return OK).
 bash pki/install/verify-leaf.sh \
-    --cert signed/splunkd-idx01-chain.pem \
+    --cert signed/returned-leaf.pem \
     --ca   pki/install/cabundle.pem
 
 # 4. Run KV Store EKU check (must return OK).
 bash pki/install/kv-store-eku-check.sh \
-    --cert signed/splunkd-idx01-chain.pem \
+    --cert signed/returned-leaf.pem \
     --ca   pki/install/cabundle.pem
 
 # 5. Install on the host.

@@ -264,10 +264,9 @@ require() {{
 }}
 require "${{SECRET_FILE}}" "${{ADMIN_PW_FILE}}"
 
-# Push secret + admin password to the remote host as files (chmod 600) and
-# reference them from the inner script. This avoids putting the cluster
-# pass4SymmKey or admin password in the SSH command line, where they would
-# be visible in `ps` and SSH server logs.
+# Push only the cluster secret to the remote host as a mode-preserving file.
+# The admin password remains local and is used only to mint the manager REST
+# session key after bootstrap.
 push_conf() {{
   local user="$1" host="$2" rel="$3"
   local local_path="${{RENDER_DIR}}/${{rel}}"
@@ -276,13 +275,12 @@ push_conf() {{
     exit 1
   fi
   scp -o StrictHostKeyChecking=accept-new -p \\
-    "${{local_path}}" "${{SECRET_FILE}}" "${{ADMIN_PW_FILE}}" \\
+    "${{local_path}}" "${{SECRET_FILE}}" \\
     "${{user}}@${{host}}:/tmp/"
-  local secret_basename pw_basename conf_basename
+  local secret_basename conf_basename
   secret_basename="$(basename "${{SECRET_FILE}}")"
-  pw_basename="$(basename "${{ADMIN_PW_FILE}}")"
   conf_basename="$(basename "${{local_path}}")"
-  # We DO want client-side expansion of secret_basename/pw_basename/conf_basename
+  # We DO want client-side expansion of secret_basename/conf_basename
   # so the remote bash sees the actual filenames. shellcheck disable=SC2087.
   # NB on splunk restart auth: bootstrap is the ONE step that legitimately
   # has to talk to the local splunkd via CLI, because the indexer is not
@@ -290,19 +288,32 @@ push_conf() {{
   # so admin auth is not required: a fresh `splunk start` does not prompt
   # for credentials, and on a system that is already running we use
   # `splunk stop && splunk start`. This keeps the admin password out of
-  # `splunk` argv on the remote host. The password file is still shred'd
-  # at the end as defense-in-depth in case operators repurpose this block.
+  # `splunk` argv on the remote host.
   # shellcheck disable=SC2087
   ssh -o StrictHostKeyChecking=accept-new "${{user}}@${{host}}" bash -s <<REMOTE_EOF
 set -euo pipefail
-secret=\\$(cat /tmp/${{secret_basename}})
-sudo cp /tmp/${{conf_basename}} /opt/splunk/etc/system/local/server.conf
-sudo sed -i "s/\\\\\\$IDXC_SECRET/\\${{secret}}/g" /opt/splunk/etc/system/local/server.conf
-if sudo /opt/splunk/bin/splunk status >/dev/null 2>&1; then
-  sudo /opt/splunk/bin/splunk stop || true
+cleanup_secret() {{
+  shred -u /tmp/${{secret_basename}} 2>/dev/null || rm -f /tmp/${{secret_basename}}
+}}
+trap cleanup_secret EXIT
+target_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster/local
+sudo install -d -o splunk -g splunk -m 750 "\\${{target_dir}}"
+sudo python3 - /tmp/${{conf_basename}} /tmp/${{secret_basename}} "\\${{target_dir}}/server.conf" <<'PY_REMOTE'
+from pathlib import Path
+import sys
+source, secret_file, target = map(Path, sys.argv[1:])
+secret = secret_file.read_text(encoding="utf-8").strip()
+if not secret:
+    raise SystemExit("ERROR: indexer cluster secret file is empty")
+text = source.read_text(encoding="utf-8").replace("$" + "IDXC_SECRET", secret)
+target.write_text(text, encoding="utf-8")
+target.chmod(0o600)
+PY_REMOTE
+sudo chown splunk:splunk "\\${{target_dir}}/server.conf"
+if sudo -u splunk /opt/splunk/bin/splunk status >/dev/null 2>&1; then
+  sudo -u splunk /opt/splunk/bin/splunk stop
 fi
-sudo /opt/splunk/bin/splunk start --answer-yes --no-prompt --accept-license || true
-shred -u /tmp/${{secret_basename}} /tmp/${{pw_basename}} 2>/dev/null || rm -f /tmp/${{secret_basename}} /tmp/${{pw_basename}}
+sudo -u splunk /opt/splunk/bin/splunk start --answer-yes --no-prompt --accept-license
 REMOTE_EOF
 }}
 
@@ -326,8 +337,10 @@ ATTEMPTS=60
 # shellcheck disable=SC1091
 source "${{LIB_DIR_FOR_BOOTSTRAP}}/credential_helpers.sh"
 SK="$(get_session_key_from_password_file "${{MANAGER_URI}}" "${{ADMIN_PW_FILE}}" "${{SPLUNK_AUTH_USER:-admin}}")"
+splunk_curl "${{SK}}" --fail-with-body --show-error -o /dev/null \
+  "${{MANAGER_URI}}/services/cluster/manager/peers?output_mode=json&count=0"
 while (( ATTEMPTS > 0 )); do
-  count=$(splunk_curl "${{SK}}" \\
+  count=$(splunk_curl "${{SK}}" --fail-with-body --show-error \\
     "${{MANAGER_URI}}/services/cluster/manager/peers?output_mode=json&count=0" 2>/dev/null \\
     | python3 -c "
 import json, sys
@@ -511,7 +524,7 @@ def render_peer_ops(cluster_manager_uri: str) -> dict[str, str]:
         "extend-restart-timeout.sh": make_script(
             mgr_sk_block
             + 'SECONDS_VAL="${RESTART_TIMEOUT_SECONDS:-900}"\n'
-            + 'splunk_curl_post "${SK}" "restart_timeout=${SECONDS_VAL}" \\\n'
+            + 'splunk_curl_post "${SK}" "restart_timeout=${SECONDS_VAL}" --fail-with-body --show-error \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'log "OK: Manager restart_timeout set to ${SECONDS_VAL} seconds."\n'
         ),
@@ -601,7 +614,7 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + "# Per Splunk doc: keep legacy replication_factor / search_factor for old\n"
             + "# buckets; add multisite settings for new buckets. The pass4SymmKey is\n"
             + "# fed to curl via --data-urlencode @file so it never lands on argv.\n"
-            + 'splunk_curl "${SK}" -X POST \\\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "mode=manager" \\\n'
             + '  --data-urlencode "multisite=true" \\\n'
             + '  --data-urlencode "available_sites=${AVAILABLE_SITES}" \\\n'
@@ -610,7 +623,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "cluster manager multisite conversion" "Restart the manager through its supported service path before assigning peer sites."\n'
-            + 'log "Manager configured for multisite. After the manager restart, run move-peer-to-site.sh per peer to assign sites."\n'
+            + 'log "PARTIAL: Manager configured for multisite; restart and peer-site assignment remain required."\n'
+            + 'exit 2\n'
         ),
         "replace-manager.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -621,40 +635,72 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'if [[ ! -s "${SECRET_FILE}" ]]; then\n'
             + '  echo "ERROR: idxc secret file empty: ${SECRET_FILE}" >&2; exit 1\n'
             + 'fi\n'
-            + 'splunk_curl "${SK}" -X POST \\\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "mode=manager" \\\n'
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "new cluster manager configuration" "Restart the new manager through its supported service path before updating peer/search-head manager_uri."\n'
-            + 'log "OK: New manager configured at ${MANAGER_URI}. After the manager restart, update peer/SH manager_uri to point here next."\n'
+            + 'log "PARTIAL: New manager configured at ${MANAGER_URI}; restart and peer/search-head cutover remain required."\n'
+            + 'exit 2\n'
         ),
         "decommission-site.sh": make_script(
             mgr_sk_block
             + 'SITE="${SITE:?set SITE=siteN}"\n'
-            + "# Read available_sites from the cluster-config REST endpoint, drop the\n"
-            + "# decommissioning site, and PUT the trimmed list back. No CLI parsing.\n"
-            + 'config_json="$(splunk_curl "${SK}" \\\n'
+            + "# Refuse to remove a site while any registered peer still reports that\n"
+            + "# site. Move peers and allow cluster fix-up to complete first.\n"
+            + 'peers_file="$(mktemp)"\n'
+            + 'trap \'rm -f "${peers_file}"\' EXIT\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -o "${peers_file}" \\\n'
+            + '  "${MANAGER_URI}/services/cluster/manager/peers?count=0&output_mode=json"\n'
+            + 'assigned=$(SITE="${SITE}" python3 - "${peers_file}" <<\'PY\'\n'
+            + 'import json, os, sys\n'
+            + 'site = os.environ["SITE"]\n'
+            + 'with open(sys.argv[1], encoding="utf-8") as fh:\n'
+            + '    data = json.load(fh)\n'
+            + 'names = []\n'
+            + 'for entry in data.get("entry", []):\n'
+            + '    content = entry.get("content", {}) if isinstance(entry, dict) else {}\n'
+            + '    if str(content.get("site", "")) == site:\n'
+            + '        names.append(str(entry.get("name") or content.get("label") or "<unknown>"))\n'
+            + 'print(",".join(names))\n'
+            + 'PY\n'
+            + ')\n'
+            + 'if [[ -n "${assigned}" ]]; then\n'
+            + '  echo "ERROR: Cannot decommission ${SITE}; registered peers still assigned there: ${assigned}" >&2\n'
+            + '  exit 1\n'
+            + 'fi\n'
+            + "# Read available_sites from the cluster-config REST endpoint, verify the\n"
+            + "# requested site exists, and drop it. No CLI table parsing.\n"
+            + 'config_json="$(splunk_curl "${SK}" --fail-with-body --show-error \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json")"\n'
-            + 'remaining=$(SITE="${SITE}" python3 - "${config_json}" <<\'PY\'\n'
+            + 'site_result=$(SITE="${SITE}" python3 - "${config_json}" <<\'PY\'\n'
             + 'import json, os, sys\n'
             + 'site = os.environ["SITE"]\n'
             + 'data = json.loads(sys.argv[1]) if sys.argv[1].strip() else {}\n'
             + 'entry = (data.get("entry") or [{}])[0]\n'
             + 'content = entry.get("content", {}) if isinstance(entry, dict) else {}\n'
             + 'avail = content.get("available_sites", "")\n'
-            + 'sites = [s.strip() for s in avail.split(",") if s.strip() and s.strip() != site]\n'
-            + 'print(",".join(sites))\n'
+            + 'current = [str(s).strip() for s in (avail if isinstance(avail, list) else str(avail).split(",")) if str(s).strip()]\n'
+            + 'sites = [s for s in current if s != site]\n'
+            + 'print(("true" if site in current else "false") + "|" + ",".join(sites))\n'
             + 'PY\n'
             + ')\n'
+            + 'site_found="${site_result%%|*}"\n'
+            + 'remaining="${site_result#*|}"\n'
+            + 'if [[ "${site_found}" != "true" ]]; then\n'
+            + '  echo "ERROR: Cannot decommission ${SITE}: it is not in available_sites." >&2\n'
+            + '  exit 1\n'
+            + 'fi\n'
             + 'if [[ -z "${remaining}" ]]; then\n'
             + '  echo "ERROR: Cannot decommission ${SITE}: no remaining sites would exist." >&2\n'
             + '  exit 1\n'
             + 'fi\n'
-            + 'splunk_curl "${SK}" -X POST \\\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "available_sites=${remaining}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "cluster manager site decommission" "Restart the manager through its supported service path so available_sites=${remaining} takes effect."\n'
-            + 'log "OK: Decommissioned ${SITE}; available_sites is now ${remaining}. Restart handoff rendered."\n'
+            + 'log "PARTIAL: ${SITE} was removed from available_sites; the manager restart handoff remains required."\n'
+            + 'exit 2\n'
         ),
         "move-peer-to-site.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -664,11 +710,12 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'PEER_URI="${PEER_MANAGEMENT_URL:-https://${PEER_HOST}:${PEER_PORT}}"\n'
             + 'MANAGER_URI="${PEER_URI}"\n'
             + _CLUSTER_MGR_SK_BLOCK
-            + 'splunk_curl "${SK}" -X POST \\\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "site=${NEW_SITE}" \\\n'
             + '  "${PEER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "indexer peer site assignment" "For a single peer, use Splunk Web or splunk offline followed by a privileged start; do not use raw splunk restart."\n'
-            + 'log "OK: Peer ${PEER_HOST} now has site=${NEW_SITE} configured. Restart handoff rendered."\n'
+            + 'log "PARTIAL: Peer ${PEER_HOST} has site=${NEW_SITE} configured; a peer-safe restart remains required."\n'
+            + 'exit 2\n'
         ),
         "migrate-non-clustered.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -689,14 +736,15 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'those standalone buckets; if you ever decommission this peer permanently you\n'
             + 'must back up or move that data separately.\n'
             + 'EOM\n'
-            + 'splunk_curl "${SK}" -X POST \\\n'
+            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "mode=peer" \\\n'
             + '  --data-urlencode "manager_uri=${REMOTE_MANAGER_URI}" \\\n'
             + '  --data-urlencode "replication_port=${REPLICATION_PORT}" \\\n'
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${PEER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "non-clustered indexer migration" "Restart the peer through documented peer semantics so it can join the cluster safely."\n'
-            + 'log "OK: ${INDEXER_HOST} is configured to join the cluster as a peer. Restart handoff rendered."\n'
+            + 'log "PARTIAL: ${INDEXER_HOST} is configured to join the cluster; a peer-safe restart remains required."\n'
+            + 'exit 2\n'
         ),
     }
 
@@ -806,6 +854,27 @@ def render_all(args: argparse.Namespace) -> dict:
 
     if args.manager_redundancy == "true" and len(managers) < 2:
         die("--manager-redundancy=true requires at least 2 entries in --manager-hosts.")
+    if args.manager_redundancy == "true" and not (args.manager_lb_uri or args.manager_dns_name):
+        die("--manager-redundancy=true requires --manager-lb-uri or --manager-dns-name so peers never pin to one manager.")
+    if args.manager_redundancy == "true" and args.manager_switchover_mode == "disabled":
+        die("--manager-redundancy=true requires --manager-switchover-mode auto or manual.")
+
+    if multisite:
+        unknown_sites = sorted(
+            {entry.get("site") for entry in [*peers, *shs] if entry.get("site") not in set(sites)}
+        )
+        if unknown_sites:
+            die("Peer/search-head site assignments are not in --available-sites: " + ", ".join(unknown_sites))
+    else:
+        try:
+            rf = int(args.replication_factor)
+            sf = int(args.search_factor)
+        except ValueError:
+            die("--replication-factor and --search-factor must be integers.")
+        if rf < 1 or sf < 1 or sf > rf:
+            die("single-site factors require replication_factor >= search_factor >= 1.")
+        if peers and rf > len(peers):
+            die("--replication-factor cannot exceed the rendered peer count.")
 
     # Per-site peer count for the legacy single-site validator.
     peer_count_per_site: dict[str, int] = {}

@@ -29,6 +29,10 @@ bash skills/widefield-saviynt-integration-setup/scripts/validate.sh \
   --evidence-file ./widefield-saviynt-evidence.local.json
 ```
 
+Validation fails closed when the evidence file is omitted, is not valid JSON,
+or lacks a revoke, password-reset, micro-certification, or remediation outcome
+marker. `--dry-run` is the only validation mode that does not require evidence.
+
 ## Remediation Map
 
 - Compromised identity: revoke access.

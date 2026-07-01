@@ -7,8 +7,10 @@ interface:
     polling via Cloud Monitoring API; two authMethod values —
     SERVICE_ACCOUNT_KEY (projectServiceKeys with projectKey write-only,
     redacted on GET, file-based delivery via --key-file) or
-    WORKLOAD_IDENTITY_FEDERATION (pool_id, provider_id, splunk_principal
-    per realm from wif-splunk-principals.json); pollRate 60–600 s (wire in
+    WORKLOAD_IDENTITY_FEDERATION (official Splunk-generated, mode-600
+    gcp_wif_config.json delivered as compact/stringified JSON in
+    workloadIdentityFederationConfig; never fabricate realm principals,
+    pool IDs, or provider IDs); projects.syncMode; pollRate 60–600 s (wire in
     milliseconds); useMetricSourceProjectForQuota (WARN: requires extra IAM
     role); importGCPMetrics; services 32-entry enum (appengine, bigquery,
     bigtable, cloudfunctions, cloudiot, cloudsql, cloudtasks, composer,
@@ -17,11 +19,11 @@ interface:
     iam, interconnect, knative, loadbalancing, logging, ml, pubsub, redis,
     router, run, spanner, storage, vpn); customMetricTypeDomains;
     excludeGceInstancesWithLabels; namedToken ForceNew warning; Terraform
-    signalfx_gcp_integration pinned to splunk-terraform/signalfx ~> 9.0;
-    GCloud CLI SA creation + role binding scripts; multi-project support;
+    signalfx_gcp_integration handoff for Service Account key mode only;
+    GCloud CLI SA creation + role binding scripts for SA mode; multi-project support;
     drift detection with credential-hash sidecar (projectKey redacted on
     GET); conflict matrix (SA key vs WIF block, services mode, poll-rate
-    bounds); and cross-skill handoffs to splunk-app-install
+    bounds; WIF missing/corrupt/insecure-file preflight); and cross-skill handoffs to splunk-app-install
     (Splunk_TA_google_cloud Splunkbase 3088 logs), splunk-observability-
     otel-collector-setup (GKE host telemetry), splunk-observability-
     dashboard-builder (GCP dashboards), and splunk-observability-native-ops

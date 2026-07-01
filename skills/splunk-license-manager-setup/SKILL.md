@@ -109,9 +109,9 @@ Under `splunk-license-manager-rendered/license/`:
   and POSTs `manager_uri` to the peer's own
   `https://<host>:8089/services/licenser/localpeer` REST endpoint using a
   password file (`get_session_key_from_password_file`); no SSH and no
-  `splunk -auth admin:<pw>` argv on either host. When
-  `--restart-splunk=true`, emits a topology-aware restart handoff instead of a
-  default REST restart. Override the peer URL with `PEER_MANAGEMENT_URL` (or
+  `splunk -auth admin:<pw>` argv on either host. Peer configuration exits
+  nonzero with a topology-aware restart handoff instead of defaulting to a
+  remote REST restart. Override the peer URL with `PEER_MANAGEMENT_URL` (or
   just the port via `PEER_MANAGEMENT_PORT`) for non-default deployments.
 - `validate.sh` — peers, usage, messages, version-compat checks.
 - `audit/<timestamp>/{groups,stacks,pools,licenses,messages,localpeer,usage,peers}.json`

@@ -42,7 +42,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--grpc-port", default="4317")
     parser.add_argument("--http-port", default="4318")
     parser.add_argument("--sender-protocol", choices=("both", "grpc", "http"), default="both")
-    parser.add_argument("--sender-tls", choices=("true", "false"), default="false")
+    parser.add_argument("--sender-tls", choices=("true", "false"), default="true")
+    parser.add_argument("--accept-insecure-plaintext-listener", action="store_true")
     parser.add_argument("--hec-token-file", default="/tmp/splunk_otlp_hec_token")
     parser.add_argument("--token-env-var", default="SPLUNK_HEC_TOKEN")
     parser.add_argument("--index", default="otlp_events")
@@ -94,6 +95,28 @@ def validate(args: argparse.Namespace) -> None:
         no_newline(value, option)
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", args.token_env_var):
         die("--token-env-var must be a shell environment variable name.")
+    if not (
+        re.fullmatch(r"[A-Za-z0-9_.-]+", args.receiver_host or "")
+        or re.fullmatch(r"\[[A-Za-z0-9:._%-]+\]", args.receiver_host or "")
+    ):
+        die("--receiver-host must be a host name, IPv4 address, or bracketed IPv6 address without a URL scheme/path.")
+    if (
+        args.sender_tls == "false"
+        and args.receiver_host not in {"127.0.0.1", "localhost", "::1", "[::1]"}
+        and not args.accept_insecure_plaintext_listener
+    ):
+        die(
+            "refusing a plaintext sender for a non-loopback receiver; enable TLS "
+            "or pass --accept-insecure-plaintext-listener for a lab-only exception."
+        )
+    for value, option in (
+        (args.source, "--source"),
+        (args.sourcetype, "--sourcetype"),
+        (args.service_name, "--service-name"),
+        (args.deployment_environment, "--deployment-environment"),
+    ):
+        if "," in value:
+            die(f"{option} must not contain commas because it is emitted in OTEL_RESOURCE_ATTRIBUTES.")
 
 
 def scheme(args: argparse.Namespace) -> str:
@@ -130,6 +153,11 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
 def render_collector_yaml(args: argparse.Namespace) -> str:
     tls_block = "      insecure: true\n" if args.sender_tls == "false" else "      insecure: false\n"
     token_env = args.token_env_var
+    index = json.dumps(args.index)
+    sourcetype = json.dumps(args.sourcetype)
+    source = json.dumps(args.source)
+    grpc = json.dumps(grpc_endpoint(args))
+    http = json.dumps(http_base(args))
     return f"""# Rendered by splunk-connect-for-otlp-setup.
 # This file references a token environment variable; it does not contain a token value.
 receivers:
@@ -142,13 +170,13 @@ processors:
   resource/splunk_metadata:
     attributes:
       - key: com.splunk.index
-        value: "{args.index}"
+        value: {index}
         action: upsert
       - key: com.splunk.sourcetype
-        value: "{args.sourcetype}"
+        value: {sourcetype}
         action: upsert
       - key: com.splunk.source
-        value: "{args.source}"
+        value: {source}
         action: upsert
       - key: host.name
         value: "${{env:HOSTNAME}}"
@@ -157,12 +185,12 @@ processors:
 
 exporters:
   otlp/splunk_connect_grpc:
-    endpoint: "{grpc_endpoint(args)}"
+    endpoint: {grpc}
     headers:
       Authorization: "Splunk ${{env:{token_env}}}"
     tls:
 {tls_block}  otlphttp/splunk_connect_http:
-    endpoint: "{http_base(args)}"
+    endpoint: {http}
     headers:
       Authorization: "Splunk ${{env:{token_env}}}"
     tls:
@@ -188,65 +216,54 @@ def render_sdk_env(args: argparse.Namespace, protocol: str) -> str:
     token_env = args.token_env_var
     endpoint = http_base(args) if protocol == "http" else f"{scheme(args)}://{grpc_endpoint(args)}"
     protocol_value = "http/protobuf" if protocol == "http" else "grpc"
+    attributes_prefix = resource_attributes(args).removesuffix("${HOSTNAME}")
     signal_lines = ""
     if protocol == "http":
         signal_lines = f"""
-export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="{http_base(args)}/v1/logs"
-export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="{http_base(args)}/v1/metrics"
-export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="{http_base(args)}/v1/traces"
+export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT={shlex.quote(http_base(args) + '/v1/logs')}
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT={shlex.quote(http_base(args) + '/v1/metrics')}
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT={shlex.quote(http_base(args) + '/v1/traces')}
 """
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 # Source this file locally after creating a chmod-600 HEC token file.
 # Token values are loaded from disk at runtime and are never rendered here.
-export SPLUNK_HEC_TOKEN_FILE="{args.hec_token_file}"
-export {token_env}="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
-export OTEL_EXPORTER_OTLP_ENDPOINT="{endpoint}"
-export OTEL_EXPORTER_OTLP_PROTOCOL="{protocol_value}"
+export SPLUNK_HEC_TOKEN_FILE={shlex.quote(args.hec_token_file)}
+if [[ ! -f "${{SPLUNK_HEC_TOKEN_FILE}}" || -L "${{SPLUNK_HEC_TOKEN_FILE}}" ]]; then
+  echo "ERROR: HEC token path must be a regular, non-symlink file: ${{SPLUNK_HEC_TOKEN_FILE}}" >&2
+  return 1 2>/dev/null || exit 1
+fi
+token_mode="$(stat -c '%a' "${{SPLUNK_HEC_TOKEN_FILE}}" 2>/dev/null || stat -f '%Lp' "${{SPLUNK_HEC_TOKEN_FILE}}" 2>/dev/null || true)"
+if [[ ! "${{token_mode}}" =~ ^[0-7]*00$ ]]; then
+  echo "ERROR: HEC token file must not have group/other permission bits: ${{SPLUNK_HEC_TOKEN_FILE}}" >&2
+  return 1 2>/dev/null || exit 1
+fi
+token_value="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
+token_value="${{token_value#"${{token_value%%[![:space:]]*}}"}}"
+token_value="${{token_value%"${{token_value##*[![:space:]]}}"}}"
+if [[ -z "${{token_value}}" ]]; then
+  echo "ERROR: HEC token file is empty." >&2
+  return 1 2>/dev/null || exit 1
+fi
+export {token_env}="${{token_value}}"
+unset token_value
+export OTEL_EXPORTER_OTLP_ENDPOINT={shlex.quote(endpoint)}
+export OTEL_EXPORTER_OTLP_PROTOCOL={shlex.quote(protocol_value)}
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Splunk ${{{token_env}}}"
-export OTEL_RESOURCE_ATTRIBUTES="{resource_attributes(args)}"
+export OTEL_RESOURCE_ATTRIBUTES={shlex.quote(attributes_prefix)}"${{HOSTNAME:-unknown}}"
 {signal_lines}"""
 
 
 def render_telemetrygen(args: argparse.Namespace) -> str:
-    insecure_flag = "--otlp-insecure" if args.sender_tls == "false" else ""
-    http_endpoint = f"{args.receiver_host}:{positive_port(args.http_port, '--http-port')}"
-    return f"""#!/usr/bin/env bash
+    return """#!/usr/bin/env bash
 set -euo pipefail
 
-# Requires telemetrygen from the OpenTelemetry Collector contrib project.
-# The token value is read from a local-only file at runtime.
-# CAVEAT: telemetrygen has no file-based header option, so --otlp-header below
-# exposes the HEC token in process args (ps). Use ONLY for ephemeral local testing.
-SPLUNK_HEC_TOKEN_FILE="${{SPLUNK_HEC_TOKEN_FILE:-{args.hec_token_file}}}"
-SPLUNK_HEC_TOKEN="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
-COMMON_ATTRS="com.splunk.index={args.index},com.splunk.sourcetype={args.sourcetype},com.splunk.source={args.source},host.name=$(hostname)"
-
-telemetrygen logs \\
-  --otlp-endpoint {shlex.quote(grpc_endpoint(args))} \\
-  --otlp-header "Authorization=Splunk ${{SPLUNK_HEC_TOKEN}}" \\
-  {insecure_flag} \\
-  --otlp-attributes "${{COMMON_ATTRS}}"
-
-telemetrygen metrics \\
-  --otlp-endpoint {shlex.quote(grpc_endpoint(args))} \\
-  --otlp-header "Authorization=Splunk ${{SPLUNK_HEC_TOKEN}}" \\
-  {insecure_flag} \\
-  --otlp-attributes "${{COMMON_ATTRS}}"
-
-telemetrygen traces \\
-  --otlp-endpoint {shlex.quote(grpc_endpoint(args))} \\
-  --otlp-header "Authorization=Splunk ${{SPLUNK_HEC_TOKEN}}" \\
-  {insecure_flag} \\
-  --otlp-attributes "${{COMMON_ATTRS}}"
-
-telemetrygen logs \\
-  --otlp-http \\
-  --otlp-endpoint {shlex.quote(http_endpoint)} \\
-  --otlp-header "Authorization=Splunk ${{SPLUNK_HEC_TOKEN}}" \\
-  {insecure_flag} \\
-  --otlp-attributes "${{COMMON_ATTRS}}"
+# telemetrygen accepts OTLP headers on argv, which would expose the HEC token
+# to process listings. This generated helper intentionally refuses that path.
+echo "ERROR: telemetrygen smoke is not executed because its HEC header would be visible in process arguments." >&2
+echo "HANDOFF: Use collector-otlp-sender.yaml or an SDK profile that reads the token file without putting it on argv." >&2
+exit 1
 """
 
 
@@ -272,6 +289,10 @@ Authorization: Splunk <HEC_TOKEN>
 
 The rendered files reference the local token file path
 `{args.hec_token_file}` but do not contain the token value.
+
+`telemetrygen-smoke.sh` is a fail-closed handoff: telemetrygen's header flag
+would put the HEC token on argv, so the helper exits nonzero and directs the
+operator to the Collector or SDK sender profiles instead.
 
 Route explicitly with OTLP resource attributes:
 
@@ -307,6 +328,7 @@ def metadata(args: argparse.Namespace, files: list[str]) -> dict[str, object]:
             "token_file_path_reference": args.hec_token_file,
             "token_env_var": args.token_env_var,
             "token_value_rendered": False,
+            "telemetrygen_smoke": "refused_argv_secret_handoff",
         },
         "files": files,
     }

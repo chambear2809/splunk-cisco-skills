@@ -27,6 +27,14 @@ Rendered file:
   OTLP HTTP, so `https://` is rejected unless future TLS receiver rendering is
   added. The renderer appends `/v1/traces`, `/v1/metrics`, and `/v1/logs` as
   needed.
+- Collector receiver bind: `local_collector_receiver_endpoint`, default
+  `0.0.0.0:4318`. Override it with
+  `--local-collector-receiver-endpoint 127.0.0.1:24318` or the spec key
+  `codex.local_collector_receiver_endpoint`. This is a `HOST:PORT` bind address,
+  not a client URL. It is intentionally independent from
+  `local_collector_endpoint`, so a Docker deployment can publish host port
+  `14318` to container port `4318` while the collector listens on all container
+  interfaces.
 - `trace_exporter` is an `otlp-http` inline exporter table
 - `metrics_exporter` is an `otlp-http` inline exporter table
 - default trace endpoint: `http://127.0.0.1:14318/v1/traces`
@@ -35,10 +43,21 @@ Rendered file:
   `http://127.0.0.1:14318/v1/logs`
 - native log exporter remains `none` unless `--enable-native-logs` is set
 - collector overlay exports traces through OTLP/HTTP APM ingest, metrics through
-  SignalFx with `send_otlp_histograms: true`, adds a logs pipeline when native
-  logs are enabled, binds its OTLP HTTP receiver to the host and port parsed
-  from `local_collector_endpoint`, and reads the token with
-  `${env:SPLUNK_ACCESS_TOKEN}`
+  SignalFx with `send_otlp_histograms: true`, adds an OTLP/HTTP event pipeline
+  targeting `https://ingest.<realm>.observability.splunkcloud.com/v3/event`
+  when native logs are enabled, binds its OTLP HTTP receiver to
+  `local_collector_receiver_endpoint`, and reads the token with
+  `${env:SPLUNK_ACCESS_TOKEN}` in the collector process
+- the rendered runner uses the Splunk Distribution `0.154.2` multi-platform
+  digest; it does not use the upstream contrib image
+- native GenAI histograms do not require a `splunk_otlp_histograms` application
+  resource marker
+- `gen_ai.client.operation.duration` uses unit `s` and explicit delta
+  temporality; `gen_ai.client.token.usage` uses unit `{token}`, explicit delta
+  temporality, and `gen_ai.token.type=input|output`
+- the collector resource processor upserts `service.name`,
+  `deployment.environment`, `sf_service`, and `sf_environment` so native Codex
+  service names do not fragment Splunk service/environment dimensions
 
 ### External Collector
 
@@ -57,27 +76,25 @@ Optional:
 - `--external-header KEY=VALUE`
 - external TLS file paths
 
-Header and TLS values must be safe literals or environment placeholders.
+Header and TLS values must be safe literals. `${NAME}` placeholders are
+refused because Codex sends OTel exporter header values literally rather than
+expanding the process environment. Credential-bearing headers are therefore
+unsupported; use `local-collector` for Splunk or another authenticated backend.
 
 ### Direct Splunk Observability
 
-Rendered file:
-`profiles/codex-o11y-direct.config.toml`
-
-- traces:
-  `https://ingest.<realm>.observability.splunkcloud.com/v2/trace/otlp`
-- metrics:
-  `https://ingest.<realm>.observability.splunkcloud.com/v2/datapoint/otlp`
-- header placeholder: `"X-SF-TOKEN" = "${SPLUNK_ACCESS_TOKEN}"`
-- native logs disabled
-- gRPC refused
+No profile is rendered. `--destination direct` fails closed because Splunk
+requires `X-SF-TOKEN`, Codex sends `${SPLUNK_ACCESS_TOKEN}` literally in OTel
+headers, and the renderer refuses both token values in generated files and
+tokens passed on argv. Use `local-collector`; its collector configuration can
+safely expand `${env:SPLUNK_ACCESS_TOKEN}` at runtime.
 
 ## Advanced Span Helpers
 
-`bin/codex-o11y-exec` wraps:
+`bin/codex-o11y-exec` wraps the profile selected at render time:
 
 ```bash
-codex exec --json "$@"
+codex exec --profile codex-o11y-local --json "$@"
 ```
 
 The wrapper tees JSONL to a local file and converts events into metadata-only
@@ -111,6 +128,18 @@ Codex has two different telemetry surfaces that are easy to conflate:
 - `notify = [...]` runs an operator command when a Codex turn ends. It can be
   used as a fail-soft post-turn bridge even when native `[otel]` log export is
   disabled.
+
+For Splunk turn telemetry, install the maintained runtime with
+`scripts/install_notify_runtime.sh`. The installer resolves its pinned,
+hash-locked dependencies once and records the installed lock checksum. The
+notify path itself performs no dependency resolution, emits metadata only,
+selects the exact completed thread and turn from the notify payload, and keeps
+failed trace/metric exports in a private persistent outbox for a later retry.
+Run `$CODEX_HOME/bin/codex-splunk-o11y-health.zsh` for offline checks or add
+`--live` for a synthetic export. Keep an existing notifier in the chain; the
+installer deliberately does not replace `notify` in `config.toml`. A collector
+supervisor can run `codex-splunk-o11y-notify-span.py --drain` after a successful
+health probe so the final failed turn is retried even when no later turn runs.
 
 Use `notify` for Galileo Observe turn mirroring. A configured Galileo MCP
 server only exposes Galileo tools to Codex; it does not automatically populate
@@ -171,3 +200,7 @@ codex --strict-config --profile codex-o11y-local
 This checks whether the active Codex version accepts the rendered config keys.
 It does not verify Splunk realm, token, collector reachability, or endpoint
 semantics.
+
+The generated execution wrapper also supplies `--profile` on every
+`codex exec` invocation. Installing a profile does not activate it globally;
+commands that omit `--profile` continue to use the base Codex configuration.

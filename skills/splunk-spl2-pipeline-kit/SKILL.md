@@ -51,6 +51,13 @@ bash skills/splunk-spl2-pipeline-kit/scripts/setup.sh \
   --pipeline-file pipelines/my_pipeline.spl2
 ```
 
+`--phase lint` and `--phase validate` require at least one explicit
+`--pipeline-file` or previously rendered template under the output directory.
+An empty target set is a hard `SPL2-NO-TARGETS` failure, not a pass.
+Render/all replaces only an empty directory or one carrying this kit's
+ownership marker/legacy README; unrelated nonempty directories are never
+recursively deleted.
+
 Run the offline smoke test:
 
 ```bash

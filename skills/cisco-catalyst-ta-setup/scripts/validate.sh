@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-catalyst-ta-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-catalyst-ta-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco Catalyst TA using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="TA_cisco_catalyst"
@@ -22,6 +31,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 get_verify_ssl_setting() {
     splunk_curl "$SK" \
@@ -68,12 +78,13 @@ for idx in "${REQUIRED_INDEXES[@]}"; do
     if platform_check_index "$SK" "$SPLUNK_URI" "$idx" 2>/dev/null; then
         pass "Index '${idx}' exists"
     else
-        warn "Index '${idx}' not found (may exist at system level)"
+        completion_issue "Index '${idx}' not found"
     fi
 done
 
 log ""
 log "--- Account Configuration ---"
+account_total=0
 for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_catalyst_ise_account" "SD-WAN:TA_cisco_catalyst_sdwan_account" "Cyber Vision:TA_cisco_catalyst_cyber_vision_account"; do
     label="${label_handler%%:*}"
     handler="${label_handler#*:}"
@@ -81,6 +92,7 @@ for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_c
     if [[ -n "${json}" ]]; then
         count=$(echo "${json}" | python3 -c "import json,sys; d=json.load(sys.stdin); e=d.get('entry',[]); print(len(e))" 2>/dev/null || echo "0")
         if [[ "${count}" -gt 0 ]]; then
+            account_total=$((account_total + count))
             pass "${label} account conf exists with ${count} account(s)"
         else
             warn "${label} account conf exists but has no stanzas"
@@ -89,6 +101,7 @@ for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_c
         warn "No ${label} account conf found"
     fi
 done
+[[ "${account_total}" -gt 0 ]] || completion_issue "No Cisco Catalyst product account is configured"
 
 log ""
 log "--- Data Inputs ---"
@@ -101,22 +114,25 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${input_count} input stanza(s) exist but all are disabled"
+        completion_issue "${input_count} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No inputs configured"
+    completion_issue "No inputs configured"
 fi
 
 log ""
 log "--- Data Flow Check ---"
+event_total=0
 for idx in "catalyst" "ise" "sdwan" "cybervision"; do
     event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
+        event_total=$((event_total + event_count))
         pass "Index '${idx}' has ${event_count} events"
     else
         warn "Index '${idx}' has no events (may be normal if just configured)"
     fi
 done
+[[ "${event_total}" -gt 0 ]] || completion_issue "No Catalyst, ISE, SD-WAN, or Cyber Vision events were found"
 
 log ""
 log "--- Settings ---"
@@ -131,8 +147,25 @@ log ""
 log "--- Companion App ---"
 if rest_check_app "$SK" "$SPLUNK_URI" "cisco-catalyst-app" 2>/dev/null; then
     pass "Cisco Enterprise Networking app is installed"
+    view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/cisco-catalyst-app/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+        | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+    if [[ "${view_count}" -gt 0 ]]; then
+        pass "Cisco Enterprise Networking dashboard views are visible: ${view_count}"
+    else
+        completion_issue "No dashboard views are visible for cisco-catalyst-app"
+    fi
+    companion_macro=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "cisco-catalyst-app" "macros" "cisco_catalyst_app_index" "definition" 2>/dev/null || true)
+    macro_aligned=true
+    for idx in catalyst ise sdwan cybervision; do
+        [[ "${companion_macro}" == *"${idx}"* ]] || macro_aligned=false
+    done
+    if ${macro_aligned}; then
+        pass "Companion dashboard macro includes all Catalyst indexes"
+    else
+        completion_issue "Companion dashboard macro is missing or not aligned to catalyst/ise/sdwan/cybervision"
+    fi
 else
-    warn "Cisco Enterprise Networking app (cisco-catalyst-app) not found"
+    completion_issue "Cisco Enterprise Networking app (cisco-catalyst-app) not found; dashboard completion evidence is unavailable"
 fi
 fi
 

@@ -46,7 +46,7 @@ When high availability is requested, the indexer count is floored to the
 clustering minimum:
 
 ```
-indexer_count = max(indexers_for_ingest, replication_factor, 3)
+indexer_count = max(indexers_for_ingest, replication_factor, 3, multisite_site_count)
 ```
 
 ### 3. Replication and search factor
@@ -56,9 +56,10 @@ indexer_count = max(indexers_for_ingest, replication_factor, 3)
 | Non-HA (standalone / single indexer) | 1 | 1 |
 | Clustered (`--ha`, default) | 3 | 2 |
 
-Override with `--replication-factor` / `--search-factor`. Search factor is
-clamped to be no greater than replication factor. Higher RF improves
-resiliency but multiplies storage.
+Override with `--replication-factor` / `--search-factor`. Either factor greater
+than one implies HA/clustering even when `--ha` is omitted. Search factor must
+not exceed replication factor; invalid input is rejected instead of silently
+clamped. Higher RF improves resiliency but multiplies storage.
 
 ### 4. Search head count
 

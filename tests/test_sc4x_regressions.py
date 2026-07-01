@@ -272,6 +272,21 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
+            # This case intentionally ran HEC-only preparation.  Model the
+            # indexes as an independently completed prerequisite so the
+            # completion validator can retain its strict required-index
+            # readback while this test remains focused on bundle-managed HEC.
+            state_path = Path(env["SC4S_STATE"])
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            for index_name in (
+                "sc4s", "print", "osnix", "oswinsec", "oswin", "netipam",
+                "netproxy", "netwaf", "netops", "netlb", "netids", "netfw",
+                "netdns", "netdlp", "netauth", "infraops", "gitops",
+                "fireeye", "epintel", "epav", "email",
+            ):
+                state["indexes"][index_name] = {"datatype": "event"}
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
             curl_log.write_text("", encoding="utf-8")
             validate_result = self.run_script(
                 "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
@@ -405,6 +420,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             output_dir = tmp_path / "rendered"
             token_file = tmp_path / "sc4s.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             result = self.run_script(
                 "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
@@ -442,6 +458,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             config_file = tmp_path / "app-workaround.conf"
 
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
             context_file.write_text("cisco_asa,index,netfw\n", encoding="utf-8")
             config_file.write_text("filter f_local { level(info); };\n", encoding="utf-8")
 
@@ -502,6 +519,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             output_dir = tmp_path / "rendered"
             token_file = tmp_path / "sc4s.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             result = self.run_script(
                 "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
@@ -897,6 +915,21 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
+            # As above, --hec-only deliberately leaves index ownership to a
+            # separate workflow.  Seed that prerequisite in the mock rather
+            # than weakening required-index validation.
+            state_path = Path(env["SC4SNMP_STATE"])
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["indexes"].update(
+                {
+                    "em_logs": {"datatype": "event"},
+                    "netops": {"datatype": "event"},
+                    "em_metrics": {"datatype": "metric"},
+                    "netmetrics": {"datatype": "metric"},
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
             curl_log.write_text("", encoding="utf-8")
             validate_result = self.run_script(
                 "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
@@ -1003,6 +1036,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             output_dir = tmp_path / "rendered"
             token_file = tmp_path / "sc4snmp.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             result = self.run_script(
                 "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
@@ -1036,6 +1070,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             output_dir = tmp_path / "rendered"
             token_file = tmp_path / "sc4snmp.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             result = self.run_script(
                 "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",

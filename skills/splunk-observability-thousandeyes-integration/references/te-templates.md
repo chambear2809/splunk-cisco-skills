@@ -27,17 +27,18 @@ Invalid (rejected by the renderer):
 
 - `"password": "mySecret123"` (plain text)
 - `"api_key": "abcd-1234-..."` (plain text, even when scrambled)
-- `"token": ""` (empty string is allowed; the renderer treats empty as "not set")
 - `"authorization": "Bearer abcdef"` (plain Bearer header)
+
+An empty credential value such as `"token": ""` is treated as not set and is allowed at render time.
 
 The render-time enforcement walks the entire `template_body` tree and matches keys whose normalized name is one of `password, secret, token, api_key, client_secret, bearer, authorization`. If you need a literal string in one of those fields (rare; usually a non-credential value), set the value via a Handlebars constant (`{{constants.policy_id}}`) so it visibly looks like a placeholder.
 
 ## Deploying a template
 
-The skill's apply-template.sh:
+The skill's `apply-template.sh`:
 
-1. POST `/v7/templates` with the template body — TE returns the new template ID.
-2. (If `--deploy-templates` was passed) POST `/v7/templates/{id}/deploy` with an empty body to materialize the assets.
+1. Preflights the template collection, POSTs `/v7/templates`, retains the returned template ID, and verifies that ID by collection readback.
+2. If `--deploy-templates` was passed, POSTs `/v7/templates/{id}/deploy` once per retained state and confirms that the template resource is still readable. This readback does not prove every asynchronous child asset finished deploying.
 
 Operators can also deploy templates through the TE UI (Manage > Templates > Deploy) which is preferable for first-time deployments because the UI surfaces dependent inputs and confirmations.
 
@@ -79,16 +80,6 @@ templates:
 
 The `credentials` block is the standard TE Templates pattern for deferring credential entry to deploy time. References inside the template body use `{{te_credentials.<id>}}` to interpolate the credential's value at deploy time only.
 
-## Pre-built TE templates
+## Existing templates
 
-Use `bash scripts/list-templates.sh` (after the skill renders) to enumerate the templates the account group can deploy. Common pre-built names include:
-
-- `Microsoft Office 365`
-- `Cisco Webex`
-- `Atlassian Cloud`
-- `Slack`
-- `Generic HTTP service`
-- `Generic network test`
-- `Generic API test`
-
-Pre-built templates can be deployed without authoring a custom `template_body`; pass `--deploy-templates` and reference the pre-built template ID in the spec instead.
+Use `bash scripts/list-templates.sh` after rendering to enumerate templates visible to the account group. This skill's spec creates templates from `templates[].template_body`; it does not accept a pre-built template ID as a substitute for that body. Deploy an existing/pre-built template through the TE UI or another documented workflow.

@@ -197,8 +197,9 @@ cp datamodels.conf "${{target_dir}}/datamodels.conf"
 echo "Staged datamodels.conf into ${{target_dir}}."
 # Reload datamodels.conf without a full restart where supported.
 "${{splunk}}" _internal call /services/configs/conf-datamodels/_reload >/dev/null 2>&1 \\
-  || echo "Reload endpoint not available; restart Splunk or reload datamodels to apply."
-"${{splunk}}" btool datamodels list --debug 2>/dev/null | grep -i acceleration || true
+  || {{ echo "ERROR: datamodels.conf was staged but reload failed; restart Splunk through the supported orchestrator before treating apply as complete." >&2; exit 2; }}
+"${{splunk}}" btool datamodels list --debug 2>/dev/null | grep -qi acceleration \
+  || {{ echo "ERROR: acceleration settings were not visible through btool after reload." >&2; exit 1; }}
 """
     )
 
@@ -225,6 +226,8 @@ IFS=',' read -r -a model_arr <<< "${{models}}"
 for model in "${{model_arr[@]}}"; do
   echo "  - ${{model}}: Settings > Data models > ${{model}} > Rebuild"
 done
+echo "HANDOFF: no supported rebuild API was called; use the documented UI or disable/re-enable workflow." >&2
+exit 2
 """
     )
 
@@ -234,9 +237,11 @@ def render_status(args: argparse.Namespace) -> str:
     return make_script(
         f"""splunk={splunk}
 echo "== data model acceleration summarization status =="
+# Uses the local Splunk CLI login/session. Passwords must not be supplied as
+# positional arguments because `splunk search -auth` exposes them in argv.
 "${{splunk}}" search '| rest splunk_server=local /services/admin/summarization \\
   | rename summary.id as id, summary.access_time as access_time, summary.complete as complete, summary.size as size_bytes, summary.mod_time as mod_time \\
-  | table id complete size_bytes access_time mod_time' -maxout 0 -auth "$@" 2>/dev/null \\
+  | table id complete size_bytes access_time mod_time' -maxout 0 2>/dev/null \\
   || "${{splunk}}" search '| rest splunk_server=local /services/admin/summarization | table title summary.complete summary.size' -maxout 0
 """
     )
@@ -252,12 +257,17 @@ def render_audit(args: argparse.Namespace) -> str:
 summary_range={summary_range}
 models={model_csv}
 IFS=',' read -r -a model_arr <<< "${{models}}"
+failures=0
 for model in "${{model_arr[@]}}"; do
   echo "== CIM population: ${{model}} (accelerated tstats, earliest ${{summary_range}}) =="
   "${{splunk}}" search "| tstats count from datamodel=${{model}} where earliest=${{summary_range}} by index sourcetype | sort - count | head 20" -maxout 0 \\
-    || echo "tstats failed for ${{model}} (model may be unaccelerated or empty)."
+    || {{ echo "tstats failed for ${{model}} (model may be unaccelerated or empty)." >&2; failures=$((failures + 1)); }}
   echo
 done
+if (( failures > 0 )); then
+  echo "ERROR: ${{failures}} CIM data model audit search(es) failed." >&2
+  exit 1
+fi
 echo "Empty results usually mean the model is unaccelerated or the data is not CIM-mapped."
 echo "Use splunk-data-source-readiness-doctor to diagnose CIM tagging and field compliance."
 """

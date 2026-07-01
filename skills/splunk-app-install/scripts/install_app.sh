@@ -20,6 +20,9 @@ UPDATE=false
 UPDATE_SET=false
 RESTART_SPLUNK=true
 PRE_VETTED=false
+CLOUD_APP_NAME=""
+CLOUD_APP_VERSION=""
+CLOUD_APP_STATUS=""
 
 REGISTRY_FILE="${REGISTRY_FILE:-${SCRIPT_DIR}/../../../skills/shared/app_registry.json}"
 
@@ -671,18 +674,25 @@ cloud_install_private_app() {
         exit 1
     fi
 
-    read -r app_name version status <<< "$(printf '%s' "${response}" \
+    IFS='|' read -r app_name version status <<< "$(printf '%s' "${response}" \
         | acs_extract_http_response_json \
         | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
-    print(data.get('name') or data.get('appID', ''), data.get('version', ''), data.get('status', ''))
+    print('|'.join(str(value or '') for value in (
+        data.get('name') or data.get('appID', ''),
+        data.get('version', ''),
+        data.get('status', ''),
+    )))
 except Exception:
-    print('', '', '')
+    print('||')
 ")"
 
-    log "SUCCESS: Splunk Cloud installed private app '${app_name:-unknown}'${version:+ (version ${version})}${status:+ [${status}]}"
+    CLOUD_APP_NAME="${app_name}"
+    CLOUD_APP_VERSION="${version}"
+    CLOUD_APP_STATUS="${status}"
+    log "ACS accepted the private app install request${app_name:+ for '${app_name}'}."
 }
 
 cloud_install_splunkbase_app() {
@@ -725,21 +735,32 @@ cloud_install_splunkbase_app() {
         exit 1
     fi
 
-    read -r app_name version status <<< "$(printf '%s' "${response}" \
+    IFS='|' read -r app_name version status <<< "$(printf '%s' "${response}" \
         | acs_extract_http_response_json \
         | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
-    print(data.get('name') or data.get('appID', ''), data.get('version', ''), data.get('status', ''))
+    print('|'.join(str(value or '') for value in (
+        data.get('name') or data.get('appID', ''),
+        data.get('version', ''),
+        data.get('status', ''),
+    )))
 except Exception:
-    print('', '', '')
+    print('||')
 ")"
 
-    log "SUCCESS: Splunk Cloud applied Splunkbase app '${app_name:-unknown}'${version:+ (version ${version})}${status:+ [${status}]}"
+    if [[ -z "${app_name}" ]]; then
+        app_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}" || true)"
+    fi
+    CLOUD_APP_NAME="${app_name}"
+    CLOUD_APP_VERSION="${version}"
+    CLOUD_APP_STATUS="${status}"
+    log "ACS accepted the Splunkbase app operation${app_name:+ for '${app_name}'}."
 }
 
 cloud_install_app() {
+    local describe_json metadata verified_name verified_version verified_status normalized_status
     case "${SOURCE}" in
         local|remote|url)
             if [[ ! -f "${APP_FILE}" ]]; then
@@ -758,6 +779,58 @@ cloud_install_app() {
     esac
 
     cloud_restart_or_exit "app installation"
+    if [[ -z "${CLOUD_APP_NAME}" ]]; then
+        log "ERROR: ACS accepted the app operation, but the installed app name could not be resolved for verification."
+        log "HANDOFF: Run 'acs apps list' and verify the expected package/version before treating the install as complete."
+        return 1
+    fi
+    if ! describe_json="$(acs_command apps describe "${CLOUD_APP_NAME}" 2>/dev/null | acs_extract_http_response_json)"; then
+        log "ERROR: ACS accepted the app operation, but '${CLOUD_APP_NAME}' could not be verified afterward."
+        log "HANDOFF: Run 'acs apps describe ${CLOUD_APP_NAME}' and check stack restart status before using the app."
+        return 1
+    fi
+    if ! metadata="$(printf '%s' "${describe_json}" | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+if isinstance(data, dict) and isinstance(data.get("app"), dict):
+    data = data["app"]
+if not isinstance(data, dict):
+    raise SystemExit(1)
+spec = data.get("spec") if isinstance(data.get("spec"), dict) else {}
+name = data.get("name") or data.get("appID") or spec.get("name") or ""
+version = data.get("version") or spec.get("version") or ""
+status = data.get("status") or spec.get("status") or ""
+if not name:
+    raise SystemExit(1)
+print(f"{name}|{version}|{status}", end="")
+')"; then
+        log "ERROR: ACS app describe returned an unrecognized record for '${CLOUD_APP_NAME}'."
+        log "HANDOFF: Verify the app ID, version, and status with 'acs apps describe ${CLOUD_APP_NAME}'."
+        return 1
+    fi
+    IFS='|' read -r verified_name verified_version verified_status <<< "${metadata}"
+    if [[ -n "${APP_VERSION}" && "${verified_version}" != "${APP_VERSION}" ]]; then
+        log "ERROR: App '${verified_name}' is version '${verified_version:-unknown}', expected pinned version '${APP_VERSION}'."
+        return 1
+    fi
+    normalized_status="$(printf '%s' "${verified_status}" | tr '[:upper:]' '[:lower:]')"
+    case "${normalized_status}" in
+        failed|failure|error|rejected|invalid)
+            log "ERROR: ACS app record for '${verified_name}' reports status '${verified_status}'."
+            return 1
+            ;;
+        pending|installing|updating|processing|queued|in_progress|in-progress)
+            log "ERROR: ACS app record for '${verified_name}' is still incomplete with status '${verified_status}'."
+            log "HANDOFF: Wait for the Cloud stack operation to settle, then rerun 'acs apps describe ${CLOUD_APP_NAME}' and verify the installed version."
+            return 1
+            ;;
+    esac
+    CLOUD_APP_NAME="${verified_name}"
+    CLOUD_APP_VERSION="${verified_version:-${CLOUD_APP_VERSION}}"
+    CLOUD_APP_STATUS="${verified_status:-${CLOUD_APP_STATUS}}"
+    log "SUCCESS: Splunk Cloud verified app '${CLOUD_APP_NAME}'${CLOUD_APP_VERSION:+ (version ${CLOUD_APP_VERSION})}${CLOUD_APP_STATUS:+ [${CLOUD_APP_STATUS}]}"
 }
 
 resolve_splunkbase_release_metadata() {
@@ -1089,6 +1162,10 @@ install_app() {
     local file_name
     file_name="$(basename "${abs_file_path}")"
     expected_app_name="$(guess_app_name_from_package "${abs_file_path}")"
+    if [[ -n "${expected_app_name}" && ! "${expected_app_name}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+        log "ERROR: Package top-level app directory '${expected_app_name}' is not a safe Splunk app ID."
+        exit 1
+    fi
 
     if deployment_should_use_bundle_for_current_target; then
         local bundle_kind
@@ -1121,7 +1198,9 @@ install_app() {
                 log "WARNING: The bundle may still be propagating through the clustered deployment plane."
             fi
         else
-            log "WARNING: Bundle delivery completed, but the app name could not be inferred for post-apply verification."
+            log "ERROR: Bundle delivery completed, but the app name could not be inferred for post-apply verification."
+            log "HANDOFF: Inspect the bundle app directory and verify the deployed app ID before treating installation as complete."
+            exit 1
         fi
 
         INSTALL_HTTP_CODE="200"
@@ -1169,7 +1248,7 @@ install_app() {
         body="${INSTALL_BODY:-}"
     fi
 
-    local app_name error_msg
+    local app_name error_msg post_install_check verification_incomplete=false
     app_name=$(echo "${body}" | python3 -c "
 import json, sys
 try:
@@ -1199,7 +1278,8 @@ except Exception:
     fi
 
     if ${INSTALL_INCOMPLETE_BUT_PRESENT}; then
-        log "WARNING: Install request did not finish cleanly, but the app is present."
+        log "ERROR: Install request did not finish cleanly; the app is present, but this does not prove the requested install/update completed."
+        verification_incomplete=true
     fi
 
     case "${http_code}" in
@@ -1217,7 +1297,13 @@ except Exception:
     esac
 
     if [[ -n "${app_name}" ]]; then
-        log "SUCCESS: App '${app_name}' installed (HTTP ${http_code})"
+        post_install_check="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${app_name}")"
+        if [[ "${post_install_check}" != "200" ]]; then
+            log "ERROR: App '${app_name}' could not be read back after the install request (HTTP ${post_install_check})."
+            verification_incomplete=true
+        else
+            log "SUCCESS: App '${app_name}' is present after the install request (HTTP ${http_code})"
+        fi
 
         local version
         version=$(splunk_curl "${SK}" \
@@ -1233,12 +1319,21 @@ except Exception:
 " 2>/dev/null || echo "unknown")
         log "Installed path: ${SPLUNK_HOME}/etc/apps/${app_name}/"
         log "Version: ${version}"
+        if [[ -n "${APP_VERSION}" && "${version}" != "${APP_VERSION}" ]]; then
+            log "ERROR: Installed app '${app_name}' reports version '${version}', expected pinned version '${APP_VERSION}'."
+            verification_incomplete=true
+        fi
     else
-        log "WARNING: Install completed (HTTP ${http_code}) but could not parse app name."
+        log "ERROR: Install was accepted (HTTP ${http_code}) but the app name could not be resolved for verification."
         log "Check Splunk: ${SPLUNK_HOME}/etc/apps/"
+        verification_incomplete=true
     fi
 
     restart_splunk_or_exit "app installation"
+    if ${verification_incomplete}; then
+        log "HANDOFF: Verify the expected app ID and version with list_apps.sh before treating installation as complete."
+        return 1
+    fi
 }
 
 # ── Main ────────────────────────────────────────────────────────────

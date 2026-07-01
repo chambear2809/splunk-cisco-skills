@@ -157,7 +157,7 @@ bash skills/splunk-federated-search-setup/scripts/validate.sh --live
 | `aws-s3-providers/<name>.json` | REST payload per reviewed legacy FSS3 provider, plus an AWS prerequisites README |
 | `data-management-federation-handoff.md` | Current Data Management app federation handoff for Amazon S3, Microsoft Azure, and Azure Databricks |
 | `apply-search-head.sh` | File-based apply on a standalone Enterprise SH |
-| `apply-shc-deployer.sh` | File-based apply through the SHC deployer bundle |
+| `apply-shc-deployer.sh` | Fail-closed handoff to `splunk-search-head-cluster-setup`; staging files alone is not reported as a completed SHC bundle apply |
 | `apply-rest.sh` | REST apply for Splunk Enterprise OR Splunk Cloud |
 | `global-enable.sh` / `global-disable.sh` | Toggle the global federated-search switch |
 | `status.sh` | REST GET per provider, prints `connectivityStatus` |

@@ -204,7 +204,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash skills/cisco-meraki-ta-setup/scripts/validate.sh
+bash skills/cisco-meraki-ta-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, index, account, inputs, data flow, settings.
@@ -295,3 +295,9 @@ bash skills/cisco-meraki-ta-setup/scripts/load_mcp_tools.sh
 
 - [reference.md](reference.md) — Complete input catalog, account fields, sizing
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require an organization account, enabled input, Meraki events and
+sourcetypes, the `meraki_index` macro, and visible shipped dashboards.

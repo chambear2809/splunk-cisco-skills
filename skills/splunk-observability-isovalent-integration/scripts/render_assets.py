@@ -626,8 +626,12 @@ helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
     "${{DRY_RUN_FLAG[@]}}"
 
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
-    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s || true
-    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s || true
+    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s
+    if kubectl -n "${{NAMESPACE}}" get deployment/${{RELEASE}}-k8s-cluster-receiver >/dev/null 2>&1; then
+        kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s
+    else
+        echo "INFO: optional k8s-cluster-receiver deployment is not present; agent rollout is healthy."
+    fi
 fi
 """
     )

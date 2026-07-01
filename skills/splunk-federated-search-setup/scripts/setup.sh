@@ -153,6 +153,11 @@ validate_args() {
     validate_choice "${SHC_REPLICATION}" true false
     validate_choice "${RESTART_SPLUNK}" true false
     validate_choice "${FEDERATED_SEARCH_ENABLED}" true false
+    if [[ "${APPLY_TARGET}" == "search-head" && "${RESTART_SPLUNK}" != "true" &&
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: standalone search-head apply requires --restart-splunk true; use render-only for staged configuration."
+        exit 2
+    fi
     if [[ "${PHASE}" == "global-toggle" && -z "${GLOBAL_TOGGLE}" ]]; then
         log "ERROR: --phase global-toggle requires --global-toggle enable|disable."
         exit 1

@@ -555,11 +555,12 @@ def tool_catalog_payload() -> dict[str, Any]:
     }
 
 
-def bridge_env_example(mcp_url: str) -> str:
+def bridge_env_example(mcp_url: str, key_file: str = "") -> str:
     return (
         "# Copy to .env.galileo-mcp and keep the populated file local only.\n"
         f"GALILEO_MCP_URL={mcp_url}\n"
         "GALILEO_API_KEY=''\n"
+        f"GALILEO_API_KEY_FILE={key_file}\n"
         "# Optional for custom/self-hosted TLS labs only.\n"
         "# GALILEO_MCP_INSECURE_TLS=1\n"
     )
@@ -662,8 +663,13 @@ if [[ -z "${GALILEO_MCP_URL:-}" ]]; then
 fi
 
 if [[ -z "${GALILEO_API_KEY:-}" ]]; then
-    echo "galileo-mcp: set GALILEO_API_KEY in ${ENV_FILE}" >&2
-    exit 1
+    if [[ -n "${GALILEO_API_KEY_FILE:-}" && -r "${GALILEO_API_KEY_FILE}" ]]; then
+        GALILEO_API_KEY="$(tr -d '\\r\\n' < "${GALILEO_API_KEY_FILE}")"
+        export GALILEO_API_KEY
+    else
+        echo "galileo-mcp: set GALILEO_API_KEY or GALILEO_API_KEY_FILE in ${ENV_FILE}" >&2
+        exit 1
+    fi
 fi
 
 if [[ "${GALILEO_MCP_INSECURE_TLS:-}" == "1" ]]; then
@@ -750,8 +756,15 @@ function fail(message) {
 if (!process.env.GALILEO_MCP_URL) {
   fail("set GALILEO_MCP_URL in " + envFile);
 }
+if (!process.env.GALILEO_API_KEY && process.env.GALILEO_API_KEY_FILE) {
+  try {
+    process.env.GALILEO_API_KEY = fs.readFileSync(process.env.GALILEO_API_KEY_FILE, "utf8").trim();
+  } catch (err) {
+    fail("could not read GALILEO_API_KEY_FILE: " + err.message);
+  }
+}
 if (!process.env.GALILEO_API_KEY) {
-  fail("set GALILEO_API_KEY in " + envFile);
+  fail("set GALILEO_API_KEY or GALILEO_API_KEY_FILE in " + envFile);
 }
 if (process.env.GALILEO_MCP_INSECURE_TLS === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -1115,7 +1128,10 @@ def main() -> int:
     if any(client in clients for client in ("codex", "claude", "kiro")):
         write_text(bridge_js, bridge_js_script(), executable=True)
         write_text(mcp_dir / "run-galileo-mcp.sh", bridge_shell_script(), executable=True)
-        write_text(mcp_dir / ".env.galileo-mcp.example", bridge_env_example(mcp_url))
+        write_text(
+            mcp_dir / ".env.galileo-mcp.example",
+            bridge_env_example(mcp_url, config["galileo_api_key_file"]),
+        )
     if "codex" in clients:
         write_text(
             mcp_dir / "codex-register-galileo-mcp.sh",

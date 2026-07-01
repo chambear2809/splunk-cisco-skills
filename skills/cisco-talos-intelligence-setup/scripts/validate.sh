@@ -2,14 +2,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-talos-intelligence-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-talos-intelligence-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates Cisco Talos Intelligence app readiness without querying Talos.
+Diagnostic mode reports incomplete service-account provisioning as warnings.
+--strict and its alias --completion make completion-critical findings exit
+nonzero. The package ships ES enrichment actions, not standalone dashboards.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_Talos_Intelligence"
@@ -18,6 +28,7 @@ PASS=0; WARN=0; FAIL=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 version_at_least() {
     python3 - "$1" "$2" <<'PY'
@@ -139,11 +150,11 @@ except Exception:
             if [[ -n "${fingerprint}" ]]; then
                 pass "Service account ${name} has fingerprint ${fingerprint}"
             else
-                warn "Service account ${name} exists but fingerprint is missing"
+                completion_issue "Service account ${name} exists but fingerprint is missing"
             fi
         done <<< "${acct_summary}"
     else
-        warn "No Talos service account stanza found. Splunk Cloud may need to finish provisioning; docs note a wait after service-account generation."
+        completion_issue "No Talos service account stanza found. Splunk Cloud may need to finish provisioning; docs note a wait after service-account generation."
     fi
 
     for action in intelligence_collection_from_talos intelligence_enrichment_with_talos; do

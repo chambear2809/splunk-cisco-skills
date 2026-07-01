@@ -29,7 +29,18 @@ bash skills/widefield-security-setup/scripts/setup.sh --render
 
 ```bash
 bash skills/widefield-security-setup/scripts/setup.sh --apply --accept-apply \
-  --children okta,saviynt,splunk,google,doctor
+  --children okta,splunk,doctor
+```
+
+Saviynt and Google SecOps child validation is evidence-gated. To include either
+child, pass `--evidence-file` containing its required marker. A combined JSON
+file may be used when routing both children, but it must contain both a Saviynt
+remediation outcome marker and Google SecOps log type `WIDEFIELD_SECURITY`:
+
+```bash
+bash skills/widefield-security-setup/scripts/setup.sh --apply --accept-apply \
+  --children saviynt,google \
+  --evidence-file ./widefield-cross-system-evidence.local.json
 ```
 
 The parent never calls private or undocumented WideField APIs. Parent apply is
@@ -44,3 +55,5 @@ directly with their required file-backed credentials.
 - Treat WideField platform configuration as a provider/customer handoff unless
   public API coverage is added to `reference.md`.
 - Run `validate.sh --dry-run` before target-specific validation.
+- Parent delegation forwards optional target values only when they were
+  explicitly supplied; it never synthesizes empty child arguments.

@@ -2,14 +2,27 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
+INDEX="netflow"
+SOURCETYPE="stream:netflow"
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/validate.sh [--strict|--completion] [--index INDEX] [--sourcetype SOURCETYPE] [--help]
 
 Validates the deployed Cisco Catalyst Enhanced NetFlow add-on using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        --index) [[ $# -ge 2 && -n "${2:-}" ]] || { echo "ERROR: --index requires a value" >&2; exit 1; }; INDEX="$2"; shift 2 ;;
+        --sourcetype) [[ $# -ge 2 && -n "${2:-}" ]] || { echo "ERROR: --sourcetype requires a value" >&2; exit 1; }; SOURCETYPE="$2"; shift 2 ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="splunk_app_stream_ipfix_cisco_hsl"
@@ -27,6 +40,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 info() { log "  INFO: $*"; }
 
 log "=== Cisco Catalyst Enhanced Netflow Add-on Validation ==="
@@ -67,14 +81,14 @@ if rest_check_app "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" 2>/dev/null; then
         nf_port=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.port" 2>/dev/null || true)
         nf_decoder=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.decoder" 2>/dev/null || true)
 
-        if [[ -n "${nf_ip}" ]]; then pass "NetFlow receiver IP: ${nf_ip}"; else warn "No netflowReceiver.0.ip configured"; fi
-        if [[ -n "${nf_port}" ]]; then pass "NetFlow receiver port: ${nf_port}"; else warn "No netflowReceiver.0.port configured"; fi
-        if [[ -n "${nf_decoder}" ]]; then pass "NetFlow decoder: ${nf_decoder}"; else warn "No netflowReceiver.0.decoder configured"; fi
+        if [[ -n "${nf_ip}" ]]; then pass "NetFlow receiver IP: ${nf_ip}"; else completion_issue "No netflowReceiver.0.ip configured"; fi
+        if [[ -n "${nf_port}" ]]; then pass "NetFlow receiver port: ${nf_port}"; else completion_issue "No netflowReceiver.0.port configured"; fi
+        if [[ -n "${nf_decoder}" ]]; then pass "NetFlow decoder: ${nf_decoder}"; else completion_issue "No netflowReceiver.0.decoder configured"; fi
     else
-        warn "${STREAM_FWD_APP} is installed but streamfwd.conf is not configured"
+        completion_issue "${STREAM_FWD_APP} is installed but streamfwd.conf is not configured"
     fi
 else
-    warn "${STREAM_FWD_APP} not found — this add-on is typically installed on the host that parses NetFlow/IPFIX"
+    completion_issue "${STREAM_FWD_APP} not found — validate on the host that parses NetFlow/IPFIX"
 fi
 
 if rest_check_app "$SK" "$SPLUNK_URI" "${STREAM_SEARCH_APP}" 2>/dev/null; then
@@ -88,7 +102,7 @@ log "--- Related Cisco Apps ---"
 if rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
     pass "${CATALYST_TA_APP} is installed"
 else
-    warn "${CATALYST_TA_APP} not found — Cisco Catalyst data collection is handled elsewhere"
+    warn "${CATALYST_TA_APP} not found on this parsing target — validate the TA and dashboards on their own tiers"
 fi
 
 if rest_check_app "$SK" "$SPLUNK_URI" "${ENTERPRISE_APP}" 2>/dev/null; then
@@ -100,6 +114,16 @@ fi
 log ""
 log "--- App Behavior ---"
 pass "No app-local accounts or inputs are expected for ${APP_NAME}"
+
+log ""
+log "--- Stream Data Evidence ---"
+event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
+    "| tstats count where index=${INDEX} sourcetype=\"${SOURCETYPE}\"" "count" 2>/dev/null || echo "0")
+if [[ "${event_count}" =~ ^[0-9]+$ && "${event_count}" -gt 0 ]]; then
+    pass "${INDEX} contains ${event_count} ${SOURCETYPE} event(s)"
+else
+    completion_issue "No ${SOURCETYPE} events were found in ${INDEX}"
+fi
 fi
 
 log ""

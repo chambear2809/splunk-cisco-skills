@@ -132,8 +132,9 @@ validate_choice "${EXECUTION_MODE}" local ssh render
 validate_choice "${ENROLL_MODE}" none deployment-server enterprise-indexers splunk-cloud
 
 if [[ "${TARGET_OS}" == "windows" || "${TARGET_OS}" =~ ^(freebsd|solaris|aix)$ || "${EXECUTION_MODE}" == "render" ]]; then
-    log "INFO: ${TARGET_OS}/render validation is a handoff check in v1. Verify Universal Forwarder service state on the target host."
-    exit 0
+    log "HANDOFF: ${TARGET_OS}/${EXECUTION_MODE} validation cannot inspect the target from this process."
+    log "Run the generated target-side validator and capture SplunkForwarder service, version, status, and enrollment evidence before declaring completion."
+    exit 2
 fi
 
 if [[ "${EXECUTION_MODE}" == "ssh" ]]; then

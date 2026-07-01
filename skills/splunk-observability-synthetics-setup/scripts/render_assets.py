@@ -12,6 +12,8 @@ from pathlib import Path
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    if path.suffix == ".sh":
+        path.chmod(0o755)
 
 
 def split_csv(value: str) -> list[str]:
@@ -72,7 +74,15 @@ Review `native-ops-spec.json`, then render or apply through
         f"""#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-bash skills/splunk-observability-native-ops/scripts/setup.sh --render --validate --spec "${{SCRIPT_DIR}}/native-ops-spec.json" --realm {shlex.quote(args.realm)}
+REPO_ROOT="${{SPLUNK_CISCO_SKILLS_ROOT:-$(git -C "${{SCRIPT_DIR}}" rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+MODE="${{1:---render}}"
+case "${{MODE}}" in
+  --render|--apply) shift ;;
+  *) MODE=--render ;;
+esac
+exec bash "${{REPO_ROOT}}/skills/splunk-observability-native-ops/scripts/setup.sh" \
+  "${{MODE}}" --validate --spec "${{SCRIPT_DIR}}/native-ops-spec.json" \
+  --realm {shlex.quote(args.realm)} "$@"
 """,
     )
     write(

@@ -699,6 +699,9 @@ class ShellContentLibraryInstaller:
             verify_ssl_source = env.get("SPLUNK_VERIFY_SSL")
         verify_ssl = bool_from_any(verify_ssl_source, default=True)
         env["SPLUNK_VERIFY_SSL"] = "true" if verify_ssl else "false"
+        ca_cert_file = str(connection.get("ca_cert_file") or "").strip()
+        if ca_cert_file:
+            env["SPLUNK_CA_CERT"] = ca_cert_file
         username = getattr(getattr(client, "config", None), "username", None)
         password = getattr(getattr(client, "config", None), "password", None)
         session_key = getattr(getattr(client, "config", None), "session_key", None)
@@ -795,7 +798,7 @@ class ShellContentLibraryInstaller:
             f"apps_dir={shlex.quote(apps_dir)}\n"
             f"splunk_bin={shlex.quote(splunk_bin)}\n"
             f"auth_file={shlex.quote(auth_file)}\n"
-            'chmod 600 "$auth_file" 2>/dev/null || true\n'
+            'chmod 600 "$auth_file"\n'
             "workdir=$(mktemp -d /tmp/codex-bundle.XXXXXX)\n"
             f"cleanup() {{ {cleanup_body}; }}\n"
             "trap cleanup EXIT\n"
@@ -876,15 +879,34 @@ class ShellContentLibraryInstaller:
         ssh_host = str(env.get("SPLUNK_SSH_HOST") or _target_host(base_url)).strip()
         ssh_port = str(env.get("SPLUNK_SSH_PORT") or "22").strip() or "22"
         ssh_user = str(env.get("SPLUNK_SSH_USER") or username or "splunk").strip() or "splunk"
-        ssh_pass = str(env.get("SPLUNK_SSH_PASS") or password or "").strip()
+        ssh_pass = str(env.get("SPLUNK_SSH_PASS") or password or "")
+        ssh_known_hosts_file = str(env.get("SPLUNK_SSH_KNOWN_HOSTS_FILE") or "").strip()
         if not ssh_host or not ssh_pass:
             auth_file.unlink(missing_ok=True)
             raise ValidationError(
                 f"Automatic {self.display_name.lower()} bundle fallback requires SSH credentials. Set SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS or provide matching Splunk credentials."
             )
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", ssh_user):
+            auth_file.unlink(missing_ok=True)
+            raise ValidationError("SPLUNK_SSH_USER contains unsupported characters.")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", ssh_host):
+            auth_file.unlink(missing_ok=True)
+            raise ValidationError("SPLUNK_SSH_HOST contains unsupported characters.")
+        try:
+            ssh_port_number = int(ssh_port)
+        except ValueError as exc:
+            auth_file.unlink(missing_ok=True)
+            raise ValidationError("SPLUNK_SSH_PORT must be an integer.") from exc
+        if not 1 <= ssh_port_number <= 65535:
+            auth_file.unlink(missing_ok=True)
+            raise ValidationError("SPLUNK_SSH_PORT must be between 1 and 65535.")
+        known_hosts_path = Path(ssh_known_hosts_file)
+        if not ssh_known_hosts_file or not known_hosts_path.is_file() or not os.access(known_hosts_path, os.R_OK):
+            auth_file.unlink(missing_ok=True)
+            raise ValidationError(
+                f"Automatic {self.display_name.lower()} bundle fallback requires a readable SPLUNK_SSH_KNOWN_HOSTS_FILE."
+            )
 
-        remote_tmp = f"/tmp/{local_file.stem}.{os.getpid()}.{self.default_app_id}{local_file.suffix}"
-        remote_auth_file = f"/tmp/{local_file.stem}.{os.getpid()}.{self.default_app_id}.auth"
         try:
             ssh_pass_file = self._write_secret_file(ssh_pass)
         except Exception:
@@ -892,8 +914,47 @@ class ShellContentLibraryInstaller:
             raise
         ssh_env = self._without_secret_env(env)
         remote_cleanup_needed = False
+        remote_dir = ""
+        remote_tmp = ""
+        remote_auth_file = ""
         ssh_process: subprocess.CompletedProcess[str] | None = None
         try:
+            mktemp_process = self._run_command(
+                [
+                    "sshpass",
+                    "-f",
+                    str(ssh_pass_file),
+                    "ssh",
+                    "-p",
+                    ssh_port,
+                    "-o",
+                    "ConnectTimeout=15",
+                    "-o",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={ssh_known_hosts_file}",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    f"{ssh_user}@{ssh_host}",
+                    "umask 077; mktemp -d /tmp/splunk-itsi-pack.XXXXXX",
+                ],
+                ssh_env,
+            )
+            if mktemp_process.returncode != 0:
+                raise ValidationError(
+                    f"Automatic {self.display_name.lower()} remote staging-directory creation failed: "
+                    + _summarize_command_output(mktemp_process.stdout, mktemp_process.stderr)
+                )
+            output_lines = [line.strip() for line in mktemp_process.stdout.splitlines() if line.strip()]
+            remote_dir = output_lines[-1] if output_lines else ""
+            if not re.fullmatch(r"/tmp/splunk-itsi-pack\.[A-Za-z0-9]+", remote_dir):
+                raise ValidationError("Remote mktemp returned an unexpected staging path.")
+            remote_tmp = f"{remote_dir}/bundle{local_file.suffix}"
+            remote_auth_file = f"{remote_dir}/auth"
+            remote_cleanup_needed = True
+
             scp_process = self._run_command(
                 [
                     "sshpass",
@@ -905,7 +966,9 @@ class ShellContentLibraryInstaller:
                     "-o",
                     "ConnectTimeout=15",
                     "-o",
-                    "StrictHostKeyChecking=accept-new",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={ssh_known_hosts_file}",
                     "-o",
                     "PubkeyAuthentication=no",
                     "-o",
@@ -921,8 +984,6 @@ class ShellContentLibraryInstaller:
                     f"Automatic {self.display_name.lower()} SSH staging failed: "
                     + _summarize_command_output(scp_process.stdout, scp_process.stderr)
                 )
-            remote_cleanup_needed = True
-
             scp_auth_process = self._run_command(
                 [
                     "sshpass",
@@ -934,7 +995,9 @@ class ShellContentLibraryInstaller:
                     "-o",
                     "ConnectTimeout=15",
                     "-o",
-                    "StrictHostKeyChecking=accept-new",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={ssh_known_hosts_file}",
                     "-o",
                     "PubkeyAuthentication=no",
                     "-o",
@@ -970,7 +1033,9 @@ class ShellContentLibraryInstaller:
                     "-o",
                     "ConnectTimeout=15",
                     "-o",
-                    "StrictHostKeyChecking=accept-new",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={ssh_known_hosts_file}",
                     "-o",
                     "PubkeyAuthentication=no",
                     "-o",
@@ -981,8 +1046,8 @@ class ShellContentLibraryInstaller:
                 ssh_env,
             )
         finally:
-            if remote_cleanup_needed and (ssh_process is None or ssh_process.returncode != 0):
-                cleanup_command = f"rm -f {shlex.quote(remote_tmp)} {shlex.quote(remote_auth_file)}"
+            if remote_cleanup_needed:
+                cleanup_command = f"rm -rf -- {shlex.quote(remote_dir)}"
                 try:
                     self._run_command(
                         [
@@ -995,7 +1060,9 @@ class ShellContentLibraryInstaller:
                             "-o",
                             "ConnectTimeout=15",
                             "-o",
-                            "StrictHostKeyChecking=accept-new",
+                            "StrictHostKeyChecking=yes",
+                            "-o",
+                            f"UserKnownHostsFile={ssh_known_hosts_file}",
                             "-o",
                             "PubkeyAuthentication=no",
                             "-o",

@@ -12,6 +12,13 @@ description: >-
 
 # Splunk Data Source Readiness Doctor
 
+## Shared add-on completion gate
+
+Whenever this workflow validates or hands off a registry-listed Splunk app or
+add-on, use the [shared completion gate](../shared/ta_completion_gate.md).
+Package presence alone is not readiness; require applicable ingest and
+dashboard evidence, or explicit package evidence that no dashboards ship.
+
 This skill proves that already-onboarded data is usable by the consumers that
 matter after installation: **ES**, **ITSI**, **ARI**, **CIM**, **OCSF**, and
 dashboards. It does not install apps or mutate Splunk. It consumes evidence from

@@ -73,8 +73,10 @@ fi
 grep -q 'install_app.sh' "${TMP_OUT_S}/splunk-side/install-app-for-soar.sh" || { echo "FAIL: install-app-for-soar.sh must reference install_app.sh" >&2; exit 1; }
 grep -q -- '--source splunkbase --app-id' "${TMP_OUT_S}/splunk-side/install-app-for-soar.sh" || { echo "FAIL: install-app-for-soar.sh must use --source splunkbase --app-id" >&2; exit 1; }
 
-# configure-phantom-endpoint.sh must use --spec / --mode preview (not invented --section/--integration flags).
-grep -q -- '--spec' "${TMP_OUT_S}/splunk-side/configure-phantom-endpoint.sh" || { echo "FAIL: configure-phantom-endpoint.sh must use --spec" >&2; exit 1; }
+# configure-phantom-endpoint.sh must fail closed; conf-essoar writes are not
+# modeled by the supported ES engine.
+grep -q 'ES-to-SOAR pairing was not applied' "${TMP_OUT_S}/splunk-side/configure-phantom-endpoint.sh" || { echo "FAIL: configure-phantom-endpoint.sh must expose the UI handoff" >&2; exit 1; }
+grep -q 'exit 2' "${TMP_OUT_S}/splunk-side/configure-phantom-endpoint.sh" || { echo "FAIL: configure-phantom-endpoint.sh must fail nonzero" >&2; exit 1; }
 
 # validate.sh must mkdir AUDIT_DIR with proper slash separator.
 # shellcheck disable=SC2016

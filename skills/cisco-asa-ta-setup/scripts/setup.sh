@@ -115,6 +115,7 @@ fi
 VALIDATE_CMD=(bash "${SCRIPT_DIR}/validate.sh" --index "${INDEX}" --sourcetype "${SOURCETYPE}")
 [[ -n "${OUTPUT_DIR}" ]] && VALIDATE_CMD+=(--rendered-dir "${OUTPUT_DIR}")
 [[ "${LIVE}" == "true" ]] && VALIDATE_CMD+=(--live)
+[[ "${ALL}" == "true" && "${LIVE}" == "true" ]] && VALIDATE_CMD+=(--completion)
 RF_INSTALL_CMD=()
 if [[ "${INSTALL}" == "true" ]]; then
     rf_build_app_install_command "${APP_ID}" "${SOURCE}" "${LOCAL_FILE}" "${APP_VERSION}" "${NO_RESTART}"

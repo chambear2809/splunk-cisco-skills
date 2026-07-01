@@ -9,9 +9,11 @@ import os
 import re
 import shlex
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlsplit
 
 import yaml
 
@@ -94,7 +96,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Controller Admin Setup",
         "target": "SaaS and on-prem Controller administration",
         "purpose": "Render API client, OAuth, users, groups, roles, SAML/LDAP, permissions, licensing, license-rule, sensitive-data, audit, and tenant-admin plans.",
-        "apply": "Controller REST API changes are API apply where documented; UI-only gaps render runbooks.",
+        "apply": "This skill has read-only API probes and operator runbooks; it does not execute Controller administration mutations.",
         "validation": "Controller API readbacks for security, access, license, audit, and sensitive-data-control state.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index",
@@ -110,7 +112,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Agent Management Setup",
         "target": "Smart Agent and Agent Management",
         "purpose": "Render Smart Agent readiness, configuration, local and remote install, upgrade, uninstall, sync, UI, smartagentctl, deployment group, auto-attach, auto-discovery, deprecated CLI, software download, checksum, signature, and agent-release compatibility plans for supported managed agent types.",
-        "apply": "Remote host execution requires --accept-remote-execution; UI paths and deprecated Smart Agent CLI paths are runbook-only; otherwise the skill emits commands for review.",
+        "apply": "The skill emits reviewed Smart Agent and smartagentctl commands, but does not execute host or Controller mutations; operators run the selected command plan after approval.",
         "validation": "Smart Agent service status, Controller registration, UI inventory, managed-agent status, deployment-group state, smartagentctl command shape, remote.yaml security posture, package checksum/signature, and release-compatibility readbacks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent",
@@ -152,7 +154,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics APM Setup",
         "target": "Business applications, tiers, nodes, transactions, service endpoints, remote services, information points, and Splunk AppDynamics for OpenTelemetry",
         "purpose": "Render APM model, application server agent snippets, serverless/development monitoring runbooks, OpenTelemetry collector and access-key runbooks, metric checks, snapshots, and topology validation.",
-        "apply": "Documented Controller APIs are API apply; runtime agent install is delegated to agent-management or k8s child skills.",
+        "apply": "APM model and runtime changes are rendered as Controller/operator runbooks and delegated instrumentation handoffs; this wrapper has no live apply implementation.",
         "validation": "Controller readbacks for apps, tiers, nodes, business transactions, metrics, snapshots, and OpenTelemetry trace ingestion.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0",
@@ -185,7 +187,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Infrastructure Visibility Setup",
         "target": "Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, GPU Monitoring, and Prometheus extensions",
         "purpose": "Render Machine Agent, network visibility, service availability, server-tag, GPU Monitoring, Prometheus extension, and infrastructure health-rule plans.",
-        "apply": "Agent and host changes are CLI/rendered apply; Controller health rules use documented APIs where available.",
+        "apply": "Agent, host, tag, and health-rule changes are rendered as operator runbooks; this wrapper has no live apply implementation.",
         "validation": "Controller server, container, network, GPU, Prometheus, service availability, tag, and health-rule readbacks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility",
@@ -213,7 +215,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Database Visibility Setup",
         "target": "Database Agent and Database Visibility API collectors",
         "purpose": "Render collector CRUD payloads with file-backed secrets, DB server/node validation, and event checks.",
-        "apply": "Database Visibility API apply uses password-file references and redacted rendered payloads.",
+        "apply": "Database collector payloads and agent commands are rendered with password-file references; this wrapper does not submit them.",
         "validation": "Collector list/readback plus DB server, node, metric, and event checks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api",
@@ -239,7 +241,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics EUM Setup",
         "target": "Browser RUM, Mobile RUM, IoT RUM, Session Replay, source maps, and app keys",
         "purpose": "Render browser injection, mobile SDK snippets, app-key inventory, Session Replay, mapping, and source-upload runbooks.",
-        "apply": "Local source edits require --accept-eum-source-edit; otherwise snippets and upload commands are rendered only.",
+        "apply": "Browser/mobile source edits and source-map uploads remain operator/CI handoffs; this wrapper does not edit source or upload artifacts.",
         "validation": "EUM app key checks, beacon validation, source-map inventory, and session replay readiness checks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/configure-the-controller-ui-for-browser-rum",
@@ -253,7 +255,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Synthetic Monitoring Setup",
         "target": "Browser Synthetic, Synthetic API Monitoring, Hosted and Private Synthetic Agents",
         "purpose": "Render synthetic jobs, private synthetic agent Docker/Kubernetes/Minikube assets, Shepherd URL checks, and run validation.",
-        "apply": "Synthetic job API apply is documented where available; private agent rollout emits reviewed container or Kubernetes plans.",
+        "apply": "Synthetic jobs and private-agent rollout are rendered as reviewed API/container/Kubernetes handoffs; this wrapper has no live apply implementation.",
         "validation": "Synthetic job, run, location, PSA health, and Shepherd connectivity checks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring",
@@ -274,7 +276,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Alerting Content Setup",
         "target": "Health rules, schedules, policies, actions, digests, suppression, anomaly detection, RCA, and AIML baselines",
         "purpose": "Render alerting content import/export, rollback, health rule, schedule, policy, action, digest, suppression, anomaly detection, RCA, dynamic baseline, and automated transaction diagnostics plans.",
-        "apply": "Documented Controller APIs are API apply; unsupported UI-only content stays as runbooks.",
+        "apply": "Alerting payloads, exports, and rollback steps are rendered for operator execution; this wrapper has no live apply implementation.",
         "validation": "Readbacks for health rules, policies, actions, schedules, suppressions, exported content snapshots, baseline behavior, and AIML diagnostics.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/health-rules/how-to-set-up-health-rules",
@@ -289,7 +291,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Dashboards Reports Setup",
         "target": "Custom dashboards, Dash Studio, reports, scheduled reports, and War Rooms",
         "purpose": "Render dashboard/report inventories, scheduled-report runbooks, Dash Studio handoffs, ThousandEyes dashboard integration handoffs, and War Room validation.",
-        "apply": "API-backed dashboard actions are API apply; UI-only report and War Room operations render runbooks.",
+        "apply": "Dashboard, report, and War Room changes are rendered as operator/UI handoffs; this wrapper has no live apply implementation.",
         "validation": "Dashboard, report, schedule, ThousandEyes query/widget, and War Room existence checks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports",
@@ -323,7 +325,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "title": "Splunk AppDynamics Tags Extensions Setup",
         "target": "Custom Tags, Integration Modules, extensions, Machine Agent custom metrics, ServiceNow, Jira, Scalyr, ACC, Log Auto-Discovery",
         "purpose": "Render tag API plans, extension runbooks, custom metric examples, and external integration handoffs.",
-        "apply": "Tag APIs are API apply; extensions and third-party connectors render runbooks unless their owner API is explicit.",
+        "apply": "Tag, extension, and third-party connector changes are rendered as operator or owning-system handoffs; this wrapper has no live apply implementation.",
         "validation": "Tag readbacks, extension file checks, custom metric visibility, and connector readiness checks.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/tag-management/26.4.0",
@@ -383,7 +385,7 @@ def reject_direct_secrets(argv: list[str]) -> None:
 
 def load_yaml_or_json(path: Path) -> dict[str, Any]:
     if not path.exists():
-        return {}
+        raise FileNotFoundError(f"spec does not exist: {path}")
     text = path.read_text(encoding="utf-8")
     if not text.strip():
         return {}
@@ -391,7 +393,9 @@ def load_yaml_or_json(path: Path) -> dict[str, Any]:
         data = json.loads(text)
     else:
         data = yaml.safe_load(text)
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        raise ValueError(f"spec must contain a top-level mapping/object: {path}")
+    return data
 
 
 def load_taxonomy() -> list[dict[str, Any]]:
@@ -513,6 +517,12 @@ def render_apply_plan(skill: str, coverage: list[dict[str, Any]]) -> str:
         else:
             lines.append("echo 'API/CLI APPLY: review generated payloads and run the documented child command.'")
         lines.append("")
+    lines.extend(
+        [
+            "echo 'PLAN ONLY: this file does not execute mutations. Use the owning skill wrapper or operator runbook.' >&2",
+            "exit 2",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -780,6 +790,8 @@ echo "Run enterprise-console-command-plan.sh only from an approved Enterprise Co
 echo "Use controller-install-upgrade-runbook.md for Controller install/upgrade steps that require password arguments"
 echo "Use platform-ha-backup-runbook.md for HA, backup, restore, and failover operations"
 echo "Use platform-security-checklist.md for TLS and hardening changes"
+echo "PLAN ONLY: run setup.sh --apply <explicit-section> with the required gate; this routing file does not mutate." >&2
+exit 2
 """
 
 
@@ -816,6 +828,20 @@ def shell_quote(value: Any) -> str:
 def bash_default(value: Any) -> str:
     text = str(value or "")
     return text.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
+
+
+def validated_http_base(value: Any, label: str) -> str:
+    text = str(value or "").strip().rstrip("/")
+    parsed = urlsplit(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"{label} must be an http(s) URL")
+    if parsed.username or parsed.password:
+        raise ValueError(f"{label} must not contain inline credentials")
+    if parsed.query or parsed.fragment:
+        raise ValueError(f"{label} must not contain a query string or fragment")
+    if parsed.path not in {"", "/"}:
+        raise ValueError(f"{label} must be an origin URL without a path")
+    return text
 
 
 def render_appd_curl_helper() -> str:
@@ -1125,6 +1151,7 @@ def render_enterprise_console_command_plan(spec: dict[str, Any]) -> str:
     platform = as_dict(spec.get("platform"))
     ec = as_dict(spec.get("enterprise_console"))
     controller = as_dict(spec.get("controller"))
+    events = as_dict(spec.get("events_service"))
     platform_name = platform.get("name", "prod-platform")
     install_dir = platform.get("installation_dir", "/opt/appdynamics/platform")
     bin_dir = ec.get("bin_dir", "/opt/appdynamics/enterpriseconsole/platform-admin/bin")
@@ -1141,6 +1168,8 @@ set -euo pipefail
 # This script never passes Controller, MySQL, or Enterprise Console passwords as shell arguments.
 # Authenticate to the Enterprise Console CLI in an approved interactive/session wrapper first.
 
+APPD_EC_APPLY="${{APPD_EC_APPLY:-0}}"
+
 PLATFORM_ADMIN="${{APPD_PLATFORM_ADMIN:-{bin_dir.rstrip('/')}/platform-admin.sh}}"
 PLATFORM_NAME={shell_quote(platform_name)}
 PLATFORM_INSTALL_DIR={shell_quote(install_dir)}
@@ -1150,14 +1179,24 @@ SSH_KEY_FILE={shell_quote(ssh_key_file)}
 HOST_FILE="${{APPD_EC_HOST_FILE:-$(dirname "$0")/enterprise-console-hosts.txt}}"
 CONTROLLER_PRIMARY_HOST={shell_quote(controller_host)}
 CONTROLLER_PROFILE={shell_quote(controller_profile)}
+EVENTS_SERVICE_ENABLED={shell_quote(bool_string(events.get('enabled'), False))}
 
 echo "Checking Enterprise Console CLI and available jobs"
 "${{PLATFORM_ADMIN}}" -h
 "${{PLATFORM_ADMIN}}" show-platform-admin-version
 "${{PLATFORM_ADMIN}}" list-jobs --service controller
-"${{PLATFORM_ADMIN}}" list-jobs --service events-service || true
+if [[ "${{EVENTS_SERVICE_ENABLED}}" == "true" ]]; then
+  "${{PLATFORM_ADMIN}}" list-jobs --service events-service
+fi
 
 echo "Rendering platform bootstrap commands"
+if [[ "${{APPD_EC_APPLY}}" != "1" ]]; then
+  echo "Dry run: set APPD_EC_APPLY=1 only after reviewing the platform, credential, and host inventory."
+  printf 'Would run: %q create-platform --name %q --installation-dir %q\n' "${{PLATFORM_ADMIN}}" "${{PLATFORM_NAME}}" "${{PLATFORM_INSTALL_DIR}}"
+  printf 'Would run: %q add-credential --credential-name %q --type ssh --user-name %q --ssh-key-file %q\n' "${{PLATFORM_ADMIN}}" "${{CREDENTIAL_NAME}}" "${{REMOTE_USER}}" "${{SSH_KEY_FILE}}"
+  printf 'Would run: %q add-hosts --host-file %q --credential %q\n' "${{PLATFORM_ADMIN}}" "${{HOST_FILE}}" "${{CREDENTIAL_NAME}}"
+  exit 0
+fi
 "${{PLATFORM_ADMIN}}" create-platform --name "${{PLATFORM_NAME}}" --installation-dir "${{PLATFORM_INSTALL_DIR}}"
 "${{PLATFORM_ADMIN}}" add-credential --credential-name "${{CREDENTIAL_NAME}}" --type ssh --user-name "${{REMOTE_USER}}" --ssh-key-file "${{SSH_KEY_FILE}}"
 "${{PLATFORM_ADMIN}}" add-hosts --host-file "${{HOST_FILE}}" --credential "${{CREDENTIAL_NAME}}"
@@ -1172,7 +1211,9 @@ echo "Controller diagnosis command"
 
 echo "Version discovery after install or upgrade"
 "${{PLATFORM_ADMIN}}" get-available-versions --platform-name "${{PLATFORM_NAME}}" --service controller
-"${{PLATFORM_ADMIN}}" get-available-versions --platform-name "${{PLATFORM_NAME}}" --service events-service || true
+if [[ "${{EVENTS_SERVICE_ENABLED}}" == "true" ]]; then
+  "${{PLATFORM_ADMIN}}" get-available-versions --platform-name "${{PLATFORM_NAME}}" --service events-service
+fi
 """
 
 
@@ -1583,6 +1624,10 @@ require_apply_value() {{
 }}
 
 if [[ ! -f "${{OVA_FILE}}" && ! "${{OVA_FILE}}" =~ ^https?:// ]]; then
+  if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+    echo "FAIL: OVA file is not local/readable: ${{OVA_FILE}}" >&2
+    exit 2
+  fi
   echo "WARN: OVA file is not local/readable: ${{OVA_FILE}}" >&2
 fi
 if [[ -n "${{VMWARE_USERNAME_FILE}}" && ! -f "${{VMWARE_USERNAME_FILE}}" ]]; then
@@ -1606,6 +1651,10 @@ fi
 if command -v "${{OVFTOOL}}" >/dev/null 2>&1; then
   run_or_print "${{OVFTOOL}}" --probe "${{OVA_FILE}}"
 else
+  if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+    echo "FAIL: ovftool not found on PATH." >&2
+    exit 2
+  fi
   echo "WARN: ovftool not found on PATH; install VMware OVF Tool before applying." >&2
 fi
 
@@ -1742,6 +1791,9 @@ patch_property() {{
 
 export GOVC_USERNAME="${{GOVC_USERNAME:-$(read_first_line "${{GOVC_USERNAME_FILE}}")}}"
 if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+  command -v "${{GOVC}}" >/dev/null 2>&1 || {{ echo "FAIL: govc not found on PATH." >&2; exit 2; }}
+  [[ -f "${{OVA_FILE}}" ]] || {{ echo "FAIL: OVA file is not readable: ${{OVA_FILE}}" >&2; exit 2; }}
+  command -v jq >/dev/null 2>&1 || {{ echo "FAIL: jq is required for a reviewed govc import." >&2; exit 2; }}
   if [[ ! -f "${{VMWARE_PASSWORD_FILE}}" ]]; then
     echo "FAIL: VMWARE_PASSWORD_FILE is required for apply: ${{VMWARE_PASSWORD_FILE}}" >&2
     exit 2
@@ -1769,8 +1821,8 @@ while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DN
     if command -v jq >/dev/null 2>&1; then
       jq --arg name "${{NODE_NAME}}" --arg disk "${{DISK_PROVISIONING}}" --arg network "${{GOVC_NETWORK}}" --argjson power "${{POWER_ON_JSON}}" '.Name = $name | .DiskProvisioning = $disk | .PowerOn = $power | if (.NetworkMapping | type) == "array" then .NetworkMapping |= map(.Network = $network) else . end' "${{OPTIONS_FILE}}.base" > "${{OPTIONS_FILE}}"
     else
-      cp "${{OPTIONS_FILE}}.base" "${{OPTIONS_FILE}}"
-      echo "WARN: jq not found; edit ${{OPTIONS_FILE}} manually before import." >&2
+      echo "FAIL: jq is required for VMWARE_APPLY=1 so import options are patched before deployment." >&2
+      exit 2
     fi
     patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_HOSTNAME_KEY}}" "${{NODE_NAME}}"
     patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_HOST_IP_CIDR_KEY}}" "${{NODE_CIDR}}"
@@ -1809,11 +1861,13 @@ VMWARE_PASSWORD_FILE="${{VMWARE_PASSWORD_FILE:-{bash_default(password_file)}}}"
 export GOVC_INSECURE="${{GOVC_INSECURE:-{bool_string(cfg.get('allow_insecure_tls'), False)}}}"
 APPD_SSH_USER="${{APPD_SSH_USER:-appduser}}"
 APPD_SSH_KEY_FILE="${{APPD_SSH_KEY_FILE:-}}"
+APPD_SSH_KNOWN_HOSTS_FILE="${{APPD_SSH_KNOWN_HOSTS_FILE:-}}"
 
 APPD_VM_NODES=$(cat <<'NODES'
 {nodes}
 NODES
 )
+VALIDATION_ERRORS=0
 
 read_first_line() {{
   local file="$1"
@@ -1832,12 +1886,14 @@ check_pod_cidr_conflict() {{
 
 while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DNS NODE_DOMAIN; do
   [[ -n "${{NODE_NAME}}" ]] || continue
-  [[ -n "${{NODE_IP}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a host IP." >&2
-  [[ -n "${{NODE_GATEWAY}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a default gateway." >&2
-  [[ -n "${{NODE_DNS}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a DNS server." >&2
-  [[ -n "${{NODE_DOMAIN}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a domain name." >&2
+  [[ -n "${{NODE_IP}}" ]] || {{ echo "FAIL: ${{NODE_NAME}} is missing a host IP." >&2; VALIDATION_ERRORS=1; }}
+  [[ -n "${{NODE_GATEWAY}}" ]] || {{ echo "FAIL: ${{NODE_NAME}} is missing a default gateway." >&2; VALIDATION_ERRORS=1; }}
+  [[ -n "${{NODE_DNS}}" ]] || {{ echo "FAIL: ${{NODE_NAME}} is missing a DNS server." >&2; VALIDATION_ERRORS=1; }}
+  [[ -n "${{NODE_DOMAIN}}" ]] || {{ echo "FAIL: ${{NODE_NAME}} is missing a domain name." >&2; VALIDATION_ERRORS=1; }}
   check_pod_cidr_conflict "${{NODE_NAME}}" "${{NODE_IP}}"
 done <<< "${{APPD_VM_NODES}}"
+
+[[ "${{VALIDATION_ERRORS}}" == "0" ]] || exit 1
 
 if [[ "${{VMWARE_VALIDATE_LIVE}}" != "1" ]]; then
   echo "Static VMware Virtual Appliance validation complete. Set VMWARE_VALIDATE_LIVE=1 for govc and SSH probes."
@@ -1855,7 +1911,13 @@ while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DN
   [[ -n "${{NODE_NAME}}" ]] || continue
   "${{GOVC}}" vm.info "${{NODE_NAME}}"
   if [[ -n "${{APPD_SSH_KEY_FILE}}" && -n "${{NODE_IP}}" ]]; then
-    ssh -i "${{APPD_SSH_KEY_FILE}}" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${{APPD_SSH_USER}}@${{NODE_IP}}" 'appdctl show boot && appdctl show cluster || true'
+    if [[ ! -f "${{APPD_SSH_KNOWN_HOSTS_FILE}}" ]]; then
+      echo "FAIL: APPD_SSH_KNOWN_HOSTS_FILE is required for verified SSH validation." >&2
+      exit 2
+    fi
+    ssh -i "${{APPD_SSH_KEY_FILE}}" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+      -o "UserKnownHostsFile=${{APPD_SSH_KNOWN_HOSTS_FILE}}" \
+      "${{APPD_SSH_USER}}@${{NODE_IP}}" 'appdctl show boot && appdctl show cluster'
   else
     echo "NOTE: skip SSH appdctl checks for ${{NODE_NAME}}; set APPD_SSH_KEY_FILE and node IPs to enable."
   fi
@@ -1929,7 +1991,14 @@ def render_platform_validation_probes(spec: dict[str, Any]) -> str:
     ec = as_dict(spec.get("enterprise_console"))
     platform = as_dict(spec.get("platform"))
     controller_url = spec.get("controller_url", "https://controller.example.com:8090")
-    events_url = events.get("vip_url", "")
+    events_enabled = to_bool(events.get("enabled"), False)
+    eum_enabled = to_bool(eum.get("enabled"), False)
+    synthetic_enabled = to_bool(synthetic.get("enabled"), False)
+    events_url = events.get("vip_url", "") if events_enabled else ""
+    eum_host = eum.get("host", "") if eum_enabled else ""
+    synthetic_host = synthetic.get("host", "") if synthetic_enabled else ""
+    eum_ports = [str(port) for port in as_list(eum.get("https_port") or eum.get("http_port")) if str(port)] if eum_enabled else []
+    synthetic_ports = [str(port) for port in as_list(synthetic.get("https_ports") or synthetic.get("http_ports")) if str(port)] if synthetic_enabled else []
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -1941,8 +2010,22 @@ CONTROLLER_URL={shell_quote(controller_url)}
 CONTROLLER_PRIMARY={shell_quote(controller.get('primary_host', 'controller-1.example.com'))}
 PLATFORM_NAME={shell_quote(platform.get('name', 'prod-platform'))}
 EVENTS_URL={shell_quote(events_url)}
-EUM_HOST={shell_quote(eum.get('host', ''))}
-SYNTHETIC_HOST={shell_quote(synthetic.get('host', ''))}
+EUM_HOST={shell_quote(eum_host)}
+SYNTHETIC_HOST={shell_quote(synthetic_host)}
+EUM_PORTS={shell_quote(' '.join(eum_ports))}
+SYNTHETIC_PORTS={shell_quote(' '.join(synthetic_ports))}
+
+probe_tcp() {{
+  local label="$1" host="$2" port="$3"
+  if ! command -v nc >/dev/null 2>&1; then
+    echo "FAIL: nc is required for ${{label}} TCP validation." >&2
+    return 2
+  fi
+  nc -z -w 10 "${{host}}" "${{port}}" || {{
+    echo "FAIL: ${{label}} TCP probe failed for ${{host}}:${{port}}" >&2
+    return 1
+  }}
+}}
 
 test -f "${{PLATFORM_ADMIN}}" || echo "WARN: platform-admin.sh not found at ${{PLATFORM_ADMIN}}"
 test -n "${{CONTROLLER_PRIMARY}}" || {{ echo "FAIL: controller primary host missing"; exit 1; }}
@@ -1957,13 +2040,15 @@ appd_curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/de
 "${{PLATFORM_ADMIN}}" show-platform-admin-version
 "${{PLATFORM_ADMIN}}" get-available-versions --platform-name "${{PLATFORM_NAME}}" --service controller
 if [[ -n "${{EVENTS_URL}}" ]]; then
-  appd_curl --fail --silent --show-error --max-time 10 "${{EVENTS_URL}}/" >/dev/null || echo "WARN: Events Service URL probe failed"
+  appd_curl --fail --silent --show-error --max-time 10 "${{EVENTS_URL}}/" >/dev/null
 fi
 if [[ -n "${{EUM_HOST}}" ]]; then
-  echo "Probe EUM host reachability: ${{EUM_HOST}}"
+  [[ -n "${{EUM_PORTS}}" ]] || {{ echo "FAIL: EUM host is configured without a validation port." >&2; exit 1; }}
+  for port in ${{EUM_PORTS}}; do probe_tcp "EUM Server" "${{EUM_HOST}}" "${{port}}"; done
 fi
 if [[ -n "${{SYNTHETIC_HOST}}" ]]; then
-  echo "Probe Synthetic host reachability: ${{SYNTHETIC_HOST}}"
+  [[ -n "${{SYNTHETIC_PORTS}}" ]] || {{ echo "FAIL: Synthetic host is configured without validation ports." >&2; exit 1; }}
+  for port in ${{SYNTHETIC_PORTS}}; do probe_tcp "Synthetic Server" "${{SYNTHETIC_HOST}}" "${{port}}"; done
 fi
 """
 
@@ -2081,6 +2166,7 @@ REQUIRED_SKILL_ARTIFACTS = {
     },
     "splunk-appdynamics-analytics-setup": {
         "analytics-events-headers.redacted.json",
+        "analytics-events-payload.json",
         "analytics-publish-plan.sh",
         "analytics-schema-plan.json",
         "business-journeys-xlm-runbook.md",
@@ -2204,10 +2290,28 @@ set -euo pipefail
 : "${{APPD_CONTROLLER_URL:={spec.get('controller_url', 'https://example.saas.appdynamics.com')}}}"
 : "${{APPD_ACCOUNT_NAME:={account}}}"
 : "${{APPD_OAUTH_TOKEN_FILE:?set APPD_OAUTH_TOKEN_FILE}}"
-AUTH_HEADER="Authorization: Bearer $(<"${{APPD_OAUTH_TOKEN_FILE}}")"
-appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
-appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
-appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
+[[ -f "${{APPD_OAUTH_TOKEN_FILE}}" && -r "${{APPD_OAUTH_TOKEN_FILE}}" && -s "${{APPD_OAUTH_TOKEN_FILE}}" ]] || {{
+  echo "FAIL: APPD_OAUTH_TOKEN_FILE must be a readable, non-empty regular file" >&2
+  exit 2
+}}
+TOKEN_MODE="$(stat -c '%a' "${{APPD_OAUTH_TOKEN_FILE}}" 2>/dev/null || stat -f '%Lp' "${{APPD_OAUTH_TOKEN_FILE}}" 2>/dev/null)"
+[[ "${{TOKEN_MODE}}" == "600" ]] || {{
+  echo "FAIL: APPD_OAUTH_TOKEN_FILE must be chmod 600 (found ${{TOKEN_MODE:-unknown}})" >&2
+  exit 2
+}}
+OAUTH_TOKEN="$(<"${{APPD_OAUTH_TOKEN_FILE}}")"
+if [[ -z "${{OAUTH_TOKEN}}" || "${{OAUTH_TOKEN}}" == *$'\n'* || "${{OAUTH_TOKEN}}" == *$'\r'* || "${{OAUTH_TOKEN}}" == *'"'* || "${{OAUTH_TOKEN}}" == *'\\'* ]]; then
+  echo "FAIL: APPD_OAUTH_TOKEN_FILE must contain one curl-config-safe token line" >&2
+  exit 2
+fi
+CURL_CONFIG="$(mktemp "${{TMPDIR:-/tmp}}/appd-controller-curl.XXXXXX")"
+chmod 600 "${{CURL_CONFIG}}"
+trap 'rm -f "${{CURL_CONFIG}}"' EXIT
+printf 'header = "Authorization: Bearer %s"\n' "${{OAUTH_TOKEN}}" > "${{CURL_CONFIG}}"
+unset OAUTH_TOKEN
+appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
+appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
+appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
 """,
     )
     chmod_exec(plan)
@@ -2689,6 +2793,7 @@ def render_smart_agent_remote_command_plan(spec: dict[str, Any]) -> str:
         host = target["host"]
         agent_types = ",".join(target["agent_types"])
         lines.append(f"echo {shell_quote(f'Target {host}: plan Smart Agent lifecycle for agent types [{agent_types}]')}")
+    lines.extend(["echo 'PLAN ONLY: this script does not execute Smart Agent commands.' >&2", "exit 2"])
     return "\n".join(lines) + "\n"
 
 
@@ -2744,6 +2849,7 @@ def render_smartagentctl_lifecycle_plan(spec: dict[str, Any]) -> str:
             "GUARDRAILS",
         ]
     )
+    commands.extend(["echo 'PLAN ONLY: copy and complete a reviewed command; this script does not invoke smartagentctl.' >&2", "exit 2"])
     return "\n".join(commands) + "\n"
 
 
@@ -2966,12 +3072,13 @@ set -euo pipefail
 
 LIVE="${{APPD_AGENT_MANAGEMENT_LIVE:-0}}"
 CONTROLLER_URL={shell_quote(controller_url)}
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 
 echo "Static Smart Agent validation"
-test -f smart-agent-readiness.yaml
-test -f smart-agent-config.ini.template
-test -f remote.yaml.template
-test -f smartagentctl-lifecycle-plan.sh
+test -f "${{SCRIPT_DIR}}/smart-agent-readiness.yaml"
+test -f "${{SCRIPT_DIR}}/smart-agent-config.ini.template"
+test -f "${{SCRIPT_DIR}}/remote.yaml.template"
+test -f "${{SCRIPT_DIR}}/smartagentctl-lifecycle-plan.sh"
 {target_checks}
 
 if [[ "${{LIVE}}" != "1" ]]; then
@@ -2980,7 +3087,8 @@ if [[ "${{LIVE}}" != "1" ]]; then
 fi
 
 appd_curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/dev/null
-echo "Controller reachable. Continue with UI Smart Agents tab and managed-agent inventory readback."
+echo "Controller reachable, but Smart Agent registration and managed-agent inventory were not read back." >&2
+exit 2
 """
 
 
@@ -3027,13 +3135,12 @@ def render_agent_upgrade_api_plan(spec: dict[str, Any]) -> str:
 set -euo pipefail
 
 : "${{APPD_CONTROLLER_URL:={spec.get('controller_url', 'https://example.saas.appdynamics.com')}}}"
-: "${{APPD_OAUTH_TOKEN_FILE:?set APPD_OAUTH_TOKEN_FILE}}"
-
-AUTH_HEADER="Authorization: Bearer $(<"${{APPD_OAUTH_TOKEN_FILE}}")"
 echo "Fetch Smart Agent and managed-agent inventory before any upgrade request."
+echo "Before implementing a live request, set APPD_OAUTH_TOKEN_FILE to a chmod-600 token file and pass it through curl --config, never -H."
 echo "Use documented Agent Upgrade API endpoints only; this plan intentionally does not mutate."
 {target_lines}
 echo "Post-upgrade validation: managed-agent version, Controller registration, license release/reacquire behavior, and rollback package availability."
+exit 2
 """
 
 
@@ -3069,7 +3176,7 @@ def render_apm_artifacts(out: Path, spec: dict[str, Any]) -> None:
     applications = as_list(spec.get("applications")) or [{"name": "checkout", "tiers": ["web", "api", "worker"]}]
     write_json(out / "apm-application-model.json", {"applications": applications, "business_transactions": as_dict(spec.get("business_transactions")), "service_endpoints": as_dict(spec.get("service_endpoints"))})
     plan = out / "apm-controller-api-plan.sh"
-    write(plan, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_CONTROLLER_URL:?set APPD_CONTROLLER_URL}\"\necho 'Read back applications, tiers, nodes, business transactions, service endpoints, metrics, and snapshots.'\n")
+    write(plan, "#!/usr/bin/env bash\nset -euo pipefail\necho 'PLAN ONLY: Controller APM model mutation/readback is not implemented by this script.' >&2\nexit 2\n")
     chmod_exec(plan)
     languages = as_dict(spec.get("agent_snippets")).get("languages", ["java", "dotnet", "nodejs", "python", "php"])
     write(out / "app-server-agent-snippets.md", "# App Server Agent Snippets\n\n" + "\n".join(f"- `{language}`: render startup/config snippet; runtime edits delegate to agent-management or k8s skills." for language in languages) + "\n")
@@ -3090,7 +3197,7 @@ def render_apm_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Deep collector deployment and tuning can hand off to the Splunk Observability OTel Collector skill when the same estate also exports to Splunk Observability Cloud.\n",
     )
     probes = out / "apm-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate APM model, snapshots, and metric hierarchy readbacks.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: live APM model, snapshot, and metric readbacks require a Controller probe.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -3167,6 +3274,27 @@ def k8s_collector_config(spec: dict[str, Any]) -> dict[str, Any]:
         or collector.get("endpoint")
         or f"http://splunk-otel-collector-agent.{namespace}.svc.cluster.local:4318"
     )
+    controller_url = validated_http_base(
+        spec.get("controller_url", "https://example.saas.appdynamics.com"),
+        "controller_url",
+    )
+    if urlsplit(controller_url).scheme != "https" and not to_bool(spec.get("accept_insecure_controller_http"), False):
+        raise ValueError("controller_url must use HTTPS unless accept_insecure_controller_http is explicitly true")
+    api_url = validated_http_base(
+        collector.get("api_url") or f"https://api.{realm}.signalfx.com",
+        "splunk_otel_collector.api_url",
+    )
+    if urlsplit(api_url).scheme != "https":
+        raise ValueError("splunk_otel_collector.api_url must use HTTPS")
+    expected_api_host = f"api.{realm}.signalfx.com".lower()
+    if (
+        (urlsplit(api_url).hostname or "").lower() != expected_api_host
+        and not to_bool(collector.get("accept_custom_api_url"), False)
+    ):
+        raise ValueError(
+            f"splunk_otel_collector.api_url must use {expected_api_host}; "
+            "set accept_custom_api_url: true only for a reviewed proxy"
+        )
     return {
         "enabled": to_bool(collector.get("enabled"), True),
         "install": to_bool(collector.get("install"), True),
@@ -3178,8 +3306,11 @@ def k8s_collector_config(spec: dict[str, Any]) -> dict[str, Any]:
         "secret_name": secret_name,
         "token_file": token_file,
         "token_env": token_env,
+        "controller_password_file": spec.get("controller_password_file", "/secure/appdynamics/controller-password"),
+        "controller_access_key_file": spec.get("controller_access_key_file", "/secure/appdynamics/controller-access-key"),
+        "controller_url": controller_url,
         "endpoint": endpoint,
-        "api_url": collector.get("api_url") or f"https://api.{realm}.signalfx.com",
+        "api_url": api_url,
         "ingest_url": collector.get("ingest_url") or f"https://ingest.{realm}.signalfx.com",
         "profiling_enabled": to_bool(collector.get("profiling_enabled"), False),
         "logs_enabled": to_bool(collector.get("logs_enabled"), True),
@@ -3211,6 +3342,17 @@ def k8s_targets(spec: dict[str, Any], languages: list[str], collector: dict[str,
             or target_dict.get("environment")
             or collector["environment"]
         )
+        o11y_export = str(target_dict.get("o11y_export") or instrumentation.get("o11y_export") or "collector").strip().lower()
+        if o11y_export != "collector":
+            raise ValueError(
+                f"target {target_dict.get('workload', index)!r}: o11y_export must be 'collector'; "
+                "direct or disabled OTel export belongs in a separate, non-combined instrumentation handoff"
+            )
+        combined_mode = normalize_combined_mode(target_dict.get("mode") or instrumentation.get("mode") or spec.get("mode") or "dual")
+        if combined_mode != "dual":
+            raise ValueError(
+                f"target {target_dict.get('workload', index)!r}: only documented combined-agent mode 'dual' is rendered; got {combined_mode!r}"
+            )
         normalized.append(
             {
                 "namespace": target_dict.get("namespace", "checkout"),
@@ -3221,8 +3363,8 @@ def k8s_targets(spec: dict[str, Any], languages: list[str], collector: dict[str,
                 "name": name,
                 "container": target_dict.get("container") or name,
                 "language": language,
-                "mode": normalize_combined_mode(target_dict.get("mode") or instrumentation.get("mode") or spec.get("mode") or "dual"),
-                "o11y_export": target_dict.get("o11y_export") or instrumentation.get("o11y_export") or "collector",
+                "mode": combined_mode,
+                "o11y_export": o11y_export,
                 "service_name": service_name,
                 "service_namespace": service_namespace,
                 "deployment_environment": deployment_environment,
@@ -3246,32 +3388,20 @@ def combined_agent_env(target: dict[str, Any], collector: dict[str, Any]) -> lis
     }
     resource_attributes.update(as_dict(target.get("resource_attributes")))
     attributes_value = ",".join(f"{key}={value}" for key, value in resource_attributes.items())
-    export_to_collector = str(target.get("o11y_export", "collector")).lower() != "direct"
+    export_to_collector = str(target.get("o11y_export", "collector")).lower() == "collector"
+    traces_enabled = collector["traces_enabled"] and export_to_collector
+    metrics_enabled = collector["metrics_enabled"] and export_to_collector
+    logs_enabled = collector["logs_enabled"] and export_to_collector
     env: list[dict[str, Any]] = [
         env_entry("AGENT_DEPLOYMENT_MODE", target["mode"]),
         env_entry("OTEL_SERVICE_NAME", target["service_name"]),
         env_entry("OTEL_RESOURCE_ATTRIBUTES", attributes_value),
-        env_entry("OTEL_TRACES_EXPORTER", "otlp" if collector["traces_enabled"] else "none"),
-        env_entry("OTEL_METRICS_EXPORTER", "otlp" if collector["metrics_enabled"] else "none"),
-        env_entry("OTEL_LOGS_EXPORTER", "otlp" if collector["logs_enabled"] else "none"),
+        env_entry("OTEL_TRACES_EXPORTER", "otlp" if traces_enabled else "none"),
+        env_entry("OTEL_METRICS_EXPORTER", "otlp" if metrics_enabled else "none"),
+        env_entry("OTEL_LOGS_EXPORTER", "otlp" if logs_enabled else "none"),
         env_entry("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf"),
-        env_entry("OTEL_EXPORTER_OTLP_ENDPOINT", collector["endpoint"] if export_to_collector else collector["ingest_url"]),
+        env_entry("OTEL_EXPORTER_OTLP_ENDPOINT", collector["endpoint"]),
     ]
-    if not export_to_collector:
-        env.extend(
-            [
-                {
-                    "name": "SPLUNK_ACCESS_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": collector["secret_name"],
-                            "key": "splunk_observability_access_token",
-                        }
-                    },
-                },
-                env_entry("SPLUNK_REALM", collector["realm"]),
-            ]
-        )
     language = target["language"]
     if language == "dotnet-core-linux":
         env.extend(
@@ -3296,7 +3426,7 @@ def render_cluster_agent_values(spec: dict[str, Any], languages: list[str], targ
         "installClusterAgent": True,
         "installSplunkOtelCollector": collector["enabled"] and collector["install"],
         "controllerInfo": {
-            "url": spec.get("controller_url", "https://example.saas.appdynamics.com"),
+            "url": collector["controller_url"],
             "account": spec.get("account_name", "customer1"),
             "username": spec.get("controller_username", "<controller-user>"),
             "password": "${APPD_CONTROLLER_PASSWORD}",
@@ -3505,7 +3635,7 @@ def render_k8s_rollout_plan(targets: list[dict[str, Any]], collector: dict[str, 
             }
         }
         patch_commands.append(
-            "kubectl -n {namespace} patch {kind} {name} --type merge -p {patch}".format(
+            "kubectl -n {namespace} patch {kind} {name} --type strategic -p {patch}".format(
                 namespace=shell_quote(target["namespace"]),
                 kind=shell_quote(target["kubectl_kind"]),
                 name=shell_quote(target["name"]),
@@ -3524,21 +3654,37 @@ set -euo pipefail
 : "${{APPD_CLUSTER_AGENT_RELEASE:=appdynamics-cluster-agent}}"
 : "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE:={collector['token_file']}}}"
 : "${{SPLUNK_OTEL_SECRET_NAME:={collector['secret_name']}}}"
+: "${{APPD_CONTROLLER_PASSWORD_FILE:={collector['controller_password_file']}}}"
+: "${{APPD_CONTROLLER_ACCESS_KEY_FILE:={collector['controller_access_key_file']}}}"
 
-test -f "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" || {{ echo "Missing ${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}"; exit 1; }}
 if [[ "${{K8S_APPLY:-0}}" == "1" ]]; then
+  for secret_file in "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" "${{APPD_CONTROLLER_PASSWORD_FILE}}" "${{APPD_CONTROLLER_ACCESS_KEY_FILE}}"; do
+    [[ -r "${{secret_file}}" ]] || {{ echo "FAIL: missing readable secret file: ${{secret_file}}" >&2; exit 2; }}
+    mode="$(stat -c '%a' "${{secret_file}}" 2>/dev/null || stat -f '%Lp' "${{secret_file}}" 2>/dev/null)"
+    [[ "${{mode}}" == "600" ]] || {{ echo "FAIL: secret file must be chmod 600: ${{secret_file}} (found ${{mode:-unknown}})" >&2; exit 2; }}
+  done
   kubectl get namespace "${{APPD_NAMESPACE}}" >/dev/null 2>&1 || kubectl create namespace "${{APPD_NAMESPACE}}"
 
   kubectl -n "${{APPD_NAMESPACE}}" create secret generic "${{SPLUNK_OTEL_SECRET_NAME}}" \\
     --from-file=splunk_observability_access_token="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
     --dry-run=client -o yaml | kubectl apply -f -
   HELM_DRY_RUN=()
+  HELM_SECRET_ARGS=(
+    --set-file controllerInfo.password="${{APPD_CONTROLLER_PASSWORD_FILE}}"
+    --set-file controllerInfo.accessKey="${{APPD_CONTROLLER_ACCESS_KEY_FILE}}"
+    --set-file splunk-otel-collector.splunkObservability.accessToken="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}"
+  )
 else
   kubectl create namespace "${{APPD_NAMESPACE}}" --dry-run=client -o yaml >/dev/null
   kubectl -n "${{APPD_NAMESPACE}}" create secret generic "${{SPLUNK_OTEL_SECRET_NAME}}" \\
-    --from-file=splunk_observability_access_token="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
+    --from-literal=splunk_observability_access_token='<redacted-dry-run>' \\
     --dry-run=client -o yaml >/dev/null
   HELM_DRY_RUN=(--dry-run)
+  HELM_SECRET_ARGS=(
+    --set-string 'controllerInfo.password=<redacted-dry-run>'
+    --set-string 'controllerInfo.accessKey=<redacted-dry-run>'
+    --set-string 'splunk-otel-collector.splunkObservability.accessToken=<redacted-dry-run>'
+  )
 fi
 
 helm repo add appdynamics-cloud-helmcharts https://appdynamics.jfrog.io/artifactory/appdynamics-cloud-helmcharts/
@@ -3548,7 +3694,7 @@ helm upgrade --install "${{APPD_CLUSTER_AGENT_RELEASE}}" appdynamics-cloud-helmc
   --values "$(dirname "$0")/cluster-agent-values.yaml" \\
   --set splunk-otel-collector.secret.create=false \\
   --set splunk-otel-collector.secret.name="${{SPLUNK_OTEL_SECRET_NAME}}" \\
-  --set-file splunk-otel-collector.splunkObservability.accessToken="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
+  "${{HELM_SECRET_ARGS[@]}}" \\
   "${{HELM_DRY_RUN[@]}}"
 
 if [[ "${{K8S_APPLY:-0}}" != "1" ]]; then
@@ -3561,7 +3707,8 @@ fi
 
 {patch_block}
 
-kubectl -n "${{APPD_NAMESPACE}}" rollout status deployment/"${{APPD_CLUSTER_AGENT_RELEASE}}" --timeout=180s || true
+kubectl -n "${{APPD_NAMESPACE}}" wait --for=condition=Ready pod \
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" --timeout=180s
 """
 
 
@@ -3623,10 +3770,14 @@ def render_combined_agent_runbook(targets: list[dict[str, Any]], collector: dict
 ## Mode Guidance
 
 - `dual`: keep AppDynamics Controller visibility and emit OpenTelemetry signals toward Splunk Observability Cloud.
-- `otel`: emit OpenTelemetry signals only when Controller-side AppDynamics agent telemetry is not wanted.
-- `appd-only`: keep Controller telemetry and skip O11y export for that workload.
+- This packet renders only documented `dual` combined-agent mode. OTel-only
+  instrumentation delegates to `splunk-observability-k8s-auto-instrumentation-setup`;
+  AppDynamics-only instrumentation belongs in the ordinary Cluster Agent plan.
 - `collector` export is the default because it centralizes O11y token use in the collector.
-- `direct` export is available for constrained environments, but it mounts the O11y token into the workload through a Kubernetes Secret.
+- Direct-to-cloud or disabled OTel export is intentionally not rendered in this
+  combined-agent packet. Those workloads must hand off to
+  `splunk-observability-k8s-auto-instrumentation-setup` or a separately reviewed
+  gateway.
 
 ## Language Notes
 
@@ -3644,19 +3795,24 @@ def render_combined_agent_runbook(targets: list[dict[str, Any]], collector: dict
 
 def render_k8s_validation_probes(targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
     rollout_checks = "\n".join(
-        f"kubectl -n {shell_quote(target['namespace'])} rollout status {shell_quote(target['kubectl_kind'])}/{shell_quote(target['name'])} --timeout=180s || true\n"
-        f"kubectl -n {shell_quote(target['namespace'])} get {shell_quote(target['kubectl_kind'])} {shell_quote(target['name'])} -o jsonpath='{{.spec.template.metadata.annotations}}' | grep -E 'appdynamics.com/(instrumentation|combined-agent-mode)' || true\n"
-        f"kubectl -n {shell_quote(target['namespace'])} get pod -l app -o jsonpath='{{range .items[*]}}{{.metadata.name}}{{\"\\n\"}}{{end}}' | head -5 || true"
+        f"kubectl -n {shell_quote(target['namespace'])} rollout status {shell_quote(target['kubectl_kind'])}/{shell_quote(target['name'])} --timeout=180s\n"
+        f"kubectl -n {shell_quote(target['namespace'])} get {shell_quote(target['kubectl_kind'])} {shell_quote(target['name'])} -o jsonpath='{{.spec.template.metadata.annotations}}' | grep -E 'appdynamics.com/(instrumentation|combined-agent-mode)'"
         for target in targets
     )
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 : "${{APPD_NAMESPACE:={collector['namespace']}}}"
+: "${{APPD_CLUSTER_AGENT_RELEASE:=appdynamics-cluster-agent}}"
 
-kubectl -n "${{APPD_NAMESPACE}}" get deploy,ds,sts,pods,secret | grep -E 'appd|cluster-agent|otel|splunk' || true
-kubectl get pods -A | grep -E 'appd|cluster-agent|splunk-otel|otel-collector' || true
-kubectl get svc -A | grep -E '4317|4318|splunk-otel|otel-collector' || true
+PODS="$(kubectl -n "${{APPD_NAMESPACE}}" get pods \
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" -o name)"
+[[ -n "${{PODS}}" ]] || {{
+  echo "FAIL: no pods found for Helm release ${{APPD_CLUSTER_AGENT_RELEASE}} in ${{APPD_NAMESPACE}}" >&2
+  exit 1
+}}
+kubectl -n "${{APPD_NAMESPACE}}" wait --for=condition=Ready pod \
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" --timeout=180s
 
 {rollout_checks}
 
@@ -3674,17 +3830,40 @@ set -euo pipefail
 : "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE:={collector['token_file']}}}"
 : "${{SPLUNK_O11Y_API_URL:={collector['api_url']}}}"
 : "${{APPD_NAMESPACE:={collector['namespace']}}}"
+: "${{APPD_CLUSTER_AGENT_RELEASE:=appdynamics-cluster-agent}}"
 
-if [[ -f "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" ]]; then
-  curl --fail --silent --show-error \\
-    -H "X-SF-Token: $(<"${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}")" \\
-    "${{SPLUNK_O11Y_API_URL}}/v2/organization" >/dev/null || echo "WARN: O11y API token probe failed"
-else
-  echo "WARN: SPLUNK_O11Y_ACCESS_TOKEN_FILE is missing; skipping O11y API token probe"
+[[ -s "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" ]] || {{
+  echo "FAIL: missing or empty SPLUNK_O11Y_ACCESS_TOKEN_FILE: ${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" >&2
+  exit 2
+}}
+TOKEN_MODE="$(stat -c '%a' "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" 2>/dev/null || stat -f '%Lp' "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" 2>/dev/null)"
+[[ "${{TOKEN_MODE}}" == "600" ]] || {{
+  echo "FAIL: SPLUNK_O11Y_ACCESS_TOKEN_FILE must be chmod 600 (found ${{TOKEN_MODE:-unknown}})" >&2
+  exit 2
+}}
+O11Y_TOKEN="$(<"${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}")"
+if [[ "${{O11Y_TOKEN}}" == *$'\\n'* || "${{O11Y_TOKEN}}" == *$'\\r'* || "${{O11Y_TOKEN}}" == *'"'* ]]; then
+  echo "FAIL: SPLUNK_O11Y_ACCESS_TOKEN_FILE must contain one curl-config-safe token line." >&2
+  exit 2
 fi
+CURL_CONFIG="$(mktemp "${{TMPDIR:-/tmp}}/appd-o11y-curl.XXXXXX")"
+chmod 600 "${{CURL_CONFIG}}"
+trap 'rm -f "${{CURL_CONFIG}}"' EXIT
+printf 'header = "X-SF-Token: %s"\\n' "${{O11Y_TOKEN}}" > "${{CURL_CONFIG}}"
+curl --fail --silent --show-error --config "${{CURL_CONFIG}}" \\
+  "${{SPLUNK_O11Y_API_URL}}/v2/organization" >/dev/null
 
-kubectl -n "${{APPD_NAMESPACE}}" logs -l app.kubernetes.io/name=splunk-otel-collector --tail=200 2>/dev/null | grep -Ei 'signalfx|splunk|otlp|exporter|error' || true
-kubectl get pods -A | grep -E 'splunk-otel|otel-collector|cluster-agent|appd' || true
+PODS="$(kubectl -n "${{APPD_NAMESPACE}}" get pods \\
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" -o name)"
+[[ -n "${{PODS}}" ]] || {{
+  echo "FAIL: no collector/Cluster Agent pods found for release ${{APPD_CLUSTER_AGENT_RELEASE}}" >&2
+  exit 1
+}}
+kubectl -n "${{APPD_NAMESPACE}}" wait --for=condition=Ready pod \\
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" --timeout=180s
+kubectl -n "${{APPD_NAMESPACE}}" logs \\
+  -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" \\
+  --all-containers --tail=20 >/dev/null
 
 echo "Expected O11y services: {services}"
 echo "Confirm these dimensions in Splunk Observability Cloud: k8s.cluster.name={collector['cluster_name']}, deployment.environment.name={collector['environment']}, service.name, service.namespace."
@@ -3721,7 +3900,7 @@ def render_k8s_artifacts(out: Path, spec: dict[str, Any]) -> None:
 def render_infrastructure_artifacts(out: Path, spec: dict[str, Any]) -> None:
     hosts = as_dict(spec.get("machine_agent")).get("hosts", ["host01.example.com"])
     plan = out / "machine-agent-command-plan.sh"
-    write(plan, "#!/usr/bin/env bash\nset -euo pipefail\n" + "\n".join(f"echo 'Render Machine Agent install/service validation for {host}'" for host in hosts) + "\n")
+    write(plan, "#!/usr/bin/env bash\nset -euo pipefail\n" + "\n".join(f"echo 'PLAN: Machine Agent install/service validation for {host}'" for host in hosts) + "\necho 'PLAN ONLY: execute through an approved host owner or Agent Management workflow.' >&2\nexit 2\n")
     chmod_exec(plan)
     write_json(out / "infrastructure-health-rules.json", {"service_availability": as_dict(spec.get("service_availability")).get("probes", []), "server_visibility": spec.get("server_visibility", True), "network_visibility": spec.get("network_visibility", "validate_only")})
     write_json(out / "server-tags-payload.json", {"server_tags": as_dict(spec.get("server_tags"))})
@@ -3742,7 +3921,7 @@ def render_infrastructure_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Use this path for infrastructure exporters such as DCGM, node exporter, cAdvisor, Kafka, MongoDB, or custom Prometheus endpoints when AppDynamics ownership is required.\n",
     )
     probes = out / "infrastructure-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate Machine Agent, Server Visibility, container metrics, GPU metrics, Prometheus extension metrics, service availability, and server tags.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: live Infrastructure Visibility readbacks require Controller and target-host probes.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -3752,6 +3931,7 @@ HOST_APPLY_SKILLS = {
 }
 
 HOST_APPLY_PHASES = {"preflight", "collector", "java", "all"}
+COLLECTOR_DESTINATIONS = {"both", "splunk", "splunk_o11y", "o11y", "appd", "appd_otel", "appdynamics"}
 
 
 def control_spec(spec: dict[str, Any]) -> dict[str, Any]:
@@ -3787,7 +3967,7 @@ def destination_spec(spec: dict[str, Any]) -> dict[str, Any]:
     collector = as_dict(spec.get("collector"))
     realm = splunk_o11y.get("realm", "us1")
     return {
-        "destination": collector.get("destination", spec.get("destination", "both")),
+        "destination": str(collector.get("destination", spec.get("destination", "both"))).strip().lower(),
         "splunk_o11y": {
             "realm": realm,
             "token_file": splunk_o11y.get("token_file", "/secure/splunk/o11y-access-token"),
@@ -3919,6 +4099,10 @@ def java_startup_config_content(target: dict[str, Any], spec: dict[str, Any]) ->
 
 def collector_exporters(destination: dict[str, Any]) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
     destination_mode = str(destination.get("destination") or "both").lower()
+    if destination_mode not in COLLECTOR_DESTINATIONS:
+        raise ValueError(
+            f"collector destination must be one of {', '.join(sorted(COLLECTOR_DESTINATIONS))}; got {destination_mode!r}"
+        )
     exporters: dict[str, Any] = {}
     traces_exporters: list[str] = []
     metrics_exporters: list[str] = []
@@ -3948,19 +4132,20 @@ def collector_exporters(destination: dict[str, Any]) -> tuple[dict[str, Any], li
 def render_collector_config(target: dict[str, Any], spec: dict[str, Any]) -> str:
     destination = destination_spec(spec)
     exporters, traces_exporters, metrics_exporters, logs_exporters = collector_exporters(destination)
-    service_pipelines: dict[str, Any] = {
-        "traces": {
+    service_pipelines: dict[str, Any] = {}
+    if traces_exporters:
+        service_pipelines["traces"] = {
             "receivers": ["otlp"],
             "processors": ["memory_limiter", "batch"],
             "exporters": traces_exporters,
-        },
-        "metrics": {
+        }
+    if metrics_exporters:
+        service_pipelines["metrics"] = {
             "receivers": ["otlp"],
             "processors": ["memory_limiter", "batch"],
             "exporters": metrics_exporters,
-        },
-    }
-    if destination.get("logs_enabled"):
+        }
+    if destination.get("logs_enabled") and logs_exporters:
         service_pipelines["logs"] = {
             "receivers": ["otlp"],
             "processors": ["memory_limiter", "batch"],
@@ -4005,6 +4190,84 @@ def collector_restart_command(target: dict[str, Any]) -> str:
     return f"systemctl restart {shlex.quote(str(service))}" if service else ""
 
 
+def systemd_environment_value(value: str) -> str:
+    if any(marker in value for marker in ("\n", "\r", "\x00")):
+        raise ValueError("collector credential values must contain exactly one line")
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def configure_collector_credentials(recorder: ApplyRecorder, target: dict[str, Any], spec: dict[str, Any]) -> None:
+    destination = destination_spec(spec)
+    destination_mode = destination["destination"]
+    environment: dict[str, str] = {}
+    if destination_mode in {"both", "splunk", "splunk_o11y", "o11y"}:
+        environment["SPLUNK_O11Y_ACCESS_TOKEN"] = recorder.read_secret_file(
+            target,
+            str(destination["splunk_o11y"]["token_file"]),
+            sudo=target_sudo(target),
+            label="Splunk Observability access token file",
+        )
+    if destination_mode in {"both", "appd", "appd_otel", "appdynamics"}:
+        environment["APPD_OTEL_API_KEY"] = recorder.read_secret_file(
+            target,
+            str(destination["appd_otel"]["api_key_file"]),
+            sudo=target_sudo(target),
+            label="AppDynamics OTel API key file",
+        )
+
+    config_path = str(target.get("collector_config_path") or "")
+    environment_path = str(
+        target.get("collector_environment_file")
+        or (Path(config_path).parent / "appd-otel-credentials.env")
+    )
+    content = "".join(f"{key}={systemd_environment_value(value)}\n" for key, value in environment.items())
+    recorder.write_text(
+        target,
+        environment_path,
+        content,
+        mode=0o600,
+        sudo=target_sudo(target),
+        label="collector credentials environment",
+    )
+
+    credentials_command = str(target.get("collector_credentials_ready_command") or "").strip()
+    install_type = str(target.get("install_type") or "rpm").lower()
+    os_family = str(target.get("os_family") or "linux").lower()
+    if credentials_command:
+        recorder.run(target, credentials_command, sudo=target_sudo(target), label="configure collector credentials")
+        return
+    if target.get("collector_restart_command") and to_bool(target.get("collector_restart_uses_environment_file"), False):
+        # The inventory explicitly attests that its custom restart command
+        # attaches the just-written environment file to the collector process.
+        return
+    if target.get("collector_restart_command"):
+        raise ValueError(
+            f"{host_target_key(target)}: custom collector_restart_command requires either "
+            "collector_credentials_ready_command or collector_restart_uses_environment_file: true"
+        )
+    if install_type == "docker" or os_family == "windows":
+        raise ValueError(
+            f"{host_target_key(target)}: Docker and Windows collector apply require collector_credentials_ready_command "
+            "that recreates/configures the runtime with collector_environment_file"
+        )
+    service = str(target.get("collector_service_name") or "")
+    if not service:
+        raise ValueError(f"{host_target_key(target)}: collector_service_name is required")
+    dropin_path = str(
+        target.get("collector_systemd_dropin_path")
+        or f"/etc/systemd/system/{service}.service.d/20-appd-otel-credentials.conf"
+    )
+    recorder.write_text(
+        target,
+        dropin_path,
+        f"[Service]\nEnvironmentFile={environment_path}\n",
+        mode=0o644,
+        sudo=target_sudo(target),
+        label="collector credentials systemd drop-in",
+    )
+    recorder.run(target, "systemctl daemon-reload", sudo=target_sudo(target), label="reload collector systemd unit")
+
+
 def java_restart_command(target: dict[str, Any]) -> str:
     if target.get("restart_command"):
         return str(target["restart_command"])
@@ -4025,9 +4288,16 @@ def collector_preflight_commands(target: dict[str, Any], spec: dict[str, Any]) -
         ("collector config path present", f"test -n {shlex.quote(str(target.get('collector_config_path', '')))}"),
         ("collector config parent exists", f"test -d {shlex.quote(str(Path(str(target.get('collector_config_path'))).parent))}"),
         ("machine agent home exists", f"test -d {shlex.quote(str(target.get('machine_agent_home')))}"),
-        ("splunk token file exists", f"test -f {shlex.quote(str(destination['splunk_o11y']['token_file']))}"),
-        ("appd api key file exists", f"test -f {shlex.quote(str(destination['appd_otel']['api_key_file']))}"),
     ]
+    destination_mode = destination["destination"]
+    if destination_mode in {"both", "splunk", "splunk_o11y", "o11y"}:
+        token_path = shlex.quote(str(destination["splunk_o11y"]["token_file"]))
+        commands.append(("splunk token file exists", f"test -s {token_path}"))
+        commands.append(("splunk token file permissions", f"mode=$(stat -c '%a' {token_path} 2>/dev/null || stat -f '%Lp' {token_path} 2>/dev/null) && test \"$mode\" = 600"))
+    if destination_mode in {"both", "appd", "appd_otel", "appdynamics"}:
+        api_key_path = shlex.quote(str(destination["appd_otel"]["api_key_file"]))
+        commands.append(("appd api key file exists", f"test -s {api_key_path}"))
+        commands.append(("appd api key file permissions", f"mode=$(stat -c '%a' {api_key_path} 2>/dev/null || stat -f '%Lp' {api_key_path} 2>/dev/null) && test \"$mode\" = 600"))
     install_type = str(target.get("install_type") or "rpm").lower()
     if install_type == "docker":
         container = target.get("collector_container_name") or target.get("container_name")
@@ -4056,7 +4326,9 @@ Skill: `{skill}`
 - `--apply preflight` validates local or SSH targets without mutation.
 - `--apply collector` writes collector config, restarts the collector, and records validation.
 - `--apply java` writes persistent Java Dual Signal startup config and restarts only with restart gates.
-- `--apply all` runs collector first, then Java, then validation.
+- `--apply all` always applies the collector first; Java is applied only when
+  `restart_strategy` is `canary` or `full`, so no dormant Java change is reported
+  as applied.
 - `--rollback` restores backed-up files from `backup-manifest.json`.
 
 Every live run writes:
@@ -4325,16 +4597,32 @@ def render_database_artifacts(out: Path, spec: dict[str, Any]) -> None:
         ),
     )
     agent = out / "database-agent-command-plan.sh"
-    write(agent, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Render Database Agent install/start/rollback commands for the reviewed host.'\n")
+    write(agent, "#!/usr/bin/env bash\nset -euo pipefail\necho 'PLAN ONLY: Database Agent host install/start/rollback is not implemented by this script.' >&2\nexit 2\n")
     chmod_exec(agent)
     probes = out / "database-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate /controller/rest/databases/collectors, servers, nodes, and _dbmon events.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: Database Visibility collector/server/node/event readback requires a Controller probe.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
 def render_analytics_artifacts(out: Path, spec: dict[str, Any]) -> None:
+    custom_events = as_dict(spec.get("custom_events"))
+    schema = str(custom_events.get("schema", "appd_custom_events"))
+    analytics_endpoint = validated_http_base(
+        spec.get("analytics_endpoint", "https://analytics.api.appdynamics.com"),
+        "analytics_endpoint",
+    )
+    analytics_host = (urlsplit(analytics_endpoint).hostname or "").lower()
+    if urlsplit(analytics_endpoint).scheme != "https":
+        raise ValueError("analytics_endpoint must use HTTPS")
+    if not (analytics_host == "appdynamics.com" or analytics_host.endswith(".appdynamics.com")) and not to_bool(
+        spec.get("accept_custom_analytics_endpoint"), False
+    ):
+        raise ValueError(
+            "custom analytics_endpoint requires accept_custom_analytics_endpoint: true to prevent Events API key exfiltration"
+        )
     write_json(out / "analytics-events-headers.redacted.json", {"X-Events-API-AccountName": spec.get("global_account_name", "customer1_abcdef"), "X-Events-API-Key": "<redacted:events_api_key_file>", "Content-Type": "application/vnd.appd.events+json;v=2"})
-    write_json(out / "analytics-schema-plan.json", {"schemas": [as_dict(spec.get("custom_events")).get("schema", "appd_custom_events")], "adql": spec.get("adql", ["SELECT * FROM transactions LIMIT 10"])})
+    write_json(out / "analytics-events-payload.json", as_list(custom_events.get("events")))
+    write_json(out / "analytics-schema-plan.json", {"schemas": [schema], "adql": spec.get("adql", ["SELECT * FROM transactions LIMIT 10"])})
     write(
         out / "business-journeys-xlm-runbook.md",
         "# Business Journeys And XLM Runbook\n\n"
@@ -4344,27 +4632,84 @@ def render_analytics_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Business Journey and XLM configuration is rendered for UI/operator review.\n",
     )
     publish = out / "analytics-publish-plan.sh"
-    write(publish, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_EVENTS_API_KEY_FILE:?set APPD_EVENTS_API_KEY_FILE}\"\necho 'Publishing is gated by --accept-analytics-event-publish.'\n")
+    write(
+        publish,
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+APPD_ANALYTICS_APPLY="${{APPD_ANALYTICS_APPLY:-0}}"
+APPD_ANALYTICS_ENDPOINT="${{APPD_ANALYTICS_ENDPOINT:-{bash_default(analytics_endpoint)}}}"
+APPD_GLOBAL_ACCOUNT_NAME="${{APPD_GLOBAL_ACCOUNT_NAME:-{bash_default(spec.get('global_account_name', 'customer1_abcdef'))}}}"
+APPD_EVENTS_SCHEMA="${{APPD_EVENTS_SCHEMA:-{bash_default(schema)}}}"
+APPD_EVENTS_API_KEY_FILE="${{APPD_EVENTS_API_KEY_FILE:-{bash_default(spec.get('events_api_key_file', '/secure/appd/events_api_key'))}}}"
+APPD_EVENTS_PAYLOAD_FILE="${{APPD_EVENTS_PAYLOAD_FILE:-${{SCRIPT_DIR}}/analytics-events-payload.json}}"
+
+if [[ "${{APPD_ANALYTICS_APPLY}}" != "1" ]]; then
+  echo "Dry run: would publish ${{APPD_EVENTS_PAYLOAD_FILE}} to schema ${{APPD_EVENTS_SCHEMA}} at ${{APPD_ANALYTICS_ENDPOINT}}."
+  echo "Set APPD_ANALYTICS_APPLY=1 only after reviewing the payload and accepting analytics event publication."
+  exit 0
+fi
+
+[[ -s "${{APPD_EVENTS_API_KEY_FILE}}" ]] || {{ echo "FAIL: missing Events API key file: ${{APPD_EVENTS_API_KEY_FILE}}" >&2; exit 2; }}
+MODE="$(stat -c '%a' "${{APPD_EVENTS_API_KEY_FILE}}" 2>/dev/null || stat -f '%Lp' "${{APPD_EVENTS_API_KEY_FILE}}" 2>/dev/null)"
+[[ "${{MODE}}" == "600" ]] || {{ echo "FAIL: Events API key file must be chmod 600; found ${{MODE}}" >&2; exit 2; }}
+[[ -s "${{APPD_EVENTS_PAYLOAD_FILE}}" ]] || {{ echo "FAIL: missing event payload file: ${{APPD_EVENTS_PAYLOAD_FILE}}" >&2; exit 2; }}
+python3 - "${{APPD_ANALYTICS_ENDPOINT}}" "${{APPD_ACCEPT_CUSTOM_ANALYTICS_ENDPOINT:-0}}" <<'PY'
+import sys
+from urllib.parse import urlsplit
+url, accept_custom = sys.argv[1:]
+parsed = urlsplit(url)
+host = (parsed.hostname or "").lower()
+if parsed.scheme != "https" or not host or parsed.username or parsed.password or parsed.query or parsed.fragment:
+    raise SystemExit("FAIL: APPD_ANALYTICS_ENDPOINT must be a credential-free HTTPS origin URL")
+if not (host == "appdynamics.com" or host.endswith(".appdynamics.com")) and accept_custom != "1":
+    raise SystemExit("FAIL: custom APPD_ANALYTICS_ENDPOINT requires APPD_ACCEPT_CUSTOM_ANALYTICS_ENDPOINT=1")
+PY
+python3 - "${{APPD_EVENTS_PAYLOAD_FILE}}" <<'PY'
+import json, sys
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+if not isinstance(payload, list) or not payload:
+    raise SystemExit("FAIL: analytics event payload must be a non-empty JSON array")
+PY
+
+ENCODED_SCHEMA="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${{APPD_EVENTS_SCHEMA}}")"
+AUTH_CONFIG="$(mktemp)"
+chmod 600 "${{AUTH_CONFIG}}"
+trap 'rm -f "${{AUTH_CONFIG}}"' EXIT
+{{
+  printf 'header = "X-Events-API-AccountName: %s"\n' "${{APPD_GLOBAL_ACCOUNT_NAME}}"
+  printf 'header = "X-Events-API-Key: '
+  tr -d '\r\n' < "${{APPD_EVENTS_API_KEY_FILE}}"
+  printf '"\n'
+  printf 'header = "Content-Type: application/vnd.appd.events+json;v=2"\n'
+}} > "${{AUTH_CONFIG}}"
+
+curl --fail-with-body --silent --show-error -X POST \
+  "${{APPD_ANALYTICS_ENDPOINT%/}}/events/publish/${{ENCODED_SCHEMA}}" \
+  -K "${{AUTH_CONFIG}}" \
+  --data-binary @"${{APPD_EVENTS_PAYLOAD_FILE}}"
+""",
+    )
     chmod_exec(publish)
     adql = out / "analytics-adql-validation.sh"
-    write(adql, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Run ADQL validation for transaction, log, browser, mobile, synthetic, IoT, and Connected Device Data event types.'\n")
+    write(adql, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: ADQL query execution is not implemented; use the reviewed queries in analytics-schema-plan.json.' >&2\necho 'Coverage: transaction, log, browser, mobile, synthetic, IoT, and Connected Device Data.' >&2\nexit 2\n")
     chmod_exec(adql)
 
 
 def render_eum_artifacts(out: Path, spec: dict[str, Any]) -> None:
     app_key = spec.get("browser_app_key", "APPD_BROWSER_APP_KEY")
+    app_key_js = json.dumps(str(app_key))
     write_json(out / "eum-app-key-inventory.json", {"browser_app_key": app_key, "mobile_app_keys": as_dict(spec.get("mobile_app_keys")), "session_replay": as_dict(spec.get("session_replay"))})
     write(out / "browser-rum-snippet.html", f"""<script charset="UTF-8">
 window["adrum-start-time"] = new Date().getTime();
 (function(config) {{
-  config.appKey = "{app_key}";
-  config.adrumExtUrlHttp = "http://cdn.appdynamics.com";
+  config.appKey = {app_key_js};
   config.adrumExtUrlHttps = "https://cdn.appdynamics.com";
-  config.beaconUrlHttp = "http://col.eum-appdynamics.com";
   config.beaconUrlHttps = "https://col.eum-appdynamics.com";
 }})(window["adrum-config"] || (window["adrum-config"] = {{}}));
 </script>
-<script src="//cdn.appdynamics.com/adrum/adrum-latest.js"></script>
+<script src="https://cdn.appdynamics.com/adrum/adrum-latest.js"></script>
 """)
     write(
         out / "mobile-sdk-snippets.md",
@@ -4396,10 +4741,10 @@ window["adrum-start-time"] = new Date().getTime();
         "- Use source maps and Session Replay only after privacy review when troubleshooting poor Core Web Vitals pages.\n",
     )
     source_map = out / "source-map-upload-plan.sh"
-    write(source_map, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_EUM_TOKEN_FILE:?set APPD_EUM_TOKEN_FILE}\"\necho 'Upload source maps or mobile symbols from CI after reviewing app key, release, and mapping path.'\n")
+    write(source_map, "#!/usr/bin/env bash\nset -euo pipefail\necho 'PLAN ONLY: source-map/mobile-symbol upload needs a product- and release-specific endpoint; execute from the owning CI pipeline.' >&2\nexit 2\n")
     chmod_exec(source_map)
     probes = out / "eum-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate app keys, beacon delivery, browser/mobile/IoT analytics, source-map and symbol inventory, browser Session Replay, and Mobile Session Replay readiness.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: live EUM beacon, mapping, analytics, and Session Replay validation requires browser/mobile and Controller probes.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -4420,18 +4765,18 @@ def render_synthetic_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Record Chrome 147 compatibility and synthetic job waterfall/screenshot behavior after upgrade.\n",
     )
     probes = out / "synthetic-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate synthetic jobs, API monitors, latest runs, waterfall artifacts, locations, and PSA Shepherd connectivity.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: live Synthetic job, run, location, waterfall, and Shepherd validation requires product API probes.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
 def render_log_observer_connect_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write_json(out / "loc-readiness-plan.json", {"controller_url": spec.get("controller_url", "https://example.saas.appdynamics.com"), "splunk_platform": as_dict(spec.get("splunk_platform")), "deep_links": as_dict(spec.get("deep_links")), "legacy_integration": as_dict(spec.get("legacy_integration"))})
     handoff = out / "splunk-platform-handoff.sh"
-    write(handoff, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Hand off Splunk service-account, allow-list, and LOC validation to Splunk Platform skills.'\n")
+    write(handoff, "#!/usr/bin/env bash\nset -euo pipefail\necho 'MANUAL HANDOFF: use splunk-cloud-acs-allowlist-setup for Cloud allowlists and the owning Splunk admin workflow for the service account; no compatible cross-skill spec is generated here.' >&2\nexit 2\n")
     chmod_exec(handoff)
     write(out / "legacy-splunk-integration-runbook.md", "# Legacy Splunk Integration Runbook\n\n- Detect old Settings > Administration > Integration > Splunk configuration.\n- Confirm replacement LOC path is ready before disablement.\n- Disablement is never blind or automatic.\n")
     deeplink = out / "loc-deeplink-validation.sh"
-    write(deeplink, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate LOC deep links from application, tier, node, business transaction, and transaction snapshot views.'\n")
+    write(deeplink, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: LOC deep-link validation requires authenticated AppDynamics and Splunk browser/API probes.' >&2\nexit 2\n")
     chmod_exec(deeplink)
 
 
@@ -4462,10 +4807,10 @@ def render_alerting_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Export alerting content before template changes and preserve rollback snapshots in `alerting-export-rollback-plan.sh`.\n",
     )
     rollback = out / "alerting-export-rollback-plan.sh"
-    write(rollback, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Export health rules, policies, actions, schedules, and suppressions before apply; render rollback from exported snapshots.'\n")
+    write(rollback, "#!/usr/bin/env bash\nset -euo pipefail\necho 'PLAN ONLY: no export snapshot has been created. Export health rules, policies, actions, schedules, and suppressions before mutation.' >&2\nexit 2\n")
     chmod_exec(rollback)
     probes = out / "alerting-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate health-rule readback, policy/action binding, schedules, suppressions, and sample notification path.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: alerting readback and notification-path probes require Controller API support.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -4502,7 +4847,7 @@ def render_dashboards_reports_artifacts(out: Path, spec: dict[str, Any]) -> None
     )
     write(out / "war-room-runbook.md", "# War Room Runbook\n\n- Validate War Room templates, participants, save/sync behavior, and archive expectations.\n- War Room operations stay UI/runbook-only unless documented API support is available.\n")
     probes = out / "dashboard-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate dashboard inventory, widget counts, report schedules, delivery, and War Room access.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: dashboard/report/War Room live validation requires Controller API/UI evidence.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -4529,7 +4874,7 @@ def appd_te_notifications(spec: dict[str, Any], controller_url: str, application
                 "integrationId": operation_id or "${TE_CUSTOM_WEBHOOK_OPERATION_ID}",
                 "integrationType": "custom-webhook",
                 "integrationName": webhook.get("operation_name") or webhook.get("connector_name") or "AppDynamics custom events",
-                "target": f"{controller_url.rstrip('/')}/controller/rest/applications/{application}/events",
+                "target": f"{controller_url.rstrip('/')}/controller/rest/applications/{quote(application, safe='')}/events",
             }
         ]
     }
@@ -4617,48 +4962,72 @@ fi
 
 CONNECTOR_FILE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/{connector_path}"
 OPERATION_FILE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/{operation_path}"
+RESULT_FILE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/te-appd-webhook-result.json"
 CONNECTOR_PAYLOAD="$(mktemp)"
+CONNECTOR_RESPONSE_FILE="$(mktemp)"
+OPERATION_RESPONSE_FILE="$(mktemp)"
+ASSIGN_RESPONSE_FILE="$(mktemp)"
 TE_CURL_CONFIG="$(mktemp)"
-chmod 600 "${{CONNECTOR_PAYLOAD}}" "${{TE_CURL_CONFIG}}"
-trap 'rm -f "${{CONNECTOR_PAYLOAD}}" "${{TE_CURL_CONFIG}}"' EXIT
+chmod 600 "${{CONNECTOR_PAYLOAD}}" "${{CONNECTOR_RESPONSE_FILE}}" "${{OPERATION_RESPONSE_FILE}}" "${{ASSIGN_RESPONSE_FILE}}" "${{TE_CURL_CONFIG}}"
+trap 'rm -f "${{CONNECTOR_PAYLOAD}}" "${{CONNECTOR_RESPONSE_FILE}}" "${{OPERATION_RESPONSE_FILE}}" "${{ASSIGN_RESPONSE_FILE}}" "${{TE_CURL_CONFIG}}"' EXIT
+[[ -s "${{CONNECTOR_FILE}}" && -s "${{OPERATION_FILE}}" ]] || {{ echo "FAIL: rendered connector/operation payload is missing." >&2; exit 2; }}
+
+secret_mode() {{ stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }}
+for secret_file in "${{TE_TOKEN_FILE}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}"; do
+  mode="$(secret_mode "${{secret_file}}")"
+  [[ "${{mode}}" == "600" ]] || {{ echo "FAIL: secret file must be chmod 600: ${{secret_file}} (found ${{mode:-unknown}})" >&2; exit 2; }}
+done
 
 {{ printf 'header = "Authorization: Bearer '; tr -d '\\r\\n' < "${{TE_TOKEN_FILE}}"; printf '"\\n'; }} > "${{TE_CURL_CONFIG}}"
 python3 - "${{CONNECTOR_FILE}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" "${{CONNECTOR_PAYLOAD}}" <<'PY'
 import json
 import sys
+from urllib.parse import urlsplit
 
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
+host = (urlsplit(str(payload.get("target", ""))).hostname or "").lower()
+if not host or host == "example.com" or host.endswith(".example.com"):
+    raise SystemExit("FAIL: connector target is missing or still uses an example host")
 payload.setdefault("authentication", {{}})["oauthClientSecret"] = open(sys.argv[2], encoding="utf-8").read().strip()
 json.dump(payload, open(sys.argv[3], "w", encoding="utf-8"))
 PY
 
-CONNECTOR_RESPONSE="$(curl -sS -X POST "https://api.thousandeyes.com/v7/connectors/generic{aid_arg}" \\
+CONNECTOR_HTTP_CODE="$(curl -sS -o "${{CONNECTOR_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/connectors/generic{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
   --data-binary @"${{CONNECTOR_PAYLOAD}}")"
-echo "${{CONNECTOR_RESPONSE}}" > /tmp/te-appd-connector-response.json
-CONNECTOR_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("id", ""))' "${{CONNECTOR_RESPONSE}}")"
+[[ "${{CONNECTOR_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: connector creation returned HTTP ${{CONNECTOR_HTTP_CODE}}" >&2; sed -n '1,120p' "${{CONNECTOR_RESPONSE_FILE}}" >&2; exit 1; }}
+CONNECTOR_ID="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])) or {{}}).get("id", ""))' "${{CONNECTOR_RESPONSE_FILE}}")"
 if [[ -z "${{CONNECTOR_ID}}" ]]; then
-  echo "FAIL: connector create response did not contain id; see /tmp/te-appd-connector-response.json" >&2
+  echo "FAIL: connector create response did not contain id." >&2
   exit 1
 fi
 
-OPERATION_RESPONSE="$(curl -sS -X POST "https://api.thousandeyes.com/v7/operations/webhooks{aid_arg}" \\
+OPERATION_HTTP_CODE="$(curl -sS -o "${{OPERATION_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/operations/webhooks{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
   --data-binary @"${{OPERATION_FILE}}")"
-echo "${{OPERATION_RESPONSE}}" > /tmp/te-appd-operation-response.json
-OPERATION_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("id", ""))' "${{OPERATION_RESPONSE}}")"
+[[ "${{OPERATION_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: webhook operation creation returned HTTP ${{OPERATION_HTTP_CODE}}; connector ${{CONNECTOR_ID}} may require cleanup." >&2; sed -n '1,120p' "${{OPERATION_RESPONSE_FILE}}" >&2; exit 1; }}
+OPERATION_ID="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])) or {{}}).get("id", ""))' "${{OPERATION_RESPONSE_FILE}}")"
 if [[ -z "${{OPERATION_ID}}" ]]; then
-  echo "FAIL: webhook operation create response did not contain id; see /tmp/te-appd-operation-response.json" >&2
+  echo "FAIL: webhook operation create response did not contain id; connector ${{CONNECTOR_ID}} may require cleanup." >&2
   exit 1
 fi
 
-printf '["%s"]\\n' "${{CONNECTOR_ID}}" | curl -sS -X PUT "https://api.thousandeyes.com/v7/operations/webhooks/${{OPERATION_ID}}/connectors{aid_arg}" \\
+ASSIGN_HTTP_CODE="$(printf '["%s"]\\n' "${{CONNECTOR_ID}}" | curl -sS -o "${{ASSIGN_RESPONSE_FILE}}" -w '%{{http_code}}' -X PUT "https://api.thousandeyes.com/v7/operations/webhooks/${{OPERATION_ID}}/connectors{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
-  --data-binary @- \\
-  -o /tmp/te-appd-operation-connectors-response.json -w '%{{http_code}}\\n'
+  --data-binary @-)"
+[[ "${{ASSIGN_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: connector assignment returned HTTP ${{ASSIGN_HTTP_CODE}}; connector ${{CONNECTOR_ID}} and operation ${{OPERATION_ID}} require review." >&2; sed -n '1,120p' "${{ASSIGN_RESPONSE_FILE}}" >&2; exit 1; }}
+
+python3 - "${{CONNECTOR_ID}}" "${{OPERATION_ID}}" "${{RESULT_FILE}}" <<'PY'
+import json, os, sys
+connector_id, operation_id, path = sys.argv[1:]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump({{"connector_id": connector_id, "operation_id": operation_id}}, handle, indent=2, sort_keys=True)
+    handle.write("\\n")
+os.chmod(path, 0o600)
+PY
 
 cat <<RESULT
 Created ThousandEyes AppDynamics custom webhook operation:
@@ -4688,7 +5057,8 @@ APPD_API_CLIENT_NAME="${{APPD_API_CLIENT_NAME:-appd-te-api-client}}"
 APPD_OAUTH_CLIENT_SECRET_FILE="${{APPD_OAUTH_CLIENT_SECRET_FILE:-}}"
 APPD_CUSTOM_EVENT_TYPE="${{APPD_CUSTOM_EVENT_TYPE:-ThousandEyesAlert}}"
 
-EVENT_URL="$(appd_controller_api_url "${{APPD_CONTROLLER_URL}}" "/controller/rest/applications/${{APPD_APPLICATION}}/events")"
+ENCODED_APPLICATION="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${{APPD_APPLICATION}}")"
+EVENT_URL="$(appd_controller_api_url "${{APPD_CONTROLLER_URL}}" "/controller/rest/applications/${{ENCODED_APPLICATION}}/events")"
 if [[ "${{APPD_TE_EVENT_PROBE:-0}}" != "1" ]]; then
   echo "Dry-run only. Set APPD_TE_EVENT_PROBE=1 to POST a CUSTOM event."
   echo "Would POST ${{EVENT_URL}} with severity=WARN, eventtype=CUSTOM, customeventtype=${{APPD_CUSTOM_EVENT_TYPE}}"
@@ -4725,7 +5095,12 @@ appd_curl -fsS -X POST "${{EVENT_URL}}" \\
 
 def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
     deployment_model = str(spec.get("deployment_model") or "saas")
-    controller_url = str(spec.get("controller_url") or "https://example.saas.appdynamics.com")
+    controller_url = validated_http_base(
+        spec.get("controller_url") or "https://example.saas.appdynamics.com",
+        "controller_url",
+    )
+    if urlsplit(controller_url).scheme != "https":
+        raise ValueError("AppDynamics/ThousandEyes webhook targets require an HTTPS Controller URL")
     account_name = str(spec.get("account_name") or "customer1")
     doc_version = str(spec.get("doc_version") or "26.4.0")
     app_target = as_dict(spec.get("appdynamics_target"))
@@ -4734,6 +5109,8 @@ def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
     te = as_dict(spec.get("thousandeyes"))
     webhook = as_dict(spec.get("custom_webhook"))
     account_group_id = str(te.get("account_group_id") or spec.get("thousandeyes_account_group") or "")
+    if account_group_id and not account_group_id.isdigit():
+        raise ValueError("thousandeyes.account_group_id must contain only decimal digits")
     realm = str(spec.get("realm") or "us0")
     tests = default_appd_te_tests(spec)
     notifications, notification_fragments = appd_te_notifications(spec, controller_url, application)
@@ -4758,7 +5135,7 @@ def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
     te_assets_spec = {
         "api_version": "splunk-observability-thousandeyes-integration/v1",
         "realm": realm,
-        "account_group_id": account_group_id or "1234",
+        "account_group_id": account_group_id,
         "stream": {"enabled": False, "test_match": [], "filters": {"test_types": []}, "mode": ""},
         "apm_connector": {"enabled": False},
         "tests": tests,
@@ -4813,11 +5190,22 @@ def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write(out / "te-assets-spec.yaml", dump_yaml(te_assets_spec))
     write_json(out / "te-alert-notification-fragments.json", notification_fragments)
 
-    connector_auth = as_dict(webhook.get("authentication")) or {
-        "type": "oauth-client-credentials",
-        "oauthClientId": webhook.get("oauth_client_id", f"appd-te-api-client@{account_name}"),
+    requested_connector_auth = as_dict(webhook.get("authentication"))
+    requested_auth_type = str(requested_connector_auth.get("type", "oauth-client-credentials"))
+    if requested_auth_type != "oauth-client-credentials":
+        raise ValueError("custom_webhook.authentication.type must be oauth-client-credentials")
+    expected_token_url = f"{controller_url.rstrip('/')}/controller/api/oauth/access_token"
+    requested_token_url = str(requested_connector_auth.get("oauthTokenUrl") or expected_token_url)
+    if requested_token_url != expected_token_url:
+        raise ValueError("custom webhook OAuth token URL must be the selected AppDynamics Controller token endpoint")
+    connector_auth = {
+        "type": requested_auth_type,
+        "oauthClientId": requested_connector_auth.get(
+            "oauthClientId",
+            webhook.get("oauth_client_id", f"appd-te-api-client@{account_name}"),
+        ),
         "oauthClientSecret": "${APPD_OAUTH_CLIENT_SECRET}",
-        "oauthTokenUrl": f"{controller_url.rstrip('/')}/controller/api/oauth/access_token",
+        "oauthTokenUrl": expected_token_url,
     }
     connector_payload = {
         "type": "generic",
@@ -4832,7 +5220,7 @@ def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "category": "alerts",
         "status": "pending",
         "type": "webhook",
-        "path": f"/controller/rest/applications/{application}/events",
+        "path": f"/controller/rest/applications/{quote(application, safe='')}/events",
         "headers": [{"name": "Accept", "value": "application/json"}],
         "queryParams": json.dumps(
             {
@@ -4857,6 +5245,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 PROJECT_ROOT="${{PROJECT_ROOT:-{bash_default(REPO_ROOT)}}}"
 SPEC="${{SCRIPT_DIR}}/te-assets-spec.yaml"
+RENDERED_ACCOUNT_GROUP_ID={shell_quote(account_group_id)}
+
+if [[ -z "${{RENDERED_ACCOUNT_GROUP_ID}}" ]]; then
+  echo "FAIL: render again with thousandeyes.account_group_id set to the reviewed numeric account-group ID." >&2
+  exit 2
+fi
+if grep -Eq 'target: https://example\\.(com|org|net)(/|$)' "${{SPEC}}"; then
+  echo "FAIL: te-assets-spec.yaml still contains an example target; render from a customer-specific spec before apply." >&2
+  exit 2
+fi
 
 cat <<'EOF'
 Review te-assets-spec.yaml before running this mutating ThousandEyes handoff.
@@ -4990,7 +5388,7 @@ def render_tags_extensions_artifacts(out: Path, spec: dict[str, Any]) -> None:
 def render_security_ai_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write(out / "security-ai-readiness.yaml", dump_yaml({"secure_application": as_dict(spec.get("secure_application")), "otel_java": as_dict(spec.get("otel_java")), "observability_for_ai": as_dict(spec.get("observability_for_ai")), "gpu": as_dict(spec.get("gpu")), "cisco_ai_pod": as_dict(spec.get("cisco_ai_pod"))}))
     secure = out / "secure-application-validation.sh"
-    write(secure, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate Secure Application entitlement, supported agents, node security status, vulnerabilities, attacks, libraries, business risk, and policyConfigs APIs.'\n")
+    write(secure, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: Secure Application entitlement, node, vulnerability, attack, library, risk, and policyConfigs validation requires authenticated API probes.' >&2\nexit 2\n")
     chmod_exec(secure)
     write(
         out / "secure-application-policy-runbook.md",
@@ -5037,7 +5435,7 @@ def render_sap_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Confirm SNP CrystalBridge Monitoring version compatibility before overwriting any newer installed SNP components.\n",
     )
     probes = out / "sap-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate SAP Agent process, Controller registration, ABAP transport status, HTTP SDK or gateway connectivity, SNP CrystalBridge metrics/events, BiQ Collector business-process data, and SAP dashboards.'\n")
+    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'NOT IMPLEMENTED: SAP process, transport, SDK, CrystalBridge, BiQ, Controller, and dashboard validation requires SAP Basis and Controller probes.' >&2\nexit 2\n")
     chmod_exec(probes)
 
 
@@ -5129,7 +5527,7 @@ def render_skill_specific(skill: str, out: Path, spec: dict[str, Any]) -> None:
         render_sap_artifacts(out, spec)
 
 
-def render(skill: str, spec_path: Path, out: Path, json_output: bool) -> int:
+def render(skill: str, spec_path: Path, out: Path, json_output: bool, *, quiet: bool = False) -> int:
     if skill not in SKILL_META:
         raise SystemExit(f"Unknown AppDynamics skill: {skill}")
     spec = load_yaml_or_json(spec_path)
@@ -5143,7 +5541,9 @@ def render(skill: str, spec_path: Path, out: Path, json_output: bool) -> int:
     render_common_artifacts(skill, out, spec, coverage)
     render_skill_specific(skill, out, spec)
     result = {"status": "rendered", "skill": skill, "output_dir": str(out), "coverage_rows": len(coverage)}
-    if json_output:
+    if quiet:
+        pass
+    elif json_output:
         print(json.dumps(result, sort_keys=True))
     else:
         print(f"Rendered {skill} to {out}")
@@ -5162,14 +5562,24 @@ def validate_host_apply_gates(args: argparse.Namespace, spec: dict[str, Any], ph
         errors.append("collector skill does not support --apply java")
     if has_ssh_targets(spec) and not args.accept_remote_execution:
         errors.append("SSH targets require --accept-remote-execution")
+    for target in host_apply_targets(spec):
+        if execution_mode(target) == "ssh" and not target.get("ssh_known_hosts_file"):
+            errors.append(f"{host_target_key(target)}: SSH apply requires ssh_known_hosts_file; accept-new host keys are not production-safe")
     if (rollback or phase != "preflight") and not args.accept_host_mutation:
         errors.append("file or service mutation requires --accept-host-mutation")
-    strategy = restart_strategy(spec)
     java_phase = args.skill == "splunk-appdynamics-dual-agent-setup" and phase in {"java", "all"}
+    strategy = restart_strategy(spec)
+    if args.skill == "splunk-appdynamics-dual-agent-setup" and phase == "java" and strategy not in {"canary", "full"}:
+        errors.append("--apply java requires restart_strategy: canary or full so the persistent change is activated and validated")
     if java_phase and strategy in {"canary", "full"} and not args.accept_app_restart:
         errors.append("Java service/container restarts require --accept-app-restart")
-    if strategy == "full" and not args.accept_full_restart:
+    if java_phase and strategy == "full" and not args.accept_full_restart:
         errors.append("restart_strategy: full requires --accept-full-restart")
+    destination_mode = destination_spec(spec)["destination"]
+    if destination_mode not in COLLECTOR_DESTINATIONS:
+        errors.append(
+            f"collector destination must be one of {', '.join(sorted(COLLECTOR_DESTINATIONS))}; got {destination_mode!r}"
+        )
     return errors
 
 
@@ -5203,6 +5613,7 @@ def run_collector_apply(recorder: ApplyRecorder, spec: dict[str, Any]) -> None:
             sudo=target_sudo(target),
             label="collector config",
         )
+        configure_collector_credentials(recorder, target, spec)
         restart = collector_restart_command(target)
         if restart:
             recorder.run(target, restart, sudo=target_sudo(target), label="restart collector")
@@ -5214,11 +5625,18 @@ def run_collector_apply(recorder: ApplyRecorder, spec: dict[str, Any]) -> None:
             recorder.run(target, str(healthcheck), sudo=False, label="collector healthcheck")
         else:
             bind = target.get("receiver_bind", "127.0.0.1")
+            grpc_port = int_or_default(target.get("grpc_port"), 4317)
+            http_port = int_or_default(target.get("http_port"), 4318)
             recorder.run(
                 target,
-                f"echo 'collector healthcheck not supplied; verify OTLP gRPC {bind}:{target.get('grpc_port', 4317)} and HTTP {bind}:{target.get('http_port', 4318)} plus exporter logs'",
+                "if command -v nc >/dev/null 2>&1; then "
+                f"nc -z {shlex.quote(str(bind))} {grpc_port} && nc -z {shlex.quote(str(bind))} {http_port}; "
+                "else "
+                f"timeout 5 bash -c {shlex.quote(f'</dev/tcp/{bind}/{grpc_port}')} && "
+                f"timeout 5 bash -c {shlex.quote(f'</dev/tcp/{bind}/{http_port}')}; "
+                "fi",
                 sudo=False,
-                label="collector healthcheck skipped",
+                label="collector OTLP port healthcheck",
             )
 
 
@@ -5235,8 +5653,9 @@ def java_targets_for_restart(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def run_java_apply(recorder: ApplyRecorder, spec: dict[str, Any], *, restart_allowed: bool) -> None:
-    restart_targets = {host_target_key(target) for target in java_targets_for_restart(spec)} if restart_allowed else set()
-    for target in host_apply_targets(spec):
+    selected_targets = java_targets_for_restart(spec) if restart_allowed else []
+    restart_targets = {host_target_key(target) for target in selected_targets}
+    for target in selected_targets:
         target.setdefault(
             "startup_config_path",
             f"/etc/systemd/system/{target.get('service_name', 'app')}.service.d/appd-dual-agent.conf",
@@ -5269,6 +5688,16 @@ def run_java_apply(recorder: ApplyRecorder, spec: dict[str, Any], *, restart_all
         healthcheck = target.get("healthcheck_command")
         if healthcheck:
             recorder.run(target, str(healthcheck), sudo=False, label="java healthcheck")
+        else:
+            runtime = str(target.get("runtime") or "systemd").lower()
+            service = str(target.get("service_name") or "")
+            if runtime == "docker":
+                command = f"test \"$(docker inspect -f '{{{{.State.Running}}}}' {shlex.quote(service)})\" = true"
+            elif str(target.get("os_family") or "linux").lower() == "windows":
+                command = f"powershell -NoProfile -Command \"if ((Get-Service -Name {service}).Status -ne 'Running') {{ exit 1 }}\""
+            else:
+                command = f"systemctl is-active --quiet {shlex.quote(service)}"
+            recorder.run(target, command, sudo=target_sudo(target), label="java service healthcheck")
 
 
 def apply_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> int:
@@ -5282,6 +5711,8 @@ def apply_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> in
     if phase == "all" and args.skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
         phase = "collector"
     include_collector, include_java = host_apply_phase_for_skill(args.skill, phase)
+    if args.skill == "splunk-appdynamics-dual-agent-setup" and phase == "all" and restart_strategy(spec) not in {"canary", "full"}:
+        include_java = False
     out.mkdir(parents=True, exist_ok=True)
     coverage = coverage_for_skill(args.skill)
     errors = validate_coverage(coverage)
@@ -5319,7 +5750,9 @@ def apply_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> in
 def rollback_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> int:
     phase = str(args.rollback or "all").strip().lower()
     spec = load_yaml_or_json(spec_path)
-    gates = validate_host_apply_gates(args, spec, phase if phase in HOST_APPLY_PHASES else "all", rollback=True)
+    gates = validate_host_apply_gates(args, spec, phase, rollback=True)
+    if phase == "preflight":
+        gates.append("preflight is read-only and has nothing to roll back; use collector, java, or all")
     if gates:
         for error in gates:
             print(f"FAIL: {error}", file=sys.stderr)
@@ -5329,21 +5762,41 @@ def rollback_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) ->
         print(f"FAIL: missing backup manifest: {manifest_path}", file=sys.stderr)
         return 1
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_phase = str(manifest.get("phase") or "all").lower()
+    if phase != "all" and manifest_phase not in {phase, "all"}:
+        print(
+            f"FAIL: backup manifest contains phase {manifest_phase!r}; it cannot satisfy --rollback {phase}",
+            file=sys.stderr,
+        )
+        return 1
     targets = {host_target_key(target): target for target in host_apply_targets(spec)}
     default_target = host_apply_targets(spec)[0]
     recorder = ApplyRecorder(out, args.skill, "rollback")
     for entry in reversed(as_list(manifest.get("files"))):
         entry_dict = as_dict(entry)
+        label = str(entry_dict.get("label") or "").lower()
+        if phase == "collector" and "collector" not in label:
+            continue
+        if phase == "java" and "java" not in label:
+            continue
         target = targets.get(str(entry_dict.get("target")), default_target)
         result = restore_entry(entry_dict, target, out)
         if result is not None:
             recorder.record_command(result)
-    if args.skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+    rollback_collector = phase in {"collector", "all"}
+    rollback_java = phase in {"java", "all"}
+    if rollback_collector:
         for target in host_apply_targets(spec):
+            if (
+                str(target.get("install_type") or "rpm").lower() != "docker"
+                and str(target.get("os_family") or "linux").lower() != "windows"
+                and not target.get("collector_restart_command")
+            ):
+                recorder.run(target, "systemctl daemon-reload", sudo=target_sudo(target), label="rollback reload collector systemd unit")
             restart = collector_restart_command(target)
             if restart:
                 recorder.run(target, restart, sudo=target_sudo(target), label="rollback restart collector")
-    elif args.accept_app_restart:
+    if args.skill == "splunk-appdynamics-dual-agent-setup" and rollback_java and args.accept_app_restart:
         for target in java_targets_for_restart(spec):
             reload_command = java_systemd_reload_command(target)
             if reload_command:
@@ -5368,14 +5821,28 @@ def rollback_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) ->
 def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int:
     errors: list[str] = []
     notes: list[str] = []
+    live_commands: list[tuple[str, Path, dict[str, str]]] = []
+    live_results: list[dict[str, Any]] = []
+    rendered_features: list[dict[str, Any]] = []
     coverage_path = out / "coverage-report.json"
     if not coverage_path.exists():
         errors.append(f"missing {coverage_path}")
     else:
         payload = json.loads(coverage_path.read_text(encoding="utf-8"))
-        errors.extend(validate_coverage(payload.get("features", [])))
+        rendered_features = [row for row in as_list(payload.get("features")) if isinstance(row, dict)]
+        errors.extend(validate_coverage(rendered_features))
         if payload.get("skill") != skill:
             errors.append(f"coverage-report skill mismatch: {payload.get('skill')} != {skill}")
+    if skill != PARENT_SKILL:
+        actionable_rows = [
+            row for row in rendered_features
+            if row.get("status") in {"api_apply", "cli_apply", "k8s_apply"}
+        ]
+        if actionable_rows and skill not in HOST_APPLY_SKILLS | EXECUTABLE_APPLY_SKILLS:
+            errors.append(
+                f"{skill} claims executable apply coverage but has no wrapper apply executor: "
+                + ", ".join(str(row.get("id")) for row in actionable_rows)
+            )
     required_artifacts = REQUIRED_SKILL_ARTIFACTS.get(skill, set())
     if required_artifacts:
         missing = sorted(name for name in required_artifacts if not (out / name).exists())
@@ -5401,6 +5868,8 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             plan_text = (out / "enterprise-console-command-plan.sh").read_text(encoding="utf-8")
             if "controllerAdminPassword=" in plan_text or "mysqlRootPassword=" in plan_text:
                 errors.append("Enterprise Console command plan must not render password arguments")
+            if "APPD_EC_APPLY" not in plan_text:
+                errors.append("Enterprise Console command plan must default to dry-run and require APPD_EC_APPLY=1")
         vmware_inventory_path = out / "virtual-appliance-vmware-inventory.yaml"
         if vmware_inventory_path.exists():
             vmware_inventory = yaml.safe_load(vmware_inventory_path.read_text(encoding="utf-8")) or {}
@@ -5415,7 +5884,9 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
                 if "://$GOVC_USERNAME:$GOVC_PASSWORD" in vmware_plan_text or "://${VMWARE_USERNAME}:${VMWARE_PASSWORD}" in vmware_plan_text:
                     errors.append(f"{vmware_plan_name} must not place VMware password values in shell arguments")
         if live:
-            notes.append(f"run live platform probes with APPD_PLATFORM_LIVE=1 bash {out / 'platform-validation-probes.sh'}")
+            live_commands.append(
+                ("platform", out / "platform-validation-probes.sh", {"APPD_PLATFORM_LIVE": "1"})
+            )
     elif skill == "splunk-appdynamics-controller-admin-setup":
         report_path = out / "license-usage-report.sh"
         if report_path.exists():
@@ -5433,7 +5904,25 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             if "--client-secret " in report_text or "--token " in report_text:
                 errors.append("license-usage-report.sh must not render direct-secret arguments")
         if live:
-            notes.append(f"run live license usage validation with APPD_LICENSE_VALIDATE_LIVE=1 bash {out / 'licensing-validation-plan.sh'}")
+            live_commands.append(
+                ("license_usage", out / "licensing-validation-plan.sh", {"APPD_LICENSE_VALIDATE_LIVE": "1"})
+            )
+    elif skill == "splunk-appdynamics-analytics-setup":
+        publish_path = out / "analytics-publish-plan.sh"
+        payload_path = out / "analytics-events-payload.json"
+        if publish_path.exists():
+            publish_text = publish_path.read_text(encoding="utf-8")
+            for marker in ("APPD_ANALYTICS_APPLY", "APPD_EVENTS_API_KEY_FILE", "--fail-with-body", "/events/publish/"):
+                if marker not in publish_text:
+                    errors.append(f"analytics-publish-plan.sh missing {marker}")
+        if payload_path.exists():
+            payload = json.loads(payload_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, list):
+                errors.append("analytics-events-payload.json must be a JSON array")
+        if live:
+            errors.append(
+                "read-only Analytics live validation is not implemented; --apply events is a separately gated mutation"
+            )
     elif skill == "splunk-appdynamics-k8s-cluster-agent-setup":
         values_path = out / "cluster-agent-values.yaml"
         if values_path.exists():
@@ -5463,8 +5952,12 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             if "K8S_APPLY=1" not in rollout_text:
                 errors.append("cluster-agent-rollout-plan.sh must default to dry-run and require K8S_APPLY=1")
         if live:
-            notes.append(f"run live Kubernetes probes with bash {out / 'cluster-agent-validation-probes.sh'}")
-            notes.append(f"run live O11y probes with bash {out / 'o11y-export-validation.sh'}")
+            live_commands.extend(
+                [
+                    ("kubernetes", out / "cluster-agent-validation-probes.sh", {}),
+                    ("splunk_o11y", out / "o11y-export-validation.sh", {}),
+                ]
+            )
     elif skill == "splunk-appdynamics-dual-agent-setup":
         targets_path = out / "dual-agent-targets.yaml"
         if targets_path.exists():
@@ -5496,7 +5989,9 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             if "-Dagent.deployment.mode=dual" not in systemd_text:
                 errors.append("java-systemd-dropin.conf must include -Dagent.deployment.mode=dual")
         if live:
-            notes.append(f"run Java Dual Signal probes with bash {out / 'java-dual-agent-validation-probes.sh'}")
+            errors.append(
+                "generic live Java validation is not implemented for local/SSH target mixes; use gated host apply health checks"
+            )
     elif skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
         collector_config_path = out / "collector-config.yaml"
         if collector_config_path.exists():
@@ -5528,7 +6023,9 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             if "logs" in pipelines:
                 errors.append("logs pipeline must be disabled unless logs_enabled is explicit")
         if live:
-            notes.append(f"run collector probes with bash {out / 'collector-validation-probes.sh'}")
+            errors.append(
+                "generic live collector validation is not implemented for local/SSH target mixes; use gated host apply health checks"
+            )
     elif skill == "splunk-appdynamics-thousandeyes-integration-setup":
         readiness_path = out / "appd-te-readiness.yaml"
         if readiness_path.exists():
@@ -5568,12 +6065,42 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             if "/operations/webhooks/${OPERATION_ID}/connectors" not in text:
                 errors.append("te-api-apply-plan.sh must assign the connector to the webhook operation")
         if live:
-            notes.append(f"run ThousandEyes custom webhook apply with APPD_TE_APPLY=1 bash {out / 'te-api-apply-plan.sh'}")
-            notes.append(f"run AppDynamics custom event probe with APPD_TE_EVENT_PROBE=1 bash {out / 'appd-events-api-probe.sh'}")
+            errors.append(
+                "read-only AppDynamics/ThousandEyes live validation is not implemented; webhook and custom-event probes mutate remote state"
+            )
     elif live:
         errors.append("live validation is not implemented in the generic renderer; use child runbook probes")
+
+    if live and not errors:
+        for label, command, env_updates in live_commands:
+            if not command.is_file():
+                errors.append(f"missing live validation command: {command}")
+                continue
+            env = os.environ.copy()
+            env.update(env_updates)
+            proc = subprocess.run(
+                ["bash", str(command)],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                capture_output=json_output,
+                check=False,
+            )
+            result = {"label": label, "command": str(command), "exit_code": proc.returncode}
+            if json_output:
+                result.update({"stdout": proc.stdout, "stderr": proc.stderr})
+            live_results.append(result)
+            if proc.returncode != 0:
+                errors.append(f"live validation {label} failed with exit code {proc.returncode}")
     status = "pass" if not errors else "fail"
-    result = {"status": status, "skill": skill, "output_dir": str(out), "errors": errors, "notes": notes}
+    result = {
+        "status": status,
+        "skill": skill,
+        "output_dir": str(out),
+        "errors": errors,
+        "notes": notes,
+        "live_results": live_results,
+    }
     if json_output:
         print(json.dumps(result, sort_keys=True))
     else:
@@ -5622,42 +6149,222 @@ def gate_accepted(args: argparse.Namespace) -> bool:
     return bool(getattr(args, attr))
 
 
+EXECUTABLE_APPLY_SKILLS = {
+    "splunk-appdynamics-platform-setup",
+    "splunk-appdynamics-k8s-cluster-agent-setup",
+    "splunk-appdynamics-analytics-setup",
+    "splunk-appdynamics-thousandeyes-integration-setup",
+}
+
+
+def bind_rendered_te_webhook(out: Path) -> None:
+    result_path = out / "te-appd-webhook-result.json"
+    assets_path = out / "te-assets-spec.yaml"
+    fragments_path = out / "te-alert-notification-fragments.json"
+    if not result_path.is_file():
+        raise ValueError("ThousandEyes webhook apply did not write te-appd-webhook-result.json")
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    operation_id = str(result.get("operation_id") or "")
+    if not operation_id:
+        raise ValueError("ThousandEyes webhook result is missing operation_id")
+    assets = load_yaml_or_json(assets_path)
+    fragments = json.loads(fragments_path.read_text(encoding="utf-8"))
+    custom = as_dict(fragments.get("custom_webhook"))
+    notifications = as_list(custom.get("customWebhook"))
+    if not notifications:
+        raise ValueError("custom webhook notification fragment is missing")
+    bound_notifications = []
+    for notification in notifications:
+        row = as_dict(notification).copy()
+        row["integrationId"] = operation_id
+        bound_notifications.append(row)
+    for rule in as_list(assets.get("alert_rules")):
+        if not isinstance(rule, dict):
+            continue
+        existing = as_dict(rule.get("notifications"))
+        existing["customWebhook"] = bound_notifications
+        rule["notifications"] = existing
+    write(assets_path, dump_yaml(assets))
+
+
+def run_rendered_apply(args: argparse.Namespace, out: Path) -> int:
+    raw_sections = str(args.apply or "all").strip().lower().replace("-", "_")
+    sections = [section.strip() for section in raw_sections.split(",") if section.strip()]
+    env = os.environ.copy()
+    commands: list[tuple[str, Path]] = []
+
+    if args.skill == "splunk-appdynamics-platform-setup":
+        if args.json:
+            print("FAIL: platform apply does not support --json because Enterprise Console/OVF tools can require an interactive session", file=sys.stderr)
+            return 2
+        if sections == ["all"]:
+            print(
+                "FAIL: platform apply requires one explicit section: enterprise_console, vmware_ovftool, or vmware_govc",
+                file=sys.stderr,
+            )
+            return 2
+        allowed = {"enterprise_console", "vmware_ovftool", "vmware_govc"}
+        unknown = sorted(set(sections) - allowed)
+        if unknown:
+            print(f"FAIL: unsupported platform apply section(s): {', '.join(unknown)}", file=sys.stderr)
+            return 2
+        for section in sections:
+            if section == "enterprise_console":
+                env["APPD_EC_APPLY"] = "1"
+                commands.append((section, out / "enterprise-console-command-plan.sh"))
+            elif section == "vmware_ovftool":
+                env["VMWARE_APPLY"] = "1"
+                commands.append((section, out / "virtual-appliance-ovftool-plan.sh"))
+            elif section == "vmware_govc":
+                env["VMWARE_APPLY"] = "1"
+                commands.append((section, out / "virtual-appliance-govc-plan.sh"))
+    elif args.skill == "splunk-appdynamics-k8s-cluster-agent-setup":
+        if sections not in (["all"], ["rollout"]):
+            print("FAIL: Kubernetes apply supports only --apply rollout", file=sys.stderr)
+            return 2
+        env["K8S_APPLY"] = "1"
+        commands.append(("rollout", out / "cluster-agent-rollout-plan.sh"))
+    elif args.skill == "splunk-appdynamics-analytics-setup":
+        if sections not in (["all"], ["events"]):
+            print("FAIL: Analytics apply supports only --apply events", file=sys.stderr)
+            return 2
+        env["APPD_ANALYTICS_APPLY"] = "1"
+        commands.append(("events", out / "analytics-publish-plan.sh"))
+    elif args.skill == "splunk-appdynamics-thousandeyes-integration-setup":
+        selected = ["webhook", "assets", "event"] if sections == ["all"] else sections
+        allowed = {"assets", "webhook", "event"}
+        unknown = sorted(set(selected) - allowed)
+        if unknown:
+            print(f"FAIL: unsupported AppDynamics/ThousandEyes apply section(s): {', '.join(unknown)}", file=sys.stderr)
+            return 2
+        # Webhook creation must precede alert-rule asset apply so the newly
+        # created operation ID can be bound into customWebhook notifications.
+        selected = sorted(selected, key={"webhook": 0, "assets": 1, "event": 2}.get)
+        for section in selected:
+            if section == "assets":
+                commands.append((section, out / "handoff-thousandeyes-assets.sh"))
+            elif section == "webhook":
+                env["APPD_TE_APPLY"] = "1"
+                commands.append((section, out / "te-api-apply-plan.sh"))
+            elif section == "event":
+                env["APPD_TE_EVENT_PROBE"] = "1"
+                commands.append((section, out / "appd-events-api-probe.sh"))
+
+    logs: list[dict[str, Any]] = []
+    for section, command in commands:
+        if not command.is_file():
+            print(f"FAIL: rendered apply command is missing: {command}", file=sys.stderr)
+            return 1
+        proc = subprocess.run(
+            ["bash", str(command)],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=args.json,
+            check=False,
+        )
+        if args.json:
+            logs.append({"section": section, "command": str(command), "exit_code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr})
+        if proc.returncode != 0:
+            if args.json:
+                print(json.dumps({"status": "failed", "skill": args.skill, "output_dir": str(out), "actions": logs}, sort_keys=True))
+            return proc.returncode
+        if args.skill == "splunk-appdynamics-thousandeyes-integration-setup" and section == "webhook" and "assets" in [item for item, _ in commands]:
+            bind_rendered_te_webhook(out)
+    if args.json:
+        print(json.dumps({"status": "applied", "skill": args.skill, "output_dir": str(out), "actions": logs}, sort_keys=True))
+    return 0
+
+
+def build_doctor_report(skill: str) -> dict[str, Any]:
+    rows = coverage_for_skill(skill)
+    errors = validate_coverage(rows)
+    warnings: list[str] = []
+    if not rows:
+        errors.append(f"taxonomy has no coverage rows for {skill}")
+
+    selected_skills = sorted(SKILL_META) if skill == PARENT_SKILL else [skill]
+    taxonomy_rows = load_taxonomy()
+    for selected_skill in selected_skills:
+        skill_dir = SKILLS_DIR / selected_skill
+        for relative in ("SKILL.md", "template.example", "scripts/setup.sh", "scripts/validate.sh"):
+            if not (skill_dir / relative).is_file():
+                errors.append(f"{selected_skill} is missing {relative}")
+        owned = [row for row in taxonomy_rows if row.get("owner") == selected_skill]
+        if selected_skill != PARENT_SKILL and not owned:
+            errors.append(f"{selected_skill} owns no taxonomy rows")
+        actionable = [
+            row for row in owned
+            if row.get("status") in {"api_apply", "cli_apply", "k8s_apply"}
+        ]
+        has_executor = selected_skill in HOST_APPLY_SKILLS | EXECUTABLE_APPLY_SKILLS
+        if actionable and not has_executor:
+            errors.append(
+                f"{selected_skill} claims executable apply coverage without an executor: "
+                + ", ".join(str(row.get("id")) for row in actionable)
+            )
+        if has_executor and not actionable:
+            warnings.append(f"{selected_skill} has an apply executor but no actionable taxonomy rows")
+
+    return {
+        "status": "pass" if not errors else "fail",
+        "skill": skill,
+        "coverage_rows": len(rows),
+        "apply_boundary": SKILL_META[skill]["apply"],
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     skill_dir = SKILLS_DIR / args.skill
     spec = Path(args.spec) if args.spec else skill_dir / "template.example"
     out = Path(args.output_dir) if args.output_dir else REPO_ROOT / f"{args.skill}-rendered"
 
+    if (args.apply is not None or args.rollback is not None) and not args.spec:
+        print("FAIL: apply and rollback require an explicit --spec path; example defaults are render-only", file=sys.stderr)
+        return 2
+
     if args.validate:
         return validate_output(args.skill, out, args.live, args.json)
     if args.doctor:
-        result = {
-            "status": "doctor",
-            "skill": args.skill,
-            "coverage_rows": len(coverage_for_skill(args.skill)),
-            "apply_boundary": SKILL_META[args.skill]["apply"],
-        }
-        print(json.dumps(result, sort_keys=True) if args.json else f"{args.skill}: doctor OK; render and validate child output.")
-        return 0
+        result = build_doctor_report(args.skill)
+        if args.json:
+            print(json.dumps(result, sort_keys=True))
+        elif result["status"] == "pass":
+            print(f"PASS: {args.skill} taxonomy, wrappers, and apply contracts are internally consistent.")
+            for warning in result["warnings"]:
+                print(f"WARN: {warning}", file=sys.stderr)
+        else:
+            for error in result["errors"]:
+                print(f"FAIL: {error}", file=sys.stderr)
+        return 0 if result["status"] == "pass" else 1
     if args.apply is not None:
         if args.skill in HOST_APPLY_SKILLS:
             return apply_host_skill(args, spec, out)
+        if args.skill not in EXECUTABLE_APPLY_SKILLS:
+            print(
+                f"FAIL: {args.skill} has no executable apply implementation; use --render and follow its explicit operator/delegation runbook",
+                file=sys.stderr,
+            )
+            return 2
         if not gate_accepted(args):
             gate = SKILL_META[args.skill]["gate"]
             print(f"FAIL: {args.skill} apply requires {GATE_FLAGS[gate]}", file=sys.stderr)
             return 2
-        rc = render(args.skill, spec, out, args.json)
-        if rc == 0 and not args.json:
-            print("Apply mode rendered a reviewed apply plan; no live mutation was executed by the generic suite.")
-        return rc
+        rc = render(args.skill, spec, out, False, quiet=True)
+        if rc != 0:
+            return rc
+        return run_rendered_apply(args, out)
     if args.rollback is not None:
         if args.skill in HOST_APPLY_SKILLS:
             return rollback_host_skill(args, spec, out)
-        coverage = coverage_for_skill(args.skill)
-        out.mkdir(parents=True, exist_ok=True)
-        write(out / "rollback-plan.sh", render_apply_plan(args.skill, coverage).replace("APPLY", "ROLLBACK"))
-        print(json.dumps({"status": "rollback-rendered", "skill": args.skill, "output_dir": str(out)}, sort_keys=True) if args.json else f"Rendered rollback plan to {out}")
-        return 0
+        print(
+            f"FAIL: {args.skill} has no executable rollback implementation; use its rendered rollback/operator handoff and product-native backup",
+            file=sys.stderr,
+        )
+        return 2
     if args.quickstart:
         rc = render(args.skill, spec, out, args.json)
         if rc == 0 and not args.json:
@@ -5667,4 +6374,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError, ValueError) as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None

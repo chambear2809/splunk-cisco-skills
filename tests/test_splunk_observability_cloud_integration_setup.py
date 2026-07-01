@@ -5,8 +5,8 @@ Covers:
 - Multi-org default-org renders as `deeplink` (not `api_apply`)
 - Cloud vs Enterprise coverage gating
 - SIM Add-on `SAMPLE_` modular-input rejection
-- chmod-600 enforcement (via setup.sh) plus the --allow-loose-token-perms override
-- --i-accept-rbac-cutover guard on enable-centralized-rbac
+- Strict chmod-600 enforcement via setup.sh
+- Fail-closed centralized-RBAC cutover handoff when no safe token transport exists
 - Handoff text references the partner skills by exact relative path
 - Region/realm mismatch preflight (FAIL on bad realm string)
 - GovCloud + GCP carve-out collapses UID sections to not_applicable
@@ -113,8 +113,7 @@ def test_multi_org_default_renders_as_deeplink(tmp_path: Path) -> None:
             pairing={
                 "mode": "unified_identity",
                 "multi_org": [
-                    {"realm": "us0", "label": "prod", "make_default": True},
-                    {"realm": "us1", "label": "staging"},
+                    {"realm": "us1", "label": "staging", "make_default": True},
                 ],
             }
         )
@@ -137,8 +136,10 @@ def test_enterprise_target_collapses_uid_sections_to_not_applicable(tmp_path: Pa
     assert coverage["centralized_rbac.capabilities"]["status"] == "not_applicable"
     assert coverage["centralized_rbac.cutover"]["status"] == "not_applicable"
     assert coverage["discover_app.related_discovery"]["status"] == "not_applicable"
-    # SE keeps SA pairing + Related Content + SIM and switches LOC to TLS path.
-    assert coverage["pairing.sa"]["status"] == "api_apply"
+    # Enterprise skips both Cloud pairing modes and uses its separate LOC
+    # service-account workflow while retaining SIM support.
+    assert coverage["pairing.sa"]["status"] == "not_applicable"
+    assert coverage["log_observer_connect.user"]["status"] == "api_apply"
     assert coverage["sim_addon.account"]["status"] == "api_apply"
     assert coverage["log_observer_connect.tls_cert"]["status"] == "handoff"
     assert coverage["sim_addon.victoria_hec"]["status"] == "not_applicable"
@@ -213,15 +214,14 @@ def test_handoff_references_partner_skills(tmp_path: Path) -> None:
     assert "skills/splunk-oncall-setup" in handoff
 
 
-def test_apply_pairing_script_includes_all_realms(tmp_path: Path) -> None:
+def test_multi_org_pairing_fails_closed_before_mutation(tmp_path: Path) -> None:
     renderer = _load_renderer()
     spec = renderer.validate_spec(
         _spec(
             pairing={
                 "mode": "unified_identity",
                 "multi_org": [
-                    {"realm": "us0", "make_default": True},
-                    {"realm": "us1"},
+                    {"realm": "us1", "make_default": True},
                     {"realm": "eu0"},
                 ],
             }
@@ -229,10 +229,13 @@ def test_apply_pairing_script_includes_all_realms(tmp_path: Path) -> None:
     )
     renderer.render(spec, tmp_path)
     apply_pairing = (tmp_path / "scripts/apply-pairing.sh").read_text()
-    assert "pair --realm us0" in apply_pairing
-    assert "pair --realm us1" in apply_pairing
-    assert "pair --realm eu0" in apply_pairing
-    assert "--o11y-access-token" not in apply_pairing
+    assert "automated multi-org pairing is unavailable" in apply_pairing
+    assert "no changes were made" in apply_pairing
+    assert "pair --realm" not in apply_pairing
+    assert "exit 2" in apply_pairing
+    plan = (tmp_path / "02-pairing.md").read_text()
+    for realm in ("us0", "us1", "eu0"):
+        assert f"`{realm}`" in plan
 
 
 def test_apply_rbac_script_guards_destructive_step(tmp_path: Path) -> None:
@@ -240,8 +243,10 @@ def test_apply_rbac_script_guards_destructive_step(tmp_path: Path) -> None:
     spec = renderer.validate_spec(_spec(centralized_rbac={"enable_centralized_rbac": True}))
     renderer.render(spec, tmp_path)
     rbac = (tmp_path / "scripts/apply-rbac.sh").read_text()
-    assert "SOICS_RBAC_CUTOVER_ACK" in rbac
-    assert "--i-accept-rbac-cutover" in rbac
+    assert "no safe token-file transport" in rbac
+    assert "no changes were made" in rbac
+    assert "SOICS_RBAC_CUTOVER_ACK" not in rbac
+    assert "exit 2" in rbac
 
 
 def test_doctor_renders_report_when_doctor_data_supplied(tmp_path: Path) -> None:

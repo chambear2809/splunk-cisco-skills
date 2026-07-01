@@ -96,11 +96,24 @@ For each credential from step 3, re-set it through Splunk so the new
 secret encrypts it:
 
 ```bash
-splunk edit user breakglass_alice -password 'NEW_PASSWORD' -auth admin:OLD
-splunk edit licenser-localpeer -master_uri https://lm.example.com:8089 \
-  -auth admin:NEW
-splunk edit cluster-config -mode peer -auth-passphrase-file /tmp/new_pass4
-# etc.
+source skills/shared/lib/credential_helpers.sh
+load_splunk_connection_settings
+SK="$(get_session_key "${SPLUNK_SEARCH_API_URI}")"
+: "${BREAKGLASS_PASSWORD_FILE:?point to a chmod-600 one-line password file}"
+splunk_curl "${SK}" --fail-with-body --show-error -X POST \
+  "${SPLUNK_SEARCH_API_URI}/services/authentication/users/breakglass_alice" \
+  --data-urlencode "password@${BREAKGLASS_PASSWORD_FILE}"
+
+# Reconfigure license peers through the topology-aware license-manager skill;
+# do not put the new credential on a Splunk CLI argv.
+bash skills/splunk-license-manager-setup/scripts/setup.sh \
+  --phase apply --apply-target peers \
+  --license-manager-uri https://lm.example.com:8089 \
+  --peer-hosts <comma-separated-peers> \
+  --admin-password-file "${SPLUNK_ADMIN_PASSWORD_FILE}"
+# The documented cluster CLI accepts `-secret <value>` but has no secret-file
+# flag. Do not place the new key on argv; use the cluster setup skills' staged
+# configuration and coordinated restart workflow instead.
 ```
 
 Use file-based password passing wherever the CLI supports it; never

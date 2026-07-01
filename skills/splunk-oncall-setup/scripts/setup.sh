@@ -11,7 +11,7 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck source=/dev/null
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-load_oncall_settings >/dev/null 2>&1 || true
+load_oncall_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-oncall-rendered"
 if [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
@@ -32,7 +32,7 @@ Modes (default: --render):
   --validate            Validate a spec and/or rendered output.
   --apply               Render, validate, then execute API actions against api.victorops.com.
   --send-alert          Send a single alert through the REST endpoint integration.
-  --install-splunk-app  Install/configure the Splunk-side companion apps (3546, 4886, 5863).
+  --install-splunk-app  Install/configure Platform apps 3546 and 4886; render the 5863 SOAR handoff.
   --uninstall           Uninstall the Splunk-side companion apps.
   --dry-run             With --apply or --install-splunk-app, show actions without mutating.
   --json                Emit JSON output where supported.
@@ -87,8 +87,8 @@ while [[ $# -gt 0 ]]; do
         --validate) VALIDATE=true; shift ;;
         --apply) APPLY=true; RENDER=true; VALIDATE=true; shift ;;
         --send-alert) SEND_ALERT=true; shift ;;
-        --install-splunk-app) INSTALL_SPLUNK_APP=true; shift ;;
-        --uninstall) UNINSTALL=true; INSTALL_SPLUNK_APP=true; shift ;;
+        --install-splunk-app) INSTALL_SPLUNK_APP=true; RENDER=true; VALIDATE=true; shift ;;
+        --uninstall) UNINSTALL=true; INSTALL_SPLUNK_APP=true; RENDER=true; VALIDATE=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --self-test) SELF_TEST=true; SEND_ALERT=true; shift ;;
@@ -170,12 +170,14 @@ if [[ "${RENDER}" == "true" ]]; then
     fi
     ensure_yaml_for_spec "${SPEC}" || exit 1
     render_args=(--spec "${SPEC}" --output-dir "${OUTPUT_DIR}")
-    if [[ "${JSON_OUTPUT}" == "true" && "${APPLY}" != "true" ]]; then
+    if [[ "${JSON_OUTPUT}" == "true" && "${APPLY}" != "true" \
+        && "${INSTALL_SPLUNK_APP}" != "true" ]]; then
         render_args+=(--json)
     fi
-    if [[ "${JSON_OUTPUT}" == "true" && "${APPLY}" == "true" ]]; then
-        # JSON+apply: route render and validate to stderr so the only
-        # stdout JSON document comes from oncall_api.py.
+    if [[ "${JSON_OUTPUT}" == "true" ]] \
+        && { [[ "${APPLY}" == "true" ]] || [[ "${INSTALL_SPLUNK_APP}" == "true" ]]; }; then
+        # JSON+mutation: route render and validate to stderr so the only
+        # stdout JSON document comes from the action executor.
         "${PYTHON_BIN}" "${SCRIPT_DIR}/render_oncall.py" "${render_args[@]}" >&2
         "${PYTHON_BIN}" "${SCRIPT_DIR}/validate_oncall.py" --spec "${SPEC}" --output-dir "${OUTPUT_DIR}" >&2
     elif [[ "${JSON_OUTPUT}" == "true" ]]; then

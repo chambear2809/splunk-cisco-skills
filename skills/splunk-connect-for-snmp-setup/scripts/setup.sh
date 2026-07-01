@@ -196,12 +196,20 @@ write_text_file() {
 
 write_secret_file() {
     local path="$1" content="$2"
-    local previous_umask
+    local previous_umask tmp
     ensure_parent_dir "${path}"
+    if [[ -L "${path}" ]]; then
+        log "ERROR: Refusing symbolic-link secret output path: ${path}"
+        return 1
+    fi
     previous_umask="$(umask)"
     umask 077
-    printf '%s' "${content}" > "${path}"
-    chmod 600 "${path}"
+    tmp="$(mktemp "${path}.tmp.XXXXXX")" || { umask "${previous_umask}"; return 1; }
+    if ! printf '%s' "${content}" > "${tmp}" || ! chmod 600 "${tmp}" || ! mv -f -- "${tmp}" "${path}"; then
+        rm -f -- "${tmp}"
+        umask "${previous_umask}"
+        return 1
+    fi
     umask "${previous_umask}"
 }
 
@@ -221,7 +229,7 @@ make_executable() {
 }
 
 validate_args() {
-    local has_mode=false
+    local has_mode=false applying=false future_token=false
 
     HEC_TLS_VERIFY="$(normalize_yes_no "${HEC_TLS_VERIFY}")"
 
@@ -248,6 +256,17 @@ validate_args() {
         exit 1
     fi
 
+    if $APPLY_COMPOSE || $APPLY_K8S; then
+        applying=true
+    fi
+    if $DO_SPLUNK_PREP && [[ -n "${WRITE_HEC_TOKEN_FILE}" ]]; then
+        future_token=true
+    fi
+    if $applying && [[ -z "${HEC_TOKEN_FILE}" ]] && ! $future_token; then
+        log "ERROR: Live apply requires --hec-token-file, or --splunk-prep with --write-hec-token-file."
+        exit 1
+    fi
+
     validate_choice "${COMPOSE_RUNTIME}" docker podman
 
     if [[ ! "${TRAP_PORT}" =~ ^[0-9]+$ ]] || (( TRAP_PORT < 1 || TRAP_PORT > 65535 )); then
@@ -268,7 +287,7 @@ validate_args() {
         exit 1
     fi
 
-    if [[ -n "${HEC_TOKEN_FILE}" && ! -f "${HEC_TOKEN_FILE}" ]]; then
+    if [[ -n "${HEC_TOKEN_FILE}" && ! -f "${HEC_TOKEN_FILE}" ]] && ! $future_token; then
         log "ERROR: HEC token file not found: ${HEC_TOKEN_FILE}"
         exit 1
     fi
@@ -297,6 +316,35 @@ validate_args() {
         OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
     else
         OUTPUT_DIR="$(resolve_abs_path "${_PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}")"
+    fi
+}
+
+ensure_apply_token_ready() {
+    local token_value=""
+    if $APPLY_COMPOSE || $APPLY_K8S; then
+        if [[ -n "${HEC_TOKEN_FILE}" && -L "${HEC_TOKEN_FILE}" ]]; then
+            log "ERROR: HEC token file must be a regular file, not a symbolic link: ${HEC_TOKEN_FILE}"
+            exit 1
+        fi
+        if [[ -z "${HEC_TOKEN_FILE}" || ! -s "${HEC_TOKEN_FILE}" ]]; then
+            log "ERROR: Live apply is blocked because no nonempty HEC token file is available."
+            log "HANDOFF: Provide --hec-token-file PATH, or combine --splunk-prep with --write-hec-token-file PATH."
+            exit 1
+        fi
+        token_value="$(read_secret_file "${HEC_TOKEN_FILE}")" || exit 1
+        if [[ -z "${token_value}" ]]; then
+            log "ERROR: Live apply is blocked because the HEC token file contains only whitespace."
+            exit 1
+        fi
+        if ! python3 - "${HEC_TOKEN_FILE}" <<'PY'
+import os
+import sys
+raise SystemExit(0 if os.stat(sys.argv[1]).st_mode & 0o077 == 0 else 1)
+PY
+        then
+            log "ERROR: HEC token file must not be readable or writable by group/other users: ${HEC_TOKEN_FILE}"
+            exit 1
+        fi
     fi
 }
 
@@ -749,21 +797,23 @@ write_hec_token_file_if_requested() {
 
     if is_splunk_cloud; then
         if ! maybe_start_search_session; then
-            log "WARN: Could not open a Splunk REST session to retrieve the HEC token value."
-            return 0
+            log "ERROR: Could not open a Splunk REST session to retrieve the requested HEC token value."
+            log "HANDOFF: Rotate/create the token through the supported Cloud HEC surface and store the one-time value in ${WRITE_HEC_TOKEN_FILE}."
+            return 1
         fi
         token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     else
         if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
-            log "WARN: Could not inspect the ingest-tier HEC token value."
-            return 0
+            log "ERROR: Could not inspect the requested ingest-tier HEC token value."
+            return 1
         fi
     fi
 
     token_value="$(rest_json_field "${token_record}" "token")"
     if [[ -z "${token_value}" ]]; then
-        log "WARN: Splunk did not return a clear HEC token value for '${token_name}'. Write the token to a local file manually."
-        return 0
+        log "ERROR: Splunk did not return the requested HEC token value for '${token_name}'."
+        log "HANDOFF: Rotate/create the token and store its one-time value in ${WRITE_HEC_TOKEN_FILE}, then rerun validation."
+        return 1
     fi
 
     write_secret_file "${WRITE_HEC_TOKEN_FILE}" "${token_value}"$'\n'
@@ -772,7 +822,7 @@ write_hec_token_file_if_requested() {
 }
 
 warn_about_hec_token_details() {
-    local token_name="$1" token_record ack_state indexes_value default_index
+    local token_name="$1" token_record ack_state indexes_value default_index missing_indexes
 
     if is_splunk_cloud; then
         if ! maybe_start_search_session; then
@@ -801,8 +851,19 @@ warn_about_hec_token_details() {
     esac
 
     if [[ -n "${indexes_value}" ]]; then
-        log "WARN: HEC token '${token_name}' has restricted Selected Indexes (${indexes_value})."
-        log "WARN: Make sure it can write to em_logs, em_metrics, netops, and netmetrics."
+        missing_indexes="$(python3 - "${indexes_value}" "${EVENT_INDEXES[@]}" "${METRIC_INDEXES[@]}" <<'PY'
+import sys
+allowed = {item.strip() for item in sys.argv[1].split(",") if item.strip()}
+required = sys.argv[2:]
+print(",".join(item for item in required if "*" not in allowed and item not in allowed), end="")
+PY
+)"
+        if [[ -n "${missing_indexes}" ]]; then
+            log "ERROR: HEC token '${token_name}' Selected Indexes omit required SC4SNMP indexes: ${missing_indexes}."
+            log "HANDOFF: Clear the Selected Indexes restriction or add every required event/metrics index, then rerun preparation."
+            return 1
+        fi
+        log "HEC token '${token_name}' Selected Indexes include all required SC4SNMP indexes."
     fi
 
     if [[ -n "${default_index}" ]]; then
@@ -1316,6 +1377,7 @@ main() {
     if [[ "${DO_SPLUNK_PREP}" == "true" ]]; then
         run_splunk_prep
     fi
+    ensure_apply_token_ready
     if [[ "${RENDER_COMPOSE}" == "true" ]]; then
         render_compose_assets
     fi

@@ -624,6 +624,11 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
 fi
 
 warn_if_current_skill_role_unsupported
+if [[ "${INSTALL}" == "true" ]]; then
+    require_current_skill_role_supported
+    require_search_tier_target_role "The Asset and Risk Intelligence app install"
+fi
+if [[ "${INSTALL}" == "true" && "${CREATE_INDEXES}" == "true" ]]; then require_index_management_target_role; fi
 
 if [[ "${PLANNING_REQUESTED}" == "true" && "${INSTALL}" != "true" && "${VALIDATE}" != "true" ]]; then
     phases=()

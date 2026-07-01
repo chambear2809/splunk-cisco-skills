@@ -57,6 +57,18 @@ ep_api_call() {
         log "ERROR: EP API token missing or empty: ${token_file}"
         return 1
     fi
+    local token_mode
+    token_mode="$(python3 - "${token_file}" <<'PY'
+import os
+import stat
+import sys
+print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "03o"))
+PY
+)" || return 1
+    if [[ "${token_mode}" != "600" && "${token_mode}" != "400" ]]; then
+        log "ERROR: EP API token file must have mode 0600 or 0400: ${token_file} (found ${token_mode})"
+        return 1
+    fi
     # Read TLS args into a bash array. mapfile is simpler but less portable;
     # use a here-string to keep behavior deterministic on macOS bash 3.x.
     # _ep_curl_tls_args returns 1 when EP_API_CA_CERT is misconfigured; we
@@ -78,17 +90,38 @@ ep_api_call() {
     fi
     local token
     token="$(cat "${token_file}")"
+    if [[ -z "${token}" || "${token}" == *$'\n'* || "${token}" == *$'\r'* || "${token}" == *'"'* ]]; then
+        log "ERROR: EP API token file must contain one non-empty line without quotes."
+        return 1
+    fi
     # printf is a bash builtin, so the token does not appear in any separate
     # process argv. The FIFO that backs the curl `-K` config is briefly
     # readable to the same UID via /proc; on multi-tenant hosts where the
     # caller's UID is shared with untrusted code, the EP token should be
     # treated as compromised — same trade-off documented in rest_helpers.sh.
-    curl -sS \
+    local response_file http_code
+    response_file="$(mktemp)" || return 1
+    chmod 600 "${response_file}"
+    if ! http_code="$(curl -sS -o "${response_file}" -w '%{http_code}' \
         ${tls_args[@]+"${tls_args[@]}"} \
         -X "${method}" \
         -K <(printf 'header = "Content-Type: application/json"\nheader = "Authorization: Bearer %s"\n' "${token}") \
         "$@" \
-        "${tenant_url}${path}"
+        "${tenant_url}${path}")"; then
+        token=""
+        rm -f "${response_file}"
+        log "ERROR: Edge Processor API request failed at the transport layer: ${method} ${path}"
+        return 1
+    fi
+    token=""
+    case "${http_code}" in
+        2??) cat "${response_file}"; rm -f "${response_file}" ;;
+        *)
+            log "ERROR: Edge Processor API request failed (HTTP ${http_code}): ${method} ${path}"
+            rm -f "${response_file}"
+            return 1
+            ;;
+    esac
 }
 
 # ep_apply_source_type <tenant_url> <token_file> <source_type_json>
@@ -145,15 +178,22 @@ ep_attach_pipeline_to_ep() {
 ep_instance_status() {
     local tenant_url="$1" token_file="$2" ep_name="$3"
     local body
-    body=$(ep_api_call "${tenant_url}" "${token_file}" GET \
-        "/api/v1/edge-processor/edge-processors/${ep_name}/instances" 2>/dev/null || echo '{}')
+    if ! body=$(ep_api_call "${tenant_url}" "${token_file}" GET \
+        "/api/v1/edge-processor/edge-processors/${ep_name}/instances" 2>/dev/null); then
+        echo "ERROR: could not read Edge Processor instance status for ${ep_name}." >&2
+        return 2
+    fi
     python3 - "${body}" <<'PY'
 import json, sys
 try:
-    data = json.loads(sys.argv[1]) if sys.argv[1].strip() else {}
-except Exception:
-    data = {}
-instances = data.get("instances", []) if isinstance(data, dict) else []
+    data = json.loads(sys.argv[1])
+except Exception as exc:
+    print(f"ERROR: invalid Edge Processor instance response: {exc}", file=sys.stderr)
+    sys.exit(2)
+if not isinstance(data, dict) or not isinstance(data.get("instances"), list):
+    print("ERROR: Edge Processor instance response has an invalid schema", file=sys.stderr)
+    sys.exit(2)
+instances = data["instances"]
 healthy = sum(1 for i in instances if i.get("status") == "Healthy")
 total = len(instances)
 print(f"{healthy} {total}")

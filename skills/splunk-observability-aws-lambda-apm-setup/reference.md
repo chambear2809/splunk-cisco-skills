@@ -11,7 +11,8 @@ Operator reference for the
 - Layer ARN format: `arn:aws:lambda:<region>:254067382080:layer:splunk-apm[-arm]:<version>`
 - Manifest source: `signalfx/lambda-layer-versions` (GitHub)
 - Baked snapshot: `references/layer-versions.snapshot.json`
-- Live refresh: `--refresh-layer-manifest` or `SPLUNK_LAMBDA_LAYER_MANIFEST_URL`
+- Refresh policy: replace the bundled snapshot from the upstream repository in
+  a reviewed code change; the CLI does not fetch executable metadata live.
 
 ## Supported runtimes
 
@@ -34,7 +35,7 @@ Operator reference for the
 |----------|-------------|
 | `AWS_LAMBDA_EXEC_WRAPPER` | Runtime exec wrapper path (see table above) |
 | `SPLUNK_REALM` | Splunk Observability Cloud realm (e.g. `us1`) |
-| `SPLUNK_ACCESS_TOKEN` | Ingest token — delivered via `{{resolve:secretsmanager:...}}` or `{{resolve:ssm-secure:...}}` |
+| `SPLUNK_ACCESS_TOKEN` | Ingest token — fetched from the selected AWS secret into a private apply-time file, then stored in Lambda environment configuration |
 | `OTEL_SERVICE_NAME` | Service name for APM (default: function name) |
 
 ### Optional
@@ -63,7 +64,11 @@ Header: X-SF-TOKEN: <access-token>
 
 ## Secret delivery
 
-`SPLUNK_ACCESS_TOKEN` must never be a literal value. Two supported methods:
+`SPLUNK_ACCESS_TOKEN` must never be passed on a command line or written into a
+rendered artifact. Two supported staging methods are available. The AWS CLI
+apply helper fetches the value and merges it into Lambda environment variables;
+Lambda itself stores environment values, so access to function configuration
+must remain least-privileged.
 
 ### Secrets Manager (default, `secret_backend: secretsmanager`)
 ```yaml
@@ -184,4 +189,4 @@ combined layer count (APM + Metrics ≤ 5 remaining slots).
 | `Task timed out` | Extension SHUTDOWN flush | Increase function timeout by at least 3 s |
 | X-Ray traces + OTel traces mixed | X-Ray coexistence not set | Set `OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION=true` |
 | Layer ARN not found | arm64 in unpublished region | Use x86_64 or choose a supported arm64 region |
-| Layer ARN stale | Snapshot >90 days old | Run `--refresh-layer-manifest` or update snapshot |
+| Layer ARN stale | Snapshot >90 days old | Review and update `references/layer-versions.snapshot.json` from upstream |

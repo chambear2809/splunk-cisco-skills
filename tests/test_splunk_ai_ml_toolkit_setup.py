@@ -37,10 +37,9 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "--legacy-anomaly-audit",
         "--output-dir",
         str(output_dir),
-        "--json",
     )
 
-    assert '"api_version": "splunk-ai-ml-toolkit-setup/v1"' in result.stdout
+    assert "Rendered Splunk AI/ML Toolkit plan" in result.stdout
     assert "Rendered validation passed" in result.stdout
 
     required = [

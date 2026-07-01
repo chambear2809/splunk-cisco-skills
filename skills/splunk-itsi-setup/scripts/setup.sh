@@ -176,6 +176,10 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
 fi
 
 if [[ "${INSTALL}" == "true" ]]; then
+    require_current_skill_role_supported
+fi
+
+if [[ "${INSTALL}" == "true" ]]; then
     build_install_command
     build_fallback_command
     if ! "${INSTALL_CMD[@]}"; then

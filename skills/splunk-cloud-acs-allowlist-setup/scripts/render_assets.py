@@ -523,6 +523,9 @@ except Exception:
     print('')
 ")
       planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}'].get('${{family}}', []))))")
+      if [[ -z "${{planned}}" ]]; then
+        continue
+      fi
       if [[ "${{live}}" != "${{planned}}" ]]; then
         printf 'WARNING: Drift detected on %s/%s (live=%s, plan=%s)\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}" >&2
         drift_found=true
@@ -567,9 +570,14 @@ features=$(python3 -c "import json; print(' '.join(sorted(json.load(open('${{PLA
 for feature in ${{features}}; do
   planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}']['${{FAMILY}}'])))" 2>/dev/null || echo "")
 
+  if [[ -z "${{planned}}" ]]; then
+    log "SKIP: no ${{FAMILY}} subnets were specified for '${{feature}}'; preserving live state."
+    continue
+  fi
+
   # Per Splunk ACS CLI docs, the read-only subcommand is `describe` (not `list`).
   live_json=$(acs_command "${{CLI_GROUP}}" describe "${{feature}}" 2>/dev/null \\
-    | acs_extract_http_response_json || printf '%s' '{{}}')
+    | acs_extract_http_response_json || {{ echo "ERROR: could not read live ${{FAMILY}} allowlist for '${{feature}}'; refusing blind convergence." >&2; exit 1; }})
   live=$(printf '%s' "${{live_json}}" | python3 -c "
 import json, sys
 try:
@@ -691,7 +699,7 @@ for feature in ${{features}}; do
     fi
     snapshot_path="${{AUDIT_DIR}}/${{feature}}-${{family}}.json"
     acs_command "${{cli_group}}" describe "${{feature}}" 2>/dev/null \\
-      | acs_extract_http_response_json > "${{snapshot_path}}" || printf '%s' '{{}}' > "${{snapshot_path}}"
+      | acs_extract_http_response_json > "${{snapshot_path}}" || {{ echo "ERROR: could not read live ${{family}} allowlist for '${{feature}}'; audit is incomplete." >&2; exit 1; }}
 
     live=$(python3 -c "
 import json, sys
@@ -707,6 +715,10 @@ import json, sys
 plan = json.load(open(sys.argv[1]))
 print(','.join(sorted(plan['features'].get(sys.argv[2], {{}}).get(sys.argv[3], []))))
 " "${{PLAN_FILE}}" "${{feature}}" "${{family}}" 2>/dev/null || printf '')
+    if [[ -z "${{planned}}" ]]; then
+      printf 'SKIP: feature=%s family=%s was unspecified; live state preserved\n' "${{feature}}" "${{family}}"
+      continue
+    fi
     if [[ "${{live}}" != "${{planned}}" ]]; then
       printf 'MISMATCH: feature=%s family=%s live=%s plan=%s\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}"
       mismatch=true

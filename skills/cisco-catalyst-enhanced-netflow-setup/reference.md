@@ -82,3 +82,11 @@ state_change_requires_restart = true
 
 Plan for a restart after installation unless the shared installer already
 handled it.
+
+## Completion Validation
+
+The validator is diagnostic by default. `--completion`/`--strict` fails when
+the parsing-tier Stream receiver is absent or incomplete or when the default
+`netflow`/`stream:netflow` data evidence is absent. Use `--index` and
+`--sourcetype` for custom routing. Search-tier Cisco TA and dashboard placement
+remains a separately validated topology handoff.

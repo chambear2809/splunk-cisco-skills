@@ -162,7 +162,7 @@ the search-tier REST API.
 ### Step 5: Validate
 
 ```bash
-bash skills/cisco-enterprise-networking-setup/scripts/validate.sh
+bash skills/cisco-enterprise-networking-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, macros, saved searches, data model, data presence.
@@ -241,3 +241,9 @@ bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
 
 - [reference.md](reference.md) — Macro definitions, saved searches, dashboards
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require dashboard macro alignment, shipped views, required saved searches,
+and at least one populated Cisco networking index.

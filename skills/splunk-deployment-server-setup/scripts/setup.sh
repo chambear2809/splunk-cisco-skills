@@ -27,6 +27,7 @@ PHASE="render"
 DRY_RUN=false
 JSON_OUTPUT=false
 APPLY=false
+LIVE=false
 OUTPUT_DIR=""
 
 DS_HOST=""
@@ -110,7 +111,7 @@ while [[ $# -gt 0 ]]; do
         --apply) APPLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
-        --live) RENDERER_ARGS_EXTRA+=("--live"); shift ;;
+        --live) LIVE=true; shift ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --ds-host) require_arg "$1" $# || exit 1; DS_HOST="$2"; shift 2 ;;
         --ds-uri) require_arg "$1" $# || exit 1; DS_URI="$2"; shift 2 ;;
@@ -132,6 +133,48 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+
+case "${PHASE}" in
+    render|preflight|bootstrap|reload|inspect|ha-pair|migrate-clients|status|validate) ;;
+    *) echo "ERROR: unsupported --phase '${PHASE}'." >&2; usage 1 ;;
+esac
+
+for value_name in FLEET_SIZE PHONE_HOME_INTERVAL HANDSHAKE_RETRY_INTERVAL MAX_CLIENT_APPS STAGED_ROLLOUT_PCT; do
+    value="${!value_name}"
+    [[ -z "${value}" ]] && continue
+    if [[ ! "${value}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: ${value_name} must be an integer." >&2
+        exit 1
+    fi
+    if [[ "${value_name}" != "FLEET_SIZE" && "${value}" -lt 1 ]]; then
+        echo "ERROR: ${value_name} must be positive." >&2
+        exit 1
+    fi
+done
+if (( STAGED_ROLLOUT_PCT < 1 || STAGED_ROLLOUT_PCT > 100 )); then
+    echo "ERROR: --staged-rollout-pct must be between 1 and 100." >&2
+    exit 1
+fi
+if [[ "${PHASE}" == "migrate-clients" && -z "${NEW_DS_URI}" ]]; then
+    echo "ERROR: migrate-clients requires --new-ds-uri." >&2
+    exit 1
+fi
+if [[ "${PHASE}" == "ha-pair" ]]; then
+    HA_PAIR=true
+    if [[ -z "${DS_SECONDARY_HOST}" || -z "${LB_URI}" ]]; then
+        echo "ERROR: ha-pair requires --ds-secondary-host and --lb-uri." >&2
+        exit 1
+    fi
+fi
+
+if [[ "${JSON_OUTPUT}" == "true" && "${PHASE}" != "render" ]]; then
+    echo "ERROR: --json is render-only; action phases produce operator output." >&2
+    exit 1
+fi
+if [[ "${PHASE}" == "render" && "${APPLY}" == "true" ]]; then
+    echo "ERROR: --apply with --phase render is ambiguous; select an explicit action phase." >&2
+    exit 1
+fi
 
 # Default output dir
 if [[ -z "${OUTPUT_DIR}" ]]; then
@@ -167,13 +210,53 @@ RENDERER_ARGS=(
 [[ -n "${ADMIN_PASSWORD_FILE}" ]] && RENDERER_ARGS+=("--admin-password-file" "${ADMIN_PASSWORD_FILE}")
 [[ "${HA_PAIR}" == "true" ]] && RENDERER_ARGS+=("--ha-pair")
 [[ "${ACCEPT_CASCADING_DS_WORKAROUND}" == "true" ]] && RENDERER_ARGS+=("--accept-cascading-ds-workaround")
-[[ "${APPLY}" == "true" ]] && RENDERER_ARGS+=("--apply")
-[[ "${DRY_RUN}" == "true" ]] && RENDERER_ARGS+=("--dry-run")
 [[ "${JSON_OUTPUT}" == "true" ]] && RENDERER_ARGS+=("--json")
 
-# Append any extra args collected during parsing (e.g. --live)
-if [[ -n "${RENDERER_ARGS_EXTRA[*]+x}" ]]; then
-    RENDERER_ARGS+=("${RENDERER_ARGS_EXTRA[@]}")
+if [[ "${DRY_RUN}" == "true" ]]; then
+    if [[ "${JSON_OUTPUT}" == "true" ]]; then
+        python3 - "${PHASE}" "${OUTPUT_DIR}" <<'PY'
+import json, sys
+print(json.dumps({"skill": "splunk-deployment-server-setup", "phase": sys.argv[1], "output_dir": sys.argv[2], "dry_run": True}))
+PY
+    else
+        echo "DRY RUN: would render Deployment Server assets under ${OUTPUT_DIR}/ds and execute phase ${PHASE}."
+    fi
+    exit 0
 fi
 
-exec "${PYTHON_BIN}" "${RENDERER}" "${RENDERER_ARGS[@]}"
+"${PYTHON_BIN}" "${RENDERER}" "${RENDERER_ARGS[@]}"
+
+run_rendered() {
+    local rel="$1"
+    local script="${OUTPUT_DIR}/ds/${rel}"
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        echo "DRY RUN: ${script}"
+        return 0
+    fi
+    if [[ ! -x "${script}" ]]; then
+        echo "ERROR: rendered action is missing or not executable: ${script}" >&2
+        exit 1
+    fi
+    "${script}"
+}
+
+case "${PHASE}" in
+    render|ha-pair)
+        if [[ "${PHASE}" == "ha-pair" && "${APPLY}" == "true" ]]; then
+            echo "ERROR: HA load-balancer provisioning is an operator handoff; review ds/ha assets and apply with the owning platform tooling." >&2
+            exit 2
+        fi
+        ;;
+    preflight)
+        bash "${SCRIPT_DIR}/validate.sh" --output-dir "${OUTPUT_DIR}"
+        ;;
+    bootstrap) run_rendered bootstrap/enable-deploy-server.sh ;;
+    reload) run_rendered reload/reload-deploy-server.sh ;;
+    inspect|status) run_rendered inspect/inspect-fleet.sh ;;
+    migrate-clients) run_rendered migrate/retarget-clients.sh ;;
+    validate)
+        validate_args=(--output-dir "${OUTPUT_DIR}")
+        [[ "${LIVE}" == "true" ]] && validate_args+=(--live --ds-uri "${DS_URI}" --admin-password-file "${ADMIN_PASSWORD_FILE}")
+        bash "${SCRIPT_DIR}/validate.sh" "${validate_args[@]}"
+        ;;
+esac

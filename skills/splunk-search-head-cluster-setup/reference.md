@@ -55,7 +55,9 @@ port = 8191
 | `$SPLUNK_HOME/etc/shcluster/apps/` | Apps deployed to all members |
 | `$SPLUNK_HOME/etc/shcluster/users/` | User-scoped objects (managed by Splunk) |
 
-**Apply bundle**: `splunk apply shcluster-bundle -auth ...` on the **deployer**.
+**Apply bundle**: establish an interactive local `splunk login` session as the
+Splunk OS user, then run `splunk apply shcluster-bundle --answer-yes` on the
+**deployer**. Never place the password in `-auth` argv.
 **Validate first**: `splunk validate shcluster-bundle` before applying.
 
 Bundle generations: each apply increments the generation counter. Check drift with `splunk show shcluster-bundle-status`.
@@ -126,8 +128,8 @@ When deploying ES on an SHC:
 |----------|--------|---------|
 | `/services/shcluster/captain/info` | GET | Captain identity, peers, status |
 | `/services/shcluster/captain/peers` | GET | All members + status |
-| `/services/shcluster/captain/control/control/restart_inactivity_timeout` | POST | Trigger rolling restart |
-| `/services/shcluster/captain/control/control/transfer-captain` | POST | Transfer captain |
+| `/services/shcluster/config/config` | POST | Set `rolling_restart` mode |
+| `/services/shcluster/captain/control/control/restart` | POST | Trigger the configured rolling restart |
 | `/services/shcluster/member/members` | GET | Member list |
 | `/services/shcluster/member/members/<uuid>/control/control/graceful_shutdown` | POST | Graceful decommission |
 | `/services/kvstore/status` | GET | KV Store replication status |
@@ -149,12 +151,13 @@ splunk show shcluster-bundle-status
 splunk show kvstore-status
 
 # Bootstrap (run once on first captain)
+# First run `splunk login` interactively as the Splunk OS user. Bootstrap also
+# requires pass4SymmKey input; do not place either secret in shell history.
 splunk bootstrap shcluster-captain \
-  -auth admin:<pass> \
   -servers_list "https://sh01:8089,https://sh02:8089,https://sh03:8089"
 
 # Apply bundle (run on deployer)
-splunk apply shcluster-bundle -auth admin:<pass> --answer-yes
+splunk apply shcluster-bundle --answer-yes
 
 # Transfer captain
 splunk transfer shcluster-captain \

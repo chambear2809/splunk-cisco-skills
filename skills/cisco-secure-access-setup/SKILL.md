@@ -129,13 +129,13 @@ You can also configure optional dashboard-side settings such as:
 ### Step 4: Validate
 
 ```bash
-bash skills/cisco-secure-access-setup/scripts/validate.sh
+bash skills/cisco-secure-access-setup/scripts/validate.sh --completion
 ```
 
 To validate one specific org:
 
 ```bash
-bash skills/cisco-secure-access-setup/scripts/validate.sh --org-id example-org-id
+bash skills/cisco-secure-access-setup/scripts/validate.sh --completion --org-id example-org-id
 ```
 
 ## Dashboards
@@ -197,3 +197,10 @@ The current skill automates:
 
 - [reference.md](reference.md) — endpoint behavior and payload fields
 - [template.example](template.example) — non-secret intake worksheet
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require an org/global-org configuration, dashboard views, and events in at
+least one configured org or S3-backed index. Strict mode rejects
+`--skip-data-flow` because it cannot prove completion without event evidence.

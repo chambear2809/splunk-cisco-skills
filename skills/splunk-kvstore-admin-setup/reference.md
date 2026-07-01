@@ -10,7 +10,9 @@ Current Splunk Enterprise KV Store documentation (verified 2026):
 - Restore with `splunk restore kvstore -pointInTime true -archiveName <file>.tar.gz`.
   On a search head cluster, run restore from the captain; only one restore can
   run at a time across the cluster. Enable maintenance mode with
-  `splunk enable kvstore-maintenance-mode` before a clustered restore.
+  `splunk enable kvstore-maintenance-mode` before a clustered restore and
+  disable it again after a successful restore. The rendered script leaves it
+  enabled when restore fails so the operator can investigate safely.
 - `splunk clean kvstore --local` (standalone) or `--cluster` (SHC) permanently
   deletes KV Store data; back up first.
 - Storage-engine migration: single-instance deployments migrate to WiredTiger
@@ -41,14 +43,23 @@ so no restart is required for the collection definition itself.
 ## Topology Notes
 
 - Standalone: storage-engine migration and server-version upgrade are automatic
-  on the Splunk Enterprise upgrade; this skill mostly reports status and renders
-  backup/restore helpers.
+  on the Splunk Enterprise upgrade. Live standalone migrate/upgrade operations
+  therefore return a nonzero handoff instead of reporting a status-only script
+  as a completed mutation.
 - SHC: migrate and upgrade are explicit, coordinated cluster commands; run them
   from a member after all members are on the same Splunk version. Hand off
   replication-lag triage, oplog reset, and captain transfer to
   `splunk-search-head-cluster-setup`.
 
+The migration apply path defaults to the supported dry run and clearly reports
+that no conversion occurred. Actual SHC migration and server-version upgrade
+are separately acceptance-gated by the setup wrapper and rendered scripts.
+
 ## Validation
 
 Static validation confirms the rendered assets exist. Live validation runs the
 rendered `status.sh` (`splunk show kvstore-status`).
+
+The optional `server.conf` is not installed by collection REST apply. Distribute
+it through the topology's normal app/bundle workflow before relying on
+`kvstoreUpgradeOnStartupEnabled`.

@@ -23,6 +23,7 @@ SOAR_TGZ=""
 SOAR_FIPS="auto"
 SOAR_HOSTS=""
 SOAR_SSH_USER="splunk"
+SOAR_SSH_KNOWN_HOSTS_FILE=""
 EXTERNAL_PG=""
 EXTERNAL_GLUSTER=""
 EXTERNAL_ES=""
@@ -57,6 +58,7 @@ Options:
   --soar-fips auto|require|disable
   --soar-hosts CSV
   --soar-ssh-user USER
+  --soar-ssh-known-hosts-file PATH
   --external-pg "k=v,..."
   --external-gluster CSV
   --external-es CSV
@@ -98,6 +100,7 @@ while [[ $# -gt 0 ]]; do
         --soar-fips) require_arg "$1" $# || exit 1; SOAR_FIPS="$2"; shift 2 ;;
         --soar-hosts) require_arg "$1" $# || exit 1; SOAR_HOSTS="$2"; shift 2 ;;
         --soar-ssh-user) require_arg "$1" $# || exit 1; SOAR_SSH_USER="$2"; shift 2 ;;
+        --soar-ssh-known-hosts-file) require_arg "$1" $# || exit 1; SOAR_SSH_KNOWN_HOSTS_FILE="$2"; shift 2 ;;
         --external-pg) require_arg "$1" $# || exit 1; EXTERNAL_PG="$2"; shift 2 ;;
         --external-gluster) require_arg "$1" $# || exit 1; EXTERNAL_GLUSTER="$2"; shift 2 ;;
         --external-es) require_arg "$1" $# || exit 1; EXTERNAL_ES="$2"; shift 2 ;;
@@ -129,6 +132,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+case "${PHASE}" in
+    render|preflight|apply|onprem-single|onprem-cluster|cloud-onboard|automation-broker|splunk-side-apps|es-integration|status|validate|all) ;;
+    *) log "ERROR: Unknown phase '${PHASE}'"; usage 1 ;;
+esac
+
 resolve_abs_path() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -157,6 +165,7 @@ RENDER_ARGS=(
     --soar-fips "${SOAR_FIPS}"
     --soar-hosts "${SOAR_HOSTS}"
     --soar-ssh-user "${SOAR_SSH_USER}"
+    --soar-ssh-known-hosts-file "${SOAR_SSH_KNOWN_HOSTS_FILE}"
     --external-pg "${EXTERNAL_PG}"
     --external-gluster "${EXTERNAL_GLUSTER}"
     --external-es "${EXTERNAL_ES}"
@@ -192,6 +201,13 @@ run_rendered() {
     (cd "${dir}" && "./${rel}")
 }
 
+assert_secret_file_mode() {
+    local path="$1" label="$2" mode
+    [[ -f "${path}" && -r "${path}" && -s "${path}" ]] || { log "ERROR: ${label} must point to a readable, non-empty regular file."; exit 1; }
+    mode="$(stat -c '%a' "${path}" 2>/dev/null || stat -f '%Lp' "${path}" 2>/dev/null)"
+    [[ "${mode}" == "600" ]] || { log "ERROR: ${label} must be chmod 600 (found ${mode:-unknown})."; exit 1; }
+}
+
 require_soar_automation_inputs() {
     if [[ -z "${SOAR_TENANT_URL}" ]]; then
         log "ERROR: --soar-tenant-url is required for ${PHASE}."
@@ -201,11 +217,80 @@ require_soar_automation_inputs() {
         log "ERROR: --soar-automation-token-file is required for ${PHASE}."
         exit 1
     fi
-    if [[ ! -s "${SOAR_AUTOMATION_TOKEN_FILE}" ]]; then
-        log "ERROR: --soar-automation-token-file must point to a readable, non-empty file."
-        exit 1
-    fi
+    assert_secret_file_mode "${SOAR_AUTOMATION_TOKEN_FILE}" "--soar-automation-token-file"
     export SOAR_TENANT_URL SOAR_AUTOMATION_TOKEN_FILE
+}
+
+require_soar_package() {
+    [[ -f "${SOAR_TGZ}" && -r "${SOAR_TGZ}" && -s "${SOAR_TGZ}" ]] || {
+        log "ERROR: --soar-tgz must point to a readable, non-empty regular file."
+        exit 1
+    }
+}
+
+require_cluster_inputs() {
+    local host
+    local cluster_hosts=()
+    require_soar_package
+    [[ -n "${SOAR_HOSTS//[[:space:],]/}" ]] || {
+        log "ERROR: --soar-hosts must contain at least one explicit cluster host."
+        exit 1
+    }
+    [[ "${SOAR_SSH_USER}" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || {
+        log "ERROR: --soar-ssh-user contains unsupported characters."
+        exit 1
+    }
+    IFS=',' read -r -a cluster_hosts <<<"${SOAR_HOSTS}"
+    for host in "${cluster_hosts[@]}"; do
+        [[ "${host}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || {
+            log "ERROR: --soar-hosts contains an invalid DNS/IPv4 host token: ${host}"
+            exit 1
+        }
+    done
+    [[ -f "${SOAR_SSH_KNOWN_HOSTS_FILE}" && -r "${SOAR_SSH_KNOWN_HOSTS_FILE}" && -s "${SOAR_SSH_KNOWN_HOSTS_FILE}" ]] || {
+        log "ERROR: --soar-ssh-known-hosts-file must point to a readable, non-empty regular file."
+        exit 1
+    }
+}
+
+require_splunk_side_target_role() {
+    local role
+    role="$(resolve_splunk_target_role)"
+    case "${role}" in
+        ""|search-tier|indexer) return 0 ;;
+        *)
+            log "ERROR: --phase splunk-side-apps cannot install Splunk apps on target role '${role}'."
+            log "       Target a search-tier endpoint, or an indexer when deploying the documented index-time package."
+            return 1
+            ;;
+    esac
+}
+
+validate_mutation_inputs() {
+    case "${PHASE}" in
+        es-integration)
+            log "ERROR: ES-to-SOAR tenant pairing is not automated by this skill."
+            log "       The supported ES engine exposes conf-essoar as inventory/preflight only; no stable public write contract is modeled."
+            log "       Complete the endpoint, token, notable forwarding, and Adaptive Response pairing in the Splunk ES/Mission Control UI."
+            log "       No pairing mutation was attempted."
+            exit 2
+            ;;
+        onprem-single)
+            [[ "${SOAR_PLATFORM}" == "onprem-single" ]] || { log "ERROR: --phase onprem-single requires --soar-platform onprem-single."; exit 2; }
+            require_soar_package
+            ;;
+        onprem-cluster)
+            [[ "${SOAR_PLATFORM}" == "onprem-cluster" ]] || { log "ERROR: --phase onprem-cluster requires --soar-platform onprem-cluster."; exit 2; }
+            require_cluster_inputs
+            ;;
+        apply|all)
+            case "${SOAR_PLATFORM}" in
+                onprem-single) require_soar_package ;;
+                onprem-cluster) require_cluster_inputs ;;
+                cloud) log "ERROR: ${PHASE} cannot provision a Splunk-managed SOAR Cloud tenant; select an explicit child phase."; exit 2 ;;
+            esac
+            ;;
+    esac
 }
 
 if [[ "${DRY_RUN}" == "true" ]]; then
@@ -220,6 +305,31 @@ if [[ "${APPLY}" == "true" && "${PHASE}" == "render" ]]; then
     PHASE="apply"
 fi
 
+if [[ "${JSON_OUTPUT}" == "true" && "${PHASE}" != "render" ]]; then
+    log "ERROR: --json is supported only for render or dry-run output; action phases also emit operational logs."
+    exit 1
+fi
+
+case "${PHASE}" in
+    apply|onprem-single|onprem-cluster|automation-broker|splunk-side-apps|all)
+        if [[ "${APPLY}" != "true" ]]; then
+            log "ERROR: --phase ${PHASE} executes mutations and requires --apply."
+            exit 2
+        fi
+        ;;
+esac
+
+validate_mutation_inputs
+
+if [[ "${PHASE}" == "splunk-side-apps" ]]; then
+    require_current_skill_role_supported
+    require_splunk_side_target_role
+fi
+
+if [[ -n "${AUTH_FILE}" ]]; then
+    assert_secret_file_mode "${AUTH_FILE}" "--auth-file"
+fi
+
 case "${PHASE}" in
     render) render_assets ;;
     preflight) render_assets; log "Preflight: review ${OUTPUT_DIR}/ before apply." ;;
@@ -231,7 +341,9 @@ case "${PHASE}" in
         elif [[ "${SOAR_PLATFORM}" == "onprem-cluster" ]]; then
             run_rendered onprem-cluster/make-cluster-node.sh
         elif [[ "${SOAR_PLATFORM}" == "cloud" ]]; then
-            log "SOAR Cloud is Splunk-managed. Follow cloud/onboarding-checklist.md."
+            log "ERROR: SOAR Cloud tenant provisioning is Splunk-managed; --apply cannot provision it."
+            log "Render cloud/onboarding-checklist.md or select an explicit automation-broker/splunk-side-apps phase."
+            exit 2
         fi
         ;;
     onprem-cluster) render_assets; run_rendered onprem-cluster/make-cluster-node.sh ;;
@@ -247,16 +359,21 @@ case "${PHASE}" in
         # install-app-for-soar-export.sh is the modern packaging of the legacy
         # "Splunk Add-on for Phantom" (TA-phantom); there is no separate
         # install-ta-phantom.sh script.
+        installed_scripts=0
         for app in install-app-for-soar.sh install-app-for-soar-export.sh; do
             if [[ -x "$(render_dir)/splunk-side/${app}" ]]; then
                 run_rendered "splunk-side/${app}"
+                installed_scripts=$((installed_scripts+1))
             fi
         done
+        [[ "${installed_scripts}" -gt 0 ]] || { log "ERROR: no Splunk-side SOAR app was selected for installation."; exit 2; }
         ;;
     es-integration)
-        require_soar_automation_inputs
-        render_assets
-        run_rendered splunk-side/configure-phantom-endpoint.sh
+        # validate_mutation_inputs fails this unsupported selection before any
+        # renderer, credential, REST, or install action. Keep this defensive
+        # branch non-mutating in case control flow is changed later.
+        log "ERROR: ES-to-SOAR tenant pairing requires the documented UI/operator handoff; no mutation was attempted."
+        exit 2
         ;;
     status|validate) render_assets; run_rendered validate.sh ;;
     all)
@@ -264,7 +381,7 @@ case "${PHASE}" in
         case "${SOAR_PLATFORM}" in
             onprem-single) run_rendered onprem-single/prepare-system.sh; run_rendered onprem-single/install-soar.sh ;;
             onprem-cluster) run_rendered onprem-cluster/make-cluster-node.sh ;;
-            cloud) log "SOAR Cloud is Splunk-managed. Follow cloud/onboarding-checklist.md." ;;
+            cloud) log "ERROR: --phase all cannot provision a Splunk-managed SOAR Cloud tenant; choose explicit child phases."; exit 2 ;;
         esac
         run_rendered validate.sh
         ;;

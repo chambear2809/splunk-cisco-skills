@@ -52,3 +52,10 @@ This skill is a router over the existing Cisco setup skills in this repo.
     forwarder-side install with no per-product router stanza; reach it directly
     or through `cisco-enterprise-networking-setup` when NetFlow dashboards are
     requested.
+
+## Completion Validation Contract
+
+Automated product routes call child validators with `--completion` (alias
+`--strict` in each child). Missing account/input, data-flow, or shipped
+dashboard evidence therefore exits nonzero. Direct child validation without
+the flag remains diagnostic for staged onboarding.

@@ -24,7 +24,8 @@ By default, assets are written under `cisco-thousandeyes-mcp-rendered/`:
 `setup.sh` supports these mode flags:
 
 - `--render` — render client configurations (default if no mode given).
-- `--apply` — render, then surface the per-client copy commands. The script does NOT execute the copies; the operator runs them after review.
+- `--apply` — render and execute Codex OAuth2 registration. Other clients fail
+  closed and point to their reviewed manual merge steps.
 - `--validate` — run static validation against an already-rendered output directory.
 - `--dry-run` — show the plan without writing files.
 - `--json` — emit JSON dry-run output.
@@ -32,7 +33,8 @@ By default, assets are written under `cisco-thousandeyes-mcp-rendered/`:
 
 ## Required values
 
-`--client LIST` is always required. Comma-separated subset of `cursor,claude,codex,vscode,kiro`.
+`--client LIST` is required for render and apply. It is not required when
+validating an already-rendered output directory.
 
 `--auth` defaults to `bearer`. Use `--auth oauth2` to render the OAuth2 client flow (browser consent on first connection; no token file needed).
 

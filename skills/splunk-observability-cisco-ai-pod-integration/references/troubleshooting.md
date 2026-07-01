@@ -56,7 +56,7 @@ cat /tmp/ai-pod-rendered/child-renders/<child-name>/splunk-otel-overlay/*.yaml
 helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \
   -n splunk-otel --create-namespace \
   -f /tmp/ai-pod-rendered/splunk-otel-overlay/values.overlay.yaml \
-  --set splunkObservability.accessToken="$(cat $TOKEN_FILE)" \
+  --set-file splunkObservability.accessToken="$TOKEN_FILE" \
   --set splunkObservability.realm="us0" \
   --dry-run --debug 2>&1 | tee /tmp/helm-debug.log
 ```

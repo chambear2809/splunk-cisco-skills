@@ -16,6 +16,7 @@ from typing import Any
 from urllib.parse import SplitResult, urlsplit
 
 from skills.shared.coding_agent_o11y.common import (
+    ENV_PLACEHOLDER_RE,
     REPO_ROOT,
     UsageError,
     command_failed,
@@ -41,6 +42,9 @@ VALID_DESTINATIONS = {"local-collector", "external-collector", "direct", "all"}
 VALID_PROTOCOLS = {"otlp-http", "otlp-grpc"}
 APPLY_SECTIONS = ("profiles", "runtime", "hooks", "env-helper")
 MANAGED_HOOK_STATUS = "Capturing Codex O11y session metadata"
+SPLUNK_OTEL_COLLECTOR_VERSION = "0.154.2"
+SPLUNK_OTEL_COLLECTOR_DIGEST = "sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2"
+SPLUNK_OTEL_COLLECTOR_IMAGE = f"quay.io/signalfx/splunk-otel-collector@{SPLUNK_OTEL_COLLECTOR_DIGEST}"
 
 
 DEFAULT_SPEC: dict[str, Any] = {
@@ -59,6 +63,7 @@ DEFAULT_SPEC: dict[str, Any] = {
         "enable_ai_defense": False,
         "accept_ai_defense_content_inspection": False,
         "local_collector_endpoint": "http://127.0.0.1:14318",
+        "local_collector_receiver_endpoint": "0.0.0.0:4318",
         "external_collector_protocol": "otlp-http",
         "external_trace_endpoint": "",
         "external_metric_endpoint": "",
@@ -91,7 +96,9 @@ def profile_name(destination: str, prefix: str) -> str:
 
 
 def destinations_for(value: str) -> list[str]:
-    return ["local-collector", "external-collector", "direct"] if value == "all" else [value]
+    # `direct` is retained as a fail-closed diagnostic, not a renderable profile.
+    # `all` therefore means all supported profile types.
+    return ["local-collector", "external-collector"] if value == "all" else [value]
 
 
 def parse_local_collector_endpoint(value: object) -> SplitResult:
@@ -123,12 +130,31 @@ def normalize_local_collector_endpoint(value: object) -> str:
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
-def local_collector_receiver_endpoint(value: object) -> str:
-    parsed = parse_local_collector_endpoint(value)
+def normalize_local_collector_receiver_endpoint(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise UsageError("local_collector_receiver_endpoint is required")
+    if "://" in raw:
+        raise UsageError(
+            "local_collector_receiver_endpoint must be a collector bind address such as 0.0.0.0:4318, not a URL"
+        )
+    parsed = urlsplit(f"//{raw}")
+    if not parsed.hostname:
+        raise UsageError("local_collector_receiver_endpoint must include a host")
+    if parsed.username or parsed.password:
+        raise UsageError("local_collector_receiver_endpoint must not include credentials")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise UsageError(f"local_collector_receiver_endpoint has an invalid port: {exc}") from exc
+    if port is None:
+        raise UsageError("local_collector_receiver_endpoint must include an explicit port")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise UsageError("local_collector_receiver_endpoint must use HOST:PORT with no path, query, or fragment")
     host = parsed.hostname or ""
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
-    return f"{host}:{parsed.port}"
+    return f"{host}:{port}"
 
 
 def resolve_codex_home(config: dict[str, Any]) -> Path:
@@ -155,6 +181,7 @@ def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
         "realm": args.realm,
         "destination": args.destination,
         "local_collector_endpoint": args.local_collector_endpoint,
+        "local_collector_receiver_endpoint": args.local_collector_receiver_endpoint,
         "external_collector_protocol": args.external_collector_protocol,
         "external_trace_endpoint": args.external_trace_endpoint,
         "external_metric_endpoint": args.external_metric_endpoint,
@@ -214,6 +241,10 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         normalize_local_collector_endpoint(codex.get("local_collector_endpoint"))
     except UsageError as exc:
         errors.append(str(exc))
+    try:
+        normalize_local_collector_receiver_endpoint(codex.get("local_collector_receiver_endpoint"))
+    except UsageError as exc:
+        errors.append(str(exc))
 
     if codex.get("content_capture") and not codex.get("accept_content_capture"):
         errors.append("prompt/response/tool-output capture requires --accept-content-capture")
@@ -230,12 +261,11 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             if codex.get("enable_native_logs") and not codex.get("external_log_endpoint"):
                 errors.append("native logs through an external collector require --external-log-endpoint")
         if target == "direct":
-            if codex.get("enable_native_logs"):
-                errors.append("direct Splunk ingest refuses native Codex logs; use local-collector or external-collector")
-            if protocol == "otlp-grpc":
-                errors.append("direct Splunk ingest supports OTLP/HTTP only; gRPC direct mode is refused")
-            if not codex.get("realm"):
-                errors.append("direct Splunk ingest requires --realm")
+            errors.append(
+                "direct Splunk ingest is refused: Codex sends OTLP header placeholders literally, while this skill "
+                "refuses raw tokens in rendered files or process arguments; use local-collector so the collector "
+                "can expand ${env:SPLUNK_ACCESS_TOKEN}"
+            )
 
     if not codex.get("enable_advanced_genai_spans"):
         warnings.append("advanced GenAI span helpers are rendered but disabled by default in metadata-only mode")
@@ -245,11 +275,21 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             ensure_safe_external_header(str(key), str(value))
         except UsageError as exc:
             errors.append(str(exc))
+        if ENV_PLACEHOLDER_RE.fullmatch(str(value)):
+            errors.append(
+                f"external header {key} uses {value}, but Codex sends OTLP header placeholders literally; "
+                "use an unauthenticated external collector or local-collector"
+            )
     for key, value in (codex.get("external_tls") or {}).items():
         try:
             ensure_safe_external_value(f"TLS {key}", str(value))
         except UsageError as exc:
             errors.append(str(exc))
+        if ENV_PLACEHOLDER_RE.fullmatch(str(value)):
+            errors.append(
+                f"external TLS {key} uses {value}, but Codex does not expand placeholders in OTel exporter config; "
+                "use a literal certificate path"
+            )
 
     return errors, warnings
 
@@ -329,43 +369,31 @@ def external_profile(config: dict[str, Any]) -> str:
 
 
 def direct_profile(config: dict[str, Any]) -> str:
-    codex = config["codex"]
-    realm = str(codex["realm"])
-    base = f"https://ingest.{realm}.observability.splunkcloud.com"
-    header = {"X-SF-TOKEN": "${SPLUNK_ACCESS_TOKEN}"}
-    lines = [
-        "# Codex direct Splunk Observability OTLP/HTTP profile.",
-        "# Direct mode sends traces and metrics only. Native Codex logs stay disabled.",
-        "# Install as $CODEX_HOME/codex-o11y-direct.config.toml and run:",
-        "#   codex --strict-config --profile codex-o11y-direct",
-        "",
-        "[otel]",
-        f"environment = {toml_quote(str(codex['environment']))}",
-        "log_user_prompt = false",
-        'exporter = "none"',
-        f"trace_exporter = {exporter_inline('otlp-http', base + '/v2/trace/otlp', headers=header)}",
-        f"metrics_exporter = {exporter_inline('otlp-http', base + '/v2/datapoint/otlp', headers=header)}",
-        "",
-    ]
-    return "\n".join(lines)
+    del config
+    raise UsageError(
+        "direct Splunk ingest is refused because Codex does not expand OTLP header placeholders and raw token "
+        "rendering is unsafe; use local-collector"
+    )
 
 
 def render_collector_overlay(config: dict[str, Any]) -> str:
     codex = config["codex"]
     realm = str(codex.get("realm") or "us0")
     native_logs = bool(codex.get("enable_native_logs"))
-    receiver_endpoint = local_collector_receiver_endpoint(codex["local_collector_endpoint"])
+    receiver_endpoint = normalize_local_collector_receiver_endpoint(codex["local_collector_receiver_endpoint"])
     logs_pipeline = (
         """    logs/codex:
       receivers: [otlp/codex]
       processors: [resource/codex, batch/codex]
-      exporters: [signalfx/codex]
+      exporters: [otlphttp/codex_logs]
 """
         if native_logs
         else ""
     )
     return f"""# Local collector overlay for Codex OTel.
-# Merge into a Splunk Distribution of OpenTelemetry Collector gateway.
+# Requires the Splunk Distribution of the OpenTelemetry Collector.
+# Supported image: {SPLUNK_OTEL_COLLECTOR_IMAGE}
+# Do not run this native-histogram path with an upstream contrib image.
 receivers:
   otlp/codex:
     protocols:
@@ -376,16 +404,29 @@ processors:
   batch/codex: {{}}
   resource/codex:
     attributes:
+      - key: codex.native.service.name
+        from_attribute: service.name
+        action: insert
       - key: service.name
         value: {yaml_quote(str(codex['service_name']))}
         action: upsert
       - key: deployment.environment
         value: {yaml_quote(str(codex['environment']))}
         action: upsert
+      - key: sf_service
+        value: {yaml_quote(str(codex['service_name']))}
+        action: upsert
+      - key: sf_environment
+        value: {yaml_quote(str(codex['environment']))}
+        action: upsert
 
 exporters:
   otlphttp/codex_traces:
     traces_endpoint: {yaml_quote(f"https://ingest.{realm}.observability.splunkcloud.com/v2/trace/otlp")}
+    headers:
+      X-SF-TOKEN: "${{env:SPLUNK_ACCESS_TOKEN}}"
+  otlphttp/codex_logs:
+    logs_endpoint: {yaml_quote(f"https://ingest.{realm}.observability.splunkcloud.com/v3/event")}
     headers:
       X-SF-TOKEN: "${{env:SPLUNK_ACCESS_TOKEN}}"
   signalfx/codex:
@@ -398,7 +439,7 @@ service:
     traces/codex:
       receivers: [otlp/codex]
       processors: [resource/codex, batch/codex]
-      exporters: [otlphttp/codex_traces, signalfx/codex]
+      exporters: [otlphttp/codex_traces]
     metrics/codex:
       receivers: [otlp/codex]
       processors: [resource/codex, batch/codex]
@@ -406,8 +447,52 @@ service:
 {logs_pipeline}"""
 
 
+def render_collector_runner(config: dict[str, Any]) -> str:
+    """Render the supported local runtime, pinning the Splunk distribution."""
+
+    codex = config["codex"]
+    client_endpoint = parse_local_collector_endpoint(codex["local_collector_endpoint"])
+    receiver = urlsplit(
+        f"//{normalize_local_collector_receiver_endpoint(codex['local_collector_receiver_endpoint'])}"
+    )
+    host_port = client_endpoint.port
+    receiver_port = receiver.port
+    if host_port is None or receiver_port is None:  # guarded by config validation
+        raise UsageError("local collector endpoints must include explicit ports")
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+config_file="${{script_dir}}/codex-o11y-local-collector.yaml"
+image={shell_quote(SPLUNK_OTEL_COLLECTOR_IMAGE)}
+
+if [[ -z "${{SPLUNK_ACCESS_TOKEN:-}}" ]]; then
+  echo "ERROR: SPLUNK_ACCESS_TOKEN must be set in the environment" >&2
+  exit 1
+fi
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: docker is required to run the local collector" >&2
+  exit 1
+fi
+
+# Pass the token through the container environment, never as an argv value.
+exec docker run --rm \\
+  --name codex-splunk-o11y-collector \\
+  --pull=missing \\
+  --publish "127.0.0.1:{host_port}:{receiver_port}" \\
+  --env SPLUNK_ACCESS_TOKEN \\
+  --volume "${{config_file}}:/etc/otel/collector/codex-o11y.yaml:ro" \\
+  "${{image}}" \\
+  --config=/etc/otel/collector/codex-o11y.yaml
+"""
+
+
 def render_exec_wrapper(config: dict[str, Any]) -> str:
     codex = config["codex"]
+    destination = str(codex["destination"])
+    if destination == "all":
+        destination = "local-collector"
+    rendered_profile = shell_quote(profile_name(destination, str(codex["profile_prefix"])))
     service_name = shell_quote(str(codex["service_name"]))
     environment = shell_quote(str(codex["environment"]))
     capture = "true" if codex.get("content_capture") else "false"
@@ -417,6 +502,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 OUTPUT_DIR="$(cd "${{SCRIPT_DIR}}/.." && pwd)"
 CAPTURE_CONTENT={capture}
+CODEX_PROFILE={rendered_profile}
 JSONL_OUT="${{CODEX_O11Y_JSONL:-}}"
 if [[ -z "${{JSONL_OUT}}" ]]; then
   JSONL_OUT="$(mktemp "${{TMPDIR:-/tmp}}/codex-o11y-exec.XXXXXX.jsonl")"
@@ -433,7 +519,7 @@ cleanup_jsonl() {{
 trap cleanup_jsonl EXIT
 
 set +e
-codex exec --json "$@" | tee "${{JSONL_OUT}}"
+codex exec --profile "${{CODEX_PROFILE}}" --json "$@" | tee "${{JSONL_OUT}}"
 codex_rc=${{PIPESTATUS[0]}}
 set -e
 
@@ -771,7 +857,7 @@ def apply_plan(config: dict[str, Any], output_dir: Path) -> dict[str, Any]:
         },
         {
             "section": "env-helper",
-            "action": "source shell env helper for token placeholders and helper paths",
+            "action": "source shell env helper for collector credentials and helper paths",
             "commands": [["source", str(output_dir / "runtime" / "codex-o11y.env")]],
         },
     ]
@@ -802,8 +888,8 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         },
         {
             "key": "splunk.direct_otlp_http",
-            "status": "render" if destination in {"direct", "all"} else "not_applicable",
-            "summary": "Direct Splunk ingest renders OTLP/HTTP traces and metrics only.",
+            "status": "refused" if destination == "direct" else "not_applicable",
+            "summary": "Direct Splunk ingest is refused because Codex does not expand header placeholders and raw token rendering is unsafe.",
             "source_url": "https://dev.splunk.com/observability/reference/api/ingest_data/latest",
         },
         {
@@ -815,13 +901,16 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         {
             "key": "splunk.histograms",
             "status": "render",
-            "summary": "Collector overlay sets send_otlp_histograms: true.",
+            "summary": (
+                f"Pinned Splunk Distribution {SPLUNK_OTEL_COLLECTOR_VERSION} uses the SignalFx exporter with "
+                "send_otlp_histograms: true; no histogram resource marker is required."
+            ),
             "source_url": "https://help.splunk.com/en/splunk-observability-cloud/manage-data/metrics-metadata-and-events/metrics-events-and-metadata/get-histogram-data-in",
         },
         {
             "key": "advanced_genai_spans",
             "status": "render" if codex.get("enable_advanced_genai_spans") else "render_disabled",
-            "summary": "codex-o11y-exec wraps codex exec --json and converts JSONL events into metadata-only spans and metrics by default.",
+            "summary": "codex-o11y-exec selects the rendered profile, runs codex exec --json, and converts JSONL events into metadata-only spans and metrics by default.",
             "source_url": "https://developers.openai.com/codex/codex-manual.md",
         },
         {
@@ -844,6 +933,8 @@ def doctor_report(config: dict[str, Any], errors: list[str], warnings: list[str]
         "## Destination",
         "",
         f"- Selected destination: `{codex['destination']}`",
+        f"- Local collector client endpoint: `{codex['local_collector_endpoint']}`",
+        f"- Local collector receiver bind: `{codex['local_collector_receiver_endpoint']}`",
         f"- Native logs enabled: `{str(bool(codex.get('enable_native_logs'))).lower()}`",
         f"- Advanced GenAI spans enabled: `{str(bool(codex.get('enable_advanced_genai_spans'))).lower()}`",
         f"- Content capture enabled: `{str(bool(codex.get('content_capture'))).lower()}`",
@@ -866,6 +957,7 @@ def doctor_report(config: dict[str, Any], errors: list[str], warnings: list[str]
             "- Run the rendered strict-config commands from `apply-plan.json` after copying profiles into `CODEX_HOME`.",
             "- Use `/hooks` to review and trust the optional Stop hook before relying on interactive session capture.",
             "- Confirm Splunk endpoint reachability with a collector or separate OTLP smoke tool; `codex --strict-config` does not validate Splunk ingest semantics.",
+            "- Keep Splunk credentials on the collector. Codex OTLP exporter headers send `${NAME}` placeholders literally.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -879,8 +971,8 @@ export CODEX_O11Y_RENDERED_DIR={shell_quote(output_dir)}
 export CODEX_O11Y_SERVICE_NAME={shell_quote(codex['service_name'])}
 export CODEX_O11Y_ENVIRONMENT={shell_quote(codex['environment'])}
 export CODEX_O11Y_CAPTURE_CONTENT={shell_quote(capture)}
-# Direct Splunk profiles expect SPLUNK_ACCESS_TOKEN in the runtime environment.
-# Do not place token values in this file.
+# The local collector expects SPLUNK_ACCESS_TOKEN in its own process environment.
+# Codex itself receives no Splunk credential; do not place token values in this file.
 """
 
 
@@ -983,11 +1075,16 @@ def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
         "",
         "## Direct Mode",
         "",
-        "Direct mode sends traces and metrics only through OTLP/HTTP endpoints. Native Codex log export remains disabled.",
+        "Direct mode is refused. Codex sends OTLP header placeholders literally, and this skill will not render a raw Splunk token. Use the local collector so `${env:SPLUNK_ACCESS_TOKEN}` is expanded by the collector.",
+        "",
+        "## Supported Local Collector",
+        "",
+        f"Run `{output_dir / 'collector' / 'run-codex-o11y-local-collector.sh'}` to use the pinned Splunk Distribution image `{SPLUNK_OTEL_COLLECTOR_IMAGE}`.",
+        "The upstream contrib collector is not the supported native-histogram path. Metrics are exported through `signalfx/codex` with `send_otlp_histograms: true`; no resource marker is required.",
         "",
         "## Advanced Spans",
         "",
-        f"Use `{output_dir / 'bin' / 'codex-o11y-exec'}` for `codex exec --json` metadata capture.",
+        f"Use `{output_dir / 'bin' / 'codex-o11y-exec'}` for profile-selected `codex exec --json` metadata capture.",
         f"Content capture is `{str(bool(codex.get('content_capture'))).lower()}`.",
         "",
         "## Galileo Notify Bridge",
@@ -1032,6 +1129,11 @@ def render(config: dict[str, Any], output_dir: Path, json_output: bool = False) 
         rendered_profiles.append(path.relative_to(output_dir).as_posix())
 
     write_text(output_dir / "collector" / "codex-o11y-local-collector.yaml", render_collector_overlay(config))
+    write_text(
+        output_dir / "collector" / "run-codex-o11y-local-collector.sh",
+        render_collector_runner(config),
+        executable=True,
+    )
     write_text(output_dir / "bin" / "codex-o11y-exec", render_exec_wrapper(config), executable=True)
     write_text(output_dir / "bin" / "codex-o11y-jsonl-to-spans.py", render_jsonl_parser(), executable=True)
     write_text(output_dir / "hooks" / "codex-o11y-stop-hook.py", render_stop_hook(config), executable=True)
@@ -1085,6 +1187,7 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
         "doctor-report.md",
         "handoff.md",
         "collector/codex-o11y-local-collector.yaml",
+        "collector/run-codex-o11y-local-collector.sh",
         "runtime/codex-o11y.env",
         "runtime/codex-notify-galileo-handoff.md",
         "bin/codex-o11y-exec",
@@ -1112,14 +1215,9 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
             errors.append(f"{profile.name}: invalid TOML: {exc}")
         text = profile.read_text(encoding="utf-8")
         if profile.name.endswith("direct.config.toml"):
-            if 'exporter = "none"' not in text:
-                errors.append("direct profile must keep native log exporter disabled")
-            if "otlp-grpc" in text:
-                errors.append("direct profile must not render otlp-grpc")
-            if "/v2/trace/otlp" not in text or "/v2/datapoint/otlp" not in text:
-                errors.append("direct profile missing Splunk OTLP trace or metric endpoints")
-            if '"X-SF-TOKEN" = "${SPLUNK_ACCESS_TOKEN}"' not in text:
-                errors.append("direct profile missing safe X-SF-TOKEN environment placeholder")
+            errors.append(
+                "direct profile is unsafe: Codex sends OTLP header placeholders literally; render local-collector instead"
+            )
         if profile.name.endswith("local.config.toml") and (
             "/v1/traces" not in text or "/v1/metrics" not in text
         ):
@@ -1129,6 +1227,31 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
         values = (output_dir / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
         if "send_otlp_histograms: true" not in values:
             errors.append("collector overlay must set send_otlp_histograms: true")
+        if "signalfx/codex:" not in values or "exporters: [signalfx/codex]" not in values:
+            errors.append("collector metrics pipeline must use the Splunk SignalFx exporter")
+        if SPLUNK_OTEL_COLLECTOR_IMAGE not in values:
+            errors.append("collector overlay must identify the supported Splunk Distribution image")
+        for required in (
+            "service.name",
+            "deployment.environment",
+            "sf_service",
+            "sf_environment",
+        ):
+            if f"key: {required}" not in values:
+                errors.append(f"collector overlay missing normalized resource attribute: {required}")
+
+    runner_path = output_dir / "collector/run-codex-o11y-local-collector.sh"
+    if runner_path.exists():
+        runner = runner_path.read_text(encoding="utf-8")
+        if SPLUNK_OTEL_COLLECTOR_IMAGE not in runner:
+            errors.append("local collector runner must pin the supported Splunk Distribution image")
+        if "otel/opentelemetry-collector-contrib" in runner:
+            errors.append("local collector runner must not use the upstream contrib image")
+
+    if (output_dir / "bin/codex-o11y-exec").exists():
+        wrapper = (output_dir / "bin/codex-o11y-exec").read_text(encoding="utf-8")
+        if 'codex exec --profile "${CODEX_PROFILE}" --json' not in wrapper:
+            errors.append("codex-o11y-exec must launch codex exec with the rendered profile")
 
     if (output_dir / "hooks/hooks.json").exists():
         try:
@@ -1302,6 +1425,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--realm", default="")
     parser.add_argument("--destination", choices=sorted(VALID_DESTINATIONS), default="")
     parser.add_argument("--local-collector-endpoint", default="")
+    parser.add_argument("--local-collector-receiver-endpoint", default="")
     parser.add_argument("--external-trace-endpoint", default="")
     parser.add_argument("--external-metric-endpoint", default="")
     parser.add_argument("--external-log-endpoint", default="")

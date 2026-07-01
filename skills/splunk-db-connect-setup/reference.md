@@ -26,7 +26,10 @@ delegate package installation to `splunk-app-install`.
 | Amazon Athena JDBC Driver Add-on for Splunk DB Connect | `8133` | `1.0.1` / December 16, 2025 | Splunk-supported add-on |
 
 InfluxDB (`6759`) is tracked only as archived/not-supported driver catalog
-metadata. It is not part of normal install coverage.
+metadata. It is not part of normal install coverage. If an explicit install
+request includes an archived/custom driver alongside supported packages, the
+helper exits nonzero before attempting any package install and emits a concrete
+manual-driver handoff.
 
 ## Custom Driver Coverage
 

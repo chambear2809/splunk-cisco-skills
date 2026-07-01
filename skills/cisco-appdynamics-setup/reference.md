@@ -286,3 +286,9 @@ value `appdynamics`. There is no macro indirection for the index.
 If the user wants service modeling in ITSI or ITE Work, the supported follow-on
 path is the **Content Pack for Splunk AppDynamics**. That is separate from this
 skill and depends on ITSI/ITE Work plus the Splunk App for Content Packs.
+
+## Completion Validation
+
+`validate.sh` is diagnostic by default. `--completion` and `--strict` promote
+missing connection, enabled-input, event, index, dashboard-alignment, and view
+evidence to a nonzero result.

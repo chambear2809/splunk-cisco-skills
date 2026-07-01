@@ -113,7 +113,7 @@ NetFlow/IPFIX receiver settings.
 ### Step 3: Validate
 
 ```bash
-bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/validate.sh
+bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, Stream forwarder context, NetFlow receiver settings,
@@ -145,3 +145,11 @@ and optional consumer apps.
 ## Additional Resources
 
 - [reference.md](reference.md) — package contents, topology, and validation notes
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+on the Stream parsing target to require the Stream forwarder and NetFlow/IPFIX
+receiver address, port, decoder configuration, and `stream:netflow` event
+evidence in the `netflow` index. Override those defaults with `--index` and
+`--sourcetype` when the Stream deployment routes data elsewhere.

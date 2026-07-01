@@ -79,5 +79,14 @@ Enterprise apply substitutes the token from a local token file at apply time.
 Cloud apply lets ACS create the token value and writes it to a local-only file
 only when requested.
 
+Enterprise apply merges the managed `[http]` and token settings into the target
+`inputs.conf`, preserving unrelated stanzas and settings and retaining a dated
+backup. Cloud apply fails closed if the installed ACS command group cannot
+enforce a requested field. If `--write-token-file` is requested, creation is
+incomplete and returns nonzero unless the one-time value is actually written.
+For an existing Cloud token, ACS cannot return the stored secret; a requested
+token-output path must therefore already contain a nonempty owner-only value or
+the apply script emits a rotation handoff and exits nonzero.
+
 Read `reference.md` before enabling `useACK` or deploying to clustered
 Enterprise HEC tiers.

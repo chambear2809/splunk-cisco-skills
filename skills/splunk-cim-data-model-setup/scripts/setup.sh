@@ -156,6 +156,10 @@ render_assets() {
 }
 
 apply_live() {
+    if [[ "${ACCELERATION}" == "unset" && -z "${CONSTRAIN_INDEXES}" && -z "${EVENTTYPE_NAME}" ]]; then
+        log "ERROR: apply requested no acceleration, macro, or eventtype/tag mutation."
+        exit 2
+    fi
     if [[ "${ACCELERATION}" == "true" && "${ACCEPT_ACCELERATION}" != "true" ]]; then
         log "ERROR: Data model acceleration consumes resources. Re-run with --accept-acceleration."
         exit 1
@@ -168,7 +172,8 @@ apply_live() {
     local sk
     sk=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
     if ! rest_check_app "${sk}" "${SPLUNK_URI}" "${APP_NAME}"; then
-        log "WARNING: App '${APP_NAME}' not found. Install the Splunk CIM add-on (Splunk_SA_CIM, Splunkbase 1621) with splunk-app-install."
+        log "ERROR: App '${APP_NAME}' not found. Install the Splunk CIM add-on (Splunk_SA_CIM, Splunkbase 1621) before applying governance."
+        exit 1
     fi
     if [[ "${ACCELERATION}" == "true" ]]; then
         local body="acceleration=1"

@@ -38,8 +38,8 @@ Input type: `audit_alarms`
 | `index` | Target index | `intersight` |
 | `interval` | Collection interval (300–3600s) | 900 |
 | `date_input` | Lookback period in days (0/7/30/180) | 7 |
-| `enable_aaa_audit_records` | Collect audit records | 1 |
-| `enable_alarms` | Collect alarms | 1 |
+| `enable_aaa_audit_records` | Collect audit records | 1 on the audit input; 0 on the alarms input |
+| `enable_alarms` | Collect alarms | 0 on the audit input; 1 on the alarms input |
 | `acknowledge` | Include acknowledged alarms | 1 |
 | `suppressed` | Include suppressed alarms | 1 |
 | `info_alarms` | Include informational alarms | 1 |
@@ -237,3 +237,9 @@ The TA uses extensive KVStore collections for inventory data used by dashboards:
 - Security: `cisco_intersight_tam_securityadvisories`, `cisco_intersight_tam_advisoryinstances`, `cisco_intersight_cond_hclstatuses`
 - Contracts: `cisco_intersight_asset_devicecontractinformations`, `cisco_intersight_asset_targets`
 - Pools: `cisco_intersight_fcpool_pools`, `cisco_intersight_ippool_pools`, `cisco_intersight_macpool_pools`, `cisco_intersight_uuidpool_pools`, `cisco_intersight_iqnpool_pools`, `cisco_intersight_resourcepool_pools`
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` exits nonzero for missing account, enabled
+input, event, index, macro-alignment, or shipped-view evidence. No-flag
+validation retains diagnostic warnings.

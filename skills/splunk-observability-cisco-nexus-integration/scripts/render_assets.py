@@ -458,10 +458,23 @@ if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
     # Helm fullname collapses to the release name when it already contains the
     # chart name (the common "splunk-otel-collector" release), otherwise it is
     # "<release>-splunk-otel-collector-*". Try both forms.
-    kubectl -n "${{NAMESPACE}}" rollout status daemonset/"${{RELEASE}}-agent" --timeout=180s \\
-        || kubectl -n "${{NAMESPACE}}" rollout status daemonset/"${{RELEASE}}-splunk-otel-collector-agent" --timeout=180s || true
-    kubectl -n "${{NAMESPACE}}" rollout status deployment/"${{RELEASE}}-k8s-cluster-receiver" --timeout=180s \\
-        || kubectl -n "${{NAMESPACE}}" rollout status deployment/"${{RELEASE}}-splunk-otel-collector-k8s-cluster-receiver" --timeout=180s || true
+    wait_for_rollout() {{
+        local kind="$1"; shift
+        local name
+        for name in "$@"; do
+            if kubectl -n "${{NAMESPACE}}" get "${{kind}}/${{name}}" >/dev/null 2>&1; then
+                kubectl -n "${{NAMESPACE}}" rollout status "${{kind}}/${{name}}" --timeout=180s
+                return
+            fi
+        done
+        echo "ERROR: no expected ${{kind}} workload was found for release ${{RELEASE}}." >&2
+        return 1
+    }}
+    wait_for_rollout daemonset \
+        "${{RELEASE}}-agent" "${{RELEASE}}-splunk-otel-collector-agent"
+    wait_for_rollout deployment \
+        "${{RELEASE}}-k8s-cluster-receiver" \
+        "${{RELEASE}}-splunk-otel-collector-k8s-cluster-receiver"
 fi
 """
     )
@@ -499,7 +512,7 @@ echo "Step 3: Apply via helm."
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
-echo '      --set splunkObservability.accessToken="$(cat $O11Y_TOKEN_FILE)"'
+echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 """
         )
     if handoffs.get("dashboard_builder", True):

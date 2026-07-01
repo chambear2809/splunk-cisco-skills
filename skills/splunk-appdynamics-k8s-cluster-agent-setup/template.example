@@ -1,9 +1,15 @@
 controller_url: https://example.saas.appdynamics.com
+# Set true only for a reviewed lab Controller that cannot serve HTTPS.
+accept_insecure_controller_http: false
 account_name: customer1
 namespace: appdynamics
 cluster_name: prod-eks-east
 environment: prod
 secret_name: appdynamics-controller-secret
+# Paths to chmod-600 files. The rollout plan injects these with Helm --set-file;
+# values.yaml retains placeholders only.
+controller_password_file: /secure/appdynamics/controller-password
+controller_access_key_file: /secure/appdynamics/controller-access-key
 languages:
   - java
   - dotnet-core-linux
@@ -17,6 +23,9 @@ splunk_otel_collector:
   install: true
   mode: cluster-agent-managed
   realm: us1
+  # api_url defaults to https://api.<realm>.signalfx.com. A reviewed proxy URL
+  # additionally requires accept_custom_api_url: true.
+  accept_custom_api_url: false
   environment: prod
   access_token_file: /secure/splunk/o11y_access_token
   secret_name: appd-splunk-otel-secret

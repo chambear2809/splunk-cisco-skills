@@ -81,6 +81,17 @@ positive_port() {
     fi
 }
 
+validate_static_names() {
+    if [[ ! "${INPUT_NAME}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+        log "ERROR: --input-name may contain only letters, numbers, dot, underscore, colon, and hyphen."
+        exit 1
+    fi
+    if [[ ! "${EXPECTED_INDEX}" =~ ^[_A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: --expected-index contains an invalid Splunk index name."
+        exit 1
+    fi
+}
+
 add_check() {
     local name="$1" status="$2" detail="$3"
     python3 - "${CHECKS_FILE}" "${name}" "${status}" "${detail}" <<'PY'
@@ -278,19 +289,19 @@ check_bound_ports() {
 
     host="${SPLUNK_HOST:-$(splunk_host_from_uri "${SPLUNK_URI}")}"
     if [[ -z "${host}" ]]; then
-        add_check "grpc-listener" "warn" "Unable to determine a target host for gRPC receiver port ${GRPC_PORT} reachability."
-        add_check "http-listener" "warn" "Unable to determine a target host for HTTP receiver port ${HTTP_PORT} reachability."
+        add_check "grpc-listener" "fail" "Unable to determine a target host for gRPC receiver port ${GRPC_PORT} reachability."
+        add_check "http-listener" "fail" "Unable to determine a target host for HTTP receiver port ${HTTP_PORT} reachability."
         return 0
     fi
     if tcp_port_reachable "${host}" "${GRPC_PORT}"; then
         add_check "grpc-listener" "ok" "gRPC receiver port ${GRPC_PORT} is reachable from the validator host."
     else
-        add_check "grpc-listener" "warn" "Could not confirm gRPC receiver port ${GRPC_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
+        add_check "grpc-listener" "fail" "Could not confirm gRPC receiver port ${GRPC_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
     fi
     if tcp_port_reachable "${host}" "${HTTP_PORT}"; then
         add_check "http-listener" "ok" "HTTP receiver port ${HTTP_PORT} is reachable from the validator host."
     else
-        add_check "http-listener" "warn" "Could not confirm HTTP receiver port ${HTTP_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
+        add_check "http-listener" "fail" "Could not confirm HTTP receiver port ${HTTP_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
     fi
 }
 
@@ -365,12 +376,12 @@ PY
         if [[ "$(printf '%s' "${input_summary}" | rest_json_field grpc_matches)" == "True" || "$(printf '%s' "${input_summary}" | rest_json_field grpc_matches)" == "true" ]]; then
             add_check "grpc-port" "ok" "gRPC port matches ${GRPC_PORT}."
         else
-            add_check "grpc-port" "warn" "gRPC port differs from expected ${GRPC_PORT}."
+            add_check "grpc-port" "fail" "gRPC port differs from expected ${GRPC_PORT}."
         fi
         if [[ "$(printf '%s' "${input_summary}" | rest_json_field http_matches)" == "True" || "$(printf '%s' "${input_summary}" | rest_json_field http_matches)" == "true" ]]; then
             add_check "http-port" "ok" "HTTP port matches ${HTTP_PORT}."
         else
-            add_check "http-port" "warn" "HTTP port differs from expected ${HTTP_PORT}."
+            add_check "http-port" "fail" "HTTP port differs from expected ${HTTP_PORT}."
         fi
     else
         add_check "input-stanza" "fail" "Input ${INPUT_TYPE}://${INPUT_NAME} was not found."
@@ -422,19 +433,21 @@ PY
     if [[ "$(printf '%s' "${hec_summary}" | rest_json_field expected_allowed)" == "True" || "$(printf '%s' "${hec_summary}" | rest_json_field expected_allowed)" == "true" ]]; then
         add_check "hec-allowed-index" "ok" "At least one HEC token allows ${EXPECTED_INDEX}."
     else
-        add_check "hec-allowed-index" "warn" "No visible HEC token explicitly allows ${EXPECTED_INDEX}; verify token used by senders."
+        add_check "hec-allowed-index" "fail" "No visible HEC token explicitly allows ${EXPECTED_INDEX}."
     fi
 
-    errors_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "search index=_internal earliest=-24h (ExecProcessor OR ModularInputs OR ${APP_NAME} OR \"index denied\" OR \"address already in use\") | stats count" "count" 2>/dev/null || echo "0")"
-    if [[ "${errors_count}" == "0" ]]; then
+    if ! errors_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "search index=_internal earliest=-24h (ExecProcessor OR ModularInputs OR ${APP_NAME} OR \"index denied\" OR \"address already in use\") | stats count" "count" 2>/dev/null)"; then
+        add_check "internal-errors" "fail" "Unable to run the _internal OTLP error search."
+    elif [[ "${errors_count}" == "0" ]]; then
         add_check "internal-errors" "ok" "No recent _internal OTLP modular-input errors found by the default search."
     else
         add_check "internal-errors" "warn" "Recent _internal search found ${errors_count} possible OTLP modular-input errors."
     fi
 
     if [[ "${SMOKE_SEARCH}" == "true" ]]; then
-        smoke_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "search index=${EXPECTED_INDEX} earliest=-15m sourcetype=${APP_NAME} | stats count" "count" 2>/dev/null || echo "0")"
-        if [[ "${smoke_count}" == "0" ]]; then
+        if ! smoke_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "search index=${EXPECTED_INDEX} earliest=-15m sourcetype=${APP_NAME} | stats count" "count" 2>/dev/null)"; then
+            add_check "smoke-search" "fail" "Unable to run the requested ${EXPECTED_INDEX} smoke search."
+        elif [[ "${smoke_count}" == "0" ]]; then
             add_check "smoke-search" "warn" "No recent events found in ${EXPECTED_INDEX} for sourcetype ${APP_NAME}."
         else
             add_check "smoke-search" "ok" "Found ${smoke_count} recent events in ${EXPECTED_INDEX}."
@@ -445,6 +458,7 @@ PY
 main() {
     positive_port "${GRPC_PORT}" "--grpc-port"
     positive_port "${HTTP_PORT}" "--http-port"
+    validate_static_names
     inspect_platform
     inspect_package
     if [[ "${DRY_RUN}" == "true" ]]; then

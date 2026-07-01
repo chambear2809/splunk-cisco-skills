@@ -10,6 +10,7 @@ import shlex
 import stat
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 OPERATIONS = (
@@ -204,16 +205,28 @@ def validate_nonnegative_int(value: str, option: str, allow_empty: bool = True) 
         die(f"{option} must be a nonnegative integer.")
 
 
+def validate_service_url(value: str, option: str, schemes: tuple[str, ...]) -> None:
+    try:
+        parsed = urlsplit(value)
+    except ValueError as exc:
+        die(f"{option} must be a valid URL: {exc}")
+    if parsed.scheme not in schemes or not parsed.hostname:
+        expected = " or ".join(f"{scheme}://" for scheme in schemes)
+        die(f"{option} must be an absolute {expected} URL.")
+    if parsed.username is not None or parsed.password is not None:
+        die(f"{option} must not contain embedded credentials.")
+    if parsed.query or parsed.fragment:
+        die(f"{option} must not contain a query string or fragment.")
+
+
 def validate(args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", args.app_name or ""):
         die("--app-name must contain only letters, numbers, underscore, dot, colon, or hyphen.")
     if not re.fullmatch(r"[A-Za-z0-9_]+", args.volume_name or ""):
         die("--volume-name must contain only letters, numbers, and underscores.")
     validate_stack_name(args.stack)
-    if not args.acs_base.startswith("https://"):
-        die("--acs-base must be an https URL.")
-    if not args.splunk_uri.startswith(("https://", "http://")):
-        die("--splunk-uri must be an http or https URL.")
+    validate_service_url(args.acs_base, "--acs-base", ("https",))
+    validate_service_url(args.splunk_uri, "--splunk-uri", ("https", "http"))
 
     indexes_all = args.indexes.strip().lower() == "all"
     indexes = target_indexes(args)
@@ -225,6 +238,18 @@ def validate(args: argparse.Namespace) -> None:
         die("--indexes must contain at least one index.")
     for index in indexes:
         validate_index_name(index)
+
+    if args.platform == "cloud" and args.operation == "smartstore":
+        die("--operation smartstore is a self-managed Splunk Enterprise workflow; use the Cloud index/DDSS workflow for Splunk Cloud.")
+    if args.operation == "clean-data" and (args.platform != "enterprise" or args.deployment != "standalone"):
+        die("--operation clean-data is supported only for a standalone Splunk Enterprise indexer.")
+    if args.operation == "retention":
+        if args.platform == "enterprise" and not (args.max_total_data_size_mb or args.frozen_time_period_in_secs):
+            die("Enterprise retention requires --max-total-data-size-mb and/or --frozen-time-period-in-secs.")
+        if args.platform == "cloud" and not (
+            args.searchable_days or args.max_data_size_mb or args.archival_retention_days
+        ):
+            die("Splunk Cloud retention requires --searchable-days, --max-data-size-mb, and/or --archival-retention-days.")
 
     for value, option in (
         (args.remote_path, "--remote-path"),
@@ -287,8 +312,6 @@ def validate(args: argparse.Namespace) -> None:
         if scheme != expected_scheme:
             die(f"--remote-path must start with {expected_scheme}:// for --remote-provider {args.remote_provider}.")
 
-    if args.operation == "clean-data" and args.deployment == "cluster":
-        die("--operation clean-data is blocked for indexer clusters; Splunk does not support clean on clustered indexes.")
     if args.operation == "delete-index":
         for index in indexes:
             reason = protected_index_reason(index, {}, strict=True)
@@ -416,7 +439,7 @@ def evidence_marks_safe_to_delete(index: str, evidence: dict[str, Any]) -> bool:
     record = evidence_index_record(evidence, index)
     if not record:
         return False
-    return bool(record.get("safe_to_delete") is True and record.get("dependencies_clear", True) is not False)
+    return bool(record.get("safe_to_delete") is True and record.get("dependencies_clear") is True)
 
 
 def protected_index_reason(index: str, evidence: dict[str, Any], strict: bool = False) -> str:
@@ -639,16 +662,16 @@ def render_collect_evidence(args: argparse.Namespace) -> str:
     return make_script(
         f"""session_key_file={session_key_file}
 splunk_uri={splunk_uri}
-[[ -s "${{session_key_file}}" ]] || {{ echo "ERROR: session key file missing or empty: ${{session_key_file}}" >&2; exit 1; }}
-curl_config="$(mktemp)"
 out="live-index-lifecycle-evidence.jsonl"
-trap 'rm -f "${{curl_config}}"' EXIT
-printf 'header = "Authorization: Splunk %s"\\n' "$(cat "${{session_key_file}}")" > "${{curl_config}}"
-: > "${{out}}"
+{secure_curl_context('session_key_file', 'Splunk')}
 python3 - "${{splunk_uri}}" "${{curl_config}}" "${{out}}" <<'PY'
 import json
+import os
+from pathlib import Path
+import re
 import subprocess
 import sys
+import tempfile
 
 splunk_uri, curl_config, out_path = sys.argv[1:4]
 searches = []
@@ -664,19 +687,35 @@ for raw in open("collection-searches.spl", encoding="utf-8"):
         continue
     searches.append((current_title, line))
 
+out = Path(out_path)
+if out.is_symlink():
+    raise SystemExit(f"ERROR: evidence output must not be a symlink: {{out}}")
+flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+fd = os.open(out, flags, 0o600)
+os.fchmod(fd, 0o600)
+
 url = f"{{splunk_uri}}/services/search/v2/jobs/export"
-with open(out_path, "a", encoding="utf-8") as out:
+with os.fdopen(fd, "w", encoding="utf-8") as output, tempfile.TemporaryDirectory(prefix="splunk-index-evidence-") as tmp_dir:
     for title, search in searches:
         print(f"POST {{url}} :: {{title}}")
+        response_path = Path(tmp_dir) / "response.json"
         result = subprocess.run(
             [
                 "curl",
                 "-sS",
+                "--proto",
+                "=https,http",
                 "-X",
                 "POST",
                 url,
                 "-K",
                 curl_config,
+                "-o",
+                str(response_path),
+                "-w",
+                "%{{http_code}}",
                 "--data-urlencode",
                 f"search={{search}}",
                 "-d",
@@ -686,12 +725,16 @@ with open(out_path, "a", encoding="utf-8") as out:
             capture_output=True,
             check=False,
         )
-        out.write(json.dumps({{"title": title, "search": search, "returncode": result.returncode}}) + "\\n")
-        for row in result.stdout.splitlines():
-            out.write(row + "\\n")
-        if result.returncode != 0:
-            out.write(json.dumps({{"title": title, "stderr": result.stderr}}) + "\\n")
-            raise SystemExit(result.stderr or f"search export failed for {{title}}")
+        status = result.stdout.strip()
+        body = response_path.read_text(encoding="utf-8", errors="replace") if response_path.exists() else ""
+        output.write(json.dumps({{"title": title, "search": search, "returncode": result.returncode, "http_status": status}}) + "\\n")
+        if result.returncode != 0 or not re.fullmatch(r"2[0-9]{{2}}", status):
+            output.write(json.dumps({{"title": title, "error": (result.stderr or body)[:2000]}}) + "\\n")
+            output.flush()
+            raise SystemExit(result.stderr or f"search export failed for {{title}} with HTTP {{status or 'unknown'}}")
+        for row in body.splitlines():
+            output.write(row + "\\n")
+        output.flush()
 PY
 echo "Wrote ${{out}}"
 """
@@ -908,34 +951,458 @@ the explicit accept flag, and exact confirmation tokens are provided.
 
 
 def render_preflight(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        if args.operation not in {"inventory", "retention", "delete-index"}:
+            return make_script(
+                f'''command -v python3 >/dev/null || {{ echo "ERROR: python3 is required." >&2; exit 1; }}
+echo "HANDOFF: {args.operation} has no generic live ACS apply in this workflow; review the rendered runbook."
+'''
+            )
+        token_file = shell_quote(str(Path(args.acs_token_file).expanduser()))
+        stack = shell_quote(args.stack)
+        payload_check = ""
+        if args.operation == "retention":
+            payload_check = '''python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("acs-index-update-payload.json")
+if path.is_symlink() or not path.is_file():
+    raise SystemExit(f"ERROR: ACS payload must be a regular, non-symlink file: {path}")
+payload = json.loads(path.read_text(encoding="utf-8"))
+indexes = payload.get("indexes") if isinstance(payload, dict) else None
+if not isinstance(indexes, list) or not indexes:
+    raise SystemExit("ERROR: no index payloads were rendered.")
+for item in indexes:
+    if not isinstance(item, dict) or not item.get("name"):
+        raise SystemExit("ERROR: ACS payload contains an invalid index record.")
+    if not any(key in item for key in ("searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays")):
+        raise SystemExit(f"ERROR: ACS payload for {item.get('name')} has no mutable fields.")
+PY
+'''
+        return make_script(
+            f'''token_file={token_file}
+stack={stack}
+[[ -n "${{stack}}" ]] || {{ echo "ERROR: --stack is required for this Splunk Cloud operation." >&2; exit 1; }}
+{secure_curl_context('token_file', 'Bearer')}{payload_check}echo "Splunk Cloud preflight passed for stack ${{stack}}."
+'''
+        )
     splunk_home = shell_quote(args.splunk_home)
     return make_script(
         f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
-"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null || true
-"${{splunk_home}}/bin/splunk" btool server list cachemanager --debug >/dev/null || true
-"${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug >/dev/null || true
+"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
+"${{splunk_home}}/bin/splunk" btool server list cachemanager --debug >/dev/null
+"${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug >/dev/null
 """
     )
 
 
-def substitution_python() -> str:
+def secure_install_python() -> str:
     return r"""from pathlib import Path
+import os
+import stat
+import sys
+import tempfile
+import time
+
+if (len(sys.argv) - 1) % 4:
+    raise SystemExit("ERROR: secure installer received an invalid argument list.")
+
+def regular_file(path_value, label, secret=False):
+    path = Path(path_value)
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot inspect {label} {path}: {exc}")
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise SystemExit(f"ERROR: {label} must be a regular, non-symlink file: {path}")
+    if secret:
+        if info.st_uid != os.geteuid():
+            raise SystemExit(f"ERROR: {label} must be owned by the executing user: {path}")
+        if stat.S_IMODE(info.st_mode) & 0o077:
+            raise SystemExit(f"ERROR: {label} must be owner-only (mode 0600 or stricter): {path}")
+    return path
+
+def read_secret(path_value, label):
+    path = regular_file(path_value, label, secret=True)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags)
+    with os.fdopen(fd, "r", encoding="utf-8") as fh:
+        info = os.fstat(fh.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) & 0o077:
+            raise SystemExit(f"ERROR: {label} changed while it was being opened: {path}")
+        value = fh.read().strip()
+    if not value:
+        raise SystemExit(f"ERROR: {label} must not be empty: {path}")
+    if "\n" in value or "\r" in value:
+        raise SystemExit(f"ERROR: {label} must contain exactly one line: {path}")
+    return value
+
+def backup_existing(target):
+    if not target.exists():
+        return
+    if target.is_symlink() or not target.is_file():
+        raise SystemExit(f"ERROR: target must be a regular, non-symlink file: {target}")
+    stamp = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+    for suffix in range(1000):
+        backup = target.with_name(f"{target.name}.bak.{stamp}.{os.getpid()}.{suffix}")
+        try:
+            fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            continue
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(target.read_bytes())
+            fh.flush()
+            os.fsync(fh.fileno())
+        return
+    raise SystemExit(f"ERROR: could not create a unique backup for {target}")
+
+def install(target_value, source_value, access_key_file, secret_key_file):
+    target = Path(target_value)
+    source = regular_file(source_value, "rendered source")
+    content = source.read_text(encoding="utf-8")
+    if "__SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__" in content:
+        access_key = read_secret(access_key_file, "S3 access-key file")
+        secret_key = read_secret(secret_key_file, "S3 secret-key file")
+        content = content.replace("__SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__", access_key)
+        content = content.replace("__SMARTSTORE_S3_SECRET_KEY_FROM_FILE__", secret_key)
+    if "__SMARTSTORE_" in content:
+        raise SystemExit(f"ERROR: unresolved SmartStore secret placeholder remains in {source}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.parent.is_symlink():
+        raise SystemExit(f"ERROR: target directory must not be a symlink: {target.parent}")
+    backup_existing(target)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, target)
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+for offset in range(1, len(sys.argv), 4):
+    install(*sys.argv[offset:offset + 4])
+"""
+
+
+def curl_config_python(auth_scheme: str) -> str:
+    return f'''from pathlib import Path
+import os
+import stat
 import sys
 
-target = Path(sys.argv[1])
-template = Path(sys.argv[2]).read_text(encoding="utf-8")
-access_key_file = sys.argv[3]
-secret_key_file = sys.argv[4]
-if "__SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__" in template:
-    access_key = Path(access_key_file).read_text(encoding="utf-8").strip()
-    secret_key = Path(secret_key_file).read_text(encoding="utf-8").strip()
-    if not access_key or not secret_key:
-        raise SystemExit("ERROR: S3 credential files must not be empty.")
-    template = template.replace("__SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__", access_key)
-    template = template.replace("__SMARTSTORE_S3_SECRET_KEY_FROM_FILE__", secret_key)
-target.write_text(template, encoding="utf-8")
-"""
+token_path = Path(sys.argv[1])
+config_path = Path(sys.argv[2])
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+try:
+    fd = os.open(token_path, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot securely open token file {{token_path}}: {{exc}}")
+with os.fdopen(fd, "r", encoding="utf-8") as fh:
+    token_info = os.fstat(fh.fileno())
+    if not stat.S_ISREG(token_info.st_mode):
+        raise SystemExit(f"ERROR: token file must be a regular, non-symlink file: {{token_path}}")
+    if token_info.st_uid != os.geteuid():
+        raise SystemExit(f"ERROR: token file must be owned by the executing user: {{token_path}}")
+    if stat.S_IMODE(token_info.st_mode) & 0o077:
+        raise SystemExit(f"ERROR: token file must be owner-only (mode 0600 or stricter): {{token_path}}")
+    token = fh.read().strip()
+if not token:
+    raise SystemExit(f"ERROR: token file is empty: {{token_path}}")
+if any(char.isspace() for char in token):
+    raise SystemExit(f"ERROR: token file must contain one whitespace-free token: {{token_path}}")
+escaped = token.replace("\\", "\\\\").replace('"', '\\"')
+flags = os.O_WRONLY | os.O_TRUNC
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+fd = os.open(config_path, flags)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write('header = "Authorization: {auth_scheme} ' + escaped + '"\\n')
+        fh.flush()
+        os.fsync(fh.fileno())
+except BaseException:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    raise
+'''
+
+
+def secure_curl_context(token_var: str, auth_scheme: str) -> str:
+    return f'''umask 077
+command -v curl >/dev/null || {{ echo "ERROR: curl is required." >&2; exit 1; }}
+command -v python3 >/dev/null || {{ echo "ERROR: python3 is required." >&2; exit 1; }}
+curl_config="$(mktemp "${{TMPDIR:-/tmp}}/splunk-index-lifecycle-curl.XXXXXX")"
+cleanup_curl_config() {{ rm -f -- "${{curl_config}}"; }}
+trap cleanup_curl_config EXIT
+python3 - "${{{token_var}}}" "${{curl_config}}" <<'PY'
+{curl_config_python(auth_scheme)}PY
+'''
+
+
+def acs_http_runtime_python() -> str:
+    return r'''import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+from urllib.parse import quote
+
+acs_base, stack, curl_config = sys.argv[1:4]
+
+def response_summary(raw, limit=2000):
+    def redact(value):
+        if isinstance(value, dict):
+            result = {}
+            for key, item in value.items():
+                lowered = str(key).lower()
+                result[key] = "<redacted>" if any(word in lowered for word in ("token", "secret", "password", "credential")) else redact(item)
+            return result
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        return value
+    try:
+        rendered = json.dumps(redact(json.loads(raw)), sort_keys=True)
+    except Exception:
+        rendered = raw
+    return rendered if limit is None else rendered[:limit]
+
+def request(method, url, body=None):
+    with tempfile.TemporaryDirectory(prefix="splunk-index-acs-") as tmp_dir:
+        response_path = Path(tmp_dir) / "response.json"
+        response_path.touch(mode=0o600)
+        command = [
+            "curl", "-sS", "--proto", "=https", "--connect-timeout", "15", "--max-time", "120",
+            "-o", str(response_path), "-w", "%{http_code}", "-X", method, url, "-K", curl_config,
+            "-H", "Accept: application/json",
+        ]
+        if body is not None:
+            payload_path = Path(tmp_dir) / "payload.json"
+            fd = os.open(payload_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(body, fh, separators=(",", ":"), sort_keys=True)
+                fh.flush()
+                os.fsync(fh.fileno())
+            command.extend(["-H", "Content-Type: application/json", "--data-binary", f"@{payload_path}"])
+        result = subprocess.run(command, text=True, capture_output=True, check=False)
+        status = result.stdout.strip()
+        raw = response_path.read_text(encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"curl failed with return code {result.returncode}")
+    if not re.fullmatch(r"[0-9]{3}", status):
+        raise RuntimeError(f"ACS returned an invalid HTTP status {status!r}: {response_summary(raw)}")
+    return int(status), raw
+
+def index_url(name):
+    return f"{acs_base.rstrip('/')}/{quote(stack, safe='')}/adminconfig/v2/indexes/{quote(name, safe='')}"
+
+def collection_url():
+    return f"{acs_base.rstrip('/')}/{quote(stack, safe='')}/adminconfig/v2/indexes"
+
+def parse_json_object(raw, context):
+    try:
+        value = json.loads(raw)
+    except Exception as exc:
+        raise RuntimeError(f"{context} returned invalid JSON: {exc}") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{context} returned JSON type {type(value).__name__}, expected object")
+    return value
+
+def extract_index_record(value, name):
+    candidates = [value]
+    for key in ("index", "item", "data"):
+        child = value.get(key) if isinstance(value, dict) else None
+        if isinstance(child, dict):
+            candidates.append(child)
+    for key in ("indexes", "items", "results"):
+        child = value.get(key) if isinstance(value, dict) else None
+        if isinstance(child, list):
+            candidates.extend(item for item in child if isinstance(item, dict))
+    for candidate in candidates:
+        if candidate.get("name") == name or candidate.get("title") == name:
+            return candidate
+    for candidate in candidates:
+        if any(key in candidate for key in ("searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays")):
+            return candidate
+    raise RuntimeError(f"ACS readback did not contain an index record for {name}")
+
+def equivalent(actual, expected):
+    if isinstance(expected, int):
+        try:
+            return int(actual) == expected
+        except (TypeError, ValueError):
+            return False
+    return actual == expected
+
+def verify_fields(record, expected):
+    return {
+        key: {"expected": value, "actual": record.get(key)}
+        for key, value in expected.items()
+        if key not in record or not equivalent(record.get(key), value)
+    }
+'''
+
+
+def smartstore_expected_settings(args: argparse.Namespace) -> dict[str, dict[str, dict[str, str]]]:
+    indexes: dict[str, dict[str, str]] = {
+        f"volume:{args.volume_name}": {
+            "storageType": "remote",
+            "path": args.remote_path,
+        }
+    }
+    volume = indexes[f"volume:{args.volume_name}"]
+    if args.remote_provider == "s3":
+        optional = {
+            "remote.s3.endpoint": args.s3_endpoint,
+            "remote.s3.auth_region": args.s3_auth_region,
+            "remote.s3.signature_version": args.s3_signature_version,
+            "remote.s3.kms.key_id": args.s3_kms_key_id,
+            "remote.s3.kms.auth_region": args.s3_kms_auth_region,
+            "remote.s3.sslVersions": args.s3_ssl_versions,
+        }
+        volume.update({key: value for key, value in optional.items() if value})
+        for key, value in (
+            ("remote.s3.supports_versioning", args.s3_supports_versioning),
+            ("remote.s3.tsidx_compression", args.s3_tsidx_compression),
+            ("remote.s3.encryption", args.s3_encryption),
+            ("remote.s3.sslVerifyServerCert", args.s3_ssl_verify_server_cert),
+        ):
+            if value != "unset":
+                volume[key] = value
+        if args.s3_access_key_file:
+            volume["remote.s3.access_key"] = "__NONEMPTY_SECRET__"
+            volume["remote.s3.secret_key"] = "__NONEMPTY_SECRET__"
+    elif args.remote_provider == "gcs" and args.gcs_credential_file:
+        volume["remote.gs.credential_file"] = args.gcs_credential_file
+    elif args.remote_provider == "azure":
+        if args.azure_endpoint:
+            volume["remote.azure.endpoint"] = args.azure_endpoint
+        if args.azure_container_name:
+            volume["remote.azure.container_name"] = args.azure_container_name
+
+    retention = {
+        line.split("=", 1)[0].strip(): line.split("=", 1)[1].strip()
+        for line in retention_lines(args)
+    }
+    if args.scope == "global":
+        indexes["default"] = {"remotePath": f"volume:{args.volume_name}/$_index_name", **retention}
+        if args.deployment == "cluster":
+            indexes["default"]["repFactor"] = "auto"
+    for index in target_indexes(args):
+        expected: dict[str, str] = {}
+        if args.deployment == "cluster":
+            expected["repFactor"] = "auto"
+        if args.scope == "per-index":
+            expected["remotePath"] = f"volume:{args.volume_name}/$_index_name"
+            expected.update(retention)
+        if args.index_hotlist_recency_secs:
+            expected["hotlist_recency_secs"] = args.index_hotlist_recency_secs
+        if args.index_hotlist_bloom_filter_recency_hours:
+            expected["hotlist_bloom_filter_recency_hours"] = args.index_hotlist_bloom_filter_recency_hours
+        indexes[index] = expected
+
+    server: dict[str, dict[str, str]] = {}
+    if bool_value(args.clean_remote_storage_by_default):
+        server["general"] = {"cleanRemoteStorageByDefault": "true"}
+    cache = {
+        key: value
+        for key, value in (
+            ("eviction_policy", args.eviction_policy),
+            ("max_cache_size", args.cache_size_mb),
+            ("eviction_padding", args.eviction_padding_mb),
+            ("hotlist_recency_secs", args.hotlist_recency_secs),
+            ("hotlist_bloom_filter_recency_hours", args.hotlist_bloom_filter_recency_hours),
+        )
+        if value
+    }
+    if cache:
+        server["cachemanager"] = cache
+    limits = {
+        key: value
+        for key, value in (
+            ("bucket_localize_acquire_lock_timeout_sec", args.bucket_localize_acquire_lock_timeout_sec),
+            ("bucket_localize_connect_timeout_max_retries", args.bucket_localize_connect_timeout_max_retries),
+            ("bucket_localize_max_timeout_sec", args.bucket_localize_max_timeout_sec),
+        )
+        if value
+    }
+    result: dict[str, dict[str, dict[str, str]]] = {"indexes": indexes}
+    if server:
+        result["server"] = server
+    if limits:
+        result["limits"] = {"remote_storage": limits}
+    return result
+
+
+def retention_expected_settings(args: argparse.Namespace) -> dict[str, dict[str, dict[str, str]]]:
+    settings = {
+        line.split("=", 1)[0].strip(): line.split("=", 1)[1].strip()
+        for line in enterprise_retention_lines(args)
+    }
+    return {"indexes": {index: dict(settings) for index in target_indexes(args)}}
+
+
+def btool_readback_python(expected: dict[str, dict[str, dict[str, str]]]) -> str:
+    expected_literal = repr(json.dumps(expected, sort_keys=True))
+    return f'''import json
+import re
+import subprocess
+import sys
+
+splunk_home = sys.argv[1]
+expected = json.loads({expected_literal})
+failures = []
+for conf_name, stanzas in expected.items():
+    for stanza, settings in stanzas.items():
+        result = subprocess.run(
+            [f"{{splunk_home}}/bin/splunk", "btool", conf_name, "list", stanza],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            failures.append(f"{{conf_name}} [{{stanza}}]: btool failed: {{result.stderr.strip()}}")
+            continue
+        actual = {{}}
+        for line in result.stdout.splitlines():
+            match = re.match(r"^\\s*([^#;][^=]*?)\\s*=\\s*(.*?)\\s*$", line)
+            if match:
+                actual[match.group(1).strip()] = match.group(2)
+        for key, wanted in settings.items():
+            observed = actual.get(key)
+            if wanted == "__NONEMPTY_SECRET__":
+                if not observed or observed.startswith("__SMARTSTORE_"):
+                    failures.append(f"{{conf_name}} [{{stanza}}] {{key}}: secret value is missing or unresolved")
+            elif observed != wanted:
+                failures.append(f"{{conf_name}} [{{stanza}}] {{key}}: expected {{wanted!r}}, got {{observed!r}}")
+if failures:
+    print("ERROR: post-activation btool readback did not match the rendered configuration:", file=sys.stderr)
+    for failure in failures:
+        print(f"  - {{failure}}", file=sys.stderr)
+    raise SystemExit(1)
+print("Post-activation btool readback matched all rendered settings.")
+'''
 
 
 def render_apply(args: argparse.Namespace, cluster: bool) -> str:
@@ -946,67 +1413,155 @@ def render_apply(args: argparse.Namespace, cluster: bool) -> str:
     base = "${splunk_home}/etc/manager-apps" if cluster else "${splunk_home}/etc/apps"
     bundle_block = (
         '"${splunk_home}/bin/splunk" apply cluster-bundle --answer-yes\n'
+        '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
         if cluster and bool_value(args.apply_cluster_bundle)
-        else 'echo "Cluster bundle apply skipped. Run splunk apply cluster-bundle --answer-yes after review."\n'
+        else 'echo "HANDOFF: cluster bundle apply is disabled; configuration was staged but not activated." >&2\nexit 2\n'
     )
     restart_block = (
         '"${splunk_home}/bin/splunk" restart\n'
+        'python3 - "${splunk_home}" <<\'PY\'\n'
+        f'{btool_readback_python(smartstore_expected_settings(args))}'
+        'PY\n'
         if not cluster and bool_value(args.restart_splunk)
-        else 'echo "Restart skipped. Restart the standalone indexer after review."\n'
+        else 'echo "HANDOFF: restart is disabled; configuration was staged but not activated." >&2\nexit 2\n'
     )
     final_block = bundle_block if cluster else restart_block
     return make_script(
-        f"""splunk_home={splunk_home}
+        f"""rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "smartstore" ]] || {{ echo "ERROR: this helper was not rendered for a SmartStore operation." >&2; exit 2; }}
+splunk_home={splunk_home}
 app_name={app_name}
 access_key_file={access_key_file}
 secret_key_file={secret_key_file}
 
-if grep -q "__SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__" indexes.conf.template; then
-  [[ -s "${{access_key_file}}" ]] || {{ echo "ERROR: S3 access key file is missing or empty: ${{access_key_file}}" >&2; exit 1; }}
-  [[ -s "${{secret_key_file}}" ]] || {{ echo "ERROR: S3 secret key file is missing or empty: ${{secret_key_file}}" >&2; exit 1; }}
-fi
-
 target_dir="{base}/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
-python3 - "${{target_dir}}/indexes.conf" indexes.conf.template "${{access_key_file}}" "${{secret_key_file}}" <<'PY'
-{substitution_python()}
+python3 - \
+  "${{target_dir}}/indexes.conf" indexes.conf.template "${{access_key_file}}" "${{secret_key_file}}" \
+  "${{target_dir}}/server.conf" server.conf '' '' \
+  "${{target_dir}}/limits.conf" limits.conf '' '' <<'PY'
+{secure_install_python()}
 PY
-chmod 600 "${{target_dir}}/indexes.conf"
-cp server.conf "${{target_dir}}/server.conf"
-cp limits.conf "${{target_dir}}/limits.conf"
-"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
+if grep -q '__SMARTSTORE_' "${{target_dir}}/indexes.conf" "${{target_dir}}/server.conf" "${{target_dir}}/limits.conf"; then
+  echo "ERROR: unresolved SmartStore placeholder remains under ${{target_dir}}." >&2
+  exit 1
+fi
 {final_block}"""
     )
 
 
+def render_cloud_status(args: argparse.Namespace) -> str:
+    token_file = shell_quote(str(Path(args.acs_token_file).expanduser()))
+    base = shell_quote(args.acs_base.rstrip("/"))
+    stack = shell_quote(args.stack)
+    indexes_csv = shell_quote(",".join(target_indexes(args)))
+    operation = shell_quote(args.operation)
+    return make_script(
+        f'''token_file={token_file}
+acs_base={base}
+stack={stack}
+indexes_csv={indexes_csv}
+operation={operation}
+[[ -n "${{stack}}" ]] || {{ echo "ERROR: --stack is required for Splunk Cloud status." >&2; exit 1; }}
+{secure_curl_context('token_file', 'Bearer')}python3 - "${{acs_base}}" "${{stack}}" "${{curl_config}}" "${{indexes_csv}}" "${{operation}}" <<'PY'
+{acs_http_runtime_python()}
+indexes_csv, operation = sys.argv[4:6]
+indexes = [item for item in indexes_csv.split(",") if item]
+expected_by_name = {{}}
+if operation == "retention":
+    payload_path = Path("acs-index-update-payload.json")
+    if payload_path.is_symlink() or not payload_path.is_file():
+        raise SystemExit(f"ERROR: ACS payload must be a regular, non-symlink file: {{payload_path}}")
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    expected_by_name = {{
+        item["name"]: {{key: value for key, value in item.items() if key not in ("name", "datatype")}}
+        for item in payload.get("indexes", [])
+        if isinstance(item, dict) and item.get("name")
+    }}
+
+if not indexes:
+    status, raw = request("GET", collection_url())
+    if status < 200 or status >= 300:
+        raise SystemExit(f"ERROR: ACS index inventory failed with HTTP {{status}}: {{response_summary(raw)}}")
+    print(response_summary(raw, None))
+    raise SystemExit(0)
+
+failures = []
+for name in indexes:
+    try:
+        status, raw = request("GET", index_url(name))
+        if operation == "delete-index":
+            if status == 404:
+                print(f"VERIFIED ABSENT: {{name}}")
+                continue
+            failures.append(f"{{name}}: expected HTTP 404 after deletion, got HTTP {{status}}")
+            continue
+        if status < 200 or status >= 300:
+            failures.append(f"{{name}}: describe failed with HTTP {{status}}: {{response_summary(raw)}}")
+            continue
+        value = parse_json_object(raw, f"ACS describe for {{name}}")
+        record = extract_index_record(value, name)
+        mismatches = verify_fields(record, expected_by_name.get(name, {{}}))
+        if mismatches:
+            failures.append(f"{{name}}: readback mismatch {{json.dumps(mismatches, sort_keys=True)}}")
+            continue
+        print(f"VERIFIED PRESENT: {{name}}")
+        print(response_summary(json.dumps(record, sort_keys=True), None))
+    except Exception as exc:
+        failures.append(f"{{name}}: {{exc}}")
+if failures:
+    print("ERROR: Splunk Cloud status verification failed:", file=sys.stderr)
+    for failure in failures:
+        print(f"  - {{failure}}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+'''
+    )
+
+
 def render_status(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        return render_cloud_status(args)
     splunk_home = shell_quote(args.splunk_home)
     volume = shell_quote(f"volume:{args.volume_name}")
+    cluster_status = (
+        '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
+        if args.deployment == "cluster"
+        else 'echo "INFO: standalone deployment; cluster bundle status is not applicable."\n'
+    )
     return make_script(
-        f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" btool indexes list {volume} --debug 2>/dev/null | grep -v -E 'remote\\.(s3|gs|azure)\\.(access|secret|key)' || true
-"${{splunk_home}}/bin/splunk" btool indexes list --debug 2>/dev/null | grep -E 'frozenTimePeriodInSecs|maxTotalDataSizeMB|maxGlobal(Data|Raw)SizeMB|disabled' || true
-"${{splunk_home}}/bin/splunk" btool server list cachemanager --debug 2>/dev/null || true
-"${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug 2>/dev/null || true
-"${{splunk_home}}/bin/splunk" show cluster-bundle-status 2>/dev/null || true
+        f"""rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
+splunk_home={splunk_home}
+volume_output="$("${{splunk_home}}/bin/splunk" btool indexes list {volume} --debug)"
+printf '%s\n' "${{volume_output}}" | grep -v -E 'remote\\.(s3|gs|azure)\\.(access|secret|key)' || echo "INFO: no non-secret settings found for {volume}."
+indexes_output="$("${{splunk_home}}/bin/splunk" btool indexes list --debug)"
+printf '%s\n' "${{indexes_output}}" | grep -E 'frozenTimePeriodInSecs|maxTotalDataSizeMB|maxGlobal(Data|Raw)SizeMB|disabled' || echo "INFO: no lifecycle overrides found."
+"${{splunk_home}}/bin/splunk" btool server list cachemanager --debug
+"${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug
+{cluster_status}
 """
     )
 
 
 def render_apply_retention_enterprise(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
-    app_name = shell_quote(args.app_name)
+    app_name = shell_quote(f"{args.app_name}_retention")
     base = "${splunk_home}/etc/manager-apps" if args.deployment == "cluster" else "${splunk_home}/etc/apps"
     final_block = (
         '"${splunk_home}/bin/splunk" apply cluster-bundle --answer-yes\n'
+        '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
         if args.deployment == "cluster" and bool_value(args.apply_cluster_bundle)
         else (
-            'echo "Cluster bundle apply skipped. Run splunk apply cluster-bundle --answer-yes after review."\n'
+            'echo "HANDOFF: cluster bundle apply is disabled; retention configuration was staged but not activated." >&2\nexit 2\n'
             if args.deployment == "cluster"
             else (
                 '"${splunk_home}/bin/splunk" restart\n'
+                'python3 - "${splunk_home}" <<\'PY\'\n'
+                f'{btool_readback_python(retention_expected_settings(args))}'
+                'PY\n'
                 if bool_value(args.restart_splunk)
-                else 'echo "Restart skipped. Restart the standalone indexer after review."\n'
+                else 'echo "HANDOFF: restart is disabled; retention configuration was staged but not activated." >&2\nexit 2\n'
             )
         )
     )
@@ -1015,8 +1570,9 @@ def render_apply_retention_enterprise(args: argparse.Namespace) -> str:
 app_name={app_name}
 target_dir="{base}/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
-cp retention-indexes.conf.template "${{target_dir}}/indexes.conf"
-"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
+python3 - "${{target_dir}}/indexes.conf" retention-indexes.conf.template '' '' <<'PY'
+{secure_install_python()}
+PY
 {final_block}"""
     )
 
@@ -1026,92 +1582,171 @@ def render_apply_retention_cloud(args: argparse.Namespace) -> str:
     base = shell_quote(args.acs_base.rstrip("/"))
     stack = shell_quote(args.stack)
     return make_script(
-        f"""token_file={token_file}
+        f'''rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
+token_file={token_file}
 acs_base={base}
 stack={stack}
 [[ -n "${{stack}}" ]] || {{ echo "ERROR: --stack is required for Splunk Cloud retention apply." >&2; exit 1; }}
-[[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
-python3 - <<'PY'
-import json
-payload=json.load(open("acs-index-update-payload.json", encoding="utf-8"))
-if not payload.get("indexes"):
-    raise SystemExit("ERROR: no index payloads were rendered.")
-PY
-curl_config="$(mktemp)"
-trap 'rm -f "${{curl_config}}" /tmp/index_lifecycle_acs_response.json' EXIT
-printf 'header = "Authorization: Bearer %s"\\n' "$(cat "${{token_file}}")" > "${{curl_config}}"
+{secure_curl_context('token_file', 'Bearer')}
 python3 - "${{acs_base}}" "${{stack}}" "${{curl_config}}" <<'PY'
-import json, subprocess, sys, tempfile
-acs_base, stack, curl_config = sys.argv[1:4]
-payload=json.load(open("acs-index-update-payload.json", encoding="utf-8"))
-for item in payload["indexes"]:
-    name=item["name"]
-    body={{k:v for k,v in item.items() if k not in {{"name","datatype"}}}}
+{acs_http_runtime_python()}
+import time
+
+payload_path = Path("acs-index-update-payload.json")
+if payload_path.is_symlink() or not payload_path.is_file():
+    raise SystemExit(f"ERROR: ACS payload must be a regular, non-symlink file: {{payload_path}}")
+try:
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"ERROR: cannot parse ACS payload: {{exc}}") from exc
+items = payload.get("indexes") if isinstance(payload, dict) else None
+if not isinstance(items, list) or not items:
+    raise SystemExit("ERROR: no index payloads were rendered.")
+
+verified = []
+for item in items:
+    name = item.get("name") if isinstance(item, dict) else None
+    if not name:
+        raise SystemExit("ERROR: ACS payload contains an invalid index record.")
+    body = {{key: value for key, value in item.items() if key not in ("name", "datatype")}}
     if not body:
-        print(f"Skip {{name}}: no mutable ACS fields supplied")
-        continue
-    with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as fh:
-        json.dump(body, fh)
-        path=fh.name
-    url=f"{{acs_base.rstrip('/')}}/{{stack}}/adminconfig/v2/indexes/{{name}}"
-    print(f"PATCH {{url}}")
-    result=subprocess.run([
-        "curl","-sS","-o","/tmp/index_lifecycle_acs_response.json","-w","%{{http_code}}",
-        "-X","PATCH",url,"-K",curl_config,"-H","Content-Type: application/json","--data",f"@{{path}}"
-    ], text=True, capture_output=True, check=False)
-    print("HTTP", result.stdout.strip())
-    if result.returncode != 0 or not result.stdout.startswith("2"):
-        raise SystemExit(result.stderr or "ACS retention request failed")
+        raise SystemExit(f"ERROR: ACS payload for {{name}} has no mutable fields.")
+    try:
+        status, raw = request("PATCH", index_url(name), body)
+        if status < 200 or status >= 300:
+            raise RuntimeError(f"PATCH returned HTTP {{status}}: {{response_summary(raw)}}")
+        last_problem = "readback did not run"
+        for attempt in range(15):
+            read_status, read_raw = request("GET", index_url(name))
+            if 200 <= read_status < 300:
+                value = parse_json_object(read_raw, f"ACS readback for {{name}}")
+                record = extract_index_record(value, name)
+                mismatches = verify_fields(record, body)
+                if not mismatches:
+                    verified.append(name)
+                    print(f"VERIFIED: ACS retention fields for {{name}} match the requested values.")
+                    break
+                last_problem = f"field mismatch {{json.dumps(mismatches, sort_keys=True)}}"
+            elif read_status in (404, 409, 429, 500, 502, 503, 504):
+                last_problem = f"transient HTTP {{read_status}}: {{response_summary(read_raw)}}"
+            else:
+                raise RuntimeError(f"GET readback returned HTTP {{read_status}}: {{response_summary(read_raw)}}")
+            if attempt < 14:
+                time.sleep(2)
+        else:
+            raise RuntimeError(f"ACS did not converge after PATCH: {{last_problem}}")
+    except Exception as exc:
+        print(f"ERROR: ACS retention mutation failed for {{name}}: {{exc}}", file=sys.stderr)
+        if verified:
+            print("PARTIAL MUTATION: already verified indexes: " + ", ".join(verified), file=sys.stderr)
+        raise SystemExit(1)
 PY
-"""
+'''
     )
+
+
+def disruptive_gate_python() -> str:
+    return r'''import json
+from pathlib import Path
+import stat
+import sys
+
+owner_path = Path(sys.argv[1])
+evidence_path = Path(sys.argv[2])
+for path, label in ((owner_path, "owner approval"), (evidence_path, "evidence")):
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot inspect {label} file {path}: {exc}")
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+        raise SystemExit(f"ERROR: {label} file must be a non-empty regular, non-symlink file: {path}")
+try:
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"ERROR: cannot parse evidence JSON: {exc}")
+if not isinstance(evidence, dict):
+    raise SystemExit("ERROR: evidence JSON must be an object.")
+'''
 
 
 def render_disable_script(args: argparse.Namespace) -> str:
     indexes = ",".join(target_indexes(args))
     splunk_home = shell_quote(args.splunk_home)
-    app_name = shell_quote(args.app_name)
+    app_name = shell_quote(f"{args.app_name}_disable")
     owner_file = shell_quote(str(Path(args.owner_approval_file).expanduser())) if args.owner_approval_file else "''"
     evidence_file = shell_quote(str(Path(args.evidence_file).expanduser())) if args.evidence_file else "''"
+    operation_guard = f'''rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "disable-index" ]] || {{ echo "ERROR: this helper was not rendered for a disable-index operation." >&2; exit 2; }}
+'''
     if args.platform == "cloud":
         return make_script(
-            """cat <<'EOF'
+            operation_guard
+            + """cat <<'EOF'
 Splunk Cloud index disable is not exposed as a safe generic apply path here.
 Use ACS retention/delete or Splunk Web/support based on your Cloud stack policy.
 EOF
-exit 1
+exit 2
 """
         )
     if args.deployment == "cluster":
         final_block = (
             '"${splunk_home}/bin/splunk" apply cluster-bundle --answer-yes\n'
+            '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
             if bool_value(args.apply_cluster_bundle)
-            else 'echo "Cluster bundle apply skipped. Run splunk apply cluster-bundle --answer-yes after review."\n'
+            else 'echo "HANDOFF: cluster bundle apply is disabled; disable configuration was staged but not activated." >&2\nexit 2\n'
         )
         return make_script(
-            f"""splunk_home={splunk_home}
+            operation_guard
+            + f"""splunk_home={splunk_home}
 app_name={app_name}
 owner_approval_file={owner_file}
 evidence_file={evidence_file}
-[[ -s "${{owner_approval_file}}" ]] || {{ echo "ERROR: owner approval file missing or empty." >&2; exit 1; }}
-[[ -s "${{evidence_file}}" ]] || {{ echo "ERROR: evidence file missing or empty." >&2; exit 1; }}
+python3 - "${{owner_approval_file}}" "${{evidence_file}}" <<'PY'
+{disruptive_gate_python()}
+PY
 target_dir="${{splunk_home}}/etc/manager-apps/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
-cp indexes-disable.conf.template "${{target_dir}}/indexes.conf"
+python3 - "${{target_dir}}/indexes.conf" indexes-disable.conf.template '' '' <<'PY'
+{secure_install_python()}
+PY
 {final_block}"""
         )
     return make_script(
-        f"""splunk_home={splunk_home}
+        operation_guard
+        + f"""splunk_home={splunk_home}
 owner_approval_file={owner_file}
 evidence_file={evidence_file}
 indexes_csv={shell_quote(indexes)}
-[[ -s "${{owner_approval_file}}" ]] || {{ echo "ERROR: owner approval file missing or empty." >&2; exit 1; }}
-[[ -s "${{evidence_file}}" ]] || {{ echo "ERROR: evidence file missing or empty." >&2; exit 1; }}
+python3 - "${{owner_approval_file}}" "${{evidence_file}}" <<'PY'
+{disruptive_gate_python()}
+PY
 IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
 for idx in "${{indexes[@]}}"; do
   [[ -n "${{idx}}" ]] || continue
   "${{splunk_home}}/bin/splunk" disable index "${{idx}}"
 done
+python3 - "${{splunk_home}}" "${{indexes_csv}}" <<'PY'
+import re
+import subprocess
+import sys
+
+splunk_home, indexes_csv = sys.argv[1:3]
+failures = []
+for name in (item for item in indexes_csv.split(",") if item):
+    result = subprocess.run(
+        [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    match = re.search(r"(?m)^\\s*disabled\\s*=\\s*(\\S+)\\s*$", result.stdout)
+    if result.returncode != 0 or not match or match.group(1).lower() not in ("1", "true", "yes"):
+        failures.append(name)
+if failures:
+    raise SystemExit("ERROR: post-disable btool readback did not show disabled=true for: " + ", ".join(failures))
+print("Post-disable btool readback verified: " + ", ".join(item for item in indexes_csv.split(",") if item))
+PY
 """
     )
 
@@ -1119,14 +1754,23 @@ done
 def destructive_gate_python() -> str:
     protected_defaults = sorted(PROTECTED_DEFAULT_INDEXES)
     sensitive = sorted(SENSITIVE_INDEXES)
-    return f"""import json, sys
+    return f"""import json, stat, sys
 from pathlib import Path
 
-evidence_path, indexes_csv, confirm_tokens_csv = sys.argv[1:4]
+evidence_path, indexes_csv, confirm_tokens_csv, owner_path, backup_path = sys.argv[1:6]
 indexes = [item for item in indexes_csv.split(",") if item]
 tokens = set(item for item in confirm_tokens_csv.split(",") if item)
 protected_defaults = set({protected_defaults!r})
 sensitive = set({sensitive!r})
+
+for path_value, label in ((evidence_path, "evidence"), (owner_path, "owner approval"), (backup_path, "backup evidence")):
+    path = Path(path_value)
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot inspect {{label}} file {{path}}: {{exc}}")
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+        raise SystemExit(f"ERROR: {{label}} file must be a non-empty regular, non-symlink file: {{path}}")
 
 try:
     evidence = json.loads(Path(evidence_path).read_text(encoding="utf-8"))
@@ -1185,7 +1829,7 @@ for index in indexes:
         raise SystemExit(f"ERROR: protected index {{index}}: default index requires non-production test evidence")
     if index in sensitive and index not in sensitive_approved:
         raise SystemExit(f"ERROR: protected index {{index}}: ES/ITSI/ARI-sensitive index requires explicit sensitive approval evidence")
-    safe_by_record = rec.get("safe_to_delete") is True and rec.get("dependencies_clear", True) is not False
+    safe_by_record = rec.get("safe_to_delete") is True and rec.get("dependencies_clear") is True
     if index not in safe and not safe_by_record:
         raise SystemExit(f"ERROR: evidence does not mark {{index}} safe_to_delete with dependencies_clear")
 print("Destructive gates passed for: " + ", ".join(indexes))
@@ -1199,7 +1843,9 @@ def render_delete_script(args: argparse.Namespace) -> str:
     backup_file = shell_quote(str(Path(args.backup_evidence_file).expanduser())) if args.backup_evidence_file else "''"
     confirm_tokens = shell_quote(",".join(args.confirm_token))
     accept = "true" if args.accept_destructive_index_delete else "false"
-    gate = f"""accept_destructive={accept}
+    gate = f"""rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "delete-index" ]] || {{ echo "ERROR: this helper was not rendered for a delete-index operation." >&2; exit 2; }}
+accept_destructive={accept}
 evidence_file={evidence_file}
 owner_approval_file={owner_file}
 backup_evidence_file={backup_file}
@@ -1210,7 +1856,7 @@ confirm_tokens_csv={confirm_tokens}
 [[ -s "${{owner_approval_file}}" ]] || {{ echo "ERROR: owner approval file missing or empty." >&2; exit 1; }}
 [[ -s "${{backup_evidence_file}}" ]] || {{ echo "ERROR: backup evidence file missing or empty." >&2; exit 1; }}
 [[ -s "${{evidence_file}}" ]] || {{ echo "ERROR: evidence file missing or empty." >&2; exit 1; }}
-python3 - "${{evidence_file}}" "${{indexes_csv}}" "${{confirm_tokens_csv}}" <<'PY'
+python3 - "${{evidence_file}}" "${{indexes_csv}}" "${{confirm_tokens_csv}}" "${{owner_approval_file}}" "${{backup_evidence_file}}" <<'PY'
 {destructive_gate_python()}
 PY
 """
@@ -1220,54 +1866,117 @@ PY
         stack = shell_quote(args.stack)
         return make_script(
             gate
-            + f"""token_file={token_file}
+            + f'''token_file={token_file}
 acs_base={base}
 stack={stack}
 [[ -n "${{stack}}" ]] || {{ echo "ERROR: --stack is required for Splunk Cloud delete apply." >&2; exit 1; }}
-[[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
-curl_config="$(mktemp)"
-trap 'rm -f "${{curl_config}}" /tmp/index_lifecycle_delete_response.json' EXIT
-printf 'header = "Authorization: Bearer %s"\\n' "$(cat "${{token_file}}")" > "${{curl_config}}"
-IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
-for idx in "${{indexes[@]}}"; do
-  url="${{acs_base}}/${{stack}}/adminconfig/v2/indexes/${{idx}}"
-  echo "DELETE ${{url}}"
-  http_code=$(curl -sS -o /tmp/index_lifecycle_delete_response.json -w '%{{http_code}}' -X DELETE "${{url}}" -K "${{curl_config}}") || {{ echo "ERROR: ACS delete request failed." >&2; exit 1; }}
-  echo "HTTP ${{http_code}}"
-  [[ "${{http_code}}" =~ ^2 ]] || {{ cat /tmp/index_lifecycle_delete_response.json >&2 || true; exit 1; }}
-done
-"""
+{secure_curl_context('token_file', 'Bearer')}python3 - "${{acs_base}}" "${{stack}}" "${{curl_config}}" "${{indexes_csv}}" <<'PY'
+{acs_http_runtime_python()}
+import time
+
+indexes = [item for item in sys.argv[4].split(",") if item]
+verified = []
+for name in indexes:
+    try:
+        status, raw = request("DELETE", index_url(name))
+        if status < 200 or status >= 300:
+            raise RuntimeError(f"DELETE returned HTTP {{status}}: {{response_summary(raw)}}")
+        last_problem = "readback did not run"
+        for attempt in range(15):
+            read_status, read_raw = request("GET", index_url(name))
+            if read_status == 404:
+                verified.append(name)
+                print(f"VERIFIED ABSENT: {{name}}")
+                break
+            if 200 <= read_status < 300:
+                last_problem = f"index is still present (HTTP {{read_status}})"
+            elif read_status in (409, 429, 500, 502, 503, 504):
+                last_problem = f"transient HTTP {{read_status}}: {{response_summary(read_raw)}}"
+            else:
+                raise RuntimeError(f"GET readback returned HTTP {{read_status}}: {{response_summary(read_raw)}}")
+            if attempt < 14:
+                time.sleep(2)
+        else:
+            raise RuntimeError(f"ACS did not confirm deletion: {{last_problem}}")
+    except Exception as exc:
+        print(f"ERROR: ACS delete failed for {{name}}: {{exc}}", file=sys.stderr)
+        if verified:
+            print("PARTIAL MUTATION: already verified absent: " + ", ".join(verified), file=sys.stderr)
+        raise SystemExit(1)
+PY
+'''
         )
     splunk_home = shell_quote(args.splunk_home)
     if args.deployment == "cluster":
         app_name = shell_quote(args.app_name)
         final_block = (
             '"${splunk_home}/bin/splunk" apply cluster-bundle --answer-yes\n'
+            '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
             if bool_value(args.apply_cluster_bundle)
-            else 'echo "Cluster bundle apply skipped. Run splunk apply cluster-bundle --answer-yes after review."\n'
+            else 'echo "HANDOFF: cluster bundle apply is disabled; index stanzas were removed only from the staged manager app." >&2\nexit 2\n'
         )
         return make_script(
             gate
             + f"""splunk_home={splunk_home}
 app_name={app_name}
 target_conf="${{splunk_home}}/etc/manager-apps/${{app_name}}/local/indexes.conf"
-[[ -f "${{target_conf}}" ]] || {{ echo "ERROR: manager app indexes.conf not found: ${{target_conf}}" >&2; exit 1; }}
 python3 - "${{target_conf}}" "${{indexes_csv}}" <<'PY'
 from pathlib import Path
+import os
+import stat
 import sys
+import tempfile
+import time
+
 path = Path(sys.argv[1])
 targets = set(item for item in sys.argv[2].split(",") if item)
+try:
+    info = path.lstat()
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot inspect manager app indexes.conf {{path}}: {{exc}}")
+if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+    raise SystemExit(f"ERROR: manager app indexes.conf must be a regular, non-symlink file: {{path}}")
 lines = path.read_text(encoding="utf-8").splitlines()
 out = []
 skip = False
+found = set()
 for line in lines:
     stripped = line.strip()
     if stripped.startswith("[") and stripped.endswith("]"):
         stanza = stripped[1:-1]
         skip = stanza in targets
+        if skip:
+            found.add(stanza)
     if not skip:
         out.append(line)
-path.write_text("\\n".join(out).rstrip() + "\\n", encoding="utf-8")
+missing = sorted(targets - found)
+if missing:
+    raise SystemExit("ERROR: target manager app does not define index stanza(s): " + ", ".join(missing))
+stamp = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+backup = path.with_name(f"{{path.name}}.bak.{{stamp}}.{{os.getpid()}}")
+fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "wb") as fh:
+    fh.write(path.read_bytes())
+    fh.flush()
+    os.fsync(fh.fileno())
+fd, tmp_name = tempfile.mkstemp(prefix=f".{{path.name}}.", dir=path.parent)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("\\n".join(out).rstrip() + "\\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp_name, path)
+except BaseException:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    try:
+        os.unlink(tmp_name)
+    except FileNotFoundError:
+        pass
+    raise
 PY
 {final_block}cat peer-cleanup-runbook.md
 """
@@ -1279,6 +1988,26 @@ IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
 for idx in "${{indexes[@]}}"; do
   "${{splunk_home}}/bin/splunk" remove index "${{idx}}"
 done
+python3 - "${{splunk_home}}" "${{indexes_csv}}" <<'PY'
+import re
+import subprocess
+import sys
+
+splunk_home, indexes_csv = sys.argv[1:3]
+still_present = []
+for name in (item for item in indexes_csv.split(",") if item):
+    result = subprocess.run(
+        [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if re.search(rf"(?m)^\\s*\\[{{re.escape(name)}}\\]\\s*$", result.stdout):
+        still_present.append(name)
+if still_present:
+    raise SystemExit("ERROR: post-delete btool readback still finds index stanza(s): " + ", ".join(still_present))
+print("Post-delete btool readback verified index stanza absence.")
+PY
 """
     )
 
@@ -1292,7 +2021,9 @@ def render_clean_data_script(args: argparse.Namespace) -> str:
     confirm_tokens = shell_quote(",".join(args.confirm_token))
     accept = "true" if args.accept_destructive_index_delete else "false"
     return make_script(
-        f"""accept_destructive={accept}
+        f"""rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "clean-data" ]] || {{ echo "ERROR: this helper was not rendered for a clean-data operation." >&2; exit 2; }}
+accept_destructive={accept}
 splunk_home={splunk_home}
 evidence_file={evidence_file}
 owner_approval_file={owner_file}
@@ -1303,7 +2034,7 @@ confirm_tokens_csv={confirm_tokens}
 [[ -s "${{owner_approval_file}}" ]] || {{ echo "ERROR: owner approval file missing or empty." >&2; exit 1; }}
 [[ -s "${{backup_evidence_file}}" ]] || {{ echo "ERROR: backup evidence file missing or empty." >&2; exit 1; }}
 [[ -s "${{evidence_file}}" ]] || {{ echo "ERROR: evidence file missing or empty." >&2; exit 1; }}
-python3 - "${{evidence_file}}" "${{indexes_csv}}" "${{confirm_tokens_csv}}" <<'PY'
+python3 - "${{evidence_file}}" "${{indexes_csv}}" "${{confirm_tokens_csv}}" "${{owner_approval_file}}" "${{backup_evidence_file}}" <<'PY'
 {destructive_gate_python()}
 PY
 IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
@@ -1323,15 +2054,15 @@ def render_archive_handoff(args: argparse.Namespace) -> str:
 Splunk Cloud archive lifecycle is delegated to splunk-ddaa-archive.
 
 Suggested command:
-bash skills/splunk-ddaa-archive/scripts/setup.sh \\
-  --stack {args.stack or '<stack>'} \\
+bash skills/splunk-ddaa-archive-setup/scripts/setup.sh \\
+  --phase render \\
   --index {first_index} \\
   --searchable-days {args.searchable_days or '<searchable-days>'} \\
-  --archival-retention-days {args.archival_retention_days or '<total-retention-days>'} \\
-  --token-file {args.acs_token_file}
+  --archival-retention-days {args.archival_retention_days or '<total-retention-days>'}
 
 Restore remains a Splunk Web workflow from Settings > Indexes.
 EOF
+exit 2
 """
         )
     return make_script(
@@ -1342,6 +2073,7 @@ Self-managed archive handoff:
 - Configure coldToFrozenScript or frozen archive path only after backup and restore tests.
 - Use retention-indexes.conf.template for the searchable retention overlay.
 EOF
+exit 2
 """
     )
 
@@ -1367,7 +2099,7 @@ To restore frozen archived data for `{index_text}`, copy archived buckets into
 the target index's `thawedPath`, rebuild if required, and validate with
 `| dbinspect index={index_text.split(',')[0]}`.
 """
-    script = make_script("cat restore-handoff.md\n")
+    script = make_script("cat restore-handoff.md\necho 'HANDOFF: restore requires operator-controlled Splunk Web or thaw steps; no data was restored.' >&2\nexit 2\n")
     return md, script
 
 

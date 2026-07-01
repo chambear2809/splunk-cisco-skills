@@ -95,6 +95,7 @@ if [[ "${JSON}" == "true" && "${DRY_RUN}" != "true" && ( "${INSTALL}" == "true" 
     echo "ERROR: --json with action modes requires --dry-run." >&2
     exit 1
 fi
+if [[ "${INSTALL}" == "true" && "${DRY_RUN}" != "true" ]]; then require_current_skill_role_supported; fi
 
 RENDER_CMD=(python3 "${RENDER_SCRIPT}" --phase render --platform "${PLATFORM}" --es-app "${ES_APP}" --story-filter "${STORY_FILTER}" --activation-policy "${ACTIVATION_POLICY}")
 [[ -n "${OUTPUT_DIR}" ]] && RENDER_CMD+=(--output-dir "${OUTPUT_DIR}")

@@ -232,6 +232,18 @@ if [[ -n "${SPEC_PATH}" || "${MODE_SET}" == "true" || -n "${OUTPUT_PATH}" || "${
     DECLARATIVE_REQUESTED=true
 fi
 
+if [[ "${MODE}" == "apply" ]] || imperative_phase_requested; then
+    require_current_skill_role_supported
+fi
+if [[ "${MODE}" == "apply" \
+    || "${BASELINE}" == "true" \
+    || "${DO_SET_LOOKUP_ORDER}" == "true" \
+    || "${DO_SET_MANAGED_ROLES}" == "true" \
+    || "${#ENABLE_DMS[@]}" -gt 0 \
+    || "${#DISABLE_DMS[@]}" -gt 0 ]]; then
+    require_search_tier_target_role "Enterprise Security knowledge-object and data-model configuration"
+fi
+
 if [[ "${DECLARATIVE_REQUESTED}" == "true" ]]; then
     if imperative_phase_requested; then
         log "INFO: Running declarative phase first; imperative flags will run afterward in the same invocation."
@@ -364,6 +376,7 @@ create_index_if_missing() {
 
 create_indexes() {
     local idx
+    require_index_management_target_role || return 1
     for idx in "$@"; do
         create_index_if_missing "${idx}"
     done

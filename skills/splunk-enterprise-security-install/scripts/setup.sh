@@ -530,7 +530,7 @@ write_backup_notice() {
 tar -czf /var/backups/es_apps_$(date +%Y%m%d_%H%M%S).tgz -C "$SPLUNK_HOME/etc" apps
 
 # 2. Back up the KV Store (run on standalone SH, or on the SHC captain).
-"$SPLUNK_HOME/bin/splunk" backup kvstore --archive-name es_kvstore_$(date +%Y%m%d_%H%M%S)
+"$SPLUNK_HOME/bin/splunk" backup kvstore -archiveName es_kvstore_$(date +%Y%m%d_%H%M%S)
 
 # 3. On SHC deployer, also back up etc/shcluster/apps.
 tar -czf /var/backups/shcluster_apps_$(date +%Y%m%d_%H%M%S).tgz -C "$SPLUNK_HOME/etc/shcluster" apps
@@ -652,23 +652,23 @@ apply_shc_bundle() {
     log ""
     log "--- Apply SHC Bundle ---"
     if [[ "${DEPLOYMENT_TYPE}" != "shc_deployer" ]]; then
-        log "  SKIP: --apply-bundle only runs with --deployment-type shc_deployer"
-        return 0
+        log "  FAIL: --apply-bundle requires --deployment-type shc_deployer"
+        return 2
     fi
     local deployer_profile
     deployer_profile="$(resolve_deployer_credential_profile 2>/dev/null || true)"
     if [[ -z "${deployer_profile}" ]]; then
-        log "  INFO: SPLUNK_DEPLOYER_PROFILE is not configured in the credentials file."
-        log "        Emitting handoff instructions for manual apply on the deployer host:"
+        log "  FAIL: SPLUNK_DEPLOYER_PROFILE is not configured in the credentials file."
+        log "        Manual command (not executed):"
         log "          \$SPLUNK_HOME/bin/splunk apply shcluster-bundle --answer-yes \\"
         log "              -target <shc-member-uri>:<mgmt-port>"
-        return 0
+        return 2
     fi
     if [[ -z "${SHC_TARGET_URI}" ]]; then
-        log "  WARN: --shc-target-uri / SHC_TARGET_URI is not set; cannot run apply-bundle via profile."
+        log "  FAIL: --shc-target-uri / SHC_TARGET_URI is required for --apply-bundle."
         log "        Run on the deployer host manually:"
         log "          \$SPLUNK_HOME/bin/splunk apply shcluster-bundle --answer-yes -target <uri>"
-        return 0
+        return 2
     fi
     log "  Running 'splunk apply shcluster-bundle' via deployer profile '${deployer_profile}' -> ${SHC_TARGET_URI}"
     if deployment_bundle_apply_on_profile "${deployer_profile}" "shc" "${SHC_TARGET_URI}" "" ""; then
@@ -687,15 +687,18 @@ shc_post_apply_health() {
     # deployer (which 404s here), so prefer SHC_TARGET_URI when set.
     local health_uri="${SHC_TARGET_URI:-${SPLUNK_URI}}"
     log "  Checking post-apply SHC cluster status via ${health_uri}..."
-    local status_json summary
-    status_json="$(splunk_curl "${SK}" \
-        "${health_uri}/services/shcluster/status?output_mode=json" 2>/dev/null || true)"
-    if [[ -z "${status_json}" ]]; then
-        log "  WARN: Could not read /services/shcluster/status from ${health_uri}; cluster-health verification skipped."
+    local response http_code status_json summary
+    response="$(splunk_curl "${SK}" \
+        "${health_uri}/services/shcluster/status?output_mode=json" \
+        -w '\n%{http_code}' 2>/dev/null || printf '\n000')"
+    http_code="$(printf '%s\n' "${response}" | tail -1)"
+    status_json="$(printf '%s\n' "${response}" | sed '$d')"
+    if [[ "${http_code}" != "200" || -z "${status_json}" ]]; then
+        log "  FAIL: Could not read /services/shcluster/status from ${health_uri} (HTTP ${http_code}); cluster health is unverified."
         if [[ "${health_uri}" == "${SPLUNK_URI}" ]]; then
             log "        Tip: pass --shc-target-uri https://<member>:8089 (or set SHC_TARGET_URI) to query a member directly."
         fi
-        return 0
+        return 1
     fi
     summary="$(printf '%s' "${status_json}" | python3 -c '
 import json, sys
@@ -717,7 +720,7 @@ except Exception:
     print("unparseable", end="")
 ' 2>/dev/null || echo "unparseable")"
     case "${summary}" in
-        unparseable|"") log "  WARN: SHC status response could not be parsed" ;;
+        unparseable|"") log "  FAIL: SHC status response could not be parsed"; return 1 ;;
         *) log "  SHC status: ${summary}" ;;
     esac
 }
@@ -768,12 +771,12 @@ deploy_ta_for_indexers() {
     local cm_profile
     cm_profile="$(resolve_cluster_manager_credential_profile 2>/dev/null || true)"
     if [[ -z "${cm_profile}" ]]; then
-        log "  INFO: SPLUNK_CLUSTER_MANAGER_PROFILE is not configured in the credentials file."
-        log "        Emitting handoff instructions for manual deployment:"
+        log "  FAIL: SPLUNK_CLUSTER_MANAGER_PROFILE is not configured in the credentials file."
+        log "        Manual handoff (not executed):"
         log "          1. scp <generated>.spl <cm-host>:\$SPLUNK_HOME/etc/manager-apps/"
         log "          2. ssh <cm-host> 'cd \$SPLUNK_HOME/etc/manager-apps && tar -xzf <package> && rm <package>'"
         log "          3. ssh <cm-host> '\$SPLUNK_HOME/bin/splunk apply cluster-bundle --answer-yes'"
-        return 0
+        return 2
     fi
     # Reject silent target mismatch: CM_URI host must match the profile's host.
     # Otherwise the operator thinks they are targeting CM_URI while the SSH
@@ -810,20 +813,20 @@ backup_kvstore() {
     local profile
     profile="$(resolve_deployer_credential_profile 2>/dev/null || true)"
     if [[ -z "${profile}" ]]; then
-        log "  INFO: SPLUNK_DEPLOYER_PROFILE is not configured; emitting handoff."
-        log "        Run on the target host manually:"
-        log "          \$SPLUNK_HOME/bin/splunk backup kvstore --archive-name es_kvstore_\$(date +%Y%m%d_%H%M%S)"
-        return 0
+        log "  FAIL: SPLUNK_DEPLOYER_PROFILE is not configured; --backup-kvstore was not executed."
+        log "        Manual command (not executed):"
+        log "          \$SPLUNK_HOME/bin/splunk backup kvstore -archiveName es_kvstore_\$(date +%Y%m%d_%H%M%S)"
+        return 2
     fi
     local archive_name
     archive_name="es_kvstore_$(date +%Y%m%d_%H%M%S)"
-    log "  Running 'splunk backup kvstore --archive-name ${archive_name}' via profile '${profile}'"
+    log "  Running 'splunk backup kvstore -archiveName ${archive_name}' via profile '${profile}'"
     local execution_mode splunk_home script
     execution_mode="$(deployment_run_with_profile "${profile}" deployment_execution_mode_for_profile "")"
     splunk_home="$(deployment_run_with_profile "${profile}" printf '%s' "${SPLUNK_HOME:-/opt/splunk}")"
     script="$(cat <<EOF
 set -euo pipefail
-"${splunk_home}/bin/splunk" backup kvstore --archive-name $(printf '%q' "${archive_name}")
+"${splunk_home}/bin/splunk" backup kvstore -archiveName $(printf '%q' "${archive_name}")
 EOF
 )"
     if deployment_run_with_profile "${profile}" \
@@ -842,6 +845,7 @@ run_uninstall() {
     log ""
     log "--- ES Uninstall ---"
     ensure_session
+    local failures=0 response http_code
     local framework_apps=(
         "DA-ESS-AccessProtection"
         "DA-ESS-EndpointProtection"
@@ -869,12 +873,14 @@ run_uninstall() {
     log "  Disabling removable framework apps before uninstall..."
     for app in "${framework_apps[@]}"; do
         if rest_check_app "${SK}" "${SPLUNK_URI}" "${app}" 2>/dev/null; then
-            if splunk_curl_post "${SK}" "" \
-                "${SPLUNK_URI}/services/apps/local/${app}/disable" >/dev/null 2>&1; then
-                log "    disabled ${app}"
-            else
-                log "    WARN: could not disable ${app}"
-            fi
+            response="$(splunk_curl_post "${SK}" "" \
+                "${SPLUNK_URI}/services/apps/local/${app}/disable" \
+                -w '\n%{http_code}' 2>/dev/null || echo "000")"
+            http_code="$(printf '%s\n' "${response}" | tail -1)"
+            case "${http_code}" in
+                200|201|204) log "    disabled ${app}" ;;
+                *) log "    FAIL: could not disable ${app} (HTTP ${http_code})"; failures=$((failures+1)) ;;
+            esac
         fi
     done
     log "  Keeping missioncontrol installed; Splunk ES 8.x documents it as part of Enterprise Security."
@@ -889,7 +895,8 @@ run_uninstall() {
                 >"${uninstall_log}" 2>&1; then
                 log "    removed ${app}"
             else
-                log "    WARN: uninstall request failed for ${app}; remove it manually from \$SPLUNK_HOME/etc/apps"
+                log "    FAIL: uninstall request failed for ${app}; remove it manually from \$SPLUNK_HOME/etc/apps"
+                failures=$((failures+1))
                 # Surface installer diagnostics so the operator can see why.
                 while IFS= read -r line; do
                     log "      ${app}: ${line}"
@@ -898,6 +905,10 @@ run_uninstall() {
             rm -f "${uninstall_log}"
         fi
     done
+    if [[ "${failures}" -gt 0 ]]; then
+        log "  FAIL: ES uninstall was incomplete (${failures} failed operation(s))."
+        return 1
+    fi
     log "  Uninstall complete. Restart Splunk to finalize."
     log "  Re-run with --uninstall --no-validate to skip the post-uninstall validation pass."
 }
@@ -1073,6 +1084,15 @@ run_essinstall() {
 
 log "=== Splunk Enterprise Security Install ==="
 log ""
+
+if [[ "${DO_INSTALL}" == "true" \
+    || "${DO_POST_INSTALL}" == "true" \
+    || "${BACKUP_KVSTORE}" == "true" \
+    || "${APPLY_BUNDLE}" == "true" \
+    || -n "${DEPLOY_TA_CM_URI}" \
+    || "${UNINSTALL}" == "true" ]]; then
+    require_current_skill_role_supported
+fi
 
 # Decide whether a Splunk REST session is needed. The generate-only path is
 # fully offline (reads a local ES package) so it does not require credentials.

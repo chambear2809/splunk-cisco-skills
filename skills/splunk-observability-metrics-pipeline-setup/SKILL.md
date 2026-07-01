@@ -23,3 +23,14 @@ bash skills/splunk-observability-metrics-pipeline-setup/scripts/setup.sh --rende
   --action aggregate \
   --realm us1
 ```
+
+Then execute the generated deep-native renderer and follow its exact UI and
+downstream pipeline handoffs:
+
+```bash
+bash splunk-observability-metrics-pipeline-rendered/delegate-deep-native-workflows.sh
+```
+
+The delegate explicitly rejects `--apply`: this repository has no verified
+public MPM mutation API, so it does not report a successful write for a UI-only
+operation.

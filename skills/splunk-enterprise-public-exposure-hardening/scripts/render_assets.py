@@ -661,8 +661,8 @@ def render_server_conf(args: argparse.Namespace) -> str:
         "sslVerifyServerCert = true",
         f"caCertFile = {args.ca_bundle_path}",
         f"caTrustStorePath = {args.ca_bundle_path}",
-        "# sslPassword and pass4SymmKey are NEVER embedded here. The apply",
-        "# scripts inject them via splunk btool / splunk edit at apply time",
+        "# sslPassword and pass4SymmKey are NEVER embedded here. Supported local",
+        "# apply writes mode-0600 config from secret files and verifies Splunk encryption",
         "# from the operator-supplied secret files.",
         "# sslPassword = <set by apply-search-head.sh from --ssl-key-password-file>",
         "",
@@ -684,9 +684,9 @@ def render_server_conf(args: argparse.Namespace) -> str:
         "disabled = false",
         "",
         "[general]",
-        "# pass4SymmKey is rotated by apply-cluster-manager.sh / apply-deployer.sh",
-        "# from --pass4symmkey-file. The default 'changeme' is unacceptable.",
-        "# pass4SymmKey = <set at apply time>",
+        "# pass4SymmKey rotation is delegated to the cluster setup skills because",
+        "# Splunk's documented CLI exposes -secret on argv and has no file option.",
+        "# pass4SymmKey = <set by cluster-aware handoff>",
         "",
         "# SVD-2026-0302 defense in depth: even with edit_cmd removed from",
         "# non-admin roles, restrict the unarchive-command path to an explicit",
@@ -698,12 +698,12 @@ def render_server_conf(args: argparse.Namespace) -> str:
         lines.extend([
             "",
             "[clustering]",
-            "# pass4SymmKey rotated at apply time",
+            "# pass4SymmKey is set by the cluster-aware handoff",
             "",
             "[deployment]",
-            "# Deployment-server pass4SymmKey is rotated by",
-            "# rotate-pass4symmkey.sh from --pass4symmkey-file.",
-            "# pass4SymmKey = <set at apply time>",
+            "# Deployment-server pass4SymmKey is coordinated through",
+            "# splunk-deployment-server-setup; the recovery helper exits nonzero.",
+            "# pass4SymmKey = <set by cluster/deployment handoff>",
         ])
     if args.auth_mode == "reverse-proxy-sso" and args.proxy_sso_trusted_ip:
         lines.extend([
@@ -1079,6 +1079,7 @@ def render_apply_search_head(args: argparse.Namespace) -> str:
     ldap_bind_pwd_path = shell_quote(args.ldap_bind_password_file or "")
     ldap_strategy = shell_quote(args.ldap_strategy_name or "")
     auth_mode = shell_quote(args.auth_mode)
+    ldap_bind_required = "true" if args.auth_mode == "ldap" and args.ldap_bind_dn else "false"
     enable_fips = "true" if args.enable_fips == "true" else "false"
     return make_script(
         f"""splunk_home={splunk_home}
@@ -1087,10 +1088,46 @@ ssl_pass_file={ssl_pass_path}
 ldap_bind_pwd_file={ldap_bind_pwd_path}
 ldap_strategy={ldap_strategy}
 auth_mode={auth_mode}
+ldap_bind_required={ldap_bind_required}
 enable_fips={enable_fips}
+umask 077
 
 if [[ ! -x "${{splunk_home}}/bin/splunk" ]]; then
   echo "ERROR: $splunk_home/bin/splunk not found." >&2
+  exit 1
+fi
+
+splunk_uid="$(stat -c '%u' "$splunk_home")"
+splunk_owner="$(stat -c '%u:%g' "$splunk_home")"
+if [[ "$EUID" -ne 0 && "$EUID" -ne "$splunk_uid" ]]; then
+  echo "ERROR: run as the Splunk service owner (uid $splunk_uid) or root." >&2
+  exit 1
+fi
+
+validate_secret_file() {{
+  local path="$1" label="$2" mode value
+  [[ -n "$path" ]] || return 0
+  if [[ ! -r "$path" || ! -s "$path" ]]; then
+    echo "ERROR: $label must be a readable, non-empty file: $path" >&2
+    return 1
+  fi
+  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  if [[ -z "$mode" ]] || (( (8#$mode & 077) != 0 )); then
+    echo "ERROR: $label must have mode 0600 or stricter: $path" >&2
+    return 1
+  fi
+  value="$(< "$path")"
+  if [[ -z "$value" || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+    echo "ERROR: $label must contain exactly one non-empty line." >&2
+    return 1
+  fi
+}}
+
+validate_secret_file "$pass4_file" "pass4SymmKey file"
+validate_secret_file "$ssl_pass_file" "TLS private-key password file"
+validate_secret_file "$ldap_bind_pwd_file" "LDAP bind password file"
+if [[ "$ldap_bind_required" == "true" && -z "$ldap_bind_pwd_file" ]]; then
+  echo "ERROR: LDAP bind DN apply requires --ldap-bind-password-file." >&2
   exit 1
 fi
 
@@ -1111,20 +1148,31 @@ fi
 mkdir -p "$(dirname "$dst_app")"
 cp -R "$src_app" "$dst_app"
 chmod -R go-w "$dst_app"
+mkdir -p "$dst_app/local"
 
 # splunk-launch.conf MUST live at $SPLUNK_HOME/etc/splunk-launch.conf,
-# NOT inside an app's default/. The app ships a copy as documentation;
-# the apply step copies it to the correct location only when FIPS is
-# explicitly enabled. FIPS must be configured BEFORE Splunk's first
-# start on this host.
+# NOT inside an app's default/. Merge only the two FIPS keys; replacing the
+# whole file would discard deployment-specific launch settings.
 if [[ "$enable_fips" == "true" ]]; then
-  if [[ -f "${{splunk_home}}/etc/splunk-launch.conf" ]]; then
+  launch_conf="${{splunk_home}}/etc/splunk-launch.conf"
+  if [[ -f "$launch_conf" ]]; then
     ts="$(date +%Y%m%d%H%M%S)"
-    cp -p "${{splunk_home}}/etc/splunk-launch.conf" \\
-       "${{splunk_home}}/etc/splunk-launch.conf.bak.$ts"
+    cp -p "$launch_conf" "$launch_conf.bak.$ts"
+  else
+    : >"$launch_conf"
   fi
-  cp "$dst_app/default/splunk-launch.conf" "${{splunk_home}}/etc/splunk-launch.conf"
-  echo "FIPS overlay placed at ${{splunk_home}}/etc/splunk-launch.conf."
+  set_launch_key() {{
+    local key="$1" value="$2"
+    if grep -qE "^${{key}}[[:space:]]*=" "$launch_conf"; then
+      sed -i -E "s|^${{key}}[[:space:]]*=.*|${{key}}=${{value}}|" "$launch_conf"
+    else
+      printf '%s=%s\n' "$key" "$value" >>"$launch_conf"
+    fi
+  }}
+  set_launch_key SPLUNK_FIPS 1
+  set_launch_key SPLUNK_FIPS_VERSION {args.fips_version}
+  chmod 0600 "$launch_conf"
+  echo "FIPS keys merged into $launch_conf."
   echo "Verify the host kernel is in FIPS mode before restart, then cold-start Splunk."
 fi
 
@@ -1154,41 +1202,69 @@ for frag in "$dst_app/local/server.conf.pass4symmkey.fragment" \\
   cat "$frag" >> "$dst_app/local/server.conf"
   rm -f "$frag"
 done
+chmod 0600 "$dst_app/local/server.conf"
 
 # Inject LDAP bindDNpassword from local file (never argv) when --auth-mode=ldap.
-# Splunk does NOT auto-encrypt bindDNpassword on first read per spec, so this
-# file goes through the standard splunk.secret credential pipeline by being
-# placed in local/authentication.conf and rewritten by splunkd at first read.
+# Splunk's secure-password pipeline detects and rewrites clear-text LDAP
+# passwords with splunk.secret when it loads the configuration.
 if [[ "$auth_mode" == "ldap" && -n "$ldap_bind_pwd_file" && -s "$ldap_bind_pwd_file" ]]; then
   ldap_pw="$(cat "$ldap_bind_pwd_file")"
   : > "$dst_app/local/authentication.conf"
   printf '[%s]\\nbindDNpassword = %s\\n' "$ldap_strategy" "$ldap_pw" \\
     >> "$dst_app/local/authentication.conf"
-  chmod 0400 "$dst_app/local/authentication.conf"
+  chmod 0600 "$dst_app/local/authentication.conf"
   unset ldap_pw
 fi
 
+if [[ "$EUID" -eq 0 ]]; then
+  chown -R "$splunk_owner" "$dst_app"
+  [[ -n "${{launch_conf:-}}" ]] && chown "$splunk_owner" "$launch_conf"
+fi
+
 "${{splunk_home}}/bin/splunk" restart
+
+# A successful restart must have encrypted every clear-text credential that
+# this script staged. Refuse completion if plaintext remains on disk.
+encryption_failed=0
+if [[ -n "$pass4_file" ]] && ! grep -Eq '^pass4SymmKey[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/server.conf"; then
+  echo "ERROR: pass4SymmKey was not encrypted after restart." >&2
+  encryption_failed=1
+fi
+if [[ -n "$ssl_pass_file" ]] && ! grep -Eq '^sslPassword[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/server.conf"; then
+  echo "ERROR: sslPassword was not encrypted after restart." >&2
+  encryption_failed=1
+fi
+if [[ -n "$ldap_bind_pwd_file" ]] && ! grep -Eq '^bindDNpassword[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/authentication.conf"; then
+  echo "ERROR: bindDNpassword was not encrypted after restart." >&2
+  encryption_failed=1
+fi
+(( encryption_failed == 0 )) || exit 1
 """
     )
 
 
 def render_apply_hec_tier(args: argparse.Namespace) -> str:
     return make_script(
-        """src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "Re-running search-head apply also propagates HEC inputs.conf."
-echo "When HEC runs on a separate indexer tier, copy"
-echo "  $src_dir/apps/000_public_exposure_hardening"
-echo "into the indexer's etc/apps/ (or via the cluster bundle) and restart."
+        """splunk_home="${SPLUNK_HOME:-/opt/splunk}"
+src_app="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/apps/000_public_exposure_hardening"
+dst_app="${splunk_home}/etc/apps/000_public_exposure_hardening"
+[[ -x "${splunk_home}/bin/splunk" ]] || { echo "ERROR: Splunk CLI missing on HEC tier." >&2; exit 1; }
+[[ -d "${src_app}" ]] || { echo "ERROR: rendered app missing: ${src_app}" >&2; exit 1; }
+if [[ -d "${dst_app}" ]]; then mv "${dst_app}" "${dst_app}.bak.$(date +%Y%m%d%H%M%S)"; fi
+mkdir -p "$(dirname "${dst_app}")"
+cp -R "${src_app}" "${dst_app}"
+chmod -R go-w "${dst_app}"
+"${splunk_home}/bin/splunk" restart
 """
     )
 
 
 def render_apply_s2s_receiver(args: argparse.Namespace) -> str:
     return make_script(
-        """echo "Apply the rendered S2S inputs.conf via the indexer cluster bundle."
-echo "Run skills/splunk-indexer-cluster-setup/scripts/setup.sh --phase apply"
-echo "after dropping the rendered app under shcluster/apps/ on the deployer."
+        """echo "ERROR: S2S receiver policy must be distributed through the indexer-cluster bundle." >&2
+echo "Use splunk-indexer-cluster-setup to stage, validate, apply, and roll the bundle."
+echo "No local receiver files were changed and no individual peer was restarted."
+exit 2
 """
     )
 
@@ -1202,12 +1278,17 @@ if [[ ! -d "$src_app" ]]; then
   echo "ERROR: rendered app missing at $src_app" >&2
   exit 1
 fi
+if [[ ! -x "${splunk_home}/bin/splunk" ]]; then
+  echo "ERROR: $splunk_home/bin/splunk not found on heavy forwarder." >&2
+  exit 1
+fi
 
 dst_app="${splunk_home}/etc/apps/000_public_exposure_hardening"
 if [[ -d "$dst_app" ]]; then
   ts="$(date +%Y%m%d%H%M%S)"
   mv "$dst_app" "${dst_app}.bak.$ts"
 fi
+mkdir -p "$(dirname "$dst_app")"
 cp -R "$src_app" "$dst_app"
 chmod -R go-w "$dst_app"
 "${splunk_home}/bin/splunk" restart
@@ -1236,41 +1317,31 @@ cp -R "$src_app" "$dst_app"
 chmod -R go-w "$dst_app"
 
 echo "App staged at $dst_app."
-echo "Run: ${splunk_home}/bin/splunk apply shcluster-bundle -target https://<captain>:8089"
+echo "ERROR: The SHC bundle is staged but not applied; this script has no secret-safe captain-auth transport." >&2
+echo "Run the rendered handoff through splunk-search-head-cluster-setup on the deployer."
 echo "Then validate with skills/splunk-agent-management-setup/scripts/validate.sh"
+exit 2
 """
     )
 
 
 def render_apply_cluster_manager(args: argparse.Namespace) -> str:
-    pass4_path = shell_quote(args.pass4symmkey_file or "")
     return make_script(
-        f"""pass4_file={pass4_path}
-splunk_home="${{SPLUNK_HOME:-/opt/splunk}}"
-
-if [[ -z "$pass4_file" || ! -s "$pass4_file" ]]; then
-  echo "ERROR: --pass4symmkey-file required for cluster manager rotation." >&2
-  exit 1
-fi
-
-# Rotate the cluster manager pass4SymmKey. The CLI reads the secret from
-# the file directly via -auth-passphrase-file; the value never appears on
-# argv. Splunk session auth must be established beforehand by either:
-#   - Running as the 'splunk' service user with an active session, or
-#   - Running 'splunk login' as an admin first.
-"${{splunk_home}}/bin/splunk" edit cluster-config -mode manager \\
-  -auth-passphrase-file "$pass4_file" || true
-
-"${{splunk_home}}/bin/splunk" restart
+        """echo "ERROR: cluster-manager hardening and pass4SymmKey rotation require cluster-wide orchestration." >&2
+echo "Splunk documents '-secret <value>' for cluster-config; it has no documented secret-file flag."
+echo "Use splunk-indexer-cluster-setup so the key, bundle validation, peers, and rolling restart converge together."
+echo "No cluster-manager state was changed."
+exit 2
 """
     )
 
 
 def render_apply_license_manager(args: argparse.Namespace) -> str:
     return make_script(
-        """echo "License manager hardening is delegated to splunk-license-manager-setup."
+        """echo "ERROR: License manager hardening is delegated to splunk-license-manager-setup." >&2
 echo "Use that skill's --phase apply to apply the rendered license manager"
 echo "configuration alongside this hardening overlay."
+exit 2
 """
     )
 
@@ -1279,11 +1350,12 @@ def render_rotate_pass4symmkey(args: argparse.Namespace) -> str:
     return make_script(
         """splunk_home="${SPLUNK_HOME:-/opt/splunk}"
 secret_file="${1:-}"
+umask 077
 
 if [[ -z "$secret_file" || ! -s "$secret_file" ]]; then
   echo "Usage: $0 /path/to/new_pass4symmkey_file" >&2
   echo "" >&2
-  echo "Rotates the pass4SymmKey across every stanza Splunk supports:" >&2
+  echo "Stages a mode-0600 pass4SymmKey recovery fragment for these stanzas:" >&2
   echo "  [general], [clustering], [shclustering], [indexer_discovery]," >&2
   echo "  [license_master], [deployment]." >&2
   echo "All peers / SHs / forwarders / DCs / license peers / DS clients" >&2
@@ -1291,20 +1363,22 @@ if [[ -z "$secret_file" || ! -s "$secret_file" ]]; then
   echo "bundle apply or phone-home." >&2
   exit 2
 fi
+secret_mode="$(stat -c '%a' "$secret_file" 2>/dev/null || true)"
+if [[ -z "$secret_mode" ]] || (( (8#$secret_mode & 077) != 0 )); then
+  echo "ERROR: pass4SymmKey file must have mode 0600 or stricter." >&2
+  exit 2
+fi
 
-# Cluster manager (indexer cluster).
-"${splunk_home}/bin/splunk" edit cluster-config -mode manager \\
-  -auth-passphrase-file "$secret_file" || true
-
-# SHC deployer / SHC member.
-"${splunk_home}/bin/splunk" edit shcluster-config \\
-  -auth-passphrase-file "$secret_file" || true
-
-# License manager / peer is configured via server.conf [license] pass4SymmKey;
-# splunk-edit cannot rotate it on every release, so emit a btool fragment.
+# Splunk's documented cluster CLIs accept '-secret <value>', which would expose
+# this secret in process argv. Do not invent an unsupported file flag. Emit a
+# mode-0600 recovery fragment and stop nonzero for cluster-aware delegation.
 local_dir="${splunk_home}/etc/system/local"
 mkdir -p "$local_dir"
 new_key="$(cat "$secret_file")"
+if [[ "$new_key" == *$'\n'* || "$new_key" == *$'\r'* ]]; then
+  echo "ERROR: pass4SymmKey file must contain one line." >&2
+  exit 2
+fi
 {
   printf '[general]\\npass4SymmKey = %s\\n' "$new_key"
   printf '[clustering]\\npass4SymmKey = %s\\n' "$new_key"
@@ -1313,9 +1387,12 @@ new_key="$(cat "$secret_file")"
   printf '[license_master]\\npass4SymmKey = %s\\n' "$new_key"
   printf '[deployment]\\npass4SymmKey = %s\\n' "$new_key"
 } > "$local_dir/server.conf.pass4symmkey.fragment"
+chmod 0600 "$local_dir/server.conf.pass4symmkey.fragment"
 unset new_key
 echo "Wrote rotation fragment to $local_dir/server.conf.pass4symmkey.fragment"
-echo "Merge into etc/system/local/server.conf, then 'splunk restart'."
+echo "ERROR: no live pass4SymmKey rotation was attempted." >&2
+echo "Use splunk-indexer-cluster-setup and splunk-search-head-cluster-setup for coordinated rotation."
+exit 2
 """
     )
 

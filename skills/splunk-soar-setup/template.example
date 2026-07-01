@@ -18,6 +18,7 @@ soar_fips: auto                # auto | require | disable
 # On-prem cluster only
 soar_hosts: soar01,soar02,soar03
 soar_ssh_user: splunk
+soar_ssh_known_hosts_file: /secure/ssh/known_hosts
 
 # External services (cluster only)
 external_pg: mode=local,host=db01,port=5432

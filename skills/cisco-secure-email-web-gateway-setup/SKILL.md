@@ -53,7 +53,7 @@ bash skills/cisco-secure-email-web-gateway-setup/scripts/render_ingestion_assets
 Validate Splunk-side readiness:
 
 ```bash
-bash skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh --product both
+bash skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh --completion --product both
 ```
 
 ## Defaults
@@ -66,3 +66,10 @@ bash skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh --product b
 Use `splunk-connect-for-syslog-setup` for SC4S runtime deployment. This skill
 only prepares the Splunk-side add-ons, indexes, macros, and rendered handoff
 snippets.
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require the selected parser TA, index, macro, and matching event data. The
+ESA/WSA parser packages do not provide standalone dashboards, so the explicit
+SC4S/file-monitor transport handoff plus data evidence is the completion gate.

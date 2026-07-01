@@ -1,8 +1,8 @@
 ---
 name: splunk-pci-compliance-setup
 description: >-
-  Render and validate Splunk App for PCI Compliance readiness, including app
-  install planning, cardholder data environment index and macro intake,
+  Render, install, and validate Splunk App for PCI Compliance readiness,
+  including package delivery, cardholder data environment index and macro intake,
   Enterprise Security or standalone installer selection, CIM/data-model
   prerequisites, roles, reports, dashboard evidence, and dependency handoffs.
   Use when the user asks to install, configure, prepare, or validate PCI
@@ -11,10 +11,19 @@ description: >-
 
 # Splunk PCI Compliance Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off the PCI app or one of
+its add-on dependencies, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate CDE ingest, macros, reports, and shipped
+dashboards against data.
+
 Render-first workflow for the Splunk App for PCI Compliance. It emits
 installer-selection guidance, CDE index/macro intake, CIM prerequisites,
-role/report checks, dashboard readiness SPL, and handoffs. It does not install
-PCI packages or alter compliance content.
+role/report checks, dashboard readiness SPL, and handoffs. Its explicit
+`--install` and `--all` modes install the selected PCI package; it does not
+alter compliance content, CDE macros, CIM acceleration, roles, or reports.
 
 ## Workflow
 

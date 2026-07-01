@@ -91,6 +91,9 @@ bash skills/splunk-platform-sizing/scripts/setup.sh \
 
 With `--deployment-target auto` (the default) the engine recommends standalone
 when the use case is All-In-One eligible, otherwise distributed.
+RF or SF greater than one automatically implies HA. SF greater than RF is
+rejected. Multisite SOK replica counts are rounded up per site so uneven totals
+are not under-provisioned.
 
 ## What It Computes
 

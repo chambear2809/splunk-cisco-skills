@@ -7,3 +7,5 @@ adql:
 custom_events:
   publish_enabled: false
   schema: appd_custom_events
+  # Add reviewed event objects here. Live publication refuses an empty array.
+  events: []

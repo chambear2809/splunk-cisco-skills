@@ -10,7 +10,7 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/galileo-agent-control-rendered"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
-APPLY_SECTIONS_DEFAULT="server,auth,controls,python-runtime,typescript-runtime,otel-sink,splunk-sink,splunk-hec,otel-collector,dashboards,detectors"
+APPLY_SECTIONS_DEFAULT="splunk-hec,otel-collector,dashboards,detectors"
 
 usage() {
     cat <<'EOF'
@@ -24,7 +24,8 @@ Modes:
   --validate                    Validate rendered artifacts
   --doctor                      Render, validate, and summarize coverage
   --apply [SECTIONS]            Render then apply selected comma-separated sections.
-                                With no list, applies all sections.
+                                With no list, applies actionable Splunk handoff sections.
+                                Render-only sections fail closed when selected as apply.
   --dry-run                     Show the render/apply plan without writing or applying
   --json                        Emit JSON for render and dry-run output
 
@@ -150,8 +151,10 @@ done
 
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 
-if [[ -n "${APPLY_SECTIONS}" ]]; then
-    RENDER_ARGS+=(--apply "${APPLY_SECTIONS}")
+if [[ "${MODE_APPLY}" == "true" ]]; then
+    rendered_apply_sections="${APPLY_SECTIONS:-${APPLY_SECTIONS_DEFAULT}}"
+    [[ "${rendered_apply_sections}" == "all" ]] && rendered_apply_sections="${APPLY_SECTIONS_DEFAULT}"
+    RENDER_ARGS+=(--apply "${rendered_apply_sections}")
 fi
 if [[ -n "${SPEC}" ]]; then
     RENDER_ARGS+=(--spec "${SPEC}")

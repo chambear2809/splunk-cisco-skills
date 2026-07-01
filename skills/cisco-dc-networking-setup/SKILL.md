@@ -118,7 +118,7 @@ In Splunk Cloud, the setup script creates these indexes through ACS.
 |-------|-------|---------|----------|
 | `cisco_aci` | `cisco_dc_aci_index` | ACI fabric data | 512 GB |
 | `cisco_nd` | `cisco_dc_nd_index` | Nexus Dashboard data | 512 GB |
-| `cisco_nexus_9k` | `cisco_dc_nexus_9k_index` | Nexus 9K switch data | 512 GB |
+| `cisco_nexus_9k` | `cisco_dc_n9k_index` | Nexus 9K switch data | 512 GB |
 
 Partial runs: `--indexes-only` or `--macros-only`.
 
@@ -174,7 +174,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash skills/cisco-dc-networking-setup/scripts/validate.sh
+bash skills/cisco-dc-networking-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, indexes, macros, accounts, inputs, data flow, settings.
@@ -191,7 +191,7 @@ To access them: **Apps → Cisco DC Networking App for Splunk**
 1. Indexes (`cisco_aci`, `cisco_nd`, `cisco_nexus_9k`) must exist and inputs
    must be enabled.
 2. The `cisco_dc_*_index` macro family (`cisco_dc_aci_index`,
-   `cisco_dc_nd_index`, `cisco_dc_nexus_9k_index`) must be updated by the setup
+   `cisco_dc_nd_index`, `cisco_dc_n9k_index`) must be updated by the setup
    script (Step 1) to point to the correct indexes.
 3. At least one account (APIC, Nexus Dashboard, or Nexus 9K) must be
    configured and actively polling.
@@ -233,3 +233,9 @@ Tools: `cisco_dc_check_health`, `cisco_dc_list_inputs`, `cisco_dc_aci_faults`,
 
 - [reference.md](reference.md) — Complete input catalog, account fields, sizing
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require at least one DC account, an enabled input, recent data, dashboard
+macros, and visible shipped views.

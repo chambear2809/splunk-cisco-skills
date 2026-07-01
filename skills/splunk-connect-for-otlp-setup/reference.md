@@ -122,10 +122,16 @@ OTLP HTTP paths must be signal-specific:
 
 gRPC senders use `host:4317`. HTTP senders use `http(s)://host:4318`.
 
+The telemetrygen CLI requires its custom header on argv. This skill therefore
+renders a nonzero handoff instead of an executable token-bearing smoke command;
+use the Collector or SDK examples for file-backed token loading.
+
 ## Conservative Repair IDs
 
 Repair is intentionally narrow. The setup wrapper can apply low-risk state
 changes or render handoffs, while the doctor report explains the operator step.
+Handoff-only and unknown fix IDs return nonzero outside `--dry-run` so callers
+cannot mistake rendered guidance for a completed repair.
 
 | Fix ID | Behavior |
 | --- | --- |
@@ -139,6 +145,7 @@ changes or render handoffs, while the doctor report explains the operator step.
 | `BAD_PORT` | Reconfigure with ports `4317` and `4318`. |
 | `PORT_CONFLICT` | Report listener conflict and keep Splunk config unchanged. |
 | `BAD_LISTEN_ADDRESS` | Reconfigure to `0.0.0.0` or a supplied listen address. |
+| `PLAINTEXT_REMOTE_LISTENER` | Enable receiver TLS or bind a lab-only sender to loopback. |
 | `CLOUD_CLASSIC_REQUIRES_IDM_OR_HF` | Render heavy-forwarder/IDM handoff. |
 | `TLS_FILES_MISSING` | Report cert/key file repair. |
 | `TLS_SENDER_RECEIVER_MISMATCH` | Re-render sender assets matching receiver TLS mode. |
@@ -162,6 +169,7 @@ changes or render handoffs, while the doctor report explains the operator step.
 - Modular input stanzas exist and are enabled where expected.
 - `grpc_port` and `http_port` are valid non-zero TCP ports.
 - Listen address is explicit and reachable from expected sender networks.
+- Non-loopback listeners use TLS; plaintext requires an explicit lab-only acceptance gate.
 - TLS receiver settings and sender scheme agree.
 - HEC global input is enabled.
 - HEC token exists, is enabled, and allows `com.splunk.index`.

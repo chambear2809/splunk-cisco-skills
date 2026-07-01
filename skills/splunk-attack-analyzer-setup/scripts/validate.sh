@@ -5,33 +5,36 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 INDEX_NAME="saa"
+COMPLETION=false
 
 usage() {
     cat <<EOF
 Splunk Attack Analyzer Validation
 
-Usage: $(basename "$0") [--index NAME]
+Usage: $(basename "$0") [--index NAME] [--completion]
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --index) require_arg "$1" $# || exit 1; INDEX_NAME="$2"; shift 2 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
 done
+validate_splunk_index_name "${INDEX_NAME}" || exit 1
 
 PASS=0
 FAIL=0
 WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 
 log "=== Splunk Attack Analyzer Validation ==="
 log ""
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
@@ -80,6 +83,15 @@ if [[ ${FAIL} -eq 0 ]]; then
         pass "Detected ${input_count} enabled live input(s) owned by Splunk_TA_SAA"
     else
         warn "No enabled Splunk_TA_SAA inputs detected; create a completed-jobs input in the add-on UI"
+    fi
+
+    log ""
+    log "--- Data Evidence ---"
+    event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=${INDEX_NAME}" "count" 2>/dev/null || echo "0")
+    if [[ "${event_count}" =~ ^[0-9]+$ && "${event_count}" -gt 0 ]]; then
+        pass "Attack Analyzer events visible in ${INDEX_NAME}: ${event_count}"
+    else
+        warn "No Attack Analyzer events visible in ${INDEX_NAME}"
     fi
 fi
 

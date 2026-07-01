@@ -78,7 +78,6 @@ Behaviour flags:
   --accept-beta                  Acknowledge the layer is BETA; required for render/apply.
   --allow-vendor-coexistence     Downgrade vendor-conflict refusal to WARN (use carefully).
   --gitops-mode                  Emit Terraform + CloudFormation only; no aws-cli/ directory.
-  --refresh-layer-manifest       Opt-in live fetch of layer ARN versions from signalfx repo.
   --aws-region REGION            Default AWS region for --discover-functions.
   --dry-run                      Skip live API calls; scaffolding stays render-only.
   --json                         Machine-readable result.
@@ -141,7 +140,6 @@ while [[ $# -gt 0 ]]; do
         --allow-loose-token-perms) ALLOW_LOOSE_TOKEN_PERMS=true ;;
         --accept-beta) ACCEPT_BETA=true ;;
         --allow-vendor-coexistence) ALLOW_VENDOR_COEXISTENCE=true ;;
-        --refresh-layer-manifest) echo "WARN: live layer-manifest refresh is not implemented; using bundled snapshot." >&2 ;;
         --gitops-mode) GITOPS_MODE=true ;;
         --aws-region) AWS_REGION="$2"; shift ;;
         --dry-run) DRY_RUN=true ;;
@@ -161,7 +159,7 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 # Pull SPLUNK_O11Y_REALM / SPLUNK_O11Y_TOKEN_FILE from credentials when present.
-load_observability_cloud_settings 2>/dev/null || true
+load_observability_cloud_settings
 
 if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
     REALM="${SPLUNK_O11Y_REALM}"
@@ -206,6 +204,7 @@ run_renderer() {
     local args=("--spec" "${SPEC}" "--output-dir" "${OUTPUT_DIR}")
     [[ -n "${REALM}" ]] && args+=("--realm" "${REALM}")
     [[ "${ACCEPT_BETA}" == "true" ]] && args+=("--accept-beta")
+    [[ "${GITOPS_MODE}" == "true" ]] && args+=("--gitops-mode")
     [[ "${JSON_OUTPUT}" == "true" ]] && args+=("--json")
     "${PYTHON_BIN}" "${RENDERER}" "${args[@]}"
 }
@@ -218,12 +217,11 @@ run_validate() {
 }
 
 run_doctor() {
-    bash "${SCRIPT_DIR}/doctor.sh" \
-        --output-dir "${OUTPUT_DIR}" \
-        --realm "${REALM:-us1}" \
-        ${TARGET:+--target "${TARGET}"} \
-        ${ALLOW_VENDOR_COEXISTENCE:+--allow-vendor-coexistence} \
-        ${JSON_OUTPUT:+--json}
+    local args=(--output-dir "${OUTPUT_DIR}" --realm "${REALM:-us1}")
+    [[ -n "${TARGET}" ]] && args+=(--target "${TARGET}")
+    [[ "${ALLOW_VENDOR_COEXISTENCE}" == "true" ]] && args+=(--allow-vendor-coexistence)
+    [[ "${JSON_OUTPUT}" == "true" ]] && args+=(--json)
+    bash "${SCRIPT_DIR}/doctor.sh" "${args[@]}"
 }
 
 case "${MODE}" in
@@ -243,43 +241,58 @@ case "${MODE}" in
         if [[ -z "${local_sections}" ]]; then
             local_sections="layer,env,iam,validation"
         fi
+        mutation_sections=()
+        run_iam=false
+        run_validation=false
         IFS=',' read -ra _sects <<< "${local_sections}"
         for s in "${_sects[@]}"; do
             s="${s// /}"
             [[ -z "${s}" ]] && continue
-            echo "==> applying section: ${s}"
             case "${s}" in
-                layer|env)
-                    if [[ "${DRY_RUN}" == "true" ]]; then
-                        echo "(dry-run) would run: bash ${OUTPUT_DIR}/aws-cli/apply-plan.sh (section ${s})"
-                    elif [[ "${GITOPS_MODE}" == "true" ]]; then
-                        echo "(gitops-mode) Lambda function updates must be applied via terraform/ or cloudformation/ artifacts."
-                        echo "  terraform/: ${OUTPUT_DIR}/terraform/main.tf"
-                        echo "  cloudformation/: ${OUTPUT_DIR}/cloudformation/snippets.yaml"
-                    else
-                        cat "${OUTPUT_DIR}/aws-cli/apply-plan.sh"
-                        echo ""
-                        echo "==> Review above; run: bash ${OUTPUT_DIR}/aws-cli/apply-plan.sh"
-                    fi
-                    ;;
-                iam)
-                    if [[ -f "${OUTPUT_DIR}/iam/iam-ingest-egress.json" ]]; then
-                        cat "${OUTPUT_DIR}/iam/iam-ingest-egress.json"
-                        echo ""
-                        echo "==> Attach this IAM policy to the Lambda execution role(s) before running functions."
-                    else
-                        echo "==> No IAM policy required (local_collector_enabled=true)."
-                    fi
-                    ;;
-                validation)
-                    run_validate
-                    ;;
+                layer|env) mutation_sections+=("${s}") ;;
+                iam) run_iam=true ;;
+                validation) run_validation=true ;;
                 *)
                     echo "Unknown section: ${s}" >&2
                     exit 2
                     ;;
             esac
         done
+
+        if [[ "${#mutation_sections[@]}" -gt 0 ]]; then
+            mutation_csv="$(IFS=,; echo "${mutation_sections[*]}")"
+            echo "==> applying Lambda mutation sections: ${mutation_csv}"
+            if [[ "${DRY_RUN}" == "true" ]]; then
+                echo "(dry-run) would run APPLY_SECTIONS=${mutation_csv} TARGET_FILTER=${TARGET:-<all>} ${OUTPUT_DIR}/aws-cli/apply-plan.sh"
+            elif [[ "${GITOPS_MODE}" == "true" ]]; then
+                echo "HANDOFF: gitops mode does not mutate Lambda functions directly."
+                echo "  Merge and apply: ${OUTPUT_DIR}/terraform/main.tf"
+                echo "  Or merge and deploy: ${OUTPUT_DIR}/cloudformation/snippets.yaml"
+            else
+                if [[ "${mutation_csv}" == *env* && -n "${TOKEN_FILE}" ]]; then
+                    assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
+                    TOKEN_FILE="${TOKEN_FILE}" bash "${OUTPUT_DIR}/scripts/write-splunk-token.sh"
+                fi
+                APPLY_SECTIONS="${mutation_csv}" TARGET_FILTER="${TARGET}" \
+                    bash "${OUTPUT_DIR}/aws-cli/apply-plan.sh"
+            fi
+        fi
+
+        if [[ "${run_iam}" == "true" ]]; then
+            echo "==> applying section: iam"
+            if [[ -f "${OUTPUT_DIR}/iam/iam-ingest-egress.json" ]]; then
+                cat "${OUTPUT_DIR}/iam/iam-ingest-egress.json"
+                echo ""
+                echo "HANDOFF: attach this policy to each Lambda execution role; no role ARN is available for safe automatic attachment."
+            else
+                echo "==> No IAM policy required (local_collector_enabled=true)."
+            fi
+        fi
+
+        if [[ "${run_validation}" == "true" ]]; then
+            echo "==> applying section: validation"
+            run_validate
+        fi
         ;;
     validate)
         run_validate

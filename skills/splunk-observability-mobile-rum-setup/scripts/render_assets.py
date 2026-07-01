@@ -504,8 +504,10 @@ def normalize_spec(
             requirements["flutter"] = flutter_version
             requirements["dart"] = dart_version
 
-        if source_mode in {"render-patches", "apply-patches"} and not app_root:
-            warnings.append(f"{app_name}: app_root is empty; source patch helper will skip this platform.")
+        if source_mode == "apply-patches" and not app_root:
+            errors.append(f"{app_name}: app_root is required when source_mode=apply-patches.")
+        elif source_mode == "render-patches" and not app_root:
+            warnings.append(f"{app_name}: app_root is empty; rendered patch requires an operator-selected source tree.")
 
         normalized_platforms.append(
             {
@@ -1260,8 +1262,8 @@ apply_one() {{
   local app_root="$3"
   local patch_file="$4"
   if [[ -z "${{app_root}}" ]]; then
-    echo "SKIP ${{app_name}} (${{platform}}): app_root is empty" >&2
-    return 0
+    echo "ERROR: app_root is empty for ${{app_name}} (${{platform}}); refusing a partial apply" >&2
+    return 1
   fi
   if [[ ! -d "${{app_root}}" ]]; then
     echo "ERROR: app_root not found for ${{app_name}}: ${{app_root}}" >&2

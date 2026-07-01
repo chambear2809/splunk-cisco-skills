@@ -16,13 +16,36 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _apply_state import append_step, has_step  # noqa: E402
+from _apply_state import append_step, redact  # noqa: E402
+
+
+_INSECURE_WARNING_EMITTED = False
+
+
+def _ssl_context() -> ssl.SSLContext | None:
+    global _INSECURE_WARNING_EMITTED
+    if os.environ.get("SPLUNK_VERIFY_SSL", "true").lower() in {"false", "0", "no"}:
+        if not _INSECURE_WARNING_EMITTED:
+            print(
+                "WARNING: SPLUNK_VERIFY_SSL disables certificate verification; the peer is not authenticated and credentials may be intercepted.",
+                file=sys.stderr,
+            )
+            _INSECURE_WARNING_EMITTED = True
+        return ssl._create_unverified_context()
+    ca_file = os.environ.get("SPLUNK_CA_CERT")
+    if ca_file:
+        path = Path(ca_file)
+        if not path.is_file():
+            raise RuntimeError(f"SPLUNK_CA_CERT is not readable: {path}")
+        return ssl.create_default_context(cafile=str(path))
+    return None
 
 
 def _splunk_request(method: str, url: str, data: dict | None = None) -> tuple[int, dict]:
@@ -37,11 +60,7 @@ def _splunk_request(method: str, url: str, data: dict | None = None) -> tuple[in
     req.add_header("Accept", "application/json")
     if data is not None:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    ctx = None
-    if os.environ.get("SPLUNK_VERIFY_SSL", "true").lower() == "false":
-        import ssl
-        ctx = ssl._create_unverified_context()
-    with urllib.request.urlopen(req, context=ctx) as resp:
+    with urllib.request.urlopen(req, context=_ssl_context(), timeout=30) as resp:
         body = resp.read().decode("utf-8")
         try:
             return resp.status, json.loads(body)
@@ -50,28 +69,101 @@ def _splunk_request(method: str, url: str, data: dict | None = None) -> tuple[in
 
 
 def status() -> dict:
-    base = os.environ.get("SPLUNK_SEARCH_API_URI")
-    if not base:
-        raise RuntimeError("SPLUNK_SEARCH_API_URI must be set (https://host:8089)")
+    base = _splunk_base()
     url = f"{base.rstrip('/')}/services/admin/token-auth/tokens_auth?output_mode=json"
     code, body = _splunk_request("GET", url)
-    return {"status_code": code, "body": body}
+    return {"status_code": code, "body": redact(body)}
+
+
+def _disabled_value(body: dict) -> bool:
+    value = body.get("disabled")
+    entries = body.get("entry")
+    if value is None and isinstance(entries, list) and entries:
+        first = entries[0]
+        if isinstance(first, dict):
+            content = first.get("content")
+            if isinstance(content, dict):
+                value = content.get("disabled")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes"}:
+            return True
+        if lowered in {"0", "false", "no"}:
+            return False
+    raise RuntimeError("token-auth status response did not contain a parseable disabled value")
 
 
 def flip(enable: bool, state_dir: Path | None = None) -> dict:
-    base = os.environ.get("SPLUNK_SEARCH_API_URI")
-    if not base:
-        raise RuntimeError("SPLUNK_SEARCH_API_URI must be set (https://host:8089)")
+    base = _splunk_base()
     url = f"{base.rstrip('/')}/services/admin/token-auth/tokens_auth"
     payload = {"disabled": "false" if enable else "true"}
     idem = f"token_auth:{base}:{'enable' if enable else 'disable'}"
-    if state_dir is not None and has_step(state_dir, idem):
-        return {"result": "skipped", "reason": "already-applied"}
-    code, body = _splunk_request("POST", url, payload)
-    result = "success" if 200 <= code < 300 else "failed"
+    before = status()
+    desired_disabled = not enable
+    if _disabled_value(before["body"]) == desired_disabled:
+        return {
+            "result": "skipped",
+            "reason": "already-converged",
+            "status_code": before["status_code"],
+        }
+    code, body = _splunk_request("POST", f"{url}?output_mode=json", payload)
+    after = status()
+    if _disabled_value(after["body"]) != desired_disabled:
+        if state_dir is not None:
+            append_step(
+                state_dir,
+                "token_auth",
+                "flip",
+                idem,
+                "failed",
+                response={"post": body, "readback": after["body"]},
+            )
+        raise RuntimeError("token-auth POST returned but readback did not match requested state")
+    result = "success"
     if state_dir is not None:
-        append_step(state_dir, "token_auth", "flip", idem, result, response=body)
-    return {"status_code": code, "body": body, "result": result}
+        append_step(
+            state_dir,
+            "token_auth",
+            "flip",
+            idem,
+            result,
+            response={"post": body, "readback": after["body"]},
+        )
+    return {
+        "status_code": code,
+        "body": redact(body),
+        "readback_status_code": after["status_code"],
+        "result": result,
+    }
+
+
+def _splunk_base() -> str:
+    base = os.environ.get("SPLUNK_SEARCH_API_URI")
+    if not base:
+        raise RuntimeError("SPLUNK_SEARCH_API_URI must be set (https://host:8089)")
+    parsed = urllib.parse.urlsplit(base)
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise RuntimeError("SPLUNK_SEARCH_API_URI contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+        or any(ch.isspace() for ch in base)
+    ):
+        raise RuntimeError(
+            "SPLUNK_SEARCH_API_URI must be an absolute https://host[:port] URL without embedded credentials, path, query, fragment, or whitespace"
+        )
+    return base.rstrip("/")
 
 
 def parse_args() -> argparse.Namespace:

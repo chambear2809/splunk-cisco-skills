@@ -136,6 +136,7 @@ explicit accept flag):
 ```bash
 bash skills/splunk-enterprise-public-exposure-hardening/scripts/setup.sh \
   --phase apply \
+  --apply-target search-head \
   --public-fqdn splunk.example.com \
   --accept-public-exposure \
   --pass4symmkey-file /tmp/splunk_pass4symmkey
@@ -160,8 +161,15 @@ Under the project root in `splunk-public-exposure-rendered/`:
 - `splunk/apply-search-head.sh`, `apply-hec-tier.sh`,
   `apply-s2s-receiver.sh`, `apply-heavy-forwarder.sh`,
   `apply-deployer.sh`, `apply-cluster-manager.sh`,
-  `apply-license-manager.sh` — role-aware apply scripts that copy the
-  rendered app into place and restart Splunk.
+  `apply-license-manager.sh` — role-aware local-host scripts selected with
+  `--apply-target`. Search-head, HEC-tier, and heavy-forwarder targets mutate
+  directly. S2S-receiver and cluster-manager targets exit nonzero and delegate
+  to the indexer-cluster workflow so a single peer is never restarted and an
+  undocumented secret-file CLI flag is never invented. Deployer stages the
+  bundle then exits nonzero pending a secret-safe SHC bundle handoff;
+  license-manager also delegates and exits nonzero.
+  SHC topologies reject direct `search-head`/`hec-tier` mutation and require
+  the deployer path.
 - `splunk/rotate-pass4symmkey.sh`, `rotate-splunk-secret.sh` — secret
   rotation helpers that read keys from local files only.
 - `splunk/certificates/verify-certs.sh`,
@@ -196,8 +204,9 @@ Under the project root in `splunk-public-exposure-rendered/`:
   Requires `--accept-public-exposure` (a single-flag acknowledgement
   that you are about to bind Splunk to a public-facing FQDN).
 - `validate` — render then run the live validation probes.
-- `all` — render + preflight + apply + validate, gated by
-  `--accept-public-exposure`.
+- `all` — render + preflight + apply + validate for direct local targets,
+  gated by `--accept-public-exposure`. Delegated cluster/license targets stop
+  nonzero at their handoff, so validation must run after the child workflow.
 
 ## SVD floor (refuses to apply below this)
 

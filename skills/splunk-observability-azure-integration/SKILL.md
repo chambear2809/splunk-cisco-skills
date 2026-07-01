@@ -14,6 +14,14 @@ description: >-
 
 # Splunk Observability Cloud — Azure Integration Setup
 
+## Shared add-on completion gate
+
+If this workflow installs or hands off the registry-listed Splunk Azure add-on
+or dashboard companion, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable ingest, macros, and shipped
+dashboards against data.
+
 Render-first skill that owns the complete lifecycle of the Splunk O11y Azure
 integration. The workflow is render-first by default. The Splunk O11y REST API
 is only called when the operator explicitly runs `--apply`.

@@ -20,8 +20,8 @@ description: >-
 
 Owns the Smart Agent and Agent Management lifecycle. The safe path is render
 first: it creates reviewed plans, templates, and runbooks without touching
-hosts. Remote host execution is gated by `--accept-remote-execution`; render
-mode only writes reviewed commands.
+hosts. The wrapper does not execute local or remote Smart Agent commands;
+`--apply` fails closed instead of claiming a deployment occurred.
 
 ```bash
 bash skills/splunk-appdynamics-agent-management-setup/scripts/setup.sh --render
@@ -59,6 +59,8 @@ They keep the intake small: deployment mode, host OS, target agents, local vs
 remote, UI vs `smartagentctl`, package source, and whether deployment groups or
 auto-attach are in scope.
 
-Only after that should an operator review `smart-agent-remote-command-plan.sh`,
+Only after that should an operator review and explicitly execute the applicable
+commands from `smart-agent-remote-command-plan.sh`,
 `smartagentctl-lifecycle-plan.sh`, `remote.yaml.template`, and the UI runbooks.
-No generated file contains secret values.
+The generated shell files print command plans; they do not execute them. No
+generated file contains secret values.

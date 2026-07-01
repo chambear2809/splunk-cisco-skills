@@ -7,6 +7,7 @@ source "${PROJECT_ROOT}/shared/lib/credential_helpers.sh"
 
 RENDERED_DIR="${PROJECT_ROOT}/../splunk-vmware-ta-rendered"
 LIVE=false
+COMPLETION=false
 EVENT_INDEX="vmware"
 ESXI_INDEX="vmware_esxi"
 METRICS_INDEX="vmware_metrics"
@@ -21,6 +22,7 @@ Usage:
 Options:
   --rendered-dir DIR      Offline rendered asset directory
   --live                  Also validate Splunk apps, indexes, and sample data
+  --completion            Run live validation and fail on any readiness warning
   --event-index INDEX     vCenter event/inventory index
   --esxi-index INDEX      ESXi syslog index
   --metrics-index INDEX   VMware metrics index
@@ -32,6 +34,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --rendered-dir) require_arg "$1" "$#" || exit 1; RENDERED_DIR="$2"; shift 2 ;;
         --live) LIVE=true; shift ;;
+        --completion|--strict) LIVE=true; COMPLETION=true; shift ;;
         --event-index|--index) require_arg "$1" "$#" || exit 1; EVENT_INDEX="$2"; shift 2 ;;
         --esxi-index) require_arg "$1" "$#" || exit 1; ESXI_INDEX="$2"; shift 2 ;;
         --metrics-index) require_arg "$1" "$#" || exit 1; METRICS_INDEX="$2"; shift 2 ;;
@@ -39,15 +42,19 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage; exit 1 ;;
     esac
 done
+validate_splunk_index_name "${EVENT_INDEX}" || exit 1
+validate_splunk_index_name "${ESXI_INDEX}" || exit 1
+validate_splunk_index_name "${METRICS_INDEX}" || exit 1
 
 PASS=0
 WARN=0
 FAIL=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 
 log "=== Splunk VMware TA Validation ==="
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 for file in metadata.json vmware-plan.md indexes.conf.template validation-searches.spl vcenter-account-runbook.md esxi-syslog-runbook.md itsi-readiness.md vmware-readiness-evidence.template.json; do
     if [[ -f "${RENDERED_DIR}/${file}" ]]; then

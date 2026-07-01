@@ -83,6 +83,8 @@ def write_local_dual_agent_spec(tmp_path: Path) -> Path:
         path.mkdir(parents=True, exist_ok=True)
     (secrets / "o11y").write_text("splunk-secret-value", encoding="utf-8")
     (secrets / "appd").write_text("appd-secret-value", encoding="utf-8")
+    (secrets / "o11y").chmod(0o600)
+    (secrets / "appd").chmod(0o600)
     spec = tmp_path / "dual-agent.yaml"
     spec.write_text(
         f"""
@@ -108,6 +110,7 @@ targets:
     collector_config_path: {collector_dir / "config.yaml"}
     collector_service_name: appdynamics-machine-agent
     collector_restart_command: "true"
+    collector_credentials_ready_command: "true"
     collector_healthcheck_command: "true"
     receiver_bind: 127.0.0.1
     grpc_port: 4317
@@ -256,7 +259,9 @@ def test_appd_host_apply_helper_atomic_write_rollback_and_ssh_command(tmp_path: 
 def test_appd_thousandeyes_apply_requires_gate() -> None:
     result = run_script(
         SKILLS_DIR / "splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh",
-        "--apply",
+        "--apply", "assets",
+        "--spec",
+        str(SKILLS_DIR / "splunk-appdynamics-thousandeyes-integration-setup/template.example"),
     )
     assert result.returncode == 2
     assert "--accept-appd-te-mutation" in result.stderr
@@ -304,7 +309,8 @@ def test_rendered_appd_probe_scripts_support_lab_tls(tmp_path: Path) -> None:
     controller_plan = (controller / "controller-admin-api-plan.sh").read_text(encoding="utf-8")
     assert "APPD_CA_CERT" in controller_plan
     assert "APPD_VERIFY_SSL" in controller_plan
-    assert "appd_curl --fail --silent --show-error -H" in controller_plan
+    assert 'appd_curl --fail --silent --show-error --config "${CURL_CONFIG}"' in controller_plan
+    assert '-H "Authorization: Bearer' not in controller_plan
 
     agent = render_skill("splunk-appdynamics-agent-management-setup", tmp_path / "agent-tls")
     agent_probe = (agent / "smart-agent-validation-probes.sh").read_text(encoding="utf-8")
@@ -557,28 +563,19 @@ def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
         str(out),
         "--live",
     )
-    assert live_validate.returncode == 0, live_validate.stderr + live_validate.stdout
-    assert "APPD_PLATFORM_LIVE=1" in live_validate.stdout
+    assert live_validate.returncode != 0
+    assert "FAIL: live validation platform failed" in live_validate.stderr
 
     apply = run_script(
         SKILLS_DIR / "splunk-appdynamics-platform-setup/scripts/setup.sh",
-        "--apply",
+        "--apply", "enterprise_console",
+        "--spec",
+        str(SKILLS_DIR / "splunk-appdynamics-platform-setup/template.example"),
         "--output-dir",
         str(tmp_path / "apply-denied"),
     )
     assert apply.returncode == 2
     assert "--accept-enterprise-console-mutation" in apply.stderr
-
-    accepted = run_script(
-        SKILLS_DIR / "splunk-appdynamics-platform-setup/scripts/setup.sh",
-        "--apply",
-        "--accept-enterprise-console-mutation",
-        "--output-dir",
-        str(tmp_path / "apply-accepted"),
-    )
-    assert accepted.returncode == 0, accepted.stderr + accepted.stdout
-    accepted_plan = (tmp_path / "apply-accepted" / "apply-plan.sh").read_text(encoding="utf-8")
-    assert "enterprise-console-command-plan.sh" in accepted_plan
 
 
 def test_platform_virtual_appliance_route_selects_infra_and_service_paths(tmp_path: Path) -> None:
@@ -999,9 +996,14 @@ def test_smart_agent_remote_command_rendering_and_gate(tmp_path: Path) -> None:
         "appd_managed_python_agent",
     } <= ids
 
-    apply = run_script(SKILLS_DIR / "splunk-appdynamics-agent-management-setup/scripts/setup.sh", "--apply")
+    apply = run_script(
+        SKILLS_DIR / "splunk-appdynamics-agent-management-setup/scripts/setup.sh",
+        "--apply",
+        "--spec",
+        str(SKILLS_DIR / "splunk-appdynamics-agent-management-setup/template.example"),
+    )
     assert apply.returncode == 2
-    assert "--accept-remote-execution" in apply.stderr
+    assert "no executable apply implementation" in apply.stderr
 
 
 def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
@@ -1227,7 +1229,9 @@ def test_eum_synthetic_and_sap_artifacts_render(tmp_path: Path) -> None:
     replay = (eum / "session-replay-config.js").read_text(encoding="utf-8")
     assert "sessionReplay" in replay
     upload = (eum / "source-map-upload-plan.sh").read_text(encoding="utf-8")
-    assert "APPD_EUM_TOKEN_FILE" in upload
+    assert "PLAN ONLY" in upload
+    assert "product- and release-specific endpoint" in upload
+    assert "exit 2" in upload
 
     synthetic = render_skill("splunk-appdynamics-synthetic-monitoring-setup", tmp_path / "synthetic")
     values = (synthetic / "private-synthetic-agent-values.yaml").read_text(encoding="utf-8")

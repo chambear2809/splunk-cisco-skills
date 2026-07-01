@@ -37,7 +37,7 @@ By default, assets are written under `splunk-observability-thousandeyes-rendered
 `setup.sh` supports these mode flags:
 
 - `--render` — render artifacts (default).
-- `--apply [SECTIONS]` — render then apply selected sections. Sections: `stream, apm, tests, alert_rules, labels, tags, te_dashboards, templates`. With no list, applies all.
+- `--apply SECTIONS` — render then apply an explicit comma-separated selection. The literal `all` selects the currently automatable sections: `stream,apm,tests,alert_rules,templates`. Omitting the list is an error. `labels`, `tags`, and `te_dashboards` may be named only to receive a fail-closed render-only handoff error; no API mutation is attempted.
 - `--validate` — run static validation against an already-rendered output directory.
 - `--dry-run` — show the plan without writing files.
 - `--json` — emit JSON dry-run output.
@@ -49,7 +49,7 @@ By default, assets are written under `splunk-observability-thousandeyes-rendered
 
 `--realm` is read from `spec.realm` if not passed on the command line; one or the other is required.
 
-For `--apply stream` you also need `--te-token-file` and `--o11y-ingest-token-file`. For `--apply apm` you need `--te-token-file` and `--o11y-api-token-file`. For all other apply sections you need `--te-token-file` and `--i-accept-te-mutations`.
+Every live apply requires a numeric `account_group_id` in the spec, `--te-token-file`, and `--i-accept-te-mutations`. `stream` also requires `--o11y-ingest-token-file`; `apm` also requires `--o11y-api-token-file`. The setup script validates every selected section before the first mutation.
 
 ## Secret handling
 
@@ -61,7 +61,7 @@ Three file-backed token flags:
 
 Rejected direct-secret flags: `--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`. Each error message points at the matching `--*-token-file` flag.
 
-The renderer never reads token files. Apply scripts read tokens from chmod-600 files at runtime through curl config or payload-substitution helpers, so secrets never enter argv or rendered files.
+The renderer never reads token files. Apply scripts require non-symlink regular files with mode 600 and exactly one non-empty UTF-8 line. The fixed-origin HTTPS helper reads tokens at runtime, so secrets never enter argv or rendered files.
 
 TE Templates render with **Handlebars placeholders only** (`{{te_credentials.api_key}}` style). The TE API rejects plain-text credentials with HTTP 400; the renderer catches this at render time so the operator gets a clear error before the network call.
 
@@ -73,15 +73,17 @@ Three modes (use exactly one):
 - `stream.filters.test_types: [http-server, agent-to-server, ...]` — any combination of canonical TE OTel v2 types.
 - `stream.mode: all` — omit testMatch entirely; stream every enabled test in the account group.
 
-## Apply sequence (when `--apply` is used without an explicit section list)
+## Verified apply behavior
 
-1. `stream` — POST `/v7/streams` (or PUT if `TE_STREAM_ID` env var set).
-2. `apm` — POST `/v7/connectors/generic`, then PUT `/v7/operations/splunk-observability-apm/<connector_id>` to enable the operation.
-3. `tests` — POST `/v7/tests/<type>` for each test entry (gated by `--i-accept-te-mutations`).
-4. `alert_rules` — POST `/v7/alerts/rules` (gated by `--i-accept-te-mutations`).
-5. `labels` and `tags` — POST `/v7/labels` and POST `/v7/tags` (gated by `--i-accept-te-mutations`).
-6. `te_dashboards` — POST `/v7/dashboards` (gated by `--i-accept-te-mutations`).
-7. `templates` — POST `/v7/templates` and (when `--deploy-templates`) POST `/v7/templates/<id>/deploy` (gated by `--i-accept-te-mutations`).
+Every request uses the fixed `https://api.thousandeyes.com/v7` origin, verified TLS, bounded timeouts/response size, HTTP 2xx enforcement, and `?aid=<account_group_id>` scoping.
+
+- `stream` — collection preflight; create plus ID collection readback, or GET/PUT/GET when `TE_STREAM_ID` is supplied.
+- `apm` — connector collection preflight, connector create plus ID readback, then operation GET/PUT/GET verification.
+- `tests`, `alert_rules`, and `templates` — collection preflight, create, retain the server-returned ID, and verify that ID in collection readback.
+- `templates --deploy-templates` — locally state-gated deploy POST followed by template-resource readback. This confirms the template remains readable, not that every asynchronous deployed child asset completed.
+- `labels`, `tags`, and `te_dashboards` — render-only; automated apply exits before mutation because authoritative response-ID and readback schemas are not yet encoded.
+
+Create state is stored atomically under the rendered output's mode-700 `state/` directory. Preserve it: the helper deliberately does not assume names are unique, so it cannot safely adopt an existing object by name after state loss. If a POST reaches TE but its response is lost, the outcome is ambiguous and must be reconciled before retrying. The generic connector collection path and alert-rule response ID are conservatively inferred from the checked-in API evidence; unsupported tenant behavior fails closed rather than reporting success.
 
 ## SignalFlow handoff
 

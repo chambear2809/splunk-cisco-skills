@@ -276,14 +276,6 @@ def _lib_dir_block() -> str:
 def render_install_licenses(args: argparse.Namespace, parsed: dict) -> str:
     license_files = " ".join(shell_quote(p) for p in parsed["license_files"]) or ""
     manager_uri = shell_quote(args.license_manager_uri)
-    restart_block = (
-        'SPLUNK_URI="${MANAGER_URI}"\n'
-        'export SPLUNK_URI\n'
-        'platform_restart_or_exit "${SK}" "${MANAGER_URI}" "license manager changes" \\\n'
-        '  "License changes typically require a restart on the manager."\n'
-        if args.restart_splunk == "true"
-        else 'echo "Splunk restart skipped. License changes typically require a restart on the manager."\n'
-    )
 
     body = _lib_dir_block() + (
         f'MANAGER_URI={manager_uri}\n'
@@ -297,12 +289,15 @@ def render_install_licenses(args: argparse.Namespace, parsed: dict) -> str:
             '    echo "ERROR: License file missing: $f" >&2\n'
             '    exit 1\n'
             '  fi\n'
+            'done\n'
+            '# Validate every file before installing the first one so a missing\n'
+            '# later file cannot leave a partially applied license set.\n'
+            f'for f in {license_files}; do\n'
             '  license_install_files "${MANAGER_URI}" "${SK}" "$f"\n'
             'done\n'
         )
     else:
         body += 'echo "No license files specified; skipping license install."\n'
-    body += restart_block
     return make_script(body)
 
 
@@ -350,8 +345,10 @@ def render_pool_json(pool: dict) -> str:
 
 def render_apply_pools(args: argparse.Namespace, parsed: dict) -> str:
     manager_uri = shell_quote(args.license_manager_uri)
+    restart_requested = "true" if args.restart_splunk == "true" else "false"
     body = _lib_dir_block() + (
         f"MANAGER_URI={manager_uri}\n"
+        f"RESTART_REQUESTED={restart_requested}\n"
         + _SOURCE_LIB_BLOCK
         + (
             'POOLS_DIR="$(dirname "$0")/pools"\n'
@@ -364,6 +361,22 @@ def render_apply_pools(args: argparse.Namespace, parsed: dict) -> str:
             '  license_pool_apply "${MANAGER_URI}" "${SK}" "${spec}"\n'
             '  log "OK: Applied pool spec ${spec}"\n'
             "done\n"
+            'SPLUNK_URI="${MANAGER_URI}"\n'
+            'export SPLUNK_URI\n'
+            'if [[ "${RESTART_REQUESTED}" != "true" ]]; then\n'
+            '  platform_restart_handoff "license manager changes" "Restart was disabled, but license installation/group changes are not complete until the manager restarts."\n'
+            '  exit 2\n'
+            'fi\n'
+            'restart_plan="$(platform_restart_plan "license manager changes")"\n'
+            "restart_decision=\"$(printf '%s\\n' \"${restart_plan}\" | awk -F= '$1 == \"decision\" {print $2}')\"\n"
+            'case "${restart_decision}" in\n'
+            '  handoff*|delegate-*|shc-rolling-restart)\n'
+            '    platform_restart_handoff "license manager changes" "Restart plan decision: ${restart_decision}."\n'
+            '    exit 2\n'
+            '    ;;\n'
+            'esac\n'
+            'platform_restart_or_exit "${SK}" "${MANAGER_URI}" "license manager changes" \\\n'
+            '  "License installation and group activation require a completed manager restart."\n'
         )
     )
     return make_script(body)
@@ -430,8 +443,12 @@ def render_configure_peer(args: argparse.Namespace, host: str, ssh_user: str) ->
             'export SPLUNK_URI\n'
             'platform_restart_handoff "license localpeer update on ${HOST}" \\\n'
             '  "Peer restart requires host-local service ownership or an explicit orchestrator restart plan."\n'
+            'exit 2\n'
             if args.restart_splunk == "true"
-            else 'echo "Restart skipped (--restart-splunk=false). Localpeer changes require a Splunk restart on ${HOST} to take effect."\n'
+            else (
+                'echo "Restart skipped (--restart-splunk=false). Localpeer changes require a Splunk restart on ${HOST} to take effect." >&2\n'
+                'exit 2\n'
+            )
         )
     )
     return make_script(body)

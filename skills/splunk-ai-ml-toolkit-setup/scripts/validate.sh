@@ -17,9 +17,10 @@ PASS=0
 WARN=0
 FAIL=0
 SK=""
+COMPLETION=false
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 
 usage() {
@@ -34,6 +35,7 @@ Options:
   --psc-target TARGET                PSC target for live validation
   --expect-ai-toolkit true|false
   --expect-dsdl true|false
+  --completion                         Fail on every readiness warning
   --help
 EOF
 }
@@ -55,6 +57,7 @@ while [[ $# -gt 0 ]]; do
         --psc-target) require_arg "$1" "$#" || exit 1; PSC_TARGET="$2"; shift 2 ;;
         --expect-ai-toolkit) require_arg "$1" "$#" || exit 1; EXPECT_AI_TOOLKIT="$(normalize_boolean "$2")"; shift 2 ;;
         --expect-dsdl) require_arg "$1" "$#" || exit 1; EXPECT_DSDL="$(normalize_boolean "$2")"; shift 2 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *)
             log "ERROR: Unknown option: $1"
@@ -63,6 +66,8 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 if [[ -n "${RENDERED_DIR}" ]]; then
     python3 - "${RENDERED_DIR}" <<'PY'

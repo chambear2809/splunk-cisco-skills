@@ -1,0 +1,5 @@
+# Runtime dependencies for codex-splunk-o11y-notify-span.py.
+# Compile with the command recorded in requirements-notify.lock.
+opentelemetry-api==1.38.0
+opentelemetry-sdk==1.38.0
+opentelemetry-exporter-otlp-proto-http==1.38.0

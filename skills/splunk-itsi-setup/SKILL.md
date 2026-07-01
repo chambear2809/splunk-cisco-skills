@@ -10,6 +10,14 @@ description: >-
 
 # Splunk ITSI Setup Automation
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off ITSI or a companion
+content pack, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable ingest, ITSI objects, and shipped
+views against data.
+
 Automates installation and validation of **Splunk IT Service Intelligence**
 (`SA-ITOA`).
 

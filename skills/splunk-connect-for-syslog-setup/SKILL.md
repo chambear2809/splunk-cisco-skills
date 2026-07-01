@@ -111,6 +111,11 @@ bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
   --write-hec-token-file /tmp/sc4s_hec_token
 ```
 
+If Splunk cannot return that requested token value, preparation exits nonzero
+and emits a rotate/create handoff; it does not report a usable token file.
+Visible Selected Indexes restrictions must include every required SC4S index,
+and HEC ACK must be disabled; otherwise preparation/validation return nonzero.
+
 ### Step 3: Render Host Deployment Assets
 
 Compose example:
@@ -186,6 +191,11 @@ bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
 ```
 
 ### Step 5: Optionally Apply Rendered Assets
+
+Live host or Kubernetes apply requires a nonempty, owner-only
+`--hec-token-file` (no group/other permission bits). A single
+combined run may instead use `--splunk-prep --write-hec-token-file PATH`; apply
+is blocked if preparation does not produce a nonempty token file.
 
 Compose:
 

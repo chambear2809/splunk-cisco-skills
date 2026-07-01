@@ -113,7 +113,7 @@ source is one of the explicit Firehose sources in `readiness-evidence-template`.
 Delegate token creation to `splunk-hec-service-setup`:
 
 ```bash
-bash skills/splunk-hec-service-setup/scripts/setup.sh --render \
+bash skills/splunk-hec-service-setup/scripts/setup.sh --phase render \
   --token-name {{hec_token_name}} --default-index {{index}} --allowed-indexes {{index}} \
   --source {{selected_source}} --sourcetype {{selected_sourcetype}} --use-ack {{use_ack}}
 ```
@@ -130,7 +130,7 @@ retry, S3 backup, and CloudWatch alarm settings from the rendered templates.
 set -euo pipefail
 
 # Review before running. This file contains no HEC token value.
-bash skills/splunk-hec-service-setup/scripts/setup.sh --render --token-name {{hec_token_name}} --default-index {{index}} --allowed-indexes {{index}} --source {{selected_source}} --sourcetype {{selected_sourcetype}} --use-ack {{use_ack}}
+bash skills/splunk-hec-service-setup/scripts/setup.sh --phase render --token-name {{hec_token_name}} --default-index {{index}} --allowed-indexes {{index}} --source {{selected_source}} --sourcetype {{selected_sourcetype}} --use-ack {{use_ack}}
 bash skills/splunk-data-source-readiness-doctor/scripts/setup.sh --phase collect --source-pack amazon_kinesis_firehose
 """,
     "validation_searches": """# Amazon Kinesis Firehose validation searches

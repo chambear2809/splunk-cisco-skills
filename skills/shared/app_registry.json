@@ -1456,7 +1456,7 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "Claude Code CLI host instrumentation workflow. Renders user or project settings.json env blocks, local/external collector or direct Splunk Observability destinations, optional Galileo trace fan-out, and secret-safe otelHeadersHelper assets without Splunk Platform tier placement."
+      "notes": "Claude Code CLI host instrumentation workflow. Renders and applies user- or project-level settings.json env blocks for direct, local-collector, or external-collector telemetry, including optional Galileo trace fan-out and secret-safe otelHeadersHelper assets, without Splunk Platform tier placement."
     },
     {
       "skill": "splunk-observability-codex-instrumentation-setup",

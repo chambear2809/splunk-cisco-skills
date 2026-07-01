@@ -1,7 +1,7 @@
 ---
 name: splunk-appdynamics-infrastructure-visibility-setup
 description: >-
-  Render, validate, and optionally apply Splunk AppDynamics Infrastructure
+  Render and validate Splunk AppDynamics Infrastructure
   Visibility workflows, including Machine Agent, Server Visibility, Network
   Visibility, Docker and container visibility, service availability, server
   tags, GPU Monitoring, Prometheus extension coverage, and infrastructure health rules. Use when the user asks for
@@ -15,6 +15,9 @@ description: >-
 
 Owns Machine Agent and infrastructure visibility plans. Privileged host or
 network-agent changes are rendered for review.
+The generated command plan is non-mutating and `--apply` fails closed; operators
+must execute the reviewed host/API runbook or delegate collector configuration
+to `splunk-appdynamics-machine-agent-otel-collector-setup`.
 
 ```bash
 bash skills/splunk-appdynamics-infrastructure-visibility-setup/scripts/setup.sh --render

@@ -14,6 +14,7 @@ PHASE="render"
 DRY_RUN=false
 JSON_OUTPUT=false
 ACCEPT_PUBLIC_EXPOSURE=false
+APPLY_TARGET="search-head"
 OUTPUT_DIR=""
 TOPOLOGY="single-search-head"
 PUBLIC_FQDN=""
@@ -107,6 +108,8 @@ Usage: $(basename "$0") [OPTIONS]
 Phases:
   --phase render|preflight|apply|validate|all   (default: render)
   --accept-public-exposure                       Required for apply / all
+  --apply-target search-head|hec-tier|s2s-receiver|heavy-forwarder|deployer|cluster-manager|license-manager
+                                                 Local role to mutate (default: search-head)
 
 Topology:
   --topology single-search-head|shc-with-hec|shc-with-hec-and-hf
@@ -236,6 +239,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --phase) require_arg "$1" $# || exit 1; PHASE="$2"; shift 2 ;;
         --accept-public-exposure) ACCEPT_PUBLIC_EXPOSURE=true; shift ;;
+        --apply-target) require_arg "$1" $# || exit 1; APPLY_TARGET="$2"; shift 2 ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --topology) require_arg "$1" $# || exit 1; TOPOLOGY="$2"; shift 2 ;;
         --public-fqdn) require_arg "$1" $# || exit 1; PUBLIC_FQDN="$2"; shift 2 ;;
@@ -359,6 +363,7 @@ validate_args() {
     validate_choice "${LDAP_NESTED_GROUPS}" true false
     validate_choice "${LDAP_ANONYMOUS_REFERRALS}" 0 1
     validate_choice "${LDAP_ENABLE_RANGE_RETRIEVAL}" true false
+    validate_choice "${APPLY_TARGET}" search-head hec-tier s2s-receiver heavy-forwarder deployer cluster-manager license-manager
 
     if [[ -z "${PUBLIC_FQDN}" ]]; then
         log "ERROR: --public-fqdn is required"
@@ -372,6 +377,12 @@ validate_args() {
         if [[ "${ACCEPT_PUBLIC_EXPOSURE}" != "true" ]]; then
             log "ERROR: --accept-public-exposure is required for --phase=${PHASE}."
             log "       This skill binds Splunk to a public-facing FQDN. Acknowledge the change explicitly."
+            exit 1
+        fi
+        if [[ "${TOPOLOGY}" == shc-* ]] \
+            && [[ "${APPLY_TARGET}" == "search-head" || "${APPLY_TARGET}" == "hec-tier" ]]; then
+            log "ERROR: ${APPLY_TARGET} is a direct local apply and is unsafe for topology ${TOPOLOGY}."
+            log "       Use --apply-target deployer, then complete the SHC bundle handoff."
             exit 1
         fi
     fi
@@ -502,6 +513,18 @@ run_rendered_script() {
     (cd "${dir}" && "./${script_path}")
 }
 
+apply_script_for_target() {
+    case "${APPLY_TARGET}" in
+        search-head) printf '%s' "splunk/apply-search-head.sh" ;;
+        hec-tier) printf '%s' "splunk/apply-hec-tier.sh" ;;
+        s2s-receiver) printf '%s' "splunk/apply-s2s-receiver.sh" ;;
+        heavy-forwarder) printf '%s' "splunk/apply-heavy-forwarder.sh" ;;
+        deployer) printf '%s' "splunk/apply-deployer.sh" ;;
+        cluster-manager) printf '%s' "splunk/apply-cluster-manager.sh" ;;
+        license-manager) printf '%s' "splunk/apply-license-manager.sh" ;;
+    esac
+}
+
 main() {
     validate_args
     build_renderer_args
@@ -522,7 +545,7 @@ main() {
             ;;
         apply)
             render_assets
-            run_rendered_script "splunk/apply-search-head.sh"
+            run_rendered_script "$(apply_script_for_target)"
             ;;
         validate)
             render_assets
@@ -531,7 +554,7 @@ main() {
         all)
             render_assets
             run_rendered_script preflight.sh
-            run_rendered_script "splunk/apply-search-head.sh"
+            run_rendered_script "$(apply_script_for_target)"
             run_rendered_script validate.sh
             ;;
     esac

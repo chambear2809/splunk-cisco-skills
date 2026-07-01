@@ -32,6 +32,7 @@ validation, or in-product SPL-to-SPL2 conversion tooling.
 
 Hard errors:
 
+- no lint target files for a lint/validate request
 - missing `$pipeline`
 - missing `from $source`
 - missing `into $destination`

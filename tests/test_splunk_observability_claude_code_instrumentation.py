@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 import subprocess
 from pathlib import Path
@@ -17,6 +18,7 @@ from skills.shared.coding_agent_o11y.common import scan_rendered_for_secret_leak
 PARENT = REPO_ROOT / "skills/splunk-observability-coding-agent-instrumentation-setup/scripts/setup.sh"
 CLAUDE = REPO_ROOT / "skills/splunk-observability-claude-code-instrumentation-setup/scripts/setup.sh"
 CLAUDE_VALIDATE = REPO_ROOT / "skills/splunk-observability-claude-code-instrumentation-setup/scripts/validate.sh"
+PUBLIC_GALILEO_CONSOLE = "https://app.galileo.ai/"
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -34,7 +36,22 @@ def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 
 
 def run_claude(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return run_cmd("bash", str(CLAUDE), *args, check=check)
+    argv = list(args)
+    destination = argv[argv.index("--destination") + 1] if "--destination" in argv else "local-collector"
+    galileo_requested = "--galileo-project" in argv or "--galileo-enabled" in argv
+    instance_supplied = (
+        "--galileo-console-url" in argv or "--galileo-otel-endpoint" in argv
+    )
+    if (
+        galileo_requested
+        and "--disable-galileo" not in argv
+        and destination != "splunk-direct"
+        and not instance_supplied
+    ):
+        # Normal Galileo-enabled regression cases explicitly confirm the public
+        # instance. Dedicated negative coverage below bypasses this helper.
+        argv.extend(["--galileo-console-url", PUBLIC_GALILEO_CONSOLE])
+    return run_cmd("bash", str(CLAUDE), *argv, check=check)
 
 
 def rendered_text(root: Path) -> str:
@@ -136,6 +153,9 @@ def test_local_collector_renders_valid_settings_and_collector_overlay(tmp_path: 
     assert env["CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"] == "1"
     assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://127.0.0.1:14318"
     assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/protobuf"
+    assert "sf_environment=prod" in env["OTEL_RESOURCE_ATTRIBUTES"]
+    assert "sf_service=claude-code" in env["OTEL_RESOURCE_ATTRIBUTES"]
+    assert "deployment.environment.name=prod" in env["OTEL_RESOURCE_ATTRIBUTES"]
     # NO literal token anywhere
     assert "X-SF-TOKEN" not in json.dumps(settings)
     assert "OTEL_EXPORTER_OTLP_HEADERS" not in env
@@ -145,26 +165,105 @@ def test_local_collector_renders_valid_settings_and_collector_overlay(tmp_path: 
     assert overlay_path.is_file()
     overlay = overlay_path.read_text(encoding="utf-8")
     assert "send_otlp_histograms: true" in overlay
-    assert "otlphttp/galileo" in overlay
+    assert "otlp_http/galileo" in overlay
     assert "https://api.galileo.ai/otel/traces" in overlay
     assert '${env:GALILEO_API_KEY}' in overlay
     assert "project: " in overlay
     assert "logstream: " in overlay
-    assert "otlphttp/claude_code_traces" in overlay
-    assert "otlphttp/claude_code_logs" in overlay
+    assert "otlp_http/claude_code_traces" in overlay
+    assert "otlp_http/claude_code_metrics" in overlay
+    assert "otlp_http/claude_code_logs" in overlay
+    assert "https://ingest.us1.observability.splunkcloud.com/v2/datapoint/otlp" in overlay
     assert "https://ingest.us1.observability.splunkcloud.com/v2/log/otlp" in overlay
     assert "https://ingest.us1.observability.splunkcloud.com/v2/trace/otlp" in overlay
     assert '${env:SPLUNK_ACCESS_TOKEN}' in overlay
-    # Galileo trace pipeline fans out to both back ends
-    assert "otlphttp/claude_code_traces, otlphttp/galileo" in overlay
+    assert "key: sf_environment" in overlay
+    assert "key: sf_service" in overlay
+    # Galileo trace pipeline fans out to Splunk and Galileo. Native cumulative
+    # token metrics are converted to the histogram required by the AI overview.
+    assert "otlp_http/claude_code_traces" in overlay
+    assert "otlp_http/galileo" in overlay
+    assert "sum/claude_code_input_tokens" not in overlay
+    assert "sum/claude_code_output_tokens" not in overlay
+    assert "gen_ai.client.token.usage" in overlay
+    assert "transform/claude_code_token_metric_genai" in overlay
+    assert "filter/claude_code_token_metrics" in overlay
+    assert 'set(datapoint.attributes["gen_ai.response.model"], datapoint.attributes["gen_ai.request.model"])' in overlay
+    assert "cumulativetodelta/claude_code_tokens" in overlay
+    assert "signal_to_metrics/claude_code_token_histogram" in overlay
+    assert 'unit: "{token}"' in overlay
+    assert "Double(datapoint.value_int) + datapoint.value_double" in overlay
+    assert "67108864" in overlay
+    assert "metrics/claude_code_token_genai" in overlay
+    assert "metrics/claude_code_token_histogram" in overlay
+    assert "span_metrics/claude_code_genai" in overlay
+    assert "namespace: gen_ai.client.operation" in overlay
+    assert "unit: s" in overlay
+    assert "metrics/claude_code_genai_duration" in overlay
+    assert "traces/claude_code_galileo" in overlay
+    assert "transform/claude_code_galileo" in overlay
+    assert "filter/claude_code_galileo_genai" in overlay
+    assert 'span.attributes["user_prompt"]' in overlay
+    assert 'span.attributes["response.model_output"]' in overlay
+    assert 'span.attributes["llm.input_messages.0.message.content"]' in overlay
+    assert 'span.attributes["llm.output_messages.0.message.content"]' in overlay
+    assert 'span.cache["claude_tools"]' in overlay
+    assert 'flatten(span.cache["claude_tools"])' in overlay
+    assert 'replace_all_patterns(span.cache["claude_tools"], "key"' in overlay
+    assert 'replace_all_patterns(span.cache["claude_tools"], "value"' in overlay
+    assert 'merge_maps(span.attributes, span.cache["claude_tools"], "upsert")' in overlay
+    assert 'span.attributes["gen_ai.tool.definitions"]' in overlay
+    assert 'span.attributes["claude_code.galileo.available_tools_count"]' in overlay
+    assert 'set(span.attributes["llm.tools"], span.attributes["tools"])' not in overlay
+    assert 'span.attributes["gen_ai.operation.name"], "execute_tool"' in overlay
+    assert 'span.attributes["gen_ai.tool.name"]' in overlay
+    assert 'span.attributes["gen_ai.tool.call.arguments"]' in overlay
+    assert 'span.attributes["gen_ai.tool.call.result"]' in overlay
+    assert 'spanevent.name == "tool.output"' in overlay
+    assert 'span.attributes["span.type"] == "tool.execution"' in overlay
+    assert 'delete_key(resource.attributes, "_claude_code.galileo.final_output")' in overlay
+    # GenAI-convention transform bridges Claude Code spans to the AI overview.
+    assert "transform/claude_code_genai" in overlay
+    assert 'set(span.attributes["gen_ai.operation.name"], "chat")' in overlay
+    assert 'set(span.attributes["gen_ai.agent.name"], "claude-code")' in overlay
+    assert 'set(span.attributes["gen_ai.operation.name"], "invoke_workflow")' in overlay
+    assert 'gen_ai.workflow.name' in overlay
+    assert "SPAN_KIND_CLIENT" in overlay
+    assert 'gen_ai.usage.input_tokens' in overlay
+    assert 'gen_ai.response.model' in overlay
+    assert 'gen_ai.provider.name' in overlay
+    # Transform runs in the traces pipeline before batch.
+    assert "resource/claude_code, transform/claude_code_genai, batch/claude_code" in overlay
+    assert (
+        "resource/claude_code, transform/claude_code_genai, "
+        "transform/claude_code_galileo, filter/claude_code_galileo_genai, "
+        "batch/claude_code"
+    ) in overlay
+    shared_routing = (out / "runtime" / "shared-collector-routing.md").read_text(encoding="utf-8")
+    assert "context: span" in shared_routing
+    assert "context: metric" in shared_routing
+    assert "context: datapoint" in shared_routing
+    assert "context: log" in shared_routing
+    assert 'name == "claude_code.token.usage"' in shared_routing
+    assert "metrics/claude_code_token_genai" in shared_routing
+    assert "transform/claude_code_token_metric_genai" in shared_routing
+    assert "cumulativetodelta/claude_code_tokens" in shared_routing
+    assert "signal_to_metrics/claude_code_token_histogram" in shared_routing
+    assert "metrics/claude_code_token_histogram" in shared_routing
+    assert "span_metrics/claude_code_genai" in shared_routing
+    assert "unit: s" in shared_routing
+    assert "metrics/claude_code_genai_duration" in shared_routing
+    assert "otlp_http/claude_code_metrics" in shared_routing
+    assert "127.0.0.1:14318:4318" in shared_routing
+    assert "0.0.0.0:4318" in shared_routing
 
 
-def test_detailed_traces_default_on_emits_beta_endpoint(tmp_path: Path) -> None:
-    """Detailed beta tracing is on by default so Galileo Luna span scorers get child spans."""
+def test_detailed_traces_opt_in_emits_beta_endpoint(tmp_path: Path) -> None:
     out = tmp_path / "detailed"
     run_claude(
         "--render", "--destination", "local-collector",
         "--realm", "us1", "--galileo-project", "coding-agents",
+        "--enable-detailed-traces", "--accept-content-capture",
         "--output-dir", str(out),
     )
     env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
@@ -174,10 +273,54 @@ def test_detailed_traces_default_on_emits_beta_endpoint(tmp_path: Path) -> None:
     assert env["BETA_TRACING_ENDPOINT"] == env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://127.0.0.1:14318"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("2.1.197 (Claude Code)", (2, 1, 197)),
+        ("claude-code v2.1.193", (2, 1, 193)),
+        ("not-a-version", None),
+    ],
+)
+def test_parse_claude_code_version(
+    raw: str, expected: tuple[int, int, int] | None
+) -> None:
+    assert cc_o11y.parse_claude_code_version(raw) == expected
+
+
+def test_assistant_response_version_preflight_rejects_old_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cc_o11y.shutil, "which", lambda _name: "/usr/local/bin/claude")
+    monkeypatch.setattr(
+        cc_o11y.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="2.1.185 (Claude Code)\n", stderr=""
+        ),
+    )
+    with pytest.raises(cc_o11y.UsageError, match="v2.1.193 or newer"):
+        cc_o11y.require_assistant_response_capable_claude()
+
+
+def test_assistant_response_version_preflight_accepts_supported_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cc_o11y.shutil, "which", lambda _name: "/usr/local/bin/claude")
+    monkeypatch.setattr(
+        cc_o11y.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="2.1.197 (Claude Code)\n", stderr=""
+        ),
+    )
+    assert cc_o11y.require_assistant_response_capable_claude() == (2, 1, 197)
+
+
 def test_detailed_traces_splunk_direct_points_beta_at_trace_endpoint(tmp_path: Path) -> None:
     out = tmp_path / "detailed-direct"
     run_claude(
         "--render", "--destination", "splunk-direct", "--realm", "us1",
+        "--enable-detailed-traces", "--accept-content-capture",
         "--output-dir", str(out),
     )
     env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
@@ -186,18 +329,32 @@ def test_detailed_traces_splunk_direct_points_beta_at_trace_endpoint(tmp_path: P
     assert env["BETA_TRACING_ENDPOINT"].endswith("/v2/trace/otlp")
 
 
-def test_disable_detailed_traces_omits_beta_vars(tmp_path: Path) -> None:
+def test_detailed_traces_require_content_capture_acceptance(tmp_path: Path) -> None:
+    result = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--enable-detailed-traces",
+        "--disable-galileo",
+        "--output-dir",
+        str(tmp_path / "detailed-without-consent"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "content-bearing span attributes" in result.stdout + result.stderr
+
+
+def test_detailed_traces_default_off_omits_beta_vars(tmp_path: Path) -> None:
     out = tmp_path / "no-detailed"
     run_claude(
         "--render", "--destination", "local-collector",
         "--realm", "us1", "--galileo-project", "coding-agents",
-        "--disable-detailed-traces",
         "--output-dir", str(out),
     )
     env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
     assert "ENABLE_BETA_TRACING_DETAILED" not in env
     assert "BETA_TRACING_ENDPOINT" not in env
-    # Base traces beta remains on.
+    # Base traces beta remains on and emits current llm_request/tool spans.
     assert env["OTEL_TRACES_EXPORTER"] == "otlp"
 
 
@@ -234,11 +391,26 @@ def test_merge_strips_stale_beta_tracing_endpoint(tmp_path: Path) -> None:
     source = next((out / "settings").glob("*.json"))
     cc_o11y.merge_settings_file(source, target)
     merged = json.loads(target.read_text(encoding="utf-8"))["env"]
-    # Stale managed value replaced by the new trace endpoint, not the old host.
-    assert "old-endpoint.example.com" not in merged.get("BETA_TRACING_ENDPOINT", "")
-    assert merged["BETA_TRACING_ENDPOINT"].endswith("/v2/trace/otlp")
+    # Detailed tracing defaults off, so stale managed values are removed.
+    assert "ENABLE_BETA_TRACING_DETAILED" not in merged
+    assert "BETA_TRACING_ENDPOINT" not in merged
     # Unmanaged key preserved.
     assert merged["MY_CUSTOM_KEY"] == "keep-me"
+
+
+def test_disable_detailed_traces_omits_beta_vars(tmp_path: Path) -> None:
+    out = tmp_path / "no-detailed"
+    run_claude(
+        "--render", "--destination", "local-collector",
+        "--realm", "us1", "--galileo-project", "coding-agents",
+        "--disable-detailed-traces",
+        "--output-dir", str(out),
+    )
+    env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
+    assert "ENABLE_BETA_TRACING_DETAILED" not in env
+    assert "BETA_TRACING_ENDPOINT" not in env
+    # Base traces beta remains on.
+    assert env["OTEL_TRACES_EXPORTER"] == "otlp"
 
 
 def test_local_collector_custom_endpoint(tmp_path: Path) -> None:
@@ -273,7 +445,7 @@ def test_local_collector_without_galileo_omits_galileo_exporter(tmp_path: Path) 
         str(out),
     )
     overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
-    assert "otlphttp/galileo" not in overlay
+    assert "otlp_http/galileo" not in overlay
     assert "GALILEO" not in overlay
 
 
@@ -665,6 +837,8 @@ def test_galileo_console_url_derives_api_endpoint() -> None:
     assert cc_o11y.galileo_endpoint_from_console("https://console.galileo.ai") == "https://api.galileo.ai/otel/traces"
     assert cc_o11y.galileo_endpoint_from_console("https://console.galileo.example.com") == "https://api.galileo.example.com/otel/traces"
     assert cc_o11y.galileo_endpoint_from_console("https://console.demo-v2.galileocloud.io/") == "https://api.demo-v2.galileocloud.io/otel/traces"
+    assert cc_o11y.galileo_endpoint_from_console("https://app.galileo.ai/") == "https://api.galileo.ai/otel/traces"
+    assert cc_o11y.galileo_endpoint_from_console("https://console-galileo.apps.mycompany.com") == "https://api-galileo.apps.mycompany.com/otel/traces"
     # an api.<tenant> host is already correct and passes through
     assert cc_o11y.galileo_endpoint_from_console("https://api.demo-v2.galileocloud.io") == "https://api.demo-v2.galileocloud.io/otel/traces"
 
@@ -675,12 +849,31 @@ def test_galileo_console_url_rejects_ambiguous_host() -> None:
     import pytest
 
     for bad in (
-        "https://app.galileo.ai/",
-        "https://console-galileo.apps.mycompany.com",
         "https://galileo.mycompany.com/",
+        "https://console.galileo.example.com/a/path",
+        "https://console.galileo.example.com/?token=not-allowed",
     ):
         with pytest.raises(cc_o11y.UsageError):
             cc_o11y.galileo_endpoint_from_console(bad)
+
+
+def test_galileo_enabled_requires_explicit_instance_url(tmp_path: Path) -> None:
+    result = run_cmd(
+        "bash",
+        str(CLAUDE),
+        "--render",
+        "--destination",
+        "local-collector",
+        "--galileo-project",
+        "proj",
+        "--output-dir",
+        str(tmp_path / "missing-instance"),
+        check=False,
+    )
+    assert result.returncode != 0
+    combined = result.stdout + result.stderr
+    assert "user's instance URL" in combined
+    assert "do not assume the public tenant" in combined
 
 
 def test_galileo_console_url_cli_overrides_endpoint(tmp_path: Path) -> None:
@@ -1073,12 +1266,298 @@ def test_validate_fails_when_galileo_pipeline_dropped(tmp_path: Path) -> None:
                "--galileo-project", "proj", "--output-dir", str(out))
     overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
     text = overlay.read_text(encoding="utf-8")
-    # Remove galileo from the traces pipeline exporters list but leave it defined.
-    text = text.replace("[otlphttp/claude_code_traces, otlphttp/galileo]", "[otlphttp/claude_code_traces]")
+    # Remove galileo from the Galileo traces pipeline exporters list but leave it defined.
+    text = text.replace("exporters: [otlp_http/galileo]", "exporters: []")
     overlay.write_text(text, encoding="utf-8")
     result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
     assert result.returncode != 0
-    assert "otlphttp/galileo" in result.stderr
+    assert "otlp_http/galileo" in result.stderr
+
+
+def test_validate_fails_when_galileo_filter_removed(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        "processors: [resource/claude_code, transform/claude_code_genai, transform/claude_code_galileo, filter/claude_code_galileo_genai, batch/claude_code]",
+        "processors: [resource/claude_code, transform/claude_code_genai, transform/claude_code_galileo, batch/claude_code]",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "filter/claude_code_galileo_genai" in result.stderr
+
+
+def test_validate_fails_when_galileo_content_transform_removed(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        "processors: [resource/claude_code, transform/claude_code_genai, transform/claude_code_galileo, filter/claude_code_galileo_genai, batch/claude_code]",
+        "processors: [resource/claude_code, transform/claude_code_genai, filter/claude_code_galileo_genai, batch/claude_code]",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "transform/claude_code_galileo" in result.stderr
+
+
+def test_validate_fails_when_galileo_dynamic_tool_mapping_removed(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = "\n".join(
+        line
+        for line in text.splitlines()
+        if 'merge_maps(span.attributes, span.cache["claude_tools"]' not in line
+    ) + "\n"
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "merge_maps" in result.stderr
+
+
+def test_validate_fails_on_resource_only_shared_trace_route(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        "\nexporters:\n",
+        """
+connectors:
+  routing:
+    default_pipelines: [traces/default]
+    error_mode: ignore
+    table:
+      - context: resource
+        condition: 'attributes["data.source"] == "claude-code"'
+        pipelines: [traces/claude_code]
+
+exporters:
+""",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "context: span route" in result.stderr
+
+
+def test_validate_fails_on_resource_only_shared_metric_route(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        "\nexporters:\n",
+        """
+connectors:
+  routing/metrics:
+    default_pipelines: [metrics/default]
+    error_mode: ignore
+    table:
+      - context: resource
+        condition: 'attributes["service.name"] == "claude-code"'
+        pipelines: [metrics/claude_code]
+
+exporters:
+""",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "context: metric or context: datapoint" in result.stderr
+
+
+def test_validate_fails_when_genai_transform_removed_from_trace_pipeline(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        "processors: [resource/claude_code, transform/claude_code_genai, batch/claude_code]",
+        "processors: [resource/claude_code, batch/claude_code]",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must run transform/claude_code_genai" in result.stderr
+
+
+def test_validate_fails_when_native_token_genai_metric_pipeline_dropped(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        """    metrics/claude_code_token_genai:
+      receivers: [otlp/claude_code]
+      processors: [resource/claude_code, filter/claude_code_token_metrics, transform/claude_code_token_metric_genai, cumulativetodelta/claude_code_tokens, batch/claude_code]
+      exporters: [signal_to_metrics/claude_code_token_histogram]
+""",
+        "",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "metrics/claude_code_token_genai" in result.stderr
+
+
+def test_validate_fails_when_native_token_histogram_connector_is_unreachable(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        """    metrics/claude_code_token_genai:
+      receivers: [otlp/claude_code]
+      processors: [resource/claude_code, filter/claude_code_token_metrics, transform/claude_code_token_metric_genai, cumulativetodelta/claude_code_tokens, batch/claude_code]
+      exporters: [signal_to_metrics/claude_code_token_histogram]
+""",
+        """    metrics/claude_code_token_genai:
+      receivers: [otlp/claude_code]
+      processors: [resource/claude_code, filter/claude_code_token_metrics, transform/claude_code_token_metric_genai, cumulativetodelta/claude_code_tokens, batch/claude_code]
+      exporters: [signalfx/claude_code]
+""",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "metrics/claude_code_token_genai pipeline must export to signal_to_metrics/claude_code_token_histogram" in result.stderr
+
+
+def test_validate_fails_when_token_histogram_output_pipeline_dropped(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        """    metrics/claude_code_token_histogram:
+      receivers: [signal_to_metrics/claude_code_token_histogram]
+      processors: [batch/claude_code]
+      exporters: [otlp_http/claude_code_metrics]
+""",
+        "",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "no metrics/claude_code_token_histogram pipeline" in result.stderr
+
+
+def test_validate_fails_when_token_delta_processor_is_not_reachable(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8").replace(
+        "transform/claude_code_token_metric_genai, cumulativetodelta/claude_code_tokens, batch/claude_code",
+        "transform/claude_code_token_metric_genai, batch/claude_code",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must run cumulativetodelta/claude_code_tokens" in result.stderr
+
+
+def test_validate_fails_when_token_counter_is_exported_directly(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8").replace(
+        "exporters: [signal_to_metrics/claude_code_token_histogram]",
+        "exporters: [signal_to_metrics/claude_code_token_histogram, otlp_http/claude_code_metrics]",
+        1,
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must not export the counter directly" in result.stderr
+
+
+def test_validate_fails_when_token_histogram_shape_is_wrong(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace('        unit: "{token}"\n', '        unit: "1"\n', 1)
+    text = text.replace(
+        ", 4194304, 16777216, 67108864]",
+        "]",
+        1,
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "token histogram" in result.stderr or "unit {token}" in result.stderr
+
+
+def test_validate_rejects_sum_connector_for_genai_token_usage(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8").replace(
+        "connectors:\n",
+        """connectors:
+  sum/claude_code_input_tokens:
+    spans:
+      gen_ai.client.token.usage:
+        source_attribute: gen_ai.usage.input_tokens
+""",
+        1,
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must not be exported by a sum connector" in result.stderr
+
+
+def test_validate_fails_when_genai_duration_histogram_pipeline_dropped(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace(
+        """    metrics/claude_code_genai_duration:
+      receivers: [span_metrics/claude_code_genai]
+      processors: [batch/claude_code]
+      exporters: [otlp_http/claude_code_metrics]
+""",
+        "",
+    )
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "metrics/claude_code_genai_duration" in result.stderr
+
+
+def test_validate_fails_when_genai_duration_histogram_uses_milliseconds(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    run_claude("--render", "--destination", "local-collector", "--realm", "us1",
+               "--galileo-project", "proj", "--output-dir", str(out))
+    overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    text = text.replace("      unit: s\n", "      unit: ms\n", 1)
+    overlay.write_text(text, encoding="utf-8")
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "histogram must use unit s" in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -1094,12 +1573,46 @@ def test_invalid_realm_rejected(tmp_path: Path) -> None:
     assert "realm must be lowercase alphanumeric" in result.stdout + result.stderr
 
 
+def test_long_galileo_identifiers_allowed_but_credentials_rejected(tmp_path: Path) -> None:
+    out = tmp_path / "long-id"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--realm",
+        "us1",
+        "--galileo-project",
+        "01234567-89ab-cdef-0123-456789abcdef",
+        "--galileo-log-stream",
+        "project-0123456789abcdefghijklmnop",
+        "--output-dir",
+        str(out),
+    )
+    assert json.loads((out / "metadata.json").read_text(encoding="utf-8"))["ok"] is True
+
+    result = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--realm",
+        "us1",
+        "--galileo-project",
+        "sk-test-0123456789abcdef",
+        "--output-dir",
+        str(tmp_path / "secret-like"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "galileo_project looks like credential material" in result.stdout + result.stderr
+
+
 @pytest.mark.parametrize(
     "endpoint,needle",
     [
         ("http://api.galileo.ai/otel/traces", "must use https://"),
         ("https://api.galileo.ai/wrong/path", "must end with /otel/traces"),
         ("https://user:pass@api.galileo.ai/otel/traces", "must not include credentials"),
+        ("https://api.galileo.ai/otel/traces?api_key=secret", "must not include a query string"),
     ],
 )
 def test_malformed_galileo_endpoint_rejected(tmp_path: Path, endpoint, needle) -> None:
@@ -1181,6 +1694,33 @@ def test_external_collector_tls_env_emission(tmp_path: Path) -> None:
         str(out),
     )
     env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
+    assert env["NODE_EXTRA_CA_CERTS"] == "/etc/otel/ca.pem"
+    assert env["CLAUDE_CODE_CLIENT_CERT"] == "/etc/otel/client.pem"
+    assert env["CLAUDE_CODE_CLIENT_KEY"] == "/etc/otel/client.key"
+    assert "OTEL_EXPORTER_OTLP_CERTIFICATE" not in env
+
+
+def test_external_collector_grpc_uses_standard_otel_tls_env(tmp_path: Path) -> None:
+    out = tmp_path / "ext-grpc-tls"
+    run_claude(
+        "--render",
+        "--destination",
+        "external-collector",
+        "--external-collector-endpoint",
+        "https://gw.example.com:4317",
+        "--external-collector-protocol",
+        "grpc",
+        "--external-ca-certificate",
+        "/etc/otel/ca.pem",
+        "--external-client-certificate",
+        "/etc/otel/client.pem",
+        "--external-client-private-key",
+        "/etc/otel/client.key",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
     assert env["OTEL_EXPORTER_OTLP_CERTIFICATE"] == "/etc/otel/ca.pem"
     assert env["OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"] == "/etc/otel/client.pem"
     assert env["OTEL_EXPORTER_OTLP_CLIENT_KEY"] == "/etc/otel/client.key"
@@ -1233,7 +1773,9 @@ def _spec(tmp_path: Path, **cc) -> Path:
     base = {
         "api_version": "splunk-observability-claude-code-instrumentation-setup/v1",
         "claude_code": {"realm": "us1", "destination": "local-collector",
-                        "galileo_project": "proj", **cc},
+                        "galileo_project": "proj",
+                        "galileo_console_url": PUBLIC_GALILEO_CONSOLE,
+                        **cc},
     }
     p = tmp_path / "spec.json"
     p.write_text(json.dumps(base), encoding="utf-8")
@@ -1263,6 +1805,22 @@ def test_tool_content_without_traces_warns(tmp_path: Path) -> None:
                "--output-dir", str(tmp_path / "o"))
     meta = json.loads((tmp_path / "o" / "metadata.json").read_text(encoding="utf-8"))
     assert any("tool content is only attached to spans" in w for w in meta.get("warnings", []))
+
+
+def test_prompt_only_capture_explicitly_keeps_assistant_responses_redacted(tmp_path: Path) -> None:
+    spec = _spec(tmp_path, log_user_prompts=True, log_assistant_responses=False)
+    out = tmp_path / "prompt-only"
+    run_claude(
+        "--render",
+        "--spec",
+        str(spec),
+        "--accept-content-capture",
+        "--output-dir",
+        str(out),
+    )
+    env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
+    assert env["OTEL_LOG_USER_PROMPTS"] == "1"
+    assert env["OTEL_LOG_ASSISTANT_RESPONSES"] == "0"
 
 
 # ---------------------------------------------------------------------------
@@ -1331,3 +1889,296 @@ def test_apply_env_helper_managed_splunk_direct_skips_same_file_helper(
     helper = out / "bin" / "claude-code-otel-headers.sh"
     assert helper.is_file()
     assert helper.stat().st_mode & stat.S_IXUSR
+
+
+# ---------------------------------------------------------------------------
+# Deep-review regressions: portability, auth, and live shared collectors
+# ---------------------------------------------------------------------------
+
+
+def test_docker_receiver_bind_is_independent_from_claude_client_endpoint(tmp_path: Path) -> None:
+    out = tmp_path / "docker-bind"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--local-collector-endpoint",
+        "http://127.0.0.1:14318",
+        "--collector-receiver-endpoint",
+        "0.0.0.0:4318",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    settings = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))
+    assert settings["env"]["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://127.0.0.1:14318"
+    overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert 'endpoint: "0.0.0.0:4318"' in overlay
+
+
+def test_model_aliases_are_explicit_and_apply_to_spans_and_metrics(tmp_path: Path) -> None:
+    out = tmp_path / "model-alias"
+    source = "arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/profile-123"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--model-alias",
+        f"{source}=claude-sonnet-4-6",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert overlay.count(source) == 2
+    assert overlay.count('set(span.attributes["gen_ai.request.model"], "claude-sonnet-4-6")') == 1
+    assert overlay.count('set(datapoint.attributes["gen_ai.request.model"], "claude-sonnet-4-6")') == 1
+
+
+def test_external_http_secret_header_uses_dynamic_helper(tmp_path: Path) -> None:
+    out = tmp_path / "external-helper"
+    run_claude(
+        "--render",
+        "--destination",
+        "external-collector",
+        "--external-collector-endpoint",
+        "https://gw.example.com:4318",
+        "--external-header",
+        "Authorization=${GATEWAY_AUTH}",
+        "--external-header",
+        "X-Scope-OrgID=tenant-a",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    settings = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))
+    assert "otelHeadersHelper" in settings
+    assert "OTEL_EXPORTER_OTLP_HEADERS" not in settings["env"]
+    helper = out / "bin" / "claude-code-otel-headers.sh"
+    helper_text = helper.read_text(encoding="utf-8")
+    assert "GATEWAY_AUTH" in helper_text
+    assert "runtime-secret-value" not in helper_text
+    env = dict(os.environ)
+    env["GATEWAY_AUTH"] = "runtime-secret-value"
+    result = subprocess.run(
+        [str(helper)], capture_output=True, text=True, check=True, env=env
+    )
+    assert json.loads(result.stdout) == {
+        "Authorization": "runtime-secret-value",
+        "X-Scope-OrgID": "tenant-a",
+    }
+
+
+def test_external_grpc_rejects_unexpanded_secret_header_placeholder(tmp_path: Path) -> None:
+    result = run_claude(
+        "--render",
+        "--destination",
+        "external-collector",
+        "--external-collector-endpoint",
+        "https://gw.example.com:4317",
+        "--external-collector-protocol",
+        "grpc",
+        "--external-header",
+        "Authorization=${GATEWAY_AUTH}",
+        "--disable-galileo",
+        "--output-dir",
+        str(tmp_path / "grpc-header"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "otelHeadersHelper does not apply to gRPC" in result.stdout + result.stderr
+
+
+def test_resource_attributes_are_encoded_and_keys_are_validated(tmp_path: Path) -> None:
+    out = tmp_path / "resource-attrs"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--resource-attribute",
+        "org.name=My Company",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    settings = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))
+    assert "org.name=My%20Company" in settings["env"]["OTEL_RESOURCE_ATTRIBUTES"]
+
+    bad = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--resource-attribute",
+        "bad,key=value",
+        "--disable-galileo",
+        "--output-dir",
+        str(tmp_path / "bad-resource-key"),
+        check=False,
+    )
+    assert bad.returncode != 0
+    assert "resource attribute key" in bad.stdout + bad.stderr
+
+
+def test_raw_api_body_capture_is_gated_and_rendered(tmp_path: Path) -> None:
+    rejected = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--log-raw-api-bodies",
+        "--disable-galileo",
+        "--output-dir",
+        str(tmp_path / "raw-rejected"),
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "accept-content-capture" in rejected.stdout + rejected.stderr
+
+    out = tmp_path / "raw-accepted"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--log-raw-api-bodies",
+        "file:/tmp/claude-raw-api-bodies",
+        "--accept-content-capture",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    settings = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))
+    assert settings["env"]["OTEL_LOG_RAW_API_BODIES"] == "file:/tmp/claude-raw-api-bodies"
+
+
+def test_settings_merge_creates_backup_and_preserves_operator_helper(tmp_path: Path) -> None:
+    out = tmp_path / "merge-review"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    target = tmp_path / "settings.json"
+    target.write_text(
+        json.dumps(
+            {
+                "_managedBy": cc_o11y.MANAGED_SETTINGS_MARKER,
+                "otelHeadersHelper": "/opt/company/custom-otel-headers",
+                "env": {"KEEP": "yes"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    source = next((out / "settings").glob("*.json"))
+    cc_o11y.merge_settings_file(source, target)
+    merged = json.loads(target.read_text(encoding="utf-8"))
+    assert merged["otelHeadersHelper"] == "/opt/company/custom-otel-headers"
+    backups = list(tmp_path.glob("settings.json.bak.*"))
+    assert len(backups) == 1
+    assert json.loads(backups[0].read_text(encoding="utf-8"))["env"]["KEEP"] == "yes"
+
+
+def test_validate_checks_shared_routing_reference_reachability(tmp_path: Path) -> None:
+    out = tmp_path / "shared-reference"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    routing = out / "runtime" / "shared-collector-routing.md"
+    routing.write_text(
+        routing.read_text(encoding="utf-8").replace(
+            "processors: [resource/claude_code, transform/claude_code_genai, batch]",
+            "processors: [resource/claude_code, batch]",
+        ),
+        encoding="utf-8",
+    )
+    result = run_cmd(
+        "bash",
+        str(CLAUDE_VALIDATE),
+        "--output-dir",
+        str(out),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "make transform/claude_code_genai reachable" in result.stderr
+
+
+def test_validate_accepts_and_checks_deployed_collector_config(tmp_path: Path) -> None:
+    out = tmp_path / "deployed-config"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    rendered_overlay = out / "collector" / "claude-code-o11y-local-collector.yaml"
+    result = run_cmd(
+        "bash",
+        str(CLAUDE_VALIDATE),
+        "--output-dir",
+        str(out),
+        "--collector-config",
+        str(rendered_overlay),
+    )
+    assert result.returncode == 0
+
+    broken = tmp_path / "broken-collector.yaml"
+    broken.write_text(
+        rendered_overlay.read_text(encoding="utf-8").replace(
+            "resource/claude_code, transform/claude_code_genai, batch/claude_code",
+            "resource/claude_code, batch/claude_code",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    failed = run_cmd(
+        "bash",
+        str(CLAUDE_VALIDATE),
+        "--output-dir",
+        str(out),
+        "--collector-config",
+        str(broken),
+        check=False,
+    )
+    assert failed.returncode != 0
+    assert "collector config" in failed.stderr
+    assert "must run transform/claude_code_genai" in failed.stderr
+
+
+def test_unknown_spec_field_and_invalid_intervals_fail_closed(tmp_path: Path) -> None:
+    spec = tmp_path / "bad-spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "api_version": cc_o11y.API_VERSION,
+                "claude_code": {"metric_export_interval_milliseconds": 1000},
+            }
+        ),
+        encoding="utf-8",
+    )
+    unknown = run_claude(
+        "--render", "--spec", str(spec), "--output-dir", str(tmp_path / "unknown"), check=False
+    )
+    assert unknown.returncode != 0
+    assert "unknown claude_code spec field" in unknown.stdout + unknown.stderr
+
+    invalid = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--metric-export-interval-ms",
+        "0",
+        "--disable-galileo",
+        "--output-dir",
+        str(tmp_path / "interval"),
+        check=False,
+    )
+    assert invalid.returncode != 0
+    assert "metric_export_interval_ms must be a positive integer" in invalid.stdout + invalid.stderr

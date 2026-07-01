@@ -13,13 +13,14 @@ PASS=0
 WARN=0
 FAIL=0
 SK=""
+COMPLETION=false
 
 EXPECT_CONFIGURED=""
 EXPECT_ONBOARDED=""
 EXPECT_PROXY_ENABLED=""
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 info() { log "  INFO: $*"; }
 
@@ -40,6 +41,7 @@ Checks:
   - Enterprise onboarding and proxy state
 
 Optional assertions:
+  --completion
   --expect-configured true|false
   --expect-onboarded true|false
   --expect-proxy-enabled true|false
@@ -285,6 +287,7 @@ while [[ $# -gt 0 ]]; do
         --expect-configured) require_arg "$1" $# || exit 1; EXPECT_CONFIGURED="$(normalize_boolean "$2")"; shift 2 ;;
         --expect-onboarded) require_arg "$1" $# || exit 1; EXPECT_ONBOARDED="$(normalize_boolean "$2")"; shift 2 ;;
         --expect-proxy-enabled) require_arg "$1" $# || exit 1; EXPECT_PROXY_ENABLED="$(normalize_boolean "$2")"; shift 2 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -293,7 +296,7 @@ done
 log "=== Splunk AI Assistant Validation ==="
 log ""
 
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! ensure_session; then

@@ -33,8 +33,8 @@ API action plans for surfaces with documented public APIs.
 Every rendered item gets a coverage status:
 
 - `api_apply`: a documented public Observability API can create or update the
-  object. This skill renders the action plan; run live apply only through the
-  specific owning skill or an approved apply client.
+  object. This skill renders the action plan and can execute it with `--apply`
+  through the shared native Observability API client.
 - `api_validate`: a documented public API can read, validate, or download data
   for the workflow.
 - `delegated_apply`: another repo skill owns the apply path.
@@ -57,9 +57,8 @@ for that exact action.
   Platform credentials in conversation.
 - Never pass tokens or passwords on the command line or as environment-variable
   prefixes.
-- This skill does not need token files for rendering. If a downstream owning
-  skill applies an API plan, use that skill's `--token-file` or file-backed
-  credential flags.
+- This skill does not need token files for rendering. Live `--apply` requires
+  `--token-file`; downstream owning skills use their own file-backed flags.
 - Reject inline secret fields such as `token`, `api_token`, `access_token`,
   `password`, `client_secret`, `secret`, and direct `*_token` values. Use
   file-reference fields in downstream specs instead.
@@ -116,7 +115,19 @@ for that exact action.
    - `payloads/` for SLO API payloads, modern dashboard intents, DB query
      investigation intents, Synthetic artifact intents, and RUM replay checks.
 
-5. Apply only through the owning skill or approved apply client:
+5. For `api_apply` and `api_validate` actions in the rendered plan, dry-run or
+   apply directly:
+
+   ```bash
+   bash skills/splunk-observability-deep-native-workflows/scripts/setup.sh \
+     --apply --dry-run --spec my-deep-native-workflows.yaml
+
+   bash skills/splunk-observability-deep-native-workflows/scripts/setup.sh \
+     --apply --spec my-deep-native-workflows.yaml \
+     --token-file /path/to/chmod-600-o11y-token
+   ```
+
+6. Use the owning skill for delegated surfaces:
    - Classic dashboards -> `splunk-observability-dashboard-builder`.
    - Detectors, teams, muting rules, Synthetics tests -> `splunk-observability-native-ops`.
    - Browser RUM instrumentation -> `splunk-observability-k8s-frontend-rum-setup`.

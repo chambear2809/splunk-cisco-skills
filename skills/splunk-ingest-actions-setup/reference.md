@@ -42,7 +42,8 @@ Based on current Splunk Ingest Actions documentation (verified 2026):
   is authored in the Ingest Actions UI or via `/services/data/ingest/rulesets`;
   this skill does not hand-author the internal RFS routing transform (it is not
   a publicly specified hand-editable form, and `_TCP_ROUTING` is for S2S/tcpout,
-  not RFS).
+  not RFS). Apply therefore exits nonzero after staging the destination and
+  printing the handoff; success requires the rule to be authored and verified.
 
 ## Secrets
 

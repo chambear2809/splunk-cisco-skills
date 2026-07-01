@@ -6,9 +6,10 @@ import os
 import ssl
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from .common import ValidationError, bool_from_any
@@ -21,6 +22,7 @@ class ClientConfig:
     username: str | None
     password: str | None
     session_key: str | None
+    ca_cert_file: str | None = None
 
 
 class SplunkRestClient:
@@ -37,6 +39,8 @@ class SplunkRestClient:
         }
         if not config.verify_ssl:
             self._ssl_context = ssl._create_unverified_context()
+        elif config.ca_cert_file:
+            self._ssl_context = ssl.create_default_context(cafile=config.ca_cert_file)
 
     @classmethod
     def from_spec(cls, spec: dict[str, Any]) -> "SplunkRestClient":
@@ -44,10 +48,43 @@ class SplunkRestClient:
         base_url = str(connection.get("base_url") or os.environ.get("SPLUNK_SEARCH_API_URI") or os.environ.get("SPLUNK_URI") or "").strip()
         if not base_url:
             raise ValidationError("Missing Splunk base URL. Set connection.base_url or SPLUNK_SEARCH_API_URI.")
+        if any(character.isspace() for character in base_url):
+            raise ValidationError("Splunk base URL must not contain whitespace.")
+        try:
+            parsed_url = urlsplit(base_url)
+        except ValueError as exc:
+            raise ValidationError(f"Splunk base URL is invalid: {exc}") from exc
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+            raise ValidationError("Splunk base URL must be an http(s) origin URL.")
+        if parsed_url.scheme != "https" and not bool_from_any(
+            connection.get("allow_insecure_http"), default=False
+        ):
+            raise ValidationError(
+                "Splunk base URL must use https. Set connection.allow_insecure_http=true "
+                "only for an explicitly accepted short-lived lab endpoint."
+            )
+        if parsed_url.username or parsed_url.password:
+            raise ValidationError("Splunk base URL must not contain inline credentials.")
+        if parsed_url.path not in {"", "/"} or parsed_url.query or parsed_url.fragment:
+            raise ValidationError("Splunk base URL must not contain a path, query, or fragment.")
+        try:
+            parsed_url.port
+        except ValueError as exc:
+            raise ValidationError(f"Splunk base URL has an invalid port: {exc}") from exc
         verify_ssl_source = connection.get("verify_ssl")
         if verify_ssl_source is None:
             verify_ssl_source = os.environ.get("SPLUNK_VERIFY_SSL")
         verify_ssl = bool_from_any(verify_ssl_source, default=True)
+        ca_cert_file = str(
+            connection.get("ca_cert_file") or os.environ.get("SPLUNK_CA_CERT") or ""
+        ).strip()
+        if ca_cert_file:
+            ca_path = Path(ca_cert_file).expanduser()
+            if not ca_path.is_file() or not os.access(ca_path, os.R_OK):
+                raise ValidationError(
+                    f"Splunk CA bundle is not a readable file: {ca_path}"
+                )
+            ca_cert_file = str(ca_path.resolve())
         session_key = cls._read_secret(connection.get("session_key_env"), "SPLUNK_SESSION_KEY")
         username = cls._read_secret(connection.get("username_env"), "SPLUNK_USERNAME")
         password = cls._read_secret(connection.get("password_env"), "SPLUNK_PASSWORD")
@@ -59,6 +96,7 @@ class SplunkRestClient:
             ClientConfig(
                 base_url=base_url.rstrip("/"),
                 verify_ssl=verify_ssl,
+                ca_cert_file=ca_cert_file or None,
                 username=username,
                 password=password,
                 session_key=session_key,

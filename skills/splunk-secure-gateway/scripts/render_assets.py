@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import shlex
 import stat
@@ -90,21 +91,31 @@ def render_connectivity(args: argparse.Namespace) -> str:
         f"""primary={primary}
 regional={regional}
 echo "== Spacebridge HTTPS health check (primary) =="
-curl -sS -m 15 "https://${{primary}}/health_check" && echo || echo "FAILED: https://${{primary}}/health_check"
+curl -fsS -m 15 "https://${{primary}}/health_check" >/dev/null
+echo "OK: https://${{primary}}/health_check"
 echo
 if [[ "${{regional}}" != "${{primary}}" ]]; then
   echo "== Spacebridge regional health check =="
-  curl -sS -m 15 "https://${{regional}}/health_check" && echo || echo "FAILED: https://${{regional}}/health_check"
+  curl -fsS -m 15 "https://${{regional}}/health_check" >/dev/null
+  echo "OK: https://${{regional}}/health_check"
   echo
 fi
 echo "== WebSocket upgrade test (outbound 443) =="
-curl -sS -m 15 -i -N \\
+headers="$(mktemp)"
+trap 'rm -f "${{headers}}"' EXIT
+curl_rc=0
+curl -sS -m 15 -D "${{headers}}" -o /dev/null -N \\
   -H "Connection: Upgrade" \\
   -H "Upgrade: websocket" \\
   -H "Host: ${{primary}}" \\
   -H "Origin: https://${{primary}}" \\
-  "https://${{primary}}/mobile" | head -1 \\
-  || echo "FAILED: WebSocket upgrade to https://${{primary}}/mobile"
+  "https://${{primary}}/mobile" || curl_rc=$?
+status="$(awk 'toupper($1) ~ /^HTTP\\// {{code=$2}} END {{print code}}' "${{headers}}")"
+if [[ "${{status}}" != "101" ]]; then
+  echo "FAILED: WebSocket upgrade returned HTTP ${{status:-none}} (curl rc=${{curl_rc}})." >&2
+  exit 1
+fi
+echo "OK: WebSocket upgrade returned HTTP 101."
 echo
 echo "Required: outbound 443 to ${{primary}} (no inbound ports)."
 echo "If a proxy does SSL decryption, it must support WebSockets or exempt ${{primary}}."
@@ -120,13 +131,12 @@ def render_enable(args: argparse.Namespace) -> str:
         else ""
     )
     enable_block = (
-        ""
+        'echo "HANDOFF: Splunk Cloud Secure Gateway app state is Splunk-managed; no operator mutation was made." >&2\nexit 2\n'
         if args.platform == "cloud"
         else (
             'echo "== enable splunk_secure_gateway =="\n'
-            '"${splunk}" display app splunk_secure_gateway 2>/dev/null || true\n'
-            '"${splunk}" enable app splunk_secure_gateway 2>/dev/null '
-            '|| echo "Could not enable via CLI; enable in Settings > Apps if needed."\n'
+            '"${splunk}" display app splunk_secure_gateway\n'
+            '"${splunk}" enable app splunk_secure_gateway\n'
         )
     )
     return make_script(
@@ -134,7 +144,7 @@ def render_enable(args: argparse.Namespace) -> str:
 {cloud_note}{enable_block}echo
 echo "== token (JWT) authentication readiness =="
 "${{splunk}}" search '| rest splunk_server=local /services/admin/token-auth/tokens_auth | table title disabled' -maxout 0 2>/dev/null \\
-  || echo "Could not read token-auth state; verify Settings > Tokens is enabled."
+  || {{ echo "ERROR: could not read token-auth state; verify Settings > Tokens is enabled." >&2; exit 1; }}
 echo
 echo "Token authentication MUST be enabled for Connected Experiences/registration."
 echo "Enable it in Settings > Tokens (or via authorize.conf / REST) before registering devices."
@@ -166,6 +176,8 @@ Deployment name shown to users: "${{deployment_name}}"
 Note: changing a user's Splunk credentials unregisters their device; they must
 re-register. For fleet rollout, use MDM (see mdm-appconfig.xml).
 EOF
+echo "HANDOFF: device registration is interactive; no device was registered." >&2
+exit 2
 """
     )
 
@@ -177,6 +189,7 @@ def render_mdm(args: argparse.Namespace) -> str:
             "<!-- Rendered by splunk-secure-gateway. MDM not requested (--mdm false). -->\n"
             "<!-- Set --mdm true to render a Managed App Configuration template. -->\n"
         )
+    deployment_name = html.escape(args.deployment_name, quote=True)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Rendered by splunk-secure-gateway. Managed App Configuration (AppConfig) TEMPLATE
@@ -191,7 +204,7 @@ def render_mdm(args: argparse.Namespace) -> str:
   <dict>
     <!-- Friendly deployment name shown in the app. -->
     <string keyName="deploymentName">
-      <defaultValue><value>{args.deployment_name}</value></defaultValue>
+      <defaultValue><value>{deployment_name}</value></defaultValue>
     </string>
     <!-- Spacebridge region (leave blank for default global relay). -->
     <string keyName="spacebridgeRegion">
@@ -214,14 +227,15 @@ def render_status(args: argparse.Namespace) -> str:
 primary={primary}
 echo "== splunk_secure_gateway app state =="
 "${{splunk}}" search '| rest splunk_server=local /services/apps/local/splunk_secure_gateway | table title disabled version' -maxout 0 2>/dev/null \\
-  || echo "Could not read app state."
+  || {{ echo "ERROR: could not read app state." >&2; exit 1; }}
 echo
 echo "== token-auth state =="
 "${{splunk}}" search '| rest splunk_server=local /services/admin/token-auth/tokens_auth | table title disabled' -maxout 0 2>/dev/null \\
-  || echo "Could not read token-auth state."
+  || {{ echo "ERROR: could not read token-auth state." >&2; exit 1; }}
 echo
 echo "== Spacebridge connectivity =="
-curl -sS -m 15 "https://${{primary}}/health_check" && echo || echo "FAILED: https://${{primary}}/health_check"
+curl -fsS -m 15 "https://${{primary}}/health_check" >/dev/null
+echo "OK: https://${{primary}}/health_check"
 """
     )
 

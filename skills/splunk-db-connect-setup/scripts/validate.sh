@@ -105,13 +105,15 @@ for script in \
 done
 
 # shellcheck disable=SC2016 # literal $7$ marker is intentional.
-if grep -R -n -E '(\$7\$|password *= *[^<[:space:]]|secret *= *[^<[:space:]]|token *= *[^<[:space:]])' "${ROOT}" >/tmp/splunk_db_connect_secret_scan.$$ 2>/dev/null; then
-    cat /tmp/splunk_db_connect_secret_scan.$$ >&2
-    rm -f /tmp/splunk_db_connect_secret_scan.$$
+scan_file="$(mktemp "${TMPDIR:-/tmp}/splunk-db-connect-secret-scan.XXXXXX")"
+trap 'rm -f "${scan_file}"' EXIT
+if grep -r -n -E '(\$7\$|password *= *[^<[:space:]]|secret *= *[^<[:space:]]|token *= *[^<[:space:]])' "${ROOT}" >"${scan_file}" 2>/dev/null; then
+    cat "${scan_file}" >&2
     echo "ERROR: Rendered output appears to contain secret material." >&2
     exit 1
 fi
-rm -f /tmp/splunk_db_connect_secret_scan.$$
+rm -f "${scan_file}"
+trap - EXIT
 
 if [[ "${LIVE}" == true ]]; then
     bash "${ROOT}/preflight.sh"

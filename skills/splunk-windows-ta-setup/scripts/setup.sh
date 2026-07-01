@@ -54,6 +54,8 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+validate_splunk_index_name "${EVENT_INDEX}" || exit 1
+validate_splunk_index_name "${PERFMON_INDEX}" || exit 1
 
 # Default action: render when nothing else was requested.
 if [[ "${INSTALL}" == "false" && "${CREATE_INDEX}" == "false" && "${RENDER}" == "false" ]]; then
@@ -94,6 +96,10 @@ create_indexes() {
 
 main() {
     warn_if_current_skill_role_unsupported
+    if [[ "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ]]; then
+        require_current_skill_role_supported
+    fi
+    [[ "${CREATE_INDEX}" == "true" ]] && require_index_management_target_role
     [[ "${INSTALL}" == "true" ]] && install_package
     [[ "${CREATE_INDEX}" == "true" ]] && create_indexes
     [[ "${RENDER}" == "true" ]] && run_render

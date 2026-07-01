@@ -77,6 +77,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ ! "${HEC_TOKEN_NAME}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+    log "ERROR: --hec-token-name contains unsupported characters."
+    exit 1
+fi
+if [[ -n "${RUNTIME}" && "${RUNTIME}" != "docker" && "${RUNTIME}" != "podman" ]]; then
+    log "ERROR: --runtime must be docker or podman."
+    exit 1
+fi
+if [[ ! "${NAMESPACE}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ || ! "${RELEASE_NAME}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]; then
+    log "ERROR: --namespace and --release-name must use lowercase Kubernetes/Helm name characters."
+    exit 1
+fi
+
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
@@ -160,7 +173,7 @@ validate_indexes() {
         if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
             pass "Index '${idx}' exists"
         else
-            warn "Index '${idx}' not found"
+            fail "Required SC4S index '${idx}' was not found or could not be queried"
         fi
     done
 
@@ -187,13 +200,13 @@ validate_indexes() {
 }
 
 validate_hec_token() {
-    local token_state token_record ack_state restricted_indexes default_index
+    local token_state token_record ack_state restricted_indexes default_index missing_indexes
     log "--- HEC Token ---"
     token_state="$(inspect_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
     case "${token_state}" in
         enabled) pass "HEC token '${HEC_TOKEN_NAME}' exists" ;;
         disabled) fail "HEC token '${HEC_TOKEN_NAME}' exists but is disabled" ;;
-        missing) warn "HEC token '${HEC_TOKEN_NAME}' not found" ;;
+        missing) fail "HEC token '${HEC_TOKEN_NAME}' not found" ;;
         *) warn "Could not determine HEC token '${HEC_TOKEN_NAME}' status" ;;
     esac
 
@@ -218,7 +231,18 @@ validate_hec_token() {
     esac
 
     if [[ -n "${restricted_indexes}" ]]; then
-        warn "HEC token '${HEC_TOKEN_NAME}' restricts Selected Indexes to: ${restricted_indexes}"
+        missing_indexes="$(python3 - "${restricted_indexes}" "${DEFAULT_INDEXES[@]}" <<'PY'
+import sys
+allowed = {item.strip() for item in sys.argv[1].split(",") if item.strip()}
+required = sys.argv[2:]
+print(",".join(item for item in required if "*" not in allowed and item not in allowed), end="")
+PY
+)"
+        if [[ -n "${missing_indexes}" ]]; then
+            fail "HEC token '${HEC_TOKEN_NAME}' Selected Indexes omit: ${missing_indexes}"
+        else
+            pass "HEC token '${HEC_TOKEN_NAME}' Selected Indexes include all required SC4S indexes"
+        fi
     fi
     if [[ -n "${default_index}" ]]; then
         if [[ "${default_index}" == "${EXPECTED_DEFAULT_INDEX}" ]]; then
@@ -233,8 +257,9 @@ validate_hec_token() {
 validate_startup_events() {
     local startup_count
     log "--- SC4S Startup Events ---"
-    startup_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=sc4s sourcetype=sc4s:events "starting up" | stats count as count' "count" 2>/dev/null || echo "0")"
-    if [[ "${startup_count}" =~ ^[0-9]+$ ]] && (( startup_count > 0 )); then
+    if ! startup_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=sc4s sourcetype=sc4s:events "starting up" | stats count as count' "count" 2>/dev/null)"; then
+        fail "Unable to run the SC4S startup-event validation search"
+    elif [[ "${startup_count}" =~ ^[0-9]+$ ]] && (( startup_count > 0 )); then
         pass "Splunk contains ${startup_count} SC4S startup event(s)"
     else
         warn "No SC4S startup events were found in Splunk yet"
@@ -379,7 +404,7 @@ except Exception:
     if [[ "${pod_summary##* }" =~ ^[0-9]+$ ]] && (( ${pod_summary##* } > 0 )); then
         pass "${pod_summary##* } SC4S pod(s) report Ready"
     else
-        warn "No SC4S pods report Ready yet"
+        fail "No SC4S pods report Ready"
     fi
     log ""
 }

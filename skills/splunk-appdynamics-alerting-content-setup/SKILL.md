@@ -1,7 +1,7 @@
 ---
 name: splunk-appdynamics-alerting-content-setup
 description: >-
-  Render, validate, and optionally apply Splunk AppDynamics alerting content,
+  Render and validate Splunk AppDynamics alerting content,
   including health rules, schedules, policies, actions, email digests, action
   suppression, anomaly detection, automated root cause analysis, import, export,
   rollback, AIML dynamic baselines, automated transaction diagnostics, and post-apply readback validation.
@@ -13,8 +13,9 @@ description: >-
 
 # Splunk AppDynamics Alerting Content Setup
 
-Renders alert content plans and rollback snapshots. API-backed objects can be
-applied where documented; unsupported UI-only content stays as runbooks.
+Renders alert content plans and rollback instructions. It does not create a
+snapshot or submit Controller changes; `--apply` and generic `--rollback` fail
+closed. Export, mutation, readback, and restore remain explicit operator steps.
 
 ```bash
 bash skills/splunk-appdynamics-alerting-content-setup/scripts/setup.sh --render

@@ -94,10 +94,13 @@ The rendered `validate.sh` does not directly probe federation auth
 validation:
 
 - `splunk list federated-search-config` on the consumer.
-- The "Test connection" REST call:
+- The "Test connection" REST call, using the repository's session-key helper:
   ```
-  curl -k -u admin:* \
-       "https://<provider>:8089/services/federated/connect/<provider_name>"
+  source skills/shared/lib/credential_helpers.sh
+  load_splunk_connection_settings
+  SK="$(get_session_key "${SPLUNK_SEARCH_API_URI}")"
+  splunk_curl "${SK}" --fail-with-body --show-error \
+    "${SPLUNK_SEARCH_API_URI}/services/federated/connect/<provider_name>"
   ```
 - Look for `_audit` events on the provider showing successful
   federation searches.

@@ -32,4 +32,6 @@ bash skills/widefield-google-secops-setup/scripts/validate.sh \
 ```
 
 Evidence should show the feed name, log type `WIDEFIELD_SECURITY`, parser
-visibility, and sample events.
+visibility, and sample events. Validation fails closed when `--evidence-file`
+is omitted, is not valid JSON, or does not contain `WIDEFIELD_SECURITY`.
+`--dry-run` is the only validation mode that does not require evidence.

@@ -1105,7 +1105,8 @@ cd "${{PROJECT_ROOT}}"
 def render_command_script(section: str, commands: list[list[str]]) -> str:
     lines = [script_header()]
     if not commands:
-        lines.append(f"echo {shell_quote('No commands selected for ' + section)}\n")
+        lines.append(f"echo {shell_quote('ERROR: no executable commands selected for ' + section)} >&2\n")
+        lines.append("exit 2\n")
         return "".join(lines)
     if section in {"domain-readiness", "cloud-control-studio", "ai-canvas"}:
         rel = {
@@ -1113,7 +1114,9 @@ def render_command_script(section: str, commands: list[list[str]]) -> str:
             "cloud-control-studio": "studio/mcp-connector-plan.md",
             "ai-canvas": "ai-canvas/board-templates",
         }[section]
-        lines.append(f"echo {shell_quote('Review rendered handoff artifacts: ')}\"${{OUTPUT_DIR}}/{rel}\"\n")
+        lines.append(f"echo {shell_quote('ERROR: this section is a rendered handoff, not an executed change.')} >&2\n")
+        lines.append(f"echo {shell_quote('Review rendered handoff artifacts: ')}\"${{OUTPUT_DIR}}/{rel}\" >&2\n")
+        lines.append("exit 2\n")
         return "".join(lines)
     for argv in commands:
         quoted = " ".join(shell_quote(part) for part in argv)
@@ -1132,6 +1135,14 @@ def render_scripts(output_dir: Path, commands: dict[str, list[list[str]]], selec
     selected_lines = [script_header(), "sections=(" + " ".join(shell_quote(s) for s in selected) + ")\n"]
     selected_lines.append(
         """for section in "${sections[@]}"; do
+  case "${section}" in
+    domain-readiness|cloud-control-studio|ai-canvas)
+      echo "ERROR: ${section} is handoff-only; refusing the mixed execution before any delegated mutation." >&2
+      exit 2
+      ;;
+  esac
+done
+for section in "${sections[@]}"; do
   "${SCRIPT_DIR}/execute-${section}.sh"
 done
 """

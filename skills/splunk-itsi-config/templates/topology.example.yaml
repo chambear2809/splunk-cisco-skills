@@ -1,7 +1,7 @@
 connection:
   base_url: https://splunk.example.com:8089
   session_key_env: SPLUNK_SESSION_KEY
-  verify_ssl: false
+  verify_ssl: true
   platform: enterprise
 
 itsi:

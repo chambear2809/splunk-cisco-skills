@@ -15,6 +15,7 @@ ACCOUNT=""
 ACCOUNT_GROUP=""
 INDEX=""
 INPUT_TYPE=""
+ALERT_RULES=""
 HEC_TOKEN=""
 HEC_URL=""
 PATHVIS_ENABLED=true
@@ -22,6 +23,7 @@ PATHVIS_INDEX="thousandeyes_pathvis"
 PATHVIS_INTERVAL="3600"
 SK=""
 INGEST_SK=""
+INPUT_SUFFIX=""
 
 usage() {
     cat >&2 <<EOF
@@ -37,6 +39,7 @@ Options:
   --account-group NAME    ThousandEyes account group name
   --index INDEX           Target index for polling inputs
   --input-type TYPE       Input group: all, metrics, traces, events, activity, alerts
+  --alert-rules IDS       Alert rule IDs joined with ~ (required for alerts/all)
   --hec-token NAME        HEC token name (default: thousandeyes)
   --hec-url URL           HEC URL override; may include /services/collector/event
   --pathvis-index INDEX   Path visualization index (default: thousandeyes_pathvis)
@@ -58,6 +61,7 @@ while [[ $# -gt 0 ]]; do
         --account-group) require_arg "$1" $# || exit 1; ACCOUNT_GROUP="$2"; shift 2 ;;
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
+        --alert-rules) require_arg "$1" $# || exit 1; ALERT_RULES="$2"; shift 2 ;;
         --hec-token) require_arg "$1" $# || exit 1; HEC_TOKEN="$2"; shift 2 ;;
         --hec-url) require_arg "$1" $# || exit 1; HEC_URL="$2"; shift 2 ;;
         --pathvis-index) require_arg "$1" $# || exit 1; PATHVIS_INDEX="$2"; shift 2 ;;
@@ -69,6 +73,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 HEC_TOKEN="${HEC_TOKEN:-${HEC_TOKEN_NAME}}"
+
+safe_input_suffix() {
+    python3 - "$1" <<'PY'
+import hashlib
+import re
+import sys
+
+raw = sys.argv[1]
+safe = re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
+safe = re.sub(r"_+", "_", safe)[:64] or "account"
+if safe != raw:
+    safe = f"{safe}_{hashlib.sha256(raw.encode()).hexdigest()[:8]}"
+print(safe, end="")
+PY
+}
 
 log_live_input_summary() {
     local total enabled disabled
@@ -111,18 +130,9 @@ check_prereqs() {
 
 ensure_app_visible() {
     ensure_search_api_session
-    local visible
-    visible=$(splunk_curl "${SK}" \
-        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
-        | python3 -c "
-import json, sys
-try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
-except: print('True')
-" 2>/dev/null || echo "True")
-    if [[ "${visible}" == "False" ]]; then
-        log "Setting ${APP_NAME} visible=true..."
-        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
-    fi
+    log "Ensuring ${APP_NAME} is visible..."
+    deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" \
+        || { log "ERROR: Failed to make ${APP_NAME} visible."; return 1; }
 }
 
 normalize_hec_base_url() {
@@ -279,15 +289,20 @@ cloud_create_hec_token_via_acs() {
 }
 
 rest_create_hec_token() {
-    local token_name="$1" indexes_str body resp hec_code
+    local token_name="$1" session_key="${2:-${INGEST_SK}}" rest_uri="${3:-${INGEST_SPLUNK_URI:-}}"
+    local indexes_str body resp hec_code
+    if [[ -z "${session_key}" || -z "${rest_uri}" ]]; then
+        log "ERROR: HEC REST creation requires a session key and REST URI."
+        return 1
+    fi
     indexes_str=$(IFS=,; echo "${DEFAULT_INDEXES[*]}")
     body=$(form_urlencode_pairs \
         name "${token_name}" \
         index "thousandeyes_metrics" \
         indexes "${indexes_str}" \
         disabled "false") || return 1
-    resp=$(splunk_curl_post "${INGEST_SK}" "${body}" \
-        "${INGEST_SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
+    resp=$(splunk_curl_post "${session_key}" "${body}" \
+        "${rest_uri}/services/data/inputs/http?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)
     hec_code=$(echo "${resp}" | tail -1)
     case "${hec_code}" in
@@ -332,7 +347,7 @@ ensure_hec_token() {
         esac
 
         log "  Creating HEC token '${token_name}' via REST..."
-        if rest_create_hec_token "${token_name}"; then
+        if rest_create_hec_token "${token_name}" "${SK}" "${SPLUNK_URI}"; then
             state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown")"
             case "${state}" in
                 enabled|disabled)
@@ -417,7 +432,7 @@ enable_metrics_inputs() {
         log "  Path visualization enabled (index=${PATHVIS_INDEX}, interval=${PATHVIS_INTERVAL}s)."
     fi
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "test_metrics_stream" "metrics_${account}" "${body}"
+        "test_metrics_stream" "metrics_${INPUT_SUFFIX}" "${body}"
     log "  Metrics stream input enabled."
 }
 
@@ -436,7 +451,7 @@ enable_traces_inputs() {
         hec_token "${hec_token}" \
         test_index "thousandeyes_traces")
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "test_traces_stream" "traces_${account}" "${body}"
+        "test_traces_stream" "traces_${INPUT_SUFFIX}" "${body}"
     log "  Traces stream input enabled."
 }
 
@@ -453,7 +468,7 @@ enable_events_inputs() {
         index "${idx}" \
         interval "3600")
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "event" "events_${account}" "${body}"
+        "event" "events_${INPUT_SUFFIX}" "${body}"
     log "  Events polling input enabled (interval: 3600s)."
 }
 
@@ -472,7 +487,7 @@ enable_activity_inputs() {
         hec_token "${hec_token}" \
         activity_index "thousandeyes_activity")
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "activity_logs_stream" "activity_${account}" "${body}"
+        "activity_logs_stream" "activity_${INPUT_SUFFIX}" "${body}"
     log "  Activity logs stream input enabled."
 }
 
@@ -487,11 +502,12 @@ enable_alerts_inputs() {
         disabled "0" \
         thousandeyes_user "${account}" \
         thousandeyes_acc_group "${acc_group}" \
+        alert_rules "${ALERT_RULES}" \
         hec_target "${hec_target}" \
         hec_token "${hec_token}" \
         alerts_index "thousandeyes_alerts")
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "alerts_stream" "alerts_${account}" "${body}"
+        "alerts_stream" "alerts_${INPUT_SUFFIX}" "${body}"
     log "  Alerts stream input enabled."
 }
 
@@ -518,6 +534,13 @@ main() {
             log "ERROR: --enable-inputs requires --account-group"
             exit 1
         fi
+        if [[ "${INPUT_TYPE}" == "alerts" || "${INPUT_TYPE}" == "all" ]]; then
+            if [[ -z "${ALERT_RULES}" ]]; then
+                log "ERROR: --input-type ${INPUT_TYPE} requires --alert-rules with ~-separated ThousandEyes alert rule IDs."
+                exit 1
+            fi
+        fi
+        INPUT_SUFFIX="$(safe_input_suffix "${ACCOUNT}")"
         case "${INPUT_TYPE}" in
             all) enable_all_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
             metrics) enable_metrics_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
@@ -596,7 +619,7 @@ except: pass
     read -rp "Would you like to enable data inputs for ${account_email}? [y/N]: " inputs_yn
     case "${inputs_yn}" in
         [yY]|[yY][eE][sS]) ;;
-        *) log ""; log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."; return 0 ;;
+        *) log ""; log "Run 'bash ${SCRIPT_DIR}/validate.sh --completion' to prove deployment completion."; return 0 ;;
     esac
 
     local acc_group
@@ -608,7 +631,7 @@ except: pass
     enable_all_inputs "${account_email}" "${acc_group}" "${HEC_TOKEN}"
     log_live_input_summary
     log ""
-    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh --completion' to prove deployment completion."
 }
 
 main

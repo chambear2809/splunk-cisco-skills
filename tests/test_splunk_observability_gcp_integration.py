@@ -2,10 +2,10 @@
 
 Covers:
 - Valid spec (SA Key mode) renders cleanly (type=GCP, pollRate, shape)
-- Valid spec (WIF mode) renders cleanly
+- Valid spec (WIF mode) renders the official config-file contract
 - Coverage keys completeness
 - REST payload: type=GCP, authMethod, projectServiceKeys placeholder, pollRate in ms
-- Terraform: signalfx_gcp_integration resource present
+- Terraform: signalfx_gcp_integration resource present only for SA-key mode
 - gcloud-cli scripts rendered when gcloud_cli_render=true
 - Secret-leak scan across the rendered tree
 - Conflict matrix: SA Key mode with WIF block → rejected
@@ -39,6 +39,16 @@ TEMPLATE = SKILL_DIR / "template.example"
 def _load_renderer():
     spec = importlib.util.spec_from_file_location(
         "sgcp_render_assets", SCRIPTS_DIR / "render_assets.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_api_client():
+    spec = importlib.util.spec_from_file_location(
+        "sgcp_api", SCRIPTS_DIR / "gcp_integration_api.py"
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -94,9 +104,7 @@ def _valid_wif_spec(**overrides) -> dict:
         "mode": "workload_identity_federation",
         "project_service_keys": [],
         "workload_identity_federation": {
-            "pool_id": "splunk-pool",
-            "provider_id": "splunk-provider",
-            "splunk_principal": "serviceAccount:o11y-ingest@prod-us-1.iam.gserviceaccount.com",
+            "config_file": "/tmp/gcp_wif_config.json",
         },
     }
     # WIF mode does not pass project_service_keys to the payload
@@ -135,6 +143,17 @@ class TestGCPRenderer:
         self._render(_valid_wif_spec(), tmp_path)
         payload = json.loads((tmp_path / "rest" / "create.json").read_text())
         assert payload["authMethod"] == "WORKLOAD_IDENTITY_FEDERATION"
+        assert payload["workloadIdentityFederationConfig"] == (
+            "${WORKLOAD_IDENTITY_FEDERATION_CONFIG_FROM_FILE}"
+        )
+        assert "workloadIdentityPoolId" not in payload
+        assert "workloadIdentityProviderId" not in payload
+        assert "projectServiceKeys" not in payload
+
+    def test_rest_payload_projects_sync_mode(self, tmp_path):
+        self._render(_valid_sa_key_spec(), tmp_path)
+        payload = json.loads((tmp_path / "rest" / "create.json").read_text())
+        assert payload["projects"] == {"syncMode": "ALL"}
 
     def test_rest_payload_project_key_placeholder(self, tmp_path):
         self._render(_valid_sa_key_spec(), tmp_path)
@@ -153,10 +172,21 @@ class TestGCPRenderer:
         tf = (tmp_path / "terraform" / "main.tf").read_text()
         assert "signalfx_gcp_integration" in tf
 
+    def test_wif_does_not_claim_terraform_pool_provider_fields(self, tmp_path):
+        self._render(_valid_wif_spec(), tmp_path)
+        tf = (tmp_path / "terraform" / "main.tf").read_text()
+        assert 'resource "signalfx_gcp_integration"' not in tf
+        assert "workload_identity_pool_id" not in tf
+        assert "workload_identity_provider_id" not in tf
+
     def test_gcloud_cli_scripts_rendered(self, tmp_path):
         self._render(_valid_sa_key_spec(), tmp_path)
         assert (tmp_path / "gcloud-cli" / "create-sa.sh").exists()
         assert (tmp_path / "gcloud-cli" / "bind-roles.sh").exists()
+
+    def test_wif_does_not_render_gcloud_pool_provider_claims(self, tmp_path):
+        self._render(_valid_wif_spec(), tmp_path)
+        assert not (tmp_path / "gcloud-cli").exists()
 
     def test_state_directory_created(self, tmp_path):
         self._render(_valid_sa_key_spec(), tmp_path)
@@ -168,6 +198,8 @@ class TestGCPRenderer:
         data = json.loads((tmp_path / "coverage-report.json").read_text())
         assert data["realm"] == "us1"
         assert data["integration_name"] == "test-gcp"
+        assert data["auth_method"] == "SERVICE_ACCOUNT_KEY"
+        assert data["projects_sync_mode"] == "ALL"
 
     def test_no_secret_leak_in_rendered_tree(self, tmp_path):
         import re
@@ -207,6 +239,21 @@ class TestGCPRenderer:
         spec = _valid_sa_key_spec()
         spec["connection"]["poll_rate_seconds"] = 30
         with pytest.raises(self.mod.RenderError, match="poll_rate_seconds"):
+            self.mod.validate_spec(spec)
+
+    def test_legacy_wif_pool_provider_fields_rejected(self):
+        spec = _valid_wif_spec()
+        spec["authentication"]["workload_identity_federation"] = {
+            "pool_id": "fabricated-pool",
+            "provider_id": "fabricated-provider",
+        }
+        with pytest.raises(self.mod.RenderError, match="unsupported legacy WIF fields"):
+            self.mod.validate_spec(spec)
+
+    def test_selected_projects_require_ids(self):
+        spec = _valid_sa_key_spec()
+        spec["projects"] = {"sync_mode": "SELECTED", "selected_project_ids": []}
+        with pytest.raises(self.mod.RenderError, match="selected_project_ids"):
             self.mod.validate_spec(spec)
 
     def test_explicit_non_empty_plus_all_built_in_rejected(self):
@@ -255,3 +302,89 @@ class TestGCPShellScripts:
             cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0, result.stdout + result.stderr
+
+
+class TestGCPWIFPreflight:
+    def setup_method(self):
+        self.api = _load_api_client()
+
+    def test_wif_config_is_compact_stringified_json(self, tmp_path):
+        config = tmp_path / "gcp_wif_config.json"
+        config.write_text('{\n  "audience": "example",\n  "type": "external_account"\n}')
+        config.chmod(0o600)
+        compact = self.api.load_wif_config_file(str(config))
+        assert compact == '{"audience":"example","type":"external_account"}'
+
+    def test_wif_config_rejects_loose_permissions(self, tmp_path):
+        config = tmp_path / "gcp_wif_config.json"
+        config.write_text('{"type":"external_account"}')
+        config.chmod(0o644)
+        with pytest.raises(self.api.ApiError, match="mode 600"):
+            self.api.load_wif_config_file(str(config))
+
+    def test_wif_config_rejects_corrupt_json(self, tmp_path):
+        config = tmp_path / "gcp_wif_config.json"
+        config.write_text("not-json")
+        config.chmod(0o600)
+        with pytest.raises(self.api.ApiError, match="valid UTF-8 JSON"):
+            self.api.load_wif_config_file(str(config))
+
+    def test_invalid_wif_config_fails_before_live_lookup(self, tmp_path, monkeypatch):
+        config = tmp_path / "gcp_wif_config.json"
+        config.write_text("not-json")
+        config.chmod(0o600)
+        payload = {
+            "type": "GCP",
+            "name": "test-gcp",
+            "authMethod": "WORKLOAD_IDENTITY_FEDERATION",
+            "projects": {"syncMode": "ALL"},
+            "workloadIdentityFederationConfig": (
+                "${WORKLOAD_IDENTITY_FEDERATION_CONFIG_FROM_FILE}"
+            ),
+        }
+
+        def unexpected_lookup(*_args, **_kwargs):
+            pytest.fail("live integration lookup ran before WIF preflight")
+
+        monkeypatch.setattr(self.api, "list_gcp_integrations", unexpected_lookup)
+        with pytest.raises(self.api.ApiError, match="valid UTF-8 JSON"):
+            self.api.upsert(
+                "us1",
+                "unused-token",
+                payload,
+                tmp_path / "state",
+                wif_config_file=str(config),
+            )
+
+    def test_upsert_sends_stringified_wif_contract(self, tmp_path, monkeypatch):
+        config = tmp_path / "gcp_wif_config.json"
+        config.write_text('{"type":"external_account","audience":"example"}')
+        config.chmod(0o600)
+        payload = {
+            "type": "GCP",
+            "name": "test-gcp",
+            "authMethod": "WORKLOAD_IDENTITY_FEDERATION",
+            "projects": {"syncMode": "ALL"},
+            "workloadIdentityFederationConfig": (
+                "${WORKLOAD_IDENTITY_FEDERATION_CONFIG_FROM_FILE}"
+            ),
+        }
+        captured = {}
+        monkeypatch.setattr(self.api, "list_gcp_integrations", lambda *_args: [])
+
+        def capture_create(_realm, _token, body):
+            captured.update(body)
+            return {"id": "created-id"}
+
+        monkeypatch.setattr(self.api, "create_integration", capture_create)
+        self.api.upsert(
+            "us1",
+            "unused-token",
+            payload,
+            tmp_path / "state",
+            wif_config_file=str(config),
+        )
+        assert captured["authMethod"] == "WORKLOAD_IDENTITY_FEDERATION"
+        assert captured["projects"] == {"syncMode": "ALL"}
+        assert isinstance(captured["workloadIdentityFederationConfig"], str)
+        assert json.loads(captured["workloadIdentityFederationConfig"])["type"] == "external_account"

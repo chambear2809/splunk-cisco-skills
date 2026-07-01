@@ -811,6 +811,16 @@ ALLOWLISTS_ENABLED={allowlists_enabled}
 PLAN_FILE="$(dirname "$0")/plan.json"
 REQUIRED_COMMAND_GROUPS=({required_groups})
 
+if python3 - "${{PLAN_FILE}}" <<'PY'
+import json, sys
+plan = json.load(open(sys.argv[1], encoding="utf-8"))
+raise SystemExit(0 if plan.get("operations", {{}}).get("users") else 1)
+PY
+then
+  echo "ERROR: the admin plan contains handoff-only user operations; remove them before applying supported ACS mutations." >&2
+  exit 2
+fi
+
 if [[ -n "${{TARGET_SH}}" ]]; then
   acs_command config use-stack "${{SPLUNK_CLOUD_STACK}}" --target-sh "${{TARGET_SH}}" >/dev/null
 fi
@@ -1028,6 +1038,9 @@ except Exception:
     print('')
 ")
       planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}'].get('${{family}}', []))))")
+      if [[ -z "${{planned}}" ]]; then
+        continue
+      fi
       if [[ "${{live}}" != "${{planned}}" ]]; then
         printf 'WARNING: Drift detected on %s/%s (live=%s, plan=%s)\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}" >&2
         drift_found=true
@@ -1076,9 +1089,14 @@ features=$(python3 -c "import json; print(' '.join(sorted(json.load(open('${{PLA
 for feature in ${{features}}; do
   planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}']['${{FAMILY}}'])))" 2>/dev/null || echo "")
 
+  if [[ -z "${{planned}}" ]]; then
+    log "SKIP: no ${{FAMILY}} subnets were specified for '${{feature}}'; preserving live state."
+    continue
+  fi
+
   # Per Splunk ACS CLI docs, the read-only subcommand is `describe` (not `list`).
   live_json=$(acs_command "${{CLI_GROUP}}" describe "${{feature}}" 2>/dev/null \\
-    | acs_extract_http_response_json || printf '%s' '{{}}')
+    | acs_extract_http_response_json || {{ echo "ERROR: could not read live ${{FAMILY}} allowlist for '${{feature}}'; refusing blind convergence." >&2; exit 1; }})
   live=$(printf '%s' "${{live_json}}" | python3 -c "
 import json, sys
 try:
@@ -1203,7 +1221,7 @@ for feature in ${{features}}; do
     fi
     snapshot_path="${{AUDIT_DIR}}/${{feature}}-${{family}}.json"
     acs_command "${{cli_group}}" describe "${{feature}}" 2>/dev/null \\
-      | acs_extract_http_response_json > "${{snapshot_path}}" || printf '%s' '{{}}' > "${{snapshot_path}}"
+      | acs_extract_http_response_json > "${{snapshot_path}}" || {{ echo "ERROR: could not read live ${{family}} allowlist for '${{feature}}'; audit is incomplete." >&2; exit 1; }}
 
     live=$(python3 -c "
 import json, sys
@@ -1219,6 +1237,10 @@ import json, sys
 plan = json.load(open(sys.argv[1]))
 print(','.join(sorted(plan['features'].get(sys.argv[2], {{}}).get(sys.argv[3], []))))
 " "${{PLAN_FILE}}" "${{feature}}" "${{family}}" 2>/dev/null || printf '')
+    if [[ -z "${{planned}}" ]]; then
+      printf 'SKIP: feature=%s family=%s was unspecified; live state preserved\n' "${{feature}}" "${{family}}"
+      continue
+    fi
     if [[ "${{live}}" != "${{planned}}" ]]; then
       printf 'MISMATCH: feature=%s family=%s live=%s plan=%s\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}"
       mismatch=true
@@ -1388,7 +1410,7 @@ JSON
     private-connectivity)
       if [[ -n "${{STACK_TOKEN:-}}" && -n "${{SPLUNK_CLOUD_STACK:-}}" ]]; then
         endpoint="${{ACS_SERVER:-https://admin.splunk.com}}/${{SPLUNK_CLOUD_STACK}}/adminconfig/v2/private-connectivity/eligibility"
-        curl -fsS --header "Authorization: Bearer ${{STACK_TOKEN}}" "${{endpoint}}" > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json" \\
+        curl -fsS -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") "${{endpoint}}" > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json" \\
           || printf '{{"status":"unavailable","name":"private-connectivity-eligibility"}}\\n' > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json"
       else
         printf '{{"status":"skipped","reason":"STACK_TOKEN and SPLUNK_CLOUD_STACK required for API-only private connectivity endpoint"}}\\n' \\
@@ -1472,6 +1494,24 @@ def render_admin_commands(plan: dict) -> str:
 def render_apply_admin_plan(plan: dict) -> str:
     helper = shell_quote(helper_path())
     ops = plan["operations"]
+    mutation_lists = (
+        "indexes",
+        "hec_tokens",
+        "users",
+        "roles",
+        "app_permissions",
+        "outbound_ports",
+        "ddss_self_storage_locations",
+        "limits",
+        "private_connectivity",
+    )
+    has_mutations = any(ops.get(key) for key in mutation_lists)
+    has_mutations = has_mutations or bool(ops["maintenance_windows"].get("preferencesFile"))
+    has_mutations = has_mutations or bool(
+        ops["restarts"].get("forceRestart") or ops["restarts"].get("restartIfRequired")
+    )
+    if not has_mutations:
+        return make_script("echo 'SKIP: no ACS admin-plan mutations were requested.'\n")
     lines = [
         "# shellcheck disable=SC1091",
         f"source {helper}",
@@ -1483,6 +1523,14 @@ def render_apply_admin_plan(plan: dict) -> str:
         "fi",
         "",
     ]
+    if ops["users"]:
+        lines.extend(
+            [
+                "echo 'ERROR: user operations require password material and are handoff-only; remove them from the apply plan before applying supported operations.' >&2",
+                "exit 2",
+                "",
+            ]
+        )
     for index in ops["indexes"]:
         create_flags = ["--name", index["name"], "--data-type", index["datatype"], "--searchable-days", index["searchableDays"], "--max-data-size-mb", index["maxDataSizeMB"]]
         update_flags = ["--searchable-days", index["searchableDays"], "--max-data-size-mb", index["maxDataSizeMB"]]
@@ -1556,8 +1604,6 @@ def render_apply_admin_plan(plan: dict) -> str:
                 "fi",
             ]
         )
-    if ops["users"]:
-        lines.append("echo 'WARNING: User create/update operations were not applied; see admin-commands.sh for the file-backed handoff.' >&2")
     lines.append("echo 'OK: ACS admin plan apply completed.'")
     return make_script("\n".join(lines))
 
@@ -1580,7 +1626,7 @@ fi
 
 case "${{ACTION}}" in
   eligibility)
-    curl -fsS --header "Authorization: Bearer ${{STACK_TOKEN}}" "${{BASE}}/eligibility"
+    curl -fsS -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") "${{BASE}}/eligibility"
     ;;
   apply)
     tmp_dir="$(mktemp -d)"
@@ -1602,7 +1648,7 @@ PY
     for body in "${{tmp_dir}}"/private-connectivity-*.json; do
       [[ -f "${{body}}" ]] || continue
       curl -fsS --request POST \\
-        --header "Authorization: Bearer ${{STACK_TOKEN}}" \\
+        -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") \\
         --header "Content-Type: application/json" \\
         --data @"${{body}}" \\
         "${{BASE}}/endpoints"

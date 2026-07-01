@@ -87,5 +87,18 @@ bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase apply --operatio
 - `upgrade` - SHC `start-shcluster-upgrade kvstore -version <v>`
 - `collections` - write collection + lookup definition via REST
 
+Live standalone `migrate` and `upgrade` requests fail with an upgrade-workflow
+handoff because those transitions occur during a supported Splunk Enterprise
+binary upgrade. `--operation none` is render-only and is rejected by apply.
+`server.conf` is a rendered coordination artifact; this skill does not install
+that file automatically. Collection REST apply writes `replicate` and every
+declared `field.<name>` type.
+
+SHC migration defaults to `--migrate-dry-run true`; that successful operation
+does not claim that migration was applied. Actual migration requires
+`--migrate-dry-run false --accept-kvstore-migrate`, and server-version upgrade
+requires `--accept-kvstore-upgrade`. Rendered destructive scripts also require
+the acceptance environment set by the wrapper.
+
 Hand SHC replication health, captain transfer, and KV Store reset coordination
 to `splunk-search-head-cluster-setup`.

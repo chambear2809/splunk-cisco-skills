@@ -81,6 +81,10 @@ host or Kubernetes value.
   restricted
 - Make sure the token can write to every SC4S index you expect to use,
   including `_metrics` if you enable metrics
+- Render-only runs may omit the token to review non-secret assets. A live host
+  or Helm apply requires a nonempty owner-only token file, supplied with
+  `--hec-token-file` or created in the same run with
+  `--splunk-prep --write-hec-token-file`.
 
 ## Core Runtime Files
 

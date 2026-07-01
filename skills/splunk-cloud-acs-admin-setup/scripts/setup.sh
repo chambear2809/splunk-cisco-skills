@@ -156,6 +156,12 @@ validate_args() {
     validate_choice "${ALLOW_ACS_LOCKOUT}" true false
     validate_choice "${STRICT_DRIFT}" true false
     validate_choice "${EMIT_TERRAFORM}" true false
+    if [[ "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ]]; then
+        if [[ -z "${ADMIN_PLAN_FILE}" && -z "${ACS_SUBNETS}${SEARCH_API_SUBNETS}${HEC_SUBNETS}${S2S_SUBNETS}${SEARCH_UI_SUBNETS}${IDM_API_SUBNETS}${IDM_UI_SUBNETS}${ACS_SUBNETS_V6}${SEARCH_API_SUBNETS_V6}${HEC_SUBNETS_V6}${S2S_SUBNETS_V6}${SEARCH_UI_SUBNETS_V6}${IDM_API_SUBNETS_V6}${IDM_UI_SUBNETS_V6}" ]]; then
+            log "ERROR: apply requested no admin plan and no IPv4/IPv6 subnet mutation."
+            exit 2
+        fi
+    fi
     if [[ -n "${OUTPUT_DIR}" ]]; then
         OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
     else

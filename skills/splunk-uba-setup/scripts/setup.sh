@@ -195,13 +195,18 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
     exit 1
 fi
 
+if [[ "${INSTALL}" == "true" && "${INSTALL_KAFKA_APP}" != "true" ]]; then
+    log "ERROR: Standalone UBA server installation is not automated by this skill."
+    log "       Use --install --install-kafka-app for the supported Kafka app action, or omit --install for readiness/migration guidance."
+    exit 2
+fi
+
 warn_if_current_skill_role_unsupported
+if [[ "${INSTALL}" == "true" && "${INSTALL_KAFKA_APP}" == "true" ]]; then require_current_skill_role_supported; fi
 emit_status_notes
 
 if [[ "${INSTALL}" == "true" && "${INSTALL_KAFKA_APP}" == "true" ]]; then
     "${KAFKA_INSTALL_CMD[@]}"
-elif [[ "${INSTALL}" == "true" ]]; then
-    log "Kafka app install not requested; continuing with readiness validation/handoff."
 fi
 
 if [[ "${VALIDATE}" == "true" ]]; then

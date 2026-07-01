@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-enterprise-networking-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-enterprise-networking-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco Enterprise Networking app using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco-catalyst-app"
@@ -31,6 +40,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco Enterprise Networking App Validation ==="
 log ""
@@ -75,11 +85,19 @@ if [[ -n "${def}" ]]; then
         if echo "${def}" | grep -q "${idx}"; then
             pass "  Index '${idx}' included in macro"
         else
-            warn "  Index '${idx}' NOT in macro — dashboards won't search this index"
+            completion_issue "Index '${idx}' is not in cisco_catalyst_app_index — dashboards will not search it"
         fi
     done
 else
-    warn "cisco_catalyst_app_index macro not found"
+    completion_issue "cisco_catalyst_app_index macro not found; dashboard searches are not aligned"
+fi
+
+view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
 fi
 
 log ""
@@ -106,21 +124,24 @@ for search_name in "${SAVED_SEARCHES[@]}"; do
             pass "Saved search '${search_name}' enabled${cron_schedule:+ (schedule: ${cron_schedule})}"
             ;;
         *)
-            warn "Saved search '${search_name}' is disabled${cron_schedule:+ (schedule: ${cron_schedule})}"
+            completion_issue "Saved search '${search_name}' is disabled${cron_schedule:+ (schedule: ${cron_schedule})}"
             ;;
     esac
 done
 
 log ""
 log "--- Data Flow Check ---"
+event_total=0
 for idx in "catalyst" "ise" "sdwan" "cybervision"; do
     event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
+        event_total=$((event_total + event_count))
         pass "Index '${idx}' has ${event_count} events"
     else
         warn "Index '${idx}' has no events (configure TA first)"
     fi
 done
+[[ "${event_total}" -gt 0 ]] || completion_issue "No Enterprise Networking dashboard data was found"
 fi
 
 log ""

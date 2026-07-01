@@ -37,20 +37,21 @@ Unified Identity is NOT supported in:
 
 When the skill detects any of these gates it:
 
-1. Marks the `pairing` UID + `centralized_rbac` + `discover_app`
-   Configurations sections as `not_applicable` (or `deeplink` where the
-   UI surface still exists for SA mode).
+1. Marks UID and `centralized_rbac` as `not_applicable`. The Discover app
+   remains available when the Cloud version supports its Configurations REST
+   surface, and service-account pairing owns its access-token write.
 2. Renders a `support-tickets/fedramp-il5-readiness.md` template if the
    operator wants UID enforcement on a FedRAMP/IL5 stack.
-3. Falls back to Service Account pairing for the `pairing` section so the
-   integration still works without UID.
+3. On Splunk Cloud Platform, falls back to Discover-app API-token pairing
+   where that public workflow is available. Splunk Enterprise uses the
+   separate Log Observer Connect service-account workflow.
 
 ## How the Skill Detects the Region
 
-For Splunk Cloud Platform the skill calls ACS to read the stack metadata
-(`acs config show-stack` returns the AWS region). For Splunk Enterprise
-the operator must set `target: enterprise` in the spec; Splunk Enterprise
-has no UID path so the region check is informational only.
+The renderer validates only the declared realm against this static map. Before
+live apply, the operator must verify Splunk Cloud stack metadata/region through
+an approved ACS workflow. For Splunk Enterprise the operator sets
+`target: enterprise`; Enterprise has no UID path.
 
 The skill compares the detected AWS region to the spec's `realm` value
 using the table above. Mismatch + same-table-row produces a WARN

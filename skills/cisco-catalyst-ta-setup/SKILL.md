@@ -191,7 +191,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash skills/cisco-catalyst-ta-setup/scripts/validate.sh
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, indexes, accounts, inputs, data flow, settings.
@@ -244,3 +244,9 @@ bash skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh
 
 - [reference.md](reference.md) — Complete input catalog, account fields, sizing
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Run it with `--completion` (alias
+`--strict`) to require at least one configured product account, an enabled
+input, Cisco event flow, required indexes, and visible companion dashboards.

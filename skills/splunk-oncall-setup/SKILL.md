@@ -5,6 +5,14 @@ description: Render, validate, and apply the full Splunk On-Call (formerly Victo
 
 # Splunk On-Call Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a Splunk-side
+On-Call companion app, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate alert ingestion/action behavior and shipped
+views, or record explicit package evidence that no dashboards ship.
+
 Use this skill for **all** Splunk On-Call operations: SaaS object management
 through the public API, the REST Endpoint Integration alert path, the Generic
 Email Endpoint Integration, and Splunk-side companion apps.
@@ -25,7 +33,9 @@ Every rendered object gets an explicit coverage status:
 - `handoff`: the skill renders deterministic operator steps for UI-only,
   Support-driven, or app-side workflows.
 - `install_apply`: the skill installs or configures a Splunk-side companion
-  app or saved search via Splunkbase + REST (Splunkbase 3546, 4886, 5863).
+  app or saved search via Splunkbase + REST (Splunkbase 3546 and 4886).
+  Splunkbase 5863 is a Splunk SOAR connector and remains an explicit SOAR
+  handoff rather than a Splunk Platform install.
 
 Do not mark UI-only workflows as `api_apply`.
 

@@ -71,18 +71,9 @@ create_indexes() {
 
 ensure_app_visible() {
     ensure_search_api_session
-    local visible
-    visible=$(splunk_curl "${SK}" \
-        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
-        | python3 -c "
-import json, sys
-try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
-except: print('True')
-" 2>/dev/null || echo "True")
-    if [[ "${visible}" == "False" ]]; then
-        log "Setting ${APP_NAME} visible=true..."
-        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
-    fi
+    log "Ensuring ${APP_NAME} is visible..."
+    deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" \
+        || { log "ERROR: Failed to make ${APP_NAME} visible."; return 1; }
 }
 
 enable_firehose_input() {
@@ -178,7 +169,7 @@ main() {
         ${auto_flag:+"${auto_flag}"} \
         --index "${auto_idx}"
     log ""
-    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh --completion' to prove deployment completion."
 }
 
 main

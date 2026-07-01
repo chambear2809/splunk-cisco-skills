@@ -12,6 +12,14 @@ description: >-
 
 # Splunk AI Assistant Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture applicable configuration, data/readiness, and
+shipped-view evidence, or explicit package evidence that no dashboards ship.
+
 Automates installation, validation, and Enterprise setup assistance for
 **Splunk AI Assistant** (`Splunk_AI_Assistant_Cloud`). The product was formerly
 branded **Splunk AI Assistant for SPL**; keep accepting that name in user

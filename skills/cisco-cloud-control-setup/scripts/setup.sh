@@ -10,7 +10,7 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/cisco-cloud-control-rendered"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
-EXECUTE_SECTIONS_DEFAULT="data-fabric,mcp,agent-observability,observability-content,domain-readiness,cloud-control-studio,ai-canvas"
+EXECUTE_SECTIONS_DEFAULT="data-fabric,mcp,agent-observability,observability-content"
 
 usage() {
     cat <<'EOF'
@@ -28,11 +28,12 @@ Modes:
   --dry-run                     Show render/execute plan without writing or executing
   --json                        Emit JSON for render and dry-run output
 
-Executable sections:
+Delegated executable sections:
   data-fabric                   Delegate Data Fabric prerequisite plans
   mcp                           Delegate Splunk and ThousandEyes MCP setup
   agent-observability           Delegate Splunk AI Agent Monitoring setup
   observability-content         Delegate dashboard and detector render plans
+Handoff-only sections (rendered; explicit --execute exits nonzero):
   domain-readiness              Emit Cisco domain child-skill handoffs
   cloud-control-studio          UI handoff only
   ai-canvas                     AI Canvas handoff only
@@ -188,6 +189,19 @@ if [[ "${MODE_EXECUTE}" == "true" ]]; then
         sections="${EXECUTE_SECTIONS_DEFAULT}"
     fi
     IFS=',' read -ra section_array <<< "${sections}"
+    # Refuse an unsupported/handoff-only selection before running any delegated
+    # mutation. This prevents a mixed request from applying earlier sections
+    # and only then discovering that a later section cannot execute.
+    for section in "${section_array[@]}"; do
+        section="${section//[[:space:]]/}"
+        case "${section}" in
+            domain-readiness|cloud-control-studio|ai-canvas)
+                log "ERROR: '${section}' is a rendered operator handoff, not an executable mutation."
+                log "       Review its artifact under ${OUTPUT_DIR}; no delegated sections were executed."
+                exit 2
+                ;;
+        esac
+    done
     for section in "${section_array[@]}"; do
         section="${section//[[:space:]]/}"
         execute_section "${section}"

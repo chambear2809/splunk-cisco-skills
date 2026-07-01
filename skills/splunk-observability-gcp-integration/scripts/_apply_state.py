@@ -46,7 +46,8 @@ def _looks_secret_key(key: str) -> bool:
     return any(s in lowered for s in (
         "token", "password", "secret", "apikey", "api_key", "jwt",
         "authorization", "x_sf_token", "external_id", "aws_secret",
-        "aws_access_key", "key", "projectkey",
+        "aws_access_key", "key", "projectkey", "wif_config",
+        "workloadidentityfederationconfig",
     ))
 
 
@@ -65,10 +66,12 @@ def append_step(
     if state_path.exists():
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            state = {"steps": []}
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"refusing to overwrite invalid apply state {state_path}: {exc}") from exc
     else:
         state = {"steps": []}
+    if not isinstance(state, dict) or not isinstance(state.get("steps", []), list):
+        raise ValueError(f"refusing to overwrite malformed apply state {state_path}")
     state.setdefault("steps", []).append({
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "section": section,
@@ -78,11 +81,13 @@ def append_step(
         "notes": notes,
         "response": redact(response),
     })
-    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    tmp_path = state_path.with_name(f".{state_path.name}.{os.getpid()}.tmp")
     try:
-        os.chmod(state_path, 0o600)
-    except OSError:
-        pass
+        tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, state_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def has_step(state_dir: Path, idempotency_key: str) -> bool:
@@ -92,8 +97,10 @@ def has_step(state_dir: Path, idempotency_key: str) -> bool:
         return False
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return False
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot trust invalid apply state {state_path}: {exc}") from exc
+    if not isinstance(state, dict) or not isinstance(state.get("steps", []), list):
+        raise ValueError(f"cannot trust malformed apply state {state_path}")
     for entry in state.get("steps", []):
         if entry.get("idempotency_key") == idempotency_key and entry.get("result") == "success":
             return True
@@ -110,4 +117,7 @@ def read_secret_file(path: str | os.PathLike[str], allow_loose: bool = False) ->
         raise PermissionError(
             f"secret file {p} has loose permissions ({oct(mode)}); chmod 600 it or pass --allow-loose-token-perms."
         )
-    return p.read_text(encoding="utf-8").strip()
+    value = p.read_text(encoding="utf-8").rstrip("\r\n")
+    if not value or "\n" in value or "\r" in value:
+        raise ValueError(f"secret file must contain exactly one non-empty line: {p}")
+    return value

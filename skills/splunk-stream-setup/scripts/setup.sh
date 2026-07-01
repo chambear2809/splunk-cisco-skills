@@ -18,7 +18,7 @@ LEGACY_ALL_IN_ONE=false
 IP_ADDR=""
 PORT="8889"
 SPLUNK_WEB_URL=""
-SSL_VERIFY="false"
+SSL_VERIFY="true"
 NETFLOW_IP=""
 NETFLOW_PORT=""
 NETFLOW_DECODER="netflow"
@@ -41,7 +41,7 @@ Stream Forwarder Options (used with --configure-streamfwd or full setup):
   --ip-addr IP             IP address for streamfwd to bind to
   --port PORT              Port for streamfwd (default: 8889)
   --splunk-web-url URL     Splunk Web URL (e.g. https://host:8000)
-  --ssl-verify true|false  SSL certificate verification (default: false)
+  --ssl-verify true|false  SSL certificate verification (default: true)
 
 NetFlow Options (optional):
   --netflow-ip IP          NetFlow receiver bind IP (e.g. 0.0.0.0)
@@ -75,6 +75,11 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+
+case "${SSL_VERIFY}" in
+    true|false) ;;
+    *) echo "ERROR: --ssl-verify must be true or false." >&2; exit 1 ;;
+esac
 
 if ! $INSTALL && ! $INDEXES_ONLY && ! $CONFIGURE_STREAMFWD; then
     FULL_SETUP=true
@@ -287,6 +292,7 @@ install_apps() {
 create_indexes() {
     log "=== Creating Indexes ==="
     local session_key="${SK-}"
+    require_index_management_target_role || return 1
     load_splunk_connection_settings || exit 1
     if ! is_splunk_cloud; then
         _get_session_key || exit 1
@@ -328,6 +334,27 @@ configure_streamfwd() {
     if [[ -z "${SPLUNK_WEB_URL}" ]]; then
         read -rp "Splunk Web URL (e.g. https://host:8000): " SPLUNK_WEB_URL
     fi
+    SPLUNK_WEB_URL="$(python3 - "${SPLUNK_WEB_URL}" <<'PY'
+from urllib.parse import urlsplit
+import sys
+
+value = sys.argv[1].strip().rstrip("/")
+if any(character.isspace() for character in value):
+    raise SystemExit("ERROR: --splunk-web-url must not contain whitespace")
+parts = urlsplit(value)
+if parts.scheme not in {"http", "https"} or not parts.hostname:
+    raise SystemExit("ERROR: --splunk-web-url must be an http(s) origin URL")
+if parts.username or parts.password:
+    raise SystemExit("ERROR: --splunk-web-url must not contain inline credentials")
+if parts.path not in {"", "/"} or parts.query or parts.fragment:
+    raise SystemExit("ERROR: --splunk-web-url must not contain a path, query, or fragment")
+try:
+    parts.port
+except ValueError as exc:
+    raise SystemExit(f"ERROR: --splunk-web-url has an invalid port: {exc}") from exc
+print(value, end="")
+PY
+)" || exit 1
 
     local streamfwd_body
     streamfwd_body=$(form_urlencode_pairs port "${PORT}" ipAddr "${IP_ADDR}")

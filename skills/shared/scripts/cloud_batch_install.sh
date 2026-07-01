@@ -233,7 +233,7 @@ fi
 
 log ""
 log "--- Verifying app identity ---"
-load_splunk_credentials 2>/dev/null || true
+load_splunk_credentials
 verify_sk=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
 if [[ -n "${verify_sk}" ]]; then
     for app_id in "${APP_IDS[@]}"; do

@@ -220,4 +220,4 @@ With `--live`:
 - `--check-rum-ingest` — DNS + TCP probe of `rum-ingest.<realm>.observability.splunkcloud.com:443`.
 - `--check-server-timing <backend-url>` — `curl -sI` and grep for `Server-Timing.*traceparent`. Emits `handoff-auto-instrumentation.sh` if missing.
 
-See [reference.md](reference.md) for the full CLI flag reference and the twelve `references/*.md` annexes for deep topical documentation.
+See [reference.md](reference.md) for the full CLI flag reference and the thirteen `references/*.md` annexes for deep topical documentation.

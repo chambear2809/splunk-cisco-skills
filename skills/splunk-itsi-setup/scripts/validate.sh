@@ -2,28 +2,37 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+usage() {
     cat <<'EOF'
-Usage: bash skills/splunk-itsi-setup/scripts/validate.sh [--help]
+Usage: bash skills/splunk-itsi-setup/scripts/validate.sh [--completion] [--help]
 
 Validates the deployed Splunk ITSI components using configured Splunk credentials.
+Use --completion (or --strict) to treat every warning as a failed completion gate.
 EOF
-    exit 0
-fi
+}
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 PASS=0
 FAIL=0
 WARN=0
+COMPLETION=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --completion|--strict) COMPLETION=true; shift ;;
+        --help|-h) usage; exit 0 ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 
 log "=== Splunk ITSI Validation ==="
 log ""
 
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
@@ -82,7 +91,7 @@ except Exception:
 
 case "${kvstore_status}" in
     ready) pass "KVStore status: ready" ;;
-    *) warn "KVStore status: ${kvstore_status} (ITSI requires healthy KVStore)" ;;
+    *) fail "KVStore status: ${kvstore_status} (ITSI requires healthy KVStore)" ;;
 esac
 
 log ""

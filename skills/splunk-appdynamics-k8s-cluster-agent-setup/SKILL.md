@@ -55,15 +55,22 @@ Typical flow:
 2. Render first and review `cluster-agent-values.yaml`,
    `splunk-otel-collector-values.yaml`, `dual-signal-workload-env.yaml`, and
    `cluster-agent-rollout-plan.sh`.
-3. Keep O11y tokens file-backed. The rollout plan uses `--set-file` and a
-   Kubernetes Secret template; it does not render token values.
-4. Prepare the reviewed apply packet only after explicit approval:
+3. Keep O11y tokens, the Controller password, and the Controller access key
+   file-backed. The rollout plan uses `--set-file`; it does not render values.
+4. Execute the reviewed rollout only after explicit approval:
 
 ```bash
 bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/setup.sh \
-  --apply --accept-k8s-rollout --spec path/to/spec.yaml
+  --apply rollout --accept-k8s-rollout --spec path/to/spec.yaml
 ```
 
-The suite still renders by default in apply mode. The generated
-`cluster-agent-rollout-plan.sh` defaults to Helm dry-run and requires
-`K8S_APPLY=1` before it mutates Kubernetes.
+The wrapper renders and then executes `cluster-agent-rollout-plan.sh` with the
+mutation gate enabled. Running that rendered script directly remains dry-run by
+default and requires `K8S_APPLY=1` before it mutates Kubernetes.
+
+Controller URLs default to HTTPS. Plain HTTP requires the explicit
+`accept_insecure_controller_http: true` exception. The O11y validation API is
+restricted to `https://api.<realm>.signalfx.com`; a reviewed proxy additionally
+requires `splunk_otel_collector.accept_custom_api_url: true`. Live O11y
+validation fails when its chmod-600 token file, Helm-release pods, readiness, or
+collector log access is unavailable; it never reports a skipped probe as a pass.

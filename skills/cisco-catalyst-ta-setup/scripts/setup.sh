@@ -170,18 +170,26 @@ enable_sdwan_inputs() {
 
     log "Enabling SD-WAN inputs for account='${account}' index='${index}'..."
 
-    local body
-    body=$(form_urlencode_pairs \
+    local health_body site_tunnel_body
+    health_body=$(form_urlencode_pairs \
         sdwan_account "${account}" \
+        health_type "utd_health,link_health" \
         index "${index}" \
         interval "3600" \
         logging_level "INFO" \
         disabled "0")
-    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$body"; then
+    site_tunnel_body=$(form_urlencode_pairs \
+        sdwan_account "${account}" \
+        health_type "site_health,tunnel_health,sse_tunnels" \
+        index "${index}" \
+        interval "3600" \
+        logging_level "INFO" \
+        disabled "0")
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$health_body"; then
         log "  ERROR: Failed to enable cisco_catalyst_sdwan_health://SDWAN_Health"
         return 1
     fi
-    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_site_and_tunnel_health" "SDWAN_Site_Tunnel_Health" "$body"; then
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_site_and_tunnel_health" "SDWAN_Site_Tunnel_Health" "$site_tunnel_body"; then
         log "  ERROR: Failed to enable cisco_catalyst_sdwan_site_and_tunnel_health://SDWAN_Site_Tunnel_Health"
         return 1
     fi
@@ -258,13 +266,13 @@ main() {
 
     if $INDEXES_ONLY; then
         create_indexes
-        log "Setup complete."
+        log "Index setup complete; this does not prove account, input, event, or dashboard readiness."
         log "$(log_platform_restart_guidance "index changes")"
         exit 0
     fi
 
     create_indexes
-    log "Setup complete."
+    log "Index setup complete; run '${SCRIPT_DIR}/validate.sh --completion' after configuring an account and input."
     log "$(log_platform_restart_guidance "index changes")"
 }
 

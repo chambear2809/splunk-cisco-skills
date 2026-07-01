@@ -91,7 +91,7 @@ log "--- Catalog Sync Connectivity ---"
 sync_result=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
     "| synccatalog dryrun=true" "status" 2>/dev/null || echo "error")
 
-if [[ "${sync_result}" == "error" ]] || [[ "${sync_result}" == "0" ]]; then
+if [[ "${sync_result}" != "Dry Run" ]]; then
     sync_s3_version=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
         "| synccatalog dryrun=true" "s3_version" 2>/dev/null || echo "")
     if [[ -n "${sync_s3_version}" ]] && [[ "${sync_s3_version}" != "0" ]]; then

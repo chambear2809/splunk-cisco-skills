@@ -61,6 +61,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ ! "${HEC_TOKEN_NAME}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+    log "ERROR: --hec-token-name contains unsupported characters."
+    exit 1
+fi
+if [[ -n "${COMPOSE_RUNTIME}" && "${COMPOSE_RUNTIME}" != "docker" && "${COMPOSE_RUNTIME}" != "podman" ]]; then
+    log "ERROR: --compose-runtime must be docker or podman."
+    exit 1
+fi
+if [[ ! "${NAMESPACE}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ || ! "${RELEASE_NAME}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]; then
+    log "ERROR: --namespace and --release-name must use lowercase Kubernetes/Helm name characters."
+    exit 1
+fi
+
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
@@ -148,7 +161,7 @@ validate_indexes() {
                 *) fail "Index '${idx}' exists but has datatype '${datatype}', expected 'event'" ;;
             esac
         else
-            warn "Index '${idx}' not found"
+            fail "Required event index '${idx}' was not found or could not be queried"
         fi
     done
 
@@ -161,7 +174,7 @@ validate_indexes() {
                 *) fail "Index '${idx}' exists but has datatype '${datatype}', expected 'metric'" ;;
             esac
         else
-            warn "Index '${idx}' not found"
+            fail "Required metrics index '${idx}' was not found or could not be queried"
         fi
     done
     log ""
@@ -171,13 +184,13 @@ validate_hec_token() {
     # On Splunk Cloud, HEC tokens created via ACS may not be visible through
     # the management REST API used here; results may report "unknown" even
     # when the token exists and is functional.
-    local token_state token_record ack_state restricted_indexes default_index
+    local token_state token_record ack_state restricted_indexes default_index missing_indexes
     log "--- HEC Token ---"
     token_state="$(inspect_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
     case "${token_state}" in
         enabled) pass "HEC token '${HEC_TOKEN_NAME}' exists" ;;
         disabled) fail "HEC token '${HEC_TOKEN_NAME}' exists but is disabled" ;;
-        missing) warn "HEC token '${HEC_TOKEN_NAME}' not found" ;;
+        missing) fail "HEC token '${HEC_TOKEN_NAME}' not found" ;;
         *) warn "Could not determine HEC token '${HEC_TOKEN_NAME}' status" ;;
     esac
 
@@ -202,7 +215,18 @@ validate_hec_token() {
     esac
 
     if [[ -n "${restricted_indexes}" ]]; then
-        warn "HEC token '${HEC_TOKEN_NAME}' restricts Selected Indexes to: ${restricted_indexes}"
+        missing_indexes="$(python3 - "${restricted_indexes}" "${EVENT_INDEXES[@]}" "${METRIC_INDEXES[@]}" <<'PY'
+import sys
+allowed = {item.strip() for item in sys.argv[1].split(",") if item.strip()}
+required = sys.argv[2:]
+print(",".join(item for item in required if "*" not in allowed and item not in allowed), end="")
+PY
+)"
+        if [[ -n "${missing_indexes}" ]]; then
+            fail "HEC token '${HEC_TOKEN_NAME}' Selected Indexes omit: ${missing_indexes}"
+        else
+            pass "HEC token '${HEC_TOKEN_NAME}' Selected Indexes include all required indexes"
+        fi
     fi
     if [[ -n "${default_index}" ]]; then
         if [[ "${default_index}" == "${EXPECTED_DEFAULT_INDEX}" ]]; then
@@ -217,15 +241,17 @@ validate_hec_token() {
 validate_sc4snmp_data() {
     local data_count metric_count
     log "--- SC4SNMP Data ---"
-    data_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=em_logs OR index=netops | stats count as count' "count" 2>/dev/null || echo "0")"
-    if [[ "${data_count}" =~ ^[0-9]+$ ]] && (( data_count > 0 )); then
+    if ! data_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=em_logs OR index=netops | stats count as count' "count" 2>/dev/null)"; then
+        fail "Unable to run the SC4SNMP event-data validation search"
+    elif [[ "${data_count}" =~ ^[0-9]+$ ]] && (( data_count > 0 )); then
         pass "Splunk contains ${data_count} SC4SNMP event(s)"
     else
         warn "No SC4SNMP event data found in Splunk yet (indexes: em_logs, netops)"
     fi
 
-    metric_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" '| mcatalog values(_dims) WHERE index=em_metrics OR index=netmetrics | stats count as count' "count" 2>/dev/null || echo "0")"
-    if [[ "${metric_count}" =~ ^[0-9]+$ ]] && (( metric_count > 0 )); then
+    if ! metric_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" '| mcatalog values(_dims) WHERE index=em_metrics OR index=netmetrics | stats count as count' "count" 2>/dev/null)"; then
+        fail "Unable to run the SC4SNMP metric-data validation search"
+    elif [[ "${metric_count}" =~ ^[0-9]+$ ]] && (( metric_count > 0 )); then
         pass "Splunk contains metric dimensions across em_metrics/netmetrics"
     else
         warn "No SC4SNMP metric data found in Splunk yet (indexes: em_metrics, netmetrics)"
@@ -341,7 +367,7 @@ except Exception:
     if [[ "${pod_summary##* }" =~ ^[0-9]+$ ]] && (( ${pod_summary##* } > 0 )); then
         pass "${pod_summary##* } SC4SNMP pod(s) report Ready"
     else
-        warn "No SC4SNMP pods report Ready yet"
+        fail "No SC4SNMP pods report Ready"
     fi
     log ""
 }

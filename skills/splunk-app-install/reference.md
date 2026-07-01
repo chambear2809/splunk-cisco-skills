@@ -58,9 +58,20 @@ The installer resolves Cisco app metadata from
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
 | `--app-version VER` | Pin a specific Splunkbase version (omit for latest) |
+| `--expected-sha256 HEX` | Required publisher SHA-256 for a remote URL package |
+| `--license-ack-url URL` | Third-party license acknowledgment URL for ACS |
+| `--pre-vetted` | Skip ACS private-app inspection only after external review |
 | `--update` | Upgrade an existing app |
 | `--no-update` | Fresh install only |
 | `--no-restart` | Skip automatic restart after install |
+
+Source fallback is caller-controlled: a failed Splunkbase attempt exits
+nonzero, and the caller may then explicitly rerun `--source local --file PATH`.
+Cloud uninstall likewise exits nonzero when ACS accepted the request but final
+absence cannot be verified.
+Cloud install also requires a recognizable post-operation app record; known
+failure/in-progress statuses and pinned-version mismatches are incomplete and
+return nonzero with a verification handoff.
 
 ## Credentials
 

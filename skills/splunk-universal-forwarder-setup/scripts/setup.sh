@@ -917,7 +917,26 @@ ensure_splunk_ownership() {
     if [[ "${EXECUTION_MODE}" == "local" ]] && [[ "$(id -un)" == "${SERVICE_USER}" ]] && [[ -w "${SPLUNK_HOME}" ]]; then
         return 0
     fi
-    hbs_run_target_cmd "${EXECUTION_MODE}" "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown -R "${SERVICE_USER}:${SERVICE_USER}" "${SPLUNK_HOME}")")" || true
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown -R "${SERVICE_USER}:${SERVICE_USER}" "${SPLUNK_HOME}")")" || {
+        log "ERROR: Failed to set ${SPLUNK_HOME} ownership to ${SERVICE_USER}:${SERVICE_USER}."
+        exit 1
+    }
+}
+
+write_splunk_config() {
+    local target_path="$1" content="$2" backup_existing="${3:-true}"
+    hbs_write_target_file "${EXECUTION_MODE}" "${target_path}" "600" "${content}" "${backup_existing}" || {
+        log "ERROR: Failed to write Universal Forwarder configuration: ${target_path}"
+        exit 1
+    }
+    if [[ -n "${SERVICE_USER}" ]]; then
+        hbs_run_target_cmd "${EXECUTION_MODE}" \
+            "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}:${SERVICE_USER}" "${target_path}")")" || {
+            log "ERROR: Failed to set Universal Forwarder config ownership on ${target_path}."
+            exit 1
+        }
+    fi
 }
 
 validate_install_constraints() {
@@ -1080,7 +1099,7 @@ write_user_seed() {
     content+="USERNAME = ${ADMIN_USER}"$'\n'
     content+="PASSWORD = ${ADMIN_PASSWORD}"$'\n'
     cleanup_user_seed_artifacts
-    hbs_write_target_file "${EXECUTION_MODE}" "${user_seed_path}" "600" "${content}" "false"
+    write_splunk_config "${user_seed_path}" "${content}" "false"
 }
 
 start_splunk() {
@@ -1099,7 +1118,10 @@ enable_boot_start() {
     [[ "${BOOT_START}" == "true" && "${TARGET_OS}" == "linux" && -n "${SERVICE_USER}" ]] || return 0
     local cmd
     cmd="$(splunk_cli_cmd enable boot-start -user "${SERVICE_USER}" --accept-license --answer-yes --no-prompt)"
-    hbs_run_target_cmd "${EXECUTION_MODE}" "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "${cmd}")" || true
+    hbs_run_target_cmd "${EXECUTION_MODE}" "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "${cmd}")" || {
+        log "ERROR: Failed to enable Universal Forwarder boot-start integration."
+        exit 1
+    }
 }
 
 stop_splunk_if_running() {
@@ -1182,11 +1204,11 @@ apply_enrollment() {
             return 0
             ;;
         deployment-server)
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/deploymentclient.conf" "600" "$(render_deploymentclient_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/system/local/deploymentclient.conf" "$(render_deploymentclient_conf)"
             needs_restart=true
             ;;
         enterprise-indexers)
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/outputs.conf" "600" "$(render_outputs_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/system/local/outputs.conf" "$(render_outputs_conf)"
             needs_restart=true
             ;;
         splunk-cloud)

@@ -658,7 +658,7 @@ load_conditional_required_secrets() {
 }
 
 prepare_effective_route() {
-    local variant_path variant_key variant_value
+    local variant_path variant_key variant_value input_type
 
     reset_effective_route
     load_effective_lists_from_product
@@ -734,6 +734,11 @@ prepare_effective_route() {
         thousandeyes)
             EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
             EFFECTIVE_INPUT_TYPE="$(product_field route.default_input_type)"
+            input_type="$(lookup_user_value "input_type" || true)"
+            [[ -n "${input_type}" ]] || input_type="${EFFECTIVE_INPUT_TYPE}"
+            case "${input_type}" in
+                all|alerts) append_unique_required_non_secret "alert_rules" ;;
+            esac
             ;;
         spaces)
             EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
@@ -1771,6 +1776,7 @@ run_thousandeyes_configure() {
         --index "${index}"
         --input-type "${input_type}"
         --hec-token "${hec_token}")
+    has_user_value "alert_rules" && cmd+=(--alert-rules "$(lookup_user_value "alert_rules")")
     has_user_value "pathvis_index" && cmd+=(--pathvis-index "$(lookup_user_value "pathvis_index")")
     has_user_value "pathvis_interval" && cmd+=(--pathvis-interval "$(lookup_user_value "pathvis_interval")")
     if has_user_value "pathvis_enabled" && ! is_truthy "$(lookup_user_value "pathvis_enabled")"; then
@@ -2038,59 +2044,60 @@ run_validation_phase() {
                 log "ERROR: ${ROUTE_TYPE} validation requires --set ${EFFECTIVE_VARIANT_KEY} <value>."
                 exit 1
             fi
-            bash "${SCRIPT_DIR}/../../cisco-security-cloud-setup/scripts/validate.sh" --product "${EFFECTIVE_PRODUCT_KEY}"
+            bash "${SCRIPT_DIR}/../../cisco-security-cloud-setup/scripts/validate.sh" --completion --product "${EFFECTIVE_PRODUCT_KEY}"
             ;;
         secure_access)
             org_id="$(lookup_user_value "org_id" || true)"
             [[ -z "${org_id}" ]] && org_id="${EFFECTIVE_DISCOVERED_ORG_ID}"
             if [[ -n "${org_id}" ]]; then
-                bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/validate.sh" --org-id "${org_id}"
+                bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/validate.sh" --completion --org-id "${org_id}"
             else
-                bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/validate.sh"
+                bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/validate.sh" --completion
             fi
             ;;
         app_install_only)
             validate_install_only_apps
             ;;
         dc_networking)
-            bash "${SCRIPT_DIR}/../../cisco-dc-networking-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-dc-networking-setup/scripts/validate.sh" --completion
             ;;
         catalyst_stack)
-            bash "${SCRIPT_DIR}/../../cisco-catalyst-ta-setup/scripts/validate.sh"
-            bash "${SCRIPT_DIR}/../../cisco-enterprise-networking-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-catalyst-ta-setup/scripts/validate.sh" --completion
+            bash "${SCRIPT_DIR}/../../cisco-enterprise-networking-setup/scripts/validate.sh" --completion
             ;;
         meraki)
-            bash "${SCRIPT_DIR}/../../cisco-meraki-ta-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-meraki-ta-setup/scripts/validate.sh" --completion
             if [[ "$(product_field route.install_companion_app)" == "true" ]]; then
                 bash "${SCRIPT_DIR}/../../cisco-enterprise-networking-setup/scripts/validate.sh"
             fi
             ;;
         intersight)
-            bash "${SCRIPT_DIR}/../../cisco-intersight-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-intersight-setup/scripts/validate.sh" --completion
             ;;
         thousandeyes)
-            bash "${SCRIPT_DIR}/../../cisco-thousandeyes-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-thousandeyes-setup/scripts/validate.sh" --completion
             ;;
         appdynamics)
-            bash "${SCRIPT_DIR}/../../cisco-appdynamics-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-appdynamics-setup/scripts/validate.sh" --completion
             ;;
         spaces)
-            bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/validate.sh" --completion
             ;;
         webex)
-            bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/validate.sh" --completion
             ;;
         ucs_ta)
-            bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/validate.sh" --completion
             ;;
         secure_email_web_gateway)
             bash "${SCRIPT_DIR}/../../cisco-secure-email-web-gateway-setup/scripts/validate.sh" \
+                --completion \
                 --product "$(product_field route.product)" \
                 --esa-index "$(effective_esa_index)" \
                 --wsa-index "$(effective_wsa_index)"
             ;;
         talos_intelligence)
-            bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/validate.sh"
+            bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/validate.sh" --completion
             ;;
         *)
             log "ERROR: Unsupported route type '${ROUTE_TYPE}' for validation." >&2

@@ -6,7 +6,7 @@ connection:
   # Leave blank to use SPLUNK_SEARCH_API_URI from the credentials file.
   base_url: ""
   session_key_env: SPLUNK_SESSION_KEY
-  verify_ssl: false
+  verify_ssl: true
   platform: auto
 
 itsi:

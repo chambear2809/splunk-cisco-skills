@@ -128,13 +128,14 @@ unsupported edge cases.
 ### Step 4: Validate
 
 ```bash
-bash skills/cisco-security-cloud-setup/scripts/validate.sh
+bash skills/cisco-security-cloud-setup/scripts/validate.sh --completion
 ```
 
 To validate one specific product flow:
 
 ```bash
 bash skills/cisco-security-cloud-setup/scripts/validate.sh \
+  --completion \
   --product xdr \
   --name XDR_Default
 ```
@@ -184,3 +185,10 @@ non-secret values before running the configuration script.
 - [reference.md](reference.md) — product matrix and endpoint details
 - [products.json](products.json) — product-to-handler metadata used by the wrapper
 - [template.example](template.example) — non-secret intake worksheet
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require the selected/configured input, nonzero event flow in an event-capable
+default index, and visible shipped views. Strict mode rejects
+`--skip-data-flow`.

@@ -98,6 +98,7 @@ PY
 }
 
 MODE_RENDER=true
+EXPLICIT_RENDER_ACTION=false
 MODE_APPLY=false
 APPLY_STEPS=""
 MODE_VALIDATE=false
@@ -140,12 +141,12 @@ fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --render) MODE_RENDER=true; shift ;;
-        --discover) MODE_DISCOVER=true; MODE_RENDER=true; shift ;;
-        --preflight) MODE_PREFLIGHT=true; MODE_RENDER=true; shift ;;
-        --doctor) MODE_DOCTOR=true; MODE_RENDER=true; shift ;;
+        --render) MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --discover) MODE_DISCOVER=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --preflight) MODE_PREFLIGHT=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --doctor) MODE_DOCTOR=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
         --apply)
-            MODE_APPLY=true; MODE_RENDER=true
+            MODE_APPLY=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true
             if [[ $# -ge 2 && ! "$2" =~ ^-- ]]; then
                 APPLY_STEPS="$2"
                 shift 2
@@ -153,12 +154,18 @@ while [[ $# -gt 0 ]]; do
                 shift
             fi
             ;;
-        --backup) MODE_BACKUP=true; MODE_RENDER=true; shift ;;
-        --upgrade-plan) MODE_UPGRADE_PLAN=true; MODE_RENDER=true; shift ;;
-        --rollback-plan) MODE_ROLLBACK_PLAN=true; MODE_RENDER=true; shift ;;
-        --uninstall-plan) MODE_UNINSTALL_PLAN=true; MODE_RENDER=true; shift ;;
-        --feature-matrix) MODE_FEATURE_MATRIX=true; MODE_RENDER=true; shift ;;
-        --validate) MODE_VALIDATE=true; shift ;;
+        --backup) MODE_BACKUP=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --upgrade-plan) MODE_UPGRADE_PLAN=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --rollback-plan) MODE_ROLLBACK_PLAN=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --uninstall-plan) MODE_UNINSTALL_PLAN=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --feature-matrix) MODE_FEATURE_MATRIX=true; MODE_RENDER=true; EXPLICIT_RENDER_ACTION=true; shift ;;
+        --validate)
+            MODE_VALIDATE=true
+            if [[ "${EXPLICIT_RENDER_ACTION}" != "true" ]]; then
+                MODE_RENDER=false
+            fi
+            shift
+            ;;
         --live) LIVE_VALIDATE=true; shift ;;
         --accept-k8s-apply) K8S_APPLY_ACCEPTED=true; shift ;;
         --accept-isovalent-disruptive-change) ISOVALENT_DISRUPTIVE_ACCEPTED=true; shift ;;
@@ -487,7 +494,7 @@ run_preflight() {
 
 run_backup() {
     require_helm
-    local stamp backup_dir namespace
+    local stamp backup_dir namespace release failed=0
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     backup_dir="${OUTPUT_DIR}/backup/${stamp}"
     mkdir -p "${backup_dir}/helm-values" "${backup_dir}/helm-history"
@@ -499,9 +506,19 @@ run_backup() {
             printf '%s not installed\n' "${release}" > "${backup_dir}/helm-history/${release}.txt"
             continue
         fi
-        _helm_cmd get values "${release}" -n "${namespace}" -a > "${backup_dir}/helm-values/${release}.yaml" 2>&1 || true
-        _helm_cmd history "${release}" -n "${namespace}" > "${backup_dir}/helm-history/${release}.txt" 2>&1 || true
+        if ! _helm_cmd get values "${release}" -n "${namespace}" -a > "${backup_dir}/helm-values/${release}.yaml" 2>&1; then
+            log "ERROR: Failed to capture Helm values for ${release} in ${namespace}."
+            failed=1
+        fi
+        if ! _helm_cmd history "${release}" -n "${namespace}" > "${backup_dir}/helm-history/${release}.txt" 2>&1; then
+            log "ERROR: Failed to capture Helm history for ${release} in ${namespace}."
+            failed=1
+        fi
     done
+    if [[ "${failed}" -ne 0 ]]; then
+        log "ERROR: Backup is incomplete; live state was not marked as backed up."
+        return 1
+    fi
     write_live_state "backup" ""
 }
 

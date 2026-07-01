@@ -126,6 +126,12 @@ def normalize_controller_url(value: str) -> str:
     parsed = parse.urlsplit(text)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ConfigError("--controller-url must be a controller host or an http(s) URL")
+    if parsed.username or parsed.password:
+        raise ConfigError("--controller-url must not contain inline credentials")
+    if parsed.query or parsed.fragment:
+        raise ConfigError("--controller-url must not contain a query string or fragment")
+    if parsed.path not in {"", "/"}:
+        raise ConfigError("--controller-url must be the Controller origin only, without a path")
     return text.rstrip("/")
 
 
@@ -454,7 +460,7 @@ class AppDClient:
                 error=str(exc.reason),
                 duration_ms=int((time.monotonic() - started) * 1000),
             )
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             return EndpointResult(
                 name=name,
                 method=method,
@@ -491,7 +497,7 @@ def oauth_token(controller_url: str, account_name: str, api_client_name: str, cl
         raise ConfigError(f"OAuth token request failed with HTTP {exc.code}: {redact_string(body)}") from exc
     except error.URLError as exc:
         raise ConfigError(f"OAuth token request failed: {redact_string(str(exc.reason))}") from exc
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ConfigError(f"OAuth token response was not JSON: {exc}") from exc
     token = payload.get("access_token")
     if not isinstance(token, str) or not token:
@@ -934,6 +940,13 @@ def auth_context_is_actionable(report: dict[str, Any]) -> bool:
 
 
 def write_csv(path: Path, sections: dict[str, list[dict[str, Any]]]) -> None:
+    def csv_safe(value: Any) -> Any:
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, sort_keys=True)
+        if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+            return "'" + value
+        return value
+
     fieldnames = [
         "section",
         "source",
@@ -975,7 +988,7 @@ def write_csv(path: Path, sections: dict[str, list[dict[str, Any]]]) -> None:
                 safe_row = redact(row)
                 if isinstance(safe_row, dict):
                     safe_row["section"] = section
-                    writer.writerow(safe_row)
+                    writer.writerow({key: csv_safe(value) for key, value in safe_row.items()})
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -1049,6 +1062,7 @@ The table below summarizes peak account-level consumption during the reporting w
 
 def write_reports(out: Path, report: dict[str, Any], include_raw: bool) -> None:
     out.mkdir(parents=True, exist_ok=True)
+    out.chmod(0o700)
     public_report = {
         key: value
         for key, value in report.items()
@@ -1061,15 +1075,23 @@ def write_reports(out: Path, report: dict[str, Any], include_raw: bool) -> None:
     )
     (out / "license-usage-report.md").write_text(render_markdown(report), encoding="utf-8")
     write_csv(out / "license-usage-report.csv", report["sections"])
+    for report_path in (
+        out / "license-usage-report.json",
+        out / "license-usage-report.md",
+        out / "license-usage-report.csv",
+    ):
+        report_path.chmod(0o600)
     if include_raw:
         raw_dir = out / "raw"
         raw_dir.mkdir(parents=True, exist_ok=True)
+        raw_dir.chmod(0o700)
         for name, payload in report["raw_payloads"].items():
             safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "payload"
             (raw_dir / f"{safe_name}.json").write_text(
                 json.dumps(redact(payload), indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            (raw_dir / f"{safe_name}.json").chmod(0o600)
 
 
 def fetch_report(args: argparse.Namespace) -> dict[str, Any]:
@@ -1256,11 +1278,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     args.controller_url = normalize_controller_url(args.controller_url)
     try:
-        int(str(args.account_id))
+        account_id = int(str(args.account_id))
     except ValueError as exc:
         raise ConfigError(
             "--account-id must be the numeric AppDynamics License API accountId; do not use GUID-like OAuth acctId/tntId values"
         ) from exc
+    if account_id <= 0:
+        raise ConfigError("--account-id must be a positive AppDynamics License API accountId")
     if not args.account_name:
         raise ConfigError("--account-name is required")
     if args.granularity_minutes <= 0:

@@ -256,8 +256,16 @@ def render_scripts(args: argparse.Namespace) -> dict[str, str]:
         "preflight.sh": make_script(
             f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
-if command -v systemctl >/dev/null 2>&1; then systemctl status Splunkd >/dev/null 2>&1 || true; fi
-"${{splunk_home}}/bin/splunk" show workload-management-status --verbose || true
+[[ "$(uname -s)" == "Linux" ]] || {{ echo "ERROR: Workload Management requires a Linux Splunk Enterprise host." >&2; exit 1; }}
+[[ -d /sys/fs/cgroup ]] || {{ echo "ERROR: cgroup filesystem is not mounted at /sys/fs/cgroup." >&2; exit 1; }}
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl status Splunkd >/dev/null 2>&1; then
+    echo "OK: Splunkd systemd unit is active."
+  else
+    echo "WARNING: Splunkd is not active under the unit named Splunkd; verify cgroup delegation for the actual service unit." >&2
+  fi
+fi
+"${{splunk_home}}/bin/splunk" show workload-management-status --verbose
 """
         ),
         "apply.sh": make_script(
@@ -269,8 +277,8 @@ mkdir -p "${{app_dir}}"
 cp workload_pools.conf workload_rules.conf workload_policy.conf "${{app_dir}}/"
 "${{splunk_home}}/bin/splunk" btool workload_pools list --debug >/dev/null
 "${{splunk_home}}/bin/splunk" btool workload_rules list --debug >/dev/null
-"${{splunk_home}}/bin/splunk" _internal call /services/workloads/pools/_reload >/dev/null 2>&1 || true
-"${{splunk_home}}/bin/splunk" _internal call "/servicesNS/nobody/${{app_name}}/workloads/rules/_reload" >/dev/null 2>&1 || true
+"${{splunk_home}}/bin/splunk" _internal call /services/workloads/pools/_reload >/dev/null
+"${{splunk_home}}/bin/splunk" _internal call "/servicesNS/nobody/${{app_name}}/workloads/rules/_reload" >/dev/null
 if [[ "${{enable_workload_management}}" == "true" ]]; then
   "${{splunk_home}}/bin/splunk" enable workload-management
 fi
@@ -278,10 +286,10 @@ fi
         ),
         "status.sh": make_script(
             f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" show workload-management-status --verbose || true
-"${{splunk_home}}/bin/splunk" list workload-pool || true
-"${{splunk_home}}/bin/splunk" list workload-rule || true
-"${{splunk_home}}/bin/splunk" list workload-rule -workload_rule_type search_filter || true
+"${{splunk_home}}/bin/splunk" show workload-management-status --verbose
+"${{splunk_home}}/bin/splunk" list workload-pool
+"${{splunk_home}}/bin/splunk" list workload-rule
+"${{splunk_home}}/bin/splunk" list workload-rule -workload_rule_type search_filter
 """
         ),
     }

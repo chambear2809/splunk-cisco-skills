@@ -83,11 +83,11 @@ Every rendered section gets an explicit coverage status in
 
 | Mode | Flag | Purpose |
 |------|------|---------|
-| quickstart | `--quickstart` | Single-shot: render + apply for the most common External-ID + Splunk-managed Metric Streams scenario. Always runs `--discover` first; pivots to `--quickstart-from-live` if an integration already exists. |
+| quickstart | `--quickstart` | Render the common scenario and print the supported SecurityToken apply plus ExternalId handoff. No live changes. |
 | render | `--render` (default) | Produces the numbered plan tree under `--output-dir`. Never touches live state. |
 | discover | `--discover` | Read-only sweep that polls `GET /v2/integration?type=AWSCloudWatch`, writes `current-state.json`, and emits a `drift-report.md` against the rendered plan. |
 | doctor | `--doctor` | Runs the troubleshooting catalog and emits `doctor-report.md` with prioritized fixes and the exact `setup.sh --apply` command for each fix. |
-| apply | `--apply [SECTIONS]` | Applies the rendered plan; without arguments runs every section in dependency order; with `--apply integration,iam,streams` runs only the named sections. |
+| apply | `--apply [SECTIONS]` | Applies selected sections. SecurityToken integration and regional streams can mutate; IAM, ExternalId two-phase setup, and StackSets fail closed to explicit handoffs. |
 
 Plus quality-of-life flags:
 
@@ -144,22 +144,29 @@ Plus quality-of-life flags:
    - `scripts/` — per-step apply scripts and cross-skill handoff drivers.
    - `support-tickets/` — pre-filled tickets when Splunk Support is required.
 
-5. Apply only when explicitly requested:
+5. Apply SecurityToken mode only when explicitly requested. ExternalId mode
+   uses the rendered two-phase handoff and direct apply refuses a partial
+   disabled integration:
 
    ```bash
    bash skills/splunk-observability-aws-integration/scripts/setup.sh \
-     --apply \
+     --apply integration,validation \
      --spec skills/splunk-observability-aws-integration/template.example \
      --realm us1 \
-     --token-file /tmp/splunk_o11y_admin_token
+     --token-file /tmp/splunk_o11y_admin_token \
+     --aws-access-key-id-file /tmp/aws_access_key_id \
+     --aws-secret-access-key-file /tmp/aws_secret_access_key
    ```
 
    To run only a subset of sections:
 
    ```bash
    bash skills/splunk-observability-aws-integration/scripts/setup.sh \
-     --apply integration,iam \
-     --spec my-aws-integration.yaml
+     --apply integration \
+     --spec my-security-token-aws-integration.yaml \
+     --token-file /tmp/splunk_o11y_admin_token \
+     --aws-access-key-id-file /tmp/aws_access_key_id \
+     --aws-secret-access-key-file /tmp/aws_secret_access_key
    ```
 
 ## Supported Sections

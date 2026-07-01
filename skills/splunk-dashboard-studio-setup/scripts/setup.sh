@@ -203,7 +203,7 @@ apply_acl() {
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
         200|201) log "ACL set: sharing=${SHARING}, owner=${OWNER}." ;;
-        *) log "WARNING: ACL update returned HTTP ${http_code}; review dashboard permissions." ;;
+        *) log "ERROR: ACL update returned HTTP ${http_code}; dashboard content exists but requested governance was not applied."; return 1 ;;
     esac
 }
 

@@ -105,6 +105,8 @@ streams:manage alerts:manage tags:read integrations:manage`
 - **Fields**: `thousandeyes_user`, `thousandeyes_acc_group`, `alert_rules`,
   `hec_target`, `hec_token`, `alerts_index`, `webhook_operation_id` (auto),
   `webhook_connector_id` (auto)
+- **Automation input**: pass one or more rule IDs to `setup.sh --alert-rules`
+  separated by `~`; the packaged handler splits this field on `~`.
 
 ### Token Refresh (internal)
 
@@ -188,3 +190,9 @@ Requires `SA-ITOA` to be installed.
 
 - **Name**: `Cisco_ThousandEyes`
 - **Acceleration**: Configurable via saved searches
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` promotes missing OAuth/input/index/event
+and dashboard evidence to failure. Streaming inputs additionally require a
+confirmed enabled HEC token. Direct no-flag validation remains diagnostic.

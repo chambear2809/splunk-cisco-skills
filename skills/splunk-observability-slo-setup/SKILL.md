@@ -24,4 +24,14 @@ bash skills/splunk-observability-slo-setup/scripts/setup.sh --render \
 ```
 
 Review `deep-native-workflow-spec.json`, then run
-`delegate-deep-native-workflows.sh` for downstream rendering.
+`delegate-deep-native-workflows.sh` for downstream rendering or API apply.
+The wrapper emits an API-ready request-based payload for `apm_service` only
+when `--service` is concrete; other SLI sources fail closed to a completion
+handoff.
+
+```bash
+bash splunk-observability-slo-rendered/delegate-deep-native-workflows.sh \
+  --apply --dry-run
+bash splunk-observability-slo-rendered/delegate-deep-native-workflows.sh \
+  --apply --token-file /path/to/chmod-600-o11y-token
+```

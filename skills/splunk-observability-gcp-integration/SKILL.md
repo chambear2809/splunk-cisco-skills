@@ -5,14 +5,22 @@ description: >-
   GCP integration for Cloud Monitoring metrics. Covers service-account key and
   Workload Identity Federation auth, poll-rate bounds, metric source quota,
   service enums, custom metric domains, label exclusions, namedToken warnings,
-  Terraform, gcloud service-account and IAM scripts, multi-project support,
+  service-account Terraform and gcloud IAM handoffs, multi-project support,
   credential-hash drift detection, and conflict checks. Use when the user asks
   to connect Splunk Observability Cloud to GCP metrics, configure Service
-  Account or WIF credentials, manage the GCP REST/Terraform integration, or set
+  Account or official generated WIF credentials, manage the GCP REST integration, or set
   up GCP dashboards, detectors, logs, or GKE telemetry handoffs.
 ---
 
 # Splunk Observability Cloud — GCP Integration Setup
+
+## Shared add-on completion gate
+
+If this workflow installs or hands off the registry-listed Splunk GCP add-on or
+dashboard companion, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable ingest, macros, and shipped
+dashboards against data.
 
 Render-first skill that owns the complete lifecycle of the Splunk O11y GCP
 integration. The workflow is render-first by default. The Splunk O11y REST API
@@ -23,10 +31,10 @@ is only called when the operator explicitly runs `--apply`.
 | Section | Coverage status |
 |---------|----------------|
 | REST payload generation | `api_validate` |
-| Terraform `signalfx_gcp_integration` | `handoff` |
+| Terraform `signalfx_gcp_integration` (SA-key mode only) | `handoff` |
 | GCloud CLI SA creation scripts | `handoff` |
 | GCloud CLI role binding scripts | `handoff` |
-| WIF pool/provider configuration | `api_validate` |
+| Official `gcp_wif_config.json` validation and REST delivery | `api_apply` / `api_validate` |
 | Drift detection (hash-based) | `api_validate` |
 | Conflict matrix enforcement | `api_validate` |
 | `projectKey` redacted on GET | `api_validate` |
@@ -38,13 +46,23 @@ is only called when the operator explicitly runs `--apply`.
 
 - Never ask for the GCP Service Account JSON key (`projectKey`) in conversation.
 - Never pass `projectKey` as a CLI argument or env-var prefix.
-- Use `--key-file` (chmod 600) for file-based delivery.
+- Use `--key-file` (chmod 600) for file-based delivery. Repeat it exactly once
+  per `project_service_keys` entry, in the same order; the CLI refuses count
+  mismatches rather than reusing one credential across projects.
+- In WIF mode, use only Splunk's official generated file named
+  `gcp_wif_config.json`, stored unchanged as a regular mode-600 file. Pass its
+  path through `--wif-config-file`; never paste its contents into the spec.
+- Do not infer realm principals or construct WIF pool/provider values. The
+  generated document is opaque and is sent as compact, stringified JSON in
+  `workloadIdentityFederationConfig`.
 - Use `write_secret_file.sh` to create secret files without shell-history exposure.
 - Reject direct-secret flags: `--secret`, `--password`, `--api-key`,
-  `--project-key`, `--token`.
+  `--project-key`, `--token`, `--wif-config`.
 - `projectKey` is redacted on `GET /v2/integration/<id>`.
   The skill compares local file hashes to `state/credential-hashes.json`
   rather than server state.
+- Every payload includes `projects.syncMode`; `SELECTED` also includes the
+  reviewed project ID list.
 
 ## Five-mode UX
 
@@ -95,9 +113,10 @@ splunk-observability-gcp-integration-rendered/
   README.md               # plan summary + apply command
   rest/create.json        # POST /v2/integration body
   rest/update.json        # PUT /v2/integration/{id} body
+  rest/wif-config-file-manifest.json # file path only; no WIF contents
   gcloud-cli/create-sa.sh  # gcloud iam sa create (review)
   gcloud-cli/bind-roles.sh # role bindings
-  terraform/main.tf       # signalfx_gcp_integration resource
+  terraform/main.tf       # SA-key resource, or explicit WIF non-support notice
   terraform/variables.tf  # variable declarations
   handoffs/               # cross-skill handoff drivers
   state/                  # populated on apply
@@ -134,8 +153,8 @@ bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
 ```
 
 Doctor checks: services non-empty when explicit mode, poll-rate 60–600,
-namedToken ForceNew warning, credential-hash freshness, and `projectKey`
-redaction notice.
+`projects.syncMode`, namedToken ForceNew warning, credential-hash freshness,
+and WIF file existence, JSON integrity, filename, regular-file status, and mode.
 
 ## Rollback
 
@@ -151,20 +170,30 @@ Disables the integration in Splunk O11y (sets `enabled: false`). Use
 
 ## Workload Identity Federation
 
-WIF allows keyless authentication — no SA JSON key is created or stored.
+WIF avoids a Service Account private key. Obtain `gcp_wif_config.json` from
+Splunk's supported integration workflow and keep it unchanged. The skill does
+not generate that document and does not infer any realm identity.
 
 ```yaml
 authentication:
   mode: workload_identity_federation
   workload_identity_federation:
-    pool_id: "splunk-o11y-pool"
-    provider_id: "splunk-o11y-provider"
-    splunk_principal: ""  # auto-filled from realm map
+    config_file: "/secure/path/gcp_wif_config.json"
 ```
 
-The Splunk-side principal for your realm is in
-`references/wif-splunk-principals.json`. For unknown realms, contact Splunk
-Support for the exact principal value.
+```bash
+chmod 600 /secure/path/gcp_wif_config.json
+bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
+  --apply --spec my-wif-spec.yaml --realm us1 \
+  --token-file /secure/path/splunk_o11y_token \
+  --wif-config-file /secure/path/gcp_wif_config.json
+```
+
+The live request uses `authMethod: WORKLOAD_IDENTITY_FEDERATION` and injects
+the complete document as compact/stringified JSON in
+`workloadIdentityFederationConfig`. Terraform WIF arguments and gcloud
+pool/provider scripts are intentionally not rendered because this skill has no
+verified provider contract for that opaque configuration.
 
 ## Hand-offs
 

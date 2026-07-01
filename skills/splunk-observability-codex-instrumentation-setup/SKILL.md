@@ -12,20 +12,27 @@ Splunk Observability. Codex telemetry belongs in user-level `CODEX_HOME`
 profile files such as `~/.codex/codex-o11y-local.config.toml`; do not put OTel
 settings in project `.codex/config.toml`.
 
-The skill renders three destination profiles:
+The skill recognizes three destination modes; two render profiles and one is a
+fail-closed compatibility diagnostic:
 
 - `local-collector`: traces and metrics to
   `http://127.0.0.1:14318` by default. Override the base endpoint with
-  `--local-collector-endpoint http://localhost:14318`.
+  `--local-collector-endpoint http://localhost:14318`. Native logs are enabled
+  with `--enable-native-logs`. The collector receiver bind is independent and
+  defaults to Docker-safe `0.0.0.0:4318`; override it with
+  `--local-collector-receiver-endpoint HOST:PORT`.
 - `external-collector`: traces, metrics, and optional native logs to explicit
-  external OTLP collector endpoints.
-- `direct`: traces to
-  `https://ingest.<realm>.observability.splunkcloud.com/v2/trace/otlp` and
-  metrics to
-  `https://ingest.<realm>.observability.splunkcloud.com/v2/datapoint/otlp`.
+  unauthenticated external OTLP collector endpoints. Safe literal routing
+  headers and literal TLS paths are supported; credential placeholders are
+  refused because Codex sends them literally.
+- `direct`: recognized only to fail closed with a migration message. Direct
+  Splunk ingest requires `X-SF-TOKEN`, but Codex does not expand environment
+  placeholders in OTel exporter headers and this skill never renders raw
+  tokens.
 
-Direct native Codex logs are refused. Native logs are allowed only through local
-or external collector destinations.
+Use `local-collector` for Splunk Observability. The collector expands
+`${env:SPLUNK_ACCESS_TOKEN}` in its own process and keeps the credential out of
+Codex configuration and process arguments.
 
 For Galileo Observe, do not assume a configured Galileo MCP server means Codex
 turns are being logged. MCP enables tool access only. Interactive Codex turn
@@ -39,11 +46,13 @@ through the Galileo trace ingest API.
 - Reject direct secret flags, including equals form: `--token`,
   `--access-token`, `--sf-token`, `--o11y-token`, `--api-key`, and
   `--password`.
-- Use environment placeholders such as `${SPLUNK_ACCESS_TOKEN}` in rendered
-  profile headers.
+- Do not render `${NAME}` placeholders in Codex OTel profile headers. Codex
+  sends those values literally; credentialed exporters must terminate at a
+  collector that owns secret expansion.
 - `codex --strict-config --profile <profile>` validates Codex config shape only;
   it does not validate Splunk endpoint semantics.
-- Direct mode is OTLP/HTTP only and refuses gRPC.
+- Direct mode is refused for every protocol because Splunk authentication
+  cannot be rendered safely into a Codex OTel profile.
 - Prompt, response, or tool-output content capture requires
   `--accept-content-capture`.
 - AI Defense content inspection requires `--enable-ai-defense` plus
@@ -62,11 +71,14 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   --render \
   --destination local-collector \
   --local-collector-endpoint http://localhost:14318 \
+  --local-collector-receiver-endpoint 0.0.0.0:4318 \
+  --enable-native-logs \
   --realm us0 \
   --output-dir splunk-observability-codex-instrumentation-rendered
 ```
 
-Render direct Splunk Observability traces and metrics:
+Direct Splunk Observability export fails closed and directs the operator to the
+local collector path:
 
 ```bash
 bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
@@ -101,6 +113,25 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   --codex-home "$HOME/.codex"
 ```
 
+Install the durable interactive turn notifier once, outside the per-turn path:
+
+```bash
+bash skills/splunk-observability-codex-instrumentation-setup/scripts/install_notify_runtime.sh \
+  --codex-home "$HOME/.codex" \
+  --service-name codex-cli \
+  --environment prod \
+  --realm us0 \
+  --trace-endpoint http://127.0.0.1:14318/v1/traces \
+  --metrics-endpoint http://127.0.0.1:14318/v1/metrics
+```
+
+The installer builds a hash-locked virtual environment once, installs static
+notify and health scripts transactionally, and writes a non-secret runtime
+manifest. A failed install restores the complete prior managed runtime. Preserve
+any existing notifier chain when adding
+`$CODEX_HOME/bin/codex-splunk-o11y-notify.zsh` to user-level Codex `notify`.
+Per-turn execution never invokes `uv`, `pip`, or another package manager.
+
 Preview apply operations without writing to `CODEX_HOME`:
 
 ```bash
@@ -114,9 +145,14 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
 
 - `profiles/*.config.toml`: user-level Codex profile files.
 - `collector/codex-o11y-local-collector.yaml`: local collector overlay with
-  OTLP trace export, SignalFx metric export, optional logs pipeline, and
-  `send_otlp_histograms: true`.
-- `bin/codex-o11y-exec`: wrapper around `codex exec --json`.
+  OTLP trace export, SignalFx metric export, `/v3/event` log export, optional logs pipeline,
+  normalized `service.name`/`deployment.environment` and
+  `sf_service`/`sf_environment`, and `send_otlp_histograms: true`.
+- `collector/run-codex-o11y-local-collector.sh`: runner pinned by multi-platform
+  digest to Splunk Distribution `0.154.2`; upstream contrib is rejected for
+  this native-histogram path.
+- `bin/codex-o11y-exec`: wrapper around
+  `codex exec --profile <rendered-profile> --json`.
 - `bin/codex-o11y-jsonl-to-spans.py`: metadata-only JSONL parser used by the
   wrapper.
 - `hooks/hooks.json` and `hooks/codex-o11y-stop-hook.py`: optional fail-soft
@@ -125,6 +161,18 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   completed Codex turns into Galileo Observe. It documents the `notify`
   strategy, trace shape, secret handling, duplicate suppression, and read-back
   validation using `traces/count` plus `export_records`.
+- `runtime/codex-splunk-o11y-notify.zsh` and
+  `runtime/codex-splunk-o11y-notify-span.py`: metadata-only, fail-soft
+  interactive turn export with exact thread/turn routing and a persistent
+  retry outbox. GenAI token and duration metrics use the OpenTelemetry bucket
+  advisories, `{token}`/`s` units, and explicit delta temporality.
+- `runtime/codex-splunk-o11y-health.zsh`: offline runtime/contract check and
+  optional live OTLP export smoke test.
+- `codex-splunk-o11y-notify-span.py --drain`: retry queued metadata-only turns
+  without waiting for another Codex turn; invoke it from the collector
+  supervisor after health recovery.
+- `scripts/install_notify_runtime.sh`: explicit, hash-locked one-time runtime
+  installer. It does not rewrite the user-level Codex notifier chain.
 - `apply-plan.json`, `coverage-report.json`, `coverage-report.md`,
   `doctor-report.md`, and `handoff.md`.
 

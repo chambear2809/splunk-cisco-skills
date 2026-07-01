@@ -93,6 +93,7 @@ def test_render_produces_payloads_and_handoffs(tmp_path: Path) -> None:
         "dashboards/agent-to-server.signalflow.yaml",
         "scripts/apply-stream.sh",
         "scripts/apply-apm-connector.sh",
+        "scripts/te-api-client.py",
         "scripts/handoff-dashboards.sh",
         "scripts/handoff-detectors.sh",
         "scripts/handoff-mcp.sh",
@@ -107,6 +108,25 @@ def test_render_produces_payloads_and_handoffs(tmp_path: Path) -> None:
     assert stream["customHeaders"]["X-SF-Token"].startswith("${")
     # Stream URL must derive from spec.realm.
     assert stream["streamEndpointUrl"] == "https://ingest.us0.signalfx.com/v2/datapoint/otlp"
+
+
+def test_render_does_not_require_configured_live_token_file(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    missing_token = tmp_path / "not-created-until-apply"
+
+    result = run_setup(
+        "--render",
+        "--spec",
+        str(spec),
+        "--output-dir",
+        str(output),
+        env={"SPLUNK_O11Y_TOKEN_FILE": str(missing_token)},
+    )
+
+    assert result.returncode == 0, combined_output(result)
+    assert (output / "te-payloads/stream.json").is_file()
+    assert not missing_token.exists()
 
 
 def test_template_handlebars_enforcement(tmp_path: Path) -> None:
@@ -192,7 +212,9 @@ def test_token_values_never_appear_in_rendered_output(tmp_path: Path) -> None:
     assert "O11Y_API_TOKEN_SHOULD_NOT_LEAK" not in text
 
 
-def test_rendered_apply_scripts_keep_tokens_off_argv(tmp_path: Path) -> None:
+def test_rendered_apply_path_uses_fixed_origin_client_and_keeps_token_values_off_argv(
+    tmp_path: Path,
+) -> None:
     output = tmp_path / "rendered"
     spec = write_spec(tmp_path / "spec.json")
     result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
@@ -211,8 +233,84 @@ def test_rendered_apply_scripts_keep_tokens_off_argv(tmp_path: Path) -> None:
     )
     for needle in forbidden:
         assert needle not in scripts
-    assert '-K "${TE_CURL_CONFIG}"' in scripts
-    assert '-K "${O11Y_CURL_CONFIG}"' in scripts
+    assert 'TE_API_CLIENT="$(dirname "${BASH_SOURCE[0]}")/te-api-client.py"' in scripts
+    assert '--token-file "${TE_TOKEN_FILE}"' in scripts
+    assert "--secret-file \"${O11Y_INGEST_TOKEN_FILE}\"" in scripts
+    assert "--secret-file \"${O11Y_API_TOKEN_FILE}\"" in scripts
+    assert "TE_CURL_CONFIG" not in scripts
+
+    client = (output / "scripts/te-api-client.py").read_text(encoding="utf-8")
+    assert 'API_BASE = "https://api.thousandeyes.com/v7"' in client
+    assert "class NoRedirectHandler" in client
+    assert "urllib.parse.urlencode({'aid': account_group_id})" in client
+    assert "response.status < 200 or response.status >= 300" in client
+    assert "payload_sha256" in client
+
+
+def test_all_live_apply_scripts_require_mutation_acceptance_and_account_scope(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+
+    for name in (
+        "apply-stream.sh",
+        "apply-apm-connector.sh",
+        "apply-tests.sh",
+        "apply-alert-rules.sh",
+        "apply-template.sh",
+    ):
+        script = (output / "scripts" / name).read_text(encoding="utf-8")
+        assert 'ACCEPT_TE_MUTATIONS:-false' in script
+        assert 'TE_ACCOUNT_GROUP_ID="1234"' in script
+        assert 'TE_API_CLIENT="$(dirname "${BASH_SOURCE[0]}")/te-api-client.py"' in script
+
+
+def test_unproven_label_tag_and_te_dashboard_apply_surfaces_fail_closed(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        labels=[{"name": "checkout", "color": "#0066cc"}],
+        tags=[{"name": "tier:1"}],
+        te_dashboards=[{"name": "Checkout", "widgets": []}],
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+
+    labels_tags = (output / "scripts/apply-labels-tags.sh").read_text(encoding="utf-8")
+    te_dashboards = (output / "scripts/apply-te-dashboards.sh").read_text(encoding="utf-8")
+    for script in (labels_tags, te_dashboards):
+        assert "disabled until authoritative ID/readback schemas are encoded" in script
+        assert "no changes were made" in script
+        assert "curl " not in script
+        assert "ensure-create" not in script
+
+
+@pytest.mark.parametrize(
+    ("override", "expected"),
+    (
+        (
+            {"stream": {"enabled": True, "mode": "all", "endpoint_url": "https://example.invalid/otlp"}},
+            "refusing to send an ingest token to an override origin",
+        ),
+        (
+            {"apm_connector": {"enabled": True, "api_url": "https://example.invalid"}},
+            "refusing to send a User API token to an override origin",
+        ),
+    ),
+)
+def test_noncanonical_o11y_token_destinations_are_rejected(
+    override: dict[str, object], expected: str, tmp_path: Path
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json", **override)
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 1
+    assert expected in combined_output(result)
 
 
 def test_idempotent_re_render(tmp_path: Path) -> None:
@@ -220,10 +318,10 @@ def test_idempotent_re_render(tmp_path: Path) -> None:
     spec = write_spec(tmp_path / "spec.json")
     args = ["--render", "--spec", str(spec), "--output-dir", str(output)]
     first = run_setup(*args)
-    second = run_setup(*args)
     assert first.returncode == 0, combined_output(first)
-    assert second.returncode == 0, combined_output(second)
     first_stream = (output / "te-payloads/stream.json").read_text(encoding="utf-8")
+    second = run_setup(*args)
+    assert second.returncode == 0, combined_output(second)
     assert (output / "te-payloads/stream.json").read_text(encoding="utf-8") == first_stream
 
 

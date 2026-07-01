@@ -8,6 +8,14 @@ description: >-
 
 # Splunk UBA Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, validates, or hands off a UBA support app or
+Kafka add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable ingest and consuming views, or record
+explicit package evidence that no dashboards ship.
+
 Use this skill when the user asks for **Splunk User Behavior Analytics (UBA)** or
 UEBA readiness. Standalone Splunk UBA is end-of-sale and this repo must not
 pretend to automate a supported UBA server installation. This skill provides:

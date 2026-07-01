@@ -39,6 +39,27 @@ Environment-specific notes:
   and validated, and any pre-built dashboards must be visible, macro-aligned,
   and returning data, or explicitly documented as not shipped by the package.
 
+## Action Completion Contract
+
+Every skill must expose a concrete action path through `scripts/setup.sh` or a
+clearly named helper that it delegates to. An action may be a guarded live
+mutation, a local source/configuration change, an operational read/backup, or a
+delegation to the repository skill that owns the target system. Rendering a
+plan by itself is not successful completion of a requested live change.
+
+- A live/apply command returns zero only after the requested state was changed
+  (or proved already converged) and its required readback checks passed.
+- Unsupported, UI-only, private-API, or topology-unsafe mutations fail nonzero
+  and name the exact supported handoff; they never report a rendered packet as
+  an applied change.
+- Placement, topology, dependency, secret-file, and acceptance checks happen
+  before the first mutation so an invalid request cannot partially apply.
+- Mutating subprocess failures propagate. Cleanup and best-effort diagnostic
+  probes may be non-fatal, but required install/configure/restart/validate
+  commands must not be hidden with `|| true` or broad exception swallowing.
+- Secrets are consumed from permission-checked files or native secret stores,
+  never embedded in rendered artifacts or passed in process arguments.
+
 ## Cisco Product And App Setup
 
 | Skill | Additional local tooling | Live access and product requirements |

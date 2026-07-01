@@ -144,27 +144,22 @@ The skill's `preflight` phase computes the SHA-256 of
 it diverges. The fix is the public-exposure-hardening skill's
 `rotate-splunk-secret.sh`.
 
-## Chain concatenation
+## Splunk certificate-file assembly
 
-For most Splunk surfaces, `serverCert` should be the leaf only,
-and intermediates live in `sslRootCAPath`. Some operators prefer
-to bundle the leaf + intermediates into a single chain file:
+Splunk's certificate-preparation documentation requires the non-Web
+certificate file to contain the server certificate, matching private key, and
+CA chain, in that order:
 
 ```bash
-cat leaf.pem intermediate.pem > leaf-with-chain.pem
+cat leaf.pem private-key.pem intermediate.pem root.pem > splunk-combined.pem
 ```
 
-This works for Web (HTTPS clients send the chain on connect) and
-HEC, but is **NOT** recommended for splunkd because:
-
-- KV Store's `openssl verify -x509_strict` runs against
-  `serverCert` separately; a chain in `serverCert` can confuse
-  the parser.
-- The cluster bundle's `sslRootCAPath` already establishes the
-  chain; bundling again duplicates work.
-
-The renderer keeps `serverCert` = leaf, `sslRootCAPath` = full
-chain bundle.
+`install-leaf.sh` assembles that mode-0600 combined PEM for splunkd, S2S,
+HEC, replication, and forwarding, while retaining a separate mode-0644 leaf
+plus chain and mode-0600 key for Splunk Web's `serverCert` + `privKeyPath`
+pair. `sslRootCAPath` still points to the CA-only trust bundle. Verification
+and KV Store EKU checks run against the extracted public leaf, never against
+the private-key-bearing combined file.
 
 ## Format conversion cheat sheet
 

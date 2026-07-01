@@ -270,8 +270,9 @@ cp transforms.conf "${{app_root}}/local/transforms.conf"
 cp local.meta "${{app_root}}/metadata/local.meta"
 echo "Staged governed conf and metadata into ${{app_root}}."
 echo "Reload to apply (or restart on an SHC deployer push):"
-"${{splunk}}" _internal call /services/configs/conf-savedsearches/_reload >/dev/null 2>&1 || true
-"${{splunk}}" _internal call /services/configs/conf-macros/_reload >/dev/null 2>&1 || true
+"${{splunk}}" _internal call /services/configs/conf-savedsearches/_reload >/dev/null
+"${{splunk}}" _internal call /services/configs/conf-macros/_reload >/dev/null
+"${{splunk}}" _internal call /services/configs/conf-transforms/_reload >/dev/null
 echo "Review effective sharing in Settings > All configurations after reload."
 """
     )
@@ -298,7 +299,9 @@ echo "About to set owner=${{new_owner}} sharing=${{share_level}} on:"
 echo "  ${{acl_endpoint}}"
 read -r -p "Type REASSIGN to continue: " confirm
 [[ "${{confirm}}" == "REASSIGN" ]] || {{ echo "Aborted."; exit 1; }}
-# Authenticate interactively or add -auth user:"$(cat /path/to/secret)".
+# Authenticate through an existing local Splunk CLI session. Do not add an
+# inline `-auth user:password` argument; that exposes the password in process
+# listings.
 "${{splunk}}" _internal call "/${{acl_endpoint#/}}" -method POST \\
   -post:owner "${{new_owner}}" -post:sharing "${{share_level}}" \\
   || {{ echo "Reassign failed; verify the endpoint and your capabilities (admin_all_objects)." >&2; exit 1; }}

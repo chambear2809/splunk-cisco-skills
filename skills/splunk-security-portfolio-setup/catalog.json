@@ -43,6 +43,7 @@
       "status": "first_class",
       "route": ["splunk-soar-setup"],
       "route_args": ["--install-export-app"],
+      "action_command": ["bash", "skills/splunk-soar-setup/scripts/setup.sh", "--phase", "splunk-side-apps", "--splunk-side-apps", "app_for_soar=false,app_for_soar_export=true", "--apply"],
       "splunkbase_ids": ["3411"],
       "notes": "Optional Splunk platform to SOAR export app, handled by splunk-soar-setup without installing a SOAR server."
     },
@@ -62,6 +63,7 @@
       "aliases": ["uba", "user behavior analytics", "ueba", "splunk uba"],
       "status": "partial",
       "route": ["splunk-uba-setup"],
+      "route_args": ["--install-kafka-app"],
       "splunkbase_ids": ["4147"],
       "notes": "Standalone UBA is end-of-sale as of 2025-12-12 with end-of-life/end-of-support on 2027-01-31; skill handles readiness, Kafka app, and ES Premier UEBA migration guidance."
     },
@@ -180,6 +182,7 @@
       "status": "first_class",
       "route": ["splunk-security-content-update-setup"],
       "route_command": ["bash", "skills/splunk-security-content-update-setup/scripts/setup.sh", "--render"],
+      "action_command": ["bash", "skills/splunk-security-content-update-setup/scripts/setup.sh", "--install"],
       "splunkbase_ids": ["3449"],
       "notes": "First-class render-first ESCU setup and content activation review; ES mutations remain delegated to Enterprise Security configuration."
     },
@@ -190,6 +193,7 @@
       "status": "first_class",
       "route": ["splunk-pci-compliance-setup"],
       "route_command": ["bash", "skills/splunk-pci-compliance-setup/scripts/setup.sh", "--render"],
+      "action_command": ["bash", "skills/splunk-pci-compliance-setup/scripts/setup.sh", "--install"],
       "splunkbase_ids": ["1143", "2897"],
       "notes": "Render-first PCI app readiness, CDE index/macro intake, CIM prerequisites, roles, reports, and installer-selection handoffs."
     },
@@ -200,6 +204,7 @@
       "status": "first_class",
       "route": ["splunk-infosec-app-setup"],
       "route_command": ["bash", "skills/splunk-infosec-app-setup/scripts/setup.sh", "--render"],
+      "action_command": ["bash", "skills/splunk-infosec-app-setup/scripts/setup.sh", "--install"],
       "splunkbase_ids": ["4240"],
       "notes": "Render-first InfoSec install readiness, source checklist, dashboard/macro/data-model checks, Cloud IDM note, and lookup handoffs."
     },
@@ -220,6 +225,7 @@
       "status": "first_class",
       "route": ["splunk-lookup-file-editing-setup"],
       "route_command": ["bash", "skills/splunk-lookup-file-editing-setup/scripts/setup.sh", "--render"],
+      "action_command": ["bash", "skills/splunk-lookup-file-editing-setup/scripts/setup.sh", "--install"],
       "splunkbase_ids": ["1724"],
       "notes": "Render-first Lookup File Editing install readiness, CSV/KV Store inventory, SHC allowRestReplay runbook, and app health handoffs."
     },

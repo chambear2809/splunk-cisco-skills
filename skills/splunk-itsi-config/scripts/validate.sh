@@ -6,10 +6,13 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 WORKFLOW=""
 SPEC_PATH=""
+COMPLETION=false
 
 usage() {
   cat <<'EOF'
-Usage: validate.sh --workflow native|content-packs|topology --spec PATH
+Usage: validate.sh --workflow native|content-packs|topology --spec PATH [--completion]
+
+Use --completion (or --strict) to fail when a workflow reports warning findings.
 
 Examples:
   bash scripts/validate.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
@@ -29,6 +32,10 @@ while [[ $# -gt 0 ]]; do
     --spec)
       SPEC_PATH="${2:-}"
       shift 2
+      ;;
+    --completion|--strict)
+      COMPLETION=true
+      shift
       ;;
     -h|--help)
       usage
@@ -60,6 +67,12 @@ if [[ ! -f "${SPEC_PATH}" ]]; then
   exit 1
 fi
 
+if [[ "${COMPLETION}" == "true" ]]; then
+  require_current_skill_role_supported
+else
+  warn_if_current_skill_role_unsupported
+fi
+
 load_splunk_connection_settings >/dev/null 2>&1 || true
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
@@ -76,13 +89,19 @@ ruby "${SCRIPT_DIR}/spec_to_json.rb" --spec "${SPEC_PATH}" --output "${SPEC_JSON
 
 case "${WORKFLOW}" in
   native)
-    python3 "${SCRIPT_DIR}/run_native.py" --spec-json "${SPEC_JSON}" --mode validate
+    RUN_ARGS=(--spec-json "${SPEC_JSON}" --mode validate)
+    [[ "${COMPLETION}" == "true" ]] && RUN_ARGS+=(--completion)
+    python3 "${SCRIPT_DIR}/run_native.py" "${RUN_ARGS[@]}"
     ;;
   content-packs)
-    python3 "${SCRIPT_DIR}/run_content_packs.py" --spec-json "${SPEC_JSON}" --mode validate
+    RUN_ARGS=(--spec-json "${SPEC_JSON}" --mode validate)
+    [[ "${COMPLETION}" == "true" ]] && RUN_ARGS+=(--completion)
+    python3 "${SCRIPT_DIR}/run_content_packs.py" "${RUN_ARGS[@]}"
     ;;
   topology)
-    python3 "${SCRIPT_DIR}/run_topology.py" --spec-json "${SPEC_JSON}" --mode validate
+    RUN_ARGS=(--spec-json "${SPEC_JSON}" --mode validate)
+    [[ "${COMPLETION}" == "true" ]] && RUN_ARGS+=(--completion)
+    python3 "${SCRIPT_DIR}/run_topology.py" "${RUN_ARGS[@]}"
     ;;
   *)
     echo "Unsupported workflow: ${WORKFLOW}" >&2

@@ -34,7 +34,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _apply_state import append_step, has_step, read_secret_file, redact  # noqa: E402
+from _apply_state import append_step, read_secret_file, redact  # noqa: E402
 
 _RETRYABLE_STATUSES = {429, 502, 503, 504}
 
@@ -174,6 +174,8 @@ def upsert(
     payload: dict[str, Any],
     state_dir: Path,
     *,
+    aws_access_key_id_file: str = "",
+    aws_secret_access_key_file: str = "",
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Idempotent create-or-update keyed on integration name."""
@@ -181,26 +183,69 @@ def upsert(
     if not name:
         raise ApiError("payload.name is required")
     idempotency_key = f"integration-upsert:{name}"
-    if has_step(state_dir, idempotency_key):
-        return {"result": "skipped", "name": name, "reason": "idempotency-key already recorded"}
+
+    auth_method = str(payload.get("authMethod", ""))
+    if auth_method == "SecurityToken":
+        if not aws_access_key_id_file or not aws_secret_access_key_file:
+            raise ApiError(
+                "SecurityToken apply requires --aws-access-key-id-file and "
+                "--aws-secret-access-key-file."
+            )
+        try:
+            payload = {
+                **payload,
+                "token": read_secret_file(aws_access_key_id_file),
+                "key": read_secret_file(aws_secret_access_key_file),
+                "enabled": True,
+            }
+        except PermissionError as exc:
+            raise ApiError(str(exc)) from exc
+    elif auth_method == "ExternalId":
+        # A new ExternalId integration must first be created disabled so its
+        # server-generated externalId can be placed in the IAM trust policy.
+        # This client will update an existing integration, but refuses to
+        # perform only the first half of a new two-phase onboarding.
+        payload = {**payload, "enabled": True}
+    else:
+        raise ApiError(f"unsupported AWS authMethod {auth_method!r}")
 
     if dry_run:
-        return {"result": "dry-run", "name": name, "would_send": redact(payload)}
+        result = {"result": "dry-run", "name": name, "would_send": redact(payload)}
+        if auth_method == "ExternalId":
+            result["precondition"] = (
+                "Only an existing integration with a concrete roleArn can be updated; "
+                "new ExternalId onboarding remains a two-phase handoff."
+            )
+        return result
 
     existing = list_aws_integrations(realm, token)
     match = next((i for i in existing if i.get("name") == name), None)
 
     if match:
+        if auth_method == "ExternalId":
+            role_arn = str(payload.get("roleArn", ""))
+            if not role_arn or "${" in role_arn:
+                role_arn = str(match.get("roleArn", ""))
+            if not role_arn:
+                raise ApiError(
+                    "existing ExternalId integration has no concrete roleArn; complete the IAM handoff first"
+                )
+            payload = {**payload, "roleArn": role_arn, "enabled": True}
         merged = {**match, **payload}
         merged["id"] = match["id"]
-        # Always re-enable on update unless caller opted out.
-        merged.setdefault("enabled", True)
+        merged["enabled"] = bool(payload.get("enabled", True))
         result = update_integration(realm, token, match["id"], merged)
         append_step(state_dir, "integration", "update", idempotency_key, "success", redact(result))
         return {"result": "updated", "name": name, "id": match["id"]}
 
-    payload_with_disabled = {**payload, "enabled": False}
-    result = create_integration(realm, token, payload_with_disabled)
+    if auth_method == "ExternalId":
+        raise ApiError(
+            "new ExternalId onboarding is two-phase: create disabled to obtain "
+            "externalId/sfxAwsAccountArn, deploy the matching IAM trust role, then "
+            "PUT roleArn with enabled=true. Follow 01-authentication.md; no integration "
+            "was created."
+        )
+    result = create_integration(realm, token, payload)
     append_step(state_dir, "integration", "create", idempotency_key, "success", redact(result))
     return {"result": "created", "name": name, "id": result.get("id")}
 
@@ -282,6 +327,8 @@ def _parse() -> argparse.Namespace:
     p.add_argument("--state-dir", required=True, help="rendered <output-dir>/state directory")
     p.add_argument("--payload-file", help="JSON payload for upsert")
     p.add_argument("--allow-loose-token-perms", action="store_true")
+    p.add_argument("--aws-access-key-id-file", default="")
+    p.add_argument("--aws-secret-access-key-file", default="")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument(
         "command",
@@ -315,7 +362,15 @@ def main() -> int:
             if not args.payload_file:
                 raise ApiError("--payload-file is required for `upsert`")
             payload = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
-            result = upsert(args.realm, token, payload, state_dir, dry_run=args.dry_run)
+            result = upsert(
+                args.realm,
+                token,
+                payload,
+                state_dir,
+                aws_access_key_id_file=args.aws_access_key_id_file,
+                aws_secret_access_key_file=args.aws_secret_access_key_file,
+                dry_run=args.dry_run,
+            )
             print(json.dumps(result, indent=2))
         elif args.command == "delete":
             if not args.integration_id:

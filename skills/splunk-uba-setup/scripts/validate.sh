@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 KAFKA_APP_NAME="Splunk-UBA-SA-Kafka"
 CHECK_KAFKA_APP=false
 UBA_HOST=""
+COMPLETION=false
 UBA_INDEXES=("ueba" "ueba_summaries" "ubaroute" "ers")
 SUPPORT_APPS=("SplunkEnterpriseSecuritySuite" "SA-UEBA" "DA-ESS-UEBA" "Splunk_TA_ueba")
 EOS_DATE="2025-12-12"
@@ -21,6 +22,7 @@ Usage: $(basename "$0") [OPTIONS]
 Options:
   --kafka-app      Require Splunk UBA Kafka Ingestion App
   --uba-host HOST  Non-secret existing UBA host for handoff notes
+  --completion     Require configured UBA indexes and requested Kafka app
   --help           Show this help
 EOF
 }
@@ -29,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --kafka-app) CHECK_KAFKA_APP=true; shift ;;
         --uba-host) require_arg "$1" $# || exit 1; UBA_HOST="$2"; shift 2 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
@@ -55,11 +58,11 @@ check_optional_app() {
 
 log "=== Splunk UBA / UEBA Readiness Validation ==="
 log ""
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Product Status ---"
-warn "Standalone Splunk UBA end-of-sale: ${EOS_DATE}; end-of-support: ${END_OF_SUPPORT_DATE}"
-warn "New UEBA work should target Splunk Enterprise Security Premier UEBA"
+log "  INFO: Standalone Splunk UBA end-of-sale: ${EOS_DATE}; end-of-support: ${END_OF_SUPPORT_DATE}"
+log "  INFO: New UEBA work should target Splunk Enterprise Security Premier UEBA"
 [[ -n "${UBA_HOST}" ]] && pass "Existing UBA host supplied for handoff: ${UBA_HOST}"
 
 log ""
@@ -88,14 +91,14 @@ if [[ ${FAIL} -eq 0 ]]; then
         if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
             pass "Index '${idx}' exists"
         else
-            warn "Index '${idx}' not found; confirm whether this deployment uses custom UBA/UEBA indexes"
+            if [[ "${COMPLETION}" == "true" ]]; then fail "Index '${idx}' not found"; else warn "Index '${idx}' not found; confirm whether this deployment uses custom UBA/UEBA indexes"; fi
         fi
     done
 
     log ""
     log "--- Migration Handoff ---"
-    warn "Standalone UBA server install remains a manual/professional-services handoff"
-    warn "Use splunk-enterprise-security-config for ES Premier UEBA readiness where applicable"
+    log "  INFO: Standalone UBA server install remains a manual/professional-services handoff"
+    log "  INFO: Use splunk-enterprise-security-config for ES Premier UEBA readiness where applicable"
 fi
 
 log ""

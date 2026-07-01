@@ -26,25 +26,31 @@ Usage:
 Modes:
   --render              Validate and render a workflow packet
   --validate            Validate a spec and/or rendered output
+  --apply               Render, validate, then execute documented API actions
+  --dry-run             With --apply, print the exact API sequence without calls
   --json                Emit JSON output where supported
 
 Options:
   --spec PATH           YAML or JSON workflow spec
   --output-dir DIR      Rendered output directory
   --realm REALM         Observability realm, such as us0
+  --token-file PATH     File containing an Observability API token for live apply
   --help                Show this help
 
-This skill is render-only. Direct secret flags such as --token, --access-token,
---api-token, --o11y-token, and --sf-token are rejected.
+UI-only surfaces remain explicit handoffs. Direct secret flags such as --token,
+--access-token, --api-token, --o11y-token, and --sf-token are rejected.
 EOF
 }
 
 RENDER=false
 VALIDATE=false
+APPLY=false
+DRY_RUN=false
 JSON_OUTPUT=false
 SPEC=""
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 REALM="${SPLUNK_O11Y_REALM:-}"
+TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
 
 if [[ $# -eq 0 ]]; then
     usage
@@ -55,10 +61,13 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --render) RENDER=true; shift ;;
         --validate) VALIDATE=true; shift ;;
+        --apply) APPLY=true; RENDER=true; VALIDATE=true; shift ;;
+        --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --realm) require_arg "$1" "$#" || exit 1; REALM="$2"; shift 2 ;;
+        --token-file) require_arg "$1" "$#" || exit 1; TOKEN_FILE="$2"; shift 2 ;;
         --token|--access-token|--api-token|--o11y-token|--sf-token|--password|--client-secret)
             reject_secret_arg "$1" "a file-backed downstream apply workflow"
             exit 1
@@ -76,7 +85,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "${RENDER}" != "true" && "${VALIDATE}" != "true" ]]; then
+if [[ "${RENDER}" != "true" && "${VALIDATE}" != "true" && "${APPLY}" != "true" ]]; then
     RENDER=true
 fi
 
@@ -115,4 +124,18 @@ if [[ "${VALIDATE}" == "true" ]]; then
         validate_args+=(--output-dir "${OUTPUT_DIR}")
     fi
     "${PYTHON_BIN}" "${SCRIPT_DIR}/render_workflows.py" "${validate_args[@]}" "${json_flag[@]}"
+fi
+
+if [[ "${APPLY}" == "true" ]]; then
+    if [[ "${DRY_RUN}" != "true" ]] && { [[ -z "${TOKEN_FILE}" ]] || [[ ! -r "${TOKEN_FILE}" ]]; }; then
+        log "ERROR: --token-file is required and must be readable for live --apply."
+        exit 1
+    fi
+    apply_args=(apply --plan-dir "${OUTPUT_DIR}")
+    [[ -n "${REALM}" ]] && apply_args+=(--realm "${REALM}")
+    [[ -n "${TOKEN_FILE}" ]] && apply_args+=(--token-file "${TOKEN_FILE}")
+    [[ "${DRY_RUN}" == "true" ]] && apply_args+=(--dry-run)
+    "${PYTHON_BIN}" \
+        "${PROJECT_ROOT}/skills/splunk-observability-native-ops/scripts/o11y_native_api.py" \
+        "${apply_args[@]}"
 fi

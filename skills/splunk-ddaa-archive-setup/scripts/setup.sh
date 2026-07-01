@@ -134,6 +134,7 @@ apply_live() {
     if cloud_check_index "${INDEX}"; then
         log "Updating DDAA archival retention for existing index ${INDEX}..."
         acs_command indexes update --name "${INDEX}" \
+            --searchable-days "${SEARCHABLE_DAYS}" \
             --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null
     else
         log "Creating index ${INDEX} with DDAA archival retention..."
@@ -143,7 +144,7 @@ apply_live() {
             --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null
     fi
     log "DDAA archival retention set for ${INDEX}: ${ARCHIVAL_RETENTION_DAYS} days (searchable ${SEARCHABLE_DAYS})."
-    acs_command indexes describe "${INDEX}" 2>/dev/null || true
+    acs_command indexes describe "${INDEX}"
 }
 
 run_status() {
@@ -151,12 +152,9 @@ run_status() {
         log "DRY RUN: acs indexes describe ${INDEX}"
         return 0
     fi
-    if acs_cli_available; then
-        acs_prepare_context || true
-        acs_command indexes describe "${INDEX}" 2>/dev/null || true
-    else
-        log "acs CLI not available; install it to describe index ${INDEX}."
-    fi
+    acs_cli_available || { log "ERROR: acs CLI not available; install it to describe index ${INDEX}."; exit 1; }
+    acs_prepare_context || { log "ERROR: Could not prepare ACS context for the stack."; exit 1; }
+    acs_command indexes describe "${INDEX}"
 }
 
 main() {
@@ -176,7 +174,11 @@ main() {
             render_assets
             [[ "${APPLY}" == "true" ]] && apply_live
             ;;
-        preflight) render_assets ;;
+        preflight)
+            render_assets
+            acs_cli_available || { log "ERROR: acs CLI is required for DDAA operations."; exit 1; }
+            acs_prepare_context || { log "ERROR: Could not prepare ACS context for the stack."; exit 1; }
+            ;;
         apply) render_assets; apply_live ;;
         status) render_assets; run_status ;;
         all) render_assets; apply_live; run_status ;;

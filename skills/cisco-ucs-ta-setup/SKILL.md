@@ -72,7 +72,14 @@ bash skills/cisco-ucs-ta-setup/scripts/configure_task.sh \
 4. Validate:
 
 ```bash
-bash skills/cisco-ucs-ta-setup/scripts/validate.sh
+bash skills/cisco-ucs-ta-setup/scripts/validate.sh --completion
 ```
 
 See `reference.md` for default templates and package-derived CIM/source details.
+
+## Validation Modes
+
+Run the command above for diagnostics. Add `--completion` (alias `--strict`) to
+require the UCS index, all default templates, a UCS Manager server record, an
+enabled task input, and `cisco:ucs` events. This TA ships no standalone
+dashboards.

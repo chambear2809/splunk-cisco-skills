@@ -235,8 +235,24 @@ cloud_requires_local_scope() {
     [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]
 }
 
+_acs_validate_splunk_index_name() {
+    local idx="${1:-}"
+
+    if declare -F validate_splunk_index_name >/dev/null 2>&1; then
+        validate_splunk_index_name "${idx}"
+        return $?
+    fi
+
+    if [[ ! "${idx}" =~ ^[A-Za-z0-9_-]{1,80}$ ]]; then
+        echo "ERROR: Invalid Splunk index name '${idx}'; use 1-80 letters, numbers, underscores, or hyphens." >&2
+        return 1
+    fi
+    return 0
+}
+
 cloud_check_index() {
     local idx="$1"
+    _acs_validate_splunk_index_name "${idx}" || return 1
     acs_prepare_context || return 1
     acs_command indexes describe "${idx}" >/dev/null 2>&1
 }
@@ -245,6 +261,7 @@ cloud_get_index_datatype() {
     local idx="$1"
     local payload
 
+    _acs_validate_splunk_index_name "${idx}" || return 1
     acs_prepare_context || return 1
     payload=$(acs_command indexes describe "${idx}" 2>/dev/null | acs_extract_http_response_json || echo "{}")
     printf '%s' "${payload}" | python3 -c "
@@ -287,6 +304,7 @@ cloud_create_index() {
     local searchable_days="${2:-${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}}"
     local index_type="${3:-event}"
 
+    _acs_validate_splunk_index_name "${idx}" || return 1
     acs_prepare_context || return 1
     if acs_command indexes describe "${idx}" >/dev/null 2>&1; then
         return 0
@@ -580,6 +598,7 @@ log_platform_restart_guidance() {
 
 platform_check_index() {
     local sk="$1" uri="$2" idx="$3"
+    _acs_validate_splunk_index_name "${idx}" || return 1
     if is_splunk_cloud; then
         cloud_check_index "${idx}"
     else
@@ -596,6 +615,7 @@ platform_check_index() {
 
 platform_get_index_datatype() {
     local sk="$1" uri="$2" idx="$3"
+    _acs_validate_splunk_index_name "${idx}" || return 1
     if is_splunk_cloud; then
         cloud_get_index_datatype "${idx}"
     else
@@ -610,6 +630,7 @@ platform_get_index_datatype() {
 
 platform_create_index() {
     local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
+    _acs_validate_splunk_index_name "${idx}" || return 1
     if is_splunk_cloud; then
         cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}" "${index_type}"
     else

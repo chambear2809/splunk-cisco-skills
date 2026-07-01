@@ -47,16 +47,22 @@ Token values are never rendered. `apply-enterprise-files.sh` reads an existing
 placeholder into `inputs.conf` on the target host. If an operator supplies a
 token file, the apply script verifies that it contains a GUID before writing
 `inputs.conf`. The generated script does not pass token values as command-line
-arguments.
+arguments. It merges managed keys in `[http]` and `[http://<token-name>]`,
+preserves unrelated stanzas and unmanaged keys, and creates a dated backup
+before the atomic replacement.
 
 `--restart-splunk true` is the default because Splunk's HEC configuration-file
-workflow requires a restart for changes to take effect. Operators can render or
-apply with `--restart-splunk false` when they need to coordinate restarts
-manually.
+workflow requires a restart for changes to take effect. Apply delegates that
+restart to `splunk-platform-restart-orchestrator`; a topology/privilege handoff
+returns nonzero instead of reporting activation complete. Operators can render
+or apply with `--restart-splunk false` when they intentionally coordinate the
+restart manually.
 
 For clustered indexer or heavy forwarder tiers, distribute the rendered
 configuration through the normal cluster-manager, deployer, or host-management
-path instead of independently editing every peer by hand.
+path instead of independently editing every peer by hand. Direct apply refuses
+known `indexer-peer`, cluster-manager, deployer, and SHC-member roles before
+writing files and emits the bundle-distribution handoff.
 
 ## Splunk Cloud Design
 
@@ -70,7 +76,14 @@ renders ACS JSON payloads and an ACS helper script:
 
 The generated Cloud apply script lets ACS generate the token value. If ACS
 returns the token value and `--write-token-file` was supplied, the script writes
-that value to a chmod 600 local file and does not print it.
+that value to a chmod 600 local file and does not print it. Requested ACS fields
+are not silently dropped: an older command group that cannot create/update the
+complete desired state emits the JSON/UI handoff and exits nonzero. When a
+token-output file was requested but ACS does not return the one-time value, the
+script also exits nonzero and requires token rotation/recreation.
+For an existing token, a requested output path must already be a nonempty,
+non-symlink, owner-only file; ACS cannot validate that stored secret, so sender
+validation remains required.
 
 ## Index Restrictions
 

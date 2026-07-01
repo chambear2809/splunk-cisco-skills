@@ -70,10 +70,8 @@ claim API parity that does not exist.
   used by the Splunk Infrastructure Monitoring Add-on account.
 - Use `--service-account-password-file` for the Log Observer Connect
   service-account password.
-- Token files must be `chmod 600`. `--apply` aborts when any token file is
-  looser, with a `chmod 600 <path>` hint. Override only with
-  `--allow-loose-token-perms` (emits a WARN — use only for short-lived scratch
-  tokens).
+- Token files must be regular, non-empty files with mode `600`. `--apply`
+  aborts on symlinks, empty files, or looser permissions.
 - Reject direct secret flags such as `--token`, `--access-token`,
   `--api-token`, `--o11y-token`, `--admin-token`, `--org-token`, `--sf-token`,
   `--service-account-password`, and `--password`.
@@ -85,9 +83,8 @@ claim API parity that does not exist.
   `current-state.json`, `state/apply-state.json`, and any other rendered
   artifact on disk.
 - `enable-centralized-rbac` is destructive and irreversible without Splunk
-  Support; `--apply rbac` refuses to run that step unless
-  `--i-accept-rbac-cutover` is also passed AND the renderer's preflight has
-  confirmed every UID-mapped user already holds an `o11y_*` role.
+  Support. This repo has no safe file-backed transport for the required ACS
+  token, so cutover is classified as `handoff` and always fails before mutation.
 - `bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_token`
   helps the user create a token file without exposing the secret in shell
   history.
@@ -136,38 +133,29 @@ claim API parity that does not exist.
 
    ```bash
    bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
-     --apply pairing,related_content,sim_addon \
+     --apply pairing,sim_addon \
      --spec my-integration.yaml
    ```
 
-   To enable Centralized RBAC (destructive cutover):
-
-   ```bash
-   bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
-     --apply rbac \
-     --i-accept-rbac-cutover \
-     --spec my-integration.yaml \
-     --admin-token-file /tmp/splunk_o11y_admin_token
-   ```
+  Centralized RBAC cutover is a fail-closed handoff because no safe file-backed
+  transport is implemented. The handoff never places a token on process argv.
 
 ## End-User UX (the "easy to use" promise)
 
 Five entry points, ordered by user effort:
 
-- `--quickstart` — single-shot: prompts only for non-secret values; auto-renders
-  + applies the most common UID + Discover app + SIM scenario; calls
-  `--validate` at the end. Refuses `enable-centralized-rbac` (operator must
-  opt in via `--apply rbac --i-accept-rbac-cutover` separately).
+- `--quickstart` — renders and validates the common UID + Discover app + SIM
+  scenario, then prints explicit supported apply and UI/admin handoffs. It does
+  not mutate live state.
 - `--render` (default) — produces the numbered plan tree; never touches live
   state.
-- `--discover` — read-only sweep that polls live state from ACS + O11y + the
-  Splunk REST surface, writes `current-state.json`, and emits a delta report
-  against the rendered plan.
-- `--doctor` — diagnoses an existing integration (twenty catalog checks) and
-  emits a prioritized fix list with the exact `setup.sh` command for each fix.
-- `--apply [SECTIONS]` — applies the rendered plan; without arguments runs
-  every section in dependency order; with `--apply pairing,rbac` runs only the
-  named sections.
+- `--discover` — writes a read-only rendered-plan inventory scaffold to
+  `current-state.json`. It does not currently claim a complete live snapshot.
+- `--doctor` — writes the static twenty-check review catalog and a prioritized
+  handoff/fix list. Use `--validate --live` for the limited implemented
+  token-auth and SIM-account reachability reads.
+- `--apply SECTIONS` — applies explicitly named supported sections. Live apply
+  without a section list is refused because plans can include UI/admin handoffs.
 
 Plus quality-of-life flags:
 
@@ -180,9 +168,8 @@ Plus quality-of-life flags:
   SignalFlow.
 - `--make-default-deeplink` — emits the multi-org "Make Default" UI deeplink
   for the named realm (since no API exists).
-- `--quickstart-enterprise` — Splunk Enterprise fast path (SA + SIM +
-  Related Content; UID, Centralized RBAC, and the Discover app are skipped
-  automatically with clear `not_applicable` messaging).
+- `--quickstart-enterprise` — renders and validates the Splunk Enterprise fast
+  path; supported mutations must be invoked explicitly afterward.
 - `--rollback <section>` — renders (does not auto-run) the reverse-engineered
   commands for steps that have a public reversible API; for irreversible steps
   (`enable-centralized-rbac`, deleted users) it renders a Splunk Support
@@ -193,24 +180,29 @@ Plus quality-of-life flags:
 Specs use `api_version: splunk-observability-cloud-integration-setup/v1` and
 can include:
 
-- `prerequisites` — version checks, region/realm map, FedRAMP/GovCloud/GCP
-  carve-out, trial-stack rejection for LOC, Discover-app version preflight
-  (10.1.2507+).
+- `prerequisites` — static region/realm and FedRAMP/GovCloud/GCP policy
+  rendering. Live stack version, trial-stack, operator-role, and Discover-app
+  10.1.2507+ checks remain explicit preflight handoffs.
 - `token_auth` — token-auth state read + flip, `edit_tokens_settings`
   capability check.
-- `pairing` — Unified Identity (UID) via `acs observability pair` and `POST
-  /adminconfig/v2/observability/sso-pairing`, or Service Account (SA) API-
-  token connection. Multi-org pairing + Make Default deeplink. SE = SA only.
+- `pairing` — Splunk Cloud Platform Unified Identity (UID) via `POST
+  /adminconfig/v2/observability/sso-pairing`, or Discover-app API-token
+  connection. Multi-org is a fail-closed per-org-token handoff plus Make
+  Default deeplink; the skill never reuses one token across declared orgs.
+  Pairing is not a Splunk Enterprise section; Enterprise uses Log Observer
+  Connect separately.
 - `centralized_rbac` — `acs observability enable-capabilities` (provisions
   `o11y_admin / o11y_power / o11y_read_only / o11y_usage`) and
   `enable-centralized-rbac`; the `o11y_access` gate role; UID role mapping.
 - `related_content_capabilities` — `read_o11y_content`, `write_o11y_content`,
   `EXECUTE_SIGNAL_FLOW`, `READ_APM_DATA`, `READ_BASIC_UI_ACCESS`, `READ_EVENT`
   capability assignments for Real Time Metrics + previews.
-- `discover_app` — the five Configurations tabs of the in-platform Discover
-  Splunk Observability Cloud app: Related Content discovery, Test related
-  content, Field aliasing (Auto Field Mapping toggle), Automatic UI updates,
-  Access tokens. Read-permission grant on the app to selected roles.
+- `discover_app` — converges the non-secret Configurations tabs of the
+  in-platform Discover Splunk Observability Cloud app: Related Content
+  discovery, Field aliasing (Auto Field Mapping), and Automatic UI updates;
+  Test related content remains a deeplink. Access tokens are written only by
+  service-account `pairing`, preventing a duplicate connection. This section
+  also merges Read permission for selected roles.
 - `log_observer_connect` — service-account user + role + workload rule;
   Splunk Cloud Platform path or Splunk Enterprise TLS-certificate path.
   Hands off realm-IP allowlist deltas to `splunk-cloud-acs-admin-setup`.
@@ -248,23 +240,22 @@ For per-section flag references and REST payload shapes, read
 
 Six worked end-to-end examples, copy/paste-ready:
 
-1. **Cloud quickstart (greenfield)** — `--quickstart` against a fresh SCP
-   stack with one O11y org; UID + SIM Add-on + Discover app + Related
-   Content; about three prompts.
-2. **Multi-org Cloud** — three O11y orgs paired to one SCP stack; enables
-   Centralized RBAC; user picks which org becomes default via the rendered
-   deeplink.
-3. **Cloud SA-only (no UID)** — Service Account pairing only (no admin
-   token required); SIM Add-on + Related Content; appropriate for stacks
-   where UID is not yet in scope.
-4. **Migrate SA -> UID** — existing SA-only customer wants Unified Identity;
-   renderer detects existing SA connection, renders a numbered migration
+1. **Cloud quickstart (greenfield)** — `--quickstart` renders and validates a
+   fresh SCP plan, then prints supported apply and Related Content handoffs.
+2. **Multi-org Cloud** — renders a fail-closed, distinct-token-per-org handoff
+   for three O11y orgs on one SCP stack; default-org selection uses a deeplink.
+3. **Cloud API-token mode (no UID)** — user API access-token pairing (no
+   admin token required); SIM Add-on plus Related Content handoff; appropriate
+   for stacks where UID is not yet in scope.
+4. **Migrate API-token -> UID** — an existing API-token customer wants Unified Identity;
+   renderer detects the existing connection and renders a numbered migration
    plan (pair UID, validate, instruct user to delete old SA via Discover
    app deeplink, optionally `enable-centralized-rbac`).
-5. **Splunk Enterprise** — `--quickstart-enterprise` (SA + SIM + Related
-   Content + LOC SE TLS path); UID/RBAC/Discover-app sections marked
-   `not_applicable`; renders the cert-extraction helper + Workload Rule.
-6. **Inherit existing integration** — `--discover` first, then `--doctor`
+5. **Splunk Enterprise** — `--quickstart-enterprise` renders SIM plus LOC
+   service-account/TLS assets without mutating; UID/RBAC/Discover-app sections are
+   marked `not_applicable`.
+6. **Inherit existing integration** — use `--discover` for a rendered-plan
+   inventory scaffold, `--validate --live` for limited reachability, then `--doctor`
    to identify drift and gaps, then targeted `--apply <section>` to
    converge to the rendered plan.
 
@@ -336,8 +327,9 @@ bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
   realms; the skill renders a `support-tickets/fedramp-il5-readiness.md`
   template instead of attempting the pair call.
 - The skill never asks for nor logs secret material, refuses every direct
-  secret CLI flag, and redacts every token, password, JWT, and pairing-id
-  from the rendered artifacts on disk.
+  secret CLI flag, and redacts every token, password, JWT, and authorization
+  value from rendered artifacts. Non-secret pairing job IDs are retained in
+  mode-600 apply state so asynchronous status polling can resume safely.
 
 ## MCP Tools
 

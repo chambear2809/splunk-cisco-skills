@@ -114,7 +114,7 @@ main() {
     [[ "${INSTALL}" == "true" ]] && install_packages
     [[ "${MACROS_ONLY}" != "true" ]] && create_indexes
     [[ "${INDEXES_ONLY}" != "true" ]] && configure_macros
-    log "Secure Email/Web Gateway Splunk-side setup complete."
+    log "Secure Email/Web Gateway Splunk-side prerequisites configured; ingestion is not complete until transport and event evidence pass validate.sh --completion."
     log "Use render_ingestion_assets.sh or splunk-connect-for-syslog-setup for SC4S/file-monitor handoff."
 }
 

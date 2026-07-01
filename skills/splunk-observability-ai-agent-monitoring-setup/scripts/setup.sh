@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck disable=SC1091
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-load_observability_cloud_settings 2>/dev/null || true
+load_observability_cloud_settings
 
 PYTHON_BIN="python3"
 if [[ -x "${PROJECT_ROOT}/.venv/bin/python3" ]]; then
@@ -233,7 +233,7 @@ case "${MODE}" in
         run_validate
         ;;
     doctor)
-        run_render || true
+        run_render
         run_validate
         ;;
     discover)

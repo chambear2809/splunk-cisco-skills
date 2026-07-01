@@ -16,6 +16,14 @@ description: >-
 
 # Splunk AI/ML Toolkit Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture applicable configuration, data/readiness, and
+shipped-view evidence, or explicit package evidence that no dashboards ship.
+
 Use this skill for Splunk-owned AI and machine-learning platform workflows
 that are not Splunk AI Assistant. It owns coverage reporting, install
 orchestration, compatibility validation, DSDL runtime handoffs, and migration

@@ -83,7 +83,7 @@ Options:
   --operation inventory|retention|smartstore|archive|disable-index|delete-index|clean-data|restore-handoff
   --scope per-index|global
   --phase inventory|plan|render|preflight|apply|status|all
-  --apply
+  --apply                         (valid with --phase render only)
   --dry-run
   --json
   --output-dir PATH
@@ -254,6 +254,36 @@ validate_args() {
     validate_choice "${RESTART_SPLUNK}" true false
     if [[ "${OPERATION}" == "smartstore" && -z "${REMOTE_PATH}" ]]; then
         log "ERROR: --remote-path is required for --operation smartstore."
+        exit 1
+    fi
+    if [[ "${DRY_RUN}" != "true" && "${PLATFORM}" == "enterprise" && "${DEPLOYMENT}" == "cluster" && "${APPLY_CLUSTER_BUNDLE}" != "true" && \
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        case "${OPERATION}" in
+            smartstore|retention|disable-index|delete-index)
+                log "ERROR: cluster ${OPERATION} apply requires --apply-cluster-bundle true; staging a manager app is not a completed apply."
+                exit 2
+                ;;
+        esac
+    fi
+    if [[ "${DRY_RUN}" != "true" && "${OPERATION}" == "clean-data" && \
+          ( "${PLATFORM}" != "enterprise" || "${DEPLOYMENT}" != "standalone" ) && \
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: clean-data apply is supported only for a standalone Splunk Enterprise indexer; clustered and Splunk Cloud cleanup require topology-owned workflows."
+        exit 2
+    fi
+    if [[ "${DRY_RUN}" != "true" && "${PLATFORM}" == "enterprise" && "${DEPLOYMENT}" == "standalone" && \
+          "${RESTART_SPLUNK}" != "true" && \
+          ( "${OPERATION}" == "smartstore" || "${OPERATION}" == "retention" ) && \
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: standalone ${OPERATION} apply requires --restart-splunk true; staging configuration is not a completed apply."
+        exit 2
+    fi
+    if [[ "${APPLY}" == "true" && "${PHASE}" != "render" ]]; then
+        log "ERROR: --apply is valid only with --phase render; use --phase apply or --phase all directly."
+        exit 1
+    fi
+    if [[ "${JSON_OUTPUT}" == "true" && "${APPLY}" == "true" && "${DRY_RUN}" != "true" ]]; then
+        log "ERROR: --json cannot be combined with a live --apply operation."
         exit 1
     fi
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && "${PHASE}" != "render" && "${PHASE}" != "inventory" && "${PHASE}" != "plan" ]]; then

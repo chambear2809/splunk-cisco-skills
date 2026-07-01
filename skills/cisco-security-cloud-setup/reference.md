@@ -67,3 +67,10 @@ Examples:
   files manually.
 - Create the target index before or during input setup if the chosen index does
   not already exist.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` requires configured input stanzas,
+event-flow evidence for event-capable inputs, and visible views. The no-flag
+form remains warning-oriented diagnostics; `--skip-data-flow` is incompatible
+with strict completion.

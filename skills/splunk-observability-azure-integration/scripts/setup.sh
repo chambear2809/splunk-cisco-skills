@@ -141,7 +141,7 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
     OUTPUT_DIR="${PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}"
 fi
 
-load_observability_cloud_settings 2>/dev/null || true
+load_observability_cloud_settings
 if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
     REALM="${SPLUNK_O11Y_REALM}"
 fi
@@ -196,10 +196,9 @@ run_validate() {
 }
 
 run_doctor() {
-    bash "${SCRIPT_DIR}/doctor.sh" \
-        --output-dir "${OUTPUT_DIR}" \
-        --realm "${REALM:-us1}" \
-        ${JSON_OUTPUT:+--json}
+    local args=(--output-dir "${OUTPUT_DIR}" --realm "${REALM:-us1}")
+    [[ "${JSON_OUTPUT}" == "true" ]] && args+=(--json)
+    bash "${SCRIPT_DIR}/doctor.sh" "${args[@]}"
 }
 
 case "${MODE}" in
@@ -214,6 +213,10 @@ case "${MODE}" in
         echo "    bash ${0} --apply --spec ${SPEC} --realm ${REALM:-<realm>} --token-file /tmp/splunk_token"
         ;;
     apply)
+        if [[ -z "${TOKEN_FILE}" || -z "${APP_ID_FILE}" || -z "${SECRET_FILE}" ]]; then
+            echo "ERROR: --apply requires --token-file, --app-id-file, and --secret-file." >&2
+            exit 2
+        fi
         assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
         assert_secret_file_perms "${APP_ID_FILE}" "Azure appId"
         assert_secret_file_perms "${SECRET_FILE}" "Azure secretKey"
@@ -229,18 +232,17 @@ case "${MODE}" in
             echo "==> applying section: ${s}"
             case "${s}" in
                 integration)
-                    if [[ "${DRY_RUN}" == "true" ]]; then
-                        echo "(dry-run) would POST/PUT ${OUTPUT_DIR}/rest/create.json to /v2/integration"
-                    else
-                        "${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" \
-                            --realm "${REALM:-us1}" \
-                            --token-file "${TOKEN_FILE}" \
-                            --app-id-file "${APP_ID_FILE}" \
-                            --secret-file "${SECRET_FILE}" \
-                            --payload-file "${OUTPUT_DIR}/rest/create.json" \
-                            --state-dir "${OUTPUT_DIR}/state" \
-                            upsert
-                    fi
+                    api_args=()
+                    [[ "${DRY_RUN}" == "true" ]] && api_args+=(--dry-run)
+                    "${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" \
+                        --realm "${REALM:-us1}" \
+                        --token-file "${TOKEN_FILE}" \
+                        --app-id-file "${APP_ID_FILE}" \
+                        --secret-file "${SECRET_FILE}" \
+                        --payload-file "${OUTPUT_DIR}/rest/create.json" \
+                        --state-dir "${OUTPUT_DIR}/state" \
+                        "${api_args[@]}" \
+                        upsert
                     ;;
                 validation)
                     run_validate

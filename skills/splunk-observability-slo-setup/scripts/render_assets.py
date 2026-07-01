@@ -12,6 +12,8 @@ from pathlib import Path
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    if path.suffix == ".sh":
+        path.chmod(0o755)
 
 
 def split_csv(value: str) -> list[str]:
@@ -72,7 +74,15 @@ Review `native-ops-spec.json`, then render or apply through
         f"""#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-bash skills/splunk-observability-native-ops/scripts/setup.sh --render --validate --spec "${{SCRIPT_DIR}}/native-ops-spec.json" --realm {shlex.quote(args.realm)}
+REPO_ROOT="${{SPLUNK_CISCO_SKILLS_ROOT:-$(git -C "${{SCRIPT_DIR}}" rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+MODE="${{1:---render}}"
+case "${{MODE}}" in
+  --render|--apply) shift ;;
+  *) MODE=--render ;;
+esac
+exec bash "${{REPO_ROOT}}/skills/splunk-observability-native-ops/scripts/setup.sh" \
+  "${{MODE}}" --validate --spec "${{SCRIPT_DIR}}/native-ops-spec.json" \
+  --realm {shlex.quote(args.realm)} "$@"
 """,
     )
     write(
@@ -89,17 +99,41 @@ test/run coordinates are known.
 
 
 def render_slo(args: argparse.Namespace, output: Path) -> list[str]:
-    payload = {
-        "name": args.name,
-        "type": "RequestBased",
-        "inputs": [
+    if args.sli_source == "apm_service" and args.service:
+        service = repr(args.service)
+        environment = repr(args.environment)
+        program = (
+            "G = data('spans.count', filter=filter('sf_service', " + service
+            + ") and filter('sf_environment', " + environment
+            + ") and filter('sf_error', 'false'))\n"
+            "T = data('spans.count', filter=filter('sf_service', " + service
+            + ") and filter('sf_environment', " + environment + "))"
+        )
+        inputs: object = {
+            "programText": program,
+            "goodEventsLabel": "G",
+            "totalEventsLabel": "T",
+        }
+    else:
+        inputs = [
             {
                 "sli_source": args.sli_source,
                 "service": args.service or "<service-name>",
                 "environment": args.environment,
+                "completion_required": True,
+            }
+        ]
+    payload = {
+        "name": args.name,
+        "type": "RequestBased",
+        "inputs": inputs,
+        "targets": [
+            {
+                "type": "RollingWindow",
+                "slo": float(args.target),
+                "compliancePeriod": args.window,
             }
         ],
-        "targets": [{"target": float(args.target), "window": args.window}],
     }
     spec = {
         "api_version": "splunk-observability-deep-native-workflows/v1",
@@ -136,6 +170,8 @@ SLI source: `{args.sli_source}`
 
 Review `slo-payload-intent.json` before using the downstream `/slo/validate`
 and `/slo` action plan emitted by `splunk-observability-deep-native-workflows`.
+An API-ready payload is emitted only for `apm_service` with a concrete service
+name. Other SLI sources remain explicit completion handoffs.
 """,
     )
     write(output / "slo-payload-intent.json", json.dumps(payload, indent=2, sort_keys=True))
@@ -145,7 +181,15 @@ and `/slo` action plan emitted by `splunk-observability-deep-native-workflows`.
         f"""#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-bash skills/splunk-observability-deep-native-workflows/scripts/setup.sh --render --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" --realm {shlex.quote(args.realm)}
+REPO_ROOT="${{SPLUNK_CISCO_SKILLS_ROOT:-$(git -C "${{SCRIPT_DIR}}" rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+MODE="${{1:---render}}"
+case "${{MODE}}" in
+  --render|--apply) shift ;;
+  *) MODE=--render ;;
+esac
+exec bash "${{REPO_ROOT}}/skills/splunk-observability-deep-native-workflows/scripts/setup.sh" \
+  "${{MODE}}" --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" \
+  --realm {shlex.quote(args.realm)} "$@"
 """,
     )
     write(output / "metadata.json", json.dumps({"skill": "splunk-observability-slo-setup", "files": files, "spec": spec}, indent=2, sort_keys=True))
@@ -203,7 +247,15 @@ Ingest Processor, or SPL2 skills for broader telemetry pipeline processing.
         f"""#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-bash skills/splunk-observability-deep-native-workflows/scripts/setup.sh --render --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" --realm {shlex.quote(args.realm)}
+REPO_ROOT="${{SPLUNK_CISCO_SKILLS_ROOT:-$(git -C "${{SCRIPT_DIR}}" rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+if [[ "${{1:-}}" == "--apply" ]]; then
+  echo "HANDOFF: Metrics Pipeline Management has no implemented public apply API in this repo." >&2
+  echo "Render the deep-native packet, then follow workflow-handoff.md in the Observability UI." >&2
+  exit 2
+fi
+exec bash "${{REPO_ROOT}}/skills/splunk-observability-deep-native-workflows/scripts/setup.sh" \
+  --render --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" \
+  --realm {shlex.quote(args.realm)} "$@"
 """,
     )
     write(output / "metadata.json", json.dumps({"skill": "splunk-observability-metrics-pipeline-setup", "files": files, "spec": spec}, indent=2, sort_keys=True))

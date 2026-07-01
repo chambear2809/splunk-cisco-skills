@@ -7,10 +7,11 @@ SPEC="${SKILL_DIR}/template.example"
 OUTPUT_DIR="${REPO_ROOT}/splunk-cloud-data-manager-rendered"
 PHASE="render"
 ACCEPT_APPLY="false"
+ACCEPT_DESTROY="false"
 
 usage() {
   cat <<'EOF'
-Usage: setup.sh [--phase render|doctor|status|apply|validate|all] [--spec PATH] [--output-dir DIR] [--accept-apply]
+Usage: setup.sh [--phase render|doctor|status|apply|validate|all] [--spec PATH] [--output-dir DIR] [--accept-apply] [--accept-destroy]
 
 Render, doctor, apply supported artifacts for, and validate Splunk Cloud Data
 Manager onboarding. Specs must contain only non-secret values and secret file
@@ -47,6 +48,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --accept-apply)
       ACCEPT_APPLY="true"
+      shift
+      ;;
+    --accept-destroy)
+      ACCEPT_DESTROY="true"
       shift
       ;;
     --help|-h)
@@ -98,7 +103,11 @@ apply_artifacts() {
   fi
   (
     cd "${OUTPUT_DIR}"
-    ACCEPT_DATA_MANAGER_APPLY=1 bash scripts/apply-data-manager-artifacts.sh
+    if [[ "${ACCEPT_DESTROY}" == "true" ]]; then
+      ACCEPT_DATA_MANAGER_APPLY=1 ACCEPT_DATA_MANAGER_DESTROY=1 bash scripts/apply-data-manager-artifacts.sh
+    else
+      ACCEPT_DATA_MANAGER_APPLY=1 bash scripts/apply-data-manager-artifacts.sh
+    fi
   )
 }
 

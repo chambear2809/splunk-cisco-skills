@@ -80,6 +80,20 @@ validate_args() {
     validate_choice "${DEPLOYMENT}" standalone shc
     validate_choice "${PHASE}" render status backup restore migrate resync
     validate_choice "${STORAGE_ENGINE}" unset wiredTiger
+    if [[ "${PHASE}" == "migrate" && "${DEPLOYMENT}" != "shc" ]]; then
+        log "ERROR: Standalone KV Store storage-engine migration occurs through the supported Splunk Enterprise upgrade workflow."
+        log "HANDOFF: Take a backup, perform the supported binary upgrade, then run --phase status."
+        exit 1
+    fi
+    if [[ "${PHASE}" == "migrate" && "${STORAGE_ENGINE}" != "wiredTiger" ]]; then
+        log "ERROR: --phase migrate requires --storage-engine wiredTiger."
+        exit 1
+    fi
+    if [[ "${PHASE}" == "resync" && "${DEPLOYMENT}" != "shc" ]]; then
+        log "ERROR: KV Store resync is supported only for a stale non-captain SHC member."
+        log "HANDOFF: Use --phase status for standalone recovery evidence; do not clean standalone KV Store data as an SHC resync."
+        exit 1
+    fi
     if [[ "${JSON_OUTPUT}" == "true" && "${PHASE}" != "render" && "${DRY_RUN}" != "true" ]]; then
         log "ERROR: --json is supported only for render-only or --dry-run workflows."
         exit 1

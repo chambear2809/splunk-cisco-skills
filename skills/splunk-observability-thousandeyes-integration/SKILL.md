@@ -1,13 +1,14 @@
 ---
 name: splunk-observability-thousandeyes-integration
 description: >-
-  Render and (optionally) apply the full ThousandEyes -> Splunk Observability
+  Render and (optionally) apply a guarded ThousandEyes -> Splunk Observability
   Cloud integration end-to-end: Integration 1.0 OpenTelemetry metric stream
   (POST /v7/streams to ingest.<realm>.signalfx.com/v2/datapoint/otlp),
   Integrations 2.0 Splunk Observability APM connector (generic connector +
-  splunk-observability-apm operation), and the full TE asset lifecycle
-  (tests, alert rules, labels, tags, TE-side dashboards, TE Templates with
-  Handlebars-only credential placeholders) across the canonical TE
+  splunk-observability-apm operation), plus verified create/readback flows for
+  tests, alert rules, and TE Templates. Renders labels, tags, and TE-side
+  dashboards as reviewable handoffs until authoritative API ID/readback
+  schemas are encoded. Covers the canonical TE
   OpenTelemetry Data Model v2 taxonomy. Generates SignalFlow dashboard specs
   and starter detectors for hand-off to splunk-observability-dashboard-builder
   and splunk-observability-native-ops. Use when the user asks to wire
@@ -24,11 +25,10 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
 
 1. **Integration 1.0 OpenTelemetry stream** — `POST /v7/streams` with `type=opentelemetry`, `signal=metric|trace|log` (default `metric`), `endpointType=http|grpc`, `streamEndpointUrl=https://ingest.<realm>.signalfx.com/v2/datapoint/otlp`, `customHeaders.X-SF-Token`, `dataModelVersion=v2`, `testMatch[]`, optional `filters.testTypes[]`.
 2. **Integrations 2.0 Splunk Observability APM connector** — generic connector targeting `https://api.<realm>.signalfx.com` with `X-SF-Token`; assigned to the `splunk-observability-apm` operation for trace linking.
-3. **Full TE asset lifecycle** — render and apply across the canonical taxonomy:
+3. **TE assets** — render across the canonical taxonomy, with apply limited to operations that have ID-based readback:
    - **Tests**: `POST /v7/tests/{type}` for `http-server`, `page-load`, `web-transactions`, `api`, `agent-to-server`, `agent-to-agent`, `bgp`, `dns-server`, `dns-trace`, `dnssec`, `sip-server`, `voice`, `ftp-server`.
    - **Alert Rules**: `POST /v7/alerts/rules` aligned with the SignalFlow detector specs we ship for O11y.
-   - **Labels** and **Tags** for grouping tests and propagating metadata into the OTel stream attributes.
-   - **TE-side Dashboards**: `POST /v7/dashboards`.
+   - **Labels**, **Tags**, and **TE-side Dashboards** are rendered for operator/API handoff; their generated apply scripts fail closed before mutation.
    - **TE Templates**: `POST /v7/templates` and `POST /v7/templates/{id}/deploy` (Handlebars-only credential placeholders).
 
 ## Out of scope (handed off)
@@ -40,6 +40,8 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
 - O11y detector apply -> [splunk-observability-native-ops](../splunk-observability-native-ops/SKILL.md).
 - `signal=log` and `signal=trace` deep targets — render the payload shape and document that O11y's `/v2/datapoint/otlp` endpoint is metrics-only.
 
+For the Splunk TA or any dashboard-companion handoff, follow [the shared TA completion gate](../shared/ta_completion_gate.md): package installation alone is not completion; validate ingest and dashboard visibility, macro alignment, and data, or record evidence that no pre-built dashboard ships.
+
 ## Safety Rules
 
 - Never ask for the ThousandEyes API token, the Splunk Observability ingest token, or the Splunk Observability API token in conversation.
@@ -49,9 +51,9 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
   - `--o11y-ingest-token-file` for the Splunk Observability **Org access token** with ingest authorization (used as `X-SF-Token` in the OTLP metric stream `customHeaders`).
   - `--o11y-api-token-file` for the Splunk Observability **User API access token** (used as `X-SF-Token` in the Integrations 2.0 APM connector and SignalFlow validate calls).
 - Reject every direct token flag (`--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`).
-- Token files must be `chmod 600`. `--apply` runs a permission preflight and aborts with a `chmod 600 <path>` hint when looser. `--allow-loose-token-perms` overrides with a `WARN`.
+- Token files must be non-symlink regular files containing exactly one non-empty UTF-8 line and must be `chmod 600`. There is no permission bypass.
 - TE Templates render with **Handlebars placeholders only** — TE API rejects plain-text credentials with HTTP 400.
-- Apply scripts read token files at runtime through curl config or payload-substitution helpers inside the rendered shell; the renderer never reads token files.
+- Apply scripts read token files at runtime through the fixed-origin HTTPS client; the renderer never reads token files. Every TE request is scoped with the rendered numeric `account_group_id` as `?aid=`.
 
 ## Primary Workflow
 
@@ -83,11 +85,12 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
 
    ```bash
    bash skills/splunk-observability-thousandeyes-integration/scripts/setup.sh \
-     --apply stream,apm,tests,alert_rules,labels,tags,te_dashboards,templates \
+     --apply stream,apm,tests,alert_rules,templates \
      --spec my-integration.yaml \
-     --te-token-file /tmp/te_token \
-     --o11y-ingest-token-file /tmp/sfx_ingest \
-     --o11y-api-token-file /tmp/sfx_api
+     --te-token-file /secure/path/te-token \
+     --o11y-ingest-token-file /secure/path/o11y-ingest-token \
+     --o11y-api-token-file /secure/path/o11y-api-token \
+     --i-accept-te-mutations
    ```
 
    To apply only a subset:
@@ -96,12 +99,15 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
    bash skills/splunk-observability-thousandeyes-integration/scripts/setup.sh \
      --apply stream,apm \
      --spec my-integration.yaml \
-     --te-token-file /tmp/te_token \
-     --o11y-ingest-token-file /tmp/sfx_ingest \
-     --o11y-api-token-file /tmp/sfx_api
+     --te-token-file /secure/path/te-token \
+     --o11y-ingest-token-file /secure/path/o11y-ingest-token \
+     --o11y-api-token-file /secure/path/o11y-api-token \
+     --i-accept-te-mutations
    ```
 
-   Mutating apply (tests, alert_rules, labels, tags, te_dashboards, templates) requires `--i-accept-te-mutations`.
+   Every live apply requires an explicit section list (or `all`) and `--i-accept-te-mutations`. `all` means the currently automatable sections: stream, APM, tests, alert rules, and templates. Labels, tags, and TE dashboards remain render-only and fail closed if selected.
+
+   Successful creates retain server-returned IDs under the rendered output's mode-700 `state/` directory and verify them by collection/item readback. Keep that state with the output. Deleting it prevents safe name-based adoption and a fresh apply may create a duplicate. A connection loss after the server accepts a POST but before its response arrives is inherently ambiguous and requires operator reconciliation.
 
 ## Per-test-type metric coverage (TE OpenTelemetry Data Model v2)
 

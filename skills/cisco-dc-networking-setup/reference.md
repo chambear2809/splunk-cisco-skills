@@ -111,7 +111,7 @@ number of switches, and compliance requirements.
 |---|---|---|
 | `cisco_dc_aci_index` | `index IN ("cisco_aci")` | Filter searches to ACI data |
 | `cisco_dc_nd_index` | `index IN ("cisco_nd")` | Filter searches to Nexus Dashboard data |
-| `cisco_dc_nexus_9k_index` | `index IN ("cisco_nexus_9k")` | Filter searches to Nexus 9K data |
+| `cisco_dc_n9k_index` | `index IN ("cisco_nexus_9k")` | Filter searches to Nexus 9K data |
 
 ## Global Settings
 
@@ -122,3 +122,9 @@ Configured in `local/cisco_dc_networking_app_for_splunk_settings.conf`:
 | `loglevel` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 | `verify_ssl` | `False` | SSL certificate verification for API calls |
 | `ca_certs_path` | (empty) | Custom CA bundle path |
+
+## Completion Validation
+
+`validate.sh --completion` (alias `--strict`) makes absent accounts, enabled
+inputs, recent events, required indexes, dashboard macros, or dashboard views a
+nonzero completion failure. The no-flag form preserves warning-only diagnosis.

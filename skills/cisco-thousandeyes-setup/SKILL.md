@@ -178,12 +178,14 @@ Before running, the agent must ask the user for:
 - ThousandEyes account group (ask user or use script to list available groups)
 - Which input types to enable
 - HEC token name (default: `thousandeyes`)
+- Alert rule IDs when enabling `alerts` or `all`
 
 ```bash
 bash skills/cisco-thousandeyes-setup/scripts/setup.sh --enable-inputs \
   --account "user@example.com" \
   --account-group "My Account Group" \
   --hec-token "thousandeyes" \
+  --alert-rules "RULE_ID_1~RULE_ID_2" \
   --input-type all
 ```
 
@@ -195,6 +197,9 @@ bash skills/cisco-thousandeyes-setup/scripts/setup.sh --enable-inputs \
 | `activity` | HEC stream | Activity/audit logs via Streaming API |
 | `alerts` | HEC webhook | Alert notifications via webhook |
 | `all` | Mixed | All of the above |
+
+The `alerts` and `all` groups require `--alert-rules` with ThousandEyes alert
+rule IDs separated by `~`, matching the add-on's REST handler format.
 
 ### Step 5: ITSI Integration (Optional)
 
@@ -211,7 +216,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 7: Validate
 
 ```bash
-bash skills/cisco-thousandeyes-setup/scripts/validate.sh
+bash skills/cisco-thousandeyes-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, HEC token, indexes, OAuth account, token refresh
@@ -301,3 +306,10 @@ bash skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh
 - [reference.md](reference.md) — Complete input catalog, account fields, API
   endpoints, HEC configuration
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require indexes, an OAuth account, token refresh, an enabled data input,
+nonzero app data, and visible shipped dashboards. A confirmed HEC token is
+required when streaming inputs are present.

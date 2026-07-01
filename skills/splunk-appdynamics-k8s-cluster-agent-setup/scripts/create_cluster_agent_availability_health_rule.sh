@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -152,17 +153,22 @@ if [[ -z "${RULE_NAME}" || -z "${SERVER_NAME_MATCH}" || -z "${METRIC_PATH}" ]]; 
     exit 2
 fi
 
-if [[ -n "${TOKEN_FILE}" ]]; then
-    appd_assert_secret_file "${TOKEN_FILE}" "AppDynamics OAuth token file"
-elif [[ -n "${CLIENT_SECRET_FILE}" ]]; then
-    if [[ -z "${ACCOUNT_NAME}" || -z "${CLIENT_NAME}" ]]; then
-        echo "FAIL: --account and --client-name are required with --client-secret-file." >&2
+if [[ "${APPLY}" == "1" ]]; then
+    if [[ -n "${TOKEN_FILE}" && -n "${CLIENT_SECRET_FILE}" ]]; then
+        echo "FAIL: provide either --token-file or --client-secret-file, not both." >&2
+        exit 2
+    elif [[ -n "${TOKEN_FILE}" ]]; then
+        appd_assert_secret_file "${TOKEN_FILE}" "AppDynamics OAuth token file"
+    elif [[ -n "${CLIENT_SECRET_FILE}" ]]; then
+        if [[ -z "${ACCOUNT_NAME}" || -z "${CLIENT_NAME}" ]]; then
+            echo "FAIL: --account and --client-name are required with --client-secret-file." >&2
+            exit 2
+        fi
+        appd_assert_secret_file "${CLIENT_SECRET_FILE}" "AppDynamics OAuth client secret file"
+    else
+        echo "FAIL: live apply requires --token-file or --client-secret-file." >&2
         exit 2
     fi
-    appd_assert_secret_file "${CLIENT_SECRET_FILE}" "AppDynamics OAuth client secret file"
-else
-    echo "FAIL: provide --token-file or --client-secret-file." >&2
-    exit 2
 fi
 
 AUTH_CONFIG="$(mktemp)"
@@ -176,18 +182,20 @@ cleanup() {
 trap cleanup EXIT
 chmod 600 "${AUTH_CONFIG}" "${PAYLOAD_FILE}" "${RESPONSE_FILE}"
 
-if [[ -n "${TOKEN_FILE}" ]]; then
-    ACCESS_TOKEN="$(tr -d '\r\n' < "${TOKEN_FILE}")"
-else
-    TOKEN_JSON="$(appd_controller_oauth_token "${CONTROLLER_URL}" "${ACCOUNT_NAME}" "${CLIENT_NAME}" "${CLIENT_SECRET_FILE}")"
-    ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("access_token", ""))' <<<"${TOKEN_JSON}")"
+if [[ "${APPLY}" == "1" ]]; then
+    if [[ -n "${TOKEN_FILE}" ]]; then
+        ACCESS_TOKEN="$(tr -d '\r\n' < "${TOKEN_FILE}")"
+    else
+        TOKEN_JSON="$(appd_controller_oauth_token "${CONTROLLER_URL}" "${ACCOUNT_NAME}" "${CLIENT_NAME}" "${CLIENT_SECRET_FILE}")"
+        ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("access_token", ""))' <<<"${TOKEN_JSON}")"
+    fi
+    if [[ -z "${ACCESS_TOKEN}" ]]; then
+        echo "FAIL: AppDynamics OAuth token is empty." >&2
+        exit 1
+    fi
+    printf 'header = "Authorization: Bearer %s"\n' "${ACCESS_TOKEN}" > "${AUTH_CONFIG}"
+    unset ACCESS_TOKEN TOKEN_JSON
 fi
-if [[ -z "${ACCESS_TOKEN}" ]]; then
-    echo "FAIL: AppDynamics OAuth token is empty." >&2
-    exit 1
-fi
-printf 'header = "Authorization: Bearer %s"\n' "${ACCESS_TOKEN}" > "${AUTH_CONFIG}"
-unset ACCESS_TOKEN TOKEN_JSON
 
 url_path_segment() {
     python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
@@ -228,10 +236,14 @@ raise SystemExit(1)
 PY
 }
 
-if [[ "${SERVER_ALERTING_APPLICATION_ID}" == "auto" ]]; then
+if [[ "${SERVER_ALERTING_APPLICATION_ID}" == "auto" && "${APPLY}" == "1" ]]; then
     if ! SERVER_ALERTING_APPLICATION_ID="$(discover_server_alerting_application_id)"; then
         exit 1
     fi
+fi
+
+if [[ "${SERVER_ALERTING_APPLICATION_ID}" == "auto" ]]; then
+    SERVER_ALERTING_APPLICATION_ID="<auto-discovered-at-apply>"
 fi
 
 CREATE_URL="$(appd_controller_api_url "${CONTROLLER_URL}" "/controller/alerting/rest/v1/applications/${SERVER_ALERTING_APPLICATION_ID}/health-rules")"
@@ -372,28 +384,45 @@ PY
         exit 1
     fi
 
-    python3 - "${SERVER_ALERTING_APPLICATION_ID}" "${EXISTING_DETAIL_FILE}" "${OUTPUT_JSON}" <<'PY'
+    python3 - "${SERVER_ALERTING_APPLICATION_ID}" "${EXISTING_DETAIL_FILE}" "${PAYLOAD_FILE}" "${OUTPUT_JSON}" <<'PY'
 import json
 import sys
 
-app_id, path, as_json = sys.argv[1:]
+app_id, path, desired_path, as_json = sys.argv[1:]
 body = json.load(open(path, encoding="utf-8"))
+desired = json.load(open(desired_path, encoding="utf-8"))
+compared_fields = (
+    "name", "enabled", "useDataFromLastNMinutes", "waitTimeAfterViolation",
+    "scheduleName", "affects", "evalCriterias",
+)
+drift = {
+    field: {"actual": body.get(field), "desired": desired.get(field)}
+    for field in compared_fields
+    if body.get(field) != desired.get(field)
+}
 summary = {
-    "status": "EXISTS",
+    "status": "DRIFT" if drift else "EXISTS_MATCHING",
     "server_alerting_application_id": int(app_id),
     "id": body.get("id"),
     "name": body.get("name"),
     "enabled": body.get("enabled"),
     "affects": body.get("affects"),
+    "drift": drift,
 }
 if as_json == "1":
     print(json.dumps(summary, sort_keys=True))
+elif drift:
+    print(
+        "FAIL: health rule exists but differs from the reviewed payload "
+        f"id={summary['id']} fields={','.join(sorted(drift))}"
+    )
 else:
     print(
-        "OK: health rule already exists "
+        "OK: matching health rule already exists "
         f"id={summary['id']} name={summary['name']} enabled={summary['enabled']} "
         f"server_alerting_application_id={summary['server_alerting_application_id']}"
     )
+raise SystemExit(1 if drift else 0)
 PY
     exit 0
 fi
@@ -439,12 +468,14 @@ EOF
     exit 1
 fi
 
-python3 - "${HTTP_CODE}" "${SERVER_ALERTING_APPLICATION_ID}" "${RESPONSE_FILE}" "${OUTPUT_JSON}" <<'PY'
+python3 - "${HTTP_CODE}" "${SERVER_ALERTING_APPLICATION_ID}" "${RESPONSE_FILE}" "${RULE_NAME}" "${OUTPUT_JSON}" <<'PY'
 import json
 import sys
 
-http_code, app_id, path, as_json = sys.argv[1:]
+http_code, app_id, path, expected_name, as_json = sys.argv[1:]
 body = json.load(open(path, encoding="utf-8"))
+if not body.get("id") or body.get("name") != expected_name:
+    raise SystemExit("FAIL: create returned 2xx but did not return the expected health-rule id/name")
 summary = {
     "status": "OK",
     "http_code": int(http_code),

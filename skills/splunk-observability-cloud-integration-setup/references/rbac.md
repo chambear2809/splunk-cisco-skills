@@ -77,10 +77,10 @@ After cutover:
   through a third-party IdP keep their existing Splunk Observability
   Cloud roles.
 
-The skill guards this step with `--i-accept-rbac-cutover` AND a renderer
-preflight that confirms every UID-mapped user already has at least one
-`o11y_*` role assigned. The cutover is irreversible without Splunk
-Customer Support intervention.
+The cutover is irreversible without Splunk Customer Support intervention.
+Because ACS requires an access token on process argv and this repo has no safe
+file-backed transport, the skill classifies cutover as a handoff and refuses
+before mutation.
 
 ## Capabilities Required for the Operator
 

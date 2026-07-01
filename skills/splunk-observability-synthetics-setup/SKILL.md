@@ -29,7 +29,12 @@ bash skills/splunk-observability-synthetics-setup/scripts/setup.sh --render \
 Review `native-ops-spec.json`, then delegate render/apply through:
 
 ```bash
-bash splunk-observability-synthetics-rendered/delegate-native-ops.sh
+bash splunk-observability-synthetics-rendered/delegate-native-ops.sh --render
+
+# Preview the exact API sequence, or apply with a file-backed token:
+bash splunk-observability-synthetics-rendered/delegate-native-ops.sh --apply --dry-run
+bash splunk-observability-synthetics-rendered/delegate-native-ops.sh \
+  --apply --token-file /path/to/chmod-600-o11y-token
 ```
 
 Use this skill for discoverability and focused planning. Use

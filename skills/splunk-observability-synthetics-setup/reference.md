@@ -15,7 +15,8 @@ This skill creates a narrow Synthetics entry point over the broader
 
 - `synthetics-plan.md`: operator plan and safety notes.
 - `native-ops-spec.json`: compatible with `splunk-observability-native-ops`.
-- `delegate-native-ops.sh`: command wrapper for downstream render/apply.
+- `delegate-native-ops.sh`: executable command wrapper accepting `--render` or
+  `--apply`, plus downstream `--dry-run` and `--token-file` options.
 - `waterfall-handoff.md`: run and artifact lookup guidance.
 - `metadata.json`: machine-readable summary.
 

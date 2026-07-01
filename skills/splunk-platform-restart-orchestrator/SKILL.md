@@ -25,6 +25,12 @@ hide a risky restart behind a generic REST call.
 - Use ACS for Splunk Cloud and restart only when `restartRequired=true`.
 - Delegate indexer cluster peer restarts to `splunk-indexer-cluster-setup`.
 - For SHC, use searchable rolling restart only when the change is eligible.
+- `--validate-restart-path` and live `--restart` return nonzero when the plan
+  resolves to a manual, indexer-cluster, SHC, or privilege handoff. The printed
+  handoff is actionable guidance, not a successful restart.
+- Enterprise `--expected-port` values are probed on target loopback after the
+  management API recovers. Cloud rejects that option before restart because
+  ACS cannot provide a target-host listener probe.
 
 ## Quick Start
 

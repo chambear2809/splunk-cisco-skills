@@ -93,3 +93,9 @@ Controls whether dashboards use accelerated data model summaries.
 | Cisco Catalyst Enhanced Netflow | `splunk_app_stream_ipfix_cisco_hsl` | Enhanced NetFlow parsing for additional dashboards (optional) |
 | Cisco Meraki Add-on | `Splunk_TA_cisco_meraki` | Meraki data (optional) |
 | Cisco ThousandEyes Add-on | `ta_cisco_thousandeyes` | ThousandEyes data (optional) |
+
+## Completion Validation
+
+`validate.sh --completion` (alias `--strict`) treats missing or disabled
+dashboard dependencies and zero dashboard data as failures. Direct no-flag
+validation remains diagnostic.

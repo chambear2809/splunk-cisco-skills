@@ -76,10 +76,13 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
                 if cmd == "config current-stack":
                     print("Current Search Head: sh-i-123")
                     raise SystemExit(0)
-                if cmd == "apps list --splunkbase --count 100":
+                if cmd == "apps list --splunkbase --count 100 --offset 0":
                     print(json.dumps({"apps": []}))
                     raise SystemExit(0)
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
+                    raise SystemExit(0)
+                if cmd == "apps describe Splunk AI Assistant for SPL":
                     print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
                     raise SystemExit(0)
                 if cmd == "status current-stack":
@@ -323,6 +326,7 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
             activation_file = tmp_path / "activation_code"
             state_file.write_text(json.dumps({"activated": False}), encoding="utf-8")
             activation_file.write_text("encoded-activation-code\n", encoding="utf-8")
+            activation_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "curl",

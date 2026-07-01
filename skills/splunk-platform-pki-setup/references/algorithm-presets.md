@@ -12,8 +12,9 @@ Splunk's documented modern set per
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| `sslVersions` | `tls1.2,tls1.3` on Splunk 10.4+; `tls1.2` on older versions |
+| `sslVersionsForClient` | same version-aware value |
+| `[tls1.3] cipherSuite` | `TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256` |
 | `cipherSuite` | `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256` |
 | `ecdhCurves` | `prime256v1, secp384r1, secp521r1` |
 | Allowed key algos | RSA-2048+, ECDSA P-256/P-384/P-521 |
@@ -31,8 +32,10 @@ NIST-approved AEAD only per
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| `sslVersions` | `tls1.2,tls1.3` on Splunk 10.4+; `tls1.2` on older versions |
+| `sslVersionsForClient` | same version-aware value |
+| `[tls1.3] cipherSuite` | `TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256` |
+| `[tls1.3] groups` | `prime256v1, secp384r1` (the groups documented as FIPS 140-3 approved by Splunk) |
 | `cipherSuite` | AEAD-only: `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256` (no CBC, no SHA-1, no anonymous DH) |
 | `ecdhCurves` | `prime256v1, secp384r1, secp521r1` |
 | Allowed key algos | RSA-2048+, ECDSA P-256/P-384/P-521 |
@@ -53,8 +56,10 @@ DISA STIG-aligned subset, cross-referenced by
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| `sslVersions` | `tls1.2,tls1.3` on Splunk 10.4+; `tls1.2` on older versions |
+| `sslVersionsForClient` | same version-aware value |
+| `[tls1.3] cipherSuite` | `TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256` |
+| `[tls1.3] groups` | `secp384r1` (P-256 is excluded by this stricter preset; P-521 is not in Splunk's documented FIPS 140-3 TLS 1.3 group set) |
 | `cipherSuite` | AEAD-only with explicit forbid list aligned to STIG: `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256` |
 | `ecdhCurves` | `secp384r1, secp521r1` (no `prime256v1` for STIG-high) |
 | Allowed key algos | RSA-3072+, ECDSA P-384/P-521 |
@@ -77,15 +82,12 @@ The renderer always refuses to emit:
   for TLS — Splunk doesn't yet wire it through OpenSSL FIPS for
   TLS use)
 
-Pass `--allow-deprecated-tls` to relax the SSLv3 / TLS 1.0 / TLS
-1.1 floor (still refuses everything else).
+The legacy `--allow-deprecated-tls` option fails closed. This skill no longer
+emits SSLv3 / TLS 1.0 / TLS 1.1 under any preset.
 
-## Why no TLS 1.3
+## TLS 1.3
 
-Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-lists the supported set as `SSLv3` / `TLS1.0` / `TLS1.1` / `TLS1.2`
-only. **TLS 1.3 is not yet a documented Splunk-supported TLS
-version**, so the renderer refuses it. When Splunk eventually adds
-TLS 1.3 support, the `--tls-version-floor` flag will accept
-`tls1.3` and the algorithm presets will gain TLS 1.3 cipher
-suites.
+Splunk Enterprise 10.4 documents TLS 1.3 and its separate
+`server.conf [tls1.3]` cipher/group policy. The renderer enables TLS 1.2 and
+TLS 1.3 for the default floor on 10.4+, or TLS 1.3 only when explicitly
+requested. `--tls-version-floor tls1.3` is rejected for older versions.

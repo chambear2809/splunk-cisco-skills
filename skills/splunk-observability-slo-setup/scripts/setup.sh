@@ -15,6 +15,9 @@ TARGET="99.9"
 WINDOW="30d"
 SLI_SOURCE="apm_service"
 JSON_OUTPUT=false
+APPLY=false
+DRY_RUN=false
+TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
 
 usage() {
     cat <<'EOF'
@@ -25,6 +28,8 @@ Usage:
 
 Options:
   --render             Render assets
+  --apply              Render, validate, and apply API-ready SLO payloads
+  --dry-run            With --apply, print API actions without calls
   --json               Emit JSON render output
   --output-dir DIR     Render output directory
   --realm REALM        Observability realm
@@ -34,6 +39,7 @@ Options:
   --target PERCENT     Objective target percentage
   --window WINDOW      Compliance window, such as 30d
   --sli-source SOURCE  apm_service, endpoint, custom_metric, or synthetics
+  --token-file PATH    Observability API token file for live apply
   --help               Show this help
 EOF
 }
@@ -41,6 +47,8 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --render) shift ;;
+        --apply) APPLY=true; shift ;;
+        --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --realm) require_arg "$1" "$#" || exit 1; REALM="$2"; shift 2 ;;
@@ -50,6 +58,7 @@ while [[ $# -gt 0 ]]; do
         --target) require_arg "$1" "$#" || exit 1; TARGET="$2"; shift 2 ;;
         --window) require_arg "$1" "$#" || exit 1; WINDOW="$2"; shift 2 ;;
         --sli-source) require_arg "$1" "$#" || exit 1; SLI_SOURCE="$2"; shift 2 ;;
+        --token-file) require_arg "$1" "$#" || exit 1; TOKEN_FILE="$2"; shift 2 ;;
         --token|--access-token|--api-token|--o11y-token|--sf-token)
             reject_secret_arg "$1" "the downstream Observability API token-file option"
             exit 1
@@ -66,3 +75,15 @@ done
 args=(--surface slo --output-dir "${OUTPUT_DIR}" --realm "${REALM}" --name "${NAME}" --service "${SERVICE}" --environment "${ENVIRONMENT_NAME}" --target "${TARGET}" --window "${WINDOW}" --sli-source "${SLI_SOURCE}")
 [[ "${JSON_OUTPUT}" == "true" ]] && args+=(--json)
 python3 "${SCRIPT_DIR}/render_assets.py" "${args[@]}"
+
+if [[ "${APPLY}" == "true" ]]; then
+    if [[ "${SLI_SOURCE}" != "apm_service" || -z "${SERVICE}" ]]; then
+        echo "ERROR: live --apply currently requires --sli-source apm_service and a concrete --service." >&2
+        echo "Other SLI sources render an explicit completion handoff instead of a misleading API write." >&2
+        exit 2
+    fi
+    delegate_args=(--apply)
+    [[ "${DRY_RUN}" == "true" ]] && delegate_args+=(--dry-run)
+    [[ -n "${TOKEN_FILE}" ]] && delegate_args+=(--token-file "${TOKEN_FILE}")
+    bash "${OUTPUT_DIR}/delegate-deep-native-workflows.sh" "${delegate_args[@]}"
+fi

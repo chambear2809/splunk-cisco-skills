@@ -36,34 +36,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${JSON_OUTPUT}" == "true" && "${LIVE}" == "true" ]]; then
+    log "ERROR: --json and --live cannot be combined because live status output is not a single JSON document."
+    exit 1
+fi
+
 resolve_abs_path() {
     python3 - "$1" <<'PY'
 from pathlib import Path
 import sys
 print(Path(sys.argv[1]).expanduser().resolve(), end="")
-PY
-}
-
-json_array() {
-    python3 - "$@" <<'PY'
-import json
-import sys
-print(json.dumps(sys.argv[1:]), end="")
-PY
-}
-
-metadata_value() {
-    local path="$1" key="$2" default="$3"
-    python3 - "$path" "$key" "$default" <<'PY'
-import json
-import sys
-path, key, default = sys.argv[1:4]
-try:
-    data = json.load(open(path, encoding="utf-8"))
-except Exception:
-    print(default, end="")
-    raise SystemExit(0)
-print(data.get(key, default), end="")
 PY
 }
 
@@ -75,7 +57,29 @@ fi
 
 render_dir="${OUTPUT_DIR}/smartstore"
 metadata="${render_dir}/metadata.json"
-operation="$(metadata_value "${metadata}" operation smartstore)"
+operation="unknown"
+metadata_error=""
+if [[ -f "${metadata}" ]]; then
+    if ! operation="$(python3 - "${metadata}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if path.is_symlink():
+    raise SystemExit("metadata.json must not be a symlink")
+data = json.loads(path.read_text(encoding="utf-8"))
+if not isinstance(data, dict):
+    raise SystemExit("metadata.json must contain a JSON object")
+operation = data.get("operation")
+if not isinstance(operation, str) or not operation:
+    raise SystemExit("metadata.json is missing a string operation")
+print(operation, end="")
+PY
+)"; then
+        metadata_error="metadata.json invalid JSON or schema"
+    fi
+fi
 
 common_required=(
     README.md
@@ -121,8 +125,37 @@ else
 fi
 
 missing=()
+[[ -z "${metadata_error}" ]] || missing+=("${metadata_error}")
 for file in "${required[@]}"; do
     [[ -f "${render_dir}/${file}" ]] || missing+=("${file}")
+done
+
+for file in metadata.json index-lifecycle-report.json index-dependency-report.json acs-index-update-payload.json; do
+    path="${render_dir}/${file}"
+    [[ -f "${path}" ]] || continue
+    if ! python3 - "${path}" <<'PY' >/dev/null
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if path.is_symlink():
+    raise SystemExit(1)
+value = json.loads(path.read_text(encoding="utf-8"))
+if not isinstance(value, dict):
+    raise SystemExit(1)
+PY
+    then
+        missing+=("${file} valid JSON object")
+    fi
+done
+
+for file in preflight.sh status.sh collect-evidence.sh apply-cluster-manager.sh apply-standalone-indexer.sh apply-retention-enterprise.sh apply-retention-cloud.sh apply-disable-index.sh apply-delete-index.sh apply-clean-data.sh archive-handoff.sh restore-handoff.sh; do
+    path="${render_dir}/${file}"
+    [[ -f "${path}" ]] || continue
+    if ! bash -n "${path}"; then
+        missing+=("${file} shell syntax")
+    fi
 done
 
 ok=true
@@ -136,7 +169,19 @@ if [[ "${operation}" == "smartstore" && -f "${render_dir}/indexes.conf.template"
 fi
 
 if [[ "${JSON_OUTPUT}" == "true" ]]; then
-    printf '{"target":"index-lifecycle","operation":"%s","render_dir":"%s","ok":%s,"missing":%s}\n' "${operation}" "${render_dir}" "${ok}" "$(json_array "${missing[@]}")"
+    python3 - "${operation}" "${render_dir}" "${ok}" "${missing[@]}" <<'PY'
+import json
+import sys
+
+operation, render_dir, ok, *missing = sys.argv[1:]
+print(json.dumps({
+    "target": "index-lifecycle",
+    "operation": operation,
+    "render_dir": render_dir,
+    "ok": ok == "true",
+    "missing": missing,
+}, sort_keys=True))
+PY
 else
     if [[ "${ok}" == "true" ]]; then
         log "Rendered index lifecycle assets are present under ${render_dir}."

@@ -15,6 +15,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 OUTPUT_DIR=""
 LIVE=false
@@ -107,17 +109,19 @@ if [[ "${LIVE}" == "true" ]]; then
     if [[ -z "${DS_URI}" ]]; then
         echo "WARN: --live specified but --ds-uri not provided; skipping live checks." >&2
     else
-        echo "Live check: ${DS_URI}/services/deployment/server/clients"
-        HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' \
-            --insecure \
-            ${ADMIN_PASSWORD_FILE:+-u "admin:$(cat "${ADMIN_PASSWORD_FILE}")"} \
-            "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json" \
-            2>/dev/null || echo "000")"
-        if [[ "${HTTP_CODE}" == "200" ]]; then
-            echo "OK: Deployment server clients endpoint reachable"
+        if [[ ! -s "${ADMIN_PASSWORD_FILE}" ]]; then
+            echo "FAIL: --live requires a non-empty --admin-password-file." >&2
+            ERRORS=$((ERRORS + 1))
         else
-            echo "WARN: Deployment server clients endpoint returned HTTP ${HTTP_CODE}" >&2
-            WARNINGS=$((WARNINGS + 1))
+            echo "Live check: ${DS_URI}/services/deployment/server/clients"
+            if SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASSWORD_FILE}" "${SPLUNK_AUTH_USER:-admin}")" && \
+               splunk_curl "${SK}" --fail-with-body --show-error \
+                 -o /dev/null "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json"; then
+            echo "OK: Deployment server clients endpoint reachable"
+            else
+                echo "FAIL: Deployment server clients endpoint request failed." >&2
+                ERRORS=$((ERRORS + 1))
+            fi
         fi
     fi
 fi

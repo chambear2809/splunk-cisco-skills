@@ -334,6 +334,21 @@ def analyze_inputs(findings: list[Finding], evidence: dict) -> None:
         tls_enabled = truthy(input_item.get("enableSSL"))
         cert = str(input_item.get("serverCert", "") or "")
         key = str(input_item.get("serverKey", "") or "")
+        if not tls_enabled and listen_address not in {
+            "",
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "[::1]",
+        }:
+            add(
+                findings,
+                "PLAINTEXT_REMOTE_LISTENER",
+                "high",
+                "OTLP listener accepts remote plaintext traffic",
+                f"Input {name} listens on {listen_address} with enableSSL disabled.",
+                "Enable receiver TLS with a trusted certificate and key, or bind only to loopback for a lab-only local sender.",
+            )
         if tls_enabled and (not cert or not key):
             add(
                 findings,

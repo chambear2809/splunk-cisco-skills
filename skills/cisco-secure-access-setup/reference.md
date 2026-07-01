@@ -135,3 +135,10 @@ installed before validating production event-log coverage.
 - `dashboard_settings` and `refresh_rate` are initialized when dashboard defaults are desired
 - optional `cloudlock_settings`, `selected_destination_lists`, and `s3_indexes`
   are present when those dashboard features are in scope
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` requires org configuration, visible
+shipped views, and nonzero data flow in a configured index. The no-flag form is
+warning-oriented diagnostics; `--skip-data-flow` is incompatible with strict
+completion.

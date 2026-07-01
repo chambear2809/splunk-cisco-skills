@@ -19,6 +19,25 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-ingest-processor-rendered"
 KIT_SCRIPT = REPO_ROOT / "skills/splunk-spl2-pipeline-kit/scripts/spl2_pipeline_kit.py"
 VALID_DESTINATION_TYPES = {"splunk_cloud", "observability", "metrics_index", "s3"}
 REFUSED_DESTINATION_TYPES = {"splunk_enterprise", "enterprise", "indexer_cluster", "hec"}
+OUTPUT_MARKER = ".splunk-ingest-processor-rendered"
+VALID_PIPELINE_TEMPLATES = {
+    "filter",
+    "route",
+    "copy-thru",
+    "redact",
+    "hash",
+    "sample",
+    "lookup",
+    "extract-json",
+    "timestamp",
+    "xml-object",
+    "metrics",
+    "ocsf",
+    "decrypt",
+    "stats",
+    "s3-archive",
+    "compatibility-lint",
+}
 AFE_SUPPORTED_REGIONS = [
     "us-east-1",
     "eu-west-1",
@@ -130,6 +149,28 @@ def write_file(path: Path, content: str, *, executable: bool = False) -> None:
         path.chmod(path.stat().st_mode | 0o111)
 
 
+def prepare_output_dir(output_dir: Path) -> None:
+    if output_dir.is_symlink():
+        raise ValueError(f"Refusing symlink output directory: {output_dir}")
+    if output_dir.exists():
+        marker = output_dir / OUTPUT_MARKER
+        legacy_readme = output_dir / "README.md"
+        legacy_owned = False
+        if legacy_readme.is_file() and not legacy_readme.is_symlink():
+            legacy_owned = legacy_readme.read_text(encoding="utf-8", errors="ignore").startswith(
+                "# Rendered Splunk Ingest Processor Assets"
+            )
+        marker_owned = marker.is_file() and not marker.is_symlink()
+        if any(output_dir.iterdir()) and not marker_owned and not legacy_owned:
+            raise ValueError(
+                f"Refusing to delete nonempty unowned output directory: {output_dir}. "
+                "Choose an empty directory or remove it after manual review."
+            )
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_file(output_dir / OUTPUT_MARKER, "owned by splunk-ingest-processor-setup\n")
+
+
 def csv_list(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
@@ -199,7 +240,7 @@ def render_source_type(name: str) -> str:
 def render_destination(dest: dict[str, str]) -> str:
     dest_type = dest.get("type", "splunk_cloud")
     payload = {
-        "name": dest["name"],
+        "name": dest.get("name", ""),
         "type": dest_type,
         "status": "rendered" if dest_type in VALID_DESTINATION_TYPES else "refused_handoff",
         "settings": {key: value for key, value in sorted(dest.items()) if key not in {"name", "type"}},
@@ -209,6 +250,8 @@ def render_destination(dest: dict[str, str]) -> str:
         payload["finding"] = "S3 Object Lock requires manual review and is not rendered by this skill."
     if dest_type in REFUSED_DESTINATION_TYPES:
         payload["finding"] = "Use splunk-edge-processor-setup for Splunk Enterprise or HEC-style destinations."
+    elif dest_type not in VALID_DESTINATION_TYPES:
+        payload["finding"] = f"Unknown destination type; choose one of {sorted(VALID_DESTINATION_TYPES)}."
     return json.dumps(payload, indent=2) + "\n"
 
 
@@ -240,16 +283,15 @@ def template_from_kit(kit_out: Path, template_name: str) -> str:
     if path.is_file():
         return path.read_text(encoding="utf-8")
     return (
-        f"// Generated fallback for template {template_name}.\n"
-        "$pipeline = | from $source\n"
-        "            | into $destination;\n"
+        f"// ERROR: unknown or unavailable template {template_name}.\n"
+        "// No executable pipeline was rendered. Select a supported template and rerun.\n"
     )
 
 
 def render_pipeline(pipe: dict[str, str], kit_out: Path) -> str:
     content = template_from_kit(kit_out, pipe.get("template", "filter"))
     header = [
-        f"// Ingest Processor pipeline: {pipe['name']}",
+        f"// Ingest Processor pipeline: {pipe.get('name', '')}",
         f"// Template: {pipe.get('template', 'filter')}",
         f"// Destination: {pipe.get('destination', '$destination')}",
     ]
@@ -260,6 +302,26 @@ def render_pipeline(pipe: dict[str, str], kit_out: Path) -> str:
 
 def collect_findings(destinations: list[dict[str, str]], pipelines: list[dict[str, str]], tier: str) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
+    destination_names = [dest.get("name", "").strip() for dest in destinations]
+    pipeline_names = [pipe.get("name", "").strip() for pipe in pipelines]
+    for kind, names in (("destination", destination_names), ("pipeline", pipeline_names)):
+        if any(not name for name in names):
+            findings.append(
+                {
+                    "severity": "error",
+                    "code": f"IP-{kind.upper()}-NAME-MISSING",
+                    "message": f"Every {kind} spec must have a nonempty name.",
+                }
+            )
+        duplicates = sorted({name for name in names if name and names.count(name) > 1})
+        if duplicates:
+            findings.append(
+                {
+                    "severity": "error",
+                    "code": f"IP-{kind.upper()}-NAME-DUPLICATE",
+                    "message": f"Duplicate {kind} names are not allowed: {duplicates}.",
+                }
+            )
     if tier == "unknown":
         findings.append(
             {
@@ -278,12 +340,21 @@ def collect_findings(destinations: list[dict[str, str]], pipelines: list[dict[st
         )
     for dest in destinations:
         dest_type = dest.get("type", "splunk_cloud")
-        if dest_type in REFUSED_DESTINATION_TYPES:
+        if dest_type not in VALID_DESTINATION_TYPES:
+            if dest_type in REFUSED_DESTINATION_TYPES:
+                message = f"Destination `{dest.get('name', '')}` uses `{dest_type}`; route this workflow to splunk-edge-processor-setup."
+                code = "IP-DESTINATION-REFUSED"
+            else:
+                message = (
+                    f"Destination `{dest.get('name', '')}` uses unknown type `{dest_type}`; "
+                    f"choose one of {sorted(VALID_DESTINATION_TYPES)} or provide a documented manual handoff."
+                )
+                code = "IP-DESTINATION-UNKNOWN"
             findings.append(
                 {
                     "severity": "error",
-                    "code": "IP-DESTINATION-REFUSED",
-                    "message": f"Destination `{dest['name']}` uses `{dest_type}`; route this workflow to splunk-edge-processor-setup.",
+                    "code": code,
+                    "message": message,
                 }
             )
         if dest_type == "s3" and dest.get("object_lock", "").lower() == "true":
@@ -292,6 +363,51 @@ def collect_findings(destinations: list[dict[str, str]], pipelines: list[dict[st
                     "severity": "error",
                     "code": "IP-S3-OBJECT-LOCK",
                     "message": "S3 Object Lock destination settings require manual review and are refused by this renderer.",
+                }
+            )
+        if dest_type == "s3":
+            if not dest.get("bucket", "").strip():
+                findings.append(
+                    {
+                        "severity": "error",
+                        "code": "IP-S3-BUCKET-MISSING",
+                        "message": f"S3 destination `{dest.get('name', '')}` requires a bucket.",
+                    }
+                )
+            archive_format = dest.get("format", "json").strip().lower()
+            if archive_format not in {"json", "parquet"}:
+                findings.append(
+                    {
+                        "severity": "error",
+                        "code": "IP-S3-FORMAT-INVALID",
+                        "message": f"S3 destination `{dest.get('name', '')}` format must be json or parquet.",
+                    }
+                )
+        if dest_type == "metrics_index" and not dest.get("index", "").strip():
+            findings.append(
+                {
+                    "severity": "error",
+                    "code": "IP-METRICS-INDEX-MISSING",
+                    "message": f"Metrics destination `{dest.get('name', '')}` requires an index.",
+                }
+            )
+    for pipe in pipelines:
+        template = pipe.get("template", "filter")
+        destination = pipe.get("destination", "").strip()
+        if template not in VALID_PIPELINE_TEMPLATES:
+            findings.append(
+                {
+                    "severity": "error",
+                    "code": "IP-PIPELINE-TEMPLATE-UNKNOWN",
+                    "message": f"Pipeline `{pipe.get('name', '')}` requests unknown template `{template}`.",
+                }
+            )
+        if destination and destination not in destination_names:
+            findings.append(
+                {
+                    "severity": "error",
+                    "code": "IP-PIPELINE-DESTINATION-MISSING",
+                    "message": f"Pipeline `{pipe.get('name', '')}` references undeclared destination `{destination}`.",
                 }
             )
     if any(pipe.get("template") == "metrics" for pipe in pipelines):
@@ -356,8 +472,8 @@ def render_apply_plan(args: argparse.Namespace, source_types: list[str], destina
         "actions": [
             {"order": 1, "type": "ui_handoff", "object": "provisioning", "description": "Confirm Ingest Processor is provisioned for the tenant."},
             {"order": 2, "type": "ui_handoff", "object": "source_types", "items": source_types},
-            {"order": 3, "type": "ui_handoff", "object": "destinations", "items": [dest["name"] for dest in destinations]},
-            {"order": 4, "type": "ui_handoff", "object": "pipelines", "items": [pipe["name"] for pipe in pipelines]},
+            {"order": 3, "type": "ui_handoff", "object": "destinations", "items": [dest.get("name", "") for dest in destinations]},
+            {"order": 4, "type": "ui_handoff", "object": "pipelines", "items": [pipe.get("name", "") for pipe in pipelines]},
             {"order": 5, "type": "ui_handoff", "object": "preview_apply", "description": "Preview with sample data, verify default destination, then apply in UI."},
             {"order": 6, "type": "delegated_handoff", "object": "post_ingest_readiness", "skill": "splunk-data-source-readiness-doctor"},
         ],
@@ -394,9 +510,9 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
     ]
     lines.extend(f"- `{source_type}`" for source_type in source_types)
     lines.extend(["", "## Destinations", ""])
-    lines.extend(f"- `{dest['name']}` (`{dest.get('type', 'splunk_cloud')}`)" for dest in destinations)
+    lines.extend(f"- `{dest.get('name', '')}` (`{dest.get('type', 'splunk_cloud')}`)" for dest in destinations)
     lines.extend(["", "## Pipelines", ""])
-    lines.extend(f"- `{pipe['name']}` -> `{pipe.get('destination', 'review')}`" for pipe in pipelines)
+    lines.extend(f"- `{pipe.get('name', '')}` -> `{pipe.get('destination', 'review')}`" for pipe in pipelines)
     return "\n".join(lines) + "\n"
 
 
@@ -478,14 +594,15 @@ def render_handoffs() -> dict[str, str]:
 
 
 def render_assets(args: argparse.Namespace) -> Path:
-    output_dir = Path(args.output_dir).expanduser().resolve()
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
+    raw_output_dir = Path(args.output_dir).expanduser()
+    if raw_output_dir.is_symlink():
+        raise ValueError(f"Refusing symlink output directory: {raw_output_dir}")
+    output_dir = raw_output_dir.resolve()
     source_types = csv_list(args.source_types) or DEFAULT_SOURCE_TYPES
     destinations = parse_spec_list(args.destinations)
     pipelines = parse_spec_list(args.pipelines)
+    prepare_output_dir(output_dir)
+
     kit_out = run_kit(output_dir)
     findings = collect_findings(destinations, pipelines, args.subscription_tier)
 
@@ -499,9 +616,9 @@ def render_assets(args: argparse.Namespace) -> Path:
     for source_type in source_types:
         write_file(output_dir / f"source-types/{safe_name(source_type)}.json", render_source_type(source_type))
     for dest in destinations:
-        write_file(output_dir / f"destinations/{safe_name(dest['name'])}.json", render_destination(dest))
+        write_file(output_dir / f"destinations/{safe_name(dest.get('name', ''))}.json", render_destination(dest))
     for pipe in pipelines:
-        write_file(output_dir / f"pipelines/{safe_name(pipe['name'])}.spl2", render_pipeline(pipe, kit_out))
+        write_file(output_dir / f"pipelines/{safe_name(pipe.get('name', ''))}.spl2", render_pipeline(pipe, kit_out))
     for lifecycle in ("apply", "edit", "remove", "refresh", "delete", "rollback"):
         write_file(output_dir / f"lifecycle/{lifecycle}.md", render_lifecycle(lifecycle))
     write_file(output_dir / "monitoring/searches.spl", render_monitoring_searches(source_types, destinations))
@@ -542,10 +659,40 @@ def validate_output(output_dir: Path) -> list[str]:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
+    source_types = csv_list(args.source_types) or DEFAULT_SOURCE_TYPES
+    destinations = parse_spec_list(args.destinations)
+    pipelines = parse_spec_list(args.pipelines)
+    findings = collect_findings(destinations, pipelines, args.subscription_tier)
+    finding_problems = [
+        f"{finding['code']}: {finding['message']}"
+        for finding in findings
+        if finding.get("severity") == "error"
+    ]
+    if args.dry_run:
+        status = "FAIL" if finding_problems else "PASS"
+        payload = {
+            "status": status,
+            "dry_run": True,
+            "output_dir": str(Path(args.output_dir).expanduser().resolve()),
+            "source_types": source_types,
+            "destinations": destinations,
+            "pipelines": pipelines,
+            "findings": findings,
+            "files_written": False,
+        }
+        if args.json:
+            print(json.dumps(payload, sort_keys=True))
+        else:
+            print(f"{status}: dry run only; no Ingest Processor assets were written")
+            print(f"Would render assets in {payload['output_dir']}")
+            for problem in finding_problems:
+                print(f"ERROR: {problem}", file=sys.stderr)
+        return 1 if finding_problems else 0
+
     output_dir = render_assets(args)
-    problems: list[str] = []
+    problems: list[str] = list(finding_problems)
     if args.phase in {"validate", "all", "doctor", "status"}:
-        problems = validate_output(output_dir)
+        problems.extend(validate_output(output_dir))
         write_file(
             output_dir / "validation-report.json",
             json.dumps({"status": "FAIL" if problems else "PASS", "problems": problems}, indent=2) + "\n",
@@ -561,4 +708,8 @@ def main(argv: Iterable[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None

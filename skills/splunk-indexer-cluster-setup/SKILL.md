@@ -133,6 +133,7 @@ bash skills/splunk-indexer-cluster-setup/scripts/setup.sh \
   --phase decommission-site \
   --cluster-manager-uri https://cm01.example.com:8089 \
   --site site2 \
+  --accept-site-decommission \
   --admin-password-file /tmp/splunk_admin_password
 
 bash skills/splunk-indexer-cluster-setup/scripts/setup.sh \

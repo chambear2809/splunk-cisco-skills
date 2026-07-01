@@ -704,12 +704,27 @@ def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str,
     headers = galileo_headers(args)
     raw, content_type = request_bytes("POST", url, headers, build_export_records_request(args, since))
     text = raw.decode("utf-8")
-    if "jsonl" in content_type.lower() or (
+    normalized_content_type = content_type.lower()
+    if any(marker in normalized_content_type for marker in ("jsonl", "ndjson")) or (
         args.export_format == "jsonl" and "\n" in text and not text.lstrip().startswith(("{", "["))
     ):
         records = parse_jsonl(text)
     else:
-        payload = json.loads(text) if text else {}
+        try:
+            payload = json.loads(text) if text else {}
+        except json.JSONDecodeError:
+            # Some Galileo deployments return newline-delimited JSON with the
+            # generic application/json content type. Fall back only when the
+            # caller explicitly requested JSONL; malformed JSON for other
+            # formats must still fail closed.
+            if args.export_format != "jsonl":
+                raise
+            records = parse_jsonl(text)
+            payload = None
+        if payload is None:
+            if args.max_records:
+                return records[: args.max_records]
+            return records
         for key in ("file_url", "download_url", "url"):
             value = payload.get(key) if isinstance(payload, dict) else None
             if isinstance(value, str) and value.startswith(("http://", "https://")):

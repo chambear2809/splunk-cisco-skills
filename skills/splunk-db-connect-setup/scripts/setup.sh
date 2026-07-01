@@ -93,6 +93,20 @@ if [[ "${DO_INSTALL_APPS}" == true && "${ACCEPT_INSTALL}" != true ]]; then
     log "ERROR: --install-apps requires --accept-install."
     exit 1
 fi
+if [[ "${ACCEPT_INSTALL}" == true && "${DO_INSTALL_APPS}" != true ]]; then
+    log "ERROR: --accept-install is valid only with --install-apps."
+    exit 1
+fi
+
+if [[ "${JSON_OUTPUT}" == true ]]; then
+    json_actions=0
+    [[ "${DO_RENDER}" == true ]] && json_actions=$((json_actions + 1))
+    [[ "${DO_PREFLIGHT}" == true ]] && json_actions=$((json_actions + 1))
+    if [[ "${DO_VALIDATE}" == true || "${DO_INSTALL_APPS}" == true || "${json_actions}" -ne 1 ]]; then
+        log "ERROR: --json requires exactly one of --render or --preflight and cannot be combined with validation/install."
+        exit 1
+    fi
+fi
 
 if [[ "${DO_RENDER}" == false && "${DO_VALIDATE}" == false && "${DO_PREFLIGHT}" == false && "${DO_INSTALL_APPS}" == false ]]; then
     log "ERROR: Choose --preflight, --render, --validate, or --install-apps."

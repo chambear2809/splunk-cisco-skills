@@ -187,8 +187,7 @@ def render_status(args: argparse.Namespace) -> str:
         "#!/usr/bin/env bash\nset -euo pipefail\n\n"
         "# List Ingest Actions rulesets via the supported REST endpoint.\n"
         "# Authenticate first with: splunk login\n"
-        f'{splunk} _internal call /services/data/ingest/rulesets 2>/dev/null || '
-        'echo "Run: curl -k -u admin:... https://<host>:8089/services/data/ingest/rulesets"\n'
+        f'exec {splunk} _internal call /services/data/ingest/rulesets\n'
     )
 
 

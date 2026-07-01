@@ -77,9 +77,12 @@ class RenderError(Exception):
 def load_services_enum() -> list[str]:
     try:
         data = json.loads(SERVICES_ENUM_PATH.read_text(encoding="utf-8"))
-        return list(data.get("services", []))
-    except Exception:
-        return []
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RenderError(f"cannot load Azure services enum {SERVICES_ENUM_PATH}: {exc}") from exc
+    services = data.get("services") if isinstance(data, dict) else None
+    if not isinstance(services, list) or not services or not all(isinstance(item, str) and item for item in services):
+        raise RenderError(f"Azure services enum {SERVICES_ENUM_PATH} must contain a non-empty string list")
+    return list(services)
 
 
 def load_spec(path: Path) -> dict[str, Any]:
@@ -365,7 +368,7 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
     payload: dict[str, Any] = {
         "type": "Azure",
         "name": spec["integration_name"],
-        "enabled": False,
+        "enabled": True,
         "tenantId": spec["authentication"]["tenant_id"],
         "appId": "${APP_ID_FROM_FILE}",
         "secretKey": "${SECRET_KEY_FROM_FILE}",
@@ -772,7 +775,7 @@ def render(
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for sub in ("rest", "terraform", "azure-cli", "bicep", "handoffs", "state"):
+    for sub in ("rest", "terraform", "azure-cli", "bicep", "handoffs"):
         target = output_dir / sub
         if target.exists():
             shutil.rmtree(target)
@@ -841,10 +844,12 @@ def render(
     state_dir = output_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "apply-state.json"
-    write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
+    if not state_path.exists():
+        write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
     os.chmod(state_path, 0o600)
     cred_hash_path = state_dir / "credential-hashes.json"
-    write_text(cred_hash_path, json.dumps({"app_id_sha256": "", "secret_sha256": ""}, indent=2) + "\n")
+    if not cred_hash_path.exists():
+        write_text(cred_hash_path, json.dumps({"app_id_sha256": "", "secret_sha256": ""}, indent=2) + "\n")
     os.chmod(cred_hash_path, 0o600)
 
     # Coverage report.

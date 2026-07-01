@@ -66,6 +66,26 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+validate_request() {
+    validate_splunk_index_name "${INDEX}" || return 1
+    case "${PHASE}" in
+        render|list) ;;
+        *) echo "ERROR: --phase must be render or list (got: ${PHASE})" >&2; return 1 ;;
+    esac
+    if [[ "${PRODUCTS}" != "exchange" ]]; then
+        echo "ERROR: --products must be exchange (got: ${PRODUCTS})" >&2
+        return 1
+    fi
+    if [[ "${PHASE}" == "list" && "${INSTALL}" == "true" ]]; then
+        echo "ERROR: --phase list cannot be combined with --install" >&2
+        return 1
+    fi
+    if [[ "${JSON}" == "true" && "${INSTALL}" == "true" ]]; then
+        echo "ERROR: --json cannot be combined with --install" >&2
+        return 1
+    fi
+}
+
 install_apps() {
     local commands=(
         "3225 4.1.0 Exchange_bundle"
@@ -94,6 +114,8 @@ run_render() {
     "${cmd[@]}"
 }
 
+validate_request
 warn_if_current_skill_role_unsupported
+if [[ "${DRY_RUN}" != "true" && "${INSTALL}" == "true" ]]; then require_current_skill_role_supported; fi
 [[ "${INSTALL}" == "true" ]] && install_apps
 run_render

@@ -11,4 +11,4 @@ restore_archive_name:        # leave blank to reuse archive_name on restore
 storage_engine: unset        # unset | wiredTiger (set wiredTiger to plan a migration)
 
 # Authenticate against splunkd interactively when running rendered scripts, or
-# pass -auth from a local file you control. Never paste the password into chat.
+# authenticate first with `splunk login`. Never place the password in argv or chat.

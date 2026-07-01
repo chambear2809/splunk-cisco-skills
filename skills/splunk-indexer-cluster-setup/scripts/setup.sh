@@ -49,6 +49,10 @@ NEW_SITE=""
 INDEXER_HOST=""
 ADMIN_PASSWORD_FILE=""
 IDXC_SECRET_FILE_ARG=""
+ACCEPT_SKIP_VALIDATION=false
+ACCEPT_FORCE_SEARCHABLE=false
+ACCEPT_PEER_REMOVE=false
+ACCEPT_SITE_DECOMMISSION=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -101,6 +105,10 @@ Common options:
   --indexer-host HOST
   --admin-password-file PATH
   --idxc-secret-file PATH
+  --accept-skip-validation
+  --accept-force-searchable
+  --accept-peer-remove
+  --accept-site-decommission
   --apply
   --dry-run
   --json
@@ -151,6 +159,10 @@ while [[ $# -gt 0 ]]; do
         --indexer-host) require_arg "$1" $# || exit 1; INDEXER_HOST="$2"; shift 2 ;;
         --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
         --idxc-secret-file) require_arg "$1" $# || exit 1; IDXC_SECRET_FILE_ARG="$2"; shift 2 ;;
+        --accept-skip-validation) ACCEPT_SKIP_VALIDATION=true; shift ;;
+        --accept-force-searchable) ACCEPT_FORCE_SEARCHABLE=true; shift ;;
+        --accept-peer-remove) ACCEPT_PEER_REMOVE=true; shift ;;
+        --accept-site-decommission) ACCEPT_SITE_DECOMMISSION=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -170,6 +182,16 @@ require_phase_value() {
     local flag="$1" value="$2" phase="$3"
     if [[ -z "${value}" ]]; then
         log "ERROR: ${flag} is required for ${phase}."
+        exit 1
+    fi
+}
+
+require_bootstrap_peers() {
+    # Rendering an operations packet without peers is useful, but executing the
+    # bootstrap with an empty peer inventory would configure only the manager
+    # and then incorrectly report the cluster bootstrap as complete.
+    if [[ -z "${PEER_HOSTS//[[:space:],]/}" ]]; then
+        log "ERROR: --peer-hosts must contain at least one peer for bootstrap/apply."
         exit 1
     fi
 }
@@ -269,6 +291,7 @@ case "${PHASE}" in
     render)
         render_assets
         if [[ "${APPLY}" == "true" ]]; then
+            require_bootstrap_peers
             run_rendered bootstrap/sequenced-bootstrap.sh
             run_rendered validate.sh
         fi
@@ -278,20 +301,34 @@ case "${PHASE}" in
         log "Preflight: review ${OUTPUT_DIR}/cluster/ before apply."
         ;;
     apply|bootstrap)
+        require_bootstrap_peers
         render_assets
         run_rendered bootstrap/sequenced-bootstrap.sh
         ;;
     bundle-validate) render_assets; run_rendered bundle/validate.sh ;;
     bundle-status) render_assets; run_rendered bundle/status.sh ;;
     bundle-apply) render_assets; run_rendered bundle/validate.sh; run_rendered bundle/apply.sh ;;
-    bundle-apply-skip-validation) render_assets; run_rendered bundle/apply-skip-validation.sh ;;
+    bundle-apply-skip-validation)
+        if [[ "${ACCEPT_SKIP_VALIDATION}" != "true" ]]; then
+            log "ERROR: bundle-apply-skip-validation requires --accept-skip-validation."
+            exit 2
+        fi
+        render_assets
+        run_rendered bundle/apply-skip-validation.sh
+        ;;
     bundle-rollback) render_assets; run_rendered bundle/rollback.sh ;;
     rolling-restart)
         render_assets
         case "${ROLLING_RESTART_MODE:-default}" in
             default) run_rendered restart/rolling-restart.sh ;;
             searchable) run_rendered restart/searchable-rolling-restart.sh ;;
-            searchable-force) run_rendered restart/force-searchable.sh ;;
+            searchable-force)
+                if [[ "${ACCEPT_FORCE_SEARCHABLE}" != "true" ]]; then
+                    log "ERROR: searchable-force restart requires --accept-force-searchable."
+                    exit 2
+                fi
+                run_rendered restart/force-searchable.sh
+                ;;
             *) log "ERROR: --rolling-restart-mode must be default|searchable|searchable-force"; exit 1 ;;
         esac
         ;;
@@ -311,11 +348,15 @@ case "${PHASE}" in
         esac
         ;;
     peer-remove)
-        render_assets
         if [[ -z "${PEER_GUID}" ]]; then
             log "ERROR: --peer-guid is required for peer-remove."
             exit 1
         fi
+        if [[ "${ACCEPT_PEER_REMOVE}" != "true" ]]; then
+            log "ERROR: peer-remove requires --accept-peer-remove."
+            exit 2
+        fi
+        render_assets
         export PEER_GUID
         run_rendered peer-ops/remove-peer.sh
         ;;
@@ -329,6 +370,10 @@ case "${PHASE}" in
         ;;
     decommission-site)
         require_phase_value "--site" "${SITE}" "decommission-site"
+        if [[ "${ACCEPT_SITE_DECOMMISSION}" != "true" ]]; then
+            log "ERROR: decommission-site requires --accept-site-decommission."
+            exit 2
+        fi
         export SITE
         render_assets
         run_rendered migration/decommission-site.sh
@@ -347,6 +392,6 @@ case "${PHASE}" in
         run_rendered migration/migrate-non-clustered.sh
         ;;
     status|validate) render_assets; run_rendered validate.sh ;;
-    all) render_assets; run_rendered bootstrap/sequenced-bootstrap.sh; run_rendered validate.sh ;;
+    all) require_bootstrap_peers; render_assets; run_rendered bootstrap/sequenced-bootstrap.sh; run_rendered validate.sh ;;
     *) log "ERROR: Unknown phase '${PHASE}'"; usage 1 ;;
 esac

@@ -6,7 +6,7 @@ the renderer writes. Each row anchors to a doc in
 
 | Surface | Conf file | Stanza | Key knobs | mTLS knob | Default port |
 |---|---|---|---|---|---|
-| Splunk Web | `web.conf` | `[settings]` | `enableSplunkWebSSL`, `serverCert`, `privKeyPath`, `caCertPath`, `sslPassword`, `cipherSuite`, `sslVersions`, `ecdhCurves` | n/a (browser TLS only) | 8000 |
+| Splunk Web | `web.conf` | `[settings]` | `enableSplunkWebSSL`, `serverCert`, `privKeyPath`, `sslPassword`, `cipherSuite`, `sslVersions`, `ecdhCurves` | n/a (browser TLS only) | 8000 |
 | splunkd REST | `server.conf` | `[sslConfig]` | `enableSplunkdSSL`, `serverCert`, `sslRootCAPath`, `sslPassword`, `cipherSuite`, `sslVersions`, `sslVersionsForClient`, `ecdhCurves`, `caTrustStore`, `caTrustStorePath` | `requireClientCert`, `sslCommonNameToCheck`, `sslAltNameToCheck` | 8089 |
 | KV Store | `server.conf` | `[sslConfig]` (shared with splunkd) | dual-EKU `serverAuth`+`clientAuth` requirement, validated by `splunk cmd openssl verify -x509_strict` | inherits from splunkd | KV uses splunkd's TLS |
 | S2S receiver | `inputs.conf` | `[splunktcp-ssl:9997]` + `[SSL]` | `serverCert`, `sslPassword`, `cipherSuite`, `sslVersions` | `requireClientCert`, name checks | 9997 |
@@ -42,7 +42,7 @@ The skill therefore splits TLS settings into two layers:
 
 | Setting | Lives in | Why |
 |---|---|---|
-| `enableSplunkdSSL`, `sslRootCAPath`, `caTrustStore`, `sslVersions`, `sslVersionsForClient`, `cipherSuite`, `ecdhCurves`, `sslVerifyServerCert`, `sslVerifyServerName`, `requireClientCert`, `sslCommonNameToCheck`, `sslAltNameToCheck`, `enableSplunkWebSSL`, `caCertPath` | **Bundle** (`master-apps/000_pki_trust/local/*.conf`) | Cluster-wide policy, identical on every peer |
+| `enableSplunkdSSL`, `sslRootCAPath`, `caTrustStore`, `sslVersions`, `sslVersionsForClient`, `cipherSuite`, `ecdhCurves`, `sslVerifyServerCert`, `sslVerifyServerName`, `requireClientCert`, `sslCommonNameToCheck`, `sslAltNameToCheck`, `enableSplunkWebSSL` | **Bundle** (`master-apps/000_pki_trust/local/*.conf`) | Cluster-wide policy, identical on every peer |
 | `serverCert`, `privKeyPath`, `sslPassword`, `clientCert`, `[replication_port-ssl://9887]` (full stanza) | **Per-host overlay** (`$SPLUNK_HOME/etc/system/local/*.conf`) | Host-specific paths; `install-leaf.sh` writes these |
 
 `install-leaf.sh` writes the per-host overlay automatically with

@@ -21,6 +21,7 @@ Modes:
   --validate                       Validate already-rendered output
   --probe                          Probe live MCP metadata without tenant mutation
   --doctor                         Render, validate, and run no-secret probe
+  --apply                          Render and register the Codex client (Codex-only)
   --dry-run                        Show render plan without writing
   --json                           Emit JSON where supported
 
@@ -39,7 +40,8 @@ Options:
   --help                           Show this help
 
 Direct secret flags such as --galileo-api-key, --api-key, --token, --password,
-and --authorization are rejected. There is no --apply mode in v1.
+and --authorization are rejected. Apply requires --client codex and a readable
+--galileo-api-key-file; other client config merges remain explicit handoffs.
 EOF
 }
 
@@ -62,6 +64,7 @@ PY
 MODE_RENDER=false
 MODE_VALIDATE=false
 MODE_PROBE=false
+MODE_APPLY=false
 DRY_RUN=false
 JSON_OUTPUT=false
 MODE_GIVEN=false
@@ -86,6 +89,7 @@ while [[ $# -gt 0 ]]; do
         --render) MODE_RENDER=true; MODE_GIVEN=true; shift ;;
         --validate) MODE_VALIDATE=true; MODE_GIVEN=true; shift ;;
         --probe) MODE_PROBE=true; MODE_GIVEN=true; shift ;;
+        --apply) MODE_APPLY=true; MODE_RENDER=true; MODE_GIVEN=true; shift ;;
         --doctor)
             MODE_RENDER=true
             MODE_VALIDATE=true
@@ -109,11 +113,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --galileo-api-key=*|--api-key=*|--token=*|--password=*|--authorization=*|--bearer-token=*)
             reject_secret_arg "${1%%=*}" "--galileo-api-key-file"
-            exit 1
-            ;;
-        --apply)
-            log "ERROR: --apply is intentionally not supported for galileo-mcp-server-setup v1."
-            log "       Review rendered files and copy/install them manually."
             exit 1
             ;;
         --help|-h) usage; exit 0 ;;
@@ -224,4 +223,38 @@ if [[ "${MODE_PROBE}" == "true" ]]; then
         PROBE_ARGS+=(--json)
     fi
     python3 "${SCRIPT_DIR}/probe_mcp.py" "${PROBE_ARGS[@]}"
+fi
+
+if [[ "${MODE_APPLY}" == "true" ]]; then
+    if [[ -z "${GALILEO_API_KEY_FILE}" || ! -r "${GALILEO_API_KEY_FILE}" ]]; then
+        log "ERROR: --apply requires a readable --galileo-api-key-file."
+        exit 1
+    fi
+    rendered_clients="$(python3 - "${OUTPUT_DIR}/metadata.json" <<'PY'
+import json
+import sys
+print(",".join(json.load(open(sys.argv[1], encoding="utf-8"))["clients"]), end="")
+PY
+)"
+    if [[ "${rendered_clients}" != "codex" ]]; then
+        log "ERROR: Automated --apply currently supports only --client codex."
+        log "       Review ${OUTPUT_DIR}/mcp/README.md for Cursor, Claude, VS Code, and Kiro merge steps."
+        exit 2
+    fi
+    python3 - "${OUTPUT_DIR}/metadata.json" "${GALILEO_API_KEY_FILE}" "${OUTPUT_DIR}/mcp/.env.galileo-mcp" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+target = Path(sys.argv[3])
+target.write_text(
+    "GALILEO_MCP_URL=" + json.dumps(metadata["mcp_url"]) + "\n"
+    "GALILEO_API_KEY_FILE=" + json.dumps(str(Path(sys.argv[2]).resolve())) + "\n",
+    encoding="utf-8",
+)
+os.chmod(target, 0o600)
+PY
+    bash "${OUTPUT_DIR}/mcp/codex-register-galileo-mcp.sh"
 fi

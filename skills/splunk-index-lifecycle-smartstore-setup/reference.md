@@ -44,6 +44,11 @@ Research anchors:
 - `clean-data`: gated standalone Enterprise data clean workflow; refused for
   indexer clusters.
 
+`smartstore` is a self-managed Splunk Enterprise workflow in this skill.
+Splunk Cloud SmartStore/DDSS requests must use the Cloud index/DDSS workflow;
+the renderer rejects `--platform cloud --operation smartstore`. Likewise,
+`clean-data` renders only for standalone Splunk Enterprise.
+
 ## Destructive Gate Evidence
 
 `delete-index` and `clean-data` fail before Splunk/ACS calls unless all required
@@ -104,11 +109,32 @@ Hard blocks and protected defaults:
   indexer cluster.
 - Keep `enableTsidxReduction = false` and `maxDataSize = auto` at defaults for
   SmartStore unless Splunk Support directs otherwise.
+- Live cluster apply requires `--apply-cluster-bundle true`. The generated
+  helper reads cluster bundle status after acceptance, but bundle status is not
+  a per-peer proof of every effective key; collect peer `btool` evidence where
+  that stronger proof is required.
+- Live standalone SmartStore and retention apply requires
+  `--restart-splunk true`, followed by an exact `btool` readback of requested
+  settings. Configuration writes are atomic and owner-only; an existing target
+  file is backed up to a unique owner-only file before replacement.
+- Retention and clustered-disable overlays use `<app-name>_retention` and
+  `<app-name>_disable` respectively, so they cannot replace the primary
+  SmartStore app's `indexes.conf`.
 
 ## Cloud And Handoffs
 
 - Cloud retention/delete apply uses ACS token files and a generated curl config
-  file so token values are not placed directly in argv.
+  file so token values are not placed directly in argv. Token files must be
+  regular, non-symlink, owned by the executing user, and mode `0600` or stricter.
+  Curl configuration, request payloads, and response bodies use randomized,
+  owner-only temporary paths and are cleaned on exit.
+- A successful Cloud retention PATCH is followed by bounded GET polling until
+  `searchableDays`, `maxDataSizeMB`, and/or `splunkArchivalRetentionDays` match
+  the request. A successful delete is followed by bounded GET polling until ACS
+  returns `404`. HTTP acceptance without matching readback fails.
+- Multi-index ACS operations are sequential, not transactional. If a later
+  target fails, the helper exits nonzero and reports the earlier targets that
+  were already verified.
 - Cloud DDAA enable/update is delegated to `splunk-ddaa-archive`.
 - Cloud restore is a UI handoff from Settings > Indexes.
 - Dependency proof routes to `splunk-data-source-readiness-doctor`.
@@ -128,5 +154,12 @@ bash skills/splunk-index-lifecycle-smartstore-setup/scripts/validate.sh
 ```
 
 Static validation checks lifecycle reports and operation-specific files. For
-SmartStore renders it also verifies the remote volume stanza. `--live` runs the
-rendered `status.sh` and redacts obvious remote credential fields.
+SmartStore renders it also verifies the remote volume stanza. It parses all
+rendered JSON objects and runs shell syntax checks on generated helpers.
+`--live` runs the rendered platform-specific `status.sh`; `--json` and `--live`
+cannot be combined. Cloud status uses ACS describe/readback, while Enterprise
+status uses local Splunk CLI and redacts obvious remote credential fields.
+
+`clean-data` can execute the supported standalone CLI clean command, but this
+workflow does not claim an independent bucket/event-count readback afterward.
+Capture `dbinspect` or search evidence after the indexer is returned to service.

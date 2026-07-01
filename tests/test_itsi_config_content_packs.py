@@ -356,6 +356,8 @@ class ContentPackTests(unittest.TestCase):
 
             commands: list[list[str]] = []
             command_envs: list[dict[str, str]] = []
+            known_hosts = Path(tempdir) / "known_hosts"
+            known_hosts.write_text("10.110.253.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
 
             def runner(command, **kwargs):
                 commands.append(command)
@@ -371,6 +373,10 @@ class ContentPackTests(unittest.TestCase):
                         ),
                         stderr="",
                     )
+                if command[0] == "sshpass" and command[3] == "ssh" and str(command[-1]).startswith("umask 077; mktemp"):
+                    return subprocess.CompletedProcess(
+                        command, 0, stdout="/tmp/splunk-itsi-pack.ABC123\n", stderr=""
+                    )
                 return subprocess.CompletedProcess(command, 0, stdout="Installed extracted app DA-ITSI-ContentLibrary\n", stderr="")
 
             installer_script = Path(tempdir) / "install_app.sh"
@@ -382,10 +388,19 @@ class ContentPackTests(unittest.TestCase):
                 "content_library": {"require_present": True, "source": "splunkbase", "app_id": "5391"},
             }
 
-            previous_env = {key: os.environ.get(key) for key in ("SPLUNK_SSH_HOST", "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS")}
+            previous_env = {
+                key: os.environ.get(key)
+                for key in (
+                    "SPLUNK_SSH_HOST",
+                    "SPLUNK_SSH_USER",
+                    "SPLUNK_SSH_PASS",
+                    "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+                )
+            }
             os.environ["SPLUNK_SSH_HOST"] = "10.110.253.20"
             os.environ["SPLUNK_SSH_USER"] = "splunk"
             os.environ["SPLUNK_SSH_PASS"] = "changeme"
+            os.environ["SPLUNK_SSH_KNOWN_HOSTS_FILE"] = str(known_hosts)
             try:
                 result = installer.install(spec, client)
             finally:
@@ -398,18 +413,23 @@ class ContentPackTests(unittest.TestCase):
             self.assertEqual(result["source"], "ssh-extract")
             self.assertEqual(commands[0][0], "bash")
             self.assertEqual(commands[1][:2], ["sshpass", "-f"])
-            self.assertEqual(commands[1][3], "scp")
+            self.assertEqual(commands[1][3], "ssh")
+            self.assertIn("mktemp -d /tmp/splunk-itsi-pack.XXXXXX", commands[1][-1])
             self.assertEqual(commands[2][:2], ["sshpass", "-f"])
             self.assertEqual(commands[2][3], "scp")
             self.assertEqual(commands[3][:2], ["sshpass", "-f"])
-            self.assertEqual(commands[3][3], "ssh")
-            self.assertIn("Unsafe archive member", commands[3][-1])
-            self.assertIn("cp -R", commands[3][-1])
-            self.assertNotIn("install app", commands[3][-1])
-            self.assertIn("nohup", commands[3][-1])
-            self.assertIn("Triggered Splunk restart in background", commands[3][-1])
-            self.assertIn("printf '%s\\n%s\\n'", commands[3][-1])
-            self.assertNotIn("-auth", commands[3][-1])
+            self.assertEqual(commands[3][3], "scp")
+            self.assertEqual(commands[4][:2], ["sshpass", "-f"])
+            self.assertEqual(commands[4][3], "ssh")
+            self.assertIn("Unsafe archive member", commands[4][-1])
+            self.assertIn("cp -R", commands[4][-1])
+            self.assertNotIn("install app", commands[4][-1])
+            self.assertIn("nohup", commands[4][-1])
+            self.assertIn("Triggered Splunk restart in background", commands[4][-1])
+            self.assertIn("printf '%s\\n%s\\n'", commands[4][-1])
+            self.assertNotIn("-auth", commands[4][-1])
+            self.assertEqual(commands[5][3], "ssh")
+            self.assertEqual(commands[5][-1], "rm -rf -- /tmp/splunk-itsi-pack.ABC123")
             command_text = "\n".join(" ".join(str(part) for part in command) for command in commands)
             self.assertNotIn("changeme", command_text)
             for command_env in command_envs[1:]:
@@ -422,11 +442,15 @@ class ContentPackTests(unittest.TestCase):
             bundle_path = Path(tempdir) / "splunk-app-for-content-packs_250.spl"
             bundle_path.write_text("placeholder", encoding="utf-8")
             commands: list[list[str]] = []
+            known_hosts = Path(tempdir) / "known_hosts"
+            known_hosts.write_text("10.110.253.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
 
             def runner(command, **kwargs):
                 commands.append(command)
-                if command[0] == "bash":
-                    return subprocess.CompletedProcess(command, 1, stdout=f"Existing package found: {bundle_path}\n", stderr="")
+                if command[0] == "sshpass" and command[3] == "ssh" and str(command[-1]).startswith("umask 077; mktemp"):
+                    return subprocess.CompletedProcess(
+                        command, 0, stdout="/tmp/splunk-itsi-pack.FAIL123\n", stderr=""
+                    )
                 if len(command) > 3 and command[0] == "sshpass" and command[1] == "-f" and command[3] == "scp":
                     return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
                 if (
@@ -434,7 +458,7 @@ class ContentPackTests(unittest.TestCase):
                     and command[0] == "sshpass"
                     and command[1] == "-f"
                     and command[3] == "ssh"
-                    and str(command[-1]).startswith("rm -f ")
+                    and str(command[-1]).startswith("rm -rf -- ")
                 ):
                     return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
                 return subprocess.CompletedProcess(command, 255, stdout="", stderr="connection lost")
@@ -448,10 +472,19 @@ class ContentPackTests(unittest.TestCase):
                 "content_library": {"require_present": True, "source": "splunkbase", "app_id": "5391"},
             }
 
-            previous_env = {key: os.environ.get(key) for key in ("SPLUNK_SSH_HOST", "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS")}
+            previous_env = {
+                key: os.environ.get(key)
+                for key in (
+                    "SPLUNK_SSH_HOST",
+                    "SPLUNK_SSH_USER",
+                    "SPLUNK_SSH_PASS",
+                    "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+                )
+            }
             os.environ["SPLUNK_SSH_HOST"] = "10.110.253.20"
             os.environ["SPLUNK_SSH_USER"] = "splunk"
             os.environ["SPLUNK_SSH_PASS"] = "changeme"
+            os.environ["SPLUNK_SSH_KNOWN_HOSTS_FILE"] = str(known_hosts)
             try:
                 with self.assertRaises(ValidationError):
                     installer._cli_install_bundle(bundle_path, spec, client, installer._build_env(spec, client))
@@ -463,8 +496,7 @@ class ContentPackTests(unittest.TestCase):
                         os.environ[key] = value
 
             self.assertEqual(commands[-1][3], "ssh")
-            self.assertTrue(str(commands[-1][-1]).startswith("rm -f "))
-            self.assertIn(".auth", commands[-1][-1])
+            self.assertEqual(commands[-1][-1], "rm -rf -- /tmp/splunk-itsi-pack.FAIL123")
             command_text = "\n".join(" ".join(str(part) for part in command) for command in commands)
             self.assertNotIn("changeme", command_text)
 

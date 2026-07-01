@@ -220,6 +220,13 @@ body_from_response() {
     printf '%s\n' "${1}" | sed '$d'
 }
 
+assert_secret_file_mode() {
+    local path="$1" label="$2" mode
+    [[ -f "${path}" && -r "${path}" && -s "${path}" ]] || { log "ERROR: ${label} must be a readable, non-empty regular file: ${path}"; exit 1; }
+    mode="$(stat -c '%a' "${path}" 2>/dev/null || stat -f '%Lp' "${path}" 2>/dev/null)"
+    [[ "${mode}" == "600" ]] || { log "ERROR: ${label} must be chmod 600 (found ${mode:-unknown}): ${path}"; exit 1; }
+}
+
 fail_on_bad_response() {
     local action="$1"
     local response="$2"
@@ -429,6 +436,7 @@ complete_onboarding() {
     local activation_code payload response code result_summary
 
     ensure_prompted_path ACTIVATION_CODE_FILE "Activation code file path"
+    assert_secret_file_mode "${ACTIVATION_CODE_FILE}" "Activation code file"
     activation_code="$(read_secret_file "${ACTIVATION_CODE_FILE}")"
     if [[ -z "${activation_code}" ]]; then
         log "ERROR: Activation code file is empty: ${ACTIVATION_CODE_FILE}"
@@ -463,6 +471,7 @@ set_proxy() {
 
     proxy_password=""
     if [[ -n "${PROXY_PASSWORD_FILE}" ]]; then
+        assert_secret_file_mode "${PROXY_PASSWORD_FILE}" "Proxy password file"
         proxy_password="$(read_secret_file "${PROXY_PASSWORD_FILE}")"
     fi
 
@@ -503,9 +512,9 @@ run_validation() {
     fi
 
     if [[ "${DO_INSTALL}" == "true" && "${VALIDATE_EXPLICIT}" != "true" ]] && is_splunk_cloud; then
-        log "WARNING: Install completed, but post-install validation could not finish."
+        log "ERROR: Install completed, but post-install validation could not finish."
         log "         Splunk Cloud validation needs search-tier REST access on :8089 and any required allowlisting."
-        return 0
+        return 1
     fi
 
     return 1

@@ -87,8 +87,8 @@ Input type prefix: `cisco_catalyst_sdwan_`
 
 | Input Stanza | Health Type | Default Interval | Index |
 |---|---|---|---|
-| `cisco_catalyst_sdwan_health://<name>` | varies | 86400s | `sdwan` |
-| `cisco_catalyst_sdwan_site_and_tunnel_health://<name>` | varies | 3600s | `sdwan` |
+| `cisco_catalyst_sdwan_health://<name>` | `utd_health,link_health` | 3600s | `sdwan` |
+| `cisco_catalyst_sdwan_site_and_tunnel_health://<name>` | `site_health,tunnel_health,sse_tunnels` | 3600s | `sdwan` |
 
 ### SD-WAN Input Fields
 
@@ -175,3 +175,9 @@ Configured in `local/ta_cisco_catalyst_settings.conf`:
 | `splunk_mgmt_env_type` | `local_instance` | Splunk management environment |
 | `splunk_mgmt_host` | `localhost` | Splunk management host |
 | `splunk_mgmt_port` | `8089` | Splunk management port |
+
+## Completion Validation
+
+`validate.sh --completion` (alias `--strict`) exits nonzero when no Catalyst
+product account, enabled input, event evidence, required index, or companion
+dashboard view is available. The no-flag form remains diagnostic.

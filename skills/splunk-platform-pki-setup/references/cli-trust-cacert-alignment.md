@@ -27,7 +27,8 @@ SSL Error: Couldn't connect to server: certificate verify failed
 ```
 
 ```bash
-$ splunk apply cluster-bundle -auth admin:<pw>
+$ splunk login
+$ splunk apply cluster-bundle
 SSLError: HTTPSConnectionPool(host='localhost', port=8089): Max retries exceeded with url: /services/cluster/manager/control/default/apply ...
 [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed
 ```

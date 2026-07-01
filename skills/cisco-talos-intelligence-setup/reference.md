@@ -40,3 +40,10 @@ Observable types supported by the package code are URL, IP address, and domain.
 The packaged `threatlist://talos_intelligence_ip_blacklist` is disabled by
 default. Its URL is `https://www.talosintelligence.com/documents/ip-blacklist`.
 Enable only when the user explicitly wants the blacklist feed.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` fails when service-account provisioning or
+its fingerprint is missing. The no-flag validator keeps provisioning-latency
+findings as warnings. No standalone dashboard/event-flow gate applies to this
+ES enrichment package.

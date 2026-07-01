@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import stat
 from pathlib import Path
@@ -320,10 +321,12 @@ def handoff_install_command(coverage: dict[str, Any]) -> list[str] | None:
 
     text = setup.read_text(encoding="utf-8", errors="ignore")
     command = ["bash", f"skills/{skill}/scripts/setup.sh"]
-    if "--all" in text:
+    if re.search(r"--all\s*\)", text):
         command.append("--all")
-    elif "--install" in text:
+    elif re.search(r"--install\s*\)", text):
         command.append("--install")
+    else:
+        return None
 
     selector = str(coverage.get("product_selector", "")).strip()
     if selector and "--products" in text:
@@ -937,7 +940,12 @@ def main() -> int:
         coverage = resolve_glossary_entry(catalog, args.profile)
         if coverage is not None:
             if args.phase == "install-command":
-                command = handoff_install_command(coverage) or coverage.get("commands", generic_install_commands()).get("install_help")
+                command = handoff_install_command(coverage)
+                if not command:
+                    die(
+                        f"{coverage['name']} has no executable install route with a concrete package or Splunkbase ID; "
+                        "render its handoff and invoke splunk-app-install with an explicit source"
+                    )
                 emit({"ok": True, "coverage": coverage, "command": command}, args.json)
                 return 0
             if args.phase == "readiness-command" and coverage.get("readiness_source_pack"):

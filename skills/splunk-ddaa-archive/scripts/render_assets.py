@@ -126,12 +126,23 @@ def render_enable(args: argparse.Namespace) -> str:
 acs_base={base}
 stack={stack}
 operation={shell_quote(operation)}
-[[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
-
 if [[ "${{operation}}" == "plan" ]]; then
   echo "Plan only: review {payload_file} and run with --operation enable|update|create to apply."
   exit 0
 fi
+[[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
+token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
+[[ "${{token_mode}}" == "600" || "${{token_mode}}" == "400" ]] \\
+  || {{ echo "ERROR: ACS token file must have mode 0600 or 0400 (found ${{token_mode:-unknown}})." >&2; exit 1; }}
+token="$(cat "${{token_file}}")"
+[[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
+  || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
+curl_config="$(mktemp)"
+response_file="$(mktemp)"
+chmod 600 "${{curl_config}}" "${{response_file}}"
+trap 'rm -f "${{curl_config}}" "${{response_file}}"' EXIT
+printf 'header = "Authorization: Bearer %s"\\n' "${{token}}" > "${{curl_config}}"
+token=""
 
 url="${{acs_base}}/${{stack}}/adminconfig/v2/indexes{url_suffix}"
 echo "Applying DDAA via {method} ${{url}}"
@@ -142,13 +153,13 @@ echo "cannot be disabled via the API. Confirm to continue."
 read -r -p "Type APPLY to continue: " confirm
 [[ "${{confirm}}" == "APPLY" ]] || {{ echo "Aborted."; exit 1; }}
 
-http_code=$(curl -sS -o /tmp/ddaa_acs_response.json -w '%{{http_code}}' \\
+http_code=$(curl -sS -o "${{response_file}}" -w '%{{http_code}}' \\
   -X {method} "${{url}}" \\
-  -H "Authorization: Bearer $(cat "${{token_file}}")" \\
+  -K "${{curl_config}}" \\
   -H "Content-Type: application/json" \\
   --data @{payload_file}) || {{ echo "ERROR: ACS request failed." >&2; exit 1; }}
 echo "HTTP ${{http_code}}"
-cat /tmp/ddaa_acs_response.json 2>/dev/null || true
+cat "${{response_file}}"
 echo
 if [[ "${{http_code}}" =~ ^2 ]]; then
   echo "DDAA request accepted. Run status.sh to confirm splunkArchivalRetentionDays."
@@ -171,15 +182,26 @@ acs_base={base}
 stack={stack}
 index={index}
 [[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
+token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
+[[ "${{token_mode}}" == "600" || "${{token_mode}}" == "400" ]] \\
+  || {{ echo "ERROR: ACS token file must have mode 0600 or 0400 (found ${{token_mode:-unknown}})." >&2; exit 1; }}
+token="$(cat "${{token_file}}")"
+[[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
+  || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
+curl_config="$(mktemp)"
+chmod 600 "${{curl_config}}"
+trap 'rm -f "${{curl_config}}"' EXIT
+printf 'header = "Authorization: Bearer %s"\\n' "${{token}}" > "${{curl_config}}"
+token=""
 url="${{acs_base}}/${{stack}}/adminconfig/v2/indexes/${{index}}"
 echo "GET ${{url}}"
-curl -sS "${{url}}" \\
-  -H "Authorization: Bearer $(cat "${{token_file}}")" \\
+curl -fsS "${{url}}" \\
+  -K "${{curl_config}}" \\
   | python3 -c 'import json,sys
 try:
     d=json.load(sys.stdin)
 except Exception:
-    print("(no JSON response)"); raise SystemExit(0)
+    print("ERROR: ACS status response was not valid JSON", file=sys.stderr); raise SystemExit(1)
 keys=["name","datatype","searchableDays","splunkArchivalRetentionDays","maxDataSizeMB","selfStorageBucketPath"]
 for k in keys:
     if k in d:

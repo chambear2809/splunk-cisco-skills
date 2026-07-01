@@ -222,6 +222,13 @@ write_secret_file() {
     umask "${previous_umask}"
 }
 
+assert_secret_source_file() {
+    local path="$1" label="$2" mode
+    [[ -f "${path}" && -r "${path}" && -s "${path}" ]] || { log "ERROR: ${label} must be a readable, non-empty regular file: ${path}"; exit 1; }
+    mode="$(stat -c '%a' "${path}" 2>/dev/null || stat -f '%Lp' "${path}" 2>/dev/null)"
+    [[ "${mode}" == "600" ]] || { log "ERROR: ${label} must be chmod 600 (found ${mode:-unknown}): ${path}"; exit 1; }
+}
+
 copy_file_with_mode() {
     local source_path="$1" dest_path="$2" mode="$3"
 
@@ -643,10 +650,7 @@ render_client_bundle() {
                 exit 1
             fi
             token_source="${BEARER_TOKEN_FILE}"
-            if [[ -n "${token_source}" && ! -f "${token_source}" ]]; then
-                log "ERROR: Bearer token file not found: ${token_source}"
-                exit 1
-            fi
+            [[ -z "${token_source}" ]] || assert_secret_source_file "${token_source}" "Bearer token file"
             if [[ -n "${MCP_URL}" ]]; then
                 mcp_url="${MCP_URL}"
             else
@@ -671,10 +675,7 @@ render_client_bundle() {
                 exit 1
             fi
             o11y_token_source="${O11Y_TOKEN_FILE}"
-            if [[ ! -f "${o11y_token_source}" ]]; then
-                log "ERROR: Observability token file not found: ${o11y_token_source}"
-                exit 1
-            fi
+            assert_secret_source_file "${o11y_token_source}" "Observability token file"
             mcp_url="$(resolve_scs_gateway_url "${o11y_realm}" "${SCS_REGION}")"
             ;;
         combined)
@@ -701,14 +702,8 @@ render_client_bundle() {
             fi
             o11y_token_source="${O11Y_TOKEN_FILE}"
             splunk_jwt_source="${SPLUNK_JWT_FILE}"
-            if [[ ! -f "${o11y_token_source}" ]]; then
-                log "ERROR: Observability token file not found: ${o11y_token_source}"
-                exit 1
-            fi
-            if [[ ! -f "${splunk_jwt_source}" ]]; then
-                log "ERROR: Splunk Platform authorization token file not found: ${splunk_jwt_source}"
-                exit 1
-            fi
+            assert_secret_source_file "${o11y_token_source}" "Observability token file"
+            assert_secret_source_file "${splunk_jwt_source}" "Splunk Platform authorization token file"
             mcp_url="$(resolve_scs_gateway_url "${o11y_realm}" "${SCS_REGION}")"
             ;;
     esac
@@ -1493,6 +1488,10 @@ fi
 
 if [[ "${LIVE_SPLUNK_ACTIONS}" == "false" && "${RENDER_CLIENTS}" != "true" ]]; then
     LIVE_SPLUNK_ACTIONS=true
+fi
+
+if [[ "${DO_UNINSTALL}" == "true" || "${LIVE_SPLUNK_ACTIONS}" == "true" ]]; then
+    require_current_skill_role_supported
 fi
 
 if [[ "${DO_INSTALL}" == "true" ]]; then

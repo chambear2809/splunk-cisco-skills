@@ -32,6 +32,14 @@ Parent `--apply --accept-apply` is intentionally limited to child
 render/validate orchestration with non-secret target context. Run child skills
 directly when a documented live mutation is required.
 
+The parent preflights evidence before delegating any child. Selecting
+`saviynt` requires valid JSON containing a revoke, password-reset,
+micro-certification, or remediation outcome marker. Selecting `google`
+requires valid JSON containing `WIDEFIELD_SECURITY`. One combined evidence file
+may satisfy both. Optional child arguments are forwarded only when explicitly
+set, so absent URLs, tenant names, project IDs, and evidence paths are not sent
+as empty values.
+
 ## Capability Coverage
 
 Every render emits `capability-coverage.md`, `okta-oin-coverage.md`, and

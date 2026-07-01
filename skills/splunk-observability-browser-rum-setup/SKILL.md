@@ -1,7 +1,7 @@
 ---
 name: splunk-observability-browser-rum-setup
 description: >-
-  Render, validate, and hand off generic Splunk Observability Cloud Browser RUM
+  Render, validate, apply, and hand off generic Splunk Observability Cloud Browser RUM
   and Session Replay setup for web applications outside the Kubernetes injection
   path, including CDN snippets, npm/TypeScript initialization, Next.js/Vite/
   Webpack source-map upload helpers, CSP headers, Session Replay privacy
@@ -51,7 +51,19 @@ bash skills/splunk-observability-browser-rum-setup/scripts/validate.sh \
   --check-url https://shop.example.com
 ```
 
-5. Hand off dashboards to `splunk-observability-dashboard-builder`, detectors to
+5. After reviewing the rendered helper, inject and upload source maps from a
+   completed frontend build:
+
+```bash
+chmod 600 /path/to/o11y-token
+bash skills/splunk-observability-browser-rum-setup/scripts/setup.sh \
+  --upload-source-maps \
+  --output-dir splunk-observability-browser-rum-rendered \
+  --assets-dir /path/to/app/dist \
+  --token-file /path/to/o11y-token
+```
+
+6. Hand off dashboards to `splunk-observability-dashboard-builder`, detectors to
    `splunk-observability-native-ops`, and missing backend trace headers to the
    appropriate APM or auto-instrumentation skill.
 
@@ -61,5 +73,8 @@ bash skills/splunk-observability-browser-rum-setup/scripts/validate.sh \
 - Session Replay requires explicit privacy review before enablement.
 - Source maps are server-to-server uploads; use an org/API token file, not the
   browser-embedded RUM token.
+- `--upload-source-maps` requires an existing rendered helper, an existing build
+  directory, and a token file with mode `0600` or `0400`; it never accepts a
+  token value on argv.
 - Keep CSP `script-src` and `connect-src` aligned with the selected CDN and
   `rum-ingest.<realm>.observability.splunkcloud.com`.

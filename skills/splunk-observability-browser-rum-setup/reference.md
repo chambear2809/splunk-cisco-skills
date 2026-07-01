@@ -2,7 +2,10 @@
 
 This skill covers generic web application Browser RUM setup outside the
 Kubernetes injection path. It is source/build-pipeline oriented and emits
-reviewable snippets rather than editing application code directly.
+reviewable snippets rather than editing application code directly. Its explicit
+action path runs the reviewed `source-map-upload.sh` helper with
+`--upload-source-maps`; that helper injects source-map references into the built
+assets and uploads the maps to Observability Cloud.
 
 ## Instrumentation Modes
 

@@ -153,7 +153,7 @@ set_app_state() {
     local body http_code resp
     body=$(form_urlencode_pairs disabled "${disabled}")
     resp=$(splunk_curl_post "${sk}" "${body}" \
-        "${SPLUNK_URI}/servicesNS/nobody/system/apps/local/${APP_NAME}" \
+        "${SPLUNK_URI}/services/apps/local/${APP_NAME}" \
         -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
@@ -187,8 +187,9 @@ apply_live() {
             set_app_state 1
             ;;
         configure)
-            log "Rendered Secure Gateway assets. Use --action enable/disable to change app state;"
-            log "deployment settings and device registration are Splunk Web / MDM operations (see runbooks)."
+            log "ERROR: deployment settings and device registration are Splunk Web / MDM handoffs; no supported live configure API is implemented."
+            log "       Review the rendered runbooks, or use --action enable/disable for an executable app-state change."
+            exit 2
             ;;
     esac
 }
@@ -201,8 +202,11 @@ get_status() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     local sk
     sk=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
-    splunk_curl "${sk}" "${SPLUNK_URI}/servicesNS/nobody/system/apps/local/${APP_NAME}?output_mode=json" \
-        2>/dev/null | rest_json_field "disabled" || log "Could not read ${APP_NAME} state."
+    if ! splunk_curl "${sk}" --fail-with-body --show-error \
+        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" | rest_json_field "disabled"; then
+        log "ERROR: Could not read ${APP_NAME} state."
+        exit 1
+    fi
 }
 
 main() {

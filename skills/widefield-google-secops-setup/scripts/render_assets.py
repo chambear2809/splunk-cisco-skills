@@ -15,7 +15,10 @@ from widefield_render_common import main  # noqa: E402
 def apply_commands(_args):
     return [
         "# Live Google SecOps feed creation is disabled until a documented API path is added.",
-        "bash skills/widefield-google-secops-setup/scripts/setup.sh --apply --accept-apply",
+        '# Set WIDEFIELD_EVIDENCE_FILE to exported Google SecOps feed/parser evidence.',
+        ': "${WIDEFIELD_EVIDENCE_FILE:?Set WIDEFIELD_EVIDENCE_FILE to a local evidence JSON file}"',
+        'grep -q "WIDEFIELD_SECURITY" "${WIDEFIELD_EVIDENCE_FILE}" || { echo "ERROR: evidence does not reference WIDEFIELD_SECURITY" >&2; exit 1; }',
+        'bash skills/widefield-google-secops-setup/scripts/validate.sh --evidence-file "${WIDEFIELD_EVIDENCE_FILE}"',
     ]
 
 

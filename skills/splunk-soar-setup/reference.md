@@ -51,6 +51,11 @@ Official references:
 - REST User (ph_user):
   <https://help.splunk.com/en/splunk-soar/soar-on-premises/rest-api-reference/8.5.0/user-management-endpoints/rest-user>
 
+SOAR API helpers require a real HTTPS tenant URL and chmod-600 secret files.
+For an explicitly approved non-TLS lab endpoint only, set
+`SOAR_API_ALLOW_HTTP=true`; production token-bearing requests should remain on
+verified HTTPS (or use `SOAR_API_CA_CERT` for a private CA).
+
 ## REST Automation User Model
 
 The Splunk SOAR REST API supports two user types:
@@ -97,9 +102,11 @@ Splunk ES                                Splunk SOAR
 +-----------------+                      +----------------+
 ```
 
-The `splunk-side/configure-phantom-endpoint.sh` script delegates to
-`splunk-enterprise-security-config integrations.soar` so the wiring lives
-in one place.
+The `splunk-side/configure-phantom-endpoint.sh` script fails closed with the
+Mission Control UI/operator handoff. The supported
+`splunk-enterprise-security-config integrations.soar` path provides read-only
+inventory and preflight only; it does not claim a stable `conf-essoar` write
+contract or accept a secret token through an undocumented endpoint.
 
 ## Hand-off Contracts
 
@@ -108,7 +115,8 @@ in one place.
   Broker egress IP targeting the `search-api` ACS feature.
 - **Splunk-side apps** — calls `splunk-app-install` for each Splunkbase ID
   rather than re-implementing app install.
-- **ES** — calls `splunk-enterprise-security-config integrations.soar`.
+- **ES** — renders a read-only `splunk-enterprise-security-config
+  integrations.soar` readiness spec and exits nonzero for the UI pairing step.
 
 ## Out of Scope
 

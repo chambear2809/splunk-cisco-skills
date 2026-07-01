@@ -14,6 +14,14 @@ description: >-
 
 # Splunk CIM Data Model Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture applicable configuration, data/readiness, and
+shipped-view evidence, or explicit package evidence that no dashboards ship.
+
 This skill renders and applies Common Information Model data model governance.
 It is render-first because acceleration consumes indexer and storage resources
 and index constraints change what searches return.

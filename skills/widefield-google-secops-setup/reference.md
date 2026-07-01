@@ -26,3 +26,8 @@ Evidence should include:
 - Coverage evidence for identity posture, non-human identity ownership, human
   MFA posture, connected application permission risk, AI identity access, and
   authentication/session analysis.
+
+`validate.sh` and `setup.sh --validate` require `--evidence-file`. The file
+must be valid JSON and must contain the exact `WIDEFIELD_SECURITY` marker;
+missing evidence or a marker mismatch exits nonzero. Use `--dry-run` to inspect
+the intended validation without supplying evidence.

@@ -7,7 +7,7 @@ description: >-
   Claude Code, Codex, VS Code, and AWS Kiro clients with both OAuth Bearer and
   OAuth2 flows. Surfaces TE rate limits, the unit-consumption warning for
   Instant Tests, and gates the write/Instant-Test tool group behind an
-  explicit opt-in. Use when the user asks to register the ThousandEyes MCP,
+  explicit acknowledgement. Use when the user asks to register the ThousandEyes MCP,
   set up TE in Cursor/Claude/Codex/VS Code/Kiro, configure the Cisco
   ThousandEyes Cursor plugin, or pair an AI assistant with TE.
 ---
@@ -20,7 +20,8 @@ This skill is **agent-tooling only** — it does not move telemetry. For TE → 
 
 Render per-client MCP configurations for the official **ThousandEyes MCP Server** at `https://api.thousandeyes.com/mcp`. Optionally apply the configurations into the user's actual Cursor / Claude Code / Codex / VS Code / AWS Kiro config locations.
 
-Render-first by default. `--apply` only writes to user config files when explicitly requested.
+Render-first by default. Automated `--apply` is supported for Codex with OAuth2;
+the other clients retain explicit reviewed manual merge handoffs.
 
 ## Safety Rules
 
@@ -30,7 +31,7 @@ Render-first by default. `--apply` only writes to user config files when explici
 - Reject direct token flags (`--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`).
 - Token files must be `chmod 600`. `--apply` runs a permission preflight and aborts with a `chmod 600 <path>` hint when looser. `--allow-loose-token-perms` overrides with a `WARN`.
 - Cursor and VS Code configs use `${input:te-key}` prompt-string patterns or environment variables, never inline tokens. Codex should use OAuth2 browser consent unless a client-side secret store can inject Bearer headers without argv exposure. Claude Code uses an OAuth-pair browser flow.
-- The write/Instant-Test tool group (`Create/Update/Delete Synthetic Test`, `Run Instant Test`, `Deploy Template`) is **never** enabled by default. Pass `--accept-te-mcp-write-tools` to allow it in clients that support per-tool gating; the rendered README always surfaces the unit-consumption warning.
+- `--accept-te-mcp-write-tools` records explicit operator acknowledgement for the write/Instant-Test group (`Create/Update/Delete Synthetic Test`, `Run Instant Test`, `Deploy Template`). It does not silently change client permissions; follow the rendered per-client approval guidance.
 
 ## Primary Workflow
 
@@ -60,14 +61,14 @@ Render-first by default. `--apply` only writes to user config files when explici
    - `mcp/README.md` — per-client install instructions, rate-limit notes, unit-consumption warnings
    - `metadata.json`
 
-4. Apply only when explicitly requested. `--apply` writes the rendered configs into the user's actual config locations (after a confirmation prompt) and runs the Codex registration helper:
+4. Apply Codex OAuth2 registration only when explicitly requested. Cursor,
+   Claude, VS Code, and Kiro remain reviewed manual config merges:
 
    ```bash
    bash skills/cisco-thousandeyes-mcp-setup/scripts/setup.sh \
      --apply \
-     --client cursor,claude,codex,vscode,kiro \
-     --auth bearer \
-     --te-token-file /tmp/te_api_token
+     --client codex \
+     --auth oauth2
    ```
 
 ## Tool Group Gating
@@ -75,7 +76,7 @@ Render-first by default. `--apply` only writes to user config files when explici
 The official ThousandEyes MCP Server exposes two tool groups:
 
 - **Read-only tools** (auto-allowed): List/Get Tests, List/Get Events, List/Get Alerts, Search Outages, Get Anomalies, Get Metrics, Get Service Map, Views Explanations, Endpoint Agent Metrics + Connected Device, Cloud/Enterprise Agents, Get Path / Full Path / BGP Test Results / BGP Route Details, Get Account Groups, Search/Deploy Templates (Search only).
-- **Write/Instant-Test tools** (require `--accept-te-mcp-write-tools`): Create/Update/Delete Synthetic Test, Run Instant Test, Deploy Template.
+- **Write/Instant-Test tools** (require explicit per-client approval; `--accept-te-mcp-write-tools` records operator acknowledgement): Create/Update/Delete Synthetic Test, Run Instant Test, Deploy Template.
 
 **Unit consumption.** Run Instant Test consumes ThousandEyes units identically to scheduled tests. The rendered README always surfaces this warning, and `--apply` refuses to enable write tools without `--accept-te-mcp-write-tools`.
 

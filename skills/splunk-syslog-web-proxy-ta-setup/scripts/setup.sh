@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 RENDER_SCRIPT="${SCRIPT_DIR}/render_assets.py"
 INSTALL=false; RENDER=false; JSON=false; DRY_RUN=false
@@ -12,7 +13,7 @@ Usage: $(basename "$0") [OPTIONS]
 
 Options:
   --render                 Render monitor templates, transport handoffs, plan, validation SPL
-  --install                Emit install commands in rendered assets; live install remains through splunk-app-install
+  --install                Render, then execute selected installs through splunk-app-install
   --index INDEX            Local file/web-server event index (default: web)
   --syslog-index INDEX     Appliance/syslog event index (default: netproxy)
   --windows-index INDEX    IIS Windows event index (default: iis)
@@ -29,8 +30,28 @@ This skill does not accept credential values. Product-specific API credentials, 
 EOF
 exit "${1:-0}"; }
 while [[ $# -gt 0 ]]; do case "$1" in --render) RENDER=true; shift ;; --install) INSTALL=true; shift ;; --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;; --syslog-index) require_arg "$1" $# || exit 1; SYSLOG_INDEX="$2"; shift 2 ;; --windows-index) require_arg "$1" $# || exit 1; WINDOWS_INDEX="$2"; shift 2 ;; --products) require_arg "$1" $# || exit 1; PRODUCTS="$2"; shift 2 ;; --server-name) require_arg "$1" $# || exit 1; SERVER_NAME="$2"; shift 2 ;; --log-root) require_arg "$1" $# || exit 1; LOG_ROOT="$2"; shift 2 ;; --syslog-port) require_arg "$1" $# || exit 1; SYSLOG_PORT="$2"; shift 2 ;; --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;; --json) JSON=true; shift ;; --dry-run) DRY_RUN=true; shift ;; --help|-h) usage ;; *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;; esac; done
+validate_splunk_index_name "${INDEX}" || exit 1
+validate_splunk_index_name "${SYSLOG_INDEX}" || exit 1
+validate_splunk_index_name "${WINDOWS_INDEX}" || exit 1
 [[ "${RENDER}" == "false" && "${INSTALL}" == "false" ]] && RENDER=true
+if [[ "${INSTALL}" == "true" && "${JSON}" == "true" ]]; then
+  echo "ERROR: --json cannot be combined with --install; renderer JSON does not include an action plan." >&2
+  exit 1
+fi
+[[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${PROJECT_ROOT}/splunk-syslog-web-proxy-ta-rendered"
+RENDERED_DIR="${OUTPUT_DIR%/}/splunk-syslog-web-proxy-ta"
 run_render(){ local cmd=(python3 "${RENDER_SCRIPT}" --phase render --index "${INDEX}" --syslog-index "${SYSLOG_INDEX}" --windows-index "${WINDOWS_INDEX}" --products "${PRODUCTS}" --server-name "${SERVER_NAME}" --log-root "${LOG_ROOT}" --syslog-port "${SYSLOG_PORT}"); [[ -n "${OUTPUT_DIR}" ]] && cmd+=(--output-dir "${OUTPUT_DIR}"); [[ "${JSON}" == "true" ]] && cmd+=(--json); [[ "${DRY_RUN}" == "true" ]] && cmd+=(--dry-run); "${cmd[@]}"; }
 warn_if_current_skill_role_unsupported
+if [[ "${INSTALL}" == "true" && "${DRY_RUN}" != "true" ]]; then
+  require_current_skill_role_supported
+  role="$(resolve_splunk_target_role)"
+  [[ "${role}" != "external-collector" ]] || { echo "ERROR: --install requires a Splunk management endpoint, not an external-collector target." >&2; exit 2; }
+fi
 run_render
-log "Syslog/web/proxy render complete. Review monitor templates and transport handoffs before applying them."
+if [[ "${INSTALL}" == "true" && "${DRY_RUN}" != "true" ]]; then
+  [[ -x "${RENDERED_DIR}/install-commands.sh" ]] || { echo "ERROR: rendered install command is missing: ${RENDERED_DIR}/install-commands.sh" >&2; exit 1; }
+  (cd "${PROJECT_ROOT}" && bash "${RENDERED_DIR}/install-commands.sh")
+  log "Selected syslog/web/proxy packages installed and readiness handoff executed."
+else
+  log "Syslog/web/proxy render complete. Review monitor templates and transport handoffs before applying them."
+fi

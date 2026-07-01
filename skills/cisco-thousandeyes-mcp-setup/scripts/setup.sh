@@ -18,7 +18,8 @@ Usage:
 
 Modes:
   --render                Render client configurations (default if no mode given)
-  --apply                 Render then write configurations into actual client config locations
+  --apply                 Render and register Codex when using OAuth2. Other clients fail
+                          closed with their explicit manual config handoff.
   --validate              Run static validation against an already-rendered output directory
   --dry-run               Show the plan without writing
   --json                  Emit JSON dry-run output
@@ -31,8 +32,8 @@ Options:
   --te-token-file PATH    ThousandEyes API token file (Bearer flow). chmod 600 required.
   --allow-loose-token-perms  Skip the chmod-600 token-permission preflight (warns instead)
   --accept-te-mcp-write-tools
-                          Enable Create/Update/Delete Synthetic Test, Run Instant Test, Deploy Template
-                          tools in clients that support per-tool gating. Default: write tools NOT enabled.
+                          Record explicit acceptance for Create/Update/Delete Synthetic Test,
+                          Run Instant Test, and Deploy Template guidance. Client permissions remain manual.
   --cursor-scope user|workspace
                           Cursor config target scope (default: user)
   --cursor-marketplace-link true|false (default: true)
@@ -67,9 +68,10 @@ print(Path(sys.argv[1]).expanduser().resolve(), end="")
 PY
 }
 
-MODE_RENDER=true
+MODE_RENDER=false
 MODE_APPLY=false
 MODE_VALIDATE=false
+MODE_GIVEN=false
 DRY_RUN=false
 JSON_OUTPUT=false
 EXPLAIN=false
@@ -100,9 +102,9 @@ fi
 # the same artifacts on disk.
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --render) MODE_RENDER=true; shift ;;
-        --apply) MODE_APPLY=true; MODE_RENDER=true; shift ;;
-        --validate) MODE_VALIDATE=true; shift ;;
+        --render) MODE_RENDER=true; MODE_GIVEN=true; shift ;;
+        --apply) MODE_APPLY=true; MODE_RENDER=true; MODE_GIVEN=true; shift ;;
+        --validate) MODE_VALIDATE=true; MODE_GIVEN=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --explain) EXPLAIN=true; shift ;;
@@ -133,9 +135,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${MODE_GIVEN}" != "true" ]]; then
+    MODE_RENDER=true
+fi
+
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 
-if [[ -z "${CLIENTS}" ]]; then
+if [[ -z "${CLIENTS}" && ( "${MODE_RENDER}" == "true" || "${MODE_APPLY}" == "true" ) ]]; then
     log "ERROR: --client is required (comma-separated; valid: cursor, claude, codex, vscode, kiro)."
     exit 1
 fi
@@ -260,11 +266,16 @@ if [[ "${MODE_VALIDATE}" == "true" ]]; then
 fi
 
 if [[ "${MODE_APPLY}" == "true" ]]; then
-    log "Apply: copy rendered configs into client config locations."
-    log "  Cursor user scope:  cp ${OUTPUT_DIR}/mcp/cursor.mcp.json ~/.cursor/mcp.json"
-    log "  Claude:             open Settings > Connectors > Add custom connector"
-    log "  Codex:              bash ${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh"
-    log "  VS Code:            cp ${OUTPUT_DIR}/mcp/vscode.mcp.json <vscode-mcp-config>"
-    log "  AWS Kiro:           cp ${OUTPUT_DIR}/mcp/kiro.mcp.json ~/.kiro/settings/mcp.json"
-    log "These commands are NOT executed automatically; review the rendered files first."
+    normalized_clients="$(printf '%s' "${CLIENTS}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    if [[ "${normalized_clients}" != "codex" ]]; then
+        log "ERROR: Automated --apply is currently supported only for --client codex --auth oauth2."
+        log "       Cursor, Claude, VS Code, and Kiro require the reviewed manual merge steps in ${OUTPUT_DIR}/mcp/README.md."
+        exit 2
+    fi
+    if [[ "${AUTH}" != "oauth2" ]]; then
+        log "ERROR: Codex apply requires --auth oauth2; bearer headers must not be exposed on process argv."
+        exit 2
+    fi
+    log "Registering the ThousandEyes MCP Server with Codex..."
+    bash "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh"
 fi

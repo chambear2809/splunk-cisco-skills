@@ -13,8 +13,8 @@ Supports the full Splunk Federated Search product surface:
   connection/dataset workflows and Controlled Availability Microsoft Azure
   and Azure Databricks workflows. These are rendered as readiness handoffs,
   not legacy provider payloads.
-- File-based apply for Splunk Enterprise standalone search heads and SHC
-  deployer bundles, plus a REST apply path that works on both Splunk
+- File-based apply for Splunk Enterprise standalone search heads, a fail-closed
+  SHC deployer bundle handoff, plus a REST apply path that works on both Splunk
   Enterprise and Splunk Cloud Platform.
 - Global federated-search enable/disable through
   /services/data/federated/settings/general.
@@ -856,7 +856,7 @@ def render_readme(spec: Spec) -> str:
         "- `server.conf` — `[shclustering] conf_replication_include.indexes = true` for SHC",
         "- `preflight.sh` — local btool sanity checks",
         "- `apply-search-head.sh` — file-based apply on a standalone Splunk Enterprise SH",
-        "- `apply-shc-deployer.sh` — file-based apply through the SHC deployer bundle",
+        "- `apply-shc-deployer.sh` — fail-closed handoff to SHC bundle validation/apply",
         "- `apply-rest.sh` — REST-based apply for both Splunk Enterprise and Splunk Cloud Platform",
         "- `status.sh` — REST GET /services/data/federated/provider; reports connectivityStatus per provider",
         "- `global-enable.sh` / `global-disable.sh` — toggle the global federated-search switch",
@@ -895,8 +895,8 @@ def render_preflight(spec: Spec) -> str:
     return make_script(
         f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
-"${{splunk_home}}/bin/splunk" btool federated list --debug >/dev/null || true
-"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null || true
+"${{splunk_home}}/bin/splunk" btool federated list --debug >/dev/null
+"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
 """
     )
 
@@ -935,6 +935,8 @@ def _password_substitution_python_block(spec: Spec) -> str:
         "    pw_path = Path(password_file)\n"
         "    if not pw_path.is_file():\n"
         "        raise SystemExit(f'ERROR: password_file missing for provider {provider_name}: {pw_path}')\n"
+        "    if pw_path.stat().st_mode & 0o077:\n"
+        "        raise SystemExit(f'ERROR: password_file permissions must be 0600/0400 for provider {provider_name}: {pw_path}')\n"
         "    pw = pw_path.read_text(encoding='utf-8').strip()\n"
         "    if not pw:\n"
         "        raise SystemExit(f'ERROR: password_file is empty for provider {provider_name}: {pw_path}')\n"
@@ -946,6 +948,11 @@ def _password_substitution_python_block(spec: Spec) -> str:
 
 
 def render_apply_local(spec: Spec, *, shc: bool) -> str:
+    if shc:
+        return make_script(
+            "echo 'HANDOFF: SHC deployer staging is not a completed cluster apply. Use the rendered files with splunk-search-head-cluster-setup bundle validation/apply after secure password injection.' >&2\n"
+            "exit 2\n"
+        )
     splunk_home = shell_quote(spec.splunk_home)
     app_name = shell_quote(spec.app_name)
     base = "${splunk_home}/etc/shcluster/apps" if shc else "${splunk_home}/etc/apps"
@@ -1048,6 +1055,8 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "splunk_pw_path = Path(splunk_pw_file)\n"
         "if not splunk_pw_path.is_file():\n"
         "    raise SystemExit(f'ERROR: SPLUNK_REST_PASSWORD_FILE does not exist: {splunk_pw_path}')\n"
+        "if splunk_pw_path.stat().st_mode & 0o077:\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_PASSWORD_FILE permissions must be 0600 or 0400.')\n"
         "splunk_pw = splunk_pw_path.read_text(encoding='utf-8').strip()\n"
         "if not splunk_pw:\n"
         "    raise SystemExit('ERROR: SPLUNK_REST_PASSWORD_FILE is empty.')\n"

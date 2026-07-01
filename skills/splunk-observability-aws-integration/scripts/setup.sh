@@ -158,7 +158,7 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 # Pull SPLUNK_O11Y_REALM / SPLUNK_O11Y_TOKEN_FILE from credentials when present.
-load_observability_cloud_settings 2>/dev/null || true
+load_observability_cloud_settings
 
 if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
     REALM="${SPLUNK_O11Y_REALM}"
@@ -235,9 +235,15 @@ run_section_apply() {
             cat "${OUTPUT_DIR}/iam/iam-trust.json" 2>/dev/null || true
             cat "${OUTPUT_DIR}/iam/iam-combined.json"
             echo ""
-            echo "==> Operator: deploy these IAM policies to the AWS account before continuing."
+            echo "HANDOFF: deploy these IAM policies to the intended AWS role/user."
+            echo "ERROR: no target role/user ARN is available, so --apply iam cannot attach them safely." >&2
+            return 2
             ;;
         integration)
+            if [[ -z "${TOKEN_FILE}" ]]; then
+                echo "ERROR: --apply integration requires --token-file." >&2
+                return 2
+            fi
             assert_secret_file_perms "${TOKEN_FILE}" "--token-file"
             assert_secret_file_perms "${AWS_ACCESS_KEY_ID_FILE}" "--aws-access-key-id-file"
             assert_secret_file_perms "${AWS_SECRET_ACCESS_KEY_FILE}" "--aws-secret-access-key-file"
@@ -247,6 +253,8 @@ run_section_apply() {
             [[ -n "${AWS_SECRET_ACCESS_KEY_FILE}" ]] && export SPLUNK_AWS_SECRET_ACCESS_KEY_FILE="${AWS_SECRET_ACCESS_KEY_FILE}"
             [[ -n "${ACCEPT_DRIFT}" ]] && export SOAI_ACCEPT_DRIFT="${ACCEPT_DRIFT}"
             local extra=()
+            [[ -n "${AWS_ACCESS_KEY_ID_FILE}" ]] && extra+=("--aws-access-key-id-file" "${AWS_ACCESS_KEY_ID_FILE}")
+            [[ -n "${AWS_SECRET_ACCESS_KEY_FILE}" ]] && extra+=("--aws-secret-access-key-file" "${AWS_SECRET_ACCESS_KEY_FILE}")
             [[ "${DRY_RUN}" == "true" ]] && extra+=("--dry-run")
             [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]] && extra+=("--allow-loose-token-perms")
             "${PYTHON_BIN}" "${API_CLIENT}" \
@@ -312,15 +320,17 @@ case "${MODE}" in
         ;;
     discover)
         run_renderer
-        run_section_apply discover || true
+        run_section_apply discover
         run_validate
         ;;
     quickstart)
         run_renderer
-        for s in iam integration streams validation; do
-            echo "==> quickstart applying: ${s}"
-            run_section_apply "${s}" || true
-        done
+        echo "==> Quickstart rendered a review packet; it does not claim a complete AWS apply."
+        echo "==> ExternalId requires the two-phase IAM handoff in ${OUTPUT_DIR}/01-authentication.md."
+        echo "==> SecurityToken mode can apply the integration with:"
+        echo "    bash ${0} --apply integration,validation --spec ${SPEC} --realm ${REALM:-<realm>} \\"
+        echo "      --token-file /tmp/o11y-token --aws-access-key-id-file /tmp/aws-id \\"
+        echo "      --aws-secret-access-key-file /tmp/aws-secret"
         ;;
     quickstart_from_live)
         # Fetch the live integration and write it to template.observed.yaml.

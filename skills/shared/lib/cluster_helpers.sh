@@ -150,16 +150,21 @@ cluster_show_status_verbose() {
 cluster_audit_snapshot() {
     local manager_uri="$1" sk="$2" output_dir="$3"
     mkdir -p "${output_dir}"
-    chmod 0700 "${output_dir}" 2>/dev/null || true
+    chmod 0700 "${output_dir}"
 
-    local endpoint
+    local endpoint failures=0
     for endpoint in info health peers sites buckets generation status; do
-        ( umask 077 && splunk_curl "${sk}" \
+        if ! ( umask 077 && splunk_curl "${sk}" \
             "${manager_uri}/services/cluster/manager/${endpoint}?output_mode=json&count=0" \
-            > "${output_dir}/manager-${endpoint}.json" 2>/dev/null ) \
-            || ( umask 077 && echo '{}' > "${output_dir}/manager-${endpoint}.json" )
+            > "${output_dir}/manager-${endpoint}.json" 2>/dev/null ); then
+            ( umask 077 && printf '{"error":"snapshot_failed","endpoint":"%s"}\n' "${endpoint}" > "${output_dir}/manager-${endpoint}.json" )
+            failures=1
+        fi
     done
-    ( umask 077 && cluster_bundle_status "${manager_uri}" "${sk}" \
-        > "${output_dir}/cluster-bundle-status.json" 2>/dev/null ) \
-        || ( umask 077 && echo '{}' > "${output_dir}/cluster-bundle-status.json" )
+    if ! ( umask 077 && cluster_bundle_status "${manager_uri}" "${sk}" \
+        > "${output_dir}/cluster-bundle-status.json" 2>/dev/null ); then
+        ( umask 077 && printf '%s\n' '{"error":"snapshot_failed","endpoint":"cluster_bundle_status"}' > "${output_dir}/cluster-bundle-status.json" )
+        failures=1
+    fi
+    (( failures == 0 ))
 }

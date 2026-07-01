@@ -232,15 +232,10 @@ def test_security_portfolio_router_preserves_specific_handoffs() -> None:
         "Authentication",
         "--dry-run",
     ]
-    assert cim["action_command"] == [
-        "bash",
-        "skills/splunk-cim-data-model-setup/scripts/setup.sh",
-        "--phase",
-        "render",
-        "--datamodel",
-        "Authentication",
-    ]
-    assert "--all" not in cim["action_command"]
+    # Rendering a default CIM model is useful guidance, but it is not a
+    # mutation. The router must not promote it to an executable action without
+    # explicit acceleration, macro, or eventtype inputs from the operator.
+    assert cim["action_command"] == []
 
 
 def test_security_portfolio_registry_entries_are_complete() -> None:
@@ -400,7 +395,7 @@ def test_security_skill_dry_runs_emit_json_without_secret_values(tmp_path: Path)
         "--broker-runtime",
         "podman",
         "--soar-url",
-        "https://soar.example.com",
+        "https://soar.customer.net",
         "--auth-file",
         str(secret_file),
         "--ca-cert-file",

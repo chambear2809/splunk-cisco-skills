@@ -13,6 +13,9 @@ INPUT_NAME=""
 SK=""
 SKIP_DATA_FLOW=false
 DATA_FLOW_EARLIEST="-1h@h"
+STRICT=false
+DATA_FLOW_CHECKS=0
+DATA_FLOW_EVENTS=0
 
 PASS=0
 FAIL=0
@@ -21,6 +24,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 usage() {
     cat >&2 <<EOF
@@ -34,6 +38,7 @@ Options:
   --name NAME                Validate one specific input name (requires --input-type)
   --skip-data-flow           Skip the per-index 'tstats' event-flow probe
   --data-flow-earliest TIME  Earliest time for the event-flow probe (default: -1h@h)
+  --strict, --completion     Exit nonzero when completion evidence is missing
   --help                     Show this help
 EOF
     exit "${1:-0}"
@@ -68,6 +73,27 @@ except Exception:
     pass
 print('no', end='')
 " "${stanza}" 2>/dev/null || echo "no"
+}
+
+handler_indexes() {
+    local handler="$1" stanza="${2:-}"
+    rest_list_ta_stanzas "$SK" "$SPLUNK_URI" "$APP_NAME" "$handler" \
+        | python3 -c '
+import json, sys
+target = sys.argv[1]
+try:
+    entries = json.load(sys.stdin).get("entry", [])
+    values = []
+    for entry in entries:
+        if target and entry.get("name") != target:
+            continue
+        value = str((entry.get("content") or {}).get("index", "")).strip()
+        if value and value not in values:
+            values.append(value)
+    sys.stdout.write("\n".join(values))
+except Exception:
+    pass
+' "${stanza}" 2>/dev/null || true
 }
 
 validate_handler() {
@@ -120,10 +146,12 @@ probe_index_event_flow() {
     local idx="$1"
     local label="$2"
     local count
+    DATA_FLOW_CHECKS=$((DATA_FLOW_CHECKS + 1))
     count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
         "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now" \
         "count" 2>/dev/null || echo "0")
     if [[ "${count}" =~ ^[0-9]+$ ]] && [[ "${count}" -gt 0 ]]; then
+        DATA_FLOW_EVENTS=$((DATA_FLOW_EVENTS + count))
         pass "${label} index '${idx}' has ${count} events since ${DATA_FLOW_EARLIEST}"
     else
         warn "${label} index '${idx}' has no events since ${DATA_FLOW_EARLIEST} (may be normal if just configured)"
@@ -137,10 +165,15 @@ while [[ $# -gt 0 ]]; do
         --name) require_arg "$1" $# || exit 1; INPUT_NAME="$2"; shift 2 ;;
         --skip-data-flow) SKIP_DATA_FLOW=true; shift ;;
         --data-flow-earliest) require_arg "$1" $# || exit 1; DATA_FLOW_EARLIEST="$2"; shift 2 ;;
+        --strict|--completion) STRICT=true; shift ;;
         --help) usage ;;
         *) log "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+if ${STRICT} && ${SKIP_DATA_FLOW}; then
+    log "ERROR: --skip-data-flow cannot be combined with --strict/--completion." >&2
+    exit 1
+fi
 
 if [[ -n "${PRODUCT}" && -n "${INPUT_TYPE}" ]]; then
     log "ERROR: Use either --product or --input-type, not both."
@@ -195,18 +228,38 @@ if [[ -n "${INPUT_TYPE}" && -n "${INPUT_NAME}" ]]; then
     handler="${APP_NAME}_${INPUT_TYPE}"
     if [[ "$(handler_has_stanza "${handler}" "${INPUT_NAME}")" == "yes" ]]; then
         pass "${INPUT_TYPE} '${INPUT_NAME}' is configured"
+        if ! ${SKIP_DATA_FLOW}; then
+            log ""
+            log "--- Data Flow ---"
+            mapfile -t selected_indexes < <(handler_indexes "${handler}" "${INPUT_NAME}")
+            if [[ "${#selected_indexes[@]}" -eq 0 ]]; then
+                selected_indexes+=("$(input_type_default_index "${INPUT_TYPE}")")
+            fi
+            for idx in "${selected_indexes[@]}"; do
+                [[ -n "${idx}" ]] || continue
+                probe_index_event_flow "${idx}" "${INPUT_TYPE}"
+            done
+        fi
     else
         fail "${INPUT_TYPE} '${INPUT_NAME}' not found"
     fi
 elif [[ -n "${INPUT_TYPE}" ]]; then
     log "--- Product/Input Type ---"
     validate_handler "${INPUT_TYPE}"
+    selected_count="$(handler_count "${APP_NAME}_${INPUT_TYPE}")"
+    [[ "${selected_count}" -gt 0 ]] || completion_issue "${INPUT_TYPE}: no configured stanza is available for completion"
     if ! $SKIP_DATA_FLOW; then
-        idx="$(input_type_default_index "${INPUT_TYPE}")"
-        if [[ -n "${idx}" ]] && [[ "$(handler_count "${APP_NAME}_${INPUT_TYPE}")" -gt 0 ]]; then
+        if [[ "${selected_count}" -gt 0 ]]; then
             log ""
             log "--- Data Flow ---"
-            probe_index_event_flow "${idx}" "${INPUT_TYPE}"
+            mapfile -t selected_indexes < <(handler_indexes "${APP_NAME}_${INPUT_TYPE}")
+            if [[ "${#selected_indexes[@]}" -eq 0 ]]; then
+                selected_indexes+=("$(input_type_default_index "${INPUT_TYPE}")")
+            fi
+            for idx in "${selected_indexes[@]}"; do
+                [[ -n "${idx}" ]] || continue
+                probe_index_event_flow "${idx}" "${INPUT_TYPE}"
+            done
         fi
     fi
 else
@@ -243,27 +296,45 @@ else
     if [[ "${total}" -gt 0 ]]; then
         pass "At least one Cisco Security Cloud input is configured (${total} total)"
     else
-        warn "No Cisco Security Cloud inputs are configured yet"
+        completion_issue "No Cisco Security Cloud inputs are configured yet"
     fi
 
     if ! $SKIP_DATA_FLOW && [[ "${#CONFIGURED_TYPES[@]}" -gt 0 ]]; then
         log ""
         log "--- Data Flow (configured inputs only) ---"
-        # Probe one default index per configured input type. Operators who
-        # remap to non-default indexes will only see the warn path here; the
-        # configuration check above is still authoritative for "configured?".
+        # Probe each configured stanza's actual index, falling back to the
+        # product default only when the handler omits an index value.
         declare -A SEEN_INDEXES=()
         for type in "${CONFIGURED_TYPES[@]}"; do
-            idx="$(input_type_default_index "${type}")"
-            if [[ -z "${idx}" ]]; then
-                continue
+            mapfile -t configured_indexes < <(handler_indexes "${APP_NAME}_${type}")
+            if [[ "${#configured_indexes[@]}" -eq 0 ]]; then
+                configured_indexes+=("$(input_type_default_index "${type}")")
             fi
-            if [[ -n "${SEEN_INDEXES[${idx}]:-}" ]]; then
-                continue
-            fi
-            SEEN_INDEXES["${idx}"]=1
-            probe_index_event_flow "${idx}" "${type}"
+            for idx in "${configured_indexes[@]}"; do
+                [[ -n "${idx}" ]] || continue
+                if [[ -n "${SEEN_INDEXES[${idx}]:-}" ]]; then
+                    continue
+                fi
+                SEEN_INDEXES["${idx}"]=1
+                probe_index_event_flow "${idx}" "${type}"
+            done
         done
+    fi
+fi
+
+view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
+fi
+
+if ${STRICT}; then
+    if [[ "${DATA_FLOW_CHECKS}" -eq 0 ]]; then
+        fail "No configured event-capable input supplied completion data-flow evidence"
+    elif [[ "${DATA_FLOW_EVENTS}" -eq 0 ]]; then
+        fail "No Cisco Security Cloud events were found in any configured input index"
     fi
 fi
 fi

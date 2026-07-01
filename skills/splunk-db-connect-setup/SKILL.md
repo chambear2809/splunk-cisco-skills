@@ -11,6 +11,14 @@ description: >-
 
 # Splunk DB Connect Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; capture JDBC input/output data evidence and shipped-view
+evidence, or explicit package evidence that no dashboards ship.
+
 Use this skill for Splunk DB Connect (`splunk_app_db_connect`, Splunkbase app
 `2686`) and the supported Splunk-published JDBC driver add-ons. The default
 path is render, preflight, and validate only. Installing packages is explicit
@@ -58,6 +66,11 @@ bash skills/splunk-db-connect-setup/scripts/setup.sh \
   --spec my-db-connect.yaml \
   --output-dir splunk-db-connect-rendered
 ```
+
+The install helper applies supported DBX/Splunk JDBC add-ons. Any requested
+archived, custom, or otherwise unsupported driver emits a manual-driver
+handoff and makes the install request return nonzero before any package is
+installed; a skipped driver is not reported as a completed install.
 
 4. If app installation is required, use the explicit install path:
 

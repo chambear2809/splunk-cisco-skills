@@ -21,6 +21,8 @@ reviewable artifacts first and keeps live product mutation behind explicit gates
 ```bash
 bash skills/splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh --render
 bash skills/splunk-appdynamics-thousandeyes-integration-setup/scripts/validate.sh
+bash skills/splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh \
+  --apply assets,webhook --accept-appd-te-mutation --spec path/to/appd-te.yaml
 ```
 
 Use a local spec derived from `template.example` for customer work. Never put
@@ -56,6 +58,9 @@ the spec, shell history, rendered files, or chat. Use chmod-600 secret files.
   Government instances.
 - Do not mutate ThousandEyes assets without `--accept-appd-te-mutation` and the
   downstream `--i-accept-te-mutations` gate.
+- `--apply` executes only explicit `assets`, `webhook`, or `event` sections
+  (`all` means all three). It requires a customer-specific spec, a numeric
+  account-group ID, non-example targets, and chmod-600 secret files.
 
 ## Rendered Outputs
 

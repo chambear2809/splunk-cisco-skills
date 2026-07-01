@@ -43,7 +43,7 @@ helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-
   -n splunk-otel \
   -f ./gpu-rendered/splunk-otel-overlay/values.overlay.yaml \
   --reuse-values \
-  --set splunkObservability.accessToken="$(cat $TOKEN_FILE)"
+  --set-file splunkObservability.accessToken="$TOKEN_FILE"
 ```
 
 Verify after upgrade:

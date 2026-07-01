@@ -51,6 +51,8 @@ REQUIRED_FILES=(
     "README.md"
     "rest/create.json"
     "rest/update.json"
+    "rest/project-key-file-manifest.json"
+    "rest/wif-config-file-manifest.json"
     "terraform/main.tf"
     "terraform/variables.tf"
     "state/apply-state.json"
@@ -75,22 +77,75 @@ if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
 import json, sys
 data = json.loads(open('${OUTPUT_DIR}/rest/create.json').read())
 assert data.get('type') == 'GCP', f'expected type=GCP, got {data.get(\"type\")!r}'
-assert 'authMethod' in data, 'authMethod missing'
+auth = data.get('authMethod')
+assert auth in ('SERVICE_ACCOUNT_KEY', 'WORKLOAD_IDENTITY_FEDERATION'), f'invalid authMethod: {auth!r}'
 poll_rate = data.get('pollRate', 0)
 assert 60000 <= poll_rate <= 600000, f'pollRate must be 60000-600000 ms, got {poll_rate}'
+projects = data.get('projects')
+assert isinstance(projects, dict), 'projects must be an object'
+assert projects.get('syncMode') in ('ALL', 'SELECTED'), 'projects.syncMode missing or invalid'
+project_ids = projects.get('projectIds', [])
+assert isinstance(project_ids, list) and all(isinstance(item, str) and item for item in project_ids), 'projects.projectIds must be a string list'
+if projects['syncMode'] == 'ALL':
+    assert not project_ids, 'projects.projectIds must be empty for ALL'
+else:
+    assert project_ids, 'projects.projectIds is required for SELECTED'
+if auth == 'WORKLOAD_IDENTITY_FEDERATION':
+    value = data.get('workloadIdentityFederationConfig')
+    assert isinstance(value, str) and value, 'workloadIdentityFederationConfig missing'
+    assert 'workloadIdentityPoolId' not in data, 'legacy workloadIdentityPoolId is invalid'
+    assert 'workloadIdentityProviderId' not in data, 'legacy workloadIdentityProviderId is invalid'
+    assert 'projectServiceKeys' not in data, 'projectServiceKeys is incompatible with WIF'
+else:
+    assert isinstance(data.get('projectServiceKeys'), list) and data['projectServiceKeys'], 'projectServiceKeys missing'
 " >/dev/null 2>&1; then
-        failures+=("rest/create.json failed shape validation (type, authMethod, pollRate)")
+        failures+=("rest/create.json failed shape validation (type, authMethod, pollRate, projects.syncMode, or auth contract)")
     else
-        infos+=("rest/create.json: type=GCP, shape OK")
+        infos+=("rest/create.json: type=GCP, projects.syncMode and auth contract OK")
     fi
 fi
 
-# Validate Terraform: signalfx_gcp_integration resource present.
+# Validate Terraform without claiming unsupported WIF provider arguments.
 if [[ -f "${OUTPUT_DIR}/terraform/main.tf" ]]; then
-    if grep -q 'signalfx_gcp_integration' "${OUTPUT_DIR}/terraform/main.tf" >/dev/null 2>&1; then
-        infos+=("terraform/main.tf: signalfx_gcp_integration resource present")
+    auth_method="$("${PYTHON_BIN}" -c "import json; print(json.load(open('${OUTPUT_DIR}/rest/create.json')).get('authMethod',''))" 2>/dev/null || true)"
+    if [[ "${auth_method}" == "WORKLOAD_IDENTITY_FEDERATION" ]]; then
+        if grep -Eq 'resource[[:space:]]+"signalfx_gcp_integration"|workload_identity_(pool|provider)_id' "${OUTPUT_DIR}/terraform/main.tf"; then
+            failures+=("terraform/main.tf: unsupported WIF resource or pool/provider arguments were rendered")
+        else
+            infos+=("terraform/main.tf: correctly declines unsupported WIF provider arguments")
+        fi
+    elif grep -q 'signalfx_gcp_integration' "${OUTPUT_DIR}/terraform/main.tf" >/dev/null 2>&1; then
+        infos+=("terraform/main.tf: service-account signalfx_gcp_integration resource present")
     else
         failures+=("terraform/main.tf: signalfx_gcp_integration resource not found")
+    fi
+fi
+
+if [[ "${auth_method:-}" == "WORKLOAD_IDENTITY_FEDERATION" && -f "${OUTPUT_DIR}/rest/wif-config-file-manifest.json" ]]; then
+    wif_config_file="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/wif-config-file-manifest.json" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("configFile", ""))
+PY
+)"
+    if "${PYTHON_BIN}" - "${wif_config_file}" <<'PY' >/dev/null 2>&1
+import json
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]) if sys.argv[1] else None
+assert path is not None
+metadata = path.lstat()
+assert path.name == "gcp_wif_config.json"
+assert stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode)
+assert stat.S_IMODE(metadata.st_mode) == 0o600
+payload = json.loads(path.read_text(encoding="utf-8"))
+assert isinstance(payload, dict) and payload
+PY
+    then
+        infos+=("gcp_wif_config.json: valid JSON regular file with mode 600")
+    else
+        failures+=("gcp_wif_config.json: missing, corrupt, insecure, renamed, or not a regular file")
     fi
 fi
 
@@ -103,6 +158,9 @@ if [[ -d "${OUTPUT_DIR}" ]]; then
         # Note placeholders used correctly.
         if grep -qE '\$\{PROJECT_KEY_FROM_FILE\}' "${file}" 2>/dev/null; then
             infos+=("${file#"${OUTPUT_DIR}"/}: correctly uses placeholder, not real credential")
+        fi
+        if grep -qE '\$\{WORKLOAD_IDENTITY_FEDERATION_CONFIG_FROM_FILE\}' "${file}" 2>/dev/null; then
+            infos+=("${file#"${OUTPUT_DIR}"/}: correctly uses a WIF file placeholder")
         fi
     done < <(find "${OUTPUT_DIR}" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.tf" \) -print0)
 fi

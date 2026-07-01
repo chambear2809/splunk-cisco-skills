@@ -14,6 +14,14 @@ description: >-
 
 # Splunk MCP Server Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off the packaged MCP app,
+follow the [shared completion gate](../shared/ta_completion_gate.md). Package
+delivery alone is not success; validate the configured endpoint and its data
+access, plus any shipped views, or record explicit package evidence that no
+dashboards ship.
+
 Automates setup of the **Splunk MCP Server** app (`Splunk_MCP_Server`).
 
 For newer Cisco Data Fabric wording, this is the MCP/tool-access route for

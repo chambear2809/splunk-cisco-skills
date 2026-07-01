@@ -263,7 +263,7 @@ else
     fi
 fi
 
-# --- 11. TLS 1.3 refusal
+# --- 11. TLS 1.3 is supported on 10.4 and refused on older trains
 if python3 "$RENDERER" \
     --output-dir "$tmp/tls13" \
     --mode private \
@@ -271,9 +271,27 @@ if python3 "$RENDERER" \
     --single-sh-fqdn sh01.example.com \
     --tls-version-floor tls1.3 \
     >/dev/null 2>"$tmp/tls13-err"; then
-    fail "tls-version-floor tls1.3 was accepted (Splunk docs do not yet support TLS 1.3)"
+    if grep -q 'sslVersions[[:space:]]*= tls1.3' \
+        "$tmp/tls13/platform-pki/pki/distribute/standalone/000_pki_trust/local/server.conf"; then
+        ok "tls-version-floor tls1.3 accepted and rendered for Splunk 10.4"
+    else
+        fail "tls-version-floor tls1.3 did not render TLS-1.3-only policy"
+    fi
 else
-    ok "tls-version-floor tls1.3 refused"
+    fail "tls-version-floor tls1.3 was refused for the default Splunk 10.4 target"
+fi
+
+if python3 "$RENDERER" \
+    --output-dir "$tmp/tls13-old" \
+    --mode private \
+    --target core5 \
+    --single-sh-fqdn sh01.example.com \
+    --splunk-version 10.2.0 \
+    --tls-version-floor tls1.3 \
+    >/dev/null 2>"$tmp/tls13-old-err"; then
+    fail "tls-version-floor tls1.3 was accepted for Splunk 10.2"
+else
+    ok "tls-version-floor tls1.3 refused for Splunk 10.2"
 fi
 
 # --- 12. setup.sh apply requires --accept-pki-rotation
@@ -335,7 +353,10 @@ assert 'presets' in d
 for p in ('splunk-modern', 'fips-140-3', 'stig'):
     assert p in d['presets']
     pp = d['presets'][p]
-    assert pp['ssl_versions'] == 'tls1.2'
+    assert pp['ssl_versions'] == 'tls1.2,tls1.3'
+    assert pp['ssl_versions_for_client'] == 'tls1.2,tls1.3'
+    assert pp['tls13_cipher_suite']
+    assert pp['tls13_groups']
     assert 'cipher_suite' in pp
     assert 'ecdh_curves' in pp
 assert d['kv_store_required_eku'] == ['serverAuth', 'clientAuth']

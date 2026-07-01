@@ -520,7 +520,11 @@ validate_inputs() {
 ensure_service_user_exists() {
     local create_cmd
     create_cmd="id -u $(hbs_shell_join "${SERVICE_USER}") >/dev/null 2>&1 || useradd -r -m -d $(hbs_shell_join "${SPLUNK_HOME}") -s /bin/false $(hbs_shell_join "${SERVICE_USER}")"
-    hbs_run_target_cmd "${EXECUTION_MODE}" "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "${create_cmd}")" >/dev/null 2>&1 || true
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "${create_cmd}")" >/dev/null 2>&1 || {
+        log "ERROR: Failed to ensure service user ${SERVICE_USER} exists on target."
+        exit 1
+    }
 }
 
 ensure_splunk_ownership() {
@@ -528,7 +532,20 @@ ensure_splunk_ownership() {
         return 0
     fi
     hbs_run_target_cmd "${EXECUTION_MODE}" \
-        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown -R "${SERVICE_USER}:${SERVICE_USER}" "${SPLUNK_HOME}")")"
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown -R "${SERVICE_USER}" "${SPLUNK_HOME}")")"
+}
+
+write_splunk_config() {
+    local target_path="$1" content="$2"
+    hbs_write_target_file "${EXECUTION_MODE}" "${target_path}" "600" "${content}" || {
+        log "ERROR: Failed to write Splunk configuration: ${target_path}"
+        exit 1
+    }
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}" "${target_path}")")" || {
+        log "ERROR: Failed to set Splunk config ownership on ${target_path}."
+        exit 1
+    }
 }
 
 install_package_to_target() {
@@ -848,7 +865,7 @@ configure_base_role() {
             enable_web_if_needed
             ;;
         standalone-indexer|indexer-peer)
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/inputs.conf" "600" "$(render_inputs_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_receiving/local/inputs.conf" "$(render_inputs_conf)"
             needs_restart=true
             ;;
         heavy-forwarder)
@@ -861,7 +878,7 @@ configure_base_role() {
             else
                 ensure_prompted_value SERVER_LIST "Indexer server list"
             fi
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/outputs.conf" "600" "$(render_outputs_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_forwarding/local/outputs.conf" "$(render_outputs_conf)"
             needs_restart=true
             ;;
         shc-member)
@@ -884,7 +901,7 @@ configure_cluster_role() {
             if [[ -z "${DISCOVERY_SECRET}" ]]; then
                 DISCOVERY_SECRET="${IDXC_SECRET}"
             fi
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/server.conf" "600" "$(render_cluster_manager_server_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf" "$(render_cluster_manager_server_conf)"
             restart_splunk
             ;;
         indexer-peer)
@@ -893,7 +910,7 @@ configure_cluster_role() {
                 ensure_prompted_path IDXC_SECRET_FILE "Indexer cluster secret file path"
                 IDXC_SECRET="$(read_secret_file "${IDXC_SECRET_FILE}")"
             fi
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/server.conf" "600" "$(render_indexer_peer_server_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf" "$(render_indexer_peer_server_conf)"
             restart_splunk
             ;;
         shc-deployer)
@@ -901,7 +918,7 @@ configure_cluster_role() {
                 ensure_prompted_path SHC_SECRET_FILE "Search head cluster secret file path"
                 SHC_SECRET="$(read_secret_file "${SHC_SECRET_FILE}")"
             fi
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/server.conf" "600" "$(render_shc_deployer_server_conf)"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf" "$(render_shc_deployer_server_conf)"
             restart_splunk
             ;;
         shc-member)
@@ -921,7 +938,7 @@ configure_cluster_role() {
                 fi
             fi
 
-            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/server.conf" "600" "$(render_shc_member_server_conf "${local_mgmt_uri}")"
+            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf" "$(render_shc_member_server_conf "${local_mgmt_uri}")"
             restart_splunk
 
             if [[ "${BOOTSTRAP_SHC}" == "true" ]]; then

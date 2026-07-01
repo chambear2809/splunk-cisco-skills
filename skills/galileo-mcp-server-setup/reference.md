@@ -57,12 +57,15 @@ first `console` label with `api` and appending `/mcp/http/mcp`. Examples:
 - `--validate`: run static validation against rendered files.
 - `--probe`: run a live no-secret MCP metadata probe.
 - `--doctor`: render, validate, and probe.
+- `--apply`: render and register Codex with a file-backed key. Other client
+  config merges remain manual and fail closed.
 - `--dry-run`: print the render plan without writing files.
 - `--json`: emit JSON for dry-run and probe summaries.
 - `--spec`: read the non-secret YAML/JSON intake file; command-line flags
   override spec values.
 
-No mode writes into real Cursor, VS Code, Codex, Claude, or Kiro config paths.
+Apply changes Codex MCP registration only; no mode writes Cursor, VS Code,
+Claude, or Kiro config paths.
 
 ## Deep Audit Gate
 

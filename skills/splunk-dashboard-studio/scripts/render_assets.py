@@ -266,6 +266,15 @@ base="${{mgmt_uri}}/servicesNS/${{owner}}/${{app}}/data/ui/views"
 # or SPLUNK_USERNAME=<user>               # curl prompts for the password interactively
 auth=()
 if [[ -n "${{SPLUNK_CURL_CONFIG:-}}" ]]; then
+  if [[ -L "${{SPLUNK_CURL_CONFIG}}" || ! -f "${{SPLUNK_CURL_CONFIG}}" ]]; then
+    echo "SPLUNK_CURL_CONFIG must be a regular, non-symlink file." >&2
+    exit 2
+  fi
+  config_mode="$(stat -f '%A' "${{SPLUNK_CURL_CONFIG}}" 2>/dev/null || stat -c '%a' "${{SPLUNK_CURL_CONFIG}}")"
+  if [[ "${{config_mode}}" != "600" ]]; then
+    echo "SPLUNK_CURL_CONFIG must have mode 600 (found ${{config_mode}})." >&2
+    exit 2
+  fi
   auth=(--config "${{SPLUNK_CURL_CONFIG}}")
 elif [[ -n "${{SPLUNK_USERNAME:-}}" ]]; then
   auth=(--user "${{SPLUNK_USERNAME}}")
@@ -274,22 +283,71 @@ else
   exit 1
 fi
 
+tls=()
+case "${{SPLUNK_VERIFY_SSL:-true}}" in
+  false|FALSE|0|no|NO) tls+=(--insecure) ;;
+  *)
+    if [[ -n "${{SPLUNK_CA_CERT:-}}" ]]; then
+      [[ -r "${{SPLUNK_CA_CERT}}" ]] || {{ echo "SPLUNK_CA_CERT is not readable." >&2; exit 2; }}
+      tls+=(--cacert "${{SPLUNK_CA_CERT}}")
+    fi
+    ;;
+esac
+
 echo "Publishing Dashboard Studio view '${{dashboard_id}}' to app '${{app}}' (owner ${{owner}})."
 read -r -p "Type APPLY to continue: " confirm
 [[ "${{confirm}}" == "APPLY" ]] || {{ echo "Aborted."; exit 1; }}
 
 # eai:data is read from dashboard.xml; the definition is never passed on the command line.
-if curl -ks -f "${{auth[@]}}" "${{base}}/${{dashboard_id}}" -o /dev/null; then
-  echo "View exists; updating definition."
-  curl -ks -f "${{auth[@]}}" "${{base}}/${{dashboard_id}}" \\
-    --data-urlencode "eai:data@dashboard.xml" -o /dev/null
-else
-  echo "Creating new view."
-  curl -ks -f "${{auth[@]}}" "${{base}}" \\
-    --data-urlencode "name=${{dashboard_id}}" \\
-    --data-urlencode "eai:data@dashboard.xml" -o /dev/null
+if ! probe_code="$(curl "${{tls[@]}}" "${{auth[@]}}" --silent --show-error \\
+  --output /dev/null --write-out '%{{http_code}}' \\
+  "${{base}}/${{dashboard_id}}?output_mode=json")"; then
+  echo "Dashboard existence probe failed at the transport/TLS layer; no mutation attempted." >&2
+  exit 1
 fi
-echo "Done. Open Apps > ${{app}} to view '${{dashboard_id}}'."
+case "${{probe_code}}" in
+  200)
+    echo "View exists; updating definition."
+    curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+      "${{base}}/${{dashboard_id}}" \\
+      --data-urlencode "eai:data@dashboard.xml" -o /dev/null
+    ;;
+  404)
+    echo "Creating new view."
+    curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+      "${{base}}" \\
+      --data-urlencode "name=${{dashboard_id}}" \\
+      --data-urlencode "eai:data@dashboard.xml" -o /dev/null
+    ;;
+  *)
+    echo "Dashboard existence probe returned HTTP ${{probe_code}}; no mutation attempted." >&2
+    exit 1
+    ;;
+esac
+
+readback="$(mktemp)"
+trap 'rm -f "${{readback}}"' EXIT
+curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+  "${{base}}/${{dashboard_id}}?output_mode=json" -o "${{readback}}"
+python3 - dashboard.xml "${{readback}}" "${{dashboard_id}}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+expected = Path(sys.argv[1]).read_text(encoding="utf-8").replace("\\r\\n", "\\n").strip()
+payload = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+entries = payload.get("entry")
+if not isinstance(entries, list) or len(entries) != 1:
+    raise SystemExit("dashboard readback did not return exactly one entry")
+entry = entries[0]
+if entry.get("name") != sys.argv[3]:
+    raise SystemExit("dashboard readback returned the wrong view")
+content = entry.get("content")
+actual = content.get("eai:data") if isinstance(content, dict) else None
+if not isinstance(actual, str) or actual.replace("\\r\\n", "\\n").strip() != expected:
+    raise SystemExit("dashboard readback did not match dashboard.xml")
+PY
+echo "Applied and verified. Open Apps > ${{app}} to view '${{dashboard_id}}'."
 """
     )
 
@@ -302,7 +360,7 @@ def render_status(args: argparse.Namespace) -> str:
 app={app}
 echo "== Dashboard Studio (version=2) views in app ${{app}} =="
 "${{splunk}}" search "| rest splunk_server=local /servicesNS/-/${{app}}/data/ui/views | search eai:data=\\"*version=\\\\\\"2\\\\\\"*\\" | table title eai:acl.owner eai:acl.sharing" -maxout 0 \\
-  || echo "Could not list views; verify app and REST access."
+  || {{ echo "Could not list views; verify app and REST access." >&2; exit 1; }}
 """
     )
 

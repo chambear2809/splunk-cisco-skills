@@ -8,16 +8,13 @@ set -euo pipefail
 #     apply-plan.json, scripts/, payloads/, state/, sim-addon/, support-tickets/)
 #   - secret leak scan across every rendered file
 #
-# Live checks (--live):
+# Live checks (--live) are intentionally limited to read-only reachability:
 #   - token-auth status read
-#   - pairing-status-by-id poll
-#   - SIM Add-on accounts + modular inputs health (MTS sizing under 250k)
-#   - LOC realm-IP allowlist diff
-#   - Discover app tab read-back vs rendered plan
+#   - SIM Add-on account-list read
 #
 # Doctor mode (--doctor) writes <output-dir>/doctor-report.md with the 20-check
-# matrix and prints a numbered, prioritized fix list. Discover mode (--discover)
-# writes <output-dir>/current-state.json with the live snapshot (read-only).
+# matrix and prints a numbered fix list. Discover mode (--discover) writes a
+# static inventory scaffold; it does not claim a live-state snapshot.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -144,28 +141,31 @@ SPLUNK_USER / SPLUNK_PASS in the project credentials file.
 | 5 | Realm <-> region match | FAIL/WARN | See <rendered>/support-tickets/cross-region-pairing.md |
 | 6 | FedRAMP / GovCloud / GCP gating for UID | FAIL | bash setup.sh --apply pairing (with pairing.mode=service_account) |
 | 7 | Pairing exists for target realm | INFO | (no fix needed; idempotency handles re-apply) |
-| 8 | Pairing status SUCCESS | FAIL | bash setup.sh --apply pairing --resume |
+| 8 | Pairing status SUCCESS | FAIL | Re-run bash setup.sh --apply pairing with the same reviewed spec and credential files |
 | 9 | o11y_access role exists and is assigned | FAIL | bash setup.sh --apply centralized_rbac |
-| 10 | All UID-mapped users have an o11y_* role | FAIL | Assign o11y_* role before --i-accept-rbac-cutover |
-| 11 | read_o11y_content / write_o11y_content capabilities assigned | WARN | bash setup.sh --apply related_content |
+| 10 | All UID-mapped users have an o11y_* role | FAIL | Assign o11y_* roles before the approved-admin cutover handoff |
+| 11 | read_o11y_content / write_o11y_content capabilities assigned | WARN | Complete the rendered role-capability handoff in 05-related-content.md |
 | 12 | Discover app installed | FAIL | Splunk Cloud upgrade required: 10.1.2507+ |
-| 13 | LOC realm IPs in search-api allowlist | FAIL | bash setup.sh --apply log_observer_connect |
+| 13 | LOC realm IPs in search-api allowlist | FAIL | Run the rendered apply-acs-allowlist-loc.sh handoff after review |
 | 14 | LOC service-account user + role + workload rule | FAIL | bash setup.sh --apply log_observer_connect |
 | 15 | Splunk_TA_sim installed | FAIL | bash setup.sh --apply sim_addon |
-| 16 | SIM account exists, default flag set, Check Connection | FAIL/WARN | bash setup.sh --apply sim_addon |
-| 17 | Victoria-stack search-head HEC allowlist contains the search-head IP | FAIL | bash setup.sh --apply sim_addon (delegated --features hec) |
+| 16 | SIM account fields converge and Check Connection succeeds | FAIL/WARN | bash setup.sh --apply sim_addon |
+| 17 | Victoria-stack search-head HEC allowlist contains the search-head IP | FAIL | Run the rendered apply-acs-allowlist-hec.sh handoff after review |
 | 18 | SIM modular inputs running, no ANALYTICS_JOB_MTS_LIMIT_HIT | FAIL/WARN | See <rendered>/sim-addon/mts-sizing.md |
 | 19 | Multi-org default-org set in Discover app | INFO | Open Discover app > Configurations > Make Default |
 | 20 | uBlock Origin warning surface | INFO | docs link |
 EOF
 fi
 
-# Discover mode: write a minimal current-state.json placeholder; live wiring uses the API clients.
+# Discover mode: write an honest static inventory scaffold. It deliberately
+# does not label limited reachability checks as a complete live snapshot.
 if [[ "${DISCOVER}" == "true" ]]; then
     cat > "${OUTPUT_DIR}/current-state.json" <<EOF
 {
   "discovered_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "note": "Run with SPLUNK_SEARCH_API_URI/SPLUNK_USER/SPLUNK_PASS configured to populate live snapshots via the API clients."
+  "source": "rendered-plan",
+  "live_snapshot": false,
+  "note": "This mode currently records an inventory scaffold only. Use --validate --live for limited token-auth and SIM-account endpoint reachability."
 }
 EOF
 fi

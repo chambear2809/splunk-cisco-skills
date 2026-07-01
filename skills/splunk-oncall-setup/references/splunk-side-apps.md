@@ -93,11 +93,12 @@ search.
 | `activealerts` | Open alerts pending recovery. |
 | `deployment` | Deployment details (org slug, deployment name). |
 
-The skill seeds `mycollection` and `deployment` through the Splunk REST API
-endpoint
+The skill seeds `mycollection` through the Splunk REST API endpoint
 `/servicesNS/<user>/victorops_app/storage/collections/data/<collection>`.
-It **never** drops the API key into a conf file or `passwords.conf`-style
-plaintext.
+The app maintains `deployment` through its own `setorganization` workflow;
+this skill writes the non-secret organization value to `[ui]` in `app.conf`
+and does not invent an undocumented KV Store record schema. It **never** drops
+the API key into a conf file or `passwords.conf`-style plaintext.
 
 ### Custom REST endpoint
 

@@ -114,6 +114,9 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-observability-cisco-ai-pod-rendered",
     "splunk-observability-cisco-intersight-rendered",
     "splunk-observability-cisco-nexus-rendered",
+    "splunk-observability-claude-code-instrumentation-rendered",
+    "splunk-observability-coding-agent-instrumentation-rendered",
+    "splunk-observability-codex-instrumentation-rendered",
     "splunk-observability-cloud-integration-rendered",
     "splunk-observability-dashboard-rendered",
     "splunk-observability-database-monitoring-rendered",
@@ -123,6 +126,7 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-observability-k8s-auto-instrumentation-rendered",
     "splunk-observability-k8s-frontend-rum-rendered",
     "splunk-observability-metrics-pipeline-rendered",
+    "splunk-observability-mobile-rum-rendered",
     "splunk-observability-native-rendered",
     "splunk-observability-nvidia-gpu-rendered",
     "splunk-observability-otel-rendered",
@@ -164,6 +168,7 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-salesforce-ta-rendered",
     "splunk-security-appliance-ta-rendered",
     "splunk-spl2-pipeline-kit-rendered",
+    "splunk-supported-addons-rendered",
     "splunk-universal-forwarder-rendered",
     "splunk-vmware-ta-rendered",
     "splunk-workload-management-rendered",
@@ -296,8 +301,23 @@ def check_skill_surface_completeness(errors: list[str]) -> None:
     validation_name_re = re.compile(
         r"(^validate(?:[_-].*)?\.(?:sh|py)$|.*validate.*\.(?:sh|py)$|^doctor\.sh$|^smoke_offline\.sh$)"
     )
+    registry = json.loads(
+        (SKILLS_DIR / "shared" / "app_registry.json").read_text(encoding="utf-8")
+    )
+    registry_app_skills = {
+        str(entry.get("skill", ""))
+        for entry in registry.get("apps", [])
+        if isinstance(entry, dict) and entry.get("skill")
+    }
+    completion_gate_routers = {
+        "cisco-product-setup",
+        "splunk-app-install",
+        "splunk-observability-thousandeyes-integration",
+        "splunk-security-portfolio-setup",
+    }
     for skill in skill_names():
         skill_dir = SKILLS_DIR / skill
+        skill_doc = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
         agents_path = skill_dir / "agents" / "openai.yaml"
         if not agents_path.is_file():
             errors.append(f"skills/{skill}/agents/openai.yaml: missing agent metadata")
@@ -305,20 +325,73 @@ def check_skill_surface_completeness(errors: list[str]) -> None:
         if not (skill_dir / "reference.md").is_file():
             errors.append(f"skills/{skill}/reference.md: missing reference index")
 
+        requires_completion_gate = (
+            "-ta-setup" in skill
+            or skill in registry_app_skills
+            or skill in completion_gate_routers
+        )
+        if requires_completion_gate and "ta_completion_gate.md" not in skill_doc:
+            errors.append(
+                f"skills/{skill}/SKILL.md: app/add-on workflow does not reference "
+                "skills/shared/ta_completion_gate.md"
+            )
+
         scripts_dir = skill_dir / "scripts"
         if not scripts_dir.is_dir():
             errors.append(f"skills/{skill}/scripts: missing scripts directory")
             continue
 
-        if not (scripts_dir / "setup.sh").is_file():
+        setup_path = scripts_dir / "setup.sh"
+        if not setup_path.is_file():
             errors.append(f"skills/{skill}/scripts/setup.sh: missing setup entry point")
+        elif setup_path.stat().st_mode & 0o111 == 0:
+            errors.append(
+                f"skills/{skill}/scripts/setup.sh: setup entry point is not executable"
+            )
+        elif "set -euo pipefail" not in setup_path.read_text(encoding="utf-8"):
+            errors.append(
+                f"skills/{skill}/scripts/setup.sh: setup entry point must use strict shell mode"
+            )
 
-        has_validation = any(
-            path.is_file() and validation_name_re.match(path.name)
+        validation_paths = [
+            path
             for path in scripts_dir.iterdir()
-        )
+            if path.is_file() and validation_name_re.match(path.name)
+        ]
+        has_validation = bool(validation_paths)
         if not has_validation:
             errors.append(f"skills/{skill}/scripts: missing validation entry point")
+        for path in validation_paths:
+            if path.suffix == ".sh" and path.stat().st_mode & 0o111 == 0:
+                errors.append(
+                    f"skills/{skill}/scripts/{path.name}: validation entry point is not executable"
+                )
+            if (
+                path.suffix == ".sh"
+                and "set -euo pipefail" not in path.read_text(encoding="utf-8")
+            ):
+                errors.append(
+                    f"skills/{skill}/scripts/{path.name}: validation entry point "
+                    "must use strict shell mode"
+                )
+
+
+def check_no_internal_skill_symlinks(errors: list[str]) -> None:
+    """Reject links inside canonical skill trees.
+
+    Editor integrations link *to* ``skills/<name>`` from their own directories.
+    A link below a canonical skill directory can point back to that directory,
+    creating a recursive filesystem loop for search, packaging, and skill
+    discovery. Canonical skill content is intentionally self-contained.
+    """
+    for skill in skill_names():
+        skill_dir = SKILLS_DIR / skill
+        for path in skill_dir.rglob("*"):
+            if path.is_symlink():
+                rel = path.relative_to(REPO_ROOT).as_posix()
+                errors.append(
+                    f"{rel}: symlinks are not allowed inside canonical skill directories"
+                )
 
 
 def check_cursor_and_claude_commands(errors: list[str]) -> None:
@@ -475,6 +548,7 @@ def check_registry_skill_refs(errors: list[str]) -> None:
     registry_path = REPO_ROOT / "skills/shared/app_registry.json"
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     known_skills = set(skill_names())
+    topology_skills: list[str] = []
     for section in ("apps", "skill_topologies"):
         entries = registry.get(section, [])
         if not isinstance(entries, list):
@@ -486,6 +560,24 @@ def check_registry_skill_refs(errors: list[str]) -> None:
                 errors.append(
                     f"skills/shared/app_registry.json: {section}[{index}] references unknown skill {skill}"
                 )
+            if section == "skill_topologies" and skill:
+                topology_skills.append(str(skill))
+
+    topology_set = set(topology_skills)
+    missing_topologies = sorted(known_skills - topology_set)
+    if missing_topologies:
+        errors.append(
+            "skills/shared/app_registry.json: missing skill_topologies entries: "
+            + ", ".join(missing_topologies)
+        )
+    duplicate_topologies = sorted(
+        skill for skill in topology_set if topology_skills.count(skill) > 1
+    )
+    if duplicate_topologies:
+        errors.append(
+            "skills/shared/app_registry.json: duplicate skill_topologies entries: "
+            + ", ".join(duplicate_topologies)
+        )
 
 
 def check_local_mcp_server_config(errors: list[str]) -> None:
@@ -527,6 +619,7 @@ def main() -> int:
     check_catalog_sync(errors)
     check_skill_requirements_catalog(errors)
     check_skill_surface_completeness(errors)
+    check_no_internal_skill_symlinks(errors)
     check_cursor_and_claude_commands(errors)
     check_no_tracked_local_artifacts(errors)
     check_gitignore_local_artifacts(errors)

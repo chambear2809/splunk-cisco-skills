@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-thousandeyes-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-thousandeyes-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco ThousandEyes app using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="ta_cisco_thousandeyes"
@@ -22,6 +31,7 @@ INGEST_SK=""
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco ThousandEyes App Validation ==="
 log ""
@@ -108,7 +118,7 @@ for idx in "${EXPECTED_INDEXES[@]}"; do
     if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
         pass "Index '${idx}' exists"
     else
-        warn "Index '${idx}' not found (run setup.sh --indexes-only)"
+        completion_issue "Index '${idx}' not found (run setup.sh --indexes-only)"
     fi
 done
 
@@ -139,10 +149,10 @@ except Exception:
     pass
 " 2>/dev/null || true
     else
-        warn "Account endpoint exists but has no configured accounts"
+        completion_issue "Account endpoint exists but has no configured accounts"
     fi
 else
-    warn "No OAuth accounts configured (run configure_account.sh)"
+    completion_issue "No OAuth accounts configured (run configure_account.sh)"
 fi
 
 log ""
@@ -169,9 +179,9 @@ except Exception:
 
 case "${refresh_status}" in
     enabled) pass "Token refresh input is enabled" ;;
-    disabled) warn "Token refresh input exists but is disabled" ;;
-    missing) warn "Token refresh input not found" ;;
-    *) warn "Could not determine token refresh input status" ;;
+    disabled) completion_issue "Token refresh input exists but is disabled" ;;
+    missing) completion_issue "Token refresh input not found" ;;
+    *) completion_issue "Could not determine token refresh input status" ;;
 esac
 
 log ""
@@ -213,6 +223,7 @@ for i in issues:
 _hec_checked=$(echo "${_hec_target_issues}" | head -1 | sed 's/checked=//')
 _hec_bad=$(echo "${_hec_target_issues}" | tail -n +2)
 if [[ "${_hec_checked}" -gt 0 ]]; then
+    [[ "${hec_state}" == "enabled" ]] || completion_issue "Streaming inputs exist but HEC token 'thousandeyes' is not confirmed enabled"
     if [[ -z "${_hec_bad}" ]]; then
         pass "HEC targets on ${_hec_checked} streaming input(s) match platform (${_hec_platform})"
     else
@@ -288,24 +299,37 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${input_count} input stanza(s) exist but all are disabled"
+        completion_issue "${input_count} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No data inputs configured (run setup.sh --enable-inputs)"
+    completion_issue "No data inputs configured (run setup.sh --enable-inputs)"
 fi
 
 log ""
 log "--- Data Flow Check ---"
+event_total=0
 for idx_label in "thousandeyes_metrics:metrics" "thousandeyes_traces:traces" "thousandeyes_events:events" "thousandeyes_activity:activity" "thousandeyes_alerts:alerts" "thousandeyes_pathvis:pathvis"; do
     idx="${idx_label%%:*}"
     label="${idx_label#*:}"
     event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
+        event_total=$((event_total + event_count))
         pass "Index '${idx}' has ${event_count} events (${label})"
     else
         warn "Index '${idx}' has no events yet (${label})"
     fi
 done
+[[ "${event_total}" -gt 0 ]] || completion_issue "No ThousandEyes events were found in any app index"
+
+log ""
+log "--- Dashboard Completion ---"
+view_count=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped ThousandEyes dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
+fi
 
 log ""
 log "--- Settings ---"

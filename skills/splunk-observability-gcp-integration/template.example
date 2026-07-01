@@ -3,6 +3,8 @@
 # Copy this file locally (e.g. template.local.yaml) and fill in non-secret values.
 # The skill reads the Splunk O11y token from --token-file (chmod 600).
 # GCP Service Account JSON key is read from --key-file (chmod 600).
+# WIF uses the official Splunk-generated gcp_wif_config.json via
+# --wif-config-file (mode 600). Do not construct or edit that document.
 # NEVER put any secret value in this file.
 
 api_version: splunk-observability-gcp-integration/v1
@@ -18,7 +20,7 @@ integration_name: production-gcp-org-1
 authentication:
   # Authentication mode:
   #   service_account_key        — GCP Service Account JSON key (projectServiceKeys)
-  #   workload_identity_federation — Keyless auth via WIF pool/provider
+  #   workload_identity_federation — Official Splunk-generated WIF config file
   mode: service_account_key
 
   # Only when mode=service_account_key.
@@ -30,9 +32,9 @@ authentication:
 
   # Only when mode=workload_identity_federation.
   workload_identity_federation:
-    pool_id: ""       # WIF pool ID
-    provider_id: ""   # WIF provider ID
-    splunk_principal: ""  # filled from realm map (references/wif-splunk-principals.json)
+    # File path only; contents are injected immediately before apply as compact
+    # JSON in workloadIdentityFederationConfig and are never rendered.
+    config_file: ""   # /secure/path/gcp_wif_config.json; exact filename, mode 600
 
 # ── Connection ────────────────────────────────────────────────────────────────
 connection:
@@ -65,13 +67,16 @@ exclude_gce_instances_with_labels: []
 # WARNING: Changing named_token destroys and re-creates the integration (ForceNew in Terraform).
 named_token: ""
 
-# ── Terraform provider ────────────────────────────────────────────────────────
+# ── Terraform provider (service_account_key only) ────────────────────────────
+# WIF is applied through the REST path. This skill intentionally does not claim
+# unsupported pool/provider Terraform arguments for the opaque WIF config.
 terraform_provider:
   source: splunk-terraform/signalfx
   version: "~> 9.0"
 
 # ── GCloud CLI render ─────────────────────────────────────────────────────────
-# Emit gcloud-cli/ scripts for SA creation and role binding.
+# Emit gcloud-cli/ scripts for SA creation and role binding in SA-key mode only.
+# No WIF pool/provider/principal construction is generated.
 gcloud_cli_render: true
 
 # ── Multi-project ─────────────────────────────────────────────────────────────

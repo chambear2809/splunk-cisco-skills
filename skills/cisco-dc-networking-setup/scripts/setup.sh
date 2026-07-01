@@ -110,12 +110,12 @@ update_macros() {
         log "ERROR: Failed to update macro 'cisco_dc_nd_index'."
         return 1
     fi
-    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_nexus_9k_index" "definition=${def_n9k}"; then
-        log "ERROR: Failed to update macro 'cisco_dc_nexus_9k_index'."
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_n9k_index" "definition=${def_n9k}"; then
+        log "ERROR: Failed to update macro 'cisco_dc_n9k_index'."
         return 1
     fi
 
-    log "Macros updated: cisco_dc_aci_index, cisco_dc_nd_index, cisco_dc_nexus_9k_index"
+    log "Macros updated: cisco_dc_aci_index, cisco_dc_nd_index, cisco_dc_n9k_index"
 }
 
 enable_aci_inputs() {
@@ -278,7 +278,7 @@ main() {
     check_prereqs
     create_indexes
     update_macros
-    log "Setup complete."
+    log "Index/macro setup complete; run '${SCRIPT_DIR}/validate.sh --completion' after configuring an account and input."
     log "$(log_platform_restart_guidance "index or macro changes")"
 }
 

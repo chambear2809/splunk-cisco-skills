@@ -12,8 +12,11 @@ DEFAULT_OUTPUT=""
 APP_NAME=""
 INDEX=""
 SOURCETYPES=""
+REQUIRE_DASHBOARD=false
+REQUIRED_MACRO=""
 RENDERED_DIR=""
 LIVE=false
+COMPLETION=false
 
 usage() {
     cat <<EOF
@@ -26,7 +29,10 @@ Options:
   --app-name NAME         App name to check with --live
   --index INDEX           Index to check with --live
   --sourcetypes LIST      Comma-separated sourcetypes for --live search checks
+  --require-dashboard     Require at least one app-owned view during live checks
+  --required-macro NAME   Require an app-owned macro during live checks
   --live                  Run read-only Splunk REST/search checks using existing credentials
+  --completion            Run live checks and fail on every readiness warning
   --help                  Show this help
 EOF
 }
@@ -47,7 +53,10 @@ while [[ $# -gt 0 ]]; do
         --app-name) require_value "$1" "${2:-}"; APP_NAME="$2"; shift 2 ;;
         --index) require_value "$1" "${2:-}"; INDEX="$2"; shift 2 ;;
         --sourcetypes) require_value "$1" "${2:-}"; SOURCETYPES="$2"; shift 2 ;;
+        --require-dashboard) REQUIRE_DASHBOARD=true; shift ;;
+        --required-macro) require_value "$1" "${2:-}"; REQUIRED_MACRO="$2"; shift 2 ;;
         --live) LIVE=true; shift ;;
+        --completion|--strict) LIVE=true; COMPLETION=true; shift ;;
         --help|-h) usage; exit 0 ;;
         --token|--password|--api-key|--session-key)
             echo "ERROR: secrets must not be passed on argv." >&2
@@ -61,6 +70,26 @@ done
     echo "ERROR: --skill-name, --profile-dir, and --default-output are required." >&2
     exit 1
 }
+if [[ -n "${INDEX}" ]]; then
+    validate_splunk_index_name "${INDEX}" || exit 1
+fi
+if [[ -n "${APP_NAME}" && "${APP_NAME}" != "N/A" && ! "${APP_NAME}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    echo "ERROR: --app-name contains unsupported characters." >&2
+    exit 1
+fi
+if [[ -n "${REQUIRED_MACRO}" && ! "${REQUIRED_MACRO}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+    echo "ERROR: --required-macro contains unsupported characters." >&2
+    exit 1
+fi
+if [[ -n "${SOURCETYPES}" ]]; then
+    IFS=',' read -r -a requested_sourcetypes <<<"${SOURCETYPES}"
+    for requested_sourcetype in "${requested_sourcetypes[@]}"; do
+        if [[ ! "${requested_sourcetype}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+            echo "ERROR: --sourcetypes contains an invalid source type: ${requested_sourcetype}" >&2
+            exit 1
+        fi
+    done
+fi
 
 if [[ -z "${RENDERED_DIR}" ]]; then
     RENDERED_DIR="${REPO_ROOT}/${DEFAULT_OUTPUT}/${PROFILE_DIR}"
@@ -74,8 +103,11 @@ PASS=0
 WARN=0
 FAIL=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
+
+check_skill_role_for_validation "${SKILL_NAME}" "${COMPLETION}" \
+    || fail "Deployment role is unsupported for ${SKILL_NAME}"
 
 scan_rendered_dir() {
     local pattern="$1"
@@ -140,6 +172,27 @@ if [[ "${LIVE}" == "true" ]]; then
                 pass "App installed: ${APP_NAME} (${version})"
             else
                 warn "App not found: ${APP_NAME}"
+            fi
+            if [[ "${REQUIRE_DASHBOARD}" == "true" ]]; then
+                dashboard_count="$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/-/${APP_NAME}/data/ui/views?count=0&output_mode=json" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    print(len(json.load(sys.stdin).get("entry") or []), end="")
+except Exception:
+    print("0", end="")
+' || echo 0)"
+                if [[ "${dashboard_count}" =~ ^[0-9]+$ && "${dashboard_count}" -gt 0 ]]; then
+                    pass "App-owned views found: ${APP_NAME} (${dashboard_count})"
+                else
+                    warn "No app-owned dashboard/view found for ${APP_NAME}"
+                fi
+            fi
+            if [[ -n "${REQUIRED_MACRO}" ]]; then
+                if rest_check_conf "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "macros" "${REQUIRED_MACRO}" 2>/dev/null; then
+                    pass "Required macro exists: ${APP_NAME}/${REQUIRED_MACRO}"
+                else
+                    warn "Required macro missing: ${APP_NAME}/${REQUIRED_MACRO}"
+                fi
             fi
         fi
         if [[ -n "${INDEX}" ]]; then

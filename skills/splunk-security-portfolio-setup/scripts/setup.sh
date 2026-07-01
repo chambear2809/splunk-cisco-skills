@@ -137,11 +137,27 @@ def route_command(entry):
     return []
 
 
-def executable_route_command(entry):
-    command = list(entry.get("route_command", []))
+def command_is_mutating(command):
     if not command:
-        return []
-    return [arg for arg in command if arg != "--dry-run"]
+        return False
+    if any(arg in {"--dry-run", "--render"} for arg in command):
+        return False
+    if "--mode" in command:
+        mode_index = command.index("--mode")
+        if mode_index + 1 >= len(command) or command[mode_index + 1] != "apply":
+            return False
+    if "--phase" in command:
+        phase_index = command.index("--phase")
+        if phase_index + 1 >= len(command):
+            return False
+        if command[phase_index + 1] in {"render", "list", "coverage", "resolve", "preview", "preflight", "status", "validate"}:
+            return False
+    return True
+
+
+def executable_route_command(entry):
+    command = list(entry.get("action_command", []))
+    return command if command_is_mutating(command) else []
 
 
 def setup_help(skill: str) -> str:
@@ -164,31 +180,46 @@ def setup_supports_flag(help_text: str, flag: str) -> bool:
 
 
 def action_command(entry):
-    if "--dry-run" in entry.get("route_command", []):
+    if entry.get("action_command"):
         return executable_route_command(entry)
+    if entry.get("route_command"):
+        # Suggested render/preview commands are not automatically promoted to
+        # mutations. Catalog entries need an explicit reviewed action_command.
+        return []
 
     route = entry.get("route", [])
     if not route:
         return route_command(entry)
 
     skill = route[0]
+    if skill == "splunk-soar-setup":
+        # SOAR needs an explicit phase and topology. A bare --apply defaults to
+        # an on-premises server install and is never a safe router inference.
+        return []
     setup = repo_root / "skills" / skill / "scripts" / "setup.sh"
     if not setup.is_file():
-        return route_command(entry)
+        return []
 
     command = ["bash", f"skills/{skill}/scripts/setup.sh"]
     help_text = setup_help(skill)
     route_args = entry.get("route_args", [])
+    selected_action = False
     if setup_supports_flag(help_text, "--all"):
         command.append("--all")
+        selected_action = True
     elif setup_supports_flag(help_text, "--install"):
         command.append("--install")
+        selected_action = True
     elif setup_supports_flag(help_text, "--apply"):
         command.append("--apply")
+        selected_action = True
     elif setup_supports_flag(help_text, "--phase") and "apply" in help_text:
         command.extend(["--phase", "apply"])
+        selected_action = True
+    if not selected_action:
+        return []
     command.extend(route_args)
-    return command
+    return command if command_is_mutating(command) else []
 
 
 def alternate_splunkbase_ids(entry):

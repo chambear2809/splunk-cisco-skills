@@ -226,8 +226,9 @@ def render_validate(args: argparse.Namespace) -> str:
         f"# Validate that the {args.datamodel} CIM data model returns tstats results.\n"
         "# Authenticate first with: splunk login\n"
         f'{splunk} search "| tstats count from datamodel={args.datamodel} | head 5" '
-        '-maxout 5 -auth "" 2>/dev/null || '
-        f'echo "Run: | tstats count from datamodel={args.datamodel} in Search to confirm acceleration/mapping."\n'
+        '-maxout 5 || { '
+        f'echo "ERROR: tstats validation failed. Authenticate with splunk login, or run | tstats count from datamodel={args.datamodel} in Search." >&2; '
+        'exit 1; }\n'
     )
 
 

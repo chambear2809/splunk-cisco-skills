@@ -245,7 +245,7 @@ the app. No additional activation step is required.
 ### Step 6: Validate
 
 ```bash
-bash skills/cisco-appdynamics-setup/scripts/validate.sh
+bash skills/cisco-appdynamics-setup/scripts/validate.sh --completion
 ```
 
 Checks: app installation, visibility, index, settings, controller connections,
@@ -305,3 +305,10 @@ bash skills/cisco-appdynamics-setup/scripts/load_mcp_tools.sh
 
 - [reference.md](reference.md) — Connection fields, input catalog, dashboards, sourcetypes
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
+
+## Validation Modes
+
+Run `scripts/validate.sh` for a backward-compatible diagnostic report. Run
+`scripts/validate.sh --completion` (alias `--strict`) to require a configured
+connection, enabled input, event flow, and visible built-in dashboard views;
+missing completion evidence exits nonzero.

@@ -11,7 +11,7 @@ When refreshing: bump the date and reconfirm the doc still says
 what the skill assumes. If the doc changed materially, update the
 relevant reference and renderer logic.
 
-> Last reviewed: 2026-05-03
+> Last reviewed: 2026-07-01
 
 ## TLS lifecycle
 
@@ -30,7 +30,7 @@ relevant reference and renderer logic.
 - [Configure Splunk Web to use TLS certificates](https://docs.splunk.com/Documentation/Splunk/latest/Security/SecureSplunkWebusingasignedcertificate)
 - [Configure mutually authenticated TLS (mTLS) on the Splunk platform](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-mutually-authenticated-transport-layer-security-mtls-on-the-splunk-platform)
 - [Configure TLS certificate host name validation](https://docs.splunk.com/Documentation/Splunk/latest/Security/EnableTLSCertHostnameValidation)
-- [Configure TLS protocol version support](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
+- [Configure TLS protocol version support](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
 - [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites)
 - [server.conf reference](https://docs.splunk.com/Documentation/Splunk/latest/admin/serverconf)
 - [web.conf reference](https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.0/configuration-file-reference/10.0.1-configuration-file-reference/web.conf)

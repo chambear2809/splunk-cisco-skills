@@ -14,10 +14,14 @@ description: >-
 
 # Splunk AppDynamics Analytics Setup
 
-Custom event publishing is gated by `--accept-analytics-event-publish` and uses
-an Events API key file. Render mode writes redacted headers and ADQL runbooks.
+Custom event publishing is the executable action path. It is gated by
+`--accept-analytics-event-publish`, uses a chmod-600 Events API key file, rejects
+empty event arrays, and fails on HTTP errors. Other Analytics assets remain
+operator runbooks.
 
 ```bash
 bash skills/splunk-appdynamics-analytics-setup/scripts/setup.sh --render
 bash skills/splunk-appdynamics-analytics-setup/scripts/validate.sh
+bash skills/splunk-appdynamics-analytics-setup/scripts/setup.sh \
+  --apply events --accept-analytics-event-publish --spec path/to/analytics.yaml
 ```

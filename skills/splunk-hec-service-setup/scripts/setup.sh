@@ -30,6 +30,7 @@ S2S_INDEXES_VALIDATION="disabled_for_internal"
 TOKEN_FILE=""
 WRITE_TOKEN_FILE=""
 RESTART_SPLUNK="true"
+HEC_BUNDLE_KIND=""
 
 usage() {
     local exit_code="${1:-0}"
@@ -130,6 +131,10 @@ validate_args() {
     validate_choice "${USE_ACK}" true false
     validate_choice "${S2S_INDEXES_VALIDATION}" disabled disabled_for_internal enabled_for_all
     validate_choice "${RESTART_SPLUNK}" true false
+    if [[ "${APPLY}" == "true" && "${PHASE}" != "render" && "${PHASE}" != "apply" && "${PHASE}" != "all" ]]; then
+        log "ERROR: --apply is valid only with --phase render, apply, or all."
+        exit 1
+    fi
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
         log "ERROR: --json is supported only for render-only or --dry-run workflows."
         exit 1
@@ -205,8 +210,28 @@ status_script() {
     fi
 }
 
+guard_enterprise_direct_apply() {
+    case "${HEC_BUNDLE_KIND}" in
+        idxc|shc)
+            log "ERROR: Direct Enterprise HEC apply is not supported for ${HEC_BUNDLE_KIND} bundle targets."
+            log "HANDOFF: Materialize $(render_dir)/inputs.conf.template with the secure token file in the cluster-manager/deployer bundle workflow, activate it topology-safely, then run status validation."
+            return 1
+            ;;
+    esac
+}
+
 main() {
+    local resolved_role="" bundle_kind=""
     validate_args
+    if [[ "${PLATFORM}" == "enterprise" && "${DRY_RUN}" != "true" \
+        && ( "${PHASE}" == "apply" || "${PHASE}" == "all" || "${APPLY}" == "true" ) ]]; then
+        load_splunk_connection_settings
+        resolved_role="$(resolve_splunk_target_role 2>/dev/null || true)"
+        SPLUNK_TARGET_ROLE="${resolved_role:-${SPLUNK_TARGET_ROLE:-standalone}}"
+        export SPLUNK_TARGET_ROLE
+        bundle_kind="$(deployment_bundle_kind_for_current_target 2>/dev/null || true)"
+        HEC_BUNDLE_KIND="${bundle_kind}"
+    fi
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then
@@ -219,13 +244,14 @@ main() {
         render)
             render_assets
             if [[ "${APPLY}" == "true" ]]; then
+                guard_enterprise_direct_apply
                 run_rendered_script "$(apply_script)"
             fi
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
-        apply) render_assets; run_rendered_script "$(apply_script)" ;;
+        apply) render_assets; guard_enterprise_direct_apply; run_rendered_script "$(apply_script)" ;;
         status) run_rendered_script "$(status_script)" ;;
-        all) render_assets; run_rendered_script preflight.sh; run_rendered_script "$(apply_script)"; run_rendered_script "$(status_script)" ;;
+        all) render_assets; guard_enterprise_direct_apply; run_rendered_script preflight.sh; run_rendered_script "$(apply_script)"; run_rendered_script "$(status_script)" ;;
     esac
 }
 

@@ -8,6 +8,7 @@ SOAR_APP_NAME="splunk_app_soar"
 EXPORT_APP_NAME="phantom"
 CHECK_EXPORT=false
 SOAR_URL=""
+COMPLETION=false
 
 usage() {
     cat <<EOF
@@ -18,6 +19,7 @@ Usage: $(basename "$0") [OPTIONS]
 Options:
   --export        Also require Splunk App for SOAR Export
   --soar-url URL  Non-secret SOAR URL for reachability/handoff notes
+  --completion    Fail on every readiness warning
   --help          Show this help
 EOF
 }
@@ -26,6 +28,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --export) CHECK_EXPORT=true; shift ;;
         --soar-url) require_arg "$1" $# || exit 1; SOAR_URL="$2"; shift 2 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
@@ -36,7 +39,7 @@ FAIL=0
 WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 
 check_app() {
     local app="$1" required="$2" version
@@ -52,7 +55,7 @@ check_app() {
 
 log "=== Splunk SOAR Validation ==="
 log ""
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
@@ -67,6 +70,8 @@ if [[ ${FAIL} -eq 0 ]]; then
     check_app "${SOAR_APP_NAME}" true
     if [[ "${CHECK_EXPORT}" == "true" ]]; then
         check_app "${EXPORT_APP_NAME}" true
+    elif [[ "${COMPLETION}" == "true" ]]; then
+        log "  INFO: Export app was not requested; skipping optional phantom app check."
     else
         check_app "${EXPORT_APP_NAME}" false
     fi
@@ -74,8 +79,8 @@ if [[ ${FAIL} -eq 0 ]]; then
     log ""
     log "--- Deployment Placement ---"
     pass "Splunk App for SOAR belongs on search heads"
-    warn "For distributed Enterprise environments with indexers, deploy splunk_app_soar to indexers because it contains indexes or index-time transformations"
-    warn "Deployment Server placement is not supported for Splunk App for SOAR"
+    log "  INFO: For distributed Enterprise environments with indexers, deploy splunk_app_soar to indexers because it contains indexes or index-time transformations"
+    log "  INFO: Deployment Server placement is not supported for Splunk App for SOAR"
 
     log ""
     log "--- Handoffs ---"
@@ -99,4 +104,3 @@ elif [[ ${WARN} -gt 0 ]]; then
 else
     log "  Status: ALL CHECKS PASSED"
 fi
-

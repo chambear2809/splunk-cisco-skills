@@ -25,7 +25,9 @@ doctor.
 Render-first workflow for `Splunk_TA_cisco-asa` and Cisco ASA/FTD syslog data.
 The skill emits reviewed placement notes, syslog handoffs, validation SPL, and
 readiness evidence templates. It does not open syslog listeners, install apps,
-or mutate Splunk by itself.
+or mutate Splunk in render-only mode. The explicit `--install` and `--all`
+modes delegate package installation to `splunk-app-install`; syslog receiver
+mutation remains a separate handoff.
 
 ## Workflow
 
@@ -59,5 +61,11 @@ The syslog receiver remains delegated to SC4S/syslog ownership workflows.
 bash skills/cisco-asa-ta-setup/scripts/validate.sh \
   --rendered-dir cisco-asa-ta-rendered --live
 ```
+
+The no-flag/live validator is diagnostic. Add `--completion` (alias `--strict`)
+to require the installed TA, target index, and `cisco:asa` event evidence; the
+completion flags require `--live`. `setup.sh --all --live` invokes this strict
+gate automatically. The TA supplies parsing/CIM knowledge rather than
+standalone dashboards, so dashboard use is handed off to ES/firewall content.
 
 See `reference.md` for source type, CIM, and receiver guardrails.

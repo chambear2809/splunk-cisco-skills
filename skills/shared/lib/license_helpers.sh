@@ -196,14 +196,21 @@ else:
 license_messages_check() {
     local manager_uri="$1" sk="$2"
     local payload
-    payload=$(_lic_curl "${manager_uri}" "${sk}" GET "messages" 2>/dev/null || echo '{}')
+    if ! payload=$(_lic_curl "${manager_uri}" "${sk}" GET "messages" 2>/dev/null); then
+        log "ERROR: license_messages_check could not read the license-manager messages endpoint."
+        return 2
+    fi
     python3 - "${payload}" <<'PY'
 import json, sys
 try:
-    data = json.loads(sys.argv[1]) if sys.argv[1].strip() else {}
-except Exception:
-    data = {}
-items = data.get("entry", []) if isinstance(data, dict) else []
+    data = json.loads(sys.argv[1])
+except Exception as exc:
+    print(f"ERROR: invalid license messages response: {exc}", file=sys.stderr)
+    sys.exit(2)
+if not isinstance(data, dict) or not isinstance(data.get("entry"), list):
+    print("ERROR: license messages response has an invalid schema", file=sys.stderr)
+    sys.exit(2)
+items = data["entry"]
 errors = sum(1 for i in items if (i.get("content", {}) or {}).get("severity") == "ERROR")
 warns = sum(1 for i in items if (i.get("content", {}) or {}).get("severity") == "WARN")
 print(f"{errors} {warns}")
@@ -218,12 +225,15 @@ PY
 license_usage_snapshot() {
     local manager_uri="$1" sk="$2" output_dir="$3"
     mkdir -p "${output_dir}"
-    chmod 0700 "${output_dir}" 2>/dev/null || true
-    local endpoint out
+    chmod 0700 "${output_dir}"
+    local endpoint out failures=0
     for endpoint in groups stacks pools licenses messages localpeer peers usage; do
         out="${output_dir}/${endpoint}.json"
-        ( umask 077 && _lic_curl "${manager_uri}" "${sk}" GET "${endpoint}" \
-            > "${out}" 2>/dev/null ) \
-            || ( umask 077 && echo '{}' > "${out}" )
+        if ! ( umask 077 && _lic_curl "${manager_uri}" "${sk}" GET "${endpoint}" \
+            > "${out}" 2>/dev/null ); then
+            ( umask 077 && printf '{"error":"snapshot_failed","endpoint":"%s"}\n' "${endpoint}" > "${out}" )
+            failures=1
+        fi
     done
+    (( failures == 0 ))
 }

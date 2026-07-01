@@ -10,9 +10,10 @@ PASS=0
 WARN=0
 FAIL=0
 SK=""
+COMPLETION=false
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 
 usage() {
@@ -23,6 +24,7 @@ Splunk Enterprise Security Install Validation
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
+  --completion    Fail on every readiness warning
   --help          Show this help text
 
 Checks are read-only and use Splunk REST credentials from the credentials file.
@@ -33,6 +35,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage 0 ;;
         *)
             log "ERROR: Unknown option '$1'"
@@ -46,7 +49,10 @@ ensure_session() {
         fail "Could not load Splunk credentials."
         return 1
     }
-    warn_if_current_skill_role_unsupported
+    check_current_skill_role_for_validation "${COMPLETION}" || {
+        fail "Deployment role is unsupported for this skill"
+        return 1
+    }
     SK="$(get_session_key "${SPLUNK_URI}")" || {
         fail "Could not authenticate to Splunk REST API."
         return 1
@@ -195,7 +201,7 @@ log "--- KV Store ---"
 kv_status="$(kvstore_status)"
 case "${kv_status}" in
     ready) pass "KV Store status: ready" ;;
-    *) warn "KV Store status: ${kv_status}; ES depends on healthy KV Store" ;;
+    *) fail "KV Store status: ${kv_status}; ES depends on healthy KV Store" ;;
 esac
 
 log ""

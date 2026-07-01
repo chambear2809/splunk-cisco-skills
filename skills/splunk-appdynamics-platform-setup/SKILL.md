@@ -22,7 +22,16 @@ and Controller documentation for CLI-capable platform work.
 ```bash
 bash skills/splunk-appdynamics-platform-setup/scripts/setup.sh --render
 bash skills/splunk-appdynamics-platform-setup/scripts/validate.sh
+bash skills/splunk-appdynamics-platform-setup/scripts/setup.sh \
+  --apply enterprise-console --accept-enterprise-console-mutation \
+  --spec path/to/platform.yaml
 ```
+
+Live apply requires one explicit section: `enterprise-console`,
+`vmware-ovftool`, or `vmware-govc`. Bare `--apply` is rejected so a platform
+bootstrap and an appliance deployment cannot be conflated. Rendered executors
+also default to dry-run unless invoked through the gated wrapper (or their
+documented action environment variable is set explicitly).
 
 The renderer emits:
 
@@ -42,6 +51,11 @@ The renderer emits:
   deployment handoff without passing VMware passwords on shell command lines.
 - `platform-validation-probes.sh` for local static checks and optional live
   reachability probes.
+
+VMware live validation requires `APPD_SSH_KNOWN_HOSTS_FILE` whenever SSH
+`appdctl` checks are enabled. Host-key enrollment is an operator prerequisite;
+the generated script does not accept new keys implicitly or suppress failed
+boot/cluster checks.
 
 First-class deployment coverage:
 

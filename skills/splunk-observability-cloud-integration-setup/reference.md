@@ -81,13 +81,17 @@ and Splunk Enterprise documentation:
   `o11y-access-token: <O11y-admin-token>` headers.
 - The pair call returns a `{"id": "<pairing-id>"}` payload; the
   `pairing-status-by-id` call polls `GET .../sso-pairing/{pairing-id}` for
-  `SUCCESS|FAILED|IN_PROGRESS`.
+  `SUCCESS|FAILED|IN_PROGRESS`. A poll timeout records `IN_PROGRESS` and exits
+  nonzero; re-running the same pairing command resumes that job ID instead of
+  issuing a duplicate POST. A recorded `FAILED` job also blocks duplicate creation.
 - The Splunk Cloud Platform <-> Splunk Observability Cloud realm-to-region
   map is fixed:
   `us-east-1 <-> us0`, `us-west-2 <-> us1`, `eu-west-1 <-> eu0`,
   `eu-central-1 <-> eu1`, `eu-west-2 <-> eu2`, `ap-southeast-2 <-> au0`,
   `ap-northeast-1 <-> jp0`, `ap-southeast-1 <-> sg0`.
   Cross-region pairing requires Splunk Account team approval.
+- The spec label `us2-gcp` disambiguates the excluded GCP deployment; public
+  Discover and SIM REST payloads use its actual Observability realm value `us2`.
 - Token authentication is off by default on the Splunk platform and is a
   hard precondition for UID. The flip is
   `POST /services/admin/token-auth/tokens_auth -d disabled=false` on the
@@ -129,15 +133,14 @@ include the section blocks documented in
 | Flag                                       | Purpose                                                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | `--render` (default)                       | Produce the numbered plan tree under `--output-dir`.                                          |
-| `--apply [SECTIONS]`                       | Apply (idempotent). Without args runs all sections; CSV picks specific sections.              |
+| `--apply SECTIONS`                         | Apply explicitly selected supported sections; omitted sections are never silently claimed.   |
 | `--validate`                               | Static checks of a rendered tree; pair with `--live` for API-side checks.                     |
-| `--doctor`                                 | Run the twenty-check diagnostic catalog and emit a prioritized fix list.                      |
-| `--discover`                               | Read-only sweep that polls live state and writes `current-state.json`.                        |
-| `--quickstart`                             | Single-shot greenfield SCP + UID + Discover + SIM scenario.                                   |
-| `--quickstart-enterprise`                  | Splunk Enterprise fast path (SA + SIM + Related Content + LOC TLS path).                      |
+| `--doctor`                                 | Render the static twenty-check review catalog and prioritized fix/handoff list.                |
+| `--discover`                               | Write a read-only rendered-plan inventory scaffold to `current-state.json` (not a complete live snapshot). |
+| `--quickstart`                             | Render/validate the greenfield SCP scenario and print supported apply/handoffs.               |
+| `--quickstart-enterprise`                  | Render/validate the Enterprise scenario and print supported apply/handoffs.                   |
 | `--explain`                                | Print apply plan in plain English; no API calls.                                              |
 | `--enable-token-auth`                      | Flip token authentication on (auto-rendered as a doctor fix).                                 |
-| `--i-accept-rbac-cutover`                  | Required guard for `--apply rbac` to actually run `enable-centralized-rbac`.                  |
 | `--rollback <section>`                     | Render reverse commands for a previously applied section.                                     |
 | `--list-sim-templates`                     | Show the curated SignalFlow modular-input catalog.                                            |
 | `--render-sim-templates a,b,c`             | Render only the named SignalFlow templates from the catalog.                                  |
@@ -149,7 +152,6 @@ include the section blocks documented in
 | `--admin-token-file PATH`                  | Splunk Observability Cloud admin token for UID + RBAC (chmod 600).                            |
 | `--org-token-file PATH`                    | Splunk Observability Cloud org access token for the SIM Add-on account (chmod 600).           |
 | `--service-account-password-file PATH`     | Log Observer Connect service-account password (chmod 600).                                    |
-| `--allow-loose-token-perms`                | Override the chmod-600 token-file requirement (emits WARN).                                   |
 | `--target cloud\|enterprise`               | Override `target` in the spec.                                                                |
 | `--json` / `--summary`                     | `--validate` and `--doctor` output modes for CI vs human consumption.                         |
 | `--dry-run`                                | Skip live API calls (apply scaffolding stays render-only).                                    |

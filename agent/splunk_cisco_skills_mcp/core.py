@@ -1623,6 +1623,7 @@ def execute_plan(
 
     result = _run_command(plan.command, timeout_seconds=plan.timeout_seconds)
     return {
+        "ok": result.returncode == 0 and not result.timed_out,
         "plan_hash": plan_hash,
         "returncode": result.returncode,
         "stdout": _truncate_and_redact(result.stdout),

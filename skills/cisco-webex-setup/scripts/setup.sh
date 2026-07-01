@@ -119,7 +119,7 @@ main() {
     if [[ "${INDEXES_ONLY}" != "true" ]]; then
         configure_macros
     fi
-    log "Webex setup complete. Use configure_account.sh and configure_inputs.sh for REST collection."
+    log "Webex package/index/macro prerequisites configured. Use configure_account.sh and configure_inputs.sh, then run validate.sh --completion."
 }
 
 main

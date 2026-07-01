@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-meraki-ta-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-meraki-ta-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco Meraki TA using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_cisco_meraki"
@@ -21,6 +30,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco Meraki TA Validation ==="
 log ""
@@ -53,7 +63,7 @@ log "--- Index ---"
 if platform_check_index "${SK}" "${SPLUNK_URI}" "meraki" 2>/dev/null; then
     pass "Index 'meraki' exists"
 else
-    warn "Index 'meraki' not found (may need to run setup.sh)"
+    completion_issue "Index 'meraki' not found (may need to run setup.sh)"
 fi
 
 log ""
@@ -83,10 +93,10 @@ except Exception:
     pass
 " 2>/dev/null || true
     else
-        warn "Organization account conf exists but has no stanzas"
+        completion_issue "Organization account conf exists but has no stanzas"
     fi
 else
-    warn "No organization account conf found"
+    completion_issue "No organization account conf found"
 fi
 
 log ""
@@ -100,10 +110,10 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${input_count} input stanza(s) exist but all are disabled"
+        completion_issue "${input_count} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No inputs configured"
+    completion_issue "No inputs configured"
 fi
 
 log ""
@@ -112,14 +122,30 @@ event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where 
 if [[ "${event_count}" -gt 0 ]]; then
     pass "Index 'meraki' has ${event_count} events"
 else
-    warn "Index 'meraki' has no events (may be normal if just configured)"
+    completion_issue "Index 'meraki' has no events (may be normal if just configured)"
 fi
 
 sourcetype_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats dc(sourcetype) as stcount where index=meraki | eval stcount=stcount-0" "stcount" 2>/dev/null || echo "0")
 if [[ "${sourcetype_count}" -gt 0 ]]; then
     pass "${sourcetype_count} distinct sourcetype(s) in meraki index"
 else
-    warn "No sourcetypes found in meraki index yet"
+    completion_issue "No sourcetypes found in meraki index yet"
+fi
+
+log ""
+log "--- Dashboard Completion ---"
+macro_def=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "macros" "meraki_index" "definition" 2>/dev/null || true)
+if [[ "${macro_def}" == *meraki* ]]; then
+    pass "Dashboard macro meraki_index references the meraki index"
+else
+    completion_issue "Dashboard macro meraki_index is missing or does not reference the meraki index"
+fi
+view_count=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
 fi
 
 log ""

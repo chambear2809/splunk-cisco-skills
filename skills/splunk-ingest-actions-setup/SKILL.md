@@ -46,7 +46,7 @@ bash skills/splunk-ingest-actions-setup/scripts/setup.sh --phase apply \
   --rule-type drop --drop-regex 'level=DEBUG' --accept-irreversible-ingest
 ```
 
-Route a source type to an S3 destination:
+Stage an S3 destination and emit the supported ruleset handoff:
 
 ```bash
 bash skills/splunk-ingest-actions-setup/scripts/setup.sh --phase apply \
@@ -63,9 +63,10 @@ bash skills/splunk-ingest-actions-setup/scripts/setup.sh --phase apply \
 - `outputs.conf` - `[rfs:<name>]` S3 destination (max 8 per deployment)
 - `status-rulesets.sh` - lists rulesets via `/services/data/ingest/rulesets`
 
-For `route-s3`, the skill applies only the `[rfs:]` destination; author the
-"Route to Destination" rule in the Ingest Actions UI / rulesets endpoint
-(the internal RFS routing transform is not hand-authored). Only one ruleset is
-supported per source type. Hand ingest-time routing on
+For `route-s3`, the skill applies only the `[rfs:]` destination, emits the
+"Route to Destination" handoff, and exits nonzero so that destination staging
+cannot be mistaken for completed routing. Author and verify the rule in the
+Ingest Actions UI / rulesets endpoint (the internal RFS routing transform is
+not hand-authored). Only one ruleset is supported per source type. Hand ingest-time routing on
 Splunk Cloud control planes to `splunk-ingest-processor-setup` and edge
 transformation to `splunk-edge-processor-setup`.

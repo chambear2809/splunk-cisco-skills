@@ -369,6 +369,8 @@ echo "  REST: POST /services/data/ingest/rulesets (see ruleset.json)"
 echo
 echo "On Splunk Cloud Victoria rulesets deploy automatically; on Classic and on"
 echo "indexer clusters you must deploy explicitly. Validate with status.sh."
+echo "ERROR: ruleset creation was not executed; apply it through the documented UI/REST workflow." >&2
+exit 2
 """
     )
 
@@ -377,16 +379,28 @@ def render_status(args: argparse.Namespace) -> str:
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
     return make_script(
         f"""splunk={splunk}
+failures=0
 echo "== existing ingest rulesets =="
 "${{splunk}}" search '| rest splunk_server=local count=0 /services/data/ingest/rulesets | table title disabled' -maxout 0 \\
-  || echo "Could not list rulesets (endpoint/capability may be unavailable)."
+  || {{ echo "ERROR: could not list rulesets (endpoint/capability may be unavailable)." >&2; failures=1; }}
 echo
 echo "== RFS / S3 upload errors (last 60m) =="
 "${{splunk}}" search 'index=_internal sourcetype=splunkd (ERROR OR WARN) (RfsOutputProcessor OR S3Client) earliest=-60m | stats count by component, log_level' -maxout 0 \\
-  || echo "Could not query _internal for RFS errors."
+  || {{ echo "ERROR: could not query _internal for RFS errors." >&2; failures=1; }}
 echo
 echo "== effective rfs destinations (btool) =="
-"${{splunk}}" btool outputs list --debug 2>/dev/null | grep -i -E '\\[rfs:|path = ' | grep -v -i -E 'access_key|secret_key' || true
+if btool_output="$("${{splunk}}" btool outputs list --debug 2>/dev/null)"; then
+  filtered="$(printf '%s\n' "${{btool_output}}" | grep -i -E '\\[rfs:|path = ' | grep -v -i -E 'access_key|secret_key' || :)"
+  if [[ -n "${{filtered}}" ]]; then
+    printf '%s\n' "${{filtered}}"
+  else
+    echo "(no effective RFS destination stanzas)"
+  fi
+else
+  echo "ERROR: btool could not read outputs.conf." >&2
+  failures=1
+fi
+(( failures == 0 )) || exit 1
 """
     )
 

@@ -1167,6 +1167,10 @@ case "${{MODE}}" in
     aws cloudformation validate-template --template-body "file://${{TEMPLATE_PATH}}" --region "${{REGION}}"
     ;;
   --apply)
+    if [[ "${{APPLY_ENABLED}}" != "true" ]]; then
+      echo "AWS CloudFormation apply is disabled in the reviewed spec." >&2
+      exit 2
+    fi
     if [[ "${{ACCEPT_DATA_MANAGER_APPLY:-}}" != "1" ]]; then
       echo "Set ACCEPT_DATA_MANAGER_APPLY=1 after reviewing Data Manager-generated CloudFormation."
       exit 2
@@ -1218,6 +1222,10 @@ case "${{MODE}}" in
     az deployment sub what-if --subscription "${{SUBSCRIPTION_ID}}" --location "${{LOCATION}}" --template-file "${{TEMPLATE_PATH}}"
     ;;
   --apply)
+    if [[ "${{APPLY_ENABLED}}" != "true" ]]; then
+      echo "Azure ARM apply is disabled in the reviewed spec." >&2
+      exit 2
+    fi
     if [[ "${{ACCEPT_DATA_MANAGER_APPLY:-}}" != "1" ]]; then
       echo "Set ACCEPT_DATA_MANAGER_APPLY=1 after reviewing ARM what-if output."
       exit 2
@@ -1263,18 +1271,32 @@ case "${{MODE}}" in
     terraform validate
     ;;
   --apply)
+    if [[ "${{APPLY_ENABLED}}" != "true" ]]; then
+      echo "GCP Terraform apply is disabled in the reviewed spec." >&2
+      exit 2
+    fi
     if [[ "${{ACCEPT_DATA_MANAGER_APPLY:-}}" != "1" ]]; then
       echo "Set ACCEPT_DATA_MANAGER_APPLY=1 after reviewing Data Manager-generated Terraform."
       exit 2
     fi
-    terraform apply
+    terraform plan -out=.codex-data-manager-apply.tfplan
+    terraform apply .codex-data-manager-apply.tfplan
     ;;
   --destroy)
+    if [[ "${{DESTROY_ENABLED}}" != "true" ]]; then
+      echo "GCP Terraform destroy is disabled in the reviewed spec." >&2
+      exit 2
+    fi
     if [[ "${{ACCEPT_DATA_MANAGER_APPLY:-}}" != "1" ]]; then
       echo "Set ACCEPT_DATA_MANAGER_APPLY=1 after reviewing Data Manager delete guidance."
       exit 2
     fi
-    terraform destroy
+    if [[ "${{ACCEPT_DATA_MANAGER_DESTROY:-}}" != "1" ]]; then
+      echo "Set ACCEPT_DATA_MANAGER_DESTROY=1 (setup.sh --accept-destroy) after separately reviewing the destroy plan." >&2
+      exit 2
+    fi
+    terraform plan -destroy -out=.codex-data-manager-destroy.tfplan
+    terraform apply .codex-data-manager-destroy.tfplan
     ;;
   *)
     echo "Usage: $0 --validate|--apply|--destroy" >&2
@@ -1305,6 +1327,24 @@ if [[ "${{ACCEPT_DATA_MANAGER_APPLY:-}}" != "1" ]]; then
 fi
 
 echo "Running enabled Data Manager artifact apply wrappers."
+ENABLED_ACTIONS={sum(1 for key in ('aws_cloudformation_apply_enabled', 'azure_arm_apply_enabled', 'gcp_terraform_apply_enabled', 'gcp_terraform_destroy_enabled') if iac_apply_enabled(iac, key))}
+if [[ "${{ENABLED_ACTIONS}}" == "0" ]]; then
+  echo "ERROR: no artifact apply or destroy operation is enabled in the reviewed spec." >&2
+  exit 2
+fi
+# Validate every enabled artifact and cloud CLI context before the first
+# provider mutation. Cross-provider apply is not transactional, so this
+# prevents avoidable partial application from malformed templates or missing
+# cloud credentials.
+if [[ {shell_quote(str(iac_apply_enabled(iac, "aws_cloudformation_apply_enabled")).lower())} == "true" ]]; then
+  ./scripts/aws-cloudformation.sh --validate
+fi
+if [[ {shell_quote(str(iac_apply_enabled(iac, "azure_arm_apply_enabled")).lower())} == "true" ]]; then
+  ./scripts/azure-arm.sh --what-if
+fi
+if [[ {shell_quote(str(iac_apply_enabled(iac, "gcp_terraform_apply_enabled") or iac_apply_enabled(iac, "gcp_terraform_destroy_enabled")).lower())} == "true" ]]; then
+  ./scripts/gcp-terraform.sh --validate
+fi
 if [[ {shell_quote(str(iac_apply_enabled(iac, "aws_cloudformation_apply_enabled")).lower())} == "true" ]]; then
   ./scripts/aws-cloudformation.sh --apply
 else
@@ -1398,6 +1438,11 @@ def check_rendered(output_dir: Path) -> None:
     if source_catalog.get("hec_ack_required_sources") != HEC_ACK_REQUIRED_SOURCES:
         raise RenderError("HEC ACK required source mapping drifted.")
     plan = json.loads((output_dir / "apply-plan.json").read_text(encoding="utf-8"))
+    enabled_ids = {
+        op.get("id") for op in plan.get("operations", []) if op.get("mutating") and op.get("enabled")
+    }
+    if {"gcp-terraform-apply", "gcp-terraform-destroy"}.issubset(enabled_ids):
+        raise RenderError("GCP Terraform apply and destroy cannot be enabled in the same apply plan.")
     missing_artifacts = [
         op["id"]
         for op in plan.get("operations", [])

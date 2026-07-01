@@ -92,7 +92,7 @@ main() {
     [[ "${INSTALL}" == "true" ]] && install_package
     [[ "${TEMPLATES_ONLY}" != "true" ]] && create_index
     [[ "${INDEXES_ONLY}" != "true" ]] && configure_templates
-    log "Cisco UCS setup complete. Use configure_server.sh and configure_task.sh to enable collection."
+    log "Cisco UCS package/index/template prerequisites configured. Use configure_server.sh and configure_task.sh, then run validate.sh --completion."
 }
 
 main

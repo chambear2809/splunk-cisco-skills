@@ -23,7 +23,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-format", choices=["json", "yaml"], default="json")
     parser.add_argument("--backup-output", help="Required backup output path before cleanup-apply.")
     parser.add_argument("--backup-format", choices=["json", "yaml"], default="yaml")
+    parser.add_argument(
+        "--completion",
+        action="store_true",
+        help="Fail if the workflow emits any warning-status finding.",
+    )
     return parser.parse_args()
+
+
+def contains_warning_status(value: object) -> bool:
+    if isinstance(value, dict):
+        if str(value.get("status", "")).lower() in {"warn", "warning"}:
+            return True
+        return any(contains_warning_status(item) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_warning_status(item) for item in value)
+    return False
 
 
 def main() -> int:
@@ -68,7 +83,8 @@ def main() -> int:
             else:
                 write_json(args.output, output_payload)
         print(json.dumps(payload, indent=2, sort_keys=True))
-        return 1 if result.failed else 0
+        completion_failed = args.completion and contains_warning_status(payload)
+        return 1 if (result.failed or completion_failed) else 0
     except SkillError as exc:
         print(str(exc), file=sys.stderr)
         return 1

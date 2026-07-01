@@ -48,11 +48,15 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     print("Current Search Head: sh-i-123")
                     raise SystemExit(0)
 
-                if cmd == "apps list --splunkbase --count 100":
+                if cmd == "apps list --splunkbase --count 100 --offset 0":
                     print(json.dumps({"apps": []}))
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
+                    raise SystemExit(0)
+
+                if cmd == "apps describe Splunk AI Assistant for SPL":
                     print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
                     raise SystemExit(0)
 
@@ -399,6 +403,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             request_log = tmp_path / "requests.jsonl"
             proxy_password_file = tmp_path / "proxy_password"
             proxy_password_file.write_text("proxy-pass\n", encoding="utf-8")
+            proxy_password_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "curl",
@@ -539,6 +544,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             activation_file = tmp_path / "activation_code"
             state_file.write_text(json.dumps({"activated": False}), encoding="utf-8")
             activation_file.write_text("encoded-activation-code\n", encoding="utf-8")
+            activation_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "curl",
@@ -1025,13 +1031,29 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 bin_dir / "acs",
                 """\
                 #!/usr/bin/env python3
+                import json
                 import os
                 import sys
                 from pathlib import Path
 
+                args = sys.argv[1:]
+                cmd = " ".join(args)
                 log_path = Path(os.environ["ACS_LOG"])
                 with log_path.open("a", encoding="utf-8") as handle:
-                    handle.write(" ".join(sys.argv[1:]) + "\\n")
+                    handle.write(cmd + "\\n")
+
+                if "apps install splunkbase --splunkbase-id 7538" in cmd:
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps install splunkbase --splunkbase-id 7539" in cmd:
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps describe TA_cisco_catalyst" in cmd:
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps describe cisco-catalyst-app" in cmd:
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    raise SystemExit(0)
 
                 raise SystemExit(0)
                 """,
@@ -1313,13 +1335,29 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 bin_dir / "acs",
                 """\
                 #!/usr/bin/env python3
+                import json
                 import os
                 import sys
                 from pathlib import Path
 
+                args = sys.argv[1:]
+                cmd = " ".join(args)
                 log_path = Path(os.environ["ACS_LOG"])
                 with log_path.open("a", encoding="utf-8") as handle:
-                    handle.write(" ".join(sys.argv[1:]) + "\\n")
+                    handle.write(cmd + "\\n")
+
+                if "apps install splunkbase --splunkbase-id 7538" in cmd:
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps install splunkbase --splunkbase-id 7539" in cmd:
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps describe TA_cisco_catalyst" in cmd:
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+                if "apps describe cisco-catalyst-app" in cmd:
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    raise SystemExit(0)
 
                 raise SystemExit(0)
                 """,
@@ -1410,6 +1448,10 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "status": "updated"}))
                     raise SystemExit(0)
 
+                if cmd == "apps describe Splunk_AI_Assistant_Cloud":
+                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.0.0", "status": "updated"}))
+                    raise SystemExit(0)
+
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
                     raise SystemExit(91)
 
@@ -1493,8 +1535,20 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(cmd + "\\n")
 
-                if cmd.startswith("apps install splunkbase --splunkbase-id "):
-                    print(json.dumps({"status": "installed"}))
+                if cmd.startswith("apps install splunkbase --splunkbase-id 7538"):
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+
+                if cmd.startswith("apps install splunkbase --splunkbase-id 7539"):
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    raise SystemExit(0)
+
+                if cmd == "apps describe TA_cisco_catalyst":
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    raise SystemExit(0)
+
+                if cmd == "apps describe cisco-catalyst-app":
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps list --splunkbase --count 100 --offset 0":
@@ -1611,7 +1665,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 def emit_text(body: str = "", code: int | None = None, effective_url: str = "") -> None:
                     if output_target and output_target != "/dev/null" and body:
                         Path(output_target).write_text(body, encoding="utf-8")
-                    elif body:
+                    elif body and output_target != "/dev/null":
                         sys.stdout.write(body)
 
                     if write_format and code is not None:
@@ -1928,7 +1982,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 def emit(body: str = "", code: int | None = None) -> None:
                     if output_target and output_target != "/dev/null" and body:
                         Path(output_target).write_text(body, encoding="utf-8")
-                    elif body:
+                    elif body and output_target != "/dev/null":
                         sys.stdout.write(body)
                     if write_format and code is not None:
                         rendered = bytes(write_format, "utf-8").decode("unicode_escape")
@@ -2175,7 +2229,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertNotIn("Skipping Splunk restart", result.stdout)
 
 
-    def test_install_app_treats_timeout_after_presence_as_success(self):
+    def test_install_app_fails_closed_on_timeout_even_when_app_is_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -2286,9 +2340,12 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             output = result.stdout + result.stderr
-            self.assertEqual(result.returncode, 0, msg=output)
-            self.assertIn("Install request did not finish cleanly, but the app is present", output)
-            self.assertIn("SUCCESS: App 'Splunk_MCP_Server' installed (HTTP 200)", output)
+            self.assertNotEqual(result.returncode, 0, msg=output)
+            self.assertIn(
+                "Install request did not finish cleanly; the app is present, but this does not prove",
+                output,
+            )
+            self.assertIn("HANDOFF: Verify the expected app ID and version", output)
             self.assertIn("Skipping Splunk restart (--no-restart)", output)
 
 
@@ -2352,16 +2409,32 @@ class InstallRegressionTests(ShellScriptRegressionBase):
 
                 args = sys.argv[1:]
                 url = ""
-                for arg in args:
+                output_target = None
+                write_format = ""
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-w" and i + 1 < len(args):
+                        write_format = args[i + 1]
+                        i += 2
+                        continue
                     if arg.startswith("http://") or arg.startswith("https://"):
                         url = arg
+                    i += 1
 
                 path = urlparse(url).path
                 if path.endswith("/services/auth/login"):
                     sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
                     raise SystemExit(0)
                 if "/services/apps/local/TestApp" in path:
-                    sys.stdout.write(json.dumps({"entry": [{"name": "TestApp", "content": {"version": "1.0.0"}}]}))
+                    if output_target == "/dev/null" and "%{http_code}" in write_format:
+                        sys.stdout.write("200")
+                    else:
+                        sys.stdout.write(json.dumps({"entry": [{"name": "TestApp", "content": {"version": "1.0.0"}}]}))
                     raise SystemExit(0)
                 raise SystemExit(0)
                 """,
@@ -3137,7 +3210,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 bin_dir / "curl",
                 """\
                 #!/usr/bin/env python3
+                import os
                 import sys
+                from pathlib import Path
                 from urllib.parse import urlparse
 
                 args = sys.argv[1:]
@@ -3165,7 +3240,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
                     raise SystemExit(0)
                 if "/services/apps/local/TestApp" in path and output_target == "/dev/null" and "%{http_code}" in write_format:
-                    sys.stdout.write("200")
+                    sys.stdout.write("200" if Path(os.environ["APP_DIR"]).exists() else "404")
                     raise SystemExit(0)
                 raise SystemExit(0)
                 """,
@@ -3206,6 +3281,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["SPLUNK_LOCAL_SUDO"] = "false"
             env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
             env["BUNDLE_APPLY_LOG"] = str(apply_log)
+            env["APP_DIR"] = str(app_dir)
 
             result = self.run_script(
                 "skills/splunk-app-install/scripts/uninstall_app.sh",
@@ -3320,7 +3396,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("did not finish cleanly, but the app is no longer present", result.stdout)
-            self.assertIn("SUCCESS: App 'example_app' has been removed", result.stdout)
+            self.assertIn("SUCCESS: App 'example_app' removal was verified", result.stdout)
 
 
     def test_cloud_uninstall_treats_fallback_delete_timeout_after_removal_as_success(self):
@@ -3626,6 +3702,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             output = result.stdout + result.stderr
-            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertNotEqual(result.returncode, 0, msg=output)
             self.assertIn("late-app", output)
             self.assertIn("ACS uninstall accepted for 'late-app'.", output)
+            self.assertIn("completion could not be verified on the search tier", output)

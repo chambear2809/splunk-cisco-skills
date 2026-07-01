@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -382,6 +383,8 @@ def test_rendered_apply_search_head_substitutes_passwords(tmp_path: Path) -> Non
     pw_b = tmp_path / "pw_b"
     pw_a.write_text("password-a-VALUE", encoding="utf-8")
     pw_b.write_text("password-b-VALUE", encoding="utf-8")
+    os.chmod(pw_a, 0o600)
+    os.chmod(pw_b, 0o600)
     fake_home = tmp_path / "splunk"
     # When --spec is set, CLI single-provider flags are NOT used. The spec must
     # carry splunk_home / app_name / restart_splunk for the apply test.

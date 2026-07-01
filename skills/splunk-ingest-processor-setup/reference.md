@@ -47,7 +47,9 @@ Supported Ingest Processor destination families in this skill:
 
 Unsupported destination families render a finding and a handoff. The most
 important unsupported family is `splunk_enterprise`, which belongs to
-`splunk-edge-processor-setup`.
+`splunk-edge-processor-setup`. Error-severity destination findings return
+nonzero even when the handoff packet was rendered. `--dry-run` performs the
+same parsing/finding classification but writes no files.
 
 ## Limits And Risk Notes
 

@@ -11,7 +11,7 @@ DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/galileo-platform-rendered"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 
-APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,luna-scorers,observe-export,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
+APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,luna-scorers,observe-export,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
 
 usage() {
     cat <<'EOF'
@@ -25,8 +25,9 @@ Modes:
   --validate                    Validate rendered artifacts
   --doctor                      Render, validate, and summarize coverage
   --apply [SECTIONS]            Render then apply selected comma-separated sections.
-                                With no list, applies all sections, or only
-                                Splunk Observability Cloud sections with --o11y-only.
+                                With no list, applies API/delegated action sections, or
+                                only actionable Observability sections with --o11y-only.
+                                Render-only handoff sections fail closed if selected.
   --dry-run                     Show the render/apply plan without writing or applying
   --json                        Emit JSON for render and dry-run output
   --o11y-only                   Pure Splunk Observability Cloud mode. Skips
@@ -193,8 +194,13 @@ done
 
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 
-if [[ -n "${APPLY_SECTIONS}" ]]; then
-    RENDER_ARGS+=(--apply "${APPLY_SECTIONS}")
+if [[ "${MODE_APPLY}" == "true" ]]; then
+    rendered_apply_sections="${APPLY_SECTIONS:-${APPLY_SECTIONS_DEFAULT}}"
+    [[ "${rendered_apply_sections}" == "all" ]] && rendered_apply_sections="${APPLY_SECTIONS_DEFAULT}"
+    if [[ "${O11Y_ONLY}" == "true" && ( -z "${APPLY_SECTIONS}" || "${APPLY_SECTIONS}" == "all" ) ]]; then
+        rendered_apply_sections="readiness,object-lifecycle,luna-scorers,otel-collector,dashboards,detectors"
+    fi
+    RENDER_ARGS+=(--apply "${rendered_apply_sections}")
 fi
 if [[ -n "${SPEC}" ]]; then
     RENDER_ARGS+=(--spec "${SPEC}")
@@ -263,7 +269,7 @@ if [[ "${MODE_APPLY}" == "true" ]]; then
         sections="${APPLY_SECTIONS_DEFAULT}"
     fi
     if [[ "${O11Y_ONLY}" == "true" && ( -z "${APPLY_SECTIONS}" || "${APPLY_SECTIONS}" == "all" ) ]]; then
-        sections="readiness,object-lifecycle,luna-scorers,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,otel-collector,dashboards,detectors"
+        sections="readiness,object-lifecycle,luna-scorers,otel-collector,dashboards,detectors"
     fi
     IFS=',' read -ra section_array <<< "${sections}"
     for section in "${section_array[@]}"; do

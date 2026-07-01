@@ -8,6 +8,7 @@ APP_NAME="Splunk_Security_Essentials"
 PASS=0
 FAIL=0
 WARN=0
+COMPLETION=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -17,6 +18,7 @@ Splunk Security Essentials Validation
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
+  --completion  Fail closed because UI-only completion gates cannot be probed
   --help  Show this help
 EOF
     exit "${exit_code}"
@@ -24,6 +26,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -37,7 +40,7 @@ info() { log "  INFO: $*"; }
 log "=== Splunk Security Essentials Validation ==="
 log ""
 
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
@@ -67,6 +70,9 @@ if [[ ${FAIL} -eq 0 ]]; then
     info "Manual gate: complete Content Mapping for the in-scope sourcetypes"
     info "Manual gate: review app configuration (settings, roles, scheduling)"
     info "Optional: enable posture dashboards in the SSE UI after the data inventory review"
+    if [[ "${COMPLETION}" == "true" ]]; then
+        fail "Completion cannot be proven by this validator: Data Inventory, Content Mapping, app settings, and dashboard population require UI evidence"
+    fi
 fi
 
 log ""

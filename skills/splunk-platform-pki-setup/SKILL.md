@@ -16,6 +16,13 @@ description: >-
 
 # Splunk Platform PKI Setup
 
+## Shared add-on completion gate
+
+If this workflow installs or hands off a registry-listed certificate or health
+add-on, follow the [shared completion gate](../shared/ta_completion_gate.md).
+Package delivery alone is not success; validate applicable collection and
+shipped views, or record explicit package evidence that no dashboards ship.
+
 This skill owns the **full TLS / PKI lifecycle** for a self-managed
 Splunk Enterprise deployment. It runs in either of two modes:
 
@@ -53,9 +60,10 @@ apply changes until the operator passes `--accept-pki-rotation`.
   headers. Splunk Web has no `customHttpHeaders`; those headers
   come from the reverse proxy and are owned by
   [`skills/splunk-enterprise-public-exposure-hardening`](../splunk-enterprise-public-exposure-hardening/SKILL.md).
-- It does not force TLS 1.3. Splunk's TLS-protocol-version doc
-  lists `tls1.2` as the maximum supported version; the skill
-  defaults to and refuses anything below `tls1.2`.
+- It never renders SSLv3, TLS 1.0, or TLS 1.1. For Splunk 10.4+, the
+  default TLS 1.2 floor permits both TLS 1.2 and TLS 1.3 and renders the
+  documented `[tls1.3]` policy; `--tls-version-floor tls1.3` enforces
+  TLS-1.3-only. Older Splunk versions remain TLS-1.2-only.
 - It does not build the FIPS-validated OpenSSL module. The
   operator owns the FIPS module; the skill flips FIPS on by
   setting both `SPLUNK_FIPS=1` (the master enable switch) and
@@ -231,6 +239,11 @@ bash skills/splunk-platform-pki-setup/scripts/setup.sh \
   --mode private \
   --target shc \
   --shc-deployer-fqdn deployer01.example.com \
+  --leaf-target shc \
+  --leaf-host sh01.example.com \
+  --leaf-cert-file /tmp/signed/sh01.pem \
+  --leaf-private-key-file /tmp/signed/sh01.key \
+  --leaf-ca-bundle-file /tmp/signed/cabundle.pem \
   --accept-pki-rotation \
   --admin-password-file /tmp/splunk_admin_password \
   --leaf-key-password-file /tmp/pki_leaf_key_password
@@ -320,16 +333,20 @@ Under the project root in `splunk-platform-pki-rendered/`:
   mode (cleartext vs SSL), `[shclustering]` `pass4SymmKey`
   presence reminder. Refuses to mark the deployment ready when any
   check fails.
-- `apply` — render then run the per-role
+- `apply` — render then run the local-host
   `pki/install/install-leaf.sh` + `align-cli-trust.sh` +
   `install-fips-launch-conf.sh` if FIPS. Requires
+  explicit `--leaf-target`, `--leaf-host`, and `--leaf-ca-bundle-file`
+  inputs, plus `--leaf-cert-file` and `--leaf-private-key-file` for every
+  target except CA-only `ldaps`, and
   `--accept-pki-rotation` (a single-flag acknowledgement that the
   operator is about to swap serving certs and trigger downstream
   restart).
 - `rotate` — render then emit a rotation runbook
   (`pki/rotate/plan-rotation.md`) describing the full delegated
   order. Does NOT exec the rolling restart itself (delegate
-  pattern, see "Rotation ownership" below).
+  pattern, see "Rotation ownership" below), and exits nonzero so
+  rendering the runbook cannot be mistaken for a completed rotation.
 - `validate` — render then run the live validation probes:
   REST + `openssl s_client -connect` per surface, KV Store
   handshake check, `splunk show-decrypted` round-trip on
@@ -340,8 +357,10 @@ Under the project root in `splunk-platform-pki-rendered/`:
   `inputs list http SSL`, dumps PEM expiry catalogue and emits
   `pki/inventory/<host>.json`. No Splunk write operations. No
   `--accept-…` required.
-- `all` — render + preflight + apply + validate, gated by
-  `--accept-pki-rotation`.
+- `all` — render + one local-host leaf apply + installed-state preflight, then
+  stop nonzero at the cluster-aware restart/rotation handoff. Run `validate` only after that
+  restart completes. It uses the same explicit leaf inputs and
+  `--accept-pki-rotation` gate.
 
 ## Apply guard — `--accept-pki-rotation`
 
@@ -362,31 +381,13 @@ The render and preflight phases never need this flag.
 
 ## Rotation ownership — delegate
 
-The skill emits `pki/rotate/plan-rotation.md` describing the order
-of operations:
-
-1. Stage the new trust anchor in the cluster bundle and SHC
-   deployer apps (already rendered).
-2. Run `bash skills/splunk-indexer-cluster-setup/scripts/setup.sh
-   --phase bundle-validate` then `--phase bundle-apply`.
-3. Run `bash skills/splunk-indexer-cluster-setup/scripts/setup.sh
-   --phase rolling-restart --rolling-restart-mode searchable` to
-   roll the indexer cluster.
-4. Stage new leaf certs on each non-clustered role (LM, DS, MC,
-   single SH, HF) and run `splunk restart`.
-5. On the SHC deployer, run
-   `splunk apply shcluster-bundle -target https://captain01.example.com:8089`
-   and let the SHC roll its members.
-6. Roll the forwarder fleet via
-   `bash skills/splunk-agent-management-setup/scripts/setup.sh`.
-7. Run this skill's `validate` phase to confirm.
-
-Every step is a single shell line that the operator runs. No tight
-coupling, no duplicated rolling-restart logic. This matches the
-repo precedent set by
+The skill emits `pki/rotate/plan-rotation.md`, but does not run cluster
+or SHC rolling restarts itself. Follow the canonical
+[rotation runbook](references/rotation-runbook.md) for the exact staging,
+bundle validation/apply, rolling-restart, SHC push, forwarder rollout,
+validation, and rollback commands. That delegation preserves the
 [`splunk-indexer-cluster-setup`](../splunk-indexer-cluster-setup/SKILL.md)
-("Cluster `pass4SymmKey` rotation… does not orchestrate that
-rolling rotation").
+ownership model instead of duplicating restart orchestration here.
 
 ## Cross-skill handoff matrix
 
@@ -420,10 +421,11 @@ the renderer also consumes
 
 ## TLS protocol floor
 
-Defaults to `sslVersions = tls1.2` and `sslVersionsForClient = tls1.2`.
-Read [references/tls-protocol-policy.md](references/tls-protocol-policy.md)
-for the upstream support table and the guarded
-`--allow-deprecated-tls` path.
+Defaults to a TLS 1.2 floor: `tls1.2,tls1.3` on Splunk 10.4+ and
+`tls1.2` on older supported versions. `--tls-version-floor tls1.3`
+requires Splunk 10.4+. The legacy `--allow-deprecated-tls` flag now fails
+closed instead of emitting unsupported protocols. Read
+[references/tls-protocol-policy.md](references/tls-protocol-policy.md).
 
 ## FIPS mode
 

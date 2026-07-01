@@ -99,8 +99,10 @@ bash skills/splunk-deployment-server-setup/scripts/setup.sh \
 
 Under `splunk-deployment-server-rendered/ds/`:
 
-- `bootstrap/enable-deploy-server.sh` — `splunk enable deploy-server` wrapped
-  in a preflight check for existing DS state.
+- `bootstrap/enable-deploy-server.sh` — runs `splunk enable deploy-server`
+  only through a pre-existing local Splunk CLI session. If no session exists,
+  it fails closed with an interactive `splunk login` handoff; it never expands
+  the password file into `-auth`.
 - `bootstrap/deployment-apps-layout.md` — documented `etc/deployment-apps/`
   directory structure and bundle-hash behavior.
 - `tuning/deploymentclient-scale.conf` — recommended `phoneHome` intervals at
@@ -130,7 +132,7 @@ Under `splunk-deployment-server-rendered/ds/`:
 | `reload` | POST `_reload` to pick up `serverclass.conf` changes without restart. |
 | `inspect` | Fetch client list, lag, app version drift; write `fleet-report.json`. |
 | `ha-pair` | Render and (optionally apply) HA pair LB config + sync scripts. |
-| `migrate-clients` | Render (and optionally execute) mass client `targetUri` migration. |
+| `migrate-clients` | Render the reviewed mass-client `targetUri` migration handoff; exits nonzero because inventory/transport targets are not part of this skill. |
 | `status` | Live `GET /services/deployment/server/clients` snapshot. |
 | `validate` | Static + (with `--live`) REST health check. |
 

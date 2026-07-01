@@ -18,6 +18,7 @@ from typing import Any
 
 
 SKILL_NAME = "galileo-platform-setup"
+SOURCE_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 APPLY_SECTIONS = [
     "readiness",
     "object-lifecycle",
@@ -502,8 +503,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${OUTPUT_DIR}/../.." && pwd)}"
-"""
+PROJECT_ROOT="${PROJECT_ROOT:-__SOURCE_PROJECT_ROOT__}"
+""".replace("__SOURCE_PROJECT_ROOT__", shell_double_default(str(SOURCE_PROJECT_ROOT)))
 
 
 def require_file_var(var_name: str, default_path: str, label: str) -> str:
@@ -528,12 +529,12 @@ def render_scripts(output_dir: Path, config: dict[str, Any], sections: list[str]
     readiness = f"""{script_header()}
 HEALTH_URL="${{GALILEO_HEALTH_URL:-{shell_double_default(config["galileo_api_base"].rstrip("/") + "/v2/healthcheck")}}}"
 echo "Galileo healthcheck endpoint: ${{HEALTH_URL}}"
-if command -v curl >/dev/null 2>&1; then
-  curl -fsS --max-time 10 "${{HEALTH_URL}}" || true
-  echo
-else
-  echo "curl not found; review ${{OUTPUT_DIR}}/readiness/readiness-report.json"
+if ! command -v curl >/dev/null 2>&1; then
+  echo "ERROR: curl is required for Galileo readiness validation." >&2
+  exit 1
 fi
+curl -fsS --max-time 10 "${{HEALTH_URL}}"
+echo
 """
     write_text(scripts_dir / "apply-readiness.sh", readiness, executable=True)
     scripts["readiness"] = "scripts/apply-readiness.sh"
@@ -725,6 +726,9 @@ WORKLOAD="${{KUBE_WORKLOAD:-{shell_double_default(config["kube_workload"])}}}"
 if [[ -z "${{WORKLOAD}}" ]]; then
   echo "Set KUBE_WORKLOAD to apply the Galileo runtime ConfigMap and annotation helper." >&2
   echo "Rendered manifest: ${{OUTPUT_DIR}}/runtime/kubernetes-galileo-env-configmap.yaml" >&2
+  if [[ -z "${{TARGET_DIR}}" ]]; then
+    exit 1
+  fi
   exit 0
 fi
 kubectl -n "${{NAMESPACE}}" apply -f "${{OUTPUT_DIR}}/runtime/kubernetes-galileo-env-configmap.yaml"
@@ -738,7 +742,7 @@ TARGET_DIR="${{RUNTIME_TARGET_DIR:-{shell_double_default(config["runtime_target_
 if [[ -z "${{TARGET_DIR}}" ]]; then
   echo "Set RUNTIME_TARGET_DIR to copy runtime/python-galileo-protect.py into an app tree." >&2
   echo "Rendered snippet: ${{OUTPUT_DIR}}/runtime/python-galileo-protect.py" >&2
-  exit 0
+  exit 1
 fi
 mkdir -p "${{TARGET_DIR}}"
 cp "${{OUTPUT_DIR}}/runtime/python-galileo-protect.py" "${{TARGET_DIR}}/galileo_protect_runtime.py"
@@ -748,29 +752,25 @@ echo "Installed Galileo Protect runtime snippet into ${{TARGET_DIR}}/galileo_pro
     scripts["protect-runtime"] = "scripts/apply-protect-runtime.sh"
 
     evaluate_assets = f"""{script_header()}
-echo "Review rendered Evaluate assets:"
-echo "  ${{OUTPUT_DIR}}/evaluate/evaluate-assets.yaml"
-echo "  ${{OUTPUT_DIR}}/evaluate/experiment-handoff.md"
-echo "  ${{OUTPUT_DIR}}/evaluate/annotation-feedback-handoff.md"
-echo "  ${{OUTPUT_DIR}}/evaluate/multimodal-metrics-handoff.yaml"
+echo "ERROR: evaluate-assets is a render-only handoff; use object-lifecycle for documented API mutations." >&2
+echo "Review ${{OUTPUT_DIR}}/evaluate/ and complete the documented console/API handoff." >&2
+exit 2
 """
     write_text(scripts_dir / "apply-evaluate-assets.sh", evaluate_assets, executable=True)
     scripts["evaluate-assets"] = "scripts/apply-evaluate-assets.sh"
 
     multimodal_assets = f"""{script_header()}
-echo "Review rendered Galileo multimodal observability assets:"
-echo "  ${{OUTPUT_DIR}}/multimodal/multimodal-observability.md"
-echo "  ${{OUTPUT_DIR}}/multimodal/multimodal-intake.example.json"
-echo "  ${{OUTPUT_DIR}}/splunk-platform/multimodal-search-examples.spl"
+echo "ERROR: multimodal-assets is a render-only handoff, not an automated apply." >&2
+echo "Review ${{OUTPUT_DIR}}/multimodal/ and the rendered validation searches." >&2
+exit 2
 """
     write_text(scripts_dir / "apply-multimodal-assets.sh", multimodal_assets, executable=True)
     scripts["multimodal-assets"] = "scripts/apply-multimodal-assets.sh"
 
     observability_controls = f"""{script_header()}
-echo "Review rendered Galileo Agent Observability Controls assets:"
-echo "  ${{OUTPUT_DIR}}/controls/agent-observability-controls.md"
-echo "  ${{OUTPUT_DIR}}/controls/control-intake.example.json"
-echo "  ${{OUTPUT_DIR}}/controls/splunk-search-examples.spl"
+echo "ERROR: observability-controls is a render-only console handoff; no documented CRUD API is available." >&2
+echo "Review ${{OUTPUT_DIR}}/controls/ and validate exported control-span evidence." >&2
+exit 2
 """
     write_text(
         scripts_dir / "apply-observability-controls.sh",

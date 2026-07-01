@@ -10,6 +10,13 @@ description: >-
 
 # Splunk Security Essentials Setup
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off SSE, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate security-data prerequisites and shipped
+dashboards against data.
+
 Use this skill to install and validate Splunk Security Essentials (SSE).
 
 ## Primary Commands

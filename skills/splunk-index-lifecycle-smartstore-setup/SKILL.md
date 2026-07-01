@@ -31,6 +31,12 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_access_key
 bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_secret_key
 ```
 
+Secret files used by generated live helpers must be regular, non-symlink files,
+owned by the executing user, and mode `0600` (or stricter). Generated curl
+configuration, ACS request payloads, and ACS response bodies use owner-only,
+random temporary paths and are removed on exit. Tokens are never placed in
+process arguments.
+
 Start with render or inventory. Do not treat a frozen, stale, or low-volume
 index as unused until dependency evidence has been collected and reviewed.
 
@@ -46,6 +52,19 @@ The skill hard-blocks deletion of internal indexes beginning with `_`. It also
 blocks protected default indexes and ES/ITSI/ARI-sensitive indexes unless the
 evidence explicitly classifies the index as safe under the documented gates.
 Clustered `clean-data` is refused.
+
+Live apply does not report completion from an HTTP or CLI acceptance alone:
+
+- Cloud retention polls ACS `GET` until every requested field matches.
+- Cloud deletion polls ACS `GET` until each target returns `404`.
+- Standalone Enterprise SmartStore/retention/disable/delete helpers perform a
+  post-action `btool` readback.
+- Cluster-manager helpers require bundle apply, then require bundle-status
+  readback. If bundle apply or a standalone restart is disabled, the generated
+  helper exits `2` after staging and identifies the remaining handoff.
+
+Multi-index Cloud mutations stop on the first unverified target, exit nonzero,
+and report any earlier targets already verified. They are not transactional.
 
 ## Quick Start
 

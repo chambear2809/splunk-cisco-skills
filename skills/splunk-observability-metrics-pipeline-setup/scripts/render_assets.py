@@ -12,6 +12,8 @@ from pathlib import Path
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    if path.suffix == ".sh":
+        path.chmod(0o755)
 
 
 def split_csv(value: str) -> list[str]:
@@ -145,7 +147,15 @@ and `/slo` action plan emitted by `splunk-observability-deep-native-workflows`.
         f"""#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-bash skills/splunk-observability-deep-native-workflows/scripts/setup.sh --render --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" --realm {shlex.quote(args.realm)}
+REPO_ROOT="${{SPLUNK_CISCO_SKILLS_ROOT:-$(git -C "${{SCRIPT_DIR}}" rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+if [[ "${{1:-}}" == "--apply" ]]; then
+  echo "HANDOFF: Metrics Pipeline Management has no implemented public apply API in this repo." >&2
+  echo "Render the deep-native packet, then follow workflow-handoff.md in the Observability UI." >&2
+  exit 2
+fi
+exec bash "${{REPO_ROOT}}/skills/splunk-observability-deep-native-workflows/scripts/setup.sh" \
+  --render --validate --spec "${{SCRIPT_DIR}}/deep-native-workflow-spec.json" \
+  --realm {shlex.quote(args.realm)} "$@"
 """,
     )
     write(output / "metadata.json", json.dumps({"skill": "splunk-observability-slo-setup", "files": files, "spec": spec}, indent=2, sort_keys=True))

@@ -112,7 +112,9 @@ main() {
         local payload
         local command=()
         payload="$(python3 "${RENDERER}" "${args[@]}" --json)"
-        mapfile -d '' -t command < <(
+        while IFS= read -r -d '' item; do
+            command+=("${item}")
+        done < <(
             PAYLOAD="${payload}" python3 - <<'PY'
 import json
 import os
@@ -126,6 +128,10 @@ for item in command:
     sys.stdout.buffer.write(str(item).encode("utf-8") + b"\0")
 PY
         )
+        if [[ "${#command[@]}" -eq 0 ]]; then
+            log "ERROR: Router did not return an executable command."
+            exit 1
+        fi
         if [[ "${DRY_RUN}" == "true" ]]; then
             if [[ "${JSON_OUTPUT}" == "true" ]]; then
                 PAYLOAD="${payload}" python3 - <<'PY'

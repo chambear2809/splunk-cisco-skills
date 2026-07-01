@@ -1,7 +1,7 @@
 ---
 name: splunk-appdynamics-tags-extensions-setup
 description: >-
-  Render, validate, and optionally apply Splunk AppDynamics tags, extensions,
+  Render and validate Splunk AppDynamics tags, extensions,
   and integration-module workflows, including Custom Tag APIs, tag enablement,
   Machine Agent custom metrics, Integration Modules, extensions, ServiceNow,
   Jira, Scalyr, Agent Command Center, and Log Auto-Discovery runbooks. Use when
@@ -12,8 +12,8 @@ description: >-
 
 # Splunk AppDynamics Tags Extensions Setup
 
-Tag APIs are API-backed where documented. Extensions and third-party systems
-render runbooks unless the owning system has an explicit apply path.
+Tag payloads, extensions, and third-party systems render operator/owner
+runbooks. This wrapper has no mutation executor and `--apply` fails closed.
 
 ```bash
 bash skills/splunk-appdynamics-tags-extensions-setup/scripts/setup.sh --render

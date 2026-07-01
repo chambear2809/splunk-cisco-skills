@@ -233,18 +233,18 @@ def render_scripts(args: argparse.Namespace) -> dict[str, str]:
         "preflight.sh": make_script(
             f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
-if [[ -f serverclass.conf ]]; then "${{splunk_home}}/bin/splunk" btool serverclass list --debug >/dev/null || true; fi
+if [[ -f serverclass.conf ]]; then "${{splunk_home}}/bin/splunk" btool serverclass list --debug >/dev/null; fi
 """
         ),
         "apply-agent-manager.sh": make_script(
             f"""splunk_home={splunk_home}
 deployment_apps_dir="${{splunk_home}}/etc/deployment-apps"
-system_local="${{splunk_home}}/etc/system/local"
-mkdir -p "${{deployment_apps_dir}}" "${{system_local}}"
-if [[ -f "${{system_local}}/serverclass.conf" ]]; then
-  cp "${{system_local}}/serverclass.conf" "${{system_local}}/serverclass.conf.bak.$(date +%Y%m%d%H%M%S)"
+manager_app="${{splunk_home}}/etc/apps/ZZZ_cisco_skills_agent_management/local"
+mkdir -p "${{deployment_apps_dir}}" "${{manager_app}}"
+if [[ -f "${{manager_app}}/serverclass.conf" ]]; then
+  cp "${{manager_app}}/serverclass.conf" "${{manager_app}}/serverclass.conf.bak.$(date +%Y%m%d%H%M%S)"
 fi
-cp serverclass.conf "${{system_local}}/serverclass.conf"
+cp serverclass.conf "${{manager_app}}/serverclass.conf"
 {app_copy}"${{splunk_home}}/bin/splunk" reload deploy-server
 """
         ),
@@ -269,8 +269,8 @@ cp serverclass.conf "${{system_local}}/serverclass.conf"
         ),
         "status.sh": make_script(
             f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" btool serverclass list --debug || true
-"${{splunk_home}}/bin/splunk" list deploy-clients || true
+"${{splunk_home}}/bin/splunk" btool serverclass list --debug
+"${{splunk_home}}/bin/splunk" list deploy-clients
 """
         ),
     }

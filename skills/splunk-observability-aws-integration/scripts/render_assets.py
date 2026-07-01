@@ -617,12 +617,16 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     }
 
     coverage["authentication.iam_policy"] = {
-        "status": "api_apply",
-        "notes": "Operator deploys the IAM trust role and attaches the rendered policy JSON.",
+        "status": "handoff",
+        "notes": "Rendered IAM JSON requires an operator-selected role/user target; setup fails closed instead of claiming attachment.",
     }
     coverage["authentication.integration_create"] = {
-        "status": "api_apply",
-        "notes": "POST /v2/integration with type=AWSCloudWatch, returns externalId + sfxAwsAccountArn.",
+        "status": "api_apply" if spec["authentication"]["mode"] == "security_token" else "handoff",
+        "notes": (
+            "SecurityToken credentials are injected from files and the integration is enabled."
+            if spec["authentication"]["mode"] == "security_token"
+            else "ExternalId requires a two-phase create/IAM/finalize handoff; direct apply refuses a partial disabled integration."
+        ),
     }
 
     conn_mode = spec["connection"]["mode"]
@@ -683,7 +687,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
             coverage["metric_streams.managed_externally"] = {"status": "not_applicable", "notes": ""}
             template = "StackSets" if spec["metric_streams"]["use_stack_sets"] else "regional"
             coverage["metric_streams.cloudformation"] = {
-                "status": "api_apply" if spec["metric_streams"]["cloudformation"] else "handoff",
+                "status": "api_apply" if spec["metric_streams"]["cloudformation"] and not spec["metric_streams"]["use_stack_sets"] else "handoff",
                 "notes": f"CloudFormation {template} template stub rendered.",
             }
     else:
@@ -703,7 +707,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     if spec["multi_account"]["enabled"]:
         coverage["multi_account"] = {
-            "status": "api_apply",
+            "status": "handoff",
             "notes": (
                 f"{len(spec['multi_account']['member_accounts'])} member integrations + "
                 f"CFN StackSets (use_org_service_managed="
@@ -948,7 +952,7 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
         payload["namedToken"] = spec["metric_streams"]["named_token"]
 
     if auth["mode"] == "external_id":
-        payload["roleArn"] = "${ROLE_ARN_FROM_CFN_OR_OPERATOR}"
+        payload["roleArn"] = auth.get("role_arn") or "${ROLE_ARN_FROM_CFN_OR_OPERATOR}"
     else:
         payload["token"] = "${AWS_ACCESS_KEY_ID_FROM_FILE}"
         payload["key"] = "${AWS_SECRET_ACCESS_KEY_FROM_FILE}"
@@ -1443,7 +1447,7 @@ def _section_handoff(spec: dict[str, Any]) -> str:
         rows.append("""
 ## AWS dashboards
 
-- `bash skills/splunk-observability-dashboard-builder/scripts/setup.sh --render-aws-dashboards`
+- `bash skills/splunk-observability-dashboard-builder/scripts/setup.sh --render --spec <aws-dashboard-spec.yaml>`
 - Pre-built AWS dashboards exist for every `AWS/*` namespace in the supported
   integrations table; use this hand-off only when you need custom rendering.
 """)
@@ -1451,7 +1455,8 @@ def _section_handoff(spec: dict[str, Any]) -> str:
         rows.append("""
 ## AWS AutoDetect detectors
 
-- `bash skills/splunk-observability-native-ops/scripts/setup.sh --apply autodetect-aws`
+- Built-in AutoDetect enablement is an Observability UI handoff.
+- Custom detector API path: `bash skills/splunk-observability-native-ops/scripts/setup.sh --apply --spec <aws-detector-spec.json> --token-file <file>`
 - Default-enabled detectors include: RDS free-disk, ALB 5xx, EC2 disk
   pressure, Route 53 health-checker latency, Route 53 unhealthy endpoint.
 """)
@@ -1498,28 +1503,43 @@ fi
 : "${{SPLUNK_O11Y_REALM:?must be set (e.g. {spec['realm']})}}"
 : "${{SPLUNK_O11Y_TOKEN_FILE:?must point at a chmod-600 admin user API access token}}"
 
+EXTRA_ARGS=()
+[[ -n "${{SPLUNK_AWS_ACCESS_KEY_ID_FILE:-}}" ]] && EXTRA_ARGS+=(--aws-access-key-id-file "${{SPLUNK_AWS_ACCESS_KEY_ID_FILE}}")
+[[ -n "${{SPLUNK_AWS_SECRET_ACCESS_KEY_FILE:-}}" ]] && EXTRA_ARGS+=(--aws-secret-access-key-file "${{SPLUNK_AWS_SECRET_ACCESS_KEY_FILE}}")
+
 "${{PYTHON_BIN}}" "${{SKILL_DIR}}/scripts/aws_integration_api.py" \\
     --realm "${{SPLUNK_O11Y_REALM}}" \\
     --token-file "${{SPLUNK_O11Y_TOKEN_FILE}}" \\
     --state-dir "${{RENDER_DIR}}/state" \\
     --payload-file "${{RENDER_DIR}}/payloads/integration-create.json" \\
+    "${{EXTRA_ARGS[@]}}" \\
     upsert
 """
 
 
 def render_apply_cloudformation_sh(spec: dict[str, Any]) -> str:
+    streams = spec["metric_streams"]
+    if not streams["use_metric_streams_sync"]:
+        return "#!/usr/bin/env bash\nset -euo pipefail\necho 'metric streams: not applicable for this polling spec'\n"
+    if streams["managed_externally"]:
+        return "#!/usr/bin/env bash\nset -euo pipefail\necho 'ERROR: metric streams are managed externally; use the rendered AWS console handoff.' >&2\nexit 2\n"
+    if streams["use_stack_sets"]:
+        return "#!/usr/bin/env bash\nset -euo pipefail\necho 'ERROR: StackSet account/OU targets are not represented; refusing a partial create-stack-set.' >&2\nexit 2\n"
+    if not streams["cloudformation"]:
+        return "#!/usr/bin/env bash\nset -euo pipefail\necho 'ERROR: CloudFormation apply is disabled in this spec; review the handoff.' >&2\nexit 2\n"
     return """#!/usr/bin/env bash
 set -euo pipefail
 
-# Apply the CloudFormation Metric Streams stub. Operator-driven; this script
-# just prints the commands from aws/cloudformation-stub.sh for review.
+# Apply the reviewed regional CloudFormation Metric Streams commands.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RENDER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-cat "${RENDER_DIR}/aws/cloudformation-stub.sh"
-echo ""
-echo "Review the commands above, then run them in a shell with AWS credentials."
+if ! command -v aws >/dev/null 2>&1; then
+    echo "ERROR: aws CLI is required." >&2
+    exit 2
+fi
+bash "${RENDER_DIR}/aws/cloudformation-stub.sh"
 """
 
 
@@ -1535,6 +1555,9 @@ RENDER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 if [[ -f "${RENDER_DIR}/aws/cloudformation-stacksets-stub.sh" ]]; then
     cat "${RENDER_DIR}/aws/cloudformation-stacksets-stub.sh"
+    echo "ERROR: StackSet instance targets are not represented, so this helper refuses a partial apply." >&2
+    echo "HANDOFF: review the rendered command and add explicit account/OU and region targets." >&2
+    exit 2
 else
     echo "Multi-account not enabled in this spec." >&2
     exit 0
@@ -1555,7 +1578,13 @@ PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
 
 echo "==> Step 1: Preflight uninstall Splunk_TA_amazon_security_lake (absorbed by"
 echo "    Splunk_TA_AWS v7.0+; running both causes data duplication)."
-bash "${{PROJECT_ROOT}}/skills/splunk-app-install/scripts/install_app.sh" --uninstall Splunk_TA_amazon_security_lake || true
+if [[ "${{ACCEPT_SECURITY_LAKE_ADDON_UNINSTALL:-false}}" != "true" ]]; then
+    echo "ERROR: set ACCEPT_SECURITY_LAKE_ADDON_UNINSTALL=true after reviewing the destructive uninstall." >&2
+    echo "Command: bash ${{PROJECT_ROOT}}/skills/splunk-app-install/scripts/uninstall_app.sh --app-name Splunk_TA_amazon_security_lake --yes" >&2
+    exit 2
+fi
+bash "${{PROJECT_ROOT}}/skills/splunk-app-install/scripts/uninstall_app.sh" \
+  --app-name Splunk_TA_amazon_security_lake --yes
 
 echo "==> Step 2: Install Splunk Add-on for AWS (Splunkbase 1876, min v{SPLUNK_TA_AWS_MIN_VERSION})."
 bash "${{PROJECT_ROOT}}/skills/splunk-app-install/scripts/install_app.sh" --source splunkbase --app-id 1876
@@ -1570,40 +1599,38 @@ echo "      --apply log_observer_connect"
 
 
 def render_handoff_dashboards_sh(spec: dict[str, Any]) -> str:
-    return """#!/usr/bin/env bash
+    return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 # Hand-off: AWS dashboards via splunk-observability-dashboard-builder.
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-
-echo "==> Pre-built AWS dashboards exist for every AWS/* namespace in the supported"
-echo "    integrations table -- they auto-populate when the integration is healthy."
-echo "==> For custom dashboards on top of AWS data, render via:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-dashboard-builder/scripts/setup.sh --render"
-echo "==> Reference for the AWS namespace catalog:"
-echo "    https://help.splunk.com/en/splunk-observability-cloud/manage-data/available-data-sources/supported-integrations-in-splunk-observability-cloud/cloud-services-aws"
+PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+: "${{AWS_DASHBOARD_SPEC:?Set AWS_DASHBOARD_SPEC to a reviewed dashboard-builder YAML/JSON spec}}"
+MODE="${{1:---render}}"
+case "${{MODE}}" in
+  --render|--validate|--apply) shift ;;
+  *) echo "ERROR: first argument must be --render, --validate, or --apply" >&2; exit 2 ;;
+esac
+exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-dashboard-builder/scripts/setup.sh" \
+  "${{MODE}}" --spec "${{AWS_DASHBOARD_SPEC}}" --realm {spec['realm']} "$@"
 """
 
 
 def render_handoff_detectors_sh(spec: dict[str, Any]) -> str:
-    return """#!/usr/bin/env bash
+    return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 # Hand-off: AWS AutoDetect detectors via splunk-observability-native-ops.
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-
-echo "==> AWS AutoDetect detectors that ship enabled-by-default include:"
-echo "      - AWS / RDS free disk space about to exhaust"
-echo "      - AWS ALB sudden change in HTTP 5xx server errors"
-echo "      - AWS EC2 disk utilization expected to reach the limit"
-echo "      - AWS Route 53 health checkers' connection time over 9 seconds"
-echo "      - AWS Route 53 unhealthy status of health check endpoint"
-echo "==> For custom detectors on top of AWS data, render via:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-native-ops/scripts/setup.sh --render"
-echo "==> Reference for the full AutoDetect detector list:"
-echo "    https://help.splunk.com/en/splunk-observability-cloud/create-alerts-detectors-and-service-level-objectives/create-alerts-and-detectors/use-and-customize-autodetect-alerts-and-detectors/list-of-available-autodetect-detectors"
+PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+: "${{AWS_DETECTOR_SPEC:?Set AWS_DETECTOR_SPEC to a reviewed native-ops JSON/YAML spec}}"
+MODE="${{1:---render}}"
+case "${{MODE}}" in
+  --render|--validate|--apply) shift ;;
+  *) echo "ERROR: first argument must be --render, --validate, or --apply" >&2; exit 2 ;;
+esac
+exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setup.sh" \
+  "${{MODE}}" --spec "${{AWS_DETECTOR_SPEC}}" --realm {spec['realm']} "$@"
 """
 
 
@@ -1617,8 +1644,10 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-echo "==> Render the Splunk OTel collector deployment for EC2 / EKS:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
+echo "==> EC2/Linux:"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm <realm>"
+echo "==> EKS/Kubernetes:"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm <realm> --distribution eks --cluster-name <cluster>"
 echo "==> Compared to CWAgent, the OTel collector ships richer host telemetry"
 echo "    (cpu, memory, disk, network, processes) through OTLP and bypasses"
 echo "    CloudWatch metric publishing costs."
@@ -1688,7 +1717,7 @@ def render(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Clear stale subdirs so re-renders don't carry leftover state.
-    for sub in ("payloads", "scripts", "state", "aws", "iam", "support-tickets"):
+    for sub in ("payloads", "scripts", "aws", "iam", "support-tickets"):
         target = output_dir / sub
         if target.exists():
             shutil.rmtree(target)
@@ -1832,7 +1861,8 @@ def render(
     state_dir = output_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "apply-state.json"
-    write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
+    if not state_path.exists():
+        write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
     os.chmod(state_path, 0o600)
     write_text(
         state_dir / "idempotency-keys.json",

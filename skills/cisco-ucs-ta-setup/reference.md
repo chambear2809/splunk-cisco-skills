@@ -33,3 +33,9 @@ Splunk documentation.
 - Sourcetype: `cisco:ucs`
 - Server URL field accepts host-style values, not full paths.
 - `disable_ssl_verification=true` is supported but should be an explicit choice.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` makes absent templates, server records,
+enabled task inputs, index, or event evidence fail. No-flag validation remains
+diagnostic. The package does not ship standalone dashboards.

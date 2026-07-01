@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -490,20 +492,44 @@ def openshift_scc_script(release: str = "splunk-otel-collector", namespace: str 
 
 def workshop_multi_tenant_script(spec: dict[str, Any]) -> str:
     block = spec.get("workshop_mode") or {}
-    prefix = block.get("participant_namespace_prefix", "workshop-participant")
-    count = int(block.get("participant_count", 30))
+    prefix = str(block.get("participant_namespace_prefix", "workshop-participant"))
+    if not re.fullmatch(r"[a-z0-9](?:[-a-z0-9]*[a-z0-9])?", prefix) or len(prefix) > 50:
+        raise SpecError(
+            "workshop_mode.participant_namespace_prefix must be a valid lowercase Kubernetes name prefix"
+        )
+    try:
+        count = int(block.get("participant_count", 30))
+    except (TypeError, ValueError) as exc:
+        raise SpecError("workshop_mode.participant_count must be an integer") from exc
+    if not 1 <= count <= 1000:
+        raise SpecError("workshop_mode.participant_count must be between 1 and 1000")
+    prefix_q = shlex.quote(prefix)
+    count_q = shlex.quote(str(count))
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n\n"
         "# Workshop multi-tenant: per-namespace SA + ClusterRoleBinding + SCC for shared cluster-receiver.\n"
         "# Mirrors the Splunk Workshop AI Pod path (splunk.github.io/observability-workshop/.../14-cisco-ai-pods/).\n"
-        f'PREFIX="${{1:-{prefix}}}"\n'
-        f'COUNT="${{2:-{count}}}"\n'
+        'PREFIX="${1:-}"\n'
+        f'[[ -n "${{PREFIX}}" ]] || PREFIX={prefix_q}\n'
+        'COUNT="${2:-}"\n'
+        f'[[ -n "${{COUNT}}" ]] || COUNT={count_q}\n'
+        '[[ "${COUNT}" =~ ^[0-9]+$ ]] && (( COUNT >= 1 && COUNT <= 1000 )) || { echo "ERROR: COUNT must be 1..1000" >&2; exit 2; }\n'
         '\n'
+        'missing=0\n'
         'for i in $(seq 1 "${COUNT}"); do\n'
         '    ns="${PREFIX}-${i}"\n'
-        '    oc get ns "${ns}" >/dev/null 2>&1 || continue\n'
-        '    oc -n "${ns}" create sa splunk-otel-collector 2>/dev/null || true\n'
+        '    if ! oc get ns "${ns}" >/dev/null 2>&1; then\n'
+        '        echo "ERROR: required workshop namespace is missing: ${ns}" >&2\n'
+        '        missing=1\n'
+        '    fi\n'
+        'done\n'
+        '(( missing == 0 )) || exit 2\n\n'
+        'for i in $(seq 1 "${COUNT}"); do\n'
+        '    ns="${PREFIX}-${i}"\n'
+        '    if ! oc -n "${ns}" get sa splunk-otel-collector >/dev/null 2>&1; then\n'
+        '        oc -n "${ns}" create sa splunk-otel-collector\n'
+        '    fi\n'
         '\n'
         '    oc apply -f - <<EOF\n'
         'apiVersion: rbac.authorization.k8s.io/v1\n'

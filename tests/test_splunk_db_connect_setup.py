@@ -461,7 +461,8 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
             install_script = (out / "splunk-db-connect/install/install-apps.sh").read_text(encoding="utf-8")
             self.assertIn("--app-id 2686", install_script)
             self.assertNotIn("--app-id 999999", install_script)
-            self.assertIn("SKIP: driver app 999999", install_script)
+            self.assertIn("HANDOFF: driver app 999999", install_script)
+            self.assertIn("no app installs were attempted", install_script)
 
     def test_driver_catalog_and_registry_coverage(self) -> None:
         module = load_renderer_module()

@@ -1488,7 +1488,8 @@ def handoff_collector(config: dict[str, Any]) -> str:
 set -euo pipefail
 
 echo "Run the base collector setup first if the Instrumentation CRD is absent:"
-echo "bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm {config['realm'] or '<realm>'} --cluster-name {config['cluster_name'] or '<cluster>'} --distribution {config['distribution']} --with-operator --with-instrumentation"
+echo "bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm {config['realm'] or '<realm>'} --cluster-name {config['cluster_name'] or '<cluster>'} --distribution {config['distribution']}"
+echo "The base collector includes Operator CRDs unless --skip-operator-crds is set; then return to this skill for Instrumentation CRs and workload annotations."
 """
 
 

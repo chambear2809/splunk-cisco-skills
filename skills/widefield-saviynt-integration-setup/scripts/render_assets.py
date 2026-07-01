@@ -15,7 +15,10 @@ from widefield_render_common import main  # noqa: E402
 def apply_commands(_args):
     return [
         "# Live Saviynt mutation is intentionally disabled until official/customer API docs are attached.",
-        "bash skills/widefield-saviynt-integration-setup/scripts/setup.sh --apply --accept-apply",
+        '# Set WIDEFIELD_EVIDENCE_FILE to exported Saviynt remediation evidence.',
+        ': "${WIDEFIELD_EVIDENCE_FILE:?Set WIDEFIELD_EVIDENCE_FILE to a local evidence JSON file}"',
+        'grep -Eiq "revoke|password[ _-]?reset|micro[ _-]?certification|remediation" "${WIDEFIELD_EVIDENCE_FILE}" || { echo "ERROR: evidence does not contain a Saviynt remediation outcome" >&2; exit 1; }',
+        'bash skills/widefield-saviynt-integration-setup/scripts/validate.sh --evidence-file "${WIDEFIELD_EVIDENCE_FILE}"',
     ]
 
 

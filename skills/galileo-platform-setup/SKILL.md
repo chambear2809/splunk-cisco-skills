@@ -170,10 +170,10 @@ Apply sections:
 - `dashboards`
 - `detectors`
 
-With `--o11y-only`, the default selected sections are `readiness`,
-`object-lifecycle`, `luna-scorers`, `observe-runtime`, `protect-runtime`,
-`evaluate-assets`, `multimodal-assets`, `observability-controls`,
-`otel-collector`, `dashboards`, and `detectors`.
+With `--o11y-only`, the default selected sections are the fully actionable
+`readiness`, `object-lifecycle`, `luna-scorers`, `otel-collector`, `dashboards`,
+and `detectors` sections. Runtime snippets and console-only asset handoffs are
+rendered for review but must be selected explicitly with their required inputs.
 Explicit Splunk Platform sections (`observe-export`, `splunk-hec`,
 `splunk-otlp`) are rejected in that mode.
 

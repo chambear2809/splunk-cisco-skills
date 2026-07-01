@@ -8,13 +8,21 @@ description: >-
   allowlist, REST automation user provisioning), Splunk SOAR Automation
   Broker on Docker or Podman with FIPS detection, Splunk-side apps (Splunk
   App for SOAR Splunkbase 6361, Splunk App for SOAR Export Splunkbase 3411),
-  and ES integration readiness via the existing Mission Control wiring. Use
+  and ES integration readiness with a fail-closed Mission Control UI handoff. Use
   when the user asks to install Splunk SOAR On-prem, build a SOAR cluster,
   onboard SOAR Cloud, install Automation Broker, install splunk-side SOAR
   apps, or wire up SOAR with Splunk Enterprise Security.
 ---
 
 # Splunk SOAR Setup
+
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a Splunk-side SOAR
+app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success; validate applicable event/action flow and shipped views,
+or record explicit package evidence that no dashboards ship.
 
 This skill covers every documented Splunk SOAR install path:
 
@@ -71,6 +79,7 @@ bash skills/splunk-soar-setup/scripts/setup.sh \
   --soar-home /opt/soar \
   --soar-https-port 8443 \
   --soar-hosts soar01,soar02,soar03 \
+  --soar-ssh-known-hosts-file /secure/ssh/known_hosts \
   --soar-tgz /tmp/splunk_soar-unpriv-8.5.0.tgz \
   --external-pg "mode=rds,host=soar-db.cluster-xyz.us-east-1.rds.amazonaws.com,port=5432" \
   --external-gluster gluster01,gluster02 \
@@ -94,8 +103,21 @@ Apply Splunk-side apps:
 ```bash
 bash skills/splunk-soar-setup/scripts/setup.sh \
   --phase splunk-side-apps \
+  --apply \
   --splunk-side-apps "app_for_soar=true,app_for_soar_export=true"
 ```
+
+All mutating phases (`apply`, `onprem-single`, `onprem-cluster`,
+`automation-broker`, `splunk-side-apps`, and `all`) require
+the explicit `--apply` gate. Render, preflight, status, and validation remain
+non-mutating.
+`--phase es-integration` exits nonzero before any mutation because the supported
+ES engine models `conf-essoar` as inventory/preflight-only. Complete tenant
+pairing, token entry, notable forwarding, and Adaptive Response verification in
+the documented Mission Control UI.
+Cluster provisioning, backup, and restore require a pre-enrolled SSH
+known-hosts file; generated scripts use strict host-key checking and never
+silently accept a new host key.
 
 Validate Splunk-side SOAR apps (reads credentials from the project-root
 `credentials` file, checks that `splunk_app_soar` is installed, and prints a

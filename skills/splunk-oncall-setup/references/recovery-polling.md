@@ -81,9 +81,9 @@ The skill's `splunk_side_install.sh` does the following when the
    `/servicesNS/<user>/victorops_app/saved/searches/<name>`.
 3. Toggle the `victorops-alert-recovery` saved search itself via
    `/servicesNS/<user>/victorops_app/saved/searches/victorops-alert-recovery`,
-   updating `enableSched`, `cron_schedule`, and `schedule_window`.
-4. Validate the schedule by calling the saved search's `/dispatch?status=1`
-   endpoint.
+   updating `disabled`, `cron_schedule`, and `schedule_window`.
+4. Read the saved-search fields back and fail the apply if the recovery flag,
+   enabled/disabled state, or cron schedule does not match the requested state.
 
 The skill never edits `savedsearches.conf` on disk — Splunk Cloud doesn't
 allow it, and on Splunk Enterprise REST is the supported path.

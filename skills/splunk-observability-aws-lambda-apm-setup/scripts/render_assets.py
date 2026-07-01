@@ -12,9 +12,9 @@ numbered, render-first plan tree under ``--output-dir``:
 - ``cloudformation/`` (CloudFormation snippets)
 - ``scripts/``   (token-secret helper + cross-skill handoff drivers)
 
-The renderer never accepts a secret value as an argument or writes one
-into any rendered file. Access tokens are delivered via Secrets Manager or
-SSM SecureString references; the token path is written as ``${SPLUNK_LAMBDA_TOKEN_FILE}``.
+The renderer never accepts a secret value as an argument or writes one into
+any rendered file. Apply-time helpers read tokens from a private local file or
+AWS Secrets Manager/SSM and keep the literal out of process arguments.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -275,7 +276,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, str]:
         "layers.arn_resolution": "api_validate",
         "layers.attach_plan": "api_validate",
         "env.exec_wrapper": "api_validate",
-        "env.token_delivery": "handoff",
+        "env.token_delivery": "api_apply",
         "env.xray_coexistence": "api_validate",
         "iam.ingest_egress": "api_validate" if not local_collector else "not_applicable",
         "terraform.lambda_config": "handoff",
@@ -288,7 +289,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, str]:
         "execution_modes.lambda_at_edge": "not_applicable",
         "execution_modes.provisioned_concurrency": "api_validate",
         "metrics_extension.layer": "api_validate" if spec.get("metrics_extension") else "not_applicable",
-        "aws_cli.update_function_config": "api_validate",
+        "aws_cli.update_function_config": "api_apply",
         "validation.span_attributes": "api_validate",
         "validation.vendor_coexistence": "api_validate",
         "handoff.cloudwatch_metrics": "handoff" if h.get("cloudwatch_metrics") else "not_applicable",
@@ -325,7 +326,7 @@ def _render_overview(spec: dict[str, Any]) -> str:
    and set the required environment variables.
 3. Emits Terraform (`terraform/`) and CloudFormation (`cloudformation/`) variants
    for GitOps workflows.
-4. Emits a one-time token-write helper (`scripts/write-splunk-token.sh`) so
+4. Emits an idempotent token-write helper (`scripts/write-splunk-token.sh`) so
    `SPLUNK_ACCESS_TOKEN` is stored in {backend} without appearing in argv or
    shell history.
 5. Renders cross-skill handoff drivers for CloudWatch metrics, dashboards,
@@ -333,8 +334,9 @@ def _render_overview(spec: dict[str, Any]) -> str:
 
 ## Safety
 
-- `SPLUNK_ACCESS_TOKEN` is delivered via `{{resolve:{backend}:...}}` references;
-  the token value never appears in rendered files or argv.
+- `SPLUNK_ACCESS_TOKEN` never appears in rendered files, shell history, or argv.
+  The AWS CLI helper fetches it from {backend} into a private temporary file,
+  then merges it into the Lambda environment configuration at apply time.
 - Run `--validate` to check the rendered tree for secret-looking content before
   applying.
 - Run `--doctor` to detect vendor/ADOT conflicts and X-Ray coexistence issues
@@ -534,7 +536,12 @@ def _render_iam_ingest_egress(spec: dict[str, Any]) -> dict[str, Any]:
 # AWS CLI plan.
 # ---------------------------------------------------------------------------
 
-def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrappers: dict[str, str]) -> str:
+def _render_aws_cli_plan(
+    spec: dict[str, Any],
+    manifest: dict[str, Any],
+    metrics_manifest: dict[str, Any],
+    wrappers: dict[str, str],
+) -> str:
     realm = spec["realm"]
     backend = spec.get("secret_backend", "secretsmanager")
     local = spec.get("local_collector_enabled", True)
@@ -564,6 +571,25 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
         ]
 
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", "# AWS CLI apply plan — review before running", ""]
+    lines.extend(
+        [
+            'APPLY_SECTIONS="${APPLY_SECTIONS:-layer,env}"',
+            'TARGET_FILTER="${TARGET_FILTER:-}"',
+            '_APPLY_LAYER=false',
+            '_APPLY_ENV=false',
+            'case ",${APPLY_SECTIONS}," in *,layer,*) _APPLY_LAYER=true ;; esac',
+            'case ",${APPLY_SECTIONS}," in *,env,*) _APPLY_ENV=true ;; esac',
+            'if [[ "${_APPLY_LAYER}" != "true" && "${_APPLY_ENV}" != "true" ]]; then',
+            '  echo "ERROR: APPLY_SECTIONS must include layer and/or env." >&2',
+            '  exit 2',
+            'fi',
+            'target_selected() {',
+            '  local function_name="$1"',
+            '  [[ -z "${TARGET_FILTER}" || ",${TARGET_FILTER}," == *",${function_name},"* ]]',
+            '}',
+            '',
+        ]
+    )
     lines.append(f"# Run scripts/write-splunk-token.sh once to store the token in {backend}.")
     lines.append("# The token is fetched from the secret backend at apply time, written into a")
     lines.append("# chmod-600 temp JSON file via stdin, and passed to the AWS CLI as")
@@ -571,17 +597,23 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
     lines.append("# so the literal token NEVER appears in argv (ps/cmdline), shell history, or logs.")
     lines.append("# Temp files are chmod 600 and removed on exit via a trap.")
     lines.append("")
-    lines.extend(token_fetch_lines)
-    lines.append("")
-    lines.append('if [[ -z "${_SPLUNK_TOKEN:-}" ]]; then')
-    lines.append('  echo "ERROR: Could not fetch SPLUNK_ACCESS_TOKEN from the secret backend." >&2')
-    lines.append('  echo "Run scripts/write-splunk-token.sh first." >&2')
-    lines.append('  exit 2')
+    lines.append('_SPLUNK_TOKEN=""')
+    lines.append('if [[ "${_APPLY_ENV}" == "true" ]]; then')
+    lines.extend(f"  {line}" for line in token_fetch_lines)
+    lines.append('  if [[ -z "${_SPLUNK_TOKEN:-}" || "${_SPLUNK_TOKEN}" == "None" ]]; then')
+    lines.append('    echo "ERROR: Could not fetch SPLUNK_ACCESS_TOKEN from the secret backend." >&2')
+    lines.append('    echo "Run scripts/write-splunk-token.sh first, or pass --token-file to setup.sh --apply." >&2')
+    lines.append('    exit 2')
+    lines.append('  fi')
     lines.append('fi')
     lines.append("")
     lines.append('_CFG_FILE=""')
+    lines.append('_CURRENT_FILE=""')
+    lines.append('_DESIRED_FILE=""')
     lines.append("cleanup() {")
     lines.append('  [[ -n "${_CFG_FILE:-}" ]] && rm -f "${_CFG_FILE}"')
+    lines.append('  [[ -n "${_CURRENT_FILE:-}" ]] && rm -f "${_CURRENT_FILE}"')
+    lines.append('  [[ -n "${_DESIRED_FILE:-}" ]] && rm -f "${_DESIRED_FILE}"')
     lines.append("  unset _SPLUNK_TOKEN 2>/dev/null || true")
     lines.append("}")
     lines.append("trap cleanup EXIT")
@@ -593,6 +625,15 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
         runtime = tgt["runtime"]
         arch = tgt.get("arch", "x86_64")
         handler_type = tgt.get("handler_type", "default")
+
+        if tgt.get("package_type", "zip") == "image":
+            lines.append(f"# --- {fn} (container image) ---")
+            lines.append(
+                f'echo "HANDOFF: {fn} uses package_type=image; rebuild and deploy the rendered '
+                f'container-image/Dockerfile.{_runtime_family(runtime)} instead of attaching a Lambda layer."'
+            )
+            lines.append("")
+            continue
 
         try:
             layer_arn = _resolve_layer_arn(manifest, region, arch)
@@ -619,32 +660,79 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
         # Placeholder is overwritten at runtime with the real token (injected via stdin).
         variables["SPLUNK_ACCESS_TOKEN"] = "__REPLACED_AT_RUNTIME__"
 
+        desired_layers = [layer_arn]
+        if spec.get("metrics_extension", False):
+            metrics_arn = _resolve_metrics_layer_arn(metrics_manifest, region, arch)
+            if not metrics_arn:
+                raise RendererError(
+                    f"No splunk-lambda-metrics layer is published for {fn} in {region} ({arch})."
+                )
+            desired_layers.append(metrics_arn)
+
         cli_input = {
             "FunctionName": fn,
-            "Layers": [layer_arn],
+            "Layers": desired_layers,
             "Environment": {"Variables": variables},
         }
         cli_json = json.dumps(cli_input, indent=2)
 
         lines.append(f"# --- {fn} ---")
+        lines.append(f'if ! target_selected {shlex.quote(fn)}; then echo "==> Skipping {fn} (TARGET_FILTER)"; else')
         lines.append(f'echo "==> Updating {fn} in {region}..."')
+        lines.append('_CURRENT_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-current.XXXXXX")"')
+        lines.append('_DESIRED_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-desired.XXXXXX")"')
         lines.append('_CFG_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-cfg.XXXXXX")"')
-        lines.append('chmod 600 "${_CFG_FILE}"')
-        lines.append('cat > "${_CFG_FILE}" <<\'CLIJSON\'')
+        lines.append('chmod 600 "${_CURRENT_FILE}" "${_DESIRED_FILE}" "${_CFG_FILE}"')
+        lines.append("aws lambda get-function-configuration \\")
+        lines.append(f"  --function-name {shlex.quote(fn)} \\")
+        lines.append(f"  --region {shlex.quote(region)} \\")
+        lines.append('  --output json > "${_CURRENT_FILE}"')
+        lines.append('cat > "${_DESIRED_FILE}" <<\'CLIJSON\'')
         lines.append(cli_json)
         lines.append("CLIJSON")
-        lines.append("# Inject the real token via stdin (never on argv); rewrite the file in place.")
+        lines.append("# Inject the token into the private desired-state file only when env is selected.")
+        lines.append('if [[ "${_APPLY_ENV}" == "true" ]]; then')
         lines.append(
             'printf \'%s\' "${_SPLUNK_TOKEN}" | python3 -c '
             '\'import json, sys; p = sys.argv[1]; c = json.load(open(p)); '
             'c["Environment"]["Variables"]["SPLUNK_ACCESS_TOKEN"] = sys.stdin.read(); '
-            'json.dump(c, open(p, "w"))\' "${_CFG_FILE}"'
+            'json.dump(c, open(p, "w"))\' "${_DESIRED_FILE}"'
+        )
+        lines.append('fi')
+        lines.append("# Preserve every unrelated layer and environment variable. Replace only")
+        lines.append("# Splunk-owned Lambda layers and merge only Splunk-owned env keys.")
+        lines.append(
+            'python3 - "${_CURRENT_FILE}" "${_DESIRED_FILE}" "${_CFG_FILE}" '
+            '"${_APPLY_LAYER}" "${_APPLY_ENV}" <<\'PY\''
+        )
+        lines.extend(
+            [
+                "import json, re, sys",
+                "current = json.load(open(sys.argv[1]))",
+                "desired = json.load(open(sys.argv[2]))",
+                "out = {'FunctionName': desired['FunctionName']}",
+                "if sys.argv[4] == 'true':",
+                "    existing = [item.get('Arn', '') for item in current.get('Layers', []) if item.get('Arn')]",
+                "    owned = re.compile(r':layer:(?:splunk-apm(?:-arm)?|splunk-lambda-metrics(?:-arm)?):')",
+                "    merged = [arn for arn in existing if not owned.search(arn)] + desired['Layers']",
+                "    merged = list(dict.fromkeys(merged))",
+                "    if len(merged) > 5:",
+                "        raise SystemExit(f'ERROR: merged Lambda layer count is {len(merged)}; AWS limit is 5')",
+                "    out['Layers'] = merged",
+                "if sys.argv[5] == 'true':",
+                "    variables = dict(current.get('Environment', {}).get('Variables', {}))",
+                "    variables.update(desired['Environment']['Variables'])",
+                "    out['Environment'] = {'Variables': variables}",
+                "json.dump(out, open(sys.argv[3], 'w'))",
+                "PY",
+            ]
         )
         lines.append("aws lambda update-function-configuration \\")
-        lines.append(f"  --region {region} \\")
+        lines.append(f"  --region {shlex.quote(region)} \\")
         lines.append('  --cli-input-json "file://${_CFG_FILE}"')
-        lines.append('rm -f "${_CFG_FILE}"')
-        lines.append('_CFG_FILE=""')
+        lines.append('rm -f "${_CURRENT_FILE}" "${_DESIRED_FILE}" "${_CFG_FILE}"')
+        lines.append('_CURRENT_FILE=""; _DESIRED_FILE=""; _CFG_FILE=""')
+        lines.append('fi')
         lines.append("")
 
     lines.append('echo "==> apply-plan: done"')
@@ -827,9 +915,21 @@ def _render_write_token_sh(spec: dict[str, Any]) -> str:
             + 'python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" <<\'PY\'\n'
             'import json, sys\n'
             'token = open(sys.argv[1]).read().rstrip("\\n")\n'
-            'json.dump({"Name": "splunk-lambda-access-token", "SecretString": token}, open(sys.argv[2], "w"))\n'
+            'json.dump({"SecretString": token}, open(sys.argv[2], "w"))\n'
             'PY\n'
-            'aws secretsmanager create-secret --cli-input-json "file://${_SECRET_JSON}"\n'
+            'if aws secretsmanager describe-secret --secret-id splunk-lambda-access-token >/dev/null 2>&1; then\n'
+            '  python3 - "${_SECRET_JSON}" <<\'PY\'\n'
+            'import json, sys\n'
+            'p = sys.argv[1]; data = json.load(open(p)); data["SecretId"] = "splunk-lambda-access-token"; json.dump(data, open(p, "w"))\n'
+            'PY\n'
+            '  aws secretsmanager put-secret-value --cli-input-json "file://${_SECRET_JSON}"\n'
+            'else\n'
+            '  python3 - "${_SECRET_JSON}" <<\'PY\'\n'
+            'import json, sys\n'
+            'p = sys.argv[1]; data = json.load(open(p)); data["Name"] = "splunk-lambda-access-token"; json.dump(data, open(p, "w"))\n'
+            'PY\n'
+            '  aws secretsmanager create-secret --cli-input-json "file://${_SECRET_JSON}"\n'
+            'fi\n'
             'rm -f "${_SECRET_JSON}"'
         )
         note = "Secret name: splunk-lambda-access-token"
@@ -849,7 +949,8 @@ def _render_write_token_sh(spec: dict[str, Any]) -> str:
 set -euo pipefail
 
 # Write the Splunk Observability Cloud access token to {backend}.
-# Run this ONCE before applying Lambda function updates.
+# Run before applying Lambda environment updates. Existing values are rotated
+# with put-secret-value (Secrets Manager) or overwritten (SSM).
 # The token value never enters shell history or any command's argv; it is read
 # from TOKEN_FILE into a chmod-600 --cli-input-json file that is removed on exit.
 #
@@ -888,12 +989,12 @@ def _render_handoff_sh(spec: dict[str, Any]) -> str:
         wrote_any = True
     if h.get("dashboards"):
         lines.append("# Lambda APM dashboards")
-        lines.append("bash skills/splunk-observability-dashboard-builder/scripts/setup.sh --render-lambda-apm-dashboards")
+        lines.append("echo 'HANDOFF: bash skills/splunk-observability-dashboard-builder/scripts/setup.sh --render --spec /path/to/lambda-dashboard.yaml'")
         lines.append("")
         wrote_any = True
     if h.get("detectors"):
         lines.append("# Lambda APM detectors (cold start / error / latency)")
-        lines.append("bash skills/splunk-observability-native-ops/scripts/setup.sh --apply autodetect-lambda")
+        lines.append("echo 'HANDOFF: bash skills/splunk-observability-native-ops/scripts/setup.sh --apply --spec /path/to/lambda-detectors.json --token-file /path/to/token'")
         lines.append("")
         wrote_any = True
     if h.get("logs"):
@@ -1163,8 +1264,9 @@ Run `--list-layer-arns` to display all published ARNs:
 bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --list-layer-arns
 ```
 
-Use `--refresh-layer-manifest` to fetch the latest versions from
-`signalfx/lambda-layer-versions`.
+The bundled snapshot is authoritative for this renderer. To refresh it, review
+and replace `references/layer-versions.snapshot.json` from the upstream
+`signalfx/lambda-layer-versions` repository in a normal code-review workflow.
 
 ## If you need SAR-style discoverability
 
@@ -1310,7 +1412,7 @@ def _validate_execution_modes(spec: dict[str, Any]) -> list[str]:
 # Top-level render.
 # ---------------------------------------------------------------------------
 
-def render(spec: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+def render(spec: dict[str, Any], output_dir: Path, *, gitops_mode: bool = False) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = _load_manifest()
     metrics_manifest = _load_metrics_manifest()
@@ -1345,8 +1447,8 @@ def render(spec: dict[str, Any], output_dir: Path) -> dict[str, Any]:
         "| `03-layers.md` | Layer ARN attachment plan |\n"
         "| `04-env.md` | Environment variable plan |\n"
         "| `05-validation.md` | Validation and smoke test |\n"
-        "| `aws-cli/apply-plan.sh` | AWS CLI commands (review before running) |\n"
-        "| `terraform/main.tf` | Terraform resource snippets |\n"
+        + ("" if gitops_mode else "| `aws-cli/apply-plan.sh` | Guarded AWS CLI apply helper |\n")
+        + "| `terraform/main.tf` | Terraform resource snippets |\n"
         "| `cloudformation/snippets.yaml` | CloudFormation / SAM snippets |\n"
         "| `sam/template.yaml` | AWS SAM template snippet |\n"
         "| `cdk/lambda-apm-stack.ts` | CDK TypeScript snippet |\n"
@@ -1374,13 +1476,18 @@ def render(spec: dict[str, Any], output_dir: Path) -> dict[str, Any]:
             encoding="utf-8",
         )
 
-    # AWS CLI plan.
+    # AWS CLI plan is intentionally absent in GitOps-only renders.
     aws_cli_dir = output_dir / "aws-cli"
-    aws_cli_dir.mkdir(exist_ok=True)
-    cli_plan = _render_aws_cli_plan(spec, manifest, wrappers)
-    plan_path = aws_cli_dir / "apply-plan.sh"
-    plan_path.write_text(cli_plan, encoding="utf-8")
-    plan_path.chmod(0o755)
+    if gitops_mode:
+        if aws_cli_dir.exists():
+            import shutil
+            shutil.rmtree(aws_cli_dir)
+    else:
+        aws_cli_dir.mkdir(exist_ok=True)
+        cli_plan = _render_aws_cli_plan(spec, manifest, metrics_manifest, wrappers)
+        plan_path = aws_cli_dir / "apply-plan.sh"
+        plan_path.write_text(cli_plan, encoding="utf-8")
+        plan_path.chmod(0o755)
 
     # Terraform.
     tf_dir = output_dir / "terraform"
@@ -1460,6 +1567,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output-dir", default=str(PROJECT_ROOT / "splunk-observability-aws-lambda-apm-rendered"))
     p.add_argument("--realm", default="")
     p.add_argument("--accept-beta", action="store_true")
+    p.add_argument("--gitops-mode", action="store_true")
     p.add_argument("--json", action="store_true", dest="json_output")
     p.add_argument("--list-runtimes", action="store_true")
     p.add_argument("--list-layer-arns", action="store_true")
@@ -1519,7 +1627,7 @@ def main(argv: list[str] | None = None) -> None:
 
     output_dir = Path(args.output_dir)
     try:
-        result = render(spec, output_dir)
+        result = render(spec, output_dir, gitops_mode=args.gitops_mode)
     except RendererError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -230,9 +230,8 @@ def dcgm_pod_labels_patch(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
     2. Creates a ClusterRole + ClusterRoleBinding for the DCGM
        ServiceAccount granting list/get on pods and namespaces.
     3. Adds an AutoMount ServiceAccountToken patch on the SA.
-    4. Documents the kubelet-path volume mount (the actual mount must be
-       added to the DaemonSet via the GPU Operator's ClusterPolicy or a
-       separate patch).
+    4. Mounts the kubelet pod-resources directory read-only so the exporter can
+       correlate device assignments with pods.
     """
     namespace = spec.get("dcgm_namespace", "nvidia-gpu-operator")
     sa = spec.get("dcgm_service_account", "nvidia-dcgm-exporter")
@@ -278,8 +277,24 @@ def dcgm_pod_labels_patch(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
                                 {"name": "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", "value": "true"},
                                 {"name": "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID", "value": "true"},
                             ],
+                            "volumeMounts": [
+                                {
+                                    "name": "pod-gpu-resources",
+                                    "mountPath": "/var/lib/kubelet/pod-resources",
+                                    "readOnly": True,
+                                }
+                            ],
                         }
-                    ]
+                    ],
+                    "volumes": [
+                        {
+                            "name": "pod-gpu-resources",
+                            "hostPath": {
+                                "path": "/var/lib/kubelet/pod-resources",
+                                "type": "Directory",
+                            },
+                        }
+                    ],
                 }
             }
         }
@@ -424,7 +439,7 @@ echo "Step 3: Apply via helm."
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
-echo '      --set splunkObservability.accessToken="$(cat $O11Y_TOKEN_FILE)"'
+echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 """
         )
     if handoffs.get("dashboard_builder", True):
@@ -533,6 +548,8 @@ def main() -> int:
     write_yaml(out / "splunk-otel-overlay/values.overlay.yaml", overlay)
 
     if dcgm_pod_labels_enabled:
+        dcgm_namespace = str(spec.get("dcgm_namespace", "nvidia-gpu-operator"))
+        dcgm_daemonset = str(spec.get("dcgm_daemonset", "nvidia-dcgm-exporter"))
         for name, payload in dcgm_pod_labels_patch(spec).items():
             write_yaml(out / f"dcgm-pod-labels-patch/{name}.yaml", payload)
         write_text(
@@ -540,7 +557,7 @@ def main() -> int:
             (
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n\n"
-                "# Apply the DCGM pod-label patch (env vars + RBAC + SA + DaemonSet env patch).\n"
+                "# Apply the DCGM pod-label patch (env vars + RBAC + SA + kubelet mount).\n"
                 "# Honors K8S_APPLY_DRY_RUN=true (server-side dry-run, no mutation).\n"
                 "# Note: GPU Operator users should patch the ClusterPolicy instead -- the\n"
                 "# DaemonSet env patch in this output may be overridden by the operator on\n"
@@ -554,8 +571,12 @@ def main() -> int:
                 "kubectl apply \"${DRY_RUN_FLAG[@]}\" -f \"${PATCH_DIR}/01-cluster-role.yaml\"\n"
                 "kubectl apply \"${DRY_RUN_FLAG[@]}\" -f \"${PATCH_DIR}/02-cluster-role-binding.yaml\"\n"
                 "kubectl apply \"${DRY_RUN_FLAG[@]}\" -f \"${PATCH_DIR}/03-service-account-automount.yaml\"\n"
-                "echo 'NOTE: 04-daemonset-env-patch.yaml is a strategic merge patch.'\n"
-                "echo 'Apply with: kubectl -n nvidia-gpu-operator patch daemonset nvidia-dcgm-exporter --patch-file ${PATCH_DIR}/04-daemonset-env-patch.yaml'\n"
+                "echo 'Applying 04-daemonset-env-patch.yaml as a strategic merge patch.'\n"
+                f"kubectl -n {dcgm_namespace!r} patch daemonset {dcgm_daemonset!r} --type=strategic "
+                '"${DRY_RUN_FLAG[@]}" --patch-file "${PATCH_DIR}/04-daemonset-env-patch.yaml"\n'
+                'if [[ "${K8S_APPLY_DRY_RUN:-false}" != "true" ]]; then\n'
+                f"    kubectl -n {dcgm_namespace!r} rollout status daemonset/{dcgm_daemonset!r} --timeout=180s\n"
+                "fi\n"
             ),
             executable=True,
         )

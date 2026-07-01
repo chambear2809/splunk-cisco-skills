@@ -22,3 +22,11 @@ version `6.0.1`).
   proves Cisco ASA ownership and events normalize to `cisco:asa`.
 - Hand off CIM acceleration and ES detection readiness to
   `splunk-cim-data-model-setup` and `splunk-enterprise-security-config`.
+
+## Completion Validation
+
+The package ships parsing and CIM knowledge rather than standalone dashboards;
+dashboard completion is an ES/firewall-content handoff after ingest is proven.
+`validate.sh --completion --live` (alias `--strict`) exits nonzero unless the
+TA, target index, and matching ASA events are present. The ordinary live form
+remains diagnostic for staged receiver onboarding.

@@ -127,7 +127,7 @@ def test_routers_can_execute_routed_action_plans_in_dry_run_mode() -> None:
     assert security["would_execute"] == [
         "bash",
         "skills/splunk-security-content-update-setup/scripts/setup.sh",
-        "--all",
+        "--install",
     ]
 
     asa = run_json(

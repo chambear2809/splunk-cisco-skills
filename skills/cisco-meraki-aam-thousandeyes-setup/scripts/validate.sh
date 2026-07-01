@@ -408,8 +408,27 @@ else:
     lines.append("- None")
 (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+failures = []
+if (out / "meraki-organizations.json").exists() and not meraki_orgs:
+    failures.append("Meraki API returned no organizations")
+if (out / "meraki-networks.json").exists() and not matching_networks:
+    failures.append("no Meraki networks matched the requested organization/filter")
+if (out / "meraki-devices.json").exists() and not any(
+    normalize_mx_model(device.get("model")) in SUPPORTED_MX_MODELS
+    for device in matching_mx_devices
+):
+    failures.append("no supported MX/C8 devices matched the requested filters")
+if (out / "agents.json").exists() and not matching_agents:
+    failures.append("no ThousandEyes agents matched the requested filters")
+if (out / "tests.json").exists() and not matching_tests:
+    failures.append("no ThousandEyes tests matched the requested filters")
+
 if print_json:
     print(json.dumps(summary, indent=2, sort_keys=True))
 else:
     print(f"Wrote validation evidence to {out}")
+if failures:
+    for failure in failures:
+        print(f"ERROR: {failure}", file=sys.stderr)
+    raise SystemExit(1)
 PY

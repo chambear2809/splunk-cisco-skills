@@ -16,53 +16,58 @@ This breaks the per-workload AI/ML observability story. You need to be able to a
 
 ## The fix
 
-DCGM Exporter v3.3.0+ supports a `--kubernetes-gpu-id-type` flag and pod-label discovery via the kubelet device plugin. Two pieces are required:
+DCGM Exporter supports pod-label discovery via the kubelet device plugin. Four
+pieces are required:
 
-1. The DCGM Exporter pod must have RBAC to read pods + nodes.
-2. The DCGM Exporter must be configured to scrape pod metadata.
+1. The DCGM Exporter ServiceAccount can read pods and namespaces.
+2. Its projected ServiceAccount token is mounted.
+3. Pod-label and pod-UID discovery environment variables are enabled.
+4. `/var/lib/kubelet/pod-resources` is mounted read-only from the node.
 
-The GPU Operator handles the second piece automatically when you enable pod labels. The first piece — the RBAC — is **not** included by default. The skill's `--enable-dcgm-pod-labels` flag generates the missing RBAC patch.
+The skill's `--enable-dcgm-pod-labels` flag renders all four pieces. A GPU
+Operator-managed DaemonSet can reconcile direct patches away, so translate the
+same settings into ClusterPolicy when the operator owns the workload.
 
 ## What `--enable-dcgm-pod-labels` renders
 
-Setting the flag (or `spec.dcgm_pod_labels.enabled: true` in the spec) emits `manifests/dcgm-pod-labels-rbac.yaml`:
+Setting `enable_dcgm_pod_labels: true` emits four files under
+`dcgm-pod-labels-patch/`: ClusterRole, ClusterRoleBinding, ServiceAccount
+automount, and a strategic DaemonSet env/hostPath patch. The RBAC portion is:
 
 ```yaml
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-dcgm-exporter-pod-labels
+  name: dcgm-exporter-pod-label-reader
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes"]
+    resources: ["pods", "namespaces"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-dcgm-exporter-pod-labels
+  name: dcgm-exporter-pod-label-reader
 subjects:
   - kind: ServiceAccount
     name: nvidia-dcgm-exporter
     namespace: nvidia-gpu-operator
 roleRef:
   kind: ClusterRole
-  name: nvidia-dcgm-exporter-pod-labels
+  name: dcgm-exporter-pod-label-reader
   apiGroup: rbac.authorization.k8s.io
 ```
 
-Apply it:
+Apply all four pieces through the guarded helper:
 
 ```bash
-kubectl apply -f manifests/dcgm-pod-labels-rbac.yaml
+bash skills/splunk-observability-nvidia-gpu-integration/scripts/setup.sh \
+  --apply-pod-labels-patch --enable-dcgm-pod-labels --accept-k8s-apply
 ```
 
-Then restart the DCGM Exporter pods:
-
-```bash
-kubectl -n nvidia-gpu-operator rollout restart daemonset/nvidia-dcgm-exporter
-```
+Add `--dry-run` for server-side validation without mutation. The helper waits
+for the configured DaemonSet rollout and returns nonzero if it fails.
 
 After restart, metrics should include pod labels:
 
@@ -109,4 +114,4 @@ kubectl get clusterrolebinding | grep dcgm
 ## Anti-patterns
 
 - **Adding pod labels via the OTel `k8s_attributes` processor**: this works but adds 50-200ms of per-metric processing latency in the OTel agent. The DCGM-side patch is much faster because the kubelet device plugin caches pod metadata.
-- **Granting `pods/exec` or `pods/log` to the DCGM ServiceAccount**: NEVER. The patch only needs `get/list/watch` on `pods` and `nodes`. Anything more is privilege escalation.
+- **Granting `pods/exec` or `pods/log` to the DCGM ServiceAccount**: NEVER. The patch only needs `get/list/watch` on `pods` and `namespaces`. Anything more is privilege escalation.

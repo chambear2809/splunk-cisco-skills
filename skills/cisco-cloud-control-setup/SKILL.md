@@ -100,18 +100,19 @@ bash skills/cisco-cloud-control-setup/scripts/setup.sh \
 `--execute SECTION[,SECTION]`, `--accept-execute`, `--dry-run`, `--json`,
 `--spec PATH`, and `--output-dir DIR`.
 
-Executable sections:
+Delegated executable sections:
 
 - `data-fabric`
 - `mcp`
 - `agent-observability`
 - `observability-content`
-- `domain-readiness`
-- `cloud-control-studio`
-- `ai-canvas`
+- `domain-readiness` (handoff-only; an execute request exits nonzero)
+- `cloud-control-studio` (handoff-only; an execute request exits nonzero)
+- `ai-canvas` (handoff-only; an execute request exits nonzero)
 
-`cloud-control-studio` and `ai-canvas` never mutate Cisco Cloud Control. They
-only render or echo operator handoff artifacts.
+`domain-readiness`, `cloud-control-studio`, and `ai-canvas` never mutate Cisco
+Cloud Control. They render operator handoff artifacts, and an explicit execute
+request exits nonzero so a handoff cannot be mistaken for an applied change.
 
 The Cisco Workflows API is treated as a readiness surface: this skill renders
 the public API/OAS, target, account-key, and rate-limit checklist, but it does

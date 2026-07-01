@@ -4,17 +4,17 @@ The skill ships `scripts/validate-signalflow.sh` for a quick REST probe of `api.
 
 ## REST probe (scripts/validate-signalflow.sh)
 
-The shipped helper uses `curl` against `/v2/metric` to confirm:
+The shipped helper uses `curl` against `/v2/metric?query=thousandeyes&limit=1` to confirm only that:
 
 - The realm endpoint is reachable.
 - The User API access token authenticates successfully.
-- At least one `thousandeyes.*` metric is registered (no time-series query, just metadata).
+- The endpoint returns valid JSON for a metric-catalog query.
 
-This is a "smoke" check. It does not confirm a specific test is actively pushing data points.
+This is an authentication/reachability smoke check. It does not compile the rendered SignalFlow, require a matching metric, or confirm that a test is actively pushing data points.
 
 ## WebSocket SignalFlow query (deeper validation)
 
-The TE reference implementation at `/Users/alecchamberlain/Documents/GitHub/network-streaming-app/scripts/thousandeyes/validate-signalflow-metrics.js` opens a WebSocket against `wss://stream.<realm>.signalfx.com/v2/signalflow/connect` and runs SignalFlow programs to assert:
+A separate WebSocket client can connect to `wss://stream.<realm>.signalfx.com/v2/signalflow/connect` and run SignalFlow programs to assert:
 
 - Recent time series exist for each `(test_type, test_id)` pair.
 - Values fall within expected SLO bands.
@@ -58,7 +58,7 @@ The TE OTel stream goes to one realm at a time; the apply path validates against
 
 ```bash
 for realm in us0 us1 eu0; do
-  REALM=$realm O11Y_API_TOKEN_FILE=/tmp/sfx_${realm}_api_token \
+  REALM=$realm O11Y_API_TOKEN_FILE="$HOME/.config/o11y/${realm}-api-token" \
     bash splunk-observability-thousandeyes-rendered/scripts/validate-signalflow.sh
 done
 ```

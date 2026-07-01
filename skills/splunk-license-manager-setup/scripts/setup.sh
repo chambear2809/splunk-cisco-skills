@@ -25,6 +25,7 @@ APPLY_TARGET="all"
 COLOCATED_WITH="dedicated"
 RESTART_SPLUNK="true"
 ADMIN_PASSWORD_FILE=""
+ACCEPT_FREE_LICENSE=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -51,6 +52,7 @@ Options:
   --colocated-with cluster-manager|monitoring-console|deployment-server|shc-deployer|search-head|indexer|dedicated
   --restart-splunk true|false
   --admin-password-file PATH
+  --accept-free-license             Required before activating the feature-restricted Free group
   --help
 
 Examples:
@@ -89,6 +91,7 @@ while [[ $# -gt 0 ]]; do
         --colocated-with) require_arg "$1" $# || exit 1; COLOCATED_WITH="$2"; shift 2 ;;
         --restart-splunk) require_arg "$1" $# || exit 1; RESTART_SPLUNK="$2"; shift 2 ;;
         --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
+        --accept-free-license) ACCEPT_FREE_LICENSE=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -120,6 +123,17 @@ validate_args() {
     if [[ -z "${LICENSE_MANAGER_URI}" ]]; then
         log "ERROR: --license-manager-uri is required."
         exit 1
+    fi
+    if [[ ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) && \
+          ( "${APPLY_TARGET}" == "peers" || "${APPLY_TARGET}" == "all" ) && -z "${PEER_HOSTS}" ]]; then
+        log "ERROR: --apply-target ${APPLY_TARGET} requires at least one --peer-hosts entry."
+        exit 2
+    fi
+    if [[ ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) && \
+          ( "${APPLY_TARGET}" == "manager" || "${APPLY_TARGET}" == "all" ) && "${LICENSE_GROUP}" == "Free" && "${ACCEPT_FREE_LICENSE}" != "true" ]]; then
+        log "ERROR: activating the Free group disables authentication, distributed search, clustering, scheduled searches, and deployment server."
+        log "       Re-run with --accept-free-license only after reviewing that impact."
+        exit 2
     fi
     if [[ -n "${OUTPUT_DIR}" ]]; then
         OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
@@ -179,14 +193,27 @@ apply_manager() {
 }
 
 apply_peers() {
-    local dir
+    local dir rc pending_restart=false
     dir="$(render_dir)"
     shopt -s nullglob
     for host_dir in "${dir}/peers"/*/; do
         local host
         host="$(basename "${host_dir%/}")"
-        run_rendered "peers/${host}/configure-peer.sh"
+        if run_rendered "peers/${host}/configure-peer.sh"; then
+            :
+        else
+            rc=$?
+            if [[ "${rc}" -eq 2 ]]; then
+                pending_restart=true
+            else
+                return "${rc}"
+            fi
+        fi
     done
+    if [[ "${pending_restart}" == "true" ]]; then
+        log "PARTIAL: all requested peers were configured, but topology-owned peer restarts remain required."
+        return 2
+    fi
 }
 
 main() {

@@ -147,7 +147,7 @@ main() {
     [[ "${INSTALL}" == "true" ]] && install_package
     create_index
     configure_threatlist_state
-    log "Talos setup complete. Run validate.sh to check ES Cloud/service-account readiness."
+    log "Talos package prerequisites configured. Run validate.sh --completion to prove ES Cloud/service-account readiness."
 }
 
 main

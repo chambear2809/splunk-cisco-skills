@@ -2,14 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STRICT=false
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-intersight-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-intersight-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates the deployed Cisco Intersight TA using configured Splunk credentials.
+Diagnostic mode reports incomplete onboarding as warnings. --strict and its
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --strict|--completion) STRICT=true; shift ;;
+        *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_Cisco_Intersight"
@@ -21,6 +30,7 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
 
 log "=== Cisco Intersight TA Validation ==="
 log ""
@@ -56,7 +66,7 @@ log "--- Index ---"
 if platform_check_index "$SK" "$SPLUNK_URI" "intersight" 2>/dev/null; then
     pass "Index 'intersight' exists"
 else
-    warn "Index 'intersight' not found (may need setup)"
+    completion_issue "Index 'intersight' not found (may need setup)"
 fi
 
 log ""
@@ -66,10 +76,18 @@ if [[ -n "${macro_def}" ]]; then
     if echo "${macro_def}" | grep -q 'intersight'; then
         pass "Macro 'cisco_intersight_index' points to intersight index"
     else
-        warn "Macro 'cisco_intersight_index' does not reference intersight: ${macro_def}"
+        completion_issue "Macro 'cisco_intersight_index' does not reference intersight: ${macro_def}"
     fi
 else
-    warn "Macro 'cisco_intersight_index' not found"
+    completion_issue "Macro 'cisco_intersight_index' not found"
+fi
+
+view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${view_count}" -gt 0 ]]; then
+    pass "Shipped dashboard views are visible: ${view_count}"
+else
+    completion_issue "No dashboard views are visible for ${APP_NAME}"
 fi
 
 log ""
@@ -100,7 +118,7 @@ except Exception:
     pass
 " 2>/dev/null || true
 else
-    warn "No Intersight accounts configured"
+    completion_issue "No Intersight accounts configured"
 fi
 
 log ""
@@ -122,10 +140,10 @@ if [[ "${total_inputs}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        warn "${total_inputs} input stanza(s) exist but all are disabled"
+        completion_issue "${total_inputs} input stanza(s) exist but all are disabled"
     fi
 else
-    warn "No inputs configured"
+    completion_issue "No inputs configured"
 fi
 
 log ""
@@ -134,7 +152,7 @@ event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where inde
 if [[ "${event_count}" -gt 0 ]]; then
     pass "Index 'intersight' has ${event_count} events"
 else
-    warn "Index 'intersight' has no events (may be normal if just configured)"
+    completion_issue "Index 'intersight' has no events (may be normal if just configured)"
 fi
 
 sourcetype_breakdown_body=$(form_urlencode_pairs \

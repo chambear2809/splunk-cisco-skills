@@ -11,6 +11,7 @@ EXPECT_MAX_ROW_LIMIT=""
 EXPECT_DEFAULT_ROW_LIMIT=""
 EXPECT_GLOBAL_RATE_LIMIT=""
 EXPECT_TENANT_AUTHENTICATED=""
+COMPLETION=false
 
 SK=""
 FAILURES=0
@@ -23,6 +24,7 @@ Splunk MCP Server Validation
 Usage: $(basename "$0") [OPTIONS]
 
 Optional assertions:
+  --completion                       Fail on unsupported deployment-role warnings
   --expect-require-encrypted-token true|false
   --expect-max-row-limit N
   --expect-default-row-limit N
@@ -141,12 +143,17 @@ while [[ $# -gt 0 ]]; do
         --expect-default-row-limit) require_arg "$1" $# || exit 1; EXPECT_DEFAULT_ROW_LIMIT="$2"; shift 2 ;;
         --expect-global-rate-limit) require_arg "$1" $# || exit 1; EXPECT_GLOBAL_RATE_LIMIT="$2"; shift 2 ;;
         --expect-tenant-authenticated) require_arg "$1" $# || exit 1; EXPECT_TENANT_AUTHENTICATED="$2"; shift 2 ;;
-        --help) usage 0 ;;
+        --completion|--strict) COMPLETION=true; shift ;;
+        --help|-h) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 
-warn_if_role_unsupported_for_skill "splunk-mcp-server-setup"
+if [[ "${COMPLETION}" == "true" ]]; then
+    require_current_skill_role_supported
+else
+    warn_if_role_unsupported_for_skill "splunk-mcp-server-setup"
+fi
 ensure_session
 
 if ! rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then

@@ -56,3 +56,9 @@ package inspection, plus the upstream README.
   (roughly 5 minutes to 48 hours depending on endpoint behavior).
 - Contact Center Search uses query templates `AAR`, `ASR`, `CAR`, and `CSR`
   against `https://<region>.webexapis.com/v1/contactCenter/search`.
+
+## Completion Validation
+
+`validate.sh --completion`/`--strict` exits nonzero for missing account, enabled
+input, event, macro, or shipped dashboard-view evidence. Direct no-flag
+validation remains diagnostic.

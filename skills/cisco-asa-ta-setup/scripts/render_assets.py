@@ -89,7 +89,8 @@ Include FTD checklist: `{{include_ftd}}`
 ## App Install
 
 Install `Splunk_TA_cisco-asa` through `splunk-app-install` or the Splunk Cloud
-app workflow. This skill only renders the handoff.
+app workflow. The rendered command is a reviewable handoff; `setup.sh --install`
+and `setup.sh --all` execute that installer explicitly.
 
 ## Syslog Receiver
 

@@ -11,6 +11,15 @@ description: >-
 
 # Splunk Cisco App Navigator (SCAN) Setup Automation
 
+## Shared add-on completion gate
+
+Whenever this workflow installs, configures, or hands off a registry-listed
+Splunk app or add-on, follow the
+[shared completion gate](../shared/ta_completion_gate.md). Package delivery
+alone is not success. Apply every relevant ingest and dashboard check; for a
+management-only app, record why ingest is not applicable and validate its
+shipped views and saved searches instead.
+
 Automates the **Splunk Cisco App Navigator** (`splunk-cisco-app-navigator`).
 
 SCAN is a management and catalog app, not a data-ingestion TA. It provides a

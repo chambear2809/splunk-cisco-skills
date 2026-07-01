@@ -78,6 +78,12 @@ def validate(args: argparse.Namespace) -> None:
     for app in csv_list(args.visible_apps):
         if not re.fullmatch(r"[A-Za-z0-9_.:-]+", app):
             die(f"Visible app {app!r} must be a valid app name.")
+    for value, option in (
+        (args.custom_endpoint_hostname, "--custom-endpoint-hostname"),
+        (args.custom_endpoint_grpc_hostname, "--custom-endpoint-grpc-hostname"),
+    ):
+        if value and not re.fullmatch(r"[A-Za-z0-9.-]+", value):
+            die(f"{option} must be a hostname.")
     if args.private_spacebridge == "true" and not (
         args.custom_endpoint_id and args.custom_endpoint_hostname and args.custom_endpoint_grpc_hostname
     ):
@@ -116,9 +122,11 @@ def render_egress_preflight(args: argparse.Namespace) -> str:
         f'host="{host}"\n'
         "echo \"Checking outbound 443 (WebSocket) to ${host} ...\"\n"
         'if command -v nc >/dev/null 2>&1; then\n'
-        '  nc -z -w 5 "${host}" 443 && echo "OK: ${host}:443 reachable" || echo "FAIL: ${host}:443 not reachable"\n'
+        '  nc -z -w 5 "${host}" 443 || { echo "FAIL: ${host}:443 not reachable" >&2; exit 1; }\n'
+        '  echo "OK: ${host}:443 reachable"\n'
         'else\n'
-        '  curl -sS --max-time 5 -o /dev/null "https://${host}" && echo "OK: ${host} reachable" || echo "FAIL: ${host} not reachable"\n'
+        '  curl -fsS --max-time 5 -o /dev/null "https://${host}" || { echo "FAIL: ${host} not reachable" >&2; exit 1; }\n'
+        '  echo "OK: ${host} reachable"\n'
         'fi\n'
         'echo "Splunk Secure Gateway requires outbound 443 to the Spacebridge host. No inbound ports are opened."\n'
     )

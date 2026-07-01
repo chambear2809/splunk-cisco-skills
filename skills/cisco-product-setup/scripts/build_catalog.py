@@ -731,6 +731,7 @@ def build_thousandeyes_route(override: dict) -> dict:
         "required_non_secret_keys": ["account_group"],
         "optional_non_secret_keys": [
             "account",
+            "alert_rules",
             "index",
             "input_type",
             "hec_token",
@@ -743,6 +744,7 @@ def build_thousandeyes_route(override: dict) -> dict:
         "accepted_non_secret_keys": [
             "account",
             "account_group",
+            "alert_rules",
             "hec_token",
             "index",
             "input_type",

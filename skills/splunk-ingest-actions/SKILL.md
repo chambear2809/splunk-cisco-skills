@@ -77,8 +77,9 @@ bash skills/splunk-ingest-actions/scripts/validate.sh --live
 - `ruleset.json` — structured ruleset spec for the Ingest Actions UI / REST
 - `props_transforms_preview.conf` — manual heavy-forwarder preview (filter to
   nullQueue, mask via INGEST_EVAL/SEDCMD)
-- `apply.sh` — stage the RFS destination into `splunk_ingest_actions/local` and
-  print the ruleset UI/REST handoff
+- `apply.sh` — stage the RFS destination into `splunk_ingest_actions/local`,
+  print the ruleset UI/REST handoff, and exit nonzero until that ruleset is
+  authored and verified
 - `status.sh` — list rulesets and surface RFS upload errors from `_internal`
 - `README.md` / `metadata.json` — review context
 

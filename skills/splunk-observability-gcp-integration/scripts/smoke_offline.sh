@@ -9,6 +9,7 @@ set -euo pipefail
 #   - rest/create.json has type=GCP
 #   - pollRate is 60000-600000 ms
 #   - authMethod is SERVICE_ACCOUNT_KEY
+#   - projects.syncMode is present
 #   - projectKey is the placeholder, not a real value
 #   - no secret values in any rendered file
 #   - terraform/main.tf contains signalfx_gcp_integration
@@ -103,6 +104,19 @@ assert data['authMethod'] == 'SERVICE_ACCOUNT_KEY', f'authMethod={data[\"authMet
 print(f'authMethod={data[\"authMethod\"]} OK')
 "; then
         failures+=("rest/create.json authMethod check failed")
+    fi
+
+    # Assert official nested projects contract is present.
+    if ! "${PYTHON_BIN}" -c "
+import json
+data = json.loads(open('${TMPDIR}/rendered/rest/create.json').read())
+projects = data.get('projects')
+assert isinstance(projects, dict), 'projects must be an object'
+sync_mode = projects.get('syncMode')
+assert sync_mode == 'ALL', f'projects.syncMode={sync_mode!r}'
+print('projects.syncMode=ALL OK')
+"; then
+        failures+=("rest/create.json projects.syncMode check failed")
     fi
 
     # Assert projectKey entries use the placeholder.

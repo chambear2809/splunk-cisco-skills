@@ -523,8 +523,14 @@ def render_sok_preflight(args: argparse.Namespace) -> str:
         "command -v kubectl >/dev/null",
         "command -v helm >/dev/null",
         "kubectl version --client=true",
+        "kubectl cluster-info",
+        "kubectl auth can-i get pods --all-namespaces | grep -qx yes",
         "helm version",
     ]
+    if args.storage_class:
+        lines.append(
+            f"kubectl get storageclass {shell_quote(args.storage_class)} >/dev/null"
+        )
     if args.eks_cluster_name:
         lines.extend(
             [
@@ -614,6 +620,8 @@ helm upgrade --install {shell_quote(args.operator_release_name)} splunk/splunk-o
   --version {shell_quote(chart_version(args))} \\
   --namespace {shell_quote(args.operator_namespace)} \\
   --create-namespace \\
+  --wait \
+  --timeout 15m \
   --values operator-values.yaml
 """
         ),
@@ -629,6 +637,8 @@ helm upgrade --install {shell_quote(args.release_name)} splunk/splunk-enterprise
   --version {shell_quote(chart_version(args))} \\
   --namespace {shell_quote(args.namespace)} \\
   --create-namespace \\
+  --wait \
+  --timeout 15m \
   --values enterprise-values.yaml
 """
         ),
@@ -659,11 +669,13 @@ helm upgrade --install {shell_quote(args.release_name)} splunk/splunk-enterprise
     emit(
         "status.sh",
         make_script(
-            f"""helm list --namespace {shell_quote(args.operator_namespace)}
-helm list --namespace {shell_quote(args.namespace)}
+            f"""helm status {shell_quote(args.operator_release_name)} --namespace {shell_quote(args.operator_namespace)}
+helm status {shell_quote(args.release_name)} --namespace {shell_quote(args.namespace)}
 kubectl get pods --namespace {shell_quote(args.operator_namespace)}
 kubectl get pods --namespace {shell_quote(args.namespace)}
-kubectl get standalone,indexercluster,searchheadcluster,clustermanager --namespace {shell_quote(args.namespace)} || true
+kubectl wait --for=condition=Ready pod --all --namespace {shell_quote(args.operator_namespace)} --timeout=5m
+kubectl wait --for=condition=Ready pod --all --namespace {shell_quote(args.namespace)} --timeout=15m
+{f'kubectl get standalone --namespace {shell_quote(args.namespace)}' if args.architecture == 's1' else f'kubectl get clustermanager,indexercluster,searchheadcluster --namespace {shell_quote(args.namespace)}'}
 """
         ),
         executable=True,

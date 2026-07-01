@@ -168,10 +168,74 @@ done < <(read_product_metadata) || {
     exit 1
 }
 
+if (( ${#metadata_lines[@]} < 3 )); then
+    echo "ERROR: Unknown product '${PRODUCT}'. Use --list-products."
+    exit 1
+fi
+
 INPUT_TYPE="${metadata_lines[0]}"
 PRODUCT_TITLE="${metadata_lines[1]}"
 DEFAULT_NAME="${metadata_lines[2]}"
 [[ -n "${INPUT_NAME}" ]] || INPUT_NAME="${DEFAULT_NAME}"
+
+# The product catalog is the authoritative contract for required fields and
+# secret handling. Validate it before handing values to the generic REST
+# configurator so an enabled stanza cannot be reported as configured while a
+# product credential or required selector is absent.
+python3 - "${PRODUCTS_FILE}" "${PRODUCT}" "${DISABLE_INPUT}" "${#USER_KEYS[@]}" "${#USER_SECRET_KEYS[@]}" \
+    "${USER_KEYS[@]}" "${USER_VALUES[@]}" "${USER_SECRET_KEYS[@]}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+products_path = Path(sys.argv[1])
+product_key = sys.argv[2]
+disable_only = sys.argv[3] == "true"
+field_count = int(sys.argv[4])
+secret_count = int(sys.argv[5])
+args = sys.argv[6:]
+
+field_keys = args[:field_count]
+field_values = args[field_count : field_count * 2]
+secret_keys = args[field_count * 2 : field_count * 2 + secret_count]
+
+entry = json.loads(products_path.read_text(encoding="utf-8"))[product_key]
+declared_secrets = set(entry.get("secret_fields") or [])
+provided_fields = dict(zip(field_keys, field_values))
+provided_secrets = set(secret_keys)
+
+errors = []
+for key in sorted(set(field_keys) & declared_secrets):
+    errors.append(f"secret field '{key}' must use --secret-file, not --set")
+for key in sorted(provided_secrets - declared_secrets):
+    errors.append(f"'{key}' is not a declared secret field for product '{product_key}'")
+
+effective = dict(entry.get("defaults") or {})
+effective.update(provided_fields)
+if not disable_only:
+    for key in entry.get("required_fields") or []:
+        if str(effective.get(key, "")).strip() == "":
+            errors.append(f"missing required field '{key}' (use --set {key} VALUE)")
+    for key in entry.get("required_secret_fields") or []:
+        if key not in provided_secrets:
+            errors.append(f"missing required secret '{key}' (use --secret-file {key} PATH)")
+
+for rule in [] if disable_only else entry.get("conditional_required_secret_fields") or []:
+    field = str(rule.get("field") or "")
+    expected = str(rule.get("value") or "")
+    actual = str(effective.get(field, "") or "")
+    if field and actual.strip().lower() == expected.strip().lower():
+        for key in rule.get("secret_keys") or []:
+            if key not in provided_secrets:
+                errors.append(
+                    f"field '{field}={actual}' requires --secret-file {key} PATH"
+                )
+
+if errors:
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    raise SystemExit(1)
+PY
 
 cmd=(bash "${CONFIGURE_INPUT_SCRIPT}" --input-type "${INPUT_TYPE}" --name "${INPUT_NAME}")
 if ! ${CREATE_INDEX}; then
@@ -181,13 +245,15 @@ if ${DISABLE_INPUT}; then
     cmd+=(--disable)
 fi
 
-for kv in "${metadata_lines[@]:3}"; do
-    key="${kv%%=*}"
-    value="${kv#*=}"
-    if ! has_user_key "${key}"; then
-        cmd+=(--set "${key}" "${value}")
-    fi
-done
+if ! ${DISABLE_INPUT}; then
+    for kv in "${metadata_lines[@]:3}"; do
+        key="${kv%%=*}"
+        value="${kv#*=}"
+        if ! has_user_key "${key}"; then
+            cmd+=(--set "${key}" "${value}")
+        fi
+    done
+fi
 
 for i in "${!USER_KEYS[@]}"; do
     cmd+=(--set "${USER_KEYS[$i]}" "${USER_VALUES[$i]}")

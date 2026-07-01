@@ -39,9 +39,10 @@ INPUT_NAME="default"
 GRPC_PORT="4317"
 HTTP_PORT="4318"
 LISTEN_ADDRESS="0.0.0.0"
-ENABLE_SSL="false"
+ENABLE_SSL="true"
 SERVER_CERT=""
 SERVER_KEY=""
+ACCEPT_PLAINTEXT_LISTENER=false
 DISABLED="0"
 INDEX="otlp_events"
 HOST_VALUE=""
@@ -51,7 +52,7 @@ INTERVAL="0"
 EXPECTED_INDEX="otlp_events"
 RECEIVER_HOST="otlp-hf.example.com"
 SENDER_PROTOCOL="both"
-SENDER_TLS="false"
+SENDER_TLS="true"
 HEC_TOKEN_FILE="/tmp/splunk_otlp_hec_token"
 HEC_PLATFORM="${SPLUNK_PLATFORM:-enterprise}"
 HEC_TOKEN_NAME="splunk_otlp"
@@ -83,9 +84,11 @@ Modular input:
   --grpc-port PORT                  OTLP gRPC port (default: 4317; port 0 rejected)
   --http-port PORT                  OTLP HTTP port (default: 4318; port 0 rejected)
   --listen-address ADDR             Listen address (default: 0.0.0.0)
-  --enable-ssl true|false           Enable receiver TLS (default: false)
+  --enable-ssl true|false           Enable receiver TLS (default: true)
   --server-cert PATH                Server certificate path for enableSSL
   --server-key PATH                 Server key path for enableSSL
+  --accept-insecure-plaintext-listener
+                                     Allow non-loopback receiver/sender HTTP (lab only)
   --index INDEX                     Input-level default index (default: otlp_events)
   --host VALUE
   --source VALUE                    Default source (default: otlp)
@@ -98,7 +101,7 @@ Sender and HEC handoff:
   --render                          Render both sender config and HEC handoff
   --receiver-host HOST              Receiver host for sender assets
   --sender-protocol both|grpc|http  Sender protocol examples (default: both)
-  --sender-tls true|false           Render HTTPS/TLS sender endpoints
+  --sender-tls true|false           Render HTTPS/TLS sender endpoints (default: true)
   --hec-token-file PATH             Local token file path reference; value is never read
   --hec-platform enterprise|cloud   HEC setup target (default: SPLUNK_PLATFORM or enterprise)
   --hec-token-name NAME             HEC token name for handoff
@@ -159,6 +162,7 @@ while [[ $# -gt 0 ]]; do
         --enable-ssl) require_value "$1" $#; ENABLE_SSL="$2"; shift 2 ;;
         --server-cert) require_value "$1" $#; SERVER_CERT="$2"; shift 2 ;;
         --server-key) require_value "$1" $#; SERVER_KEY="$2"; shift 2 ;;
+        --accept-insecure-plaintext-listener) ACCEPT_PLAINTEXT_LISTENER=true; shift ;;
         --index) require_value "$1" $#; INDEX="$2"; EXPECTED_INDEX="$2"; shift 2 ;;
         --host) require_value "$1" $#; HOST_VALUE="$2"; shift 2 ;;
         --source) require_value "$1" $#; SOURCE_VALUE="$2"; shift 2 ;;
@@ -204,6 +208,22 @@ positive_port() {
     fi
 }
 
+reject_newline() {
+    local value="$1" option="$2"
+    if [[ "${value}" == *$'\n'* || "${value}" == *$'\r'* ]]; then
+        log "ERROR: ${option} must not contain newlines."
+        exit 1
+    fi
+}
+
+validate_index_name() {
+    local value="$1" option="$2"
+    if [[ ! "${value}" =~ ^[_A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: ${option} contains an invalid Splunk index name: ${value}"
+        exit 1
+    fi
+}
+
 resolve_abs_path() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -213,19 +233,85 @@ PY
 }
 
 validate_common_args() {
+    local allowed_index expected_allowed=false
+    local -a allowed_index_array
     validate_choice "${ENABLE_SSL}" true false
     validate_choice "${SENDER_PROTOCOL}" both grpc http
     validate_choice "${SENDER_TLS}" true false
     validate_choice "${HEC_PLATFORM}" enterprise cloud
     positive_port "${GRPC_PORT}" "--grpc-port"
     positive_port "${HTTP_PORT}" "--http-port"
-    if [[ "${ENABLE_SSL}" == "true" && ( -z "${SERVER_CERT}" || -z "${SERVER_KEY}" ) ]]; then
+    if [[ ! "${INTERVAL}" =~ ^[0-9]+$ ]]; then
+        log "ERROR: --interval must be a nonnegative integer."
+        exit 1
+    fi
+    if [[ "${CONFIGURE_INPUT}" == "true" && "${ENABLE_SSL}" == "true" && ( -z "${SERVER_CERT}" || -z "${SERVER_KEY}" ) ]]; then
         log "ERROR: --enable-ssl true requires --server-cert and --server-key."
+        exit 1
+    fi
+    if [[ "${CONFIGURE_INPUT}" == "true" && "${ENABLE_SSL}" == "false" \
+        && "${LISTEN_ADDRESS}" != "127.0.0.1" && "${LISTEN_ADDRESS}" != "localhost" \
+        && "${LISTEN_ADDRESS}" != "::1" && "${LISTEN_ADDRESS}" != "[::1]" \
+        && "${ACCEPT_PLAINTEXT_LISTENER}" != "true" ]]; then
+        log "ERROR: refusing a non-loopback plaintext OTLP listener."
+        log "       Enable TLS or pass --accept-insecure-plaintext-listener for an explicit lab-only exception."
+        exit 1
+    fi
+    if [[ "${RENDER_SENDER_CONFIG}" == "true" && "${SENDER_TLS}" == "false" \
+        && "${RECEIVER_HOST}" != "127.0.0.1" && "${RECEIVER_HOST}" != "localhost" \
+        && "${RECEIVER_HOST}" != "::1" && "${RECEIVER_HOST}" != "[::1]" \
+        && "${ACCEPT_PLAINTEXT_LISTENER}" != "true" ]]; then
+        log "ERROR: refusing to render a plaintext sender for a non-loopback receiver."
+        log "       Enable sender TLS or pass --accept-insecure-plaintext-listener for an explicit lab-only exception."
+        exit 1
+    fi
+    if [[ ! "${INPUT_NAME}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+        log "ERROR: --input-name may contain only letters, numbers, dot, underscore, colon, and hyphen."
+        exit 1
+    fi
+    if [[ ! "${HEC_TOKEN_NAME}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+        log "ERROR: --hec-token-name may contain only letters, numbers, dot, underscore, colon, and hyphen."
+        exit 1
+    fi
+    validate_index_name "${INDEX}" "--index"
+    validate_index_name "${EXPECTED_INDEX}" "--expected-index"
+    reject_newline "${LISTEN_ADDRESS}" "--listen-address"
+    reject_newline "${SERVER_CERT}" "--server-cert"
+    reject_newline "${SERVER_KEY}" "--server-key"
+    reject_newline "${HOST_VALUE}" "--host"
+    reject_newline "${SOURCE_VALUE}" "--source"
+    reject_newline "${SOURCETYPE_VALUE}" "--sourcetype"
+    reject_newline "${RECEIVER_HOST}" "--receiver-host"
+    reject_newline "${HEC_TOKEN_FILE}" "--hec-token-file"
+    reject_newline "${OUTPUT_DIR}" "--output-dir"
+    reject_newline "${HEC_ALLOWED_INDEXES}" "--hec-allowed-indexes"
+    if [[ ! "${RECEIVER_HOST}" =~ ^[A-Za-z0-9_.-]+$ && ! "${RECEIVER_HOST}" =~ ^\[[A-Za-z0-9:._%-]+\]$ ]]; then
+        log "ERROR: --receiver-host must be a host name, IPv4 address, or bracketed IPv6 address without a URL scheme/path."
         exit 1
     fi
     OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
     if [[ -z "${HEC_ALLOWED_INDEXES}" ]]; then
         HEC_ALLOWED_INDEXES="${EXPECTED_INDEX}"
+    fi
+    if [[ "${HEC_ALLOWED_INDEXES}" == ,* || "${HEC_ALLOWED_INDEXES}" == *,,* || "${HEC_ALLOWED_INDEXES}" == *, ]]; then
+        log "ERROR: --hec-allowed-indexes contains an empty index."
+        exit 1
+    fi
+    IFS=',' read -r -a allowed_index_array <<< "${HEC_ALLOWED_INDEXES}"
+    if (( ${#allowed_index_array[@]} == 0 )); then
+        log "ERROR: --hec-allowed-indexes must contain at least one index."
+        exit 1
+    fi
+    for allowed_index in "${allowed_index_array[@]}"; do
+        allowed_index="${allowed_index#"${allowed_index%%[![:space:]]*}"}"
+        allowed_index="${allowed_index%"${allowed_index##*[![:space:]]}"}"
+        [[ -n "${allowed_index}" ]] || { log "ERROR: --hec-allowed-indexes contains an empty index."; exit 1; }
+        validate_index_name "${allowed_index}" "--hec-allowed-indexes"
+        [[ "${allowed_index}" == "${EXPECTED_INDEX}" ]] && expected_allowed=true
+    done
+    if [[ "${expected_allowed}" != "true" ]]; then
+        log "ERROR: --hec-allowed-indexes must include --expected-index (${EXPECTED_INDEX})."
+        exit 1
     fi
 }
 
@@ -452,6 +538,9 @@ render_sender_config() {
         --source "${SOURCE_VALUE}"
         --sourcetype "${SOURCETYPE_VALUE}"
     )
+    if [[ "${ACCEPT_PLAINTEXT_LISTENER}" == "true" ]]; then
+        cmd+=(--accept-insecure-plaintext-listener)
+    fi
     if [[ "${DRY_RUN}" == "true" ]]; then
         cmd+=(--dry-run)
     fi
@@ -462,7 +551,8 @@ render_sender_config() {
 }
 
 render_hec_handoff() {
-    local dir script token_file_arg
+    local dir script setup_q platform_q token_name_q default_index_q allowed_indexes_q
+    local source_q sourcetype_q output_q token_file_q token_file_flag_q token_file_flag
     dir="${OUTPUT_DIR}/${APP_NAME}"
     script="${dir}/render-hec-handoff.sh"
     if [[ "${DRY_RUN}" == "true" ]]; then
@@ -470,26 +560,36 @@ render_hec_handoff() {
         return 0
     fi
     mkdir -p "${dir}"
-    token_file_arg=""
-    if [[ -n "${HEC_TOKEN_FILE}" ]]; then
-        token_file_arg="--token-file ${HEC_TOKEN_FILE}"
+    printf -v setup_q '%q' "${PROJECT_ROOT}/skills/splunk-hec-service-setup/scripts/setup.sh"
+    printf -v platform_q '%q' "${HEC_PLATFORM}"
+    printf -v token_name_q '%q' "${HEC_TOKEN_NAME}"
+    printf -v default_index_q '%q' "${EXPECTED_INDEX}"
+    printf -v allowed_indexes_q '%q' "${HEC_ALLOWED_INDEXES}"
+    printf -v source_q '%q' "${SOURCE_VALUE}"
+    printf -v sourcetype_q '%q' "${SOURCETYPE_VALUE}"
+    printf -v output_q '%q' "${OUTPUT_DIR}/hec-service"
+    printf -v token_file_q '%q' "${HEC_TOKEN_FILE}"
+    if [[ "${HEC_PLATFORM}" == "cloud" ]]; then
+        token_file_flag="--write-token-file"
+    else
+        token_file_flag="--token-file"
     fi
+    printf -v token_file_flag_q '%q' "${token_file_flag}"
     cat > "${script}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT}"
-exec bash "\${PROJECT_ROOT}/skills/splunk-hec-service-setup/scripts/setup.sh" \\
-  --platform "${HEC_PLATFORM}" \\
+exec bash ${setup_q} \\
+  --platform ${platform_q} \\
   --phase render \\
-  --token-name "${HEC_TOKEN_NAME}" \\
+  --token-name ${token_name_q} \\
   --description "Managed for splunk-connect-for-otlp" \\
-  --default-index "${EXPECTED_INDEX}" \\
-  --allowed-indexes "${HEC_ALLOWED_INDEXES}" \\
-  --source "${SOURCE_VALUE}" \\
-  --sourcetype "${SOURCETYPE_VALUE}" \\
-  --output-dir "${OUTPUT_DIR}/hec-service" \\
-  ${token_file_arg}
+  --default-index ${default_index_q} \\
+  --allowed-indexes ${allowed_indexes_q} \\
+  --source ${source_q} \\
+  --sourcetype ${sourcetype_q} \\
+  --output-dir ${output_q} \\
+  ${token_file_flag_q} ${token_file_q}
 EOF
     chmod 755 "${script}"
     log "Rendered HEC handoff to ${script}"
@@ -537,7 +637,7 @@ run_doctor() {
 }
 
 run_repair() {
-    local fix
+    local fix unresolved=0
     if [[ -z "${FIXES}" ]]; then
         log "ERROR: --repair requires --fixes FIX_ID[,FIX_ID]."
         exit 1
@@ -552,15 +652,24 @@ run_repair() {
             INPUT_DISABLED) set_input_state 0 ;;
             HEC_GLOBAL_DISABLED|HEC_TOKEN_MISSING|HEC_TOKEN_DISABLED|HEC_ALLOWED_INDEX_MISSING)
                 render_hec_handoff
+                log "HANDOFF: ${fix} requires review/apply through ${OUTPUT_DIR}/${APP_NAME}/render-hec-handoff.sh."
+                unresolved=$((unresolved + 1))
                 ;;
             TLS_SENDER_RECEIVER_MISMATCH|SENDER_INDEX_FORBIDDEN|SENDER_AUTH_HEADER_MISSING|SENDER_HTTP_PATH_INVALID|SENDER_PORT_MISMATCH)
                 render_sender_config
+                log "HANDOFF: ${fix} requires deploying and validating the sender assets under ${OUTPUT_DIR}/${APP_NAME}."
+                unresolved=$((unresolved + 1))
                 ;;
             *)
-                log "No automated repair for ${fix}; see doctor fix plan."
+                log "HANDOFF: No automated repair exists for '${fix}'. Run --doctor, follow the rendered fix plan, and rerun --validate."
+                unresolved=$((unresolved + 1))
                 ;;
         esac
     done
+    if (( unresolved > 0 )) && [[ "${DRY_RUN}" != "true" ]]; then
+        log "ERROR: ${unresolved} requested repair(s) produced operator handoffs and remain incomplete."
+        return 1
+    fi
 }
 
 main() {

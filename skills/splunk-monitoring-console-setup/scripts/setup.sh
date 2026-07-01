@@ -109,9 +109,19 @@ validate_args() {
     validate_choice "${ENABLE_PLATFORM_ALERTS}" true false
     validate_choice "${SEARCH_PEER_SCHEME}" https http
     validate_choice "${RESTART_SPLUNK}" true false
+    if [[ "${RESTART_SPLUNK}" != "true" &&
+          ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: Monitoring Console apply requires --restart-splunk true; use render-only for staged configuration."
+        exit 2
+    fi
     if [[ -n "${SEARCH_PEERS}" && -z "${PEER_USERNAME}" ]]; then
         log "ERROR: --peer-username is required when --search-peers is supplied."
         exit 1
+    fi
+    if [[ -n "${SEARCH_PEERS}" && ( "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ) ]]; then
+        log "ERROR: search-peer onboarding requires remote credentials and is an explicit Splunk Web/operator handoff."
+        log "       Render and review with --phase render, onboard peers securely, then apply without --search-peers."
+        exit 2
     fi
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
         log "ERROR: --json is supported only for render-only or --dry-run workflows."
@@ -185,9 +195,9 @@ main() {
             fi
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
-        apply) render_assets; run_rendered_script apply.sh; run_rendered_script add-search-peers.sh ;;
+        apply) render_assets; run_rendered_script apply.sh ;;
         status) render_assets; run_rendered_script status.sh ;;
-        all) render_assets; run_rendered_script preflight.sh; run_rendered_script apply.sh; run_rendered_script add-search-peers.sh; run_rendered_script status.sh ;;
+        all) render_assets; run_rendered_script preflight.sh; run_rendered_script apply.sh; run_rendered_script status.sh ;;
     esac
 }
 

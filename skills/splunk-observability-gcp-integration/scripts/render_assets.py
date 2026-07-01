@@ -5,15 +5,16 @@ Reads a YAML or JSON spec (default: ``template.example``) and emits a
 render-first plan tree under ``--output-dir``:
 
 - ``rest/``         — POST/PUT /v2/integration payloads (type=GCP)
-- ``terraform/``    — signalfx_gcp_integration resource + variables
-- ``gcloud-cli/``   — SA creation + role binding scripts
+- ``terraform/``    — signalfx_gcp_integration resource for service-account auth
+- ``gcloud-cli/``   — service-account creation + role binding scripts
 - ``handoffs/``     — cross-skill driver scripts (opt-in per handoffs.*)
 - ``state/``        — placeholder; populated by gcp_integration_api.py on apply
 - ``coverage-report.json``
 - ``apply-plan.json``
 
-The renderer never accepts or writes any secret value.  projectKey and the
-Splunk O11y token are referenced as file-paths only.
+The renderer never accepts or writes any secret value. ``projectKey``, the
+official Splunk-generated ``gcp_wif_config.json``, and the Splunk O11y token
+are referenced as file paths only.
 """
 
 from __future__ import annotations
@@ -52,7 +53,6 @@ TERRAFORM_PROVIDER_VERSION_DEFAULT = "~> 9.0"
 SERVICES_MODES: tuple[str, ...] = ("all_built_in", "explicit")
 
 SERVICES_ENUM_PATH = Path(__file__).parent.parent / "references" / "services-enum.json"
-WIF_PRINCIPALS_PATH = Path(__file__).parent.parent / "references" / "wif-splunk-principals.json"
 
 SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"eyJ[A-Za-z0-9._-]{20,}"),
@@ -73,17 +73,12 @@ class RenderError(Exception):
 def load_services_enum() -> list[str]:
     try:
         data = json.loads(SERVICES_ENUM_PATH.read_text(encoding="utf-8"))
-        return list(data.get("services", []))
-    except Exception:
-        return []
-
-
-def load_wif_principals() -> dict[str, str]:
-    try:
-        data = json.loads(WIF_PRINCIPALS_PATH.read_text(encoding="utf-8"))
-        return dict(data.get("principals", {}))
-    except Exception:
-        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RenderError(f"cannot load GCP services enum {SERVICES_ENUM_PATH}: {exc}") from exc
+    services = data.get("services") if isinstance(data, dict) else None
+    if not isinstance(services, list) or not services or not all(isinstance(item, str) and item for item in services):
+        raise RenderError(f"GCP services enum {SERVICES_ENUM_PATH} must contain a non-empty string list")
+    return list(services)
 
 
 def load_spec(path: Path) -> dict[str, Any]:
@@ -110,7 +105,8 @@ def assert_no_secrets_in_text(text: str, label: str) -> None:
 def validate_spec(
     spec: dict[str, Any],
     realm_override: str | None = None,
-    key_file_override: str | None = None,
+    key_file_overrides: list[str] | None = None,
+    wif_config_file_override: str | None = None,
 ) -> dict[str, Any]:
     """Normalize spec, fill defaults, FAIL on hard errors."""
     if not isinstance(spec, dict):
@@ -137,24 +133,31 @@ def validate_spec(
             f"authentication.mode must be one of {AUTH_MODES}, got {auth_mode!r}"
         )
 
-    # Conflict matrix: SA key mode vs WIF block.
+    # Conflict matrix: SA key mode vs WIF configuration.
     psk = auth.get("project_service_keys") or []
     wif = auth.get("workload_identity_federation") or {}
-    wif_has_data = bool(wif.get("pool_id") or wif.get("provider_id"))
+    if not isinstance(wif, dict):
+        raise RenderError("authentication.workload_identity_federation must be a mapping")
+    wif_has_data = any(value not in (None, "", [], {}) for value in wif.values())
 
     if auth_mode == "service_account_key":
+        if wif_config_file_override:
+            raise RenderError("--wif-config-file cannot be used with service_account_key")
         if wif_has_data:
             raise RenderError(
                 "authentication.mode=service_account_key but workload_identity_federation "
                 "block is populated. Remove the WIF block or change mode."
             )
-        # Apply key_file override if provided.
-        if key_file_override and psk:
-            for entry in psk:
+        # Apply repeated key-file overrides one-to-one in project spec order.
+        if key_file_overrides:
+            if len(key_file_overrides) != len(psk):
+                raise RenderError(
+                    f"received {len(key_file_overrides)} --key-file value(s) for "
+                    f"{len(psk)} project_service_keys entries; supply exactly one per project"
+                )
+            for entry, key_file in zip(psk, key_file_overrides):
                 if isinstance(entry, dict):
-                    entry["key_file"] = key_file_override
-        elif key_file_override:
-            auth["project_service_keys"] = [{"project_id": "unknown", "key_file": key_file_override}]
+                    entry["key_file"] = key_file
         if not psk:
             raise RenderError(
                 "authentication.project_service_keys is required when mode=service_account_key. "
@@ -164,21 +167,36 @@ def validate_spec(
             if not isinstance(entry, dict) or not entry.get("project_id"):
                 raise RenderError("each project_service_keys entry must have a project_id")
     elif auth_mode == "workload_identity_federation":
+        if key_file_overrides:
+            raise RenderError("--key-file cannot be used with workload_identity_federation")
         if psk:
             raise RenderError(
                 "authentication.mode=workload_identity_federation but project_service_keys "
                 "is populated. Remove the project_service_keys block or change mode."
             )
-        auth.setdefault("workload_identity_federation", {})
-        wif = auth["workload_identity_federation"]
-        wif.setdefault("pool_id", "")
-        wif.setdefault("provider_id", "")
-        # Auto-fill splunk_principal from realm map if empty.
-        if not wif.get("splunk_principal"):
-            principals = load_wif_principals()
-            wif["splunk_principal"] = principals.get(
-                realm, "${SPLUNK_WIF_PRINCIPAL_CONTACT_SPLUNK_SUPPORT}"
+        legacy_fields = sorted(
+            key for key in ("pool_id", "provider_id", "splunk_principal") if key in wif
+        )
+        if legacy_fields:
+            raise RenderError(
+                "unsupported legacy WIF fields are present: "
+                + ", ".join(legacy_fields)
+                + ". Do not construct pool/provider/principal values; use config_file "
+                  "pointing to Splunk's official generated gcp_wif_config.json."
             )
+        if wif_config_file_override:
+            wif["config_file"] = wif_config_file_override
+        config_file = str(wif.get("config_file") or "").strip()
+        if not config_file:
+            raise RenderError(
+                "authentication.workload_identity_federation.config_file is required in WIF mode; "
+                "use the official Splunk-generated gcp_wif_config.json file"
+            )
+        if Path(config_file).name != "gcp_wif_config.json":
+            raise RenderError(
+                "WIF config_file must reference the official generated file named gcp_wif_config.json"
+            )
+        wif["config_file"] = config_file
 
     conn = spec.setdefault("connection", {})
     poll_rate = int(conn.setdefault("poll_rate_seconds", 300))
@@ -201,6 +219,21 @@ def validate_spec(
             f"projects.sync_mode must be ALL or SELECTED, got {projects['sync_mode']!r}"
         )
     projects.setdefault("selected_project_ids", [])
+    selected_project_ids = projects["selected_project_ids"]
+    if not isinstance(selected_project_ids, list) or not all(
+        isinstance(project_id, str) and project_id.strip()
+        for project_id in selected_project_ids
+    ):
+        raise RenderError("projects.selected_project_ids must be a list of non-empty strings")
+    projects["selected_project_ids"] = list(dict.fromkeys(selected_project_ids))
+    if projects["sync_mode"] == "ALL" and projects["selected_project_ids"]:
+        raise RenderError(
+            "projects.selected_project_ids must be empty when projects.sync_mode=ALL"
+        )
+    if projects["sync_mode"] == "SELECTED" and not projects["selected_project_ids"]:
+        raise RenderError(
+            "projects.selected_project_ids must be non-empty when projects.sync_mode=SELECTED"
+        )
 
     services = spec.setdefault("services", {})
     services.setdefault("mode", "all_built_in")
@@ -277,10 +310,12 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         }
         coverage["authentication.wif"] = {"status": "not_applicable", "notes": "SA key mode"}
     else:
-        wif = auth.get("workload_identity_federation", {})
         coverage["authentication.wif"] = {
             "status": "api_apply",
-            "notes": f"WIF pool={wif.get('pool_id')} provider={wif.get('provider_id')}",
+            "notes": (
+                "official gcp_wif_config.json supplied by file; sent as compact JSON in "
+                "workloadIdentityFederationConfig"
+            ),
         }
         coverage["authentication.project_service_keys"] = {
             "status": "not_applicable",
@@ -337,15 +372,29 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     else:
         coverage["named_token"] = {"status": "not_applicable", "notes": "using default org token"}
 
-    coverage["terraform.resource"] = {
-        "status": "handoff",
-        "notes": f"signalfx_gcp_integration in terraform/main.tf (provider {spec['terraform_provider']['version']})",
-    }
+    if auth_mode == "service_account_key":
+        coverage["terraform.resource"] = {
+            "status": "handoff",
+            "notes": f"signalfx_gcp_integration in terraform/main.tf (provider {spec['terraform_provider']['version']})",
+        }
+    else:
+        coverage["terraform.resource"] = {
+            "status": "not_applicable",
+            "notes": (
+                "No Terraform WIF resource is claimed; use the REST apply path with the "
+                "official generated gcp_wif_config.json"
+            ),
+        }
 
-    if spec["gcloud_cli_render"]:
+    if spec["gcloud_cli_render"] and auth_mode == "service_account_key":
         coverage["gcloud_cli"] = {
-            "status": "api_apply",
+            "status": "handoff",
             "notes": "gcloud-cli/create-sa.sh + bind-roles.sh rendered",
+        }
+    elif auth_mode == "workload_identity_federation":
+        coverage["gcloud_cli"] = {
+            "status": "not_applicable",
+            "notes": "WIF pool/provider construction is intentionally not generated",
         }
     else:
         coverage["gcloud_cli"] = {"status": "not_applicable", "notes": "gcloud_cli_render=false"}
@@ -364,7 +413,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     }
     coverage["validation.credential_hash"] = {
         "status": "api_validate",
-        "notes": "SHA-256 of key_file(s) vs state/credential-hashes.json",
+        "notes": "SHA-256 of key_file(s) or WIF config vs state/credential-hashes.json",
     }
 
     handoffs = spec["handoffs"]
@@ -386,7 +435,8 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
     """Produce the canonical POST /v2/integration body (type=GCP).
 
     pollRate: wire is milliseconds; spec is seconds.
-    projectKey: rendered as file-path placeholder only, never the value.
+    projectKey and workloadIdentityFederationConfig are rendered as placeholders;
+    the API client reads their chmod-600 files immediately before apply.
     """
     auth = spec["authentication"]
     auth_mode = auth["mode"]
@@ -396,11 +446,16 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
     payload: dict[str, Any] = {
         "type": "GCP",
         "name": spec["integration_name"],
-        "enabled": False,
+        "enabled": True,
         "pollRate": conn["poll_rate_seconds"] * 1000,
         "useMetricSourceProjectForQuota": bool(conn["use_metric_source_project_for_quota"]),
         "importGCPMetrics": bool(conn["import_gcp_metrics"]),
+        "projects": {
+            "syncMode": spec["projects"]["sync_mode"],
+        },
     }
+    if spec["projects"]["sync_mode"] == "SELECTED":
+        payload["projects"]["projectIds"] = list(spec["projects"]["selected_project_ids"])
 
     if auth_mode == "service_account_key":
         payload["authMethod"] = "SERVICE_ACCOUNT_KEY"
@@ -415,10 +470,9 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
         ]
     elif auth_mode == "workload_identity_federation":
         payload["authMethod"] = "WORKLOAD_IDENTITY_FEDERATION"
-        wif = auth.get("workload_identity_federation", {})
-        payload["workloadIdentityPoolId"] = wif.get("pool_id", "")
-        payload["workloadIdentityProviderId"] = wif.get("provider_id", "")
-        payload["projectServiceKeys"] = []
+        payload["workloadIdentityFederationConfig"] = (
+            "${WORKLOAD_IDENTITY_FEDERATION_CONFIG_FROM_FILE}"
+        )
 
     if services["mode"] == "explicit" and services["explicit"]:
         payload["services"] = list(services["explicit"])
@@ -450,6 +504,17 @@ def render_terraform_main(spec: dict[str, Any]) -> str:
     auth = spec["authentication"]
     auth_mode = auth["mode"]
 
+    if auth_mode == "workload_identity_federation":
+        return """# Workload Identity Federation is intentionally not rendered as a
+# signalfx_gcp_integration Terraform resource here. The supported contract uses
+# authMethod=WORKLOAD_IDENTITY_FEDERATION and a compact JSON string loaded from
+# Splunk's official generated gcp_wif_config.json. This skill does not claim
+# provider arguments for that opaque file.
+#
+# Apply WIF through scripts/setup.sh --apply --wif-config-file
+# /secure/path/gcp_wif_config.json after reviewing rest/create.json.
+"""
+
     services_block = ""
     if services["mode"] == "explicit" and services["explicit"]:
         services_block = "  services = " + json.dumps(services["explicit"], indent=4).replace("\n", "\n  ") + "\n"
@@ -458,23 +523,16 @@ def render_terraform_main(spec: dict[str, Any]) -> str:
 
     poll_rate_comment = "  # poll_rate is in SECONDS for signalfx_gcp_integration (60-600)"
 
-    if auth_mode == "service_account_key":
-        psk = auth.get("project_service_keys") or []
-        project_keys_block = ""
-        for entry in psk:
-            if isinstance(entry, dict) and entry.get("project_id"):
-                project_keys_block += f"""
+    psk = auth.get("project_service_keys") or []
+    project_keys_block = ""
+    for entry in psk:
+        if isinstance(entry, dict) and entry.get("project_id"):
+            project_keys_block += f"""
   project_service_keys {{
     project_id  = "{entry['project_id']}"
     project_key = var.project_key  # sensitive; deliver via TF_VAR_project_key or vault
   }}"""
-        auth_block = project_keys_block + "\n"
-    else:
-        wif = auth.get("workload_identity_federation", {})
-        auth_block = f"""
-  workload_identity_pool_id     = "{wif.get('pool_id', '')}"
-  workload_identity_provider_id = "{wif.get('provider_id', '')}"
-"""
+    auth_block = project_keys_block + "\n"
 
     return f"""terraform {{
   required_providers {{
@@ -516,8 +574,8 @@ def render_terraform_variables(spec: dict[str, Any]) -> str:
 }
 """
     else:
-        return """# No sensitive variables required for Workload Identity Federation mode.
-# Pool ID and provider ID are rendered directly in main.tf.
+        return """# No Terraform variables are rendered for Workload Identity Federation.
+# Use the REST apply path with the official generated gcp_wif_config.json.
 """
 
 
@@ -682,7 +740,21 @@ def render_readme(spec: dict[str, Any]) -> str:
     auth = spec["authentication"]
     auth_mode = auth["mode"]
     psk = auth.get("project_service_keys") or []
-    project_count = len(psk) if auth_mode == "service_account_key" else "N/A (WIF)"
+    project_count = len(psk) if auth_mode == "service_account_key" else "managed by projects.syncMode"
+    if auth_mode == "service_account_key":
+        credential_step = "Create the GCP SA and key: `bash gcloud-cli/create-sa.sh`"
+        role_step = "Bind roles: `bash gcloud-cli/bind-roles.sh`"
+        apply_credential = "--key-file /secure/path/gcp-sa-key.json"
+        terraform_review = "Review `rest/create.json` and the optional `terraform/main.tf` handoff."
+    else:
+        credential_step = (
+            "Obtain Splunk's official generated `gcp_wif_config.json`; do not construct or edit it"
+        )
+        role_step = "Store it as a mode-600 regular file"
+        apply_credential = "--wif-config-file /secure/path/gcp_wif_config.json"
+        terraform_review = (
+            "Review `rest/create.json`; Terraform WIF arguments are intentionally not claimed."
+        )
 
     return f"""# Splunk Observability Cloud <-> GCP Integration ({spec['integration_name']})
 
@@ -700,10 +772,10 @@ Generated by [`{SKILL_NAME}`] at {datetime.now(timezone.utc).isoformat()}.
 
 ## Next steps
 
-1. Create the GCP SA and key: `bash gcloud-cli/create-sa.sh`
-2. Bind roles: `bash gcloud-cli/bind-roles.sh`
-3. Review `rest/create.json` and `terraform/main.tf`.
-4. Apply: `bash {SKILL_NAME}/scripts/setup.sh --apply --realm {spec['realm']} --token-file /tmp/splunk_token --key-file /tmp/splunk-gcp-sa-key.json`
+1. {credential_step}.
+2. {role_step}.
+3. {terraform_review}
+4. Apply: `bash {SKILL_NAME}/scripts/setup.sh --apply --realm {spec['realm']} --token-file /secure/path/splunk_token {apply_credential}`
 5. Validate: `bash {SKILL_NAME}/scripts/setup.sh --validate --live`
 
 See `coverage-report.json` for per-section coverage status.
@@ -735,7 +807,7 @@ def render(
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for sub in ("rest", "terraform", "gcloud-cli", "handoffs", "state"):
+    for sub in ("rest", "terraform", "gcloud-cli", "handoffs"):
         target = output_dir / sub
         if target.exists():
             shutil.rmtree(target)
@@ -749,6 +821,36 @@ def render(
     rest_dir.mkdir(parents=True, exist_ok=True)
     payload = render_rest_payload(spec)
     write_text(rest_dir / "create.json", json.dumps(payload, indent=2) + "\n")
+    write_text(
+        rest_dir / "project-key-file-manifest.json",
+        json.dumps(
+            [
+                {"projectId": entry.get("project_id", ""), "keyFile": entry.get("key_file", "")}
+                for entry in spec["authentication"].get("project_service_keys", [])
+                if isinstance(entry, dict)
+            ],
+            indent=2,
+        ) + "\n",
+    )
+    wif_config_file = ""
+    if spec["authentication"]["mode"] == "workload_identity_federation":
+        wif_config_file = str(
+            spec["authentication"]["workload_identity_federation"].get("config_file", "")
+        )
+    write_text(
+        rest_dir / "wif-config-file-manifest.json",
+        json.dumps(
+            {
+                "authMethod": (
+                    "WORKLOAD_IDENTITY_FEDERATION"
+                    if wif_config_file
+                    else "SERVICE_ACCOUNT_KEY"
+                ),
+                "configFile": wif_config_file,
+            },
+            indent=2,
+        ) + "\n",
+    )
     update_payload = {**payload, "enabled": True, "id": "${INTEGRATION_ID}"}
     write_text(rest_dir / "update.json", json.dumps(update_payload, indent=2) + "\n")
 
@@ -759,7 +861,10 @@ def render(
     write_text(tf_dir / "variables.tf", render_terraform_variables(spec))
 
     # GCloud CLI.
-    if spec["gcloud_cli_render"]:
+    if (
+        spec["gcloud_cli_render"]
+        and spec["authentication"]["mode"] == "service_account_key"
+    ):
         cli_dir = output_dir / "gcloud-cli"
         cli_dir.mkdir(parents=True, exist_ok=True)
         create_sa = render_gcloud_cli_create_sa(spec)
@@ -794,10 +899,18 @@ def render(
     state_dir = output_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "apply-state.json"
-    write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
+    if not state_path.exists():
+        write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
     os.chmod(state_path, 0o600)
     cred_hash_path = state_dir / "credential-hashes.json"
-    write_text(cred_hash_path, json.dumps({"project_key_sha256": {}}, indent=2) + "\n")
+    if not cred_hash_path.exists():
+        write_text(
+            cred_hash_path,
+            json.dumps(
+                {"project_key_sha256": {}, "wif_config_sha256": {}},
+                indent=2,
+            ) + "\n",
+        )
     os.chmod(cred_hash_path, 0o600)
 
     # Coverage report.
@@ -808,6 +921,13 @@ def render(
                 "api_version": API_VERSION,
                 "realm": spec["realm"],
                 "integration_name": spec["integration_name"],
+                "auth_method": spec["authentication"]["mode"].upper(),
+                "projects_sync_mode": spec["projects"]["sync_mode"],
+                "wif_config_delivery": (
+                    "file-backed compact JSON string"
+                    if spec["authentication"]["mode"] == "workload_identity_federation"
+                    else None
+                ),
                 "coverage": coverage,
                 "warnings": spec.get("_warnings", []),
                 "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -822,11 +942,18 @@ def render(
         "api_version": API_VERSION,
         "ordered_steps": [
             {
-                "step": "gcloud_cli.create_sa" if auth_mode == "service_account_key" else "gcloud_cli.create_wif_pool",
+                "step": (
+                    "gcloud_cli.create_sa"
+                    if auth_mode == "service_account_key"
+                    else "prerequisites.obtain_official_wif_config"
+                ),
                 "description": (
                     "Create GCP SA + download key + bind Monitoring Viewer + Compute Viewer roles"
                     if auth_mode == "service_account_key"
-                    else "Create WIF pool + provider; configure Splunk principal IAM binding"
+                    else (
+                        "Obtain Splunk's official generated gcp_wif_config.json and store it "
+                        "as a mode-600 file; no pool/provider/principal values are fabricated"
+                    )
                 ),
                 "operator_driven": True,
             },
@@ -876,7 +1003,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spec", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--realm", default="")
-    parser.add_argument("--key-file", default="")
+    parser.add_argument("--key-file", action="append", default=[])
+    parser.add_argument("--wif-config-file", default="")
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--list-services", action="store_true")
@@ -904,7 +1032,8 @@ def main() -> int:
         spec = validate_spec(
             spec,
             realm_override=args.realm or None,
-            key_file_override=args.key_file or None,
+            key_file_overrides=args.key_file or None,
+            wif_config_file_override=args.wif_config_file or None,
         )
     except RenderError as exc:
         print(f"FAIL: {exc}", flush=True)

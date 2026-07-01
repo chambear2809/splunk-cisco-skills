@@ -18,7 +18,7 @@ rates) when calling `https://api.<realm>.observability.splunkcloud.com/v2/integr
 |------------|----------------|--------------|-------|
 | `integration_name` | `name` | string | Display name |
 | (constant) | `type` | string | Always `AWSCloudWatch` |
-| (computed) | `enabled` | bool | Master on/off; renderer sets to `true` after the IAM trust step |
+| (computed) | `enabled` | bool | SecurityToken apply writes `true`; ExternalId remains a reviewed two-phase create/IAM/finalize handoff |
 | `authentication.mode` | `authMethod` | string | `ExternalId` (commercial) or `SecurityToken` (GovCloud / China) |
 | (computed from CFN) | `roleArn` | string | Required for `ExternalId`; the customer's IAM role ARN |
 | (returned on create) | `externalId` | string | Server-generated; embed in IAM trust policy |

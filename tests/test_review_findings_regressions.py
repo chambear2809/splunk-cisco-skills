@@ -92,7 +92,7 @@ def test_acs_admin_renderer_covers_broader_control_plane(tmp_path: Path) -> None
     assert '"feature": item["features"]' in private_rest
     assert '"features": [\n          "ingest"\n        ]' in plan
     assert '"restartIfRequired": false' in plan
-    assert "User create/update operations were not applied" in apply_admin
+    assert "user operations require password material and are handoff-only" in apply_admin
 
 
 def test_acs_admin_renderer_scopes_preflight_and_operations_to_modules(tmp_path: Path) -> None:
@@ -242,8 +242,9 @@ def test_soar_automation_broker_requires_file_based_token(tmp_path: Path) -> Non
             str(SOAR_SETUP),
             "--phase",
             "automation-broker",
+            "--apply",
             "--soar-tenant-url",
-            "https://example.splunkcloudgc.com/soar",
+            "https://customer.splunkcloudgc.com/soar",
             "--output-dir",
             str(tmp_path),
         ],

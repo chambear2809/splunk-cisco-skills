@@ -25,7 +25,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -280,6 +279,55 @@ class RenderError(Exception):
     """Raised when the spec cannot be rendered (FAIL)."""
 
 
+SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+SAFE_INDEX_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
+SAFE_STACK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
+
+
+def require_safe_name(label: str, value: Any) -> str:
+    if not isinstance(value, str) or not SAFE_NAME_RE.fullmatch(value):
+        raise RenderError(
+            f"{label} must contain only letters, digits, dot, underscore, colon, or hyphen"
+        )
+    return value
+
+
+def require_safe_name_list(label: str, value: Any) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise RenderError(f"{label} must be a non-empty list")
+    return [require_safe_name(f"{label}[{index}]", item) for index, item in enumerate(value)]
+
+
+def require_safe_index_name_list(label: str, value: Any) -> list[str]:
+    """Validate Splunk index names, including internal indexes such as _audit."""
+    if not isinstance(value, list) or not value:
+        raise RenderError(f"{label} must be a non-empty list")
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not SAFE_INDEX_NAME_RE.fullmatch(item):
+            raise RenderError(
+                f"{label}[{index}] must contain only letters, digits, dot, underscore, colon, or hyphen"
+            )
+    return value
+
+
+def require_positive_int(label: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise RenderError(f"{label} must be a positive integer")
+    return value
+
+
+def require_bool(label: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise RenderError(f"{label} must be boolean")
+    return value
+
+
+def require_mapping(label: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RenderError(f"{label} must be a mapping")
+    return value
+
+
 def load_spec(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
@@ -311,12 +359,12 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
         raise RenderError("api_version must be a string")
 
     target = target_override or spec.get("target", "cloud")
-    if target not in {"cloud", "enterprise"}:
+    if not isinstance(target, str) or target not in {"cloud", "enterprise"}:
         raise RenderError(f"target must be 'cloud' or 'enterprise', got {target!r}")
     spec["target"] = target
 
     realm = spec.get("realm", "")
-    if not realm:
+    if not isinstance(realm, str) or not realm:
         raise RenderError("realm is required (us0 / us1 / eu0 / eu1 / eu2 / au0 / jp0 / sg0 / us2-gcp)")
     if realm not in REALM_REGION_MAP:
         raise RenderError(
@@ -325,35 +373,76 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
         )
 
     if target == "cloud":
-        if not spec.get("splunk_cloud_stack"):
+        stack = spec.get("splunk_cloud_stack")
+        if not stack:
             raise RenderError("splunk_cloud_stack is required when target=cloud")
+        if not isinstance(stack, str) or not SAFE_STACK_RE.fullmatch(stack):
+            raise RenderError("splunk_cloud_stack must contain only letters, digits, or hyphens")
 
     spec.setdefault("discover_app_required", True)
     spec.setdefault("token_auth", {"enforce": True})
+    require_bool("discover_app_required", spec["discover_app_required"])
+    token_auth = require_mapping("token_auth", spec["token_auth"])
+    token_auth.setdefault("enforce", True)
+    require_bool("token_auth.enforce", token_auth["enforce"])
 
-    pairing = spec.setdefault("pairing", {})
+    pairing = require_mapping("pairing", spec.setdefault("pairing", {}))
     pairing.setdefault("mode", "unified_identity")
-    if pairing["mode"] not in {"unified_identity", "service_account"}:
+    if not isinstance(pairing["mode"], str) or pairing["mode"] not in {"unified_identity", "service_account"}:
         raise RenderError(
             f"pairing.mode must be 'unified_identity' or 'service_account', got {pairing['mode']!r}"
         )
 
-    multi_org = pairing.get("multi_org") or []
+    multi_org = pairing.get("multi_org", [])
+    if multi_org is None:
+        multi_org = []
     if not isinstance(multi_org, list):
         raise RenderError("pairing.multi_org must be a list")
+    pairing["multi_org"] = multi_org
+
+    seen_realms: set[str] = set()
+    for index, entry in enumerate(multi_org):
+        if not isinstance(entry, dict):
+            raise RenderError(f"pairing.multi_org[{index}] must be a mapping")
+        entry_realm = entry.get("realm")
+        if not isinstance(entry_realm, str) or entry_realm not in REALM_REGION_MAP:
+            raise RenderError(
+                f"pairing.multi_org[{index}].realm must be one of: "
+                f"{', '.join(sorted(REALM_REGION_MAP))}"
+            )
+        if entry_realm == realm:
+            raise RenderError(
+                f"pairing.multi_org[{index}].realm repeats the primary realm; list only additional organizations"
+            )
+        if entry_realm in seen_realms:
+            raise RenderError(f"pairing.multi_org contains duplicate realm {entry_realm!r}")
+        seen_realms.add(entry_realm)
+        label = entry.get("label", "")
+        if not isinstance(label, str) or "\n" in label or "\r" in label:
+            raise RenderError(f"pairing.multi_org[{index}].label must be a single-line string")
+        if not isinstance(entry.get("make_default", False), bool):
+            raise RenderError(f"pairing.multi_org[{index}].make_default must be boolean")
 
     default_count = sum(1 for entry in multi_org if isinstance(entry, dict) and entry.get("make_default"))
     if multi_org and default_count > 1:
         raise RenderError("at most one pairing.multi_org entry may set make_default: true")
-
-    rbac = spec.setdefault("centralized_rbac", {})
+    rbac = require_mapping("centralized_rbac", spec.setdefault("centralized_rbac", {}))
     rbac.setdefault("enable_capabilities", False)
     rbac.setdefault("enable_centralized_rbac", False)
-    rbac.setdefault("o11y_access_role", {})
+    require_bool("centralized_rbac.enable_capabilities", rbac["enable_capabilities"])
+    require_bool("centralized_rbac.enable_centralized_rbac", rbac["enable_centralized_rbac"])
+    rbac["o11y_access_role"] = require_mapping(
+        "centralized_rbac.o11y_access_role", rbac.setdefault("o11y_access_role", {})
+    )
     rbac["o11y_access_role"].setdefault("create", True)
     rbac["o11y_access_role"].setdefault("assign_to_roles", ["user", "power", "sc_admin"])
+    require_bool("centralized_rbac.o11y_access_role.create", rbac["o11y_access_role"]["create"])
+    require_safe_name_list(
+        "centralized_rbac.o11y_access_role.assign_to_roles",
+        rbac["o11y_access_role"]["assign_to_roles"],
+    )
 
-    related = spec.setdefault("related_content", {})
+    related = require_mapping("related_content", spec.setdefault("related_content", {}))
     related.setdefault("enable", True)
     related.setdefault(
         "capabilities_to_grant",
@@ -367,22 +456,41 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
         ],
     )
     related.setdefault("assign_to_roles", ["user", "power", "sc_admin"])
+    require_bool("related_content.enable", related["enable"])
+    require_safe_name_list("related_content.capabilities_to_grant", related["capabilities_to_grant"])
+    require_safe_name_list("related_content.assign_to_roles", related["assign_to_roles"])
 
-    discover = spec.setdefault("discover_app", {})
+    discover = require_mapping("discover_app", spec.setdefault("discover_app", {}))
     discover.setdefault("related_content_discovery", True)
     discover.setdefault("test_related_content", "deeplink_only")
-    field = discover.setdefault("field_aliasing", {})
+    field = require_mapping("discover_app.field_aliasing", discover.setdefault("field_aliasing", {}))
     field.setdefault("auto_field_mapping", True)
     discover.setdefault("automatic_ui_updates", True)
     discover.setdefault("access_tokens_realm_token_file_ref", "SPLUNK_O11Y_TOKEN_FILE")
     discover.setdefault("read_permission_roles", ["user", "power", "sc_admin"])
+    require_bool("discover_app.related_content_discovery", discover["related_content_discovery"])
+    require_bool("discover_app.field_aliasing.auto_field_mapping", field["auto_field_mapping"])
+    require_bool("discover_app.automatic_ui_updates", discover["automatic_ui_updates"])
+    if discover["test_related_content"] != "deeplink_only":
+        raise RenderError("discover_app.test_related_content must be deeplink_only")
+    if discover["access_tokens_realm_token_file_ref"] != "SPLUNK_O11Y_TOKEN_FILE":
+        raise RenderError(
+            "discover_app.access_tokens_realm_token_file_ref must be SPLUNK_O11Y_TOKEN_FILE"
+        )
+    require_safe_name_list("discover_app.read_permission_roles", discover["read_permission_roles"])
 
-    loc = spec.setdefault("log_observer_connect", {})
+    loc = require_mapping("log_observer_connect", spec.setdefault("log_observer_connect", {}))
     loc.setdefault("enable", True)
-    sa = loc.setdefault("service_account", {})
+    require_bool("log_observer_connect.enable", loc["enable"])
+    sa = require_mapping("log_observer_connect.service_account", loc.setdefault("service_account", {}))
     sa.setdefault("username", "svc_log_observer")
     sa.setdefault("password_file_ref", "--service-account-password-file")
-    role = loc.setdefault("role", {})
+    require_safe_name("log_observer_connect.service_account.username", sa["username"])
+    if sa["password_file_ref"] != "--service-account-password-file":
+        raise RenderError(
+            "log_observer_connect.service_account.password_file_ref must be --service-account-password-file"
+        )
+    role = require_mapping("log_observer_connect.role", loc.setdefault("role", {}))
     role.setdefault("name", "log_observer_connect")
     role.setdefault("base_role", "user")
     role.setdefault("indexes", ["main"])
@@ -391,14 +499,32 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
     role.setdefault("time_window_seconds", 2592000)
     role.setdefault("earliest_event_seconds", 7776000)
     role.setdefault("disk_space_mb", 1000)
+    require_safe_name("log_observer_connect.role.name", role["name"])
+    require_safe_name("log_observer_connect.role.base_role", role["base_role"])
+    require_safe_index_name_list("log_observer_connect.role.indexes", role["indexes"])
+    for key in (
+        "standard_search_limit_per_user",
+        "expected_concurrent_users",
+        "time_window_seconds",
+        "earliest_event_seconds",
+        "disk_space_mb",
+    ):
+        require_positive_int(f"log_observer_connect.role.{key}", role[key])
     loc.setdefault("workload_rule_runtime_seconds", 300)
+    require_positive_int(
+        "log_observer_connect.workload_rule_runtime_seconds",
+        loc["workload_rule_runtime_seconds"],
+    )
     loc.setdefault("realm_ip_allowlist_handoff", True)
+    require_bool("log_observer_connect.realm_ip_allowlist_handoff", loc["realm_ip_allowlist_handoff"])
 
-    ds = spec.setdefault("dashboard_studio", {})
+    ds = require_mapping("dashboard_studio", spec.setdefault("dashboard_studio", {}))
     ds.setdefault("validate_default_connection", True)
     ds.setdefault("render_sample_chart", True)
+    require_bool("dashboard_studio.validate_default_connection", ds["validate_default_connection"])
+    require_bool("dashboard_studio.render_sample_chart", ds["render_sample_chart"])
 
-    sim = spec.setdefault("sim_addon", {})
+    sim = require_mapping("sim_addon", spec.setdefault("sim_addon", {}))
     sim.setdefault("install", True)
     sim.setdefault("index_name", "sim_metrics")
     sim.setdefault("account_name", "production")
@@ -407,6 +533,27 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
     sim.setdefault("modular_inputs", ["aws_ec2", "kubernetes", "os_hosts"])
     sim.setdefault("itsi_content_pack_handoff", True)
     sim.setdefault("victoria_stack_hec_allowlist_handoff", "auto")
+    require_bool("sim_addon.install", sim["install"])
+    require_bool("sim_addon.data_collection_enabled", sim["data_collection_enabled"])
+    require_bool("sim_addon.itsi_content_pack_handoff", sim["itsi_content_pack_handoff"])
+    victoria_handoff = sim["victoria_stack_hec_allowlist_handoff"]
+    if not (victoria_handoff == "auto" or isinstance(victoria_handoff, bool)):
+        raise RenderError("sim_addon.victoria_stack_hec_allowlist_handoff must be auto or boolean")
+    require_safe_name("sim_addon.index_name", sim["index_name"])
+    require_safe_name("sim_addon.account_name", sim["account_name"])
+    if sim["org_token_file_ref"] != "SPLUNK_O11Y_ORG_TOKEN_FILE":
+        raise RenderError("sim_addon.org_token_file_ref must be SPLUNK_O11Y_ORG_TOKEN_FILE")
+    if not isinstance(sim["modular_inputs"], list):
+        raise RenderError("sim_addon.modular_inputs must be a list")
+    if sim["install"] and not sim["modular_inputs"]:
+        raise RenderError("sim_addon.modular_inputs must be non-empty when sim_addon.install=true")
+    if "expected_entities_per_input" in sim:
+        require_positive_int(
+            "sim_addon.expected_entities_per_input", sim["expected_entities_per_input"]
+        )
+
+    for index, name in enumerate(sim["modular_inputs"]):
+        require_safe_name(f"sim_addon.modular_inputs[{index}]", name)
 
     bad = [name for name in sim["modular_inputs"] if name.upper().startswith("SAMPLE_")]
     if bad:
@@ -423,8 +570,15 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
             f"Allowed: {', '.join(sorted(SIGNALFLOW_CATALOG))}"
         )
 
-    spec.setdefault("enterprise_overrides", {}).setdefault(
+    enterprise_overrides = require_mapping(
+        "enterprise_overrides", spec.setdefault("enterprise_overrides", {})
+    )
+    enterprise_overrides.setdefault(
         "log_observer_connect_tls_cert_helper", True
+    )
+    require_bool(
+        "enterprise_overrides.log_observer_connect_tls_cert_helper",
+        enterprise_overrides["log_observer_connect_tls_cert_helper"],
     )
 
     return spec
@@ -435,12 +589,46 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
 # ---------------------------------------------------------------------------
 
 
+def effective_pairing_mode(spec: dict[str, Any]) -> str:
+    """Return the actionable mode, including the documented UID fallback."""
+    if spec["target"] == "cloud" and spec["realm"] not in UID_SUPPORTED_REALMS:
+        return "service_account"
+    return spec["pairing"]["mode"]
+
+
+def observability_api_realm(realm: str) -> str:
+    """Translate the renderer's disambiguated GCP label to the public realm."""
+    return "us2" if realm == "us2-gcp" else realm
+
+
+def effective_pairing_orgs(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return primary plus additional orgs exactly once, in stable order."""
+    primary: dict[str, Any] = {
+        "realm": spec["realm"],
+        "label": "",
+        "make_default": False,
+    }
+    result = [primary]
+    by_realm = {spec["realm"]: 0}
+    for raw in spec["pairing"].get("multi_org") or []:
+        entry = dict(raw)
+        entry.setdefault("label", "")
+        entry.setdefault("make_default", False)
+        entry_realm = entry["realm"]
+        if entry_realm in by_realm:
+            result[by_realm[entry_realm]] = entry
+        else:
+            by_realm[entry_realm] = len(result)
+            result.append(entry)
+    return result
+
+
 def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     target = spec["target"]
     realm = spec["realm"]
-    pairing_mode = spec["pairing"]["mode"]
+    pairing_mode = effective_pairing_mode(spec)
     discover_required = spec.get("discover_app_required", True)
-    multi_org = spec["pairing"].get("multi_org") or []
+    multiple_pairing_orgs = len(effective_pairing_orgs(spec)) > 1
     rbac = spec["centralized_rbac"]
     sim = spec["sim_addon"]
     related = spec["related_content"]
@@ -452,7 +640,10 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     coverage: dict[str, dict[str, str]] = {}
 
-    coverage["prerequisites"] = {"status": "api_validate", "notes": "Stack/version + region/realm + Discover-app version preflight."}
+    coverage["prerequisites"] = {
+        "status": "handoff",
+        "notes": "The renderer validates spec shape and the static realm map; live stack/version/RBAC discovery remains an operator preflight.",
+    }
 
     coverage["token_auth.flip"] = {"status": "api_apply", "notes": "POST /services/admin/token-auth/tokens_auth -d disabled=false"}
 
@@ -460,17 +651,41 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         coverage["pairing.uid"] = {"status": "not_applicable", "notes": "UID requires Splunk Cloud Platform."}
     elif fed_or_excluded:
         coverage["pairing.uid"] = {"status": "not_applicable", "notes": f"realm {realm} is excluded from UID (FedRAMP / GovCloud / GCP)."}
+    elif pairing_mode == "unified_identity" and multiple_pairing_orgs:
+        coverage["pairing.uid"] = {
+            "status": "handoff",
+            "notes": "Multi-org pairing needs one independently validated admin-token file per org; the current CLI accepts only one and fails closed.",
+        }
     elif pairing_mode == "unified_identity":
-        coverage["pairing.uid"] = {"status": "api_apply", "notes": "acs observability pair + GET pairing-status-by-id."}
+        coverage["pairing.uid"] = {"status": "api_apply", "notes": "ACS REST pairing POST followed by status-by-ID GET polling."}
     else:
         coverage["pairing.uid"] = {"status": "not_applicable", "notes": "spec selected service_account mode."}
 
-    coverage["pairing.sa"] = {
-        "status": "api_apply" if (pairing_mode == "service_account" or target == "enterprise" or fed_or_excluded) else "api_validate",
-        "notes": "Discover app Access tokens REST tab write (or alternate when UID is in scope).",
-    }
+    if target == "enterprise":
+        coverage["pairing.sa"] = {
+            "status": "not_applicable",
+            "notes": (
+                "Discover-app API-token pairing is a Splunk Cloud Platform workflow. "
+                "Use the separate Log Observer Connect service-account section for Splunk Enterprise."
+            ),
+        }
+    elif not discover_required:
+        coverage["pairing.sa"] = {
+            "status": "handoff",
+            "notes": "Service-account pairing requires the Discover app Configurations REST surface, but discover_app_required=false.",
+        }
+    elif pairing_mode == "service_account" and multiple_pairing_orgs:
+        coverage["pairing.sa"] = {
+            "status": "handoff",
+            "notes": "Multi-org API-token pairing needs one independently validated token file per org; the current CLI accepts only one and fails closed.",
+        }
+    else:
+        coverage["pairing.sa"] = {
+            "status": "api_apply" if pairing_mode == "service_account" else "api_validate",
+            "notes": "The pairing section owns the Discover app Access tokens REST write; UID mode only validates it.",
+        }
 
-    if multi_org:
+    if multiple_pairing_orgs:
         coverage["pairing.multi_org_default"] = {
             "status": "deeplink",
             "notes": "Discover app > Configurations > 3-dot menu > Make Default; no public API for default-org.",
@@ -478,26 +693,36 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     else:
         coverage["pairing.multi_org_default"] = {"status": "not_applicable", "notes": "single-org spec."}
 
-    if target == "enterprise" or fed_or_excluded:
-        coverage["centralized_rbac.capabilities"] = {"status": "not_applicable", "notes": "ACS observability not available."}
-        coverage["centralized_rbac.cutover"] = {"status": "not_applicable", "notes": "ACS observability not available."}
+    if target == "enterprise" or fed_or_excluded or pairing_mode != "unified_identity":
+        coverage["centralized_rbac.capabilities"] = {"status": "not_applicable", "notes": "Centralized RBAC requires an applicable Unified Identity pairing."}
+        coverage["centralized_rbac.cutover"] = {"status": "not_applicable", "notes": "Centralized RBAC requires an applicable Unified Identity pairing."}
     else:
         coverage["centralized_rbac.capabilities"] = {
-            "status": "api_apply" if rbac.get("enable_capabilities") else "deeplink",
-            "notes": "acs observability enable-capabilities (provisions o11y_admin/power/read_only/usage; ~30 min propagation).",
+            "status": "api_apply" if rbac.get("enable_capabilities") else "not_applicable",
+            "notes": (
+                "acs observability enable-capabilities (provisions o11y_admin/power/read_only/usage; ~30 min propagation)."
+                if rbac.get("enable_capabilities")
+                else "centralized_rbac.enable_capabilities=false."
+            ),
         }
         coverage["centralized_rbac.cutover"] = {
-            "status": "api_apply" if rbac.get("enable_centralized_rbac") else "deeplink",
-            "notes": "acs observability enable-centralized-rbac (destructive; --i-accept-rbac-cutover required).",
+            "status": "handoff" if rbac.get("enable_centralized_rbac") else "deeplink",
+            "notes": "No safe token-file cutover transport is implemented; the generated apply fails before mutation.",
         }
-    coverage["centralized_rbac.o11y_access"] = {
-        "status": "api_apply" if rbac["o11y_access_role"].get("create") else "deeplink",
-        "notes": "Splunk authorize REST: create the o11y_access gate role + assign to roles.",
-    }
+    if target == "cloud" and not fed_or_excluded and pairing_mode == "unified_identity":
+        coverage["centralized_rbac.o11y_access"] = {
+            "status": "api_apply" if rbac["o11y_access_role"].get("create") else "deeplink",
+            "notes": "Splunk authorize REST creates the o11y_access gate role; assigning it to other roles remains an explicit operator handoff.",
+        }
+    else:
+        coverage["centralized_rbac.o11y_access"] = {
+            "status": "not_applicable",
+            "notes": "The o11y_access UID gate role requires an applicable Unified Identity pairing.",
+        }
 
     coverage["related_content_capabilities"] = {
-        "status": "api_apply" if related.get("enable") else "deeplink",
-        "notes": "Splunk authorize REST: assign Related Content + Real Time Metrics capabilities.",
+        "status": "handoff" if related.get("enable") else "deeplink",
+        "notes": "Safe role-capability merge is not implemented; setup emits the exact role/capability handoff and exits nonzero.",
     }
 
     if target == "enterprise" or (target == "cloud" and discover_required is False):
@@ -508,20 +733,20 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         coverage["discover_app.read_permission"] = {"status": "not_applicable", "notes": "Discover app not installed."}
     else:
         coverage["discover_app.related_discovery"] = {
-            "status": "api_apply" if discover.get("related_content_discovery") else "deeplink",
-            "notes": "Discover app setup REST (Related Content discovery toggle).",
+            "status": "api_apply",
+            "notes": f"Discover app setup REST converges Related Content discovery to {bool(discover.get('related_content_discovery'))}.",
         }
         coverage["discover_app.field_aliasing"] = {
-            "status": "api_apply" if discover.get("field_aliasing", {}).get("auto_field_mapping") else "deeplink",
-            "notes": "Discover app setup REST (Auto Field Mapping toggle + alias map).",
+            "status": "api_apply",
+            "notes": f"Discover app setup REST converges Auto Field Mapping to {bool(discover.get('field_aliasing', {}).get('auto_field_mapping'))}.",
         }
         coverage["discover_app.ui_updates"] = {
-            "status": "api_apply" if discover.get("automatic_ui_updates") else "deeplink",
-            "notes": "Discover app setup REST (Automatic UI updates toggle).",
+            "status": "api_apply",
+            "notes": f"Discover app setup REST converges Automatic UI updates to {bool(discover.get('automatic_ui_updates'))}.",
         }
         coverage["discover_app.access_tokens"] = {
-            "status": "api_apply",
-            "notes": "Discover app setup REST (Realm + token write).",
+            "status": "api_validate",
+            "notes": "Access-token mutation belongs exclusively to the service-account pairing section.",
         }
         coverage["discover_app.read_permission"] = {
             "status": "api_apply",
@@ -552,12 +777,12 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
             coverage[key] = {"status": "not_applicable", "notes": "log_observer_connect.enable=false."}
 
     coverage["dashboard_studio_o11y.default"] = {
-        "status": "api_validate" if ds.get("validate_default_connection") else "deeplink",
-        "notes": "Validate default Splunk Observability Cloud connection is set on this stack.",
+        "status": "handoff" if ds.get("validate_default_connection") else "deeplink",
+        "notes": "Rendered review requirement; no live default-connection read is implemented here.",
     }
     coverage["dashboard_studio_o11y.sample"] = {
-        "status": "api_apply" if ds.get("render_sample_chart") else "deeplink",
-        "notes": "Splunk Dashboard Studio dashboard create REST (sample O11y-metric chart).",
+        "status": "handoff" if ds.get("render_sample_chart") else "deeplink",
+        "notes": "Renders a sample chart JSON snippet; publish through splunk-dashboard-studio-setup.",
     }
 
     if sim.get("install"):
@@ -654,11 +879,11 @@ def section_prerequisites(spec: dict[str, Any]) -> str:
         lines.append(f"- Splunk Cloud Platform stack: `{spec['splunk_cloud_stack']}`")
         if discover_required:
             lines.append(
-                "- Discover Splunk Observability Cloud app: REQUIRED (Splunk Cloud Platform 10.1.2507+); "
-                "preflight FAILs render on older versions."
+                "- Discover Splunk Observability Cloud app: REQUIRED (Splunk Cloud Platform 10.1.2507+). "
+                "The renderer cannot query the stack version; verify it before live apply."
             )
         else:
-            lines.append("- Discover Splunk Observability Cloud app: optional; falls back to API-token-only mode on older SCP.")
+            lines.append("- Discover Splunk Observability Cloud app: unavailable/optional; API-token pairing fails closed because its REST surface is required.")
     else:
         lines.append("- Splunk Enterprise: 9.0.1+ required for Log Observer Connect.")
 
@@ -666,7 +891,7 @@ def section_prerequisites(spec: dict[str, Any]) -> str:
         lines.append(
             f"- WARN: realm `{realm}` is outside the supported Unified Identity matrix "
             f"(FedRAMP / GovCloud / GCP). UID sections are marked `not_applicable`; "
-            "Service Account pairing remains available."
+            "Discover-app API-token pairing remains available on supported Splunk Cloud Platform versions."
         )
 
     lines.extend([
@@ -709,13 +934,19 @@ def section_token_auth(spec: dict[str, Any]) -> str:
         "## Detection",
         "",
         "```bash",
-        "curl -k -u <admin_user>:<admin_password> -X GET https://<splunk-host>:8089/services/admin/token-auth/tokens_auth",
+        "source skills/shared/lib/credential_helpers.sh",
+        "load_splunk_connection_settings",
+        "SK=\"$(get_session_key \"${SPLUNK_SEARCH_API_URI}\")\"",
+        "splunk_curl \"${SK}\" --fail-with-body --show-error \\",
+        "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth?output_mode=json\"",
         "```",
         "",
         "## Enable (no restart required)",
         "",
         "```bash",
-        "curl -k -u <admin_user>:<admin_password> -X POST https://<splunk-host>:8089/services/admin/token-auth/tokens_auth -d disabled=false",
+        "splunk_curl \"${SK}\" --fail-with-body --show-error -X POST \\",
+        "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth\" \\",
+        "  -d disabled=false",
         "```",
         "",
         "Or use the skill's helper:",
@@ -740,32 +971,45 @@ def section_pairing(spec: dict[str, Any]) -> str:
     pairing = spec["pairing"]
     realm = spec["realm"]
     target = spec["target"]
-    multi_org = pairing.get("multi_org") or []
+    pairing_orgs = effective_pairing_orgs(spec)
+    multi_org = pairing_orgs if len(pairing_orgs) > 1 else []
+    mode = effective_pairing_mode(spec)
     fed_or_excluded = realm not in UID_SUPPORTED_REALMS
 
     lines = [
         "# 02 Pairing",
         "",
-        f"- Mode: `{pairing['mode']}`",
+        f"- Effective mode: `{mode}`",
         f"- Realm: `{realm}`",
     ]
+    if mode != pairing["mode"]:
+        lines.append(f"- Requested mode: `{pairing['mode']}` (fell back because this realm is excluded from UID)")
     if multi_org:
-        lines.append(f"- Multi-org orgs: {len(multi_org)}")
+        lines.append(f"- Pairing orgs (primary + additional): {len(multi_org)}")
     lines.append("")
 
     if target == "enterprise":
-        lines.append("Splunk Enterprise supports Service Account pairing only. Unified Identity is not available.")
+        lines.append(
+            "Splunk Enterprise does not use the Splunk Cloud Platform Unified Identity or Discover-app API-token pairing flow. "
+            "Use the separate Log Observer Connect service-account workflow in section 06."
+        )
+    elif multi_org:
+        lines.append(
+            "Automated multi-org pairing fails before mutation: each organization needs its own independently validated token file, "
+            "while the current CLI accepts only one. Complete the rendered per-org administrative handoff, then use Make Default."
+        )
     elif fed_or_excluded:
         lines.append(
-            f"Realm `{realm}` is excluded from Unified Identity. Service Account pairing is the supported path."
+            f"Realm `{realm}` is excluded from Unified Identity. Discover-app API-token pairing is the supported Splunk Cloud Platform path."
         )
-    elif pairing["mode"] == "unified_identity":
+    elif mode == "unified_identity":
         lines.extend([
             "## Unified Identity (UID) pair",
             "",
             "```bash",
             "bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --apply pairing \\",
             "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
+            "  --splunk-cloud-admin-jwt-file \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\" \\",
             f"  --realm {realm}",
             "```",
             "",
@@ -778,7 +1022,7 @@ def section_pairing(spec: dict[str, Any]) -> str:
             "  printf 'header = \"o11y-access-token: '; tr -d '\\r\\n' < \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\"; printf '\"\\n'; } > \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"",
             "trap 'rm -f \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"' EXIT",
             "",
-            "curl -X POST 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing' \\",
+            "curl --fail-with-body --silent --show-error -X POST 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing' \\",
             "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
             "  -H 'Content-Type: application/json'",
             "```",
@@ -786,7 +1030,7 @@ def section_pairing(spec: dict[str, Any]) -> str:
             "Returns `{\"id\": \"<pairing-id>\"}`. Poll with:",
             "",
             "```bash",
-            "curl -X GET 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing/${PAIRING_ID}' \\",
+            "curl --fail-with-body --silent --show-error -X GET 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing/${PAIRING_ID}' \\",
             "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
             "  -H 'Content-Type: application/json'",
             "```",
@@ -794,9 +1038,9 @@ def section_pairing(spec: dict[str, Any]) -> str:
             "Statuses are `SUCCESS`, `FAILED`, or `IN_PROGRESS`.",
         ])
     else:
-        lines.append("Service Account (SA) pairing uses an Splunk Observability Cloud API access token written into the Discover app's Access tokens tab.")
+        lines.append("API-token pairing uses a Splunk Observability Cloud user API access token written into the Discover app's Access tokens tab.")
 
-    if multi_org:
+    if multi_org and target == "cloud":
         lines.extend([
             "",
             "## Multi-org plan",
@@ -834,8 +1078,8 @@ def section_rbac(spec: dict[str, Any]) -> str:
         "# 03 Centralized RBAC",
         "",
     ]
-    if target == "enterprise" or fed_or_excluded:
-        lines.append("Centralized RBAC requires ACS observability commands; not available for the chosen target/realm. Marked `not_applicable`.")
+    if target == "enterprise" or fed_or_excluded or effective_pairing_mode(spec) != "unified_identity":
+        lines.append("Centralized RBAC requires an applicable Unified Identity pairing; it is not available for the chosen target/realm/mode. Marked `not_applicable`.")
         return "\n".join(lines) + "\n"
 
     lines.extend([
@@ -853,17 +1097,11 @@ def section_rbac(spec: dict[str, Any]) -> str:
         "",
         "Missing this role yields the `You do not have access to Splunk Observability Cloud` error at first login.",
         "",
-        "## Step 3 (DESTRUCTIVE): enable-centralized-rbac",
-        "",
-        "```bash",
-        "bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --apply rbac \\",
-        "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
-        "  --i-accept-rbac-cutover",
-        "```",
+        "## Step 3 (DESTRUCTIVE HANDOFF): enable-centralized-rbac",
         "",
         "After this step Splunk Cloud Platform becomes the RBAC store for Splunk Observability Cloud. UID-mapped users WITHOUT an `o11y_*` role are LOCKED OUT.",
         "",
-        "The skill refuses to apply this step without `--i-accept-rbac-cutover` AND a passed preflight that confirms every UID-mapped user already holds an `o11y_*` role.",
+        "This repo has no safe file-backed transport for the documented ACS token argument. If cutover is requested, live apply fails before all RBAC mutations and hands the reviewed plan to an approved Splunk Cloud administrator.",
         "",
         "## UID role mapping (auto-applied at first login)",
         "",
@@ -892,8 +1130,7 @@ def section_discover_app(spec: dict[str, Any]) -> str:
     if target == "enterprise":
         lines.extend([
             "The Discover app's Configurations REST surface is Splunk Cloud Platform only. ",
-            "On Splunk Enterprise, configure the equivalent connection via the Discover app's Access tokens UI ",
-            "(if installed) or via Splunk Observability Cloud's Add new connection wizard.",
+            "Splunk Enterprise does not use this Platform/O11y pairing flow; use the separate Log Observer Connect service-account/TLS workflow.",
             "",
             "Marked `not_applicable` for the target=enterprise renderer.",
         ])
@@ -901,12 +1138,12 @@ def section_discover_app(spec: dict[str, Any]) -> str:
     if not discover_required:
         lines.extend([
             "Spec set `discover_app_required: false`; renderer assumes Splunk Cloud Platform < 10.1.2507 (no Configurations UI).",
-            "Falls back to API-token-only pairing recorded under `02-pairing.md`.",
+            "Service-account/API-token pairing cannot be applied without that REST surface; the pairing section fails closed and emits a handoff.",
         ])
         return "\n".join(lines) + "\n"
 
     lines.extend([
-        "Configures the five Configurations tabs of the in-platform Discover app, plus the Read permission grant.",
+        "Converges the three non-secret Configurations toggles and merges the Read permission grant. Test is UI-only; Access tokens belong to pairing.",
         "",
         "## Tab 1: Related Content discovery",
         "",
@@ -937,8 +1174,8 @@ def section_discover_app(spec: dict[str, Any]) -> str:
         "",
         "## Tab 5: Access tokens",
         "",
-        f"- Realm: `{realm}`",
-        f"- Token file: read from `${{{discover['access_tokens_realm_token_file_ref']}}}` (never inlined here).",
+        "- This tab is owned by the service-account pairing section so the Discover configuration section never creates a second connection.",
+        f"- Pairing realm: `{realm}`.",
         "",
         "## Read permission grant",
         "",
@@ -1179,7 +1416,7 @@ def section_sim_addon(spec: dict[str, Any]) -> str:
             "Handed off to `splunk-itsi-config`:",
             "",
             "```bash",
-            "bash skills/splunk-itsi-config/scripts/setup.sh --content-pack splunk_observability_cloud",
+            "bash skills/splunk-itsi-config/scripts/setup.sh --workflow content-packs --spec <reviewed-content-pack-spec.yaml>",
             "```",
             "",
             "The pack depends on this skill's SIM Add-on configuration; install order is correct.",
@@ -1235,7 +1472,7 @@ def section_handoff(spec: dict[str, Any]) -> str:
             "## ITSI Content Pack for Splunk Observability Cloud",
             "",
             "```bash",
-            "bash skills/splunk-itsi-config/scripts/setup.sh --content-pack splunk_observability_cloud",
+            "bash skills/splunk-itsi-config/scripts/setup.sh --workflow content-packs --spec <reviewed-content-pack-spec.yaml>",
             "```",
         ])
 
@@ -1260,6 +1497,79 @@ SHEBANG = "#!/usr/bin/env bash\nset -euo pipefail\n\n"
 
 
 SPLUNK_CURL_AUTH_HELPER = """\
+if ! "${PYTHON_BIN:-python3}" - "${SPLUNK_SEARCH_API_URI}" <<'PY_URI'
+import sys
+import urllib.parse
+
+parsed = urllib.parse.urlsplit(sys.argv[1])
+try:
+    parsed.port
+except ValueError:
+    raise SystemExit(1)
+valid = (
+    parsed.scheme.lower() == "https"
+    and bool(parsed.hostname)
+    and parsed.username is None
+    and parsed.password is None
+    and parsed.path in {"", "/"}
+    and not parsed.query
+    and not parsed.fragment
+    and not any(ch.isspace() for ch in sys.argv[1])
+)
+raise SystemExit(0 if valid else 1)
+PY_URI
+then
+  echo "ERROR: SPLUNK_SEARCH_API_URI must be an absolute https://host[:port] URL without embedded credentials, path, query, fragment, or whitespace" >&2
+  exit 2
+fi
+
+curl() {
+  command curl --fail-with-body --silent --show-error "$@"
+}
+
+CURL_TLS_ARGS=()
+case "${SPLUNK_VERIFY_SSL:-true}" in
+  false|FALSE|0|no|NO)
+    echo "WARNING: SPLUNK_VERIFY_SSL disables certificate verification; the peer is not authenticated and credentials may be intercepted." >&2
+    CURL_TLS_ARGS+=(--insecure)
+    ;;
+  *)
+    if [[ -n "${SPLUNK_CA_CERT:-}" ]]; then
+      [[ -r "${SPLUNK_CA_CERT}" ]] || {
+        echo "ERROR: SPLUNK_CA_CERT is not readable: ${SPLUNK_CA_CERT}" >&2
+        exit 2
+      }
+      CURL_TLS_ARGS+=(--cacert "${SPLUNK_CA_CERT}")
+    fi
+    ;;
+esac
+
+require_secret_file() {
+  local path="${1:?secret-file path is required}"
+  local label="${2:-secret file}"
+  [[ ! -L "${path}" && -f "${path}" && -s "${path}" ]] || {
+    echo "ERROR: ${label} is missing or empty: ${path}" >&2
+    exit 2
+  }
+  local mode
+  mode="$(stat -f '%A' "${path}" 2>/dev/null || stat -c '%a' "${path}")"
+  [[ "${mode}" == "600" ]] || {
+    echo "ERROR: ${label} must have mode 600 (found ${mode}): ${path}" >&2
+    exit 2
+  }
+  "${PYTHON_BIN:-python3}" - "${path}" <<'PY_SECRET'
+from pathlib import Path
+import sys
+
+try:
+    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+except (OSError, UnicodeError):
+    raise SystemExit(1)
+if len(lines) != 1 or not lines[0] or "\\x00" in lines[0]:
+    raise SystemExit(1)
+PY_SECRET
+}
+
 _curl_config_escape() {
   local value="${1:-}"
   value="${value//\\\\/\\\\\\\\}"
@@ -1277,6 +1587,18 @@ make_splunk_auth_config() {
   printf '%s\\n' "${auth_config}"
 }
 
+make_curl_form_secret_config() {
+  local field="${1:?form field is required}"
+  local path="${2:?secret-file path is required}"
+  local value config
+  value="$(<"${path}")"
+  config="$(mktemp)"
+  chmod 600 "${config}"
+  printf 'data-urlencode = "%s=%s"\\n' "$(_curl_config_escape "${field}")" "$(_curl_config_escape "${value}")" > "${config}"
+  value=""
+  printf '%s\\n' "${config}"
+}
+
 """
 
 
@@ -1286,26 +1608,51 @@ def apply_script_token_auth() -> str:
         ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set (https://host:8089)}\"\n"
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
-        + SPLUNK_CURL_AUTH_HELPER
-        + "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n\n"
-        "curl -k -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
-        "  -X POST \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth\" \\\n"
-        "  -d disabled=false\n"
+        "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+        "TOKEN_AUTH_API=\"${TOKEN_AUTH_API:-skills/splunk-observability-cloud-integration-setup/scripts/token_auth_api.py}\"\n"
+        "\"${PYTHON_BIN}\" \"${TOKEN_AUTH_API}\" --state-dir \"${TOKEN_AUTH_STATE_DIR:-state}\" enable\n"
     )
 
 
 def apply_script_pairing(spec: dict[str, Any]) -> str:
-    realm = spec["realm"]
-    multi = spec["pairing"].get("multi_org") or [{"realm": realm}]
+    multi = effective_pairing_orgs(spec)
+    mode = effective_pairing_mode(spec)
     stack = spec.get("splunk_cloud_stack", "")
+    if spec["target"] == "enterprise":
+        return SHEBANG + (
+            "echo 'ERROR: pairing is not a Splunk Enterprise action.' >&2\n"
+            "echo 'HANDOFF: use the log_observer_connect section for the supported Enterprise service-account workflow; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
+    if len(multi) > 1:
+        return SHEBANG + (
+            "echo 'ERROR: automated multi-org pairing is unavailable because this CLI accepts only one token file.' >&2\n"
+            "echo 'HANDOFF: pair each org with its own independently validated token, then use the rendered Make Default deeplink; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
+    if mode == "service_account":
+        body = SHEBANG + (
+            "# Step: Splunk Cloud Platform API-token pairing through the Discover app.\n"
+            ": \"${SPLUNK_O11Y_TOKEN_FILE:?SPLUNK_O11Y_TOKEN_FILE must point to a chmod-600 user-token file}\"\n"
+            "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+            "DISCOVER_API=\"${DISCOVER_API:-skills/splunk-observability-cloud-integration-setup/scripts/discover_app_api.py}\"\n"
+            "PAIRING_STATE_DIR=\"${PAIRING_STATE_DIR:-state}\"\n\n"
+        )
+        for entry in multi:
+            api_realm = observability_api_realm(entry["realm"])
+            body += (
+                f"# Configure realm: {entry.get('realm')}\n"
+                "\"${PYTHON_BIN}\" \"${DISCOVER_API}\" --state-dir \"${PAIRING_STATE_DIR}\" "
+                f"access-tokens --realm {api_realm} --token-file \"${{SPLUNK_O11Y_TOKEN_FILE}}\"\n\n"
+            )
+        return body
     body = SHEBANG + (
-        "# Step: Unified Identity pair (one call per realm).\n"
+        "# Step: Unified Identity pair (single organization).\n"
         ": \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE:?SPLUNK_O11Y_ADMIN_TOKEN_FILE must point to a chmod-600 admin token file}\"\n\n"
         "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
         "PAIRING_API=\"${PAIRING_API:-skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
-        f"SPLUNK_CLOUD_STACK=\"${{SPLUNK_CLOUD_STACK:-{stack}}}\"\n"
-        "PAIRING_ARGS=(--admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\n"
+        f"SPLUNK_CLOUD_STACK=\"{stack}\"\n"
+        "PAIRING_ARGS=(--state-dir \"${PAIRING_STATE_DIR:-state}\" --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\n"
         "[[ -n \"${SPLUNK_CLOUD_STACK:-}\" ]] && PAIRING_ARGS+=(--splunk-cloud-stack \"${SPLUNK_CLOUD_STACK}\")\n"
         "[[ -n \"${SPLUNK_CLOUD_ADMIN_JWT_FILE:-}\" ]] && PAIRING_ARGS+=(--splunk-cloud-admin-jwt-file \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\")\n\n"
     )
@@ -1319,9 +1666,28 @@ def apply_script_pairing(spec: dict[str, Any]) -> str:
 
 def apply_script_rbac(spec: dict[str, Any]) -> str:
     rbac = spec["centralized_rbac"]
+    if (
+        spec["target"] == "enterprise"
+        or spec["realm"] not in UID_SUPPORTED_REALMS
+        or effective_pairing_mode(spec) != "unified_identity"
+    ):
+        return SHEBANG + (
+            "echo 'ERROR: centralized RBAC is not applicable to this target or realm.' >&2\n"
+            "echo 'HANDOFF: retain the target system RBAC model; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
+    if rbac.get("enable_centralized_rbac"):
+        return SHEBANG + (
+            "echo 'ERROR: centralized RBAC cutover has no safe token-file transport in this repo.' >&2\n"
+            "echo 'HANDOFF: use an approved Splunk Cloud administrative workflow; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
+    if not rbac.get("enable_capabilities") and not rbac["o11y_access_role"].get("create"):
+        return SHEBANG + (
+            "echo 'ERROR: centralized_rbac has no requested supported mutation.' >&2\n"
+            "exit 2\n"
+        )
     body = SHEBANG + "# Step: Centralized RBAC.\n\n"
-    if rbac.get("enable_capabilities"):
-        body += "acs --format structured observability enable-capabilities\n\n"
     if rbac["o11y_access_role"].get("create"):
         body += (
             ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set}\"\n"
@@ -1329,27 +1695,18 @@ def apply_script_rbac(spec: dict[str, Any]) -> str:
             ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
             f"{SPLUNK_CURL_AUTH_HELPER}"
             "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-            "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n\n"
+            "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
+            "curl \"${CURL_TLS_ARGS[@]}\" -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
+            "  \"${SPLUNK_SEARCH_API_URI}/services/authorization/roles?output_mode=json&count=0\" >/dev/null\n\n"
+        )
+    if rbac.get("enable_capabilities"):
+        body += "acs --format structured observability enable-capabilities\n\n"
+    if rbac["o11y_access_role"].get("create"):
+        body += (
             "# Create the o11y_access gate role (no extra capabilities).\n"
-            "curl -k -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
+            "curl \"${CURL_TLS_ARGS[@]}\" -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
             "  -X POST \"${SPLUNK_SEARCH_API_URI}/services/authorization/roles\" \\\n"
             "  -d name=o11y_access -d srchIndexesAllowed=\"\" -d srchIndexesDefault=\"\"\n\n"
-        )
-    if rbac.get("enable_centralized_rbac"):
-        body += (
-            "# DESTRUCTIVE: requires --i-accept-rbac-cutover at the setup.sh level.\n"
-            ": \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE:?SPLUNK_O11Y_ADMIN_TOKEN_FILE must point to a chmod-600 admin token file}\"\n"
-            "if [[ \"${SOICS_RBAC_CUTOVER_ACK:-false}\" != \"true\" ]]; then\n"
-            "  echo 'enable-centralized-rbac refused: SOICS_RBAC_CUTOVER_ACK!=true. Re-run with --i-accept-rbac-cutover.' >&2\n"
-            "  exit 2\n"
-            "fi\n"
-            "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-            "PAIRING_API=\"${PAIRING_API:-skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
-            "\"${PYTHON_BIN}\" \"${PAIRING_API}\" \\\n"
-            "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\\n"
-            f"  --realm {spec['realm']} \\\n"
-            "  --i-accept-rbac-cutover \\\n"
-            "  enable-centralized-rbac\n"
         )
     return body
 
@@ -1357,31 +1714,25 @@ def apply_script_rbac(spec: dict[str, Any]) -> str:
 def apply_script_discover_app(spec: dict[str, Any]) -> str:
     target = spec["target"]
     if target == "enterprise" or not spec.get("discover_app_required", True):
-        return SHEBANG + "# Discover app Configurations REST is Splunk Cloud Platform 10.1.2507+ only.\necho 'discover_app: not applicable for this target/version' >&2\n"
-    realm = spec["realm"]
+        return SHEBANG + (
+            "echo 'ERROR: Discover app Configurations REST is not applicable to this target/version.' >&2\n"
+            "echo 'HANDOFF: use a supported Splunk Cloud Platform 10.1.2507+ target or complete the documented UI workflow; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
     discover = spec["discover_app"]
     body = SHEBANG + (
-        "# Step: Discover Splunk Observability Cloud app — five Configurations tabs + Read permission grant.\n"
+        "# Step: Discover Splunk Observability Cloud app Configurations + Read permission.\n"
         ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set}\"\n"
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
-        ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
-        f": \"${{{discover['access_tokens_realm_token_file_ref']}:?{discover['access_tokens_realm_token_file_ref']} must point to a chmod-600 token file}}\"\n\n"
-        f"{SPLUNK_CURL_AUTH_HELPER}"
-        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
-        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n"
-        "BASE_URL=\"${SPLUNK_SEARCH_API_URI}/servicesNS/nobody/discover_splunk_observability_cloud\"\n\n"
-        "# Tab 1: Related Content discovery toggle.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/related_content_discovery\" -d enabled={'1' if discover['related_content_discovery'] else '0'}\n\n"
-        "# Tab 3: Field aliasing + Auto Field Mapping toggle.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/field_aliasing\" -d auto_field_mapping={'1' if discover['field_aliasing']['auto_field_mapping'] else '0'}\n\n"
-        "# Tab 4: Automatic UI updates toggle.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/automatic_ui_updates\" -d enabled={'1' if discover['automatic_ui_updates'] else '0'}\n\n"
-        "# Tab 5: Access tokens (realm + token from chmod-600 file).\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/access_tokens\" -d realm={realm} --data-urlencode \"access_token@${{{discover['access_tokens_realm_token_file_ref']}}}\"\n\n"
-        "# Read permission grant on the Discover app.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/servicesNS/nobody/system/apps/local/discover_splunk_observability_cloud/permissions\" \\\n"
-        f"  -d 'sharing=app' -d 'perms.read={','.join(discover['read_permission_roles'])}'\n"
+        ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
+        "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+        "DISCOVER_API=\"${DISCOVER_API:-skills/splunk-observability-cloud-integration-setup/scripts/discover_app_api.py}\"\n"
+        "STATE_ARGS=(--state-dir \"${DISCOVER_STATE_DIR:-state}\")\n\n"
+        "\"${PYTHON_BIN}\" \"${DISCOVER_API}\" \"${STATE_ARGS[@]}\" preflight\n"
+        f"\"${{PYTHON_BIN}}\" \"${{DISCOVER_API}}\" \"${{STATE_ARGS[@]}}\" related-content-discovery --enabled {'true' if discover['related_content_discovery'] else 'false'}\n"
+        f"\"${{PYTHON_BIN}}\" \"${{DISCOVER_API}}\" \"${{STATE_ARGS[@]}}\" field-aliasing --auto-field-mapping {'true' if discover['field_aliasing']['auto_field_mapping'] else 'false'}\n"
+        f"\"${{PYTHON_BIN}}\" \"${{DISCOVER_API}}\" \"${{STATE_ARGS[@]}}\" automatic-ui-updates --enabled {'true' if discover['automatic_ui_updates'] else 'false'}\n"
+        f"\"${{PYTHON_BIN}}\" \"${{DISCOVER_API}}\" \"${{STATE_ARGS[@]}}\" read-permission --roles {','.join(discover['read_permission_roles'])}\n"
     )
     return body
 
@@ -1389,7 +1740,10 @@ def apply_script_discover_app(spec: dict[str, Any]) -> str:
 def apply_script_loc(spec: dict[str, Any]) -> str:
     loc = spec["log_observer_connect"]
     if not loc.get("enable"):
-        return SHEBANG + "# log_observer_connect.enable=false; nothing to apply.\n"
+        return SHEBANG + (
+            "echo 'ERROR: log_observer_connect.enable=false; no live action was requested.' >&2\n"
+            "exit 2\n"
+        )
     role = loc["role"]
     sa = loc["service_account"]
     runtime = loc["workload_rule_runtime_seconds"]
@@ -1401,11 +1755,18 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         ": \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE:?--service-account-password-file must be set (chmod 600)}\"\n\n"
         f"{SPLUNK_CURL_AUTH_HELPER}"
+        "require_secret_file \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE}\" 'LOC service-account password file'\n"
         "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
+        "LOC_PASSWORD_CONFIG=\"\"\n"
+        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\" \"${LOC_PASSWORD_CONFIG}\"' EXIT\n"
+        "LOC_PASSWORD_CONFIG=\"$(make_curl_form_secret_config password \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE}\")\"\n"
         "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n\n"
+        "# Read every target collection before the first mutation.\n"
+        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/authorization/roles?output_mode=json&count=0\" >/dev/null\n"
+        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/authentication/users?output_mode=json&count=0\" >/dev/null\n"
+        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/workloads/rules?output_mode=json&count=0\" >/dev/null\n\n"
         "# Role.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authorization/roles\" \\\n"
+        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authorization/roles\" \\\n"
         f"  -d name={role['name']} \\\n"
         f"  -d imported_roles={role['base_role']} \\\n"
         f"  -d capabilities=edit_tokens_own -d capabilities=search \\\n"
@@ -1416,12 +1777,12 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
         f"  -d rtSrchJobsQuota=0 \\\n"
         f"  {' '.join(f'-d srchIndexesAllowed={ix}' for ix in role['indexes'])}\n\n"
         "# User.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authentication/users\" \\\n"
+        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authentication/users\" \\\n"
         f"  -d name={sa['username']} \\\n"
         f"  -d roles={role['name']} \\\n"
-        f"  --data-urlencode \"password@${{LOC_SERVICE_ACCOUNT_PASSWORD_FILE}}\"\n\n"
+        f"  -K \"${{LOC_PASSWORD_CONFIG}}\"\n\n"
         "# Workload rule.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/workloads/rules\" \\\n"
+        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/workloads/rules\" \\\n"
         f"  -d name=loc_runtime_abort \\\n"
         f"  -d predicate=\"user={sa['username']} AND runtime>{runtime}s\" \\\n"
         f"  -d action=abort -d schedule=alwayson\n"
@@ -1432,43 +1793,37 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
 def apply_script_sim_addon(spec: dict[str, Any]) -> str:
     sim = spec["sim_addon"]
     if not sim.get("install"):
-        return SHEBANG + "# sim_addon.install=false; nothing to apply.\n"
+        return SHEBANG + (
+            "echo 'ERROR: sim_addon.install=false; no live action was requested.' >&2\n"
+            "exit 2\n"
+        )
     realm = spec["realm"]
+    api_realm = observability_api_realm(realm)
     body = SHEBANG + (
         "# Step: Splunk Infrastructure Monitoring Add-on account + modular inputs.\n"
         ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set}\"\n"
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         f": \"${{{sim['org_token_file_ref']}:?--org-token-file must be set (chmod 600)}}\"\n\n"
-        f"{SPLUNK_CURL_AUTH_HELPER}"
-        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
-        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n"
-        "TA_BASE=\"${SPLUNK_SEARCH_API_URI}/servicesNS/nobody/Splunk_TA_sim\"\n\n"
-        "# Index.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/data/indexes\" \\\n"
-        f"  -d name={sim['index_name']} -d datatype=metric || true\n\n"
-        "# Account.\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{TA_BASE}}/splunk_infrastructure_monitoring_account\" \\\n"
-        f"  -d name={sim['account_name']} \\\n"
-        f"  -d realm={realm} \\\n"
-        f"  --data-urlencode \"access_token@${{{sim['org_token_file_ref']}}}\" \\\n"
-        f"  -d job_start_rate=60 \\\n"
-        f"  -d event_search_rate=30\n"
-        "\n"
+        "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+        "SIM_API=\"${SIM_API:-skills/splunk-observability-cloud-integration-setup/scripts/sim_addon_api.py}\"\n"
+        "SIM_CATALOG_DIR=\"${SIM_CATALOG_DIR:-sim-addon/signalflow-catalog}\"\n"
+        "STATE_ARGS=(--state-dir \"${SIM_STATE_DIR:-state}\")\n\n"
+        "\"${PYTHON_BIN}\" \"${SIM_API}\" \"${STATE_ARGS[@]}\" preflight\n"
+        f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" ensure-metric-index --name {sim['index_name']}\n"
+        f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" create-account --name {sim['account_name']} --realm {api_realm} --org-token-file \"${{{sim['org_token_file_ref']}}}\" --job-start-rate 60 --event-search-rate 30\n"
+        f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" check-connection --name {sim['account_name']}\n"
+        f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" enable-account --name {sim['account_name']} --enabled {'true' if sim.get('data_collection_enabled') else 'false'}\n\n"
     )
     for name in sim["modular_inputs"]:
         catalog = SIGNALFLOW_CATALOG[name]
         runnable = name  # already SAMPLE_-stripped
         body += (
             f"# Modular input: {runnable} ({catalog['description']})\n"
-            f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/servicesNS/nobody/Splunk_TA_sim/data/inputs/splunk_infrastructure_monitoring_data_streams\" \\\n"
-            f"  -d name={runnable} \\\n"
-            f"  -d index={sim['index_name']} \\\n"
-            f"  -d account={sim['account_name']} \\\n"
-            f"  -d interval=300 \\\n"
-            f"  -d disabled={'0' if sim.get('data_collection_enabled') else '1'} \\\n"
-            f"  --data-urlencode signalflow_program={shlex.quote(catalog['program'])}\n\n"
+            f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" create-modular-input \\\n"
+            f"  --name {runnable} --index {sim['index_name']} --account {sim['account_name']} \\\n"
+            f"  --interval-seconds 300 --enabled {'true' if sim.get('data_collection_enabled') else 'false'} \\\n"
+            f"  --signalflow-program-file \"${{SIM_CATALOG_DIR}}/{runnable}.signalflow\"\n\n"
         )
     return body
 
@@ -1503,8 +1858,10 @@ def handoff_script_acs_hec() -> str:
 def handoff_script_itsi() -> str:
     return SHEBANG + (
         "# Content Pack for Splunk Observability Cloud handoff to splunk-itsi-config.\n"
+        "ITSI_SPEC=\"${1:?Usage: apply-itsi-content-pack.sh /path/to/reviewed-content-pack-spec.yaml [--apply]}\"\n"
+        "shift\n"
         "exec bash skills/splunk-itsi-config/scripts/setup.sh \\\n"
-        "  --content-pack splunk_observability_cloud \"$@\"\n"
+        "  --workflow content-packs --spec \"${ITSI_SPEC}\" \"$@\"\n"
     )
 
 
@@ -1617,7 +1974,7 @@ def render(
 ) -> dict[str, Any]:
     if output_dir.exists():
         # Remove only generated subdirs to avoid clobbering user files.
-        for sub in ("payloads", "scripts", "state", "support-tickets", "sim-addon"):
+        for sub in ("payloads", "scripts", "support-tickets", "sim-addon"):
             shutil.rmtree(output_dir / sub, ignore_errors=True)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1637,8 +1994,8 @@ def render(
         "2. Run `--doctor` to confirm readiness.\n"
         "3. `--apply token_auth` if token authentication is off.\n"
         "4. `--apply pairing` (the rest of the sections depend on a healthy pair).\n"
-        "5. `--apply related_content,discover_app,log_observer_connect,sim_addon`.\n"
-        "6. `--apply rbac --i-accept-rbac-cutover` ONLY when ready for the destructive cutover.\n"
+        "5. Apply only the supported sections for this target; review `coverage-report.json` first.\n"
+        "6. Complete Related Content and centralized-RBAC handoffs through approved admin workflows.\n"
         "7. Hand the cross-skill scripts under `scripts/` to the relevant teams.\n"
     )
     write_text(output_dir / "README.md", readme)
@@ -1687,6 +2044,10 @@ def render(
         "api_version": spec.get("api_version"),
         "target": spec["target"],
         "realm": spec["realm"],
+        "splunk_cloud_stack": spec.get("splunk_cloud_stack", ""),
+        "pairing_mode": effective_pairing_mode(spec),
+        "requested_pairing_mode": spec["pairing"]["mode"],
+        "pairing_realms": [entry["realm"] for entry in effective_pairing_orgs(spec)],
         "steps": [
             {
                 "section": section,
@@ -1755,7 +2116,8 @@ def render(
     # State scaffolding (apply-state.json + idempotency keys).
     state_dir = output_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    write_text(state_dir / "apply-state.json", "{\"steps\": []}\n")
+    if not (state_dir / "apply-state.json").exists():
+        write_text(state_dir / "apply-state.json", "{\"steps\": []}\n")
     os.chmod(state_dir / "apply-state.json", 0o600)
     write_text(state_dir / "idempotency-keys.json", json.dumps([s["idempotency_key"] for s in apply_plan["steps"]], indent=2))
 
@@ -1838,6 +2200,12 @@ def main() -> int:
 
     if args.make_default_deeplink:
         realm = args.realm or "us0"
+        if realm not in REALM_REGION_MAP:
+            print(
+                f"realm {realm!r} is not recognized; allowed: {', '.join(sorted(REALM_REGION_MAP))}",
+                file=__import__("sys").stderr,
+            )
+            return 2
         host = "app.us2.signalfx.com" if realm == "us2-gcp" else f"app.{realm}.signalfx.com"
         print(f"Make Default UI: https://{host}/#/myprofile/orgs (admin opens 3-dot menu next to {realm})")
         return 0
@@ -1846,15 +2214,19 @@ def main() -> int:
     if not spec_path.exists():
         print(f"spec not found: {spec_path}", file=__import__("sys").stderr)
         return 2
-    raw_spec = load_spec(spec_path)
-    spec = validate_spec(raw_spec, target_override=args.target)
-    if args.realm:
-        spec["realm"] = args.realm
-        spec = validate_spec(spec)
-    if args.render_sim_templates:
-        chosen = [t.strip() for t in args.render_sim_templates.split(",") if t.strip()]
-        spec["sim_addon"]["modular_inputs"] = chosen
-        spec = validate_spec(spec)
+    try:
+        raw_spec = load_spec(spec_path)
+        spec = validate_spec(raw_spec, target_override=args.target)
+        if args.realm:
+            spec["realm"] = args.realm
+            spec = validate_spec(spec)
+        if args.render_sim_templates:
+            chosen = [t.strip() for t in args.render_sim_templates.split(",") if t.strip()]
+            spec["sim_addon"]["modular_inputs"] = chosen
+            spec = validate_spec(spec)
+    except RenderError as exc:
+        print(f"validation FAILED: {exc}", file=__import__("sys").stderr)
+        return 2
 
     discover_data = None
     if args.discover_input:

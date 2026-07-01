@@ -88,6 +88,9 @@ The live validation runner writes checkpointed, sanitized evidence under
 
 - `checkpoint.json` for resume-safe apply steps
 - `runs/<timestamp>/ledger.jsonl` with one row per command
+
+One-shot and bounded/watch exits reflect the final completed sweep: if its
+totals contain any hard failures, the runner exits nonzero.
 - `runs/<timestamp>/evidence/*.redacted.json`
 - `runs/<timestamp>/final-report.json` and `.md`
 

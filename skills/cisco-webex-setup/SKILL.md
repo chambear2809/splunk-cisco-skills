@@ -92,7 +92,7 @@ reaches that input.
 4. Validate:
 
 ```bash
-bash skills/cisco-webex-setup/scripts/validate.sh
+bash skills/cisco-webex-setup/scripts/validate.sh --completion
 ```
 
 ## Input Coverage
@@ -116,3 +116,9 @@ value format.
 
 See `reference.md` for the package-derived sourcetypes, scopes, and timing
 guardrails.
+
+## Validation Modes
+
+Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
+to require the Webex add-on and dashboard app, dashboard macros/views, an OAuth
+account, an enabled input, and event data in the Webex indexes.

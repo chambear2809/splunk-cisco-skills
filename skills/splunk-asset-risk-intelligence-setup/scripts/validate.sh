@@ -23,6 +23,7 @@ ARI_CAPABILITIES=(
 PASS=0
 FAIL=0
 WARN=0
+COMPLETION=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -32,6 +33,7 @@ Splunk Asset and Risk Intelligence Validation
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
+  --completion  Fail on every readiness warning
   --help  Show this help
 EOF
     exit "${exit_code}"
@@ -39,6 +41,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --completion|--strict) COMPLETION=true; shift ;;
         --help|-h) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -46,7 +49,7 @@ done
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() { if [[ "${COMPLETION}" == "true" ]]; then fail "$*"; else log "  WARN: $*"; WARN=$((WARN + 1)); fi; }
 
 version_lt() {
     python3 - "$1" "$2" <<'PY'
@@ -170,7 +173,7 @@ print(", ".join(sorted(set(found))) if found else "none")
 
 log "=== Splunk Asset and Risk Intelligence Validation ==="
 log ""
-warn_if_current_skill_role_unsupported
+check_current_skill_role_for_validation "${COMPLETION}" || fail "Deployment role is unsupported for this skill"
 
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
@@ -228,7 +231,7 @@ except Exception:
     if [[ "${kvstore_status}" == "ready" ]]; then
         pass "KV Store status: ready"
     else
-        warn "KV Store status: ${kvstore_status}; ARI requires healthy KV Store"
+        fail "KV Store status: ${kvstore_status}; ARI requires healthy KV Store"
     fi
 
     log ""

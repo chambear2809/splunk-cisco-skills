@@ -568,18 +568,18 @@ BASE_OUTPUT_DIR="${{BASE_OUTPUT_DIR:-/tmp/splunk-observability-otel-rendered}}"
 MERGED_VALUES="${{MERGED_VALUES:-${{HERE}}/values.dbmon.merged.yaml}}"
 
 echo "Render the base Splunk OTel Collector values first:"
-echo "  bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\"
-echo "    --render-k8s --realm {realm} --cluster-name {cluster_name} \\"
+echo "  bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\\\"
+echo "    --render-k8s --realm {realm} --cluster-name {cluster_name} \\\\"
 echo "    --distribution {distribution} --output-dir ${{BASE_OUTPUT_DIR}}"
 echo
 echo "Then re-render DBMon with --base-values to produce a merge that preserves"
 echo "existing receivers/processors/exporters/pipeline arrays:"
-echo "  bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \\"
-echo "    --render --spec skills/splunk-observability-database-monitoring-setup/template.example \\"
+echo "  bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \\\\"
+echo "    --render --spec skills/splunk-observability-database-monitoring-setup/template.example \\\\"
 echo "    --base-values ${{BASE_OUTPUT_DIR}}/k8s/values.yaml --output-dir ${{OUTPUT_DIR}}"
 echo
-echo "Apply with Helm after reviewing ${collector['version']} chart compatibility:"
-echo "  helm upgrade --install {collector['release_name']} splunk-otel-collector-chart/splunk-otel-collector \\"
+echo "Apply with Helm after reviewing {collector['version']} chart compatibility:"
+echo "  helm upgrade --install {collector['release_name']} splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "    -n {collector['namespace']} --create-namespace -f ${{MERGED_VALUES}}"
 """
 
@@ -653,7 +653,14 @@ helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
     "${{DRY_RUN_FLAG[@]}}"
 
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
-    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+    if kubectl -n "${{NAMESPACE}}" get deployment/${{RELEASE}}-k8s-cluster-receiver >/dev/null 2>&1; then
+        kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s
+    elif kubectl -n "${{NAMESPACE}}" get deployment/${{RELEASE}}-cluster-receiver >/dev/null 2>&1; then
+        kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s
+    else
+        echo "ERROR: DBMon cluster-receiver deployment was not found after Helm apply." >&2
+        exit 1
+    fi
 fi
 """
     )

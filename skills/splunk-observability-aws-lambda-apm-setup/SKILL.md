@@ -31,7 +31,7 @@ The skill is the live fulfillment of the `handoffs.lambda_apm` stub emitted by
 | Target function validation | `api_validate` |
 | Layer ARN resolution (snapshot) | `api_validate` |
 | Exec-wrapper wiring | `api_validate` |
-| Token delivery (Secrets Manager / SSM) | `handoff` |
+| Token delivery (Secrets Manager / SSM) | `api_apply` |
 | X-Ray coexistence flag | `api_validate` |
 | IAM ingest-egress policy (local collector disabled) | `api_validate` / `not_applicable` |
 | Terraform variant | `handoff` |
@@ -40,7 +40,7 @@ The skill is the live fulfillment of the `handoffs.lambda_apm` stub emitted by
 | CDK TypeScript + Python variant | `handoff` |
 | SAR advisory | `handoff` |
 | Container-image Dockerfile snippet | `handoff` (image targets only) |
-| AWS CLI apply plan | `api_validate` |
+| AWS CLI apply plan | `api_apply` |
 | Span attribute validation | `api_validate` |
 | Vendor-coexistence check | `api_validate` |
 | SnapStart guidance (Java) | `api_validate` |
@@ -53,9 +53,10 @@ The skill is the live fulfillment of the `handoffs.lambda_apm` stub emitted by
 ## Safety Rules
 
 - Never ask for the Splunk O11y access token in conversation.
-- Never pass `SPLUNK_ACCESS_TOKEN` as a literal value. Use `--token-file` for
-  live API calls. For Lambda function config, the renderer emits
-  `{{resolve:secretsmanager:...}}` or `{{resolve:ssm-secure:...}}` references.
+- Never pass `SPLUNK_ACCESS_TOKEN` as a command-line value. Use `--token-file`.
+  The apply helper rotates the selected AWS secret, fetches it into a private
+  temporary file, and merges it into the Lambda environment without exposing
+  it in rendered files, shell history, or process arguments.
 - Token files must be `chmod 600`. Use `write_secret_file.sh` to create one
   without shell-history exposure.
 - Reject direct-secret flags: `--token`, `--access-token`, `--api-token`,
@@ -102,7 +103,7 @@ splunk-observability-aws-lambda-apm-rendered/
   03-layers.md                 # layer attachment plan
   04-env.md                    # environment variable plan
   05-validation.md             # validation steps
-  aws-cli/apply-plan.sh        # AWS CLI commands (review before running)
+  aws-cli/apply-plan.sh        # guarded AWS CLI apply helper
   terraform/main.tf            # Terraform resource snippets
   cloudformation/snippets.yaml # CloudFormation snippets
   sam/template.yaml            # AWS SAM template snippet
@@ -126,8 +127,7 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_token
 TOKEN_FILE=/tmp/splunk_o11y_token \
   bash splunk-observability-aws-lambda-apm-rendered/scripts/write-splunk-token.sh
 
-# Delete the local temp file:
-rm /tmp/splunk_o11y_token
+# Keep the local file until the apply step below completes, then delete it.
 ```
 
 ### 5. Apply
@@ -138,6 +138,8 @@ bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh \
   --spec my-lambda-spec.yaml \
   --realm us1 \
   --token-file /tmp/splunk_o11y_token
+
+rm /tmp/splunk_o11y_token
 ```
 
 Or apply only specific sections:

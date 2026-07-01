@@ -257,8 +257,8 @@ def render_preflight(args: argparse.Namespace) -> str:
         f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 test -d "${{splunk_home}}/etc/apps/splunk_monitoring_console"
-"${{splunk_home}}/bin/splunk" btool app list --app=splunk_monitoring_console --debug >/dev/null || true
-"${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug >/dev/null || true
+"${{splunk_home}}/bin/splunk" btool app list --app=splunk_monitoring_console --debug >/dev/null
+"${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug >/dev/null
 """
     )
 
@@ -274,6 +274,10 @@ def render_apply(args: argparse.Namespace) -> str:
         f"""splunk_home={splunk_home}
 target_dir="${{splunk_home}}/etc/apps/splunk_monitoring_console/local"
 mkdir -p "${{target_dir}}"
+stamp="$(date +%Y%m%d%H%M%S)"
+for name in app.conf splunk_monitoring_console_assets.conf savedsearches.conf; do
+  [[ -f "${{target_dir}}/${{name}}" ]] && cp "${{target_dir}}/${{name}}" "${{target_dir}}/${{name}}.bak.${{stamp}}"
+done
 cp app.conf splunk_monitoring_console_assets.conf savedsearches.conf "${{target_dir}}/"
 echo "distsearch.conf is rendered for review. Add peers through Splunk Web or copy it with trusted.pem key handling."
 {restart_block}"""
@@ -293,7 +297,7 @@ peers=({peers})
 
 if (( ${{#peers[@]}} == 0 )); then
   echo "No search peers were rendered. Re-render with --search-peers host:port,host2:port." >&2
-  exit 0
+  exit 2
 fi
 cat <<'EOF'
 Search peer onboarding requires remote admin credentials. Splunk CLI documents
@@ -314,7 +318,7 @@ for peer in "${{peers[@]}}"; do
     echo "  Remote username: ${{peer_username}}"
   fi
 done
-"${{splunk_home}}/bin/splunk" list search-server || true
+"${{splunk_home}}/bin/splunk" list search-server
 """
     )
 
@@ -323,10 +327,10 @@ def render_status(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     return make_script(
         f"""splunk_home={splunk_home}
-"${{splunk_home}}/bin/splunk" list search-server || true
-"${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug 2>/dev/null || true
-"${{splunk_home}}/bin/splunk" btool distsearch list --debug 2>/dev/null || true
-"${{splunk_home}}/bin/splunk" btool savedsearches list "DMC Forwarder - Build Asset Table" --debug 2>/dev/null || true
+"${{splunk_home}}/bin/splunk" list search-server
+"${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug
+"${{splunk_home}}/bin/splunk" btool distsearch list --debug
+"${{splunk_home}}/bin/splunk" btool savedsearches list "DMC Forwarder - Build Asset Table" --debug
 """
     )
 

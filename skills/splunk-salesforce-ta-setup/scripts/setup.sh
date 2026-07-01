@@ -64,6 +64,12 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+validate_splunk_index_name "${INDEX}" || exit 1
+
+if [[ "${JSON}" == "true" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then
+    echo "ERROR: --json cannot be combined with --install or --create-index." >&2
+    exit 1
+fi
 
 if [[ "${INSTALL}" == "false" && "${CREATE_INDEX}" == "false" && "${RENDER}" == "false" ]]; then
     RENDER=true
@@ -88,10 +94,18 @@ run_render() {
 install_package() {
     local cmd=(bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --no-update)
     [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart)
-    "${cmd[@]}"
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        printf 'DRY RUN:'; printf ' %q' "${cmd[@]}"; printf '\n'
+    else
+        "${cmd[@]}"
+    fi
 }
 
 create_index() {
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        log "DRY RUN: create index ${INDEX}"
+        return 0
+    fi
     ensure_session
     if platform_create_index "${SK:-}" "${SPLUNK_URI:-}" "${INDEX}" "512000"; then
         log "Ensured index '${INDEX}' exists."
@@ -102,6 +116,8 @@ create_index() {
 }
 
 warn_if_current_skill_role_unsupported
+if [[ "${DRY_RUN}" != "true" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then require_current_skill_role_supported; fi
+if [[ "${DRY_RUN}" != "true" && "${CREATE_INDEX}" == "true" ]]; then require_index_management_target_role; fi
 [[ "${INSTALL}" == "true" ]] && install_package
 [[ "${CREATE_INDEX}" == "true" ]] && create_index
 [[ "${RENDER}" == "true" ]] && run_render

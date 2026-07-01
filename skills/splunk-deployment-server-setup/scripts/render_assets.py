@@ -18,12 +18,56 @@ Reads CLI args (from setup.sh) and emits the DS rendered tree under
 from __future__ import annotations
 
 import argparse
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SKILL_NAME = "splunk-deployment-server-setup"
+_HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9_./~+-]+$")
+
+
+def _validate_host(value: str, option: str) -> str:
+    if not _HOST_RE.fullmatch(value or ""):
+        raise SystemExit(f"ERROR: {option} must be a hostname/IP token.")
+    return value
+
+
+def _validate_uri(value: str, option: str) -> str:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise SystemExit(f"ERROR: {option} must be an http(s) management URI.")
+    _validate_host(parsed.hostname, option)
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username:
+        raise SystemExit(f"ERROR: {option} must contain only scheme, host, and optional port.")
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: {option} has an invalid port: {exc}") from exc
+    return value.rstrip("/")
+
+
+def _parse_lb_endpoint(value: str) -> tuple[str, int]:
+    parsed = urlparse(value if "://" in value else f"//{value}")
+    if not parsed.hostname or parsed.path not in {"", "/"}:
+        raise SystemExit("ERROR: --lb-uri must be a hostname with optional port.")
+    try:
+        port = parsed.port or 8089
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: --lb-uri has an invalid port: {exc}") from exc
+    return _validate_host(parsed.hostname, "--lb-uri"), port
+
+
+def _positive_int(value: str, option: str, *, allow_zero: bool = False) -> int:
+    if not re.fullmatch(r"[0-9]+", value or ""):
+        raise SystemExit(f"ERROR: {option} must be an integer.")
+    parsed = int(value)
+    if parsed < (0 if allow_zero else 1):
+        raise SystemExit(f"ERROR: {option} must be {'nonnegative' if allow_zero else 'positive'}.")
+    return parsed
 
 
 def _lib_dir_block() -> str:
@@ -90,13 +134,32 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     out = Path(args.output_dir)
     ds = out / "ds"
 
-    ds_host = args.ds_host or "ds01.example.com"
-    ds_uri = args.ds_uri or f"https://{ds_host}:8089"
-    fleet_size = int(args.fleet_size)
-    phone_home, phone_home_note = _phone_home_recommendation(fleet_size)
+    ds_host = _validate_host(args.ds_host or "ds01.example.com", "--ds-host")
+    ds_uri = _validate_uri(args.ds_uri or f"https://{ds_host}:8089", "--ds-uri")
+    fleet_size = _positive_int(args.fleet_size, "--fleet-size", allow_zero=True)
+    recommended_phone_home, recommended_phone_home_note = _phone_home_recommendation(fleet_size)
+    if args.phone_home_interval:
+        phone_home = _positive_int(args.phone_home_interval, "--phone-home-interval")
+        phone_home_note = "operator override"
+    else:
+        phone_home, phone_home_note = recommended_phone_home, recommended_phone_home_note
+    handshake_retry = _positive_int(args.handshake_retry_interval, "--handshake-retry-interval")
+    max_client_apps = _positive_int(args.max_client_apps, "--max-client-apps")
+    staged_rollout_pct = _positive_int(args.staged_rollout_pct, "--staged-rollout-pct")
+    if staged_rollout_pct > 100:
+        raise SystemExit("ERROR: --staged-rollout-pct cannot exceed 100.")
+    if args.lb_type not in {"haproxy", "aws-nlb"}:
+        raise SystemExit("ERROR: --lb-type must be haproxy or aws-nlb.")
     ha_enabled = args.ha_enabled
-    ds_host2 = args.ds_host2 or "ds02.example.com"
-    ds_vip = args.ds_vip or "ds-vip.example.com"
+    ds_host2 = _validate_host(args.ds_host2 or "ds02.example.com", "--ds-secondary-host")
+    ds_uri2 = _validate_uri(
+        args.ds_secondary_uri or f"https://{ds_host2}:8089",
+        "--ds-secondary-uri",
+    )
+    ds_vip_host, ds_vip_port = _parse_lb_endpoint(args.ds_vip or "ds-vip.example.com")
+    new_ds_uri = _validate_uri(args.new_ds_uri or ds_uri, "--new-ds-uri")
+    if args.admin_password_file and not _SAFE_PATH_RE.fullmatch(args.admin_password_file):
+        raise SystemExit("ERROR: --admin-password-file contains unsupported characters.")
     # Admin password file baked as the default for rendered REST scripts
     # (still overridable at runtime via ADMIN_PASS_FILE).
     pw_file = args.admin_password_file or "/tmp/splunk_admin_password"
@@ -118,11 +181,14 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + "# Run as the splunk OS user (or via sudo -u splunk).\n"
         + 'SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"\n'
         + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n\n'
-        + "# Step 1: Enable the deploy-server feature (CLI requires inline -auth;\n"
-        + "# the password is read from the file, briefly visible only in this\n"
-        + "# host's local process table during the enable call).\n"
-        + 'sudo -u splunk "${SPLUNK_HOME}/bin/splunk" enable deploy-server \\\n'
-        + '  -auth "${AUTH_USER}:$(cat "${ADMIN_PASS_FILE}")"\n\n'
+        + "# Step 1: Enable the deploy-server feature. This is a CLI-only action.\n"
+        + "# Use a pre-existing local Splunk CLI login/session; never expand the\n"
+        + "# password file into -auth because that exposes it in the process list.\n"
+        + 'if ! sudo -u splunk "${SPLUNK_HOME}/bin/splunk" enable deploy-server; then\n'
+        + '  echo "ERROR: deploy-server enablement requires a local CLI session." >&2\n'
+        + '  echo "HANDOFF: run sudo -u splunk ${SPLUNK_HOME}/bin/splunk login interactively, then rerun this helper." >&2\n'
+        + "  exit 2\n"
+        + "fi\n\n"
         + "# Step 2: Restart to activate. A Deployment Server is full Splunk\n"
         + "# Enterprise, so the systemd unit is Splunkd (NOT SplunkForwarder);\n"
         + "# fall back to the splunk CLI if systemd is not managing the service.\n"
@@ -130,7 +196,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + '  sudo -u splunk "${SPLUNK_HOME}/bin/splunk" restart\n\n'
         + "# Step 3: Verify (session-key auth keeps the password off argv)\n"
         + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json" | \\\n'
         + "  python3 -m json.tool | head -5\n"
         + 'echo "Deployment server enabled. Add apps to ${SPLUNK_HOME}/etc/deployment-apps/"\n',
@@ -154,7 +220,8 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "- Apps here are pushed to UFs and HFs — NOT to search heads or indexers.\n"
         "- Do NOT use `etc/apps/` for deployment server apps.\n"
         "- The DS reads `serverclass.conf` from `${SPLUNK_HOME}/etc/system/local/` "
-        "or from a deployment app in `etc/deployment-apps/`.\n"
+        "or a local management app under `etc/apps/`; `etc/deployment-apps/` "
+        "contains payloads sent to clients and is not a local config layer.\n"
         "- After adding or editing apps, run `reload/reload-deploy-server.sh`.\n"
         "- `filterType` must be `whitelist` or `blacklist` — never rely on the default "
         "(changed in Splunk 9.4.3+).\n\n"
@@ -175,7 +242,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + "# Triggers re-read of serverclass.conf and pushes updated app assignments.\n"
         + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
         + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
-        + 'splunk_curl_post "${SK}" "" \\\n'
+        + 'splunk_curl_post "${SK}" "" --fail-with-body --show-error \\\n'
         + '  -X POST "${DS_URI}/services/deployment/server/_reload" | python3 -m json.tool\n'
         + 'echo "Deployment server reloaded."\n',
         encoding="utf-8",
@@ -188,15 +255,15 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
         + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n\n'
         + 'echo "=== Deployment Server Clients (first 20) ==="\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/deployment/server/clients?count=20&output_mode=json" | \\\n'
         + "  python3 -m json.tool\n\n"
         + 'echo "=== Server Classes ==="\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/deployment/server/serverclasses?output_mode=json" | \\\n'
         + "  python3 -m json.tool\n\n"
         + 'echo "=== Deployment Applications ==="\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/deployment/server/applications/local?output_mode=json" | \\\n'
         + "  python3 -m json.tool\n",
         encoding="utf-8",
@@ -226,13 +293,20 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "    sys.exit(2)\n"
         "CREDS = f'{AUTH_USER}:{_pw}'\n\n"
         "import base64, ssl\n"
-        "ctx = ssl.create_default_context()\nctx.check_hostname = False\n"
-        "ctx.verify_mode = ssl.CERT_NONE\n"
+        "CA_CERT = os.environ.get('SPLUNK_CA_CERT', '')\n"
+        "VERIFY_SSL = os.environ.get('SPLUNK_VERIFY_SSL', 'true').lower() not in {'0', 'false', 'no'}\n"
+        "if VERIFY_SSL:\n"
+        "    ctx = ssl.create_default_context(cafile=CA_CERT or None)\n"
+        "else:\n"
+        "    print('WARNING: TLS certificate verification disabled by SPLUNK_VERIFY_SSL=false', file=sys.stderr)\n"
+        "    ctx = ssl.create_default_context()\n"
+        "    ctx.check_hostname = False\n"
+        "    ctx.verify_mode = ssl.CERT_NONE\n"
         "req = urllib.request.Request(\n"
         "    f'{DS_URI}/services/deployment/server/clients?count=0&output_mode=json',\n"
         "    headers={'Authorization': 'Basic ' + base64.b64encode(CREDS.encode()).decode()}\n"
         ")\n"
-        "resp = urllib.request.urlopen(req, context=ctx)\n"
+        "resp = urllib.request.urlopen(req, context=ctx, timeout=30)\n"
         "data = json.loads(resp.read())\n"
         "now = datetime.now(timezone.utc).timestamp()\n"
         "stale = []\n"
@@ -251,32 +325,41 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         encoding="utf-8",
     )
 
-    # ha/haproxy.cfg
-    (ds / "ha" / "haproxy.cfg").write_text(
-        "# HAProxy config for Splunk Deployment Server HA pair.\n"
-        "# Both DS instances share the same etc/deployment-apps/ via rsync or Git.\n"
-        "# Health check: GET /services/server/info returns 200 when DS is up.\n\n"
-        "global\n    log /dev/log local0\n    maxconn 4096\n\n"
-        "defaults\n    mode http\n    timeout connect 5s\n"
-        "    timeout client  60s\n    timeout server  60s\n\n"
-        "frontend splunk_ds\n    bind *:8089\n    default_backend splunk_ds_backend\n\n"
-        "backend splunk_ds_backend\n    balance roundrobin\n"
-        "    option httpchk GET /services/server/info\n"
-        f"    server ds1 {ds_host}:8089 check ssl verify none inter 10s rise 2 fall 3\n"
-        f"    server ds2 {ds_host2}:8089 check ssl verify none inter 10s rise 2 fall 3 backup\n",
-        encoding="utf-8",
-    )
+    # ha/haproxy.cfg. The splunkd management endpoints require authentication,
+    # so an unauthenticated HTTP health check marks healthy servers down. Use a
+    # TLS/TCP check and verify each backend certificate instead.
+    if args.lb_type == "haproxy":
+        haproxy_text = (
+            "# HAProxy config for a Splunk Deployment Server HA pair.\n"
+            "# Replace the CA path with the CA that signed each splunkd certificate.\n\n"
+            "global\n    log /dev/log local0\n    maxconn 4096\n\n"
+            "defaults\n    mode tcp\n    timeout connect 5s\n"
+            "    timeout client  60s\n    timeout server  60s\n\n"
+            f"frontend splunk_ds\n    bind *:{ds_vip_port}\n    default_backend splunk_ds_backend\n\n"
+            "backend splunk_ds_backend\n    balance roundrobin\n"
+            "    option tcp-check\n"
+            f"    server ds1 {ds_host}:8089 check check-ssl verify required verifyhost {ds_host} ca-file /etc/ssl/certs/splunk-ds-ca.pem inter 10s rise 2 fall 3\n"
+            f"    server ds2 {ds_host2}:8089 check check-ssl verify required verifyhost {ds_host2} ca-file /etc/ssl/certs/splunk-ds-ca.pem inter 10s rise 2 fall 3 backup\n"
+        )
+    else:
+        haproxy_text = (
+            "# HAProxy is not selected (`--lb-type aws-nlb`).\n"
+            "# Provision an AWS Network Load Balancer TCP listener on the chosen\n"
+            "# management port, target both deployment servers, and use TLS/TCP\n"
+            "# health checks that do not disable backend certificate validation.\n"
+        )
+    (ds / "ha" / "haproxy.cfg").write_text(haproxy_text, encoding="utf-8")
 
     # ha/dns-record-template.txt
     (ds / "ha" / "dns-record-template.txt").write_text(
         f"# DNS record for DS VIP (used in deploymentclient.conf targetUri)\n"
         f"# Replace with your actual DNS zone and IP addresses.\n\n"
-        f"{ds_vip}.    300    IN    A    <DS1_IP>\n"
-        f"{ds_vip}.    300    IN    A    <DS2_IP>\n\n"
+        f"{ds_vip_host}.    300    IN    A    <DS1_IP>\n"
+        f"{ds_vip_host}.    300    IN    A    <DS2_IP>\n\n"
         f"# Or use a CNAME to your load balancer:\n"
-        f"# {ds_vip}.    300    IN    CNAME    <haproxy_or_elb_hostname>.\n\n"
+        f"# {ds_vip_host}.    300    IN    CNAME    <haproxy_or_elb_hostname>.\n\n"
         f"# UF deploymentclient.conf targetUri:\n"
-        f"# targetUri = {ds_vip}:8089\n",
+        f"# targetUri = {ds_vip_host}:{ds_vip_port}\n",
         encoding="utf-8",
     )
 
@@ -293,9 +376,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + '  "${SPLUNK_HOME}/etc/deployment-apps/" \\\n'
         + '  "splunk@${SECONDARY}:${SPLUNK_HOME}/etc/deployment-apps/"\n\n'
         + "# Then reload on both nodes (one session key per node).\n"
-        + f"for uri in 'https://{ds_host}:8089' 'https://{ds_host2}:8089'; do\n"
+        + f"for uri in {ds_uri!r} {ds_uri2!r}; do\n"
         + '  sk="$(get_session_key_from_password_file "${uri}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
-        + '  splunk_curl_post "${sk}" "" \\\n'
+        + '  splunk_curl_post "${sk}" "" --fail-with-body --show-error \\\n'
         + '    -X POST "${uri}/services/deployment/server/_reload" > /dev/null\n'
         + "done\n"
         + 'echo "Sync and reload complete."\n',
@@ -308,7 +391,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "# Mass re-target UF clients to a new DS URI.\n"
         "# This renders the commands; review before running on your UF fleet.\n"
         "# Requires Ansible, Fabric, or a parallel SSH tool.\n\n"
-        "NEW_DS_URI=\"${NEW_DS_URI:-" + ds_uri + "}\"\n\n"
+        "NEW_DS_URI=\"${NEW_DS_URI:-" + new_ds_uri + "}\"\n\n"
         "cat <<'INSTRUCTIONS'\n"
         "Steps to re-target clients:\n"
         "  1. Deploy a new deployment-app containing deploymentclient.conf:\n"
@@ -317,7 +400,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "  2. Or push via existing DS to a server class covering all UFs.\n"
         "  3. Verify check-in on new DS with inspect/inspect-fleet.sh.\n"
         "  4. After all clients have re-targeted, decommission the old DS.\n"
-        "INSTRUCTIONS\n",
+        "INSTRUCTIONS\n"
+        "echo 'HANDOFF: no inventory/transport target was supplied, so no clients were changed.' >&2\n"
+        "exit 2\n",
         encoding="utf-8",
     )
 
@@ -328,14 +413,17 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + "# then expand to full fleet.\n"
         + 'APP_NAME="${APP_NAME:-}"\n'
         + 'CANARY_CLASS="${CANARY_CLASS:-canary_uf_class}"\n'
+        + f'ROLLOUT_PERCENT="${{ROLLOUT_PERCENT:-{staged_rollout_pct}}}"\n'
         + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n\n'
         + 'if [[ -z "${APP_NAME}" ]]; then echo "Set APP_NAME" >&2; exit 1; fi\n\n'
         + 'echo "Step 1: Apply ${APP_NAME} to canary class ${CANARY_CLASS}"\n'
         + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
-        + 'splunk_curl_post "${SK}" "" \\\n'
+        + 'splunk_curl_post "${SK}" "" --fail-with-body --show-error \\\n'
         + '  -X POST "${DS_URI}/services/deployment/server/_reload" > /dev/null\n\n'
         + 'echo "Step 2: Monitor canary for 30 minutes before proceeding"\n'
-        + 'echo "Step 3: Expand server class to full fleet and reload again"\n',
+        + 'echo "Step 3: expand by ${ROLLOUT_PERCENT}% per reviewed wave, then reload again"\n'
+        + 'echo "HANDOFF: this helper reloaded the reviewed current server class but did not alter canary membership." >&2\n'
+        + 'exit 2\n',
         encoding="utf-8",
     )
 
@@ -374,17 +462,16 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
         + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
         + 'echo "=== DS Server Info ==="\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/server/info?output_mode=json" | python3 -m json.tool | head -20\n'
         + 'echo "=== DS Clients Count ==="\n'
-        + 'splunk_curl "${SK}" \\\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json" | \\\n'
         + '  python3 -c "import json,sys; d=json.load(sys.stdin); print(\'Total clients:\', d.get(\'paging\', {}).get(\'total\', \'unknown\'))"\n',
         encoding="utf-8",
     )
 
     # preflight-report.md
-    phone_home_rec, phone_home_rec_note = _phone_home_recommendation(fleet_size)
     ha_rec = "YES — fleet size requires HA DS pair" if fleet_size >= 5000 else "optional (recommended at 5000+ UFs)"
     (ds / "preflight-report.md").write_text(
         f"# DS Preflight Report\n\n"
@@ -392,7 +479,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         f"| Check | Value | Status |\n|-------|-------|--------|\n"
         f"| DS host | `{ds_host}` | OK |\n"
         f"| Fleet size | {fleet_size} UFs | OK |\n"
-        f"| phoneHomeIntervalInSecs | {phone_home_rec} | {phone_home_rec_note} |\n"
+        f"| phoneHomeIntervalInSecs | {phone_home} | {phone_home_note} |\n"
+        f"| handshakeRetryIntervalInSecs | {handshake_retry} | operator input |\n"
+        f"| max client apps | {max_client_apps} | operator input |\n"
         f"| HA pair recommended | {ha_rec} | {'WARN' if fleet_size >= 5000 and not ha_enabled else 'OK'} |\n"
         f"| filterType explicit | required | Rendered with explicit value |\n",
         encoding="utf-8",
@@ -427,7 +516,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "output_dir": str(out.resolve()),
         "ds_host": ds_host,
         "fleet_size": fleet_size,
-        "phone_home_interval": phone_home_rec,
+        "phone_home_interval": phone_home,
         "ha_enabled": ha_enabled,
         "rendered_files": [str(p.relative_to(out)) for p in sorted(out.rglob("*")) if p.is_file()],
     }

@@ -158,6 +158,7 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
 fi
 
 warn_if_current_skill_role_unsupported
+if [[ "${INSTALL}" == "true" ]]; then require_current_skill_role_supported; fi
 
 if [[ "${INSTALL}" == "true" ]]; then
     if ! "${INSTALL_CMD[@]}"; then

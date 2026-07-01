@@ -206,6 +206,7 @@
     "defaults": {
       "index": "cisco_isovalent",
       "interval": "300",
+      "sourcetype": "cisco:isovalent",
       "port": "8088"
     }
   },
@@ -218,6 +219,7 @@
     "defaults": {
       "index": "cisco_isovalent",
       "interval": "300",
+      "sourcetype": "cisco:isovalent:edge_processor",
       "port": "8088"
     }
   },

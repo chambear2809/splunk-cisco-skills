@@ -29,7 +29,22 @@ def parse_args() -> argparse.Namespace:
         default=str(SCRIPT_DIR.parent / "reports"),
         help="Directory where topology reports should be written.",
     )
+    parser.add_argument(
+        "--completion",
+        action="store_true",
+        help="Fail if the workflow emits any warning-status finding.",
+    )
     return parser.parse_args()
+
+
+def contains_warning_status(value: object) -> bool:
+    if isinstance(value, dict):
+        if str(value.get("status", "")).lower() in {"warn", "warning"}:
+            return True
+        return any(contains_warning_status(item) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_warning_status(item) for item in value)
+    return False
 
 
 def main() -> int:
@@ -72,7 +87,14 @@ def main() -> int:
         topology_failed = any(
             change["status"] == "error" for change in result["topology"].get("changes", [])
         ) or any(item["status"] == "fail" for item in result["topology"].get("validations", []))
-        return 1 if (prerequisite_failed or pack_failed or native_failed or topology_failed) else 0
+        completion_failed = args.completion and contains_warning_status(result)
+        return 1 if (
+            prerequisite_failed
+            or pack_failed
+            or native_failed
+            or topology_failed
+            or completion_failed
+        ) else 0
     except SkillError as exc:
         print(str(exc), file=sys.stderr)
         return 1

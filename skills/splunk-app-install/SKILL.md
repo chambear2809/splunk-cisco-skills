@@ -10,18 +10,28 @@ description: >-
 
 # Splunk App Install
 
+## Shared add-on completion gate
+
+This skill completes package delivery only. For every TA, add-on, or dashboard
+companion, continue through the owning skill and the
+[shared completion gate](../shared/ta_completion_gate.md). Never report a
+package install as complete setup without applicable ingest and dashboard
+evidence, or explicit package evidence that no dashboards ship.
+
 Automates installation, update, and management of Splunk apps and add-ons.
 
 ## Package Model
 
-**Pull from Splunkbase first, then fall back to local packages in `splunk-ta/`.**
+**Pull from Splunkbase first, then explicitly retry with a reviewed local
+package in `splunk-ta/` when needed.**
 This applies to both Splunk Cloud and Splunk Enterprise targets.
 
 - Primary path: `--source splunkbase --app-id <ID>` pulls the latest
   compatible release from Splunkbase. Omit `--app-version` to get the latest.
 - Fallback path: if Splunkbase is unavailable (no credentials, download
-  failure, private app), use `--source local` and the installer will look for
-  matching packages in `splunk-ta/`.
+  failure, private app), the caller must rerun with `--source local`; in
+  interactive mode the installer lists packages in `splunk-ta/`. It does not
+  silently switch sources after a failed Splunkbase operation.
 - Cloud: ACS fetches the release directly from Splunkbase.
 - Enterprise: the installer downloads the package, caches it in `splunk-ta/`,
   and installs it through the management API. For remote hosts, local packages
@@ -130,6 +140,8 @@ For Splunk Cloud:
 - remaining local and downloaded packages are installed as private apps via ACS
 - Splunkbase apps are installed or updated via ACS
 - the ACS CLI must be installed and configured for the target stack
+- completion is read back with `acs apps describe`; failed or still-pending
+  states, unresolved app names, and pinned-version mismatches return nonzero
 
 To skip prompts, supply values via flags:
 
@@ -145,6 +157,9 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
 | `--app-version VER` | Pin a specific Splunkbase version; omit for latest |
+| `--expected-sha256 HEX` | Required publisher SHA-256 for non-Splunkbase URL downloads |
+| `--license-ack-url URL` | Third-party license acknowledgment URL for ACS installs |
+| `--pre-vetted` | Skip ACS inspection only for an already reviewed private app |
 | `--update` | Upgrade an existing app |
 | `--no-update` | Fresh install (skip upgrade prompt) |
 | `--no-restart` | Skip the automatic restart after install |
@@ -176,6 +191,12 @@ Removes a Splunk app. Lists all installed apps so the user can pick by number.
 Asks for confirmation before removing, then restarts Splunk automatically and
 waits for the management API to return. Use `--no-restart` only when batching
 changes.
+
+On Cloud, an ACS-accepted uninstall returns nonzero if neither search-tier nor
+equivalent completion evidence is available. Follow the printed ACS/search-tier
+verification handoff before treating the app as removed.
+Enterprise and bundle removals also read back `/services/apps/local` after the
+activation path and return nonzero unless the app is absent.
 
 ```bash
 bash skills/splunk-app-install/scripts/uninstall_app.sh

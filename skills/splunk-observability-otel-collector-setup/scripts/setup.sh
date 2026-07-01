@@ -9,6 +9,11 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-otel-rendered"
+if [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python"
+else
+    PYTHON_BIN="${PYTHON:-python3}"
+fi
 
 usage() {
     cat <<'EOF'
@@ -862,7 +867,7 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
     RENDER_ARGS+=(--json)
 fi
 
-python3 "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
+"${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
 
 if [[ "${DRY_RUN}" == "true" ]]; then
     exit 0

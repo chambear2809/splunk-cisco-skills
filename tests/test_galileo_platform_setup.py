@@ -53,6 +53,39 @@ def load_bridge() -> ModuleType:
     return module
 
 
+def _query_args() -> Namespace:
+    return Namespace(
+        galileo_api_base="https://api.example.invalid",
+        project_id="project-id",
+        export_format="jsonl",
+        max_records=None,
+    )
+
+
+def test_query_galileo_accepts_ndjson_content_type(monkeypatch) -> None:
+    bridge = load_bridge()
+    monkeypatch.setattr(bridge, "galileo_headers", lambda _args: {})
+    monkeypatch.setattr(bridge, "build_export_records_request", lambda _args, _since: {})
+    monkeypatch.setattr(
+        bridge,
+        "request_bytes",
+        lambda *_args, **_kwargs: (b'{"id":"one"}\n{"id":"two"}\n', "application/x-ndjson"),
+    )
+    assert [item["id"] for item in bridge.query_galileo(_query_args(), None)] == ["one", "two"]
+
+
+def test_query_galileo_falls_back_to_jsonl_for_generic_json(monkeypatch) -> None:
+    bridge = load_bridge()
+    monkeypatch.setattr(bridge, "galileo_headers", lambda _args: {})
+    monkeypatch.setattr(bridge, "build_export_records_request", lambda _args, _since: {})
+    monkeypatch.setattr(
+        bridge,
+        "request_bytes",
+        lambda *_args, **_kwargs: (b'{"id":"one"}\n{"id":"two"}\n', "application/json"),
+    )
+    assert [item["id"] for item in bridge.query_galileo(_query_args(), None)] == ["one", "two"]
+
+
 def test_setup_help_lists_apply_sections() -> None:
     result = run_cmd("bash", str(SETUP), "--help")
     combined = result.stdout + result.stderr
@@ -301,11 +334,6 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
         "readiness",
         "object-lifecycle",
         "luna-scorers",
-        "observe-runtime",
-        "protect-runtime",
-        "evaluate-assets",
-        "multimodal-assets",
-        "observability-controls",
         "otel-collector",
         "dashboards",
         "detectors",

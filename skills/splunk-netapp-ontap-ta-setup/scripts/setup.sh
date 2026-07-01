@@ -62,6 +62,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+validate_request() {
+    validate_splunk_index_name "${INDEX}" || return 1
+    case "${PHASE}" in
+        render|list) ;;
+        *) echo "ERROR: --phase must be render or list (got: ${PHASE})" >&2; return 1 ;;
+    esac
+    python3 - "${PRODUCTS}" <<'PY'
+import sys
+
+allowed = {"ontap", "extractions", "indexes"}
+selected = [item.strip().lower() for item in sys.argv[1].split(",") if item.strip()]
+if not selected:
+    raise SystemExit("ERROR: --products must select at least one product")
+unknown = sorted(set(selected) - allowed)
+if unknown:
+    raise SystemExit(f"ERROR: unknown product selector(s): {', '.join(unknown)}")
+PY
+    if [[ "${PHASE}" == "list" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then
+        echo "ERROR: --phase list cannot be combined with --install or --create-index" >&2
+        return 1
+    fi
+    if [[ "${JSON}" == "true" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then
+        echo "ERROR: --json cannot be combined with --install or --create-index" >&2
+        return 1
+    fi
+}
+
 install_selected() {
     python3 - "${PRODUCTS}" <<'PY' | while IFS=$'\t' read -r app_id version app_name; do
 import sys
@@ -106,7 +133,10 @@ run_render() {
     "${cmd[@]}"
 }
 
+validate_request
 warn_if_current_skill_role_unsupported
+if [[ "${DRY_RUN}" != "true" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then require_current_skill_role_supported; fi
+if [[ "${DRY_RUN}" != "true" && "${CREATE_INDEX}" == "true" ]]; then require_index_management_target_role; fi
 [[ "${INSTALL}" == "true" ]] && install_selected
 [[ "${CREATE_INDEX}" == "true" ]] && create_index
 run_render

@@ -78,7 +78,10 @@ except: print('True')
 " 2>/dev/null || echo "True")
     if [[ "${visible}" == "False" ]]; then
         log "Setting ${APP_NAME} visible=true..."
-        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
+        if ! deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1; then
+            log "ERROR: Failed to set ${APP_NAME} visible=true."
+            return 1
+        fi
     fi
 }
 
@@ -99,7 +102,8 @@ except Exception:
     if [[ "${count}" -gt 0 ]]; then
         log "  Product catalog loaded: ${count} product stanzas"
     else
-        log "WARNING: Product catalog returned 0 stanzas — check app installation"
+        log "ERROR: Product catalog returned 0 stanzas — app setup is incomplete"
+        return 1
     fi
 }
 
@@ -113,7 +117,8 @@ verify_lookup() {
     if [[ "${http_code}" == "200" ]]; then
         log "  Lookup 'scan_splunkbase_apps' found"
     else
-        log "WARNING: Lookup 'scan_splunkbase_apps' not accessible (HTTP ${http_code})"
+        log "ERROR: Lookup 'scan_splunkbase_apps' not accessible (HTTP ${http_code})"
+        return 1
     fi
 }
 
@@ -122,18 +127,26 @@ run_catalog_sync() {
     local result
     result=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
         "| synccatalog dryrun=false" "status" 2>/dev/null || echo "unknown")
-    log "  synccatalog result: ${result}"
+    case "${result}" in
+        Success|Skipped)
+            log "  synccatalog result: ${result}"
+            ;;
+        *)
+            log "ERROR: synccatalog failed or returned an unexpected status: ${result}"
+            return 1
+            ;;
+    esac
 
     log "Running Splunkbase lookup sync (synclookup)..."
     local lookup_result
     lookup_result=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
         "| synclookup input_csv=splunkbase_assets/splunkbase_apps.csv.gz output_csv=scan_splunkbase_apps.csv.gz" \
-        "status" 2>/dev/null || echo "error")
-    if [[ "${lookup_result}" == "error" ]] || [[ "${lookup_result}" == "0" ]]; then
-        log "WARNING: synclookup may have failed — check synclookup.log on the search head"
-    else
-        log "  synclookup result: ${lookup_result}"
+        "status_code" 2>/dev/null || echo "error")
+    if [[ "${lookup_result}" != "200" ]]; then
+        log "ERROR: synclookup failed (status_code=${lookup_result}) — check synclookup.log on the search head"
+        return 1
     fi
+    log "  synclookup result: HTTP ${lookup_result}"
 }
 
 main() {

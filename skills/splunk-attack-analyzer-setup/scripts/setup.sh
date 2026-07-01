@@ -88,6 +88,7 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+validate_splunk_index_name "${INDEX_NAME}" || exit 1
 
 if [[ "${MODE_SET}" != "true" ]]; then
     INSTALL=true
@@ -108,9 +109,10 @@ if (( INTERVAL < 300 )); then
     exit 1
 fi
 
-if [[ -n "${API_KEY_FILE}" && ! -r "${API_KEY_FILE}" ]]; then
-    echo "ERROR: --api-key-file is not readable: ${API_KEY_FILE}" >&2
-    exit 1
+if [[ -n "${API_KEY_FILE}" ]]; then
+    [[ -f "${API_KEY_FILE}" && -r "${API_KEY_FILE}" && -s "${API_KEY_FILE}" ]] || { echo "ERROR: --api-key-file must be a readable, non-empty regular file: ${API_KEY_FILE}" >&2; exit 1; }
+    api_key_mode="$(stat -c '%a' "${API_KEY_FILE}" 2>/dev/null || stat -f '%Lp' "${API_KEY_FILE}" 2>/dev/null)"
+    [[ "${api_key_mode}" == "600" ]] || { echo "ERROR: --api-key-file must be chmod 600 (found ${api_key_mode:-unknown})." >&2; exit 1; }
 fi
 
 ADDON_INSTALL_CMD=()
@@ -128,7 +130,11 @@ build_install_command() {
         cmd+=(--source local --file "${file_path}" --no-update)
     fi
     [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart)
-    eval "${out_name}=(\"\${cmd[@]}\")"
+    case "${out_name}" in
+        ADDON_INSTALL_CMD) ADDON_INSTALL_CMD=("${cmd[@]}") ;;
+        APP_INSTALL_CMD) APP_INSTALL_CMD=("${cmd[@]}") ;;
+        *) echo "ERROR: unsupported install command target: ${out_name}" >&2; exit 1 ;;
+    esac
     return 0
 }
 
@@ -239,6 +245,11 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
 fi
 
 warn_if_current_skill_role_unsupported
+if [[ "${INSTALL}" == "true" ]]; then
+    require_current_skill_role_supported
+    require_search_tier_target_role "The combined Attack Analyzer add-on/dashboard install"
+fi
+if [[ "${INSTALL}" == "true" && "${CREATE_INDEX}" == "true" ]]; then require_index_management_target_role; fi
 
 if [[ "${INSTALL}" == "true" ]]; then
     # Splunk_TA_SAA (6999) MUST be installed before Splunk_App_SAA (7000)

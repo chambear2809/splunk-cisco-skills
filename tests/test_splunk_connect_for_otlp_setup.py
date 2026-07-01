@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -65,6 +66,10 @@ def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
         "--configure-input",
         "--input-name",
         "otlp-main",
+        "--server-cert",
+        "/opt/splunk/etc/auth/otlp/server.pem",
+        "--server-key",
+        "/opt/splunk/etc/auth/otlp/server.key",
         "--expected-index",
         "otlp_events",
     )
@@ -74,6 +79,8 @@ def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
     assert payload["operations"] == ["configure-input"]
     assert payload["input"]["grpc_port"] == 4317
     assert payload["input"]["http_port"] == 4318
+    assert payload["input"]["enableSSL"] is True
+    assert payload["sender"]["tls"] is True
     assert payload["sender"]["auth_header_format"] == "Authorization: Splunk <HEC_TOKEN>"
     assert payload["sender"]["token_value_rendered"] is False
     assert payload["hec_handoff"]["skill"] == "splunk-hec-service-setup"
@@ -122,14 +129,14 @@ def test_rendered_sender_assets_cover_http_grpc_metadata_and_no_token_values(tmp
     assert secret not in combined
     assert "Authorization=Splunk ${SPLUNK_HEC_TOKEN}" in combined
     assert "Authorization: \"Splunk ${env:SPLUNK_HEC_TOKEN}\"" in combined
-    assert f'SPLUNK_HEC_TOKEN_FILE="{token_file}"' in combined
+    assert f"export SPLUNK_HEC_TOKEN_FILE={shlex.quote(str(token_file))}" in combined
     assert "SPLUNK_HEC_TOKEN_FILE=\"$/" not in combined
     assert "com.splunk.index" in combined
     assert "otlp_events" in combined
     assert "otlp.example.com:4317" in combined
-    assert "http://otlp.example.com:4318/v1/logs" in combined
-    assert "http://otlp.example.com:4318/v1/metrics" in combined
-    assert "http://otlp.example.com:4318/v1/traces" in combined
+    assert "https://otlp.example.com:4318/v1/logs" in combined
+    assert "https://otlp.example.com:4318/v1/metrics" in combined
+    assert "https://otlp.example.com:4318/v1/traces" in combined
 
 
 def test_doctor_classifies_topology_hec_sender_and_internal_failures(tmp_path: Path) -> None:

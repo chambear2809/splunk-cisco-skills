@@ -56,14 +56,18 @@ while [[ $# -gt 0 ]]; do
         *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+validate_splunk_index_name "${INDEX}" || exit 1
+[[ "${JSON}" != "true" || ( "${INSTALL}" != "true" && "${CREATE_INDEX}" != "true" ) ]] || { echo "ERROR: --json cannot be combined with --install or --create-index." >&2; exit 1; }
 [[ "${INSTALL}" == "false" && "${CREATE_INDEX}" == "false" && "${RENDER}" == "false" ]] && RENDER=true
 
 ensure_session() { load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }; if ! is_splunk_cloud; then SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }; fi; }
 run_render() { local cmd=(python3 "${RENDER_SCRIPT}" --phase render --index "${INDEX}" --account-name "${ACCOUNT_NAME}" --inputs "${INPUTS}" --rest-endpoint "${REST_ENDPOINT}" --file-or-folder-id "${FILE_OR_FOLDER_ID}"); [[ -n "${OUTPUT_DIR}" ]] && cmd+=(--output-dir "${OUTPUT_DIR}"); [[ "${JSON}" == "true" ]] && cmd+=(--json); [[ "${DRY_RUN}" == "true" ]] && cmd+=(--dry-run); "${cmd[@]}"; }
-install_package() { local cmd=(bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --no-update); [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart); "${cmd[@]}"; }
-create_index() { ensure_session; if platform_create_index "${SK:-}" "${SPLUNK_URI:-}" "${INDEX}" "512000"; then log "Ensured index '${INDEX}' exists."; else log "ERROR: Failed to ensure index '${INDEX}'."; exit 1; fi; }
+install_package() { local cmd=(bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --no-update); [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart); if [[ "${DRY_RUN}" == "true" ]]; then printf 'DRY RUN:'; printf ' %q' "${cmd[@]}"; printf '\n'; else "${cmd[@]}"; fi; }
+create_index() { if [[ "${DRY_RUN}" == "true" ]]; then log "DRY RUN: create index ${INDEX}"; return 0; fi; ensure_session; if platform_create_index "${SK:-}" "${SPLUNK_URI:-}" "${INDEX}" "512000"; then log "Ensured index '${INDEX}' exists."; else log "ERROR: Failed to ensure index '${INDEX}'."; exit 1; fi; }
 
 warn_if_current_skill_role_unsupported
+if [[ "${DRY_RUN}" != "true" && ( "${INSTALL}" == "true" || "${CREATE_INDEX}" == "true" ) ]]; then require_current_skill_role_supported; fi
+if [[ "${DRY_RUN}" != "true" && "${CREATE_INDEX}" == "true" ]]; then require_index_management_target_role; fi
 [[ "${INSTALL}" == "true" ]] && install_package
 [[ "${CREATE_INDEX}" == "true" ]] && create_index
 [[ "${RENDER}" == "true" ]] && run_render

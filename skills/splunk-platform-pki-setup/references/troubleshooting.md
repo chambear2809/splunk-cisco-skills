@@ -136,6 +136,10 @@ $SPLUNK_HOME/bin/splunk cmd openssl verify -verbose -x509_strict \
 # If it returns anything other than OK, re-run this skill:
 bash skills/splunk-platform-pki-setup/scripts/setup.sh \
     --phase apply --target indexer-cluster,shc \
+    --leaf-target splunkd --leaf-host idx01.example.com \
+    --leaf-cert-file /tmp/signed/idx01.pem \
+    --leaf-private-key-file /tmp/signed/idx01.key \
+    --leaf-ca-bundle-file /tmp/signed/cabundle.pem \
     --accept-pki-rotation \
     --admin-password-file /tmp/splunk_admin_password
 ```
