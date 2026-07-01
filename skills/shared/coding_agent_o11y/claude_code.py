@@ -45,6 +45,7 @@ PROTOCOL_ALIASES = {"otlp-http": "http/protobuf", "otlp-grpc": "grpc"}
 VALID_PROTOCOL_INPUTS = VALID_PROTOCOLS | set(PROTOCOL_ALIASES)
 APPLY_SECTIONS = ("settings", "env-helper", "collector-overlay", "galileo-handoff")
 MANAGED_SETTINGS_MARKER = "splunk-observability-claude-code-instrumentation-setup"
+DEFAULT_GALILEO_OTEL_ENDPOINT = "https://api.galileo.ai/otel/traces"
 
 MANAGED_ENV_PREFIXES = ("CLAUDE_CODE_", "OTEL_")
 # Managed env keys that do not share the CLAUDE_CODE_/OTEL_ prefixes but are still
@@ -78,7 +79,7 @@ DEFAULT_SPEC: dict[str, Any] = {
         "galileo_console_url": "",
         "galileo_project": "",
         "galileo_log_stream": "default",
-        "galileo_otel_endpoint": "https://api.galileo.ai/otel/traces",
+        "galileo_otel_endpoint": DEFAULT_GALILEO_OTEL_ENDPOINT,
         "local_collector_endpoint": "http://127.0.0.1:14318",
         "external_collector_endpoint": "",
         "metric_export_interval_ms": 60000,
@@ -214,6 +215,9 @@ def galileo_endpoint_from_console(value: str) -> str:
 
 
 REALM_RE = re.compile(r"^[a-z0-9]+$")
+SAFE_TLS_VALUE_RE = re.compile(
+    r"^(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z0-9./~][A-Za-z0-9 ._:/@=~+-]{0,180})$"
+)
 
 
 def validate_realm(value: object) -> str:
@@ -226,6 +230,15 @@ def validate_realm(value: object) -> str:
     if not REALM_RE.match(realm):
         raise UsageError("realm must be lowercase alphanumeric (for example us1, eu0)")
     return realm
+
+
+def ensure_safe_external_tls_value(label: str, value: str) -> None:
+    if not value:
+        return
+    if re.search(r"(?i)(?:token|password|api[_-]?key|secret|access[_-]?token)\s*=", value):
+        raise UsageError(f"{label} looks like an inline secret assignment; use an environment placeholder.")
+    if not SAFE_TLS_VALUE_RE.fullmatch(value):
+        raise UsageError(f"{label} must be a safe file path or an environment placeholder.")
 
 
 def resolve_settings_scope_path(config: dict[str, Any], output_dir: Path) -> Path:
@@ -252,9 +265,16 @@ def headers_helper_target_path(config: dict[str, Any], output_dir: Path) -> Path
 
 def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
     config = copy.deepcopy(DEFAULT_SPEC)
+    spec_data: dict[str, Any] = {}
     if args.spec:
-        config = deep_merge(config, load_structured_file(Path(args.spec).expanduser()))
+        spec_data = load_structured_file(Path(args.spec).expanduser())
+        config = deep_merge(config, spec_data)
     cc = config.setdefault("claude_code", {})
+    spec_cc = spec_data.get("claude_code") if isinstance(spec_data, dict) else {}
+    explicit_spec_galileo_endpoint = (
+        isinstance(spec_cc, dict)
+        and str(spec_cc.get("galileo_otel_endpoint") or "").strip() != ""
+    )
 
     cli_updates = {
         "environment": args.environment,
@@ -278,7 +298,14 @@ def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
 
     if args.galileo_console_url:
         cc["galileo_console_url"] = args.galileo_console_url
-        cc["galileo_otel_endpoint"] = galileo_endpoint_from_console(args.galileo_console_url)
+    if (
+        cc.get("galileo_console_url")
+        and not args.galileo_otel_endpoint
+        and not explicit_spec_galileo_endpoint
+        and str(cc.get("galileo_otel_endpoint") or "").strip()
+        in {"", DEFAULT_GALILEO_OTEL_ENDPOINT}
+    ):
+        cc["galileo_otel_endpoint"] = galileo_endpoint_from_console(str(cc["galileo_console_url"]))
 
     if args.galileo_enabled:
         cc["galileo_enabled"] = True
@@ -313,7 +340,7 @@ def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
         "client-private-key": args.external_client_private_key,
     }.items():
         if value:
-            ensure_safe_external_value(f"TLS {key}", value)
+            ensure_safe_external_tls_value(f"TLS {key}", value)
             tls[key] = value
     cc["external_tls"] = tls
 
@@ -403,6 +430,8 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
 
     galileo_enabled = bool_config(cc.get("galileo_enabled"))
     if galileo_enabled and destination in {"local-collector", "external-collector", "all"}:
+        if not bool_config(cc.get("enable_traces_beta")):
+            errors.append("Galileo integration requires Claude Code traces beta because Galileo ingests traces only")
         if not str(cc.get("galileo_project") or "").strip():
             errors.append("Galileo integration requires --galileo-project when enabled")
         try:
@@ -449,7 +478,7 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             errors.append(str(exc))
     for key, value in (cc.get("external_tls") or {}).items():
         try:
-            ensure_safe_external_value(f"TLS {key}", str(value))
+            ensure_safe_external_tls_value(f"TLS {key}", str(value))
         except UsageError as exc:
             errors.append(str(exc))
     for key, value in (cc.get("resource_attributes") or {}).items():
@@ -522,6 +551,16 @@ def render_env_dict(config: dict[str, Any], output_dir: Path) -> dict[str, str]:
         if external_headers:
             header_pairs = [f"{k}={v}" for k, v in sorted(external_headers.items())]
             env["OTEL_EXPORTER_OTLP_HEADERS"] = ",".join(header_pairs)
+        external_tls = cc.get("external_tls") or {}
+        tls_env = {
+            "ca-certificate": "OTEL_EXPORTER_OTLP_CERTIFICATE",
+            "client-certificate": "OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE",
+            "client-private-key": "OTEL_EXPORTER_OTLP_CLIENT_KEY",
+        }
+        for tls_key, env_key in tls_env.items():
+            value = str(external_tls.get(tls_key) or "")
+            if value:
+                env[env_key] = value
         # Detailed traces follow the trace endpoint (explicit trace endpoint wins,
         # else the shared endpoint).
         beta_tracing_endpoint = (trace_ep if trace_ep and traces_enabled else shared_ep)
@@ -919,6 +958,14 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
     destination = str(cc["destination"])
     traces_enabled = bool_config(cc.get("enable_traces_beta"))
     galileo_enabled = bool_config(cc.get("galileo_enabled"))
+    if not galileo_enabled:
+        galileo_status = "not_applicable"
+    elif destination == "external-collector":
+        galileo_status = "operator_owned"
+    elif destination == "splunk-direct":
+        galileo_status = "not_applicable"
+    else:
+        galileo_status = "render"
     entries = [
         {
             "key": "claude_code.settings_env_block",
@@ -974,13 +1021,16 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         },
         {
             "key": "galileo.traces",
-            "status": "render" if galileo_enabled and destination != "splunk-direct" else "not_applicable",
-            "summary": "Galileo Observe ingests Claude Code traces via otlphttp/galileo when the collector fan-out is enabled.",
+            "status": galileo_status,
+            "summary": (
+                "Galileo Observe ingests Claude Code traces via otlphttp/galileo when the local collector "
+                "fan-out is rendered; external collector Galileo fan-out is operator-owned."
+            ),
             "source_url": "https://v2docs.galileo.ai/how-to-guides/logging-with-otel",
         },
         {
             "key": "galileo.genai_attributes",
-            "status": "render" if galileo_enabled and destination != "splunk-direct" else "not_applicable",
+            "status": galileo_status,
             "summary": (
                 "Galileo /otel/traces only ingests spans that carry OTel GenAI semantic-convention "
                 "attributes (gen_ai.*). Claude Code detailed beta spans satisfy this; spans without "
@@ -991,7 +1041,7 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         },
         {
             "key": "galileo.non_public_tenant",
-            "status": "render" if galileo_enabled and destination != "splunk-direct" else "not_applicable",
+            "status": galileo_status,
             "summary": (
                 "For non-public Galileo tenants (e.g. Galileo Cloud, Splunk-hosted Agent Observability), "
                 "pass --galileo-console-url; the console. host is rewritten to api. and the OTLP endpoint "
@@ -1264,7 +1314,7 @@ def _validate_collector_overlay_structure(text: str) -> list[str]:
     return errors
 
 
-def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, Any]:
+def validate_output(output_dir: Path, json_output: bool = False, emit_output: bool = True) -> dict[str, Any]:
     required = [
         "metadata.json",
         "apply-plan.json",
@@ -1317,6 +1367,17 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
                 )
             if not doc.get("otelHeadersHelper"):
                 errors.append(f"{settings_file.name}: splunk-direct requires otelHeadersHelper")
+            rendered_helper = output_dir / "bin" / "claude-code-otel-headers.sh"
+            if not rendered_helper.exists():
+                errors.append(
+                    f"{settings_file.name}: splunk-direct requires rendered headers helper "
+                    "bin/claude-code-otel-headers.sh"
+                )
+            elif not os.access(rendered_helper, os.X_OK):
+                errors.append(
+                    f"{settings_file.name}: rendered headers helper bin/claude-code-otel-headers.sh "
+                    "must be executable"
+                )
 
     env_dir = output_dir / "env"
     if env_dir.exists():
@@ -1378,15 +1439,16 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
         except json.JSONDecodeError as exc:
             errors.append(f"metadata.json invalid JSON: {exc}")
     payload = {"ok": not errors, "errors": errors, "warnings": warnings, "output_dir": str(output_dir)}
-    if json_output:
-        print(json.dumps(payload, indent=2, sort_keys=True))
-    else:
-        if errors:
-            print("Validation failed:", file=sys.stderr)
-            for error in errors:
-                print(f"  - {error}", file=sys.stderr)
+    if emit_output:
+        if json_output:
+            print(json.dumps(payload, indent=2, sort_keys=True))
         else:
-            print(f"validate: OK -> {output_dir}")
+            if errors:
+                print("Validation failed:", file=sys.stderr)
+                for error in errors:
+                    print(f"  - {error}", file=sys.stderr)
+            else:
+                print(f"validate: OK -> {output_dir}")
     if errors:
         raise SystemExit(1)
     return payload
@@ -1453,7 +1515,7 @@ def apply_sections(
     plan_path = output_dir / "apply-plan.json"
     metadata_path = output_dir / "metadata.json"
     if plan_path.exists():
-        validate_output(output_dir, json_output=False)
+        validate_output(output_dir, json_output=False, emit_output=not json_output)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
     else:
         metadata = render(config, output_dir, json_output=False)
@@ -1479,15 +1541,19 @@ def apply_sections(
             if command[0] == "render-only":
                 continue
             if command[0] == "install":
+                source = Path(command[-2])
                 target = Path(os.path.expandvars(os.path.expanduser(command[-1])))
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(command[-2], target)
+                if source.resolve() != target.resolve():
+                    shutil.copy2(source, target)
                 if len(command) >= 3 and command[2] == "0755":
                     target.chmod(target.stat().st_mode | 0o111)
             elif command[0] == "install-executable":
+                source = Path(command[-2])
                 target = Path(os.path.expandvars(os.path.expanduser(command[-1])))
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(command[-2], target)
+                if source.resolve() != target.resolve():
+                    shutil.copy2(source, target)
                 target.chmod(target.stat().st_mode | 0o111)
             elif command[0] == "merge-settings":
                 merge_settings_file(

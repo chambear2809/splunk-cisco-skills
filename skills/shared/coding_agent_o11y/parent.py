@@ -33,6 +33,8 @@ VALID_DESTINATIONS = {"local-collector", "external-collector", "direct", "splunk
 def child_destination(agent: str, destination: str) -> str:
     if agent == "claude-code" and destination == "direct":
         return "splunk-direct"
+    if agent == "codex" and destination == "splunk-direct":
+        return "direct"
     return destination
 
 

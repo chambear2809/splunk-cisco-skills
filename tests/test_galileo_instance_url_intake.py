@@ -73,6 +73,23 @@ def test_platform_render_uses_user_supplied_console_url(tmp_path: Path) -> None:
     assert f"export GALILEO_CONSOLE_URL='{GALILEO_CONSOLE_URL}'" in runtime_env
 
 
+def test_platform_template_requires_galileo_url_intake(tmp_path: Path) -> None:
+    result = run_cmd(
+        "bash",
+        "skills/galileo-platform-setup/scripts/setup.sh",
+        "--render",
+        "--spec",
+        "skills/galileo-platform-setup/template.example",
+        "--output-dir",
+        str(tmp_path / "platform-template"),
+        "--json",
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Galileo instance URL intake is required" in result.stdout + result.stderr
+
+
 def test_agent_control_render_preserves_user_supplied_console_url(tmp_path: Path) -> None:
     output_dir = tmp_path / "agent-control"
     run_cmd(

@@ -265,8 +265,14 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
         allowed = index
     api_base = arg_or_spec("galileo_api_base", "galileo.api_base", "")
     console_url = arg_or_spec("galileo_console_url", "galileo.console_url", "")
+    if not api_base and not console_url:
+        raise SystemExit(
+            "ERROR: Galileo instance URL intake is required. Pass --galileo-console-url "
+            "with the user's Galileo console URL, or pass --galileo-api-base only when "
+            "the user explicitly confirmed that API base."
+        )
     if not api_base:
-        api_base = derive_api_base(console_url) if console_url else "https://api.galileo.ai"
+        api_base = derive_api_base(console_url)
     otel_endpoint = arg_or_spec("galileo_otel_endpoint", "galileo.otel_endpoint", "")
     if not otel_endpoint:
         otel_endpoint = api_base.rstrip("/") + "/otel/v1/traces"

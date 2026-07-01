@@ -205,7 +205,7 @@ def test_disable_traces_beta_also_disables_detailed(tmp_path: Path) -> None:
     out = tmp_path / "no-traces"
     run_claude(
         "--render", "--destination", "local-collector",
-        "--realm", "us1", "--galileo-project", "coding-agents",
+        "--realm", "us1", "--disable-galileo",
         "--disable-traces-beta",
         "--output-dir", str(out),
     )
@@ -623,8 +623,7 @@ def test_traces_beta_off_by_default_does_not_render_trace_exporter(tmp_path: Pat
         "--destination",
         "local-collector",
         "--disable-traces-beta",
-        "--galileo-project",
-        "proj",
+        "--disable-galileo",
         "--output-dir",
         str(out),
     )
@@ -699,6 +698,84 @@ def test_galileo_console_url_cli_overrides_endpoint(tmp_path: Path) -> None:
     )
     overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
     assert "https://api.galileo.myco.com/otel/traces" in overlay
+
+
+def test_galileo_console_url_from_spec_derives_endpoint(tmp_path: Path) -> None:
+    out = tmp_path / "spec-console-url"
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "api_version": "splunk-observability-claude-code-instrumentation-setup/v1",
+                "claude_code": {
+                    "galileo_console_url": "https://console.demo-v2.galileocloud.io/",
+                    "galileo_enabled": True,
+                    "galileo_project": "proj",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    run_claude("--render", "--spec", str(spec), "--output-dir", str(out))
+    overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert "https://api.demo-v2.galileocloud.io/otel/traces" in overlay
+
+
+def test_galileo_spec_endpoint_override_is_preserved(tmp_path: Path) -> None:
+    out = tmp_path / "spec-endpoint-url"
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "api_version": "splunk-observability-claude-code-instrumentation-setup/v1",
+                "claude_code": {
+                    "galileo_console_url": "https://console.demo-v2.galileocloud.io/",
+                    "galileo_enabled": True,
+                    "galileo_otel_endpoint": "https://api.explicit.example.com/otel/traces",
+                    "galileo_project": "proj",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    run_claude("--render", "--spec", str(spec), "--output-dir", str(out))
+    overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert "https://api.explicit.example.com/otel/traces" in overlay
+
+
+def test_galileo_cli_endpoint_override_is_preserved(tmp_path: Path) -> None:
+    out = tmp_path / "cli-endpoint-url"
+    run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--galileo-project",
+        "proj",
+        "--galileo-console-url",
+        "https://console.demo-v2.galileocloud.io/",
+        "--galileo-otel-endpoint",
+        "https://api.explicit.example.com/otel/traces",
+        "--output-dir",
+        str(out),
+    )
+    overlay = (out / "collector" / "claude-code-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert "https://api.explicit.example.com/otel/traces" in overlay
+
+
+def test_galileo_requires_traces_beta(tmp_path: Path) -> None:
+    result = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--disable-traces-beta",
+        "--galileo-project",
+        "proj",
+        "--output-dir",
+        str(tmp_path / "bad-galileo-no-traces"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "Galileo integration requires Claude Code traces beta" in result.stdout + result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -779,12 +856,9 @@ def test_apply_dry_run_shows_merge_settings_operation(tmp_path: Path) -> None:
         "--output-dir",
         str(out),
     )
-    # apply_sections first calls validate_output (which may print "validate: OK → ..."),
-    # then outputs the JSON payload. Find the JSON object in stdout.
     stdout = result.stdout.strip()
-    json_start = stdout.find("{")
-    assert json_start >= 0, f"No JSON object found in stdout: {stdout!r}"
-    payload = json.loads(stdout[json_start:])
+    assert stdout.startswith("{")
+    payload = json.loads(stdout)
     assert payload["dry_run"] is True
     operations = payload.get("operations", [])
     section_ops = [op for op in operations if op.get("section") == "settings"]
@@ -938,6 +1012,25 @@ def test_validate_fails_when_headers_helper_removed(tmp_path: Path) -> None:
     assert "otelHeadersHelper" in result.stderr
 
 
+def test_validate_fails_when_rendered_headers_helper_removed(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    _render_direct(out)
+    (out / "bin" / "claude-code-otel-headers.sh").unlink()
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "rendered headers helper" in result.stderr
+
+
+def test_validate_fails_when_rendered_headers_helper_not_executable(tmp_path: Path) -> None:
+    out = tmp_path / "v"
+    _render_direct(out)
+    helper = out / "bin" / "claude-code-otel-headers.sh"
+    helper.chmod(0o644)
+    result = run_cmd("bash", str(CLAUDE_VALIDATE), "--output-dir", str(out), check=False)
+    assert result.returncode != 0
+    assert "must be executable" in result.stderr
+
+
 def test_validate_fails_when_direct_embeds_headers(tmp_path: Path) -> None:
     out = tmp_path / "v"
     _render_direct(out)
@@ -1069,6 +1162,50 @@ def test_external_collector_header_emission(tmp_path: Path) -> None:
     assert env["OTEL_EXPORTER_OTLP_HEADERS"] == "X-Scope-OrgID=tenant-a"
 
 
+def test_external_collector_tls_env_emission(tmp_path: Path) -> None:
+    out = tmp_path / "ext-tls"
+    run_claude(
+        "--render",
+        "--destination",
+        "external-collector",
+        "--external-collector-endpoint",
+        "https://gw.example.com:4318",
+        "--external-ca-certificate",
+        "/etc/otel/ca.pem",
+        "--external-client-certificate",
+        "/etc/otel/client.pem",
+        "--external-client-private-key",
+        "/etc/otel/client.key",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    env = json.loads(next((out / "settings").glob("*.json")).read_text(encoding="utf-8"))["env"]
+    assert env["OTEL_EXPORTER_OTLP_CERTIFICATE"] == "/etc/otel/ca.pem"
+    assert env["OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"] == "/etc/otel/client.pem"
+    assert env["OTEL_EXPORTER_OTLP_CLIENT_KEY"] == "/etc/otel/client.key"
+
+
+def test_external_collector_galileo_coverage_is_operator_owned(tmp_path: Path) -> None:
+    out = tmp_path / "ext-galileo"
+    run_claude(
+        "--render",
+        "--destination",
+        "external-collector",
+        "--external-collector-endpoint",
+        "https://gw.example.com:4318",
+        "--galileo-project",
+        "proj",
+        "--output-dir",
+        str(out),
+    )
+    coverage = json.loads((out / "coverage-report.json").read_text(encoding="utf-8"))["coverage"]
+    statuses = {item["key"]: item["status"] for item in coverage}
+    assert statuses["galileo.traces"] == "operator_owned"
+    assert statuses["galileo.genai_attributes"] == "operator_owned"
+    assert statuses["galileo.non_public_tenant"] == "operator_owned"
+
+
 def test_external_collector_missing_endpoints_rejected(tmp_path: Path) -> None:
     result = run_claude("--render", "--destination", "external-collector",
                         "--disable-galileo", "--json",
@@ -1154,3 +1291,43 @@ def test_apply_settings_managed_scope_merges_into_output_dir(tmp_path: Path) -> 
     assert merged["model"] == "sonnet"
     # The merge target stayed under the temp output dir (never touched real ~/.claude).
     assert str(managed).startswith(str(tmp_path))
+
+
+def test_apply_env_helper_managed_splunk_direct_skips_same_file_helper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    out = tmp_path / "out"
+    run_claude(
+        "--render",
+        "--destination",
+        "splunk-direct",
+        "--settings-scope",
+        "managed",
+        "--realm",
+        "us1",
+        "--disable-galileo",
+        "--output-dir",
+        str(out),
+    )
+    result = run_claude(
+        "--apply",
+        "env-helper",
+        "--settings-scope",
+        "managed",
+        "--destination",
+        "splunk-direct",
+        "--realm",
+        "us1",
+        "--disable-galileo",
+        "--json",
+        "--output-dir",
+        str(out),
+    )
+    payload = json.loads(result.stdout)
+    assert payload["dry_run"] is False
+    helper = out / "bin" / "claude-code-otel-headers.sh"
+    assert helper.is_file()
+    assert helper.stat().st_mode & stat.S_IXUSR
