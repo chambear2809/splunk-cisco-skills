@@ -88,6 +88,7 @@ projects/tmp-*
 /splunk-platform-sizing-rendered/
 /splunk-observability-ai-agent-monitoring-rendered/
 /splunk-observability-aws-integration-rendered/
+/splunk-observability-claude-code-instrumentation-rendered/
 /splunk-observability-aws-lambda-apm-rendered/
 /splunk-observability-azure-integration-rendered/
 /splunk-observability-browser-rum-rendered/

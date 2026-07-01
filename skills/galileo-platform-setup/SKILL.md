@@ -17,6 +17,18 @@ This skill is the repo-owned automation home for Galileo platform to Splunk
 workflows. It composes existing Splunk skills rather than reimplementing their
 logic.
 
+## Required Intake
+
+Before rendering, validating, doctoring, probing, or applying this skill, ask
+the user for the Galileo instance console URL and record the exact value they
+provide, for example `https://console.demo-v2.galileocloud.io/`. Do not assume
+`https://app.galileo.ai` or `https://api.galileo.ai` unless the user explicitly
+confirms the default Galileo Cloud instance.
+
+Pass the URL as `--galileo-console-url "$GALILEO_CONSOLE_URL"` or set
+`galileo.console_url` in the spec. Derive API and OTLP endpoints from that
+console URL unless the user provides explicit endpoint overrides.
+
 ## Supported Paths
 
 1. **Platform readiness**: render endpoint derivation, `/v2/healthcheck`,
@@ -88,6 +100,7 @@ Render default artifacts first:
 ```bash
 bash skills/galileo-platform-setup/scripts/setup.sh \
   --render \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
   --output-dir galileo-platform-rendered
 ```
 

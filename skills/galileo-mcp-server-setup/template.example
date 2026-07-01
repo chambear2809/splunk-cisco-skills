@@ -16,11 +16,13 @@ clients:
   - kiro
 
 galileo:
-  # Leave mcp_url empty for Galileo Cloud.
+  # Required intake. Ask the user for their Galileo instance URL before
+  # rendering, for example https://console.demo-v2.galileocloud.io/.
+  console_url: ""
+  # Leave mcp_url empty so the renderer derives it from console_url.
   mcp_url: ""
   # For self-hosted deployments, set console_url and the renderer derives
   # the MCP URL by replacing "console" with "api" and appending /mcp/http/mcp.
-  console_url: ""
 
 client_options:
   cursor:

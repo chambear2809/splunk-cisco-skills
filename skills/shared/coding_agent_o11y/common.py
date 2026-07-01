@@ -18,20 +18,36 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 is not expected 
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-FORBIDDEN_SECRET_FLAGS = {
+# Single source of truth for secret-bearing CLI flags. SECRET_FLAG_RE is built from
+# this set so the readable list and the enforcing regex can never drift (SEC-05).
+FORBIDDEN_SECRET_FLAGS = (
     "--token",
     "--access-token",
     "--sf-token",
     "--o11y-token",
     "--api-key",
+    "--api-token",
+    "--galileo-api-key",
+    "--galileo-token",
+    "--client-secret",
+    "--authorization",
+    "--bearer-token",
     "--password",
-}
+)
 SECRET_FLAG_RE = re.compile(
-    r"^--(?:token|access-token|sf-token|o11y-token|api-key|password)(?:=|$)",
+    r"^(?:" + "|".join(re.escape(flag) for flag in FORBIDDEN_SECRET_FLAGS) + r")(?:=|$)",
     re.IGNORECASE,
 )
 SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)(?:token|password|api[_-]?key|secret|access[_-]?token)\s*="
+)
+# Colon- or equals-delimited secret key followed by a value, for scanning rendered
+# YAML/JSON config (SEC-01). Matches header/key names like X-SF-TOKEN and
+# Galileo-API-Key in addition to bare token/secret/api-key assignments.
+SECRET_KEYVAL_RE = re.compile(
+    r"(?i)(?:token|password|api[_-]?key|secret|access[_-]?token|authorization"
+    r"|galileo-api-key|x-[a-z0-9-]*(?:api|auth|key|token)[a-z0-9-]*)"
+    r"[\"']?\s*[:=]\s*(?P<value>.+)$"
 )
 UNSAFE_LONG_VALUE_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9_+./=-]{28,}(?![A-Za-z0-9])")
 ENV_PLACEHOLDER_RE = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*\}$")
@@ -152,13 +168,23 @@ def validate_toml_file(path: Path) -> None:
         tomllib.load(handle)
 
 
+# Any ${NAME} or ${env:NAME} placeholder reference (allowed in rendered files).
+_PLACEHOLDER_ANY_RE = re.compile(r"\$\{(?:env:)?[A-Za-z_][A-Za-z0-9_]*\}")
+
+
+def _residual_value_is_secret(value: str) -> bool:
+    """True when a key's value, after removing placeholder references, still holds
+    real secret-looking material (a long high-entropy literal). Empty/placeholder-only
+    residuals are safe."""
+    residual = _PLACEHOLDER_ANY_RE.sub("", value)
+    # Strip surrounding quotes/whitespace/commas left after placeholder removal.
+    residual = residual.strip().strip('"\'').strip().rstrip(",").strip().strip('"\'')
+    if not residual:
+        return False
+    return bool(UNSAFE_LONG_VALUE_RE.search(residual))
+
+
 def scan_rendered_for_secret_leaks(root: Path) -> list[str]:
-    allowed_placeholders = {
-        "${SPLUNK_ACCESS_TOKEN}",
-        "${SPLUNK_O11Y_TOKEN}",
-        "${OTLP_TOKEN}",
-        "${CODEX_O11Y_TOKEN}",
-    }
     errors: list[str] = []
     for path in sorted(root.rglob("*")):
         if not path.is_file():
@@ -168,17 +194,27 @@ def scan_rendered_for_secret_leaks(root: Path) -> list[str]:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        searchable = text
-        for placeholder in allowed_placeholders:
-            searchable = searchable.replace(placeholder, "")
-        if "SUPER_SECRET" in searchable or "SHOULD_NOT_RENDER" in searchable:
+
+        # Test markers: flag regardless of form.
+        stripped = _PLACEHOLDER_ANY_RE.sub("", text)
+        if "SUPER_SECRET" in stripped or "SHOULD_NOT_RENDER" in stripped:
             errors.append(f"{rel}: contains test secret marker")
-        if SECRET_ASSIGNMENT_RE.search(searchable):
-            # Keep config keys and placeholders out of the generic warning noise.
-            for line in searchable.splitlines():
-                if SECRET_ASSIGNMENT_RE.search(line) and "${" not in line and "X-SF-TOKEN" not in line:
-                    errors.append(f"{rel}: contains secret-like assignment")
-                    break
+            continue
+
+        # Per-line scan. A line is only flagged when, after removing every allowed
+        # ${...}/${env:...} placeholder, a secret-like key still carries a real
+        # literal value. This catches both `KEY=<literal>` and `Key: "<literal>"`
+        # (YAML/JSON) forms and closes the assignment-form evasion where a header
+        # name substring on the line previously suppressed the check.
+        flagged = False
+        for raw_line in text.splitlines():
+            match = SECRET_KEYVAL_RE.search(raw_line)
+            if match and _residual_value_is_secret(match.group("value")):
+                errors.append(f"{rel}: contains secret-like assignment")
+                flagged = True
+                break
+        if flagged:
+            continue
     return errors
 
 

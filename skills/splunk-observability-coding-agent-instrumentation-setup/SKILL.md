@@ -11,8 +11,9 @@ This is a parent router for coding-agent telemetry. It resolves the target
 agent, destination mode, and child skill command. It does not install profiles,
 hooks, runtime helpers, or collector assets.
 
-The first fully implemented child is
-`splunk-observability-codex-instrumentation-setup`.
+The fully implemented children are
+`splunk-observability-codex-instrumentation-setup` and
+`splunk-observability-claude-code-instrumentation-setup`.
 
 ## Safety Rules
 
@@ -50,13 +51,15 @@ bash skills/splunk-observability-coding-agent-instrumentation-setup/scripts/setu
   `doctor-report.md`.
 - `--validate`: validate and render the parent orchestration output.
 - `--doctor`: same router diagnostics as render.
-- `--discover`: list implemented agents and destinations.
+- `--discover`: list implemented agents (`codex`, `claude-code`) and
+  supported destinations (`local-collector`, `external-collector`, `direct`,
+  `all`).
 - `--execute`: execute the child command, or with `--dry-run`, only print it.
 - `--json`: emit JSON.
 
 ## Options
 
-- `--agent codex|future`
+- `--agent codex|claude-code|future`
 - `--destination local-collector|external-collector|direct|all`
 - `--output-dir DIR`
 
@@ -66,6 +69,12 @@ When the agent is `codex`, hand off to:
 
 ```bash
 bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh --help
+```
+
+When the agent is `claude-code`, hand off to:
+
+```bash
+bash skills/splunk-observability-claude-code-instrumentation-setup/scripts/setup.sh --help
 ```
 
 Read [reference.md](reference.md) for the routing contract and child command

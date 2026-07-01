@@ -16,6 +16,17 @@ This skill renders Agent Control setup assets without exposing secret values.
 It owns the Agent Control runtime and sink examples, and delegates Splunk-side
 HEC, OTel Collector, dashboard, and detector work to the existing Splunk skills.
 
+## Required Intake
+
+Before rendering, validating, doctoring, probing, or applying this skill, ask
+the user for the Galileo instance console URL and record the exact value they
+provide, for example `https://console.demo-v2.galileocloud.io/`. Do not assume
+the default Galileo Cloud URL unless the user explicitly confirms it.
+
+Pass the URL as `--galileo-console-url "$GALILEO_CONSOLE_URL"` or set
+`galileo.console_url` in the spec. This URL is separate from
+`--server-url`, which points to the standalone Agent Control server.
+
 Use `galileo-platform-setup` instead when the user is asking about the Galileo
 Agent Observability `Controls` console tab, Log stream control attachment, or
 exported control-span evidence. This skill is for external/open-source Agent
@@ -61,6 +72,7 @@ Render from the intake template:
 bash skills/galileo-agent-control-setup/scripts/setup.sh \
   --render \
   --validate \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
   --spec skills/galileo-agent-control-setup/template.example \
   --output-dir galileo-agent-control-rendered
 ```

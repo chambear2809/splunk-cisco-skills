@@ -2,6 +2,11 @@
 # Copy to template.local and fill in non-secret values only.
 api_version: galileo-agent-control-setup/v1
 
+galileo:
+  # Required intake. Ask the user for their Galileo instance URL before
+  # rendering, for example https://console.demo-v2.galileocloud.io/.
+  console_url: ""
+
 agent_control:
   server_url: "http://localhost:8000"
   server_host: "0.0.0.0"

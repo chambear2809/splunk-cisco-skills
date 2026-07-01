@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk O11y Claude Code Instrumentation"
+  short_description: "Instrument Claude Code with Splunk O11y and Galileo."
+  default_prompt: "Use $splunk-observability-claude-code-instrumentation-setup to render, validate, or safely apply Claude Code OTel telemetry for Splunk Observability and Galileo."
+
+policy:
+  allow_implicit_invocation: true

@@ -3,4 +3,6 @@ interface:
   short_description: "Render and audit Galileo MCP configs"
   default_prompt: >-
     Use $galileo-mcp-server-setup to render, validate, probe, and deep-audit
-    safe client configurations for the official Galileo MCP Server.
+    safe client configurations for the official Galileo MCP Server. Before
+    tenant-specific work, ask for the Galileo instance console URL and pass it
+    as --galileo-console-url unless the user provides a specific MCP URL.

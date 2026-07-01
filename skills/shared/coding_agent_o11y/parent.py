@@ -24,21 +24,45 @@ from skills.shared.coding_agent_o11y.common import (
 
 SKILL_NAME = "splunk-observability-coding-agent-instrumentation-setup"
 CODEX_CHILD = "splunk-observability-codex-instrumentation-setup"
+CLAUDE_CODE_CHILD = "splunk-observability-claude-code-instrumentation-setup"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-observability-coding-agent-instrumentation-rendered"
-VALID_AGENTS = {"codex", "future"}
-VALID_DESTINATIONS = {"local-collector", "external-collector", "direct", "all"}
+VALID_AGENTS = {"codex", "claude-code", "future"}
+VALID_DESTINATIONS = {"local-collector", "external-collector", "direct", "splunk-direct", "all"}
+
+
+def child_destination(agent: str, destination: str) -> str:
+    if agent == "claude-code" and destination == "direct":
+        return "splunk-direct"
+    return destination
 
 
 def child_command(agent: str, destination: str) -> list[str]:
-    if agent != "codex":
-        raise UsageError(f"agent {agent!r} is a future placeholder and has no child implementation yet")
-    return [
-        "bash",
-        f"skills/{CODEX_CHILD}/scripts/setup.sh",
-        "--render",
-        "--destination",
-        destination,
-    ]
+    mapped_destination = child_destination(agent, destination)
+    if agent == "codex":
+        return [
+            "bash",
+            f"skills/{CODEX_CHILD}/scripts/setup.sh",
+            "--render",
+            "--destination",
+            mapped_destination,
+        ]
+    if agent == "claude-code":
+        return [
+            "bash",
+            f"skills/{CLAUDE_CODE_CHILD}/scripts/setup.sh",
+            "--render",
+            "--destination",
+            mapped_destination,
+        ]
+    raise UsageError(f"agent {agent!r} is a future placeholder and has no child implementation yet")
+
+
+def child_skill_for(agent: str) -> str:
+    if agent == "codex":
+        return CODEX_CHILD
+    if agent == "claude-code":
+        return CLAUDE_CODE_CHILD
+    raise UsageError(f"agent {agent!r} has no child skill mapping")
 
 
 def orchestration_plan(agent: str, destination: str) -> dict[str, Any]:
@@ -46,13 +70,15 @@ def orchestration_plan(agent: str, destination: str) -> dict[str, Any]:
     warnings = []
     if destination in {"external-collector", "all"}:
         warnings.append("external collector child render requires explicit trace and metric endpoints")
-    if destination in {"direct", "all"}:
+    if agent == "codex" and destination in {"direct", "splunk-direct", "all"}:
         warnings.append("direct Splunk ingest is OTLP/HTTP traces and metrics only; native logs stay disabled")
+    if agent == "claude-code" and destination in {"direct", "splunk-direct", "all"}:
+        warnings.append("direct Splunk ingest uses OTLP/HTTP per-signal endpoints; Galileo fan-out is unavailable")
     return {
         "skill": SKILL_NAME,
         "agent": agent,
         "destination": destination,
-        "child_skill": CODEX_CHILD,
+        "child_skill": child_skill_for(agent),
         "router_only": True,
         "would_execute": command,
         "warnings": warnings,
@@ -110,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.discover:
             payload = {
                 "agents": sorted(VALID_AGENTS),
-                "implemented_agents": ["codex"],
+                "implemented_agents": ["codex", "claude-code"],
                 "destinations": sorted(VALID_DESTINATIONS),
                 "parent_is_router_only": True,
             }

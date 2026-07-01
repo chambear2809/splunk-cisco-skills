@@ -1,0 +1,40 @@
+{
+  "api_version": "splunk-observability-claude-code-instrumentation-setup/v1",
+  "claude_code": {
+    "settings_scope": "user",
+    "environment": "prod",
+    "service_name": "claude-code",
+    "realm": "us1",
+    "destination": "local-collector",
+    "enable_traces_beta": true,
+    "enable_detailed_traces": true,
+    "galileo_enabled": true,
+    "galileo_project": "my-claude-code-project",
+    "galileo_log_stream": "production",
+    "galileo_console_url": "",
+    "galileo_otel_endpoint": "https://api.galileo.ai/otel/traces",
+    "local_collector_endpoint": "http://127.0.0.1:14318",
+    "external_collector_endpoint": "",
+    "external_collector_protocol": "http/protobuf",
+    "external_metric_endpoint": "",
+    "external_log_endpoint": "",
+    "external_trace_endpoint": "",
+    "external_headers": {},
+    "metric_export_interval_ms": 60000,
+    "logs_export_interval_ms": 5000,
+    "metrics_include_session_id": true,
+    "metrics_include_version": false,
+    "metrics_include_account_uuid": true,
+    "metrics_include_entrypoint": false,
+    "metrics_include_resource_attributes": true,
+    "log_user_prompts": false,
+    "log_assistant_responses": false,
+    "log_tool_details": false,
+    "log_tool_content": false,
+    "accept_content_capture": false,
+    "resource_attributes": {
+      "department": "engineering",
+      "team.id": "platform"
+    }
+  }
+}

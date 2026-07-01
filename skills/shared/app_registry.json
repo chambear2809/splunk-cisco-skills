@@ -1445,6 +1445,20 @@
       "notes": "Coding-agent telemetry parent router only. Emits child orchestration plans and does not mutate Splunk Platform, collector, or agent runtime placement."
     },
     {
+      "skill": "splunk-observability-claude-code-instrumentation-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Claude Code CLI host instrumentation workflow. Renders user or project settings.json env blocks, local/external collector or direct Splunk Observability destinations, optional Galileo trace fan-out, and secret-safe otelHeadersHelper assets without Splunk Platform tier placement."
+    },
+    {
       "skill": "splunk-observability-codex-instrumentation-setup",
       "role_support": {
         "search-tier": "none",
