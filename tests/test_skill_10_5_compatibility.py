@@ -79,6 +79,10 @@ def test_private_packages_are_explicitly_classified() -> None:
             "name": "Splunk_MCP_Server",
             "relationship": "private-primary",
             "status": "nonproduction",
+            "release_version": "",
+            "verified_version": "1.2.1",
+            "verified_status": "nonproduction",
+            "cloud_compatible": None,
         }
     ]
 

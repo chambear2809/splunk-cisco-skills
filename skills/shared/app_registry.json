@@ -48,7 +48,7 @@
         "label": "`cisco-security-cloud-setup`",
         "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.6.6 for Splunk 10.5; render/handoff for public 3.6.7 unless a vendor-approved override is recorded",
         "cloud_config_path": "Target/version preflight, then REST via CiscoSecurityCloud custom admin handlers",
-        "notes": "Cisco EULA license-ack required. Verified 3.6.6 advertises Splunk 10.5 and is Cloud-compatible; public 3.6.7 does not advertise 10.5. The setup wrapper fails before REST for an unverified selection unless --accept-unsupported-platform is backed by vendor approval."
+        "notes": "Cisco EULA license-ack required. Verified 3.6.6 advertises Splunk 10.5 and is Cloud-compatible; public 3.6.7 does not advertise 10.5. The setup wrapper reads the installed version and fails before REST mutation unless --accept-unsupported-platform is backed by vendor approval."
       },
       {
         "kind": "app",
@@ -128,7 +128,7 @@
         "label": "`cisco-intersight-setup`",
         "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.1.1 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded",
         "cloud_config_path": "Target/version preflight, then REST via custom account/input handlers",
-        "notes": "Cisco EULA license-ack required. Verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. Index creation uses ACS."
+        "notes": "Cisco EULA license-ack required. Verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. The setup wrapper reads the installed version and fails before REST mutation unless --accept-unsupported-platform is backed by vendor approval. Index creation uses ACS."
       },
       {
         "kind": "app",
@@ -144,7 +144,7 @@
         "label": "`cisco-enterprise-networking-setup`",
         "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.1.0 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded",
         "cloud_config_path": "Target/version preflight, then REST for macros/saved searches/datamodel settings",
-        "notes": "Cisco EULA license-ack required. Verified 3.1.0 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
+        "notes": "Cisco EULA license-ack required. Verified 3.1.0 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. The setup wrapper reads the installed version and fails before REST mutation unless --accept-unsupported-platform is backed by vendor approval. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
       },
       {
         "kind": "workflow",

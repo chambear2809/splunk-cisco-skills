@@ -41,6 +41,27 @@ def escape(value: str) -> str:
     return str(value).replace("|", r"\|").replace("\n", "<br>")
 
 
+def package_evidence(app: dict[str, object]) -> str:
+    app_id = str(app["id"])
+    name = str(app["name"])
+    relationship = str(app["relationship"])
+    status = str(app["status"])
+    release = str(app["release_version"])
+    verified = str(app["verified_version"])
+    verified_status = str(app["verified_status"])
+    identity = f"{app_id} `{name}`" if app_id else f"private/local `{name}`"
+    details: list[str] = []
+    if release:
+        details.append(f"latest {release}: {status}")
+    else:
+        details.append(status)
+    if verified and (verified != release or not release):
+        details.append(f"verified {verified}: {verified_status}")
+    if app["cloud_compatible"] is False:
+        details.append("Cloud install: rejected")
+    return f"{relationship}: {identity} ({'; '.join(details)})"
+
+
 def render() -> str:
     payload = audit()
     if not payload["ok"]:
@@ -82,17 +103,9 @@ def render() -> str:
     )
     for row in payload["skills"]:
         apps = row["splunkbase_apps"]
-        app_text = ", ".join(
-            (
-                f"{app['relationship']}: {app['id']} `{app['name']}` ({app['status']})"
-                if app["id"]
-                else (
-                    f"{app['relationship']}: private/local `{app['name']}` "
-                    f"({app['status']})"
-                )
-            )
-            for app in apps
-        ) or "No direct Splunkbase package"
+        app_text = ", ".join(package_evidence(app) for app in apps) or (
+            "No direct Splunkbase package"
+        )
         lines.append(
             f"| `{row['skill']}` | {STATUS_LABELS.get(row['status'], row['status'])} "
             f"| {escape(app_text)} | {escape(row['compatibility'])} |"

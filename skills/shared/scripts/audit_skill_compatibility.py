@@ -277,6 +277,32 @@ def audit() -> dict[str, Any]:
                             or app.get("production_status")
                             or "unclassified"
                         ),
+                        "release_version": str(app.get("latest_release_version", "")),
+                        "verified_version": str(
+                            app.get("latest_verified_version")
+                            or app.get("reviewed_version", "")
+                        ),
+                        "verified_status": (
+                            (
+                                "supported"
+                                if expected_target
+                                in (app.get("verified_platform_versions") or [])
+                                else "unsupported"
+                            )
+                            if "verified_platform_versions" in app
+                            else (
+                                str(app.get("compatibility_status", "unclassified"))
+                                if app.get("latest_verified_version")
+                                == app.get("latest_release_version")
+                                and app.get("latest_verified_version")
+                                else str(
+                                    app.get("compatibility_classification")
+                                    or app.get("production_status")
+                                    or "unverified"
+                                )
+                            )
+                        ),
+                        "cloud_compatible": app.get("cloud_compatible"),
                     }
                     for app in apps
                 ],
