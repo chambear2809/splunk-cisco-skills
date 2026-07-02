@@ -8,7 +8,18 @@ The doctor uses `scripts/doctor.py` as the source of truth for:
   `fix_kind`, `preview_command`, `apply_command`, `handoff_skill`, and
   `rollback_or_validation`.
 - `validate_catalog()`: structural checks that fail tests when a domain lacks
-  a rule or a delegated/manual/diagnose route.
+  a rule or a delegated/manual/diagnose route, when declared coverage differs
+  from applicable rules, when a handoff is missing, or when any repository
+  skill lacks a disposition.
+- `PRODUCT_ROUTE_CATALOG`: product/app aliases and precise specialist routers.
+- `CANONICAL_SKILL_ALIASES`: compatibility workflows that resolve to the
+  canonical setup skill.
+
+Coverage is not health. `remediation_coverage` describes the available fix or
+handoff class. `assessment` is `healthy`, `finding`, `partial`, `unknown`, or
+`not_applicable`. A domain is healthy only when every applicable rule has
+concrete evidence and none trigger. Missing evidence produces
+`SAD-EVIDENCE-INCOMPLETE`; use `--require-complete-evidence` to exit nonzero.
 
 ## Coverage Domains
 
@@ -18,21 +29,31 @@ The manifest covers:
 - Cloud ACS control plane
 - Cloud Monitoring Console
 - Enterprise health
+- Platform lifecycle, supported versions, topology, sizing, runtimes, and sidecars
+- Cloud and Enterprise configuration validation
 - Monitoring Console
 - Indexes and storage
-- Ingest paths
-- Forwarder and deployment server
+- DDAA, DDSS, SmartStore, archive, restore, and data lifecycle
+- Ingest paths, data quality, queues, and loss signals
+- Ingest Processor, Edge Processor, Ingest Actions, SPL2, Data Manager, DB Connect, and OTLP
+- Agent Management, forwarders, and deployment-server compatibility
 - Distributed search and SHC
+- Federated Search and Hybrid Search migration
 - Indexer clustering
 - License/subscription
 - Search and scheduler
 - Workload management
 - Apps and add-ons
-- Auth, users, roles, tokens
+- Auth, SSO/SAML, LDAP, MFA, users, roles, and tokens
 - TLS/PKI/security hardening
-- KV Store and knowledge objects
+- Audit and compliance
+- KV Store, knowledge objects, CIM, and data models
+- Dashboard Studio, Secure Gateway, and mobile readiness
+- Data-source and semantic readiness, including the TA completion gate
 - Backup, DR, support evidence
-- Premium product handoffs
+- Restart and maintenance orchestration
+- Product handoffs for the full repository catalog
+- Diagnostic evidence completeness
 
 ## Evidence Shape
 
@@ -49,9 +70,44 @@ collection, tests, or operator-provided snapshots. Common top-level keys:
 - `license`, `subscription`, `scheduler`, `workload_management`
 - `apps`, `auth`, `security`, `kvstore`, `knowledge_objects`
 - `backup`, `support`, `premium_products`
+- `lifecycle`, `topology`, `runtime`, `capacity`, `sidecars`
+- `config_validation`, `audit`, `federated_search`, `dashboards`, `secure_gateway`
+- `data_manager`, `ingest_processor`, `edge_processor`, `ingest_actions`, `otlp`, `db_connect`
+- `ddaa`, `ddss`, `archive`, `data_readiness`, `cim`, `ocsf`, `products`
+- `applicability.rules` and `applicability.domains`: optional boolean maps for
+  explicitly marking unlicensed, disabled, unsupported, or unused capabilities
+  not applicable to this environment. Unknown rule/domain names fail schema
+  validation.
 
 Evidence is redacted before writing under `evidence/`. Secret-like keys and
-token-looking values are replaced with `[REDACTED]`.
+token-looking values, URI userinfo, and secret query parameters are replaced
+with `[REDACTED]`. Rendered files are mode `0600`.
+
+Each coverage-domain row includes `expected_evidence_paths`,
+`assessed_rule_ids`, and `unassessed_rule_ids`. An empty list/false/zero is a
+valid assessed value; an absent path, `null`, `unknown`, `unavailable`,
+`not_assessed`, or `not_collected` is not.
+`explicitly_not_applicable_rule_ids` records reviewed applicability exclusions;
+optional features must be marked this way rather than silently omitted.
+
+## Current Platform Corrections
+
+- As of 2026-07-02, the shared Enterprise support contract lists 9.3, 9.4,
+  10.0, 10.2, and 10.4. Enterprise 9.2 and older are EOS; 10.1 and 10.3 were
+  not released Enterprise trains. The doctor derives lifecycle findings from
+  `server.version` and the shared version contract.
+- Cloud 10.3.2512+ supports configuration validation through the btool REST
+  API; it is not `not_applicable`.
+- Cloud administrators can manage workload rules, admission rules, and pool
+  assignment. The doctor renders an operator checklist instead of a support-only
+  classification.
+- Cloud SHC and indexer-cluster health are diagnosable through CMC even though
+  the underlying clusters remain Splunk-managed.
+- Hybrid Search is end-of-life; findings route to Federated Search migration.
+- DDAA, DDSS, and SmartStore are distinct lifecycle mechanisms and have
+  separate Cloud/Enterprise handoffs.
+- Agent Management is the current name for deployment-server/forwarder
+  management capabilities; legacy terminology remains in evidence aliases.
 
 ## Fix Policy
 
@@ -67,7 +123,8 @@ in the MCP safety map, and documented here.
 
 ## Splunk 10.4 enterprise deployment notes
 
-For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+For Splunk Enterprise `10.4.0`, Splunk Cloud Platform `10.5.2605`, and the
+previous Cloud documentation train `10.4.2604` planning,
 read this skill alongside
 [`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
 the prose companion to the

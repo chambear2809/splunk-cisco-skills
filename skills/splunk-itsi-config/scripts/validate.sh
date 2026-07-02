@@ -15,11 +15,9 @@ Usage: validate.sh --workflow native|content-packs|topology --spec PATH [--compl
 Use --completion (or --strict) to fail when a workflow reports warning findings.
 
 Examples:
-  bash scripts/validate.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
-  bash scripts/validate.sh --workflow topology --spec templates/beginner.topology.yaml
-  bash scripts/validate.sh --workflow native --spec templates/native.example.yaml
-  bash scripts/validate.sh --workflow content-packs --spec templates/content_packs.example.yaml
-  bash scripts/validate.sh --workflow topology --spec templates/topology.example.yaml
+  bash skills/splunk-itsi-config/scripts/validate.sh --workflow content-packs --spec my-itsi-content-pack.yaml
+  bash skills/splunk-itsi-config/scripts/validate.sh --workflow topology --spec my-itsi-topology.yaml
+  bash skills/splunk-itsi-config/scripts/validate.sh --workflow native --spec my-itsi-native.yaml
 EOF
 }
 
@@ -73,6 +71,12 @@ else
   warn_if_current_skill_role_unsupported
 fi
 
+SPEC_JSON="$(mktemp)"
+trap 'rm -f "${SPEC_JSON}"' EXIT
+
+ruby "${SCRIPT_DIR}/spec_to_json.rb" --spec "${SPEC_PATH}" --output "${SPEC_JSON}"
+python3 "${SCRIPT_DIR}/lint_spec.py" --workflow "${WORKFLOW}" --spec-json "${SPEC_JSON}" --source-path "${SPEC_PATH}" --quiet
+
 load_splunk_connection_settings >/dev/null 2>&1 || true
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
@@ -80,12 +84,7 @@ fi
 if [[ -n "${SPLUNK_PASS:-}" ]]; then
   SPLUNK_PASSWORD="${SPLUNK_PASS}"
 fi
-export SPLUNK_PLATFORM SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SESSION_KEY SPLUNK_USERNAME SPLUNK_PASSWORD SPLUNK_VERIFY_SSL
-
-SPEC_JSON="$(mktemp)"
-trap 'rm -f "${SPEC_JSON}"' EXIT
-
-ruby "${SCRIPT_DIR}/spec_to_json.rb" --spec "${SPEC_PATH}" --output "${SPEC_JSON}"
+export SPLUNK_PLATFORM SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SESSION_KEY SPLUNK_USERNAME SPLUNK_PASSWORD SPLUNK_VERIFY_SSL SPLUNK_ALLOW_INSECURE_TLS SPLUNK_CA_CERT
 
 case "${WORKFLOW}" in
   native)

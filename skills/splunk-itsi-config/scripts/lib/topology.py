@@ -11,6 +11,7 @@ from .native import (
     _apply_preview_keys,
     _existing_kpis_by_title,
     _merge_dependencies,
+    _normalize_entity_rules,
     _normalize_kpi,
 )
 
@@ -302,10 +303,14 @@ def _build_service_payload(
         payload["description"] = service_spec.get("description", "")
     if existing is None or "sec_grp" in service_spec:
         payload["sec_grp"] = service_spec.get("sec_grp", default_team)
-    if "enabled" in service_spec:
-        payload["enabled"] = bool_from_any(service_spec.get("enabled"))
+    if existing is None or "enabled" in service_spec:
+        payload["enabled"] = bool_from_any(
+            service_spec.get("enabled"),
+            default=False,
+            field=f"services[{service_spec['title']}].enabled",
+        )
     if "entity_rules" in service_spec:
-        payload["entity_rules"] = deepcopy(service_spec.get("entity_rules") or [])
+        payload["entity_rules"] = _normalize_entity_rules(service_spec.get("entity_rules"), service_spec["title"])
     if "service_tags" in service_spec:
         payload["service_tags"] = deepcopy(service_spec.get("service_tags") or {})
     if "kpis" in service_spec:
@@ -337,7 +342,7 @@ def _service_subset(
         expected["description"] = desired.get("description", "")
     if not existing_present or "sec_grp" in service_spec:
         expected["sec_grp"] = desired.get("sec_grp")
-    if "enabled" in service_spec:
+    if not existing_present or "enabled" in service_spec:
         expected["enabled"] = desired.get("enabled")
     if "entity_rules" in service_spec:
         expected["entity_rules"] = desired.get("entity_rules")

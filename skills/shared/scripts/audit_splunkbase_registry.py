@@ -21,15 +21,31 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
-USER_AGENT = "splunk-cisco-skills/10.4-readiness-audit"
+PLATFORM_VERSIONS_PATH = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
+USER_AGENT = "splunk-cisco-skills/platform-compatibility-audit"
 VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*(?:[.-][A-Za-z0-9]+)?)\b")
 DATE_RE = re.compile(r"([A-Z][a-z]+ \d{1,2}, 20\d{2})")
+
+
+def default_compatibility_target() -> str:
+    payload = json.loads(PLATFORM_VERSIONS_PATH.read_text(encoding="utf-8"))
+    target = str((payload.get("defaults") or {}).get("splunkbase_compatibility_target", "")).strip()
+    if not target:
+        raise ValueError(
+            "defaults.splunkbase_compatibility_target is missing from "
+            f"{PLATFORM_VERSIONS_PATH}"
+        )
+    return target
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit Splunkbase registry metadata.")
     parser.add_argument("--registry", default=str(REGISTRY_PATH))
-    parser.add_argument("--target-splunk-version", default="10.4")
+    parser.add_argument(
+        "--target-splunk-version",
+        default=default_compatibility_target(),
+        help="Platform compatibility target (default: shared platform-version contract).",
+    )
     parser.add_argument("--live", action="store_true", help="Fetch public Splunkbase pages.")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     parser.add_argument("--max-workers", type=int, default=12)

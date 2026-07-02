@@ -100,6 +100,7 @@ teardown() {
 
     run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
       --render-clients \
+      --accept-nonproduction-package \
       --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
       --bearer-token-file "${token_file}" \
       --output-dir "${output_dir}" \
@@ -308,6 +309,7 @@ teardown() {
 
     run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
       --render-clients \
+      --accept-nonproduction-package \
       --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
       --bearer-token-file "${token_file}" \
       --output-dir "${output_dir}" \
@@ -337,6 +339,7 @@ teardown() {
 
     run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
       --render-clients \
+      --accept-nonproduction-package \
       --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
       --bearer-token-file "${token_file}" \
       --output-dir "${output_dir}" \
@@ -368,6 +371,7 @@ teardown() {
 
     run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
       --render-clients \
+      --accept-nonproduction-package \
       --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
       --bearer-token-file "${token_file}" \
       --output-dir "${output_dir}" \
@@ -398,6 +402,7 @@ teardown() {
 
     run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
       --render-clients \
+      --accept-nonproduction-package \
       --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
       --bearer-token-file "${token_file}" \
       --output-dir "${output_dir}" \
@@ -407,6 +412,115 @@ teardown() {
 
     [ "$status" -eq 0 ]
     [ ! -f "${workspace_dir}/.mcp.json" ]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup rejects remote HTTP client URLs" {
+    work_dir="$(mktemp -d)"
+    token_file="${work_dir}/splunk.token"
+
+    printf '%s' 'encrypted-token-value' > "${token_file}"
+    chmod 600 "${token_file}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "http://splunk.example.invalid:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --output-dir "${work_dir}/rendered" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "MCP URL must use HTTPS" ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup limits insecure TLS and HTTP to loopback" {
+    work_dir="$(mktemp -d)"
+    token_file="${work_dir}/splunk.token"
+
+    printf '%s' 'encrypted-token-value' > "${token_file}"
+    chmod 600 "${token_file}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --client-insecure-tls \
+      --output-dir "${work_dir}/remote" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "restricted to loopback" ]]
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "http://127.0.0.1:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --client-insecure-tls \
+      --output-dir "${work_dir}/loopback" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+    run cat "${work_dir}/loopback/.env.splunk-mcp"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SPLUNK_MCP_URL=http://127.0.0.1:8089/services/mcp" ]]
+    [[ "$output" =~ "SPLUNK_MCP_INSECURE_TLS=1" ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup does not auto-register a bridge without credentials" {
+    work_dir="$(mktemp -d)"
+    home_dir="${work_dir}/home"
+    output_dir="${work_dir}/rendered"
+    workspace_dir="${work_dir}/workspace"
+
+    mkdir -p "${home_dir}" "${workspace_dir}"
+
+    run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --accept-nonproduction-package \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --output-dir "${output_dir}" \
+      --cursor-workspace "${workspace_dir}" \
+      --client-name "splunk-no-credential"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Refusing to register an unusable MCP bridge without a live credential environment" ]]
+    [ ! -e "${output_dir}/.env.splunk-mcp" ]
+    [ ! -e "${workspace_dir}/.cursor/mcp.json" ]
+    [ ! -e "${workspace_dir}/.mcp.json" ]
+
+    run env HOME="${home_dir}" codex mcp get "splunk-no-credential" --json
+    [ "$status" -ne 0 ]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup permits credential-free render-only output" {
+    work_dir="$(mktemp -d)"
+    output_dir="${work_dir}/rendered"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --output-dir "${output_dir}" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+    [ -f "${output_dir}/run-splunk-mcp.js" ]
+    [ -f "${output_dir}/.cursor/mcp.json" ]
+    [ ! -e "${output_dir}/.env.splunk-mcp" ]
 
     rm -rf "${work_dir}"
 }

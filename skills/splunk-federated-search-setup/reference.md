@@ -38,8 +38,10 @@ inventing unsupported API writes:
 | Surface | Stage | Notes |
 |---|---|---|
 | Federated Search for Amazon S3 through Data Management | Available by entitlement | Define connections and datasets in the Data Management app; prefer this model for new tenants unless the older provider-payload path is explicitly reviewed. |
-| Federated Search for Microsoft Azure | Controlled Availability | Searches Azure Data Lake Storage and Azure Blob Storage datasets; activation and DSU entitlement require Splunk representative review. |
-| Federated Search for Azure Databricks | Controlled Availability | Searches Azure Databricks Unity Catalog tables through Delta Sharing; searches use SPL2 and `sdselect` command behavior. |
+| Federated Search for Microsoft Azure | Available by activation | Searches Azure Data Lake Storage and Azure Blob Storage datasets; activation and DSU entitlement require Splunk representative review. |
+| Federated Search for Azure Databricks | Available by activation | Searches Azure Databricks Unity Catalog tables through Delta Sharing; searches use SPL2. |
+| Federated Search for Snowflake | Available by activation | Searches tables and views in Snowflake on AWS through a programmatic access token; Azure/GCP-hosted Snowflake warehouses are not supported by the current offering. |
+| Federated Search for DDSS | Available by activation | Searches DDSS datasets stored in Amazon S3; DDSS locations in Azure or GCP are not supported by the current offering. |
 
 FSS3 cannot be configured through `federated.conf`. For tenants still using the
 reviewed legacy provider model, Splunk Cloud admins POST FSS3 provider
@@ -226,5 +228,7 @@ authentication:
 - Federated Search options overview: https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions
 - Federated Search for Microsoft Azure: https://help.splunk.com/?resourceId=c4c3bc139-7e3d-4340-a596-59691b399b2e
 - Federated Search for Azure Databricks: https://help.splunk.com/?resourceId=cea9c5a52-95d8-4a01-9e16-4548b24059e8-splunkcloud_federatedsearch
-- Define a Microsoft Azure dataset: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-microsoft-azure-datasets/define-a-microsoft-azure-dataset
-- Create an Azure Databricks connection: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-azure-databricks-datasets/create-an-azure-databricks-connection
+- Define a Microsoft Azure dataset: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-microsoft-azure-datasets/define-a-microsoft-azure-dataset
+- Create an Azure Databricks connection: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-azure-databricks-datasets/create-an-azure-databricks-connection
+- Federated Search for Snowflake: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-snowflake-datasets/about-federated-search-for-snowflake
+- Federated Search for DDSS: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-ddss-datasets/about-federated-search-for-ddss

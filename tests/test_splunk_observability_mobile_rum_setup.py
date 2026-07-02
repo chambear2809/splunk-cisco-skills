@@ -450,19 +450,19 @@ def test_validate_and_server_timing_regex(tmp_path: Path) -> None:
 
 
 def test_mcp_classification_and_secret_rejection() -> None:
-    readonly = core.plan_skill_script(
+    render_plan = core.plan_skill_script(
         "splunk-observability-mobile-rum-setup",
         "setup.sh",
         ["--render"],
     )
-    assert readonly["read_only"] is True
+    assert render_plan["read_only"] is False
 
     patches = core.plan_skill_script(
         "splunk-observability-mobile-rum-setup",
         "setup.sh",
         ["--render-patches"],
     )
-    assert patches["read_only"] is True
+    assert patches["read_only"] is False
 
     apply_plan = core.plan_skill_script(
         "splunk-observability-mobile-rum-setup",

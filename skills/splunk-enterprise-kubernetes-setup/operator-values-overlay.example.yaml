@@ -1,0 +1,53 @@
+splunkOperator:
+  podLabels:
+    example.com/reviewed-overlay: "true"
+# Reviewed, non-secret Splunk Operator 3.1.0 overlay example.
+#
+# Copy this file, replace or extend the harmless example label above with only
+# the settings your deployment needs, and pass it with --operator-values-overlay.
+# Never put registry passwords, cloud credentials, or tokens in a values file.
+# Verify every key against:
+#   helm show values splunk/splunk-operator --version 3.1.0
+#
+# Example:
+# splunkOperator:
+#   # Reference an existing image-pull Secret by name only.
+#   imagePullSecrets:
+#     - name: splunk-registry
+#
+#   labels:
+#     app.kubernetes.io/part-of: splunk-platform
+#   annotations:
+#     example.com/change-ticket: CHG-000000
+#   podLabels:
+#     workload.example.com/tier: control-plane
+#   podAnnotations:
+#     example.com/owner: splunk-platform
+#
+#   nodeSelector:
+#     workload.example.com/class: splunk-control
+#   tolerations:
+#     - key: workload.example.com/splunk
+#       operator: Equal
+#       value: "true"
+#       effect: NoSchedule
+#   affinity: {}
+#
+#   resources:
+#     requests:
+#       cpu: "1"
+#       memory: 2Gi
+#     limits:
+#       cpu: "2"
+#       memory: 4Gi
+#
+# Resource/scheduling examples must remain compatible with the generated
+# production identity and sizing contract; strict validation rejects conflicts.
+#
+# The renderer owns and verifies the Operator App Framework staging PVC/mount;
+# replacement volumes or mounts are rejected. It also rejects image overrides,
+# service accounts, arbitrary commands/env (including CLUSTER_DOMAIN), probes,
+# security/host settings, services, and namespace/watch-scope changes. Select
+# the Operator image with --operator-image and use explicit coverage.md
+# handoffs for protected fields. Only the splunkOperator root and the exact keys
+# demonstrated/listed in reference.md are accepted; typos and unknown keys fail.

@@ -6,40 +6,51 @@ turns that into services, KPIs, and dependency edges. Start with
 `templates/beginner.topology.yaml` and `references/beginner_quickstart.md` before
 using exported or advanced ITSI payloads.
 
+The target must already have licensed, healthy ITSI. When packs are referenced,
+a compatible live Content Library API and all prerequisite apps must already
+exist. This workflow does not install apps or restart Splunk.
+
 The topology workflow combines the existing native and content-pack flows with a
 top-level service-tree DSL:
 
-- `bash scripts/setup.sh --workflow topology --spec <path>`
-- `bash scripts/setup.sh --workflow topology --spec <path> --apply`
-- `bash scripts/validate.sh --workflow topology --spec <path>`
-- `bash scripts/setup.sh --workflow topology --spec <path> --mode prune-plan --output topology-prune-plan.json`
-- `bash scripts/setup.sh --workflow topology --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
-- `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
+- `bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec <path> --mode lint`
+- `bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec <path>`
+- `bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec <path> --apply`
+- `bash skills/splunk-itsi-config/scripts/validate.sh --workflow topology --spec <path> --completion`
+- `bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec <path> --mode prune-plan --output topology-prune-plan.json`
+- `bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
+- `python3 skills/splunk-itsi-config/scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
 
-Topology specs can include all native sections from `references/native_itsi.md`, including extended ITSI objects such as teams, entity types, KPI base searches, service templates, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views.
+Lint is offline. Normal preview and validation are GET-only. Catalog refresh is
+an apply-only opt-in, and apply requires explicit `--apply` approval.
+
+Topology specs can include native sections from `references/native_itsi.md`.
+Core service/KPI/dependency fields are typed. Extended ITSI objects such as
+teams, entity types, KPI templates, correlation searches, maintenance, backup,
+glass tables, deep dives, and home views remain experimental passthroughs unless
+`product_coverage.md` says otherwise.
 
 Use `topology_glass_table.py` to generate a starter native `glass_tables` section from `topology.roots`. The generated payload is intentionally a reviewable starter layout, not a replacement for the ITSI visual editor.
 
 ## Supported Spec Shape
 
 ```yaml
+schema_version: 1
+metadata:
+  template: true
+
 connection:
   base_url: https://splunk.example.com:8089
   session_key_env: SPLUNK_SESSION_KEY
-  verify_ssl: false
+  verify_ssl: true
   platform: enterprise
 
 itsi:
   require_present: true
-  install_if_missing: true
-  source: splunkbase
-  app_id: "1841"
 
 content_library:
   require_present: true
-  install_if_missing: true
-  source: splunkbase
-  app_id: "5391"
+  refresh_catalog: false
 
 defaults:
   sec_grp: default_itsi_security_group
@@ -104,6 +115,8 @@ topology:
 - Preview resolves pack-relative services and service templates from the content-pack `preview` response if they are not live yet.
 - Apply and validate use live ITSI objects for service, KPI, and template linkage checks.
 - Existing services that declare `from_template` are relinked through the ITSI `service/<_key>/base_service_template` REST endpoint.
+- The link route used by this skill has append-only entity-rule semantics. Use
+  the ITSI UI for replace or keep-existing choices.
 
 ## Validation Rules
 
@@ -111,3 +124,5 @@ topology:
 - Explicit `kpis` on an edge must match live KPI titles on the child service for apply and validate.
 - Normal preview/apply/validate only adds or updates managed services, template links, and dependencies.
 - `prune-plan` and guarded `cleanup-apply` reuse the native cleanup model. The topology workflow expands `topology.roots` into desired service titles first, including pack-prefix candidates for `service_ref` nodes, so topology-only services are not reported as unmanaged just because they are absent from the top-level `services` section.
+- A generated glass-table payload is a review starter, not evidence that the
+  target version accepted the layout or that its searches return data.

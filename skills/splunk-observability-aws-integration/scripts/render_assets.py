@@ -1464,7 +1464,8 @@ def _section_handoff(spec: dict[str, Any]) -> str:
         rows.append("""
 ## OTel collector for EC2 / EKS host telemetry
 
-- `bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render`
+- EKS: `bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm REALM --cluster-name EKS_CLUSTER --distribution eks --cloud-provider aws`
+- EC2: `bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm REALM`
 - Use this when CWAgent host metrics are insufficient or unavailable.
 """)
     if not any(h.values()):

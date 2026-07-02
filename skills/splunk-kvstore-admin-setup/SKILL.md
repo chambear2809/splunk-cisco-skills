@@ -39,9 +39,9 @@ upgrade. After upgrade, run `status.sh` or `splunk show kvstore-status --verbose
 and confirm `serverVersion` reflects the expected MongoDB 8 train before
 collection governance or restore work.
 
-Cloud stacks on doc train **10.4.2603** inherit the same KV Store behavior on
-the Splunk-managed side; Enterprise operators still own the upgrade ladder on
-self-managed hosts.
+Cloud stacks on doc trains **10.5.2605** and **10.4.2604** inherit the same KV
+Store behavior on the Splunk-managed side; Enterprise operators still own the
+upgrade ladder on self-managed hosts.
 
 ## Quick Start
 

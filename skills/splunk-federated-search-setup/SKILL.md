@@ -7,8 +7,8 @@ description: >-
   transparent mode with multiple providers and federated indexes per render,
   Federated Search for Amazon S3 legacy/reviewed provider payloads
   (FSS3, type=aws_s3, Splunk Cloud Platform only), plus Data Management app
-  readiness handoffs for current Amazon S3, Microsoft Azure, and Azure
-  Databricks federation, file-based apply for Splunk
+  readiness handoffs for current Amazon S3, Microsoft Azure, Azure Databricks,
+  Snowflake, and DDSS federation, file-based apply for Splunk
   Enterprise standalone search heads or SHC deployers, REST-based apply that
   works on Splunk Enterprise and Splunk Cloud, the global federated-search
   enable/disable switch, and a status helper that reports per-provider
@@ -40,9 +40,9 @@ Covered:
   provider model (Splunk Cloud Platform only; FSS3 cannot be configured via
   `federated.conf`).
 - **Data Management app federation handoff** — readiness notes for the current
-  connection/dataset model for Amazon S3 plus Controlled Availability
-  Microsoft Azure and Azure Databricks federation. These are UI/entitlement
-  handoffs until a stable public API contract is available.
+  connection/dataset model for Amazon S3, Microsoft Azure, Azure Databricks,
+  Snowflake, and DDSS. These are UI/entitlement handoffs until a stable public
+  API contract is available.
 - **Global federated-search switch** — enable or disable Federated Search
   for the entire deployment via
   `/services/data/federated/settings/general`.

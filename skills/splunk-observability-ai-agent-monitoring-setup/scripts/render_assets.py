@@ -588,8 +588,6 @@ agent:
     exporters:
       signalfx:
         send_otlp_histograms: true
-gateway:
-  enabled: true
 """
 
 
@@ -672,6 +670,7 @@ def apply_plan(spec: dict[str, Any], output_dir: Path, token_file: str = "", pla
                 str(deployment.get("cluster_name", "")),
                 "--namespace",
                 str(deployment.get("namespace", "splunk-otel")),
+                "--gateway",
                 "--extra-values-file",
                 str(output_dir / "collector" / "values-ai-agent-monitoring.yaml"),
                 "--deployment-environment",

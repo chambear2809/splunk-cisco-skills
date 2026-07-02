@@ -12,7 +12,7 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from lib.common import infer_platform, semver_key, write_yaml  # noqa: E402
+from lib.common import infer_platform, semver_key, write_json, write_text, write_yaml  # noqa: E402
 
 
 class SemverKeyTests(unittest.TestCase):
@@ -63,6 +63,21 @@ class InferPlatformTests(unittest.TestCase):
 
 
 class ItsiCommonTests(unittest.TestCase):
+    def test_written_artifacts_are_owner_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            paths = [
+                Path(tempdir) / "report.json",
+                Path(tempdir) / "report.yaml",
+                Path(tempdir) / "report.md",
+            ]
+            write_json(paths[0], {"status": "ok"})
+            write_yaml(paths[1], {"status": "ok"})
+            write_text(paths[2], "ok\n")
+
+            for path in paths:
+                with self.subTest(path=path.name):
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
     def test_write_yaml_quotes_reserved_scalars_and_mapping_keys_for_roundtrip(self) -> None:
         payload = {
             "correlation_searches": [

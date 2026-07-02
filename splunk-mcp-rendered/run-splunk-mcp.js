@@ -3,14 +3,25 @@
 
 // Cross-platform MCP bridge for Splunk MCP Server.
 // Works on macOS, Linux, and Windows (Git Bash, native cmd/PowerShell).
-// Requires: node (comes with mcp-remote) and npx mcp-remote.
+// Requires: Node.js and a preinstalled, operator-vetted mcp-remote 0.1.38.
 
 const fs = require("fs");
+const net = require("net");
 const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 
 const scriptDir = __dirname;
 const envFile = path.join(scriptDir, ".env.splunk-mcp");
+const allowedEnvKeys = new Set([
+  "SPLUNK_MCP_URL",
+  "SPLUNK_MCP_GATEWAY_MODE",
+  "SPLUNK_MCP_INSECURE_TLS",
+  "SPLUNK_MCP_TOKEN",
+  "SPLUNK_MCP_HEADER_AUTHORIZATION",
+  "SPLUNK_MCP_HEADER_SPLUNK_TENANT",
+  "SPLUNK_MCP_HEADER_X_SF_TOKEN",
+  "SPLUNK_MCP_HEADER_X_SF_REALM",
+]);
 
 // Load .env.splunk-mcp if present (KEY=VALUE lines, no export, no quoting needed).
 function parseShellWord(value) {
@@ -66,6 +77,7 @@ function parseShellWord(value) {
       result += ch;
     }
   }
+  if (state !== "normal") throw new Error("unterminated quoted value");
   return result;
 }
 
@@ -78,7 +90,17 @@ function loadEnvFile(filePath) {
     const eq = trimmed.indexOf("=");
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    const val = parseShellWord(trimmed.slice(eq + 1).trim());
+    if (!allowedEnvKeys.has(key)) {
+      process.stderr.write("splunk-mcp: unsupported key in " + filePath + ": " + key + "\n");
+      process.exit(1);
+    }
+    let val;
+    try {
+      val = parseShellWord(trimmed.slice(eq + 1).trim());
+    } catch (error) {
+      process.stderr.write("splunk-mcp: invalid value in " + filePath + " for " + key + ": " + error.message + "\n");
+      process.exit(1);
+    }
     // Pre-existing env vars take precedence.
     if (!(key in process.env)) {
       process.env[key] = val;
@@ -103,6 +125,46 @@ function hasEnv(name) {
 function fail(message) {
   process.stderr.write("splunk-mcp: " + message + "\n");
   process.exit(1);
+}
+
+function validateRuntimeUrl(rawUrl) {
+  let parsed;
+  if (/[\u0000-\u001F\u007F]/.test(rawUrl)) {
+    fail("SPLUNK_MCP_URL contains control characters");
+  }
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_) {
+    fail("SPLUNK_MCP_URL must be an absolute HTTPS URL");
+  }
+  if (parsed.username || parsed.password || !parsed.hostname || parsed.hash) {
+    fail("SPLUNK_MCP_URL must include a host and must not contain userinfo");
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const loopback = host === "localhost" ||
+    (net.isIP(host) === 4 && host.startsWith("127.")) ||
+    host === "::1" || host === "0:0:0:0:0:0:0:1";
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback)) {
+    fail("SPLUNK_MCP_URL must use HTTPS; HTTP is allowed only for loopback");
+  }
+  if (process.env.SPLUNK_MCP_INSECURE_TLS === "1" && !loopback) {
+    fail("SPLUNK_MCP_INSECURE_TLS=1 is restricted to loopback; configure a trusted CA for remote endpoints");
+  }
+}
+
+validateRuntimeUrl(mcpUrl);
+
+for (const name of [
+  "SPLUNK_MCP_TOKEN",
+  "SPLUNK_MCP_HEADER_AUTHORIZATION",
+  "SPLUNK_MCP_HEADER_SPLUNK_TENANT",
+  "SPLUNK_MCP_HEADER_X_SF_TOKEN",
+  "SPLUNK_MCP_HEADER_X_SF_REALM",
+]) {
+  const value = process.env[name];
+  if (value && (/\r|\n/.test(value) || value.length > 65536)) {
+    fail(name + " contains a forbidden line break or exceeds 65536 characters");
+  }
 }
 
 if (!["platform", "o11y", "combined"].includes(gatewayMode)) {
@@ -130,7 +192,8 @@ if (process.env.SPLUNK_MCP_INSECURE_TLS === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-// Resolve mcp-remote: prefer global install, fall back to npx.
+// Resolve a preinstalled, operator-vetted mcp-remote. Never download and
+// execute a mutable npm package during MCP startup.
 function findMcpRemote() {
   try {
     // On Windows `where`, on Unix `which` -- execFileSync with a
@@ -144,11 +207,45 @@ function findMcpRemote() {
   } catch (_) {
     // not found on PATH
   }
-  // Fall back to npx (always available if Node.js is installed).
-  return { cmd: process.platform === "win32" ? "npx.cmd" : "npx", args: ["mcp-remote"] };
+  fail("mcp-remote not found on PATH; install the vetted version with: npm install -g mcp-remote@0.1.38");
+}
+
+function readPackageMetadata(filePath) {
+  let current = path.dirname(fs.realpathSync(filePath));
+  while (true) {
+    const candidate = path.join(current, "package.json");
+    if (fs.existsSync(candidate)) {
+      try {
+        const metadata = JSON.parse(fs.readFileSync(candidate, "utf8"));
+        if (metadata.name === "mcp-remote") return metadata;
+      } catch (_) {
+        // Keep walking; a parent package.json may be the package root.
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  if (process.platform !== "win32") return null;
+  try {
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+    const npmRoot = execFileSync(npmCommand, ["root", "-g"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const expectedShimDir = path.dirname(npmRoot).toLowerCase();
+    if (path.dirname(path.resolve(filePath)).toLowerCase() !== expectedShimDir) return null;
+    return JSON.parse(fs.readFileSync(path.join(npmRoot, "mcp-remote", "package.json"), "utf8"));
+  } catch (_) {
+    return null;
+  }
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
+const mcpRemotePackage = readPackageMetadata(cmd);
+if (!mcpRemotePackage || mcpRemotePackage.name !== "mcp-remote" || mcpRemotePackage.version !== "0.1.38") {
+  fail("mcp-remote 0.1.38 is required; install it with: npm install -g mcp-remote@0.1.38");
+}
 // Pass literal placeholders so mcp-remote performs ${VAR} substitution
 // at runtime against the inherited env. This keeps secret header values out
 // of argv (visible to process listings).
@@ -184,7 +281,7 @@ const child = spawn(
 child.on("error", function(err) {
   process.stderr.write(
     "splunk-mcp: failed to start mcp-remote: " + err.message + "\n" +
-    "  Install it with: npm install -g mcp-remote\n"
+    "  Install it with: npm install -g mcp-remote@0.1.38\n"
   );
   process.exit(1);
 });

@@ -1,12 +1,18 @@
 # Splunk Observability OTel Collector intake template
 #
 # Copy this file to template.local and fill in non-secret values only.
+# This is a manual intake worksheet. setup.sh does not parse TOML/template.local;
+# map reviewed values to documented CLI flags.
 # Create token files separately with:
 #   bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_token
 
 [observability]
 realm = "us0"
-deployment_environment = "prod"
+deployment_environment = ""
+
+[secret_files]
+o11y_token_file = "" # required for Observability apply; path only, never a token value
+platform_hec_token_file = "" # required for direct HEC apply unless the HEC helper manages it
 
 [kubernetes]
 enabled = true
@@ -15,14 +21,23 @@ release_name = "splunk-otel-collector"
 cluster_name = "example-cluster"
 distribution = ""
 cloud_provider = ""
-chart_version = ""
+chart_version = "0.154.0"
 kube_context = ""
+eks_cluster_name = "" # set with aws_region to render the EKS kubeconfig helper
+aws_region = ""
+extra_values_files = [] # copied and hashed; inline secrets and secret.create=true are rejected
+k8s_objects_file = "" # typed list; empty forces clusterReceiver.k8sObjects=[] (see k8s-objects.example.yaml)
+accept_cluster_wide_object_rbac = false # required with k8s_objects_file; secrets/configmaps are always refused
 o11y_ingest_url = ""
 o11y_api_url = ""
 priority_class_name = ""
 render_priority_class = false
 windows_nodes = false
 cluster_receiver_enabled = true
+agent_enabled = true
+gateway_enabled = false
+gateway_replicas = 3
+network_explorer_enabled = false # forces gateway=true/replicas=1 and renders the external eBPF chart handoff
 agent_host_network = true
 enable_platform_persistent_queue = false
 platform_persistent_queue_path = "/var/addon/splunk/exporter_queue"
@@ -33,10 +48,27 @@ enable_istio_autodetect = false
 enable_obi = false
 install_operator_crds = true
 enable_certmanager = false
+instrumentation_installation_job = true
+instrumentation_kubectl_image_tag = "v1.35.1" # must stay within one minor of the K8s server
+target_allocator_enabled = false
+k8s_entities_enabled = false
+entity_events_enabled = false
+fips_enabled = false # 0.154.0 FIPS image supports Linux amd64/arm64 and Windows amd64; incompatible with OBI/discovery
+
+[signals]
+metrics = true
+traces = true
+logs = false
+journald = false # Kubernetes Linux-agent only; requires a Platform log destination
+profiling = false
+events = false
+discovery = false
+autoinstrumentation = false
 
 [kubernetes.platform_hec_logs]
 enabled = false
-url = "https://splunk.example.com:8088/services/collector"
+url = "https://splunk.example.com:8088/services/collector/event"
+accept_insecure_platform_hec = false # required only for an explicitly reviewed http:// URL
 index = "k8s_logs"
 render_helper = false
 hec_platform = "cloud"
@@ -54,43 +86,69 @@ hec_app_name = "splunk_httpinput"
 hec_restart_splunk = true
 hec_s2s_indexes_validation = "disabled_for_internal"
 
+[kubernetes.platform]
+logs_enabled = false # export pipeline only; sources are container/journald flags, events/objects, or reviewed extraFileLogs
+metrics_enabled = false
+metrics_index = ""
+traces_enabled_experimental = false
+traces_index = ""
+accept_experimental_traces = false
+otlp_endpoint = ""
+otlp_protocol = "grpc"
+otlp_insecure = false
+hec_ca_file = ""
+hec_client_cert_file = ""
+hec_client_key_file = ""
+otlp_ca_file = ""
+otlp_client_cert_file = ""
+otlp_client_key_file = ""
+
 [linux]
 enabled = true
 execution = "local"
 host = ""
-ssh_user = ""
-ssh_port = 22
-ssh_key_file = ""
+ssh_user = "" # required for SSH; host/user/port are validated in every SSH helper
+ssh_port = 22 # 1-65535
+ssh_key_file = "" # optional non-symlink mode-600 private key
 mode = "agent"
 memory_mib = 512
-listen_interface = "0.0.0.0"
+listen_interface = "" # empty = 127.0.0.1 agent, 0.0.0.0 gateway
 api_url = ""
 ingest_url = ""
-trace_url = ""
-hec_url = ""
 collector_config = ""
+health_endpoint = "" # required with collector_config; default config uses http://127.0.0.1:13133/
 service_user = ""
 service_group = ""
 skip_collector_repo = false
 repo_channel = "primary"
-instrumentation_mode = "systemd"
+instrumentation_mode = "none"
 instrumentation_sdks = ""
 npm_path = ""
 otlp_endpoint = ""
 otlp_endpoint_protocol = ""
 metrics_exporter = ""
-logs_exporter = "otlp"
-instrumentation_version = ""
+logs_exporter = ""
+cpu_profiling = false # --enable-profiling; requires auto-instrumentation
+memory_profiling = false # --enable-memory-profiling; independently controlled
+instrumentation_version = "0.154.2" # audited executable pin; upgrades require source-ledger/test review
+collector_version = "0.154.2" # audited executable pin; upgrades use the reviewed package-manager handoff
+installer_url = "https://raw.githubusercontent.com/signalfx/splunk-otel-collector/v0.154.2/packaging/installer/install.sh"
+installer_sha256 = "16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29"
 service_name = ""
 godebug = ""
-enable_obi = false
-obi_version = ""
-obi_install_dir = ""
+enable_obi = false # installs and validates the binary only; runtime/service configuration remains a handoff
+obi_version = "" # when enabled, empty or v0.6.0 selects the only audited executable pin
+obi_install_dir = "" # optional absolute path; the same directory is passed to uninstall
 
 [technical_addon]
 enabled = false
-target = "deployment-server" # deployment-server or universal-forwarder
-package_paths = ["./Splunk_TA_otel-0.153.0.tgz"]
+target = "deployment-server" # deployment-server, heavy-forwarder, or universal-forwarder
+# Deployment server may stage non-overlapping multi-OS/split packages. Local HF/UF
+# accepts exactly one Linux-capable package; Windows-only 8699 uses the DS path.
+package_paths = ["./splunk-add-on-for-opentelemetry-collector_01542.tgz"]
+# Other audited 0.154.2 artifacts:
+#   ./splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01542.tgz  # app 8698
+#   ./splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01542.tgz # app 8699
 package_flavor = "auto" # auto, multi-os, linux-x86-64, windows-x86-64
 mode = "agent" # agent, gateway, agent-to-gateway
 listen_interface = "" # empty = localhost for agent, 0.0.0.0 for gateway
@@ -105,3 +163,5 @@ accept_token_in_conf = false
 fips_required = false
 fedramp_required = false
 accept_regulated_override = false
+accept_unaudited_package = false # explicit exception after structural audit; official digest is the default
+serverclass_whitelist = "" # empty renders a deliberate no-match filter

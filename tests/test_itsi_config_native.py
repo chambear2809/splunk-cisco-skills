@@ -15,7 +15,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from lib.common import ValidationError  # noqa: E402
-from lib.native import NativeWorkflow  # noqa: E402
+from lib.native import NativeWorkflow, _normalize_kpi, _normalize_service  # noqa: E402
 
 
 class FakeNativeClient:
@@ -385,6 +385,97 @@ class InterfaceRecordingNativeClient(FakeNativeClient):
 
 
 class NativeWorkflowTests(unittest.TestCase):
+    def test_kpi_update_preserves_omitted_existing_fields(self) -> None:
+        existing = {
+            "_key": "kpi:1",
+            "title": "Latency",
+            "description": "Production latency",
+            "type": "kpi_primary",
+            "urgency": "9",
+            "alert_on": "both",
+            "alert_period": "15",
+            "alert_lag": "45",
+            "base_search": "index=old | stats avg(ms) as latency",
+        }
+
+        desired = _normalize_kpi(
+            {"title": "Latency", "threshold_field": "latency"},
+            existing=existing,
+            service_title="API",
+        )
+
+        self.assertEqual(desired["description"], "Production latency")
+        self.assertEqual(desired["urgency"], "9")
+        self.assertEqual(desired["alert_on"], "both")
+        self.assertEqual(desired["alert_period"], "15")
+        self.assertEqual(desired["alert_lag"], "45")
+
+    def test_service_can_explicitly_clear_entity_rules(self) -> None:
+        existing = {
+            "_key": "service:1",
+            "title": "API",
+            "entity_rules": [
+                {
+                    "rule_condition": "AND",
+                    "rule_items": [{"field": "host", "rule_type": "matches", "value": "api-*"}],
+                }
+            ],
+        }
+        desired = _normalize_service(
+            {"title": "API", "entity_rules": []},
+            existing,
+            "default_itsi_security_group",
+        )
+        self.assertIn("entity_rules", desired)
+        self.assertEqual(desired["entity_rules"], [])
+
+    def test_new_services_default_disabled(self) -> None:
+        desired = _normalize_service(
+            {"title": "API"},
+            None,
+            "default_itsi_security_group",
+        )
+        self.assertIs(desired["enabled"], False)
+
+    def test_apply_completes_full_preview_preflight_before_first_write(self) -> None:
+        client = FakeNativeClient(
+            {
+                "notable_event_aggregation_policy": {
+                    "Default Policy": {
+                        "_key": "neap:default",
+                        "title": "Default Policy",
+                        "managed": True,
+                    }
+                }
+            }
+        )
+        spec = {
+            "schema_version": 1,
+            "entities": [{"title": "host-1", "identifier_fields": [{"field": "host", "value": "host-1"}]}],
+            "neaps": [{"title": "Default Policy", "description": "unsafe update"}],
+        }
+
+        with self.assertRaisesRegex(ValidationError, "Refusing to update managed NEAP"):
+            NativeWorkflow(client).run(spec, "apply")
+
+        self.assertEqual(client.operations, [], "preflight failure must occur before creating the entity")
+
+    def test_summarization_rules_are_version_gated_to_itsi_5(self) -> None:
+        client = FakeNativeClient()
+        client.app_exists = lambda _app: True  # type: ignore[attr-defined]
+        client.kvstore_status = lambda: "ready"  # type: ignore[attr-defined]
+        client.get_app_version = lambda _app: "4.21.2"  # type: ignore[attr-defined]
+        spec = {
+            "schema_version": 1,
+            "metadata": {"allow_experimental_api": True},
+            "summarization_rules": [{"title": "Diagnose critical services", "payload": {"enabled": False}}],
+        }
+
+        with self.assertRaisesRegex(ValidationError, "requires ITSI 5.0"):
+            NativeWorkflow(client).run(spec, "apply")
+
+        self.assertEqual(client.operations, [])
+
     def test_preview_identifies_new_objects_without_mutating(self) -> None:
         client = FakeNativeClient()
         spec = {
@@ -437,7 +528,19 @@ class NativeWorkflowTests(unittest.TestCase):
                         "title": "Network Edge",
                         "description": "Edge network service",
                         "sec_grp": "default_itsi_security_group",
-                        "entity_rules": [{"field": "host", "value": "edge-*"}],
+                        "entity_rules": [
+                            {
+                                "rule_condition": "AND",
+                                "rule_items": [
+                                    {
+                                        "field": "host",
+                                        "field_type": "alias",
+                                        "rule_type": "matches",
+                                        "value": "edge-*",
+                                    }
+                                ],
+                            }
+                        ],
                         "kpis": [
                             {
                                 "_key": "service:1::kpi::1",
@@ -1848,6 +1951,15 @@ class NativeWorkflowTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValidationError, "HTTP 401"):
             NativeWorkflow(client).run({}, "export")
+
+    def test_inventory_marks_auth_failures_fatal(self) -> None:
+        result = NativeWorkflow(AuthFailureClient()).run({}, "inventory")
+
+        self.assertTrue(result.failed)
+        self.assertTrue(
+            any(item["status"] == "error" and "HTTP 401" in item["message"] for item in result.diagnostics),
+            result.diagnostics,
+        )
 
     def test_inventory_counts_live_objects(self) -> None:
         client = FakeNativeClient(

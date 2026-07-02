@@ -696,7 +696,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "==> Render Splunk OTel collector for GKE:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm REALM --cluster-name GKE_CLUSTER --distribution gke --cloud-provider gcp"
 echo ""
 echo "==> The OTel collector complements (does not replace) the GCP Cloud Monitoring integration."
 echo "    GKE cluster metrics via Cloud Monitoring (container service)"

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests.regression_helpers import REPO_ROOT
 
@@ -48,46 +49,16 @@ class LiveValidationRunnerTests(unittest.TestCase):
             steps = runner.build_apply_steps(Path(tmpdir), allow_apply=True)
 
         by_id = {step.step_id: step for step in steps}
-        self.assertIn("splunk-admin-doctor:apply-safe-packet", by_id)
-        self.assertFalse(by_id["splunk-admin-doctor:apply-safe-packet"].mutates)
-        self.assertIn("splunk-observability-dashboard-builder:apply-live-smoke", by_id)
-        self.assertTrue(by_id["splunk-observability-dashboard-builder:apply-live-smoke"].mutates)
-        self.assertIn("splunk-observability-dashboard-builder:cleanup-live-smoke", by_id)
-        cleanup = by_id["splunk-observability-dashboard-builder:cleanup-live-smoke"]
-        self.assertTrue(cleanup.mutates)
-        self.assertFalse(cleanup.read_only)
-        self.assertEqual("apply-cleanup", cleanup.category)
-        self.assertEqual("intentional-skip", cleanup.final_on_failure)
-        self.assertIn("--cleanup", cleanup.command)
-        self.assertIn("--apply-result", cleanup.command)
-        for step_id in {
-            "splunk-hec-service-setup:cleanup-ssh-validation-token",
-            "splunk-workload-management-setup:cleanup-ssh-validation-app",
-        }:
-            with self.subTest(step=step_id):
-                step = by_id[step_id]
-                self.assertEqual("apply-cleanup", step.category)
-                self.assertTrue(step.mutates)
-                self.assertFalse(step.read_only)
-                self.assertEqual("intentional-skip", step.final_on_failure)
-                self.assertIn("codex_live_validation", " ".join(step.command))
-                self.assertIn("rollback_or_validation", step.metadata)
-                self.assertFalse(runner.command_uses_direct_secret(step.command), step.command)
-        for step_id in {
-            "splunk-hec-service-setup:post-cleanup-ssh-check",
-            "splunk-workload-management-setup:post-cleanup-ssh-check",
-        }:
-            with self.subTest(step=step_id):
-                step = by_id[step_id]
-                self.assertEqual("apply-cleanup-validation", step.category)
-                self.assertFalse(step.mutates)
-                self.assertTrue(step.read_only)
-                self.assertEqual("intentional-skip", step.final_on_failure)
-                self.assertFalse(runner.command_uses_direct_secret(step.command), step.command)
+        self.assertEqual(set(by_id), {"splunk-admin-doctor:render-fix-plan"})
+        step = by_id["splunk-admin-doctor:render-fix-plan"]
+        self.assertFalse(step.mutates)
+        self.assertIn("--phase", step.command)
+        self.assertIn("fix-plan", step.command)
+        self.assertIn("rollback_or_validation", step.metadata)
         for step in steps:
             self.assertIn("rollback_or_validation", step.metadata) if step.category == "apply" and not step.skip_reason else None
 
-    def test_plan_includes_ssh_baseline_and_remote_apply_steps(self) -> None:
+    def test_plan_includes_ssh_baseline_but_no_remote_apply_steps(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir = Path(tmpdir)
             baseline_steps = runner.build_baseline_steps("onprem_2535", run_dir)
@@ -101,44 +72,52 @@ class LiveValidationRunnerTests(unittest.TestCase):
         self.assertFalse(baseline_by_id["baseline-ssh-btool-check"].required)
         self.assertEqual("intentional-skip", baseline_by_id["baseline-ssh-btool-check"].final_on_failure)
 
-        apply_by_id = {step.step_id: step for step in apply_steps}
-        for step_id in {
-            "splunk-monitoring-console-setup:apply-ssh-no-restart",
-            "splunk-hec-service-setup:apply-ssh-token-no-restart",
-            "splunk-workload-management-setup:apply-ssh-no-enable",
-        }:
-            with self.subTest(step=step_id):
-                step = apply_by_id[step_id]
-                self.assertEqual("ssh-apply", step.mode)
-                self.assertTrue(step.mutates)
-                self.assertFalse(step.read_only)
-                self.assertEqual("intentional-skip", step.final_on_failure)
-                self.assertIn("rollback_or_validation", step.metadata)
-                self.assertEqual("remote-rendered-apply", step.command[3])
-                self.assertFalse(runner.command_uses_direct_secret(step.command), step.command)
+        self.assertTrue(apply_steps)
+        self.assertFalse(any(step.mutates for step in apply_steps))
+        self.assertFalse(any(step.mode.startswith("ssh") for step in apply_steps))
 
-        for step_id in {
-            "splunk-enterprise:post-apply-ssh-status",
-            "splunk-monitoring-console-setup:post-apply-ssh-check",
-            "splunk-hec-service-setup:post-apply-ssh-check",
-            "splunk-workload-management-setup:post-apply-ssh-check",
-        }:
-            with self.subTest(step=step_id):
-                step = apply_by_id[step_id]
-                self.assertEqual("apply-validation", step.category)
-                self.assertFalse(step.mutates)
-                self.assertTrue(step.read_only)
-                self.assertIn("rollback_or_validation", step.metadata)
-                self.assertFalse(runner.command_uses_direct_secret(step.command), step.command)
+    def test_selected_and_skipped_skill_scope_cannot_expand_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            doctor_only = runner.build_plan(
+                profile="onprem_2535",
+                run_dir=run_dir,
+                allow_apply=True,
+                selected_skills={"splunk-admin-doctor"},
+            )
+            other_only = runner.build_plan(
+                profile="onprem_2535",
+                run_dir=run_dir,
+                allow_apply=True,
+                selected_skills={"splunk-hec-service-setup"},
+            )
+            doctor_skipped = runner.build_plan(
+                profile="onprem_2535",
+                run_dir=run_dir,
+                allow_apply=True,
+                skip_skills={"splunk-admin-doctor"},
+            )
 
-        hec_check = apply_by_id["splunk-hec-service-setup:post-apply-ssh-check"]
-        self.assertIn("btool inputs list --debug", " ".join(hec_check.command))
-        self.assertNotIn("token =", " ".join(hec_check.command).lower())
+        self.assertIn("splunk-admin-doctor:render-fix-plan", {step.step_id for step in doctor_only})
+        self.assertNotIn("splunk-admin-doctor:render-fix-plan", {step.step_id for step in other_only})
+        self.assertNotIn("splunk-admin-doctor:render-fix-plan", {step.step_id for step in doctor_skipped})
+        self.assertFalse(any(step.mutates for step in doctor_only + other_only + doctor_skipped))
 
-        hec_cleanup = apply_by_id["splunk-hec-service-setup:cleanup-ssh-validation-token"]
-        hec_cleanup_text = " ".join(hec_cleanup.command).lower()
-        self.assertIn("codex_live_validation_hec", hec_cleanup_text)
-        self.assertNotIn("token =", hec_cleanup_text)
+    def test_cloud_plan_omits_enterprise_ssh_and_targets_cloud_doctor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            steps = runner.build_plan(
+                profile="cloud_profile",
+                run_dir=Path(tmpdir),
+                allow_apply=True,
+                platform="cloud",
+                selected_skills={"splunk-admin-doctor"},
+            )
+
+        self.assertFalse(any(step.mode.startswith("ssh") for step in steps))
+        self.assertFalse(any(step.mutates for step in steps))
+        doctor_step = next(step for step in steps if step.step_id == "splunk-admin-doctor:doctor-live-evidence")
+        platform_index = doctor_step.command.index("--platform")
+        self.assertEqual(doctor_step.command[platform_index + 1], "cloud")
 
     def test_commands_do_not_use_direct_secret_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -159,6 +138,10 @@ class LiveValidationRunnerTests(unittest.TestCase):
                 "sessionKey=123456789abcdef",
                 '"token": "SUPER_SECRET_VALUE_12345"',
                 "password = hunter2hunter2",
+                "https://admin:uri-password@example.test:8089/services",
+                '"pass4SymmKey": "symmetric-secret-value"',
+                '"sslPassword": "ssl-password-value"',
+                '"privateKeyPassword": "private-key-password-value"',
             ]
         )
         redacted = runner.redact(text)
@@ -166,6 +149,10 @@ class LiveValidationRunnerTests(unittest.TestCase):
         self.assertNotIn("123456789abcdef", redacted)
         self.assertNotIn("SUPER_SECRET_VALUE_12345", redacted)
         self.assertNotIn("hunter2hunter2", redacted)
+        self.assertNotIn("uri-password", redacted)
+        self.assertNotIn("symmetric-secret-value", redacted)
+        self.assertNotIn("ssl-password-value", redacted)
+        self.assertNotIn("private-key-password-value", redacted)
         self.assertIn("[REDACTED]", redacted)
 
     def test_redaction_preserves_structural_checkpoint_step_ids_with_token(self) -> None:
@@ -185,18 +172,58 @@ class LiveValidationRunnerTests(unittest.TestCase):
         self.assertEqual("pass", row["status"])
         self.assertEqual("[REDACTED]", row["metadata"]["hec_token"])
 
+    def test_json_artifacts_are_redacted_and_owner_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "evidence.json"
+            runner.write_json(
+                path,
+                {
+                    "clientSecret": "CLIENT_SECRET_VALUE",
+                    "uri": "https://admin:URI_PASSWORD@example.test:8089/services",
+                },
+            )
+            rendered = path.read_text(encoding="utf-8")
+            mode = path.stat().st_mode & 0o777
+
+        self.assertEqual(mode, 0o600)
+        self.assertNotIn("CLIENT_SECRET_VALUE", rendered)
+        self.assertNotIn("URI_PASSWORD", rendered)
+
     def test_checkpoint_reuse_ignores_legacy_redacted_string_rows(self) -> None:
         self.assertFalse(
             runner.checkpoint_result_is_reusable("[REDACTED]", force_rerun=False, category="apply")
         )
         self.assertTrue(
-            runner.checkpoint_result_is_reusable({"status": "pass"}, force_rerun=False, category="apply")
+            runner.checkpoint_result_is_reusable(
+                {"status": "pass", "command": "render-current-plan"},
+                force_rerun=False,
+                category="apply",
+                command="render-current-plan",
+            )
         )
         self.assertFalse(
-            runner.checkpoint_result_is_reusable({"status": "pass"}, force_rerun=True, category="apply")
+            runner.checkpoint_result_is_reusable(
+                {"status": "pass", "command": "old-plan"},
+                force_rerun=False,
+                category="apply",
+                command="new-plan",
+            )
         )
         self.assertFalse(
-            runner.checkpoint_result_is_reusable({"status": "pass"}, force_rerun=False, category="read-only")
+            runner.checkpoint_result_is_reusable(
+                {"status": "pass", "command": "render-current-plan"},
+                force_rerun=True,
+                category="apply",
+                command="render-current-plan",
+            )
+        )
+        self.assertFalse(
+            runner.checkpoint_result_is_reusable(
+                {"status": "intentional-skip", "command": "render-current-plan"},
+                force_rerun=False,
+                category="apply",
+                command="render-current-plan",
+            )
         )
 
     def test_btool_findings_are_live_environment_constraints_not_auth_failures(self) -> None:
@@ -239,14 +266,27 @@ class LiveValidationRunnerTests(unittest.TestCase):
             runner.classify_failure(step, 1, "ERROR: Cannot reach 10.0.0.1:8089 (connection refused or timed out).", ""),
         )
 
-    def test_generated_o11y_dashboard_spec_uses_codex_live_validation_names(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            spec_path = runner.write_o11y_dashboard_spec(Path(tmpdir), realm="us1")
-            text = spec_path.read_text(encoding="utf-8")
+    def test_code_bugs_cannot_be_downgraded_to_intentional_skip(self) -> None:
+        step = runner.ValidationStep(
+            step_id="broken-command",
+            category="read-only",
+            command=["missing-command"],
+            required=False,
+            final_on_failure="intentional-skip",
+        )
+        classification = runner.classify_failure(step, 127, "", "missing-command: command not found")
 
-        self.assertIn("codex_live_validation_skill_checks", text)
-        self.assertIn("codex_live_validation_dashboard", text)
-        self.assertIn('"realm": "us1"', text)
+        self.assertEqual(classification, "code_bug")
+        self.assertFalse(runner.should_intentional_skip(step, classification))
+
+    def test_plan_only_does_not_collect_live_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = runner.parse_args(["--plan-only", "--output-dir", tmpdir, "--quiet"])
+            with mock.patch.object(runner, "collect_live_evidence") as collect:
+                payload = runner.run_once(args)
+
+        collect.assert_not_called()
+        self.assertTrue(payload["steps"])
 
     def test_default_spec_discovers_templates_directory_examples(self) -> None:
         spec_path = runner.default_spec_for_skill("splunk-observability-dashboard-builder")

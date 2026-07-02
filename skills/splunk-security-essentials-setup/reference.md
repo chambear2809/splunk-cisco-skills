@@ -10,7 +10,7 @@
 - Package pattern: `splunk-security-essentials_*`
 - Access: unrestricted
 - Splunk platform compatibility researched: Splunk Enterprise / Cloud Platform
-  9.0 through 10.4 (default 10.4; also 10.3 Cloud / 10.2 / older Enterprise trains)
+  9.0 through 10.5
 
 ## Setup Checklist
 

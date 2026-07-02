@@ -38,7 +38,7 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_otlp_hec_token
 
 The audited release is Splunkbase app `8704`, package/app ID
 `splunk-connect-for-otlp`, version `0.4.1`, compatible with Splunk `9.4` through
-`10.4` (default target `10.4`; also `10.3` Cloud / `10.2` / older Enterprise trains).
+`10.5`.
 
 The inspected package contains only conf/UI metadata plus platform binaries:
 

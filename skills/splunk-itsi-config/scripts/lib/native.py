@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .common import ValidationError, bool_from_any, canonicalize, compact, deep_merge, listify, subset_matches
+from .spec_validation import validate_spec
 
 
 DEFAULT_TEAM = "default_itsi_security_group"
@@ -75,6 +76,7 @@ POST_SERVICE_CONFIG_SECTIONS = (
     ConfigObjectSection("upgrade_readiness_prechecks", "upgrade_readiness_prechecks", label="upgrade_readiness_precheck"),
     ConfigObjectSection("summarizations", "summarization"),
     ConfigObjectSection("summarization_feedback", "summarization_feedback"),
+    ConfigObjectSection("summarization_rules", "summarization_rule"),
     ConfigObjectSection("user_preferences", "user_preference", default_sec_grp=False),
 )
 ALL_CONFIG_SECTIONS = PRE_SERVICE_CONFIG_SECTIONS + POST_SERVICE_CONFIG_SECTIONS
@@ -210,6 +212,7 @@ NEAP_SECTION = ConfigObjectSection(
     "notable_event_aggregation_policy",
     interface="event_management",
 )
+INVENTORY_AND_CLEANUP_SECTIONS = ALL_CONFIG_SECTIONS + (NEAP_SECTION,)
 
 
 @dataclass
@@ -286,8 +289,13 @@ def _normalize_entity(
     payload["title"] = entity_spec["title"]
     if existing is None or "description" in entity_spec:
         payload["description"] = entity_spec.get("description", "")
+    requested_team = entity_spec.get("sec_grp", DEFAULT_TEAM)
+    if requested_team != DEFAULT_TEAM:
+        raise ValidationError(
+            f"Entity '{entity_spec['title']}' must use sec_grp={DEFAULT_TEAM}; ITSI entities are Global objects."
+        )
     if existing is None or "sec_grp" in entity_spec:
-        payload["sec_grp"] = entity_spec.get("sec_grp", default_team)
+        payload["sec_grp"] = DEFAULT_TEAM
     identifiers = listify(entity_spec.get("identifier_fields"))
     informational = listify(entity_spec.get("informational_fields"))
     if identifiers:
@@ -331,6 +339,42 @@ def _existing_kpis_by_title(service_payload: dict[str, Any]) -> dict[str, dict[s
     return {kpi.get("title"): deepcopy(kpi) for kpi in listify(service_payload.get("kpis")) if kpi.get("title")}
 
 
+def _normalize_entity_rules(value: Any, service_title: str) -> list[dict[str, Any]]:
+    """Accept ITSI's canonical OR-of-AND groups plus a concise flat form."""
+
+    groups: list[dict[str, Any]] = []
+    flat_items: list[dict[str, Any]] = []
+    for index, raw in enumerate(listify(value)):
+        if not isinstance(raw, dict):
+            raise ValidationError(
+                f"Service '{service_title}' entity_rules[{index}] must be a mapping."
+            )
+        if "rule_items" in raw:
+            condition = str(raw.get("rule_condition") or "AND").upper()
+            if condition not in {"AND", "OR"}:
+                raise ValidationError(
+                    f"Service '{service_title}' entity_rules[{index}].rule_condition must be AND or OR."
+                )
+            items = listify(raw.get("rule_items"))
+            if not items or not all(isinstance(item, dict) for item in items):
+                raise ValidationError(
+                    f"Service '{service_title}' entity_rules[{index}].rule_items must be a non-empty list of mappings."
+                )
+            groups.append({**deepcopy(raw), "rule_condition": condition, "rule_items": deepcopy(items)})
+            continue
+        if not str(raw.get("field") or "").strip() or "value" not in raw:
+            raise ValidationError(
+                f"Service '{service_title}' entity_rules[{index}] must define field and value."
+            )
+        item = deepcopy(raw)
+        item.setdefault("field_type", "alias")
+        item.setdefault("rule_type", "matches")
+        flat_items.append(item)
+    if flat_items:
+        groups.append({"rule_condition": "AND", "rule_items": flat_items})
+    return groups
+
+
 def _stable_kpi_key(service_title: str | None, kpi_title: str) -> str:
     seed = f"{service_title or 'service'}::{kpi_title}".encode("utf-8")
     return hashlib.sha1(seed).hexdigest()[:24]
@@ -342,39 +386,51 @@ def _normalize_kpi(
     service_title: str | None = None,
 ) -> dict[str, Any]:
     payload = deepcopy(existing or {})
-    updates = {
-        "title": kpi_spec["title"],
-        "description": kpi_spec.get("description", ""),
-        "type": kpi_spec.get("type", "kpi_primary"),
-        "search": kpi_spec.get("search"),
-        "base_search": kpi_spec.get("base_search") or kpi_spec.get("search"),
-        "search_type": kpi_spec.get("search_type"),
-        "threshold_field": kpi_spec.get("threshold_field"),
-        "aggregate_statop": kpi_spec.get("aggregate_statop"),
-        "entity_statop": kpi_spec.get("entity_statop"),
-        "entity_id_fields": kpi_spec.get("entity_id_fields"),
-        "entity_breakdown_id_field": kpi_spec.get("entity_breakdown_id_field"),
-        "search_alert_earliest": kpi_spec.get("search_alert_earliest", "5"),
-        "search_alert_latest": kpi_spec.get("search_alert_latest"),
-        "threshold_direction": kpi_spec.get("threshold_direction"),
-        "urgency": kpi_spec.get("urgency", kpi_spec.get("importance", "5")),
-        "unit": kpi_spec.get("unit"),
-        "importance": kpi_spec.get("importance"),
-        "alert_on": kpi_spec.get("alert_on", "aggregate"),
-        "alert_period": kpi_spec.get("alert_period", "5"),
-        "alert_lag": kpi_spec.get("alert_lag", "30"),
-        "kpi_threshold_template_id": kpi_spec.get("kpi_threshold_template_id"),
-        "kpi_base_search_id": kpi_spec.get("kpi_base_search_id"),
-        "base_search_id": kpi_spec.get("base_search_id"),
-        "isadhoc": kpi_spec.get("isadhoc"),
-        "is_service_entity_filter": kpi_spec.get("is_service_entity_filter"),
-        "is_entity_breakdown": kpi_spec.get("is_entity_breakdown"),
-        "adaptive_thresholding": kpi_spec.get("adaptive_thresholding"),
-        "anomaly_detection": kpi_spec.get("anomaly_detection"),
-    }
+    updates: dict[str, Any] = {"title": kpi_spec["title"]}
+    direct_fields = (
+        "description",
+        "type",
+        "search",
+        "search_type",
+        "threshold_field",
+        "aggregate_statop",
+        "entity_statop",
+        "entity_id_fields",
+        "entity_breakdown_id_field",
+        "search_alert_earliest",
+        "search_alert_latest",
+        "threshold_direction",
+        "urgency",
+        "unit",
+        "importance",
+        "alert_on",
+        "alert_period",
+        "alert_lag",
+        "kpi_threshold_template_id",
+        "kpi_base_search_id",
+        "base_search_id",
+        "isadhoc",
+        "is_service_entity_filter",
+        "is_entity_breakdown",
+        "adaptive_thresholding",
+        "anomaly_detection",
+    )
+    for field_name in direct_fields:
+        if field_name in kpi_spec:
+            updates[field_name] = kpi_spec[field_name]
+    if "base_search" in kpi_spec or "search" in kpi_spec:
+        updates["base_search"] = kpi_spec.get("base_search") or kpi_spec.get("search")
+    if existing is None:
+        updates.setdefault("description", "")
+        updates.setdefault("type", "kpi_primary")
+        updates.setdefault("search_alert_earliest", "5")
+        updates.setdefault("urgency", kpi_spec.get("importance", "5"))
+        updates.setdefault("alert_on", "aggregate")
+        updates.setdefault("alert_period", "5")
+        updates.setdefault("alert_lag", "30")
     if (
-        updates["base_search"]
-        and not updates["search_type"]
+        updates.get("base_search")
+        and not updates.get("search_type")
         and not kpi_spec.get("base_search_id")
         and not kpi_spec.get("kpi_base_search_id")
     ):
@@ -403,10 +459,14 @@ def _normalize_service(service_spec: dict[str, Any], existing: dict[str, Any] | 
         payload["description"] = service_spec.get("description", "")
     if existing is None or "sec_grp" in service_spec:
         payload["sec_grp"] = service_spec.get("sec_grp", default_team)
-    if "enabled" in service_spec:
-        payload["enabled"] = bool_from_any(service_spec.get("enabled"))
+    if existing is None or "enabled" in service_spec:
+        payload["enabled"] = bool_from_any(
+            service_spec.get("enabled"),
+            default=False,
+            field=f"services[{service_spec['title']}].enabled",
+        )
     if "entity_rules" in service_spec:
-        payload["entity_rules"] = deepcopy(service_spec.get("entity_rules") or [])
+        payload["entity_rules"] = _normalize_entity_rules(service_spec.get("entity_rules"), service_spec["title"])
     if "service_tags" in service_spec:
         payload["service_tags"] = deepcopy(service_spec.get("service_tags") or {})
     existing_kpis = _existing_kpis_by_title(existing or {})
@@ -468,7 +528,20 @@ def _normalize_config_object(
         payload["description"] = object_spec.get("description", "")
     if section.default_sec_grp and (existing is None or "sec_grp" in object_spec):
         payload["sec_grp"] = object_spec.get("sec_grp", default_team)
-    payload = deep_merge(payload, _config_object_overlay(object_spec))
+    if section.section == "service_templates":
+        requested_team = object_spec.get("sec_grp", DEFAULT_TEAM)
+        if requested_team != DEFAULT_TEAM:
+            raise ValidationError(
+                f"Service template '{title}' must use sec_grp={DEFAULT_TEAM}; ITSI service templates are Global objects."
+            )
+        payload["sec_grp"] = DEFAULT_TEAM
+    overlay = _config_object_overlay(object_spec)
+    if section.section == "glass_table_icons":
+        if "width" in overlay and "default_width" not in overlay:
+            overlay["default_width"] = overlay.pop("width")
+        if "height" in overlay and "default_height" not in overlay:
+            overlay["default_height"] = overlay.pop("height")
+    payload = deep_merge(payload, overlay)
     return compact(payload)
 
 
@@ -478,7 +551,15 @@ def _expected_config_object(object_spec: dict[str, Any], section: ConfigObjectSe
         expected["description"] = object_spec.get("description", "")
     if section.default_sec_grp and "sec_grp" in object_spec:
         expected["sec_grp"] = object_spec.get("sec_grp", default_team)
-    expected = deep_merge(expected, _config_object_overlay(object_spec))
+    if section.section == "service_templates":
+        expected["sec_grp"] = DEFAULT_TEAM
+    overlay = _config_object_overlay(object_spec)
+    if section.section == "glass_table_icons":
+        if "width" in overlay and "default_width" not in overlay:
+            overlay["default_width"] = overlay.pop("width")
+        if "height" in overlay and "default_height" not in overlay:
+            overlay["default_height"] = overlay.pop("height")
+    expected = deep_merge(expected, overlay)
     return compact(expected)
 
 
@@ -800,7 +881,9 @@ def _expected_entity(desired: dict[str, Any]) -> dict[str, Any]:
 def _desired_kpi_subset(service_spec: dict[str, Any]) -> list[dict[str, Any]]:
     subset: list[dict[str, Any]] = []
     for kpi_spec in listify(service_spec.get("kpis")):
-        normalized = _normalize_kpi(kpi_spec, service_title=service_spec.get("title"))
+        # Passing an empty existing payload produces only explicitly managed
+        # fields. Creation defaults must not become update-time drift checks.
+        normalized = _normalize_kpi(kpi_spec, existing={}, service_title=service_spec.get("title"))
         normalized.pop("_key", None)
         # ITSI rewrites the runtime search fields after save. base_search is the
         # stable field that preserves the user's SPL for ad hoc KPIs.
@@ -1096,6 +1179,32 @@ class NativeWorkflow:
     def run(self, spec: dict[str, Any], mode: str) -> NativeResult:
         if mode not in {"preview", "apply", "validate", "export", "inventory", "prune-plan", "cleanup-apply"}:
             raise ValidationError(f"Unsupported native mode '{mode}'.")
+        validate_spec(
+            spec,
+            "native",
+            for_apply=mode in {"apply", "cleanup-apply"},
+            allow_empty=mode in {"export", "inventory", "prune-plan"},
+        )
+        if hasattr(self.client, "app_exists") and not self.client.app_exists("SA-ITOA"):
+            raise ValidationError(
+                "Splunk IT Service Intelligence (SA-ITOA) is not installed, enabled, or visible on this target. "
+                "Run splunk-itsi-setup before using splunk-itsi-config."
+            )
+        if mode in {"apply", "cleanup-apply"} and hasattr(self.client, "kvstore_status"):
+            kvstore_status = self.client.kvstore_status()
+            if str(kvstore_status or "").strip().lower() != "ready":
+                raise ValidationError(
+                    f"ITSI writes require KV Store status ready; observed {kvstore_status or 'unknown'}. "
+                    "Repair ITSI platform health before apply."
+                )
+        if mode == "apply" and spec.get("summarization_rules") and hasattr(self.client, "get_app_version"):
+            itsi_version = str(self.client.get_app_version("SA-ITOA") or "").strip()
+            version_match = re.match(r"^(\d+)", itsi_version)
+            if not version_match or int(version_match.group(1)) < 5:
+                raise ValidationError(
+                    "summarization_rules requires ITSI 5.0 or newer and a target-version exported payload; "
+                    f"observed SA-ITOA version {itsi_version or 'unknown'}."
+                )
         if mode == "export":
             return self._export(spec)
         if mode == "inventory":
@@ -1106,6 +1215,19 @@ class NativeWorkflow:
             return self._cleanup_apply(spec)
         if mode == "validate":
             return self._validate(spec)
+        if mode == "apply":
+            preflight = self._upsert(spec, apply=False, mode="preview")
+            if preflight.failed:
+                failures = [
+                    item.get("message") or f"{item.get('object_type')}: {item.get('title')}"
+                    for item in preflight.diagnostics
+                    if item.get("status") == "error"
+                ]
+                failures.extend(
+                    change.detail for change in preflight.changes if change.status == "error"
+                )
+                detail = "; ".join(str(item) for item in failures[:8]) or "preflight reported a failure"
+                raise ValidationError(f"Apply preflight failed before any write: {detail}")
         return self._upsert(spec, apply=(mode == "apply"), mode=mode)
 
     def _list_object_type(
@@ -1291,7 +1413,7 @@ class NativeWorkflow:
                 inventory["kvstore_status"] = self.client.kvstore_status()
             except Exception as exc:  # read-only report should keep going
                 inventory["kvstore_status"] = f"unavailable: {exc}"
-        for section in ALL_CONFIG_SECTIONS:
+        for section in INVENTORY_AND_CLEANUP_SECTIONS:
             try:
                 count_endpoint = None
                 count_error = None
@@ -1552,8 +1674,45 @@ class NativeWorkflow:
                     item = {"status": "unavailable", "message": str(exc)}
                 maintenance_status[object_key] = item
             inventory["maintenance_status"] = maintenance_status
+        unavailable: list[tuple[str, str]] = []
+
+        def collect_unavailable(value: Any, path: str = "inventory") -> None:
+            if isinstance(value, dict):
+                status = str(value.get("status") or "").lower()
+                if status in {"unavailable", "error"}:
+                    unavailable.append((path, str(value.get("message") or status)))
+                for key, child in value.items():
+                    collect_unavailable(child, f"{path}.{key}")
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    collect_unavailable(child, f"{path}[{index}]")
+
+        collect_unavailable(inventory)
+        for path, message in unavailable:
+            fatal = path in {"inventory.objects.entities", "inventory.objects.services"} or any(
+                marker in message.lower()
+                for marker in ("http 401", "http 403", "authentication", "certificate verify", "tls")
+            )
+            result.diagnostics.append(
+                {
+                    "status": "error" if fatal else "warn",
+                    "object_type": "inventory",
+                    "title": path,
+                    "message": message,
+                }
+            )
         result.inventory = inventory
-        result.changes.append(ChangeRecord("inventory", "live ITSI", "read", "ok", "Collected read-only ITSI inventory."))
+        result.changes.append(
+            ChangeRecord(
+                "inventory",
+                "live ITSI",
+                "read",
+                "error" if any(item.get("status") == "error" for item in result.diagnostics) else "ok",
+                "Collected read-only ITSI inventory with fatal gaps."
+                if any(item.get("status") == "error" for item in result.diagnostics)
+                else "Collected read-only ITSI inventory.",
+            )
+        )
         return result
 
     @staticmethod
@@ -1642,7 +1801,7 @@ class NativeWorkflow:
             "unavailable_sections": [],
         }
         desired_by_section: dict[str, set[str]] = {}
-        for section in ALL_CONFIG_SECTIONS:
+        for section in INVENTORY_AND_CLEANUP_SECTIONS:
             desired_by_section[section.section] = {
                 _config_object_title(item, section)
                 for item in listify(spec.get(section.section))

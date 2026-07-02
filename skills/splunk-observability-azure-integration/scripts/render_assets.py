@@ -682,7 +682,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "==> Render Splunk OTel collector for AKS:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm REALM --cluster-name AKS_CLUSTER --distribution aks --cloud-provider azure"
 echo ""
 echo "==> The OTel collector complements (does not replace) the Azure Monitor integration."
 echo "    AKS cluster: microsoft.containerservice/managedclusters metrics via Azure Monitor"

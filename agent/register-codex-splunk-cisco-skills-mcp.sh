@@ -16,8 +16,6 @@ if [[ ! -f "${RUNNER}" ]]; then
     exit 1
 fi
 
-if codex mcp get "${SERVER_NAME}" --json >/dev/null 2>&1; then
-    codex mcp remove "${SERVER_NAME}" >/dev/null
-fi
-
+# `codex mcp add` updates an existing name atomically. Removing first would
+# destroy a working registration if the replacement command fails.
 exec codex mcp add "${SERVER_NAME}" -- python3 "${RUNNER}"

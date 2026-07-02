@@ -212,6 +212,33 @@ def test_fss3_provider_renders_rest_payload_and_aws_readme(tmp_path: Path) -> No
     assert "aws_logs" not in fed
 
 
+def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
+    tmp_path: Path,
+) -> None:
+    spec_path = write_spec(tmp_path, "fss3.json", _fss3_provider_spec(tmp_path))
+    out = tmp_path / "out"
+    result = run_render("--output-dir", str(out), "--spec", str(spec_path))
+    assert result.returncode == 0, result.stderr
+
+    handoff = (out / "federated-search/data-management-federation-handoff.md").read_text()
+    metadata = json.loads((out / "federated-search/metadata.json").read_text())
+    expected = {
+        "amazon_s3_data_management",
+        "microsoft_azure",
+        "azure_databricks",
+        "snowflake",
+        "ddss",
+    }
+    assert expected == {
+        item["key"] for item in metadata["data_management_federation_handoffs"]
+    }
+    for label in ("Microsoft Azure", "Azure Databricks", "Snowflake", "DDSS"):
+        assert f"Federated Search for {label}" in handoff
+    assert "edit_connections" in handoff
+    assert "edit_datasets" in handoff
+    assert "does not support DDSS locations in Azure or GCP" in handoff
+
+
 def test_fss3_payload_omits_kms_when_not_provided(tmp_path: Path) -> None:
     spec = _fss3_provider_spec(tmp_path)
     spec["providers"][0].pop("aws_kms_keys_arn_allowlist")

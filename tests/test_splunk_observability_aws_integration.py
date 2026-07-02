@@ -311,6 +311,32 @@ def test_cfn_stacksets_url_when_use_stack_sets(tmp_path: Path) -> None:
     assert "create-stack-set" in stub
 
 
+def test_streams_rollback_quotes_output_path_without_command_execution(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "command-substitution-ran"
+    hostile_output = f"$(touch {marker})"
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(SETUP),
+            "--rollback",
+            "streams",
+            "--output-dir",
+            hostile_output,
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not marker.exists()
+    assert "\\$\\(" in result.stdout
+
+
 # --- Multi-account ----------------------------------------------------------
 
 

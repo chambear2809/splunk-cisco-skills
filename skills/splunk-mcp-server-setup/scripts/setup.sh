@@ -6,10 +6,37 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 APP_NAME="Splunk_MCP_Server"
-DEFAULT_PACKAGE_FILE="${PROJECT_ROOT}/splunk-ta/splunk-mcp-server_110.tgz"
+PACKAGE_MANIFEST="${SCRIPT_DIR}/../package-manifest.json"
+PACKAGE_METADATA="$(python3 - "${PACKAGE_MANIFEST}" <<'PY'
+import json
+import re
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    manifest = json.load(handle)
+if manifest.get("app_id") != 7931 or manifest.get("app_name") != "Splunk_MCP_Server":
+    raise SystemExit("ERROR: invalid Splunk MCP Server package manifest identity")
+if not re.fullmatch(r"[0-9a-f]{64}", str(manifest.get("sha256", ""))):
+    raise SystemExit("ERROR: invalid Splunk MCP Server package manifest SHA-256")
+approved = manifest.get("production_approved")
+if not isinstance(approved, bool):
+    raise SystemExit("ERROR: package manifest production_approved must be boolean")
+print(
+    manifest["version"],
+    manifest["filename"],
+    manifest["sha256"],
+    str(approved).lower(),
+    manifest.get("review_status", "unknown"),
+    sep="\t",
+)
+PY
+)" || exit 1
+IFS=$'\t' read -r EXPECTED_APP_VERSION DEFAULT_PACKAGE_NAME DEFAULT_PACKAGE_SHA256 PACKAGE_PRODUCTION_APPROVED PACKAGE_REVIEW_STATUS <<< "${PACKAGE_METADATA}"
+DEFAULT_PACKAGE_FILE="${PROJECT_ROOT}/splunk-ta/${DEFAULT_PACKAGE_NAME}"
 DEFAULT_OUTPUT_DIR_NAME="splunk-mcp-rendered"
 
 DO_INSTALL=false
+ACCEPT_NONPRODUCTION_PACKAGE=false
 DO_UNINSTALL=false
 HAS_UNINSTALL_CONFLICT=false
 PACKAGE_FILE="${DEFAULT_PACKAGE_FILE}"
@@ -35,7 +62,7 @@ CONFIGURE_CURSOR=true
 CONFIGURE_CLAUDE=true
 
 TOKEN_USER=""
-TOKEN_EXPIRES_ON="+30d"
+TOKEN_EXPIRES_ON="+12h"
 TOKEN_NOT_BEFORE=""
 WRITE_TOKEN_FILE=""
 BEARER_TOKEN_FILE=""
@@ -69,11 +96,12 @@ Usage: $(basename "$0") [OPTIONS]
 
 Primary actions:
   --install                              Install or update ${APP_NAME} from the repo-local package
+  --accept-nonproduction-package         Permit review-blocked package workflows for isolated evaluation only
   --uninstall                            Uninstall ${APP_NAME} using the shared app uninstaller (standalone)
   --rotate-keys                          Rotate the MCP RSA keys through /mcp_token
   --rotate-key-size 2048|4096            Key size used with --rotate-keys (default: 2048)
   --token-user USER                      Username to mint the encrypted bearer token for
-  --token-expires-on VALUE               Token lifetime expression for /mcp_token (default: +30d)
+  --token-expires-on VALUE               Token lifetime expression for /mcp_token (default: +12h)
   --token-not-before VALUE               Optional not_before value for /mcp_token
   --write-token-file PATH                Write the encrypted bearer token to PATH (0600)
   --bearer-token-file PATH               Existing encrypted bearer token file to use when rendering clients
@@ -100,7 +128,7 @@ Server settings:
   --timeout SECONDS                      mcp.conf [server] timeout
   --max-row-limit N                      mcp.conf [server] max_row_limit
   --default-row-limit N                  mcp.conf [server] default_row_limit
-  --ssl-verify VALUE                     mcp.conf [server] ssl_verify (true|false|none|/path/to/ca.pem)
+  --ssl-verify VALUE                     Store mcp.conf [server] ssl_verify (not enforced by vendor 1.2.1)
   --require-encrypted-token true|false   mcp.conf [server] require_encrypted_token
   --legacy-token-grace-days N            mcp.conf [server] legacy_token_grace_days
   --token-max-lifetime-seconds N         mcp.conf [server] mcp_token_max_lifetime_seconds
@@ -140,8 +168,25 @@ normalize_boolean() {
     esac
 }
 
+validate_uint_option() {
+    local label="$1" value="$2" minimum="$3" maximum="$4"
+    [[ -z "${value}" ]] && return 0
+    if [[ ! "${value}" =~ ^[0-9]+$ ]] || (( 10#${value} < minimum || 10#${value} > maximum )); then
+        log "ERROR: ${label} must be an integer between ${minimum} and ${maximum}; got '${value}'."
+        exit 1
+    fi
+}
+
 shell_quote() {
     printf '%q' "${1:-}"
+}
+
+validate_header_value() {
+    local value="$1" label="$2"
+    if [[ "${value}" == *$'\n'* || "${value}" == *$'\r'* || ${#value} -gt 65536 ]]; then
+        log "ERROR: ${label} contains a forbidden line break or exceeds 65536 characters."
+        exit 1
+    fi
 }
 
 resolve_abs_path() {
@@ -205,36 +250,80 @@ ensure_parent_dir() {
     mkdir -p "$(dirname "$1")"
 }
 
+atomic_write_from_stdin() {
+    local path="$1" mode="$2"
+    ensure_parent_dir "${path}"
+    python3 /dev/fd/3 "${path}" "${mode}" 3<<'PY'
+import os
+import stat
+import sys
+import tempfile
+from pathlib import Path
+
+target = Path(sys.argv[1])
+mode = int(sys.argv[2], 8)
+try:
+    existing = target.lstat()
+except FileNotFoundError:
+    existing = None
+if existing is not None and (stat.S_ISLNK(existing.st_mode) or not stat.S_ISREG(existing.st_mode)):
+    raise SystemExit(f"ERROR: refusing to replace non-regular or symlink target: {target}")
+
+payload = sys.stdin.buffer.read()
+fd, temp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+try:
+    os.fchmod(fd, mode)
+    with os.fdopen(fd, "wb", closefd=True) as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temp_name, target)
+    dir_fd = os.open(target.parent, os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+except BaseException:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    try:
+        os.unlink(temp_name)
+    except OSError:
+        pass
+    raise
+PY
+}
+
 write_text_file() {
     local path="$1" content="$2"
-    ensure_parent_dir "${path}"
-    printf '%s' "${content}" > "${path}"
+    printf '%s' "${content}" | atomic_write_from_stdin "${path}" 644
 }
 
 write_secret_file() {
     local path="$1" content="$2"
-    local previous_umask
-    ensure_parent_dir "${path}"
-    previous_umask="$(umask)"
-    umask 077
-    printf '%s' "${content}" > "${path}"
-    chmod 600 "${path}"
-    umask "${previous_umask}"
+    printf '%s' "${content}" | atomic_write_from_stdin "${path}" 600
 }
 
 assert_secret_source_file() {
-    local path="$1" label="$2" mode
-    [[ -f "${path}" && -r "${path}" && -s "${path}" ]] || { log "ERROR: ${label} must be a readable, non-empty regular file: ${path}"; exit 1; }
+    local path="$1" label="$2" mode owner size
+    [[ ! -L "${path}" && -f "${path}" && -r "${path}" && -s "${path}" ]] || { log "ERROR: ${label} must be a readable, non-empty, non-symlink regular file: ${path}"; exit 1; }
     mode="$(stat -c '%a' "${path}" 2>/dev/null || stat -f '%Lp' "${path}" 2>/dev/null)"
     [[ "${mode}" == "600" ]] || { log "ERROR: ${label} must be chmod 600 (found ${mode:-unknown}): ${path}"; exit 1; }
+    owner="$(stat -c '%u' "${path}" 2>/dev/null || stat -f '%u' "${path}" 2>/dev/null)"
+    [[ "${owner}" == "$(id -u)" ]] || { log "ERROR: ${label} must be owned by the current user: ${path}"; exit 1; }
+    size="$(stat -c '%s' "${path}" 2>/dev/null || stat -f '%z' "${path}" 2>/dev/null)"
+    if [[ ! "${size}" =~ ^[0-9]+$ ]] || (( 10#${size} > 65536 )); then
+        log "ERROR: ${label} size is unknown or exceeds the 65536-byte limit: ${path}"
+        exit 1
+    fi
 }
 
 copy_file_with_mode() {
     local source_path="$1" dest_path="$2" mode="$3"
-
-    ensure_parent_dir "${dest_path}"
-    cp "${source_path}" "${dest_path}"
-    chmod "${mode}" "${dest_path}"
+    [[ ! -L "${source_path}" && -f "${source_path}" ]] || { log "ERROR: Refusing unsafe copy source: ${source_path}"; exit 1; }
+    atomic_write_from_stdin "${dest_path}" "${mode}" < "${source_path}"
 }
 
 derive_mcp_url() {
@@ -245,11 +334,13 @@ import sys
 uri = (sys.argv[1] or "").strip()
 if not uri:
     raise SystemExit(1)
+if "://" not in uri:
+    uri = "https://" + uri
 
 parts = urlsplit(uri)
-scheme = parts.scheme or "https"
-netloc = parts.netloc or parts.path
-if not netloc:
+scheme = parts.scheme.lower()
+netloc = parts.netloc
+if scheme not in {"http", "https"} or not netloc or parts.username or parts.password:
     raise SystemExit(1)
 
 print(f"{scheme}://{netloc}/services/mcp", end="")
@@ -264,6 +355,34 @@ normalize_gateway_mode() {
             exit 1
             ;;
     esac
+}
+
+validate_client_url() {
+    local url="$1" allow_loopback_http="$2" insecure_tls="$3"
+    python3 - "${url}" "${allow_loopback_http}" "${insecure_tls}" <<'PY'
+import ipaddress
+import sys
+from urllib.parse import urlsplit
+
+url, allow_loopback_http, insecure_tls = sys.argv[1:]
+parts = urlsplit(url)
+if any(ord(ch) < 32 or ord(ch) == 127 for ch in url):
+    raise SystemExit("ERROR: MCP URL contains control characters")
+if not parts.hostname or parts.username or parts.password or parts.fragment:
+    raise SystemExit("ERROR: MCP URL must include a host and must not contain userinfo")
+
+host = parts.hostname.lower()
+loopback = host == "localhost"
+try:
+    loopback = loopback or ipaddress.ip_address(host).is_loopback
+except ValueError:
+    pass
+
+if parts.scheme != "https" and not (parts.scheme == "http" and loopback and allow_loopback_http == "true"):
+    raise SystemExit("ERROR: MCP URL must use HTTPS (HTTP is allowed only for an explicit loopback target)")
+if insecure_tls == "true" and not loopback:
+    raise SystemExit("ERROR: --client-insecure-tls is restricted to loopback targets; install a trusted CA for remote endpoints")
+PY
 }
 
 normalize_o11y_realm() {
@@ -376,13 +495,108 @@ ensure_app_installed() {
     fi
 }
 
-install_or_update_app() {
-    local update_flag="--no-update"
+ensure_expected_installed_app_version() {
+    local installed_version expected_mcp_url
+    [[ -n "${SK}" ]] || ensure_session
+    ensure_app_installed
+    installed_version="$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+    if [[ "${installed_version}" != "${EXPECTED_APP_VERSION}" ]]; then
+        log "ERROR: Installed ${APP_NAME} version ${installed_version:-unknown} does not match the reviewed version ${EXPECTED_APP_VERSION}."
+        log "       Install the reviewed package first, or use --accept-nonproduction-package only for isolated evaluation."
+        exit 1
+    fi
 
-    if [[ ! -f "${PACKAGE_FILE}" ]]; then
+    if [[ "${RENDER_CLIENTS}" == "true" && "${GATEWAY_MODE}" == "platform" && -n "${MCP_URL}" ]]; then
+        expected_mcp_url="$(derive_mcp_url "${SPLUNK_URI}")" || {
+            log "ERROR: Could not derive the reviewed MCP endpoint from ${SPLUNK_URI}."
+            exit 1
+        }
+        python3 - "${MCP_URL}" "${expected_mcp_url}" <<'PY' || {
+from urllib.parse import urlsplit
+import sys
+
+def endpoint(value):
+    parts = urlsplit(value)
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    return (
+        parts.scheme.lower(),
+        (parts.hostname or "").lower(),
+        port,
+        parts.path.rstrip("/"),
+        parts.query,
+    )
+
+if endpoint(sys.argv[1]) != endpoint(sys.argv[2]):
+    raise SystemExit(1)
+PY
+            log "ERROR: --mcp-url does not identify the same reviewed Splunk endpoint as SPLUNK_URI."
+            log "       Use matching Splunk credentials or --accept-nonproduction-package only for isolated evaluation."
+            exit 1
+        }
+    fi
+}
+
+install_or_update_app() {
+    local update_flag="--no-update" actual_sha package_version
+
+    if [[ -L "${PACKAGE_FILE}" || ! -f "${PACKAGE_FILE}" ]]; then
         log "ERROR: Package file not found: ${PACKAGE_FILE}"
         exit 1
     fi
+
+    if [[ "${PACKAGE_PRODUCTION_APPROVED}" != "true" ]]; then
+        if [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
+            log "ERROR: ${APP_NAME} ${EXPECTED_APP_VERSION} is not production-approved by this repository review."
+            log "       review_status=${PACKAGE_REVIEW_STATUS}"
+            log "       Wait for a reviewed vendor fix. For isolated evaluation only, pass --accept-nonproduction-package."
+            exit 1
+        fi
+    fi
+
+    actual_sha="$(python3 - "${PACKAGE_FILE}" <<'PY'
+import hashlib
+import sys
+
+digest = hashlib.sha256()
+with open(sys.argv[1], "rb") as handle:
+    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        digest.update(chunk)
+print(digest.hexdigest(), end="")
+PY
+)"
+    if [[ "${actual_sha}" != "${DEFAULT_PACKAGE_SHA256}" ]]; then
+        log "ERROR: Package checksum mismatch for ${PACKAGE_FILE}."
+        log "       expected=${DEFAULT_PACKAGE_SHA256}"
+        log "       actual=${actual_sha}"
+        exit 1
+    fi
+    package_version="$(python3 - "${PACKAGE_FILE}" <<'PY'
+import configparser
+import io
+import sys
+import tarfile
+
+with tarfile.open(sys.argv[1], "r:*") as archive:
+    member = archive.getmember("Splunk_MCP_Server/default/app.conf")
+    handle = archive.extractfile(member)
+    if handle is None:
+        raise SystemExit("ERROR: package does not contain default/app.conf")
+    parser = configparser.ConfigParser()
+    parser.read_file(io.TextIOWrapper(handle, encoding="utf-8"))
+id_version = parser.get("id", "version")
+launcher_version = parser.get("launcher", "version")
+if id_version != launcher_version:
+    raise SystemExit(
+        f"ERROR: package version metadata disagrees: id={id_version}, launcher={launcher_version}"
+    )
+print(launcher_version, end="")
+PY
+)" || exit 1
+    if [[ "${package_version}" != "${EXPECTED_APP_VERSION}" ]]; then
+        log "ERROR: Expected ${APP_NAME} ${EXPECTED_APP_VERSION}, found ${package_version:-unknown}."
+        exit 1
+    fi
+    log "Verified ${APP_NAME} ${package_version} package (sha256=${actual_sha})."
 
     ensure_session
     if rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
@@ -639,6 +853,7 @@ render_client_bundle() {
     fi
 
     token_source=""
+    o11y_realm=""
     o11y_token_source=""
     splunk_jwt_source=""
     has_secret_source=false
@@ -708,6 +923,10 @@ render_client_bundle() {
             ;;
     esac
 
+    [[ -z "${o11y_realm}" ]] || validate_header_value "${o11y_realm}" "Observability realm"
+    [[ -z "${SPLUNK_TENANT}" ]] || validate_header_value "${SPLUNK_TENANT}" "Splunk tenant"
+    validate_client_url "${mcp_url}" "true" "${CLIENT_INSECURE_TLS}" || exit 1
+
     if [[ -n "${token_source}" || -n "${o11y_token_source}" || -n "${splunk_jwt_source}" ]]; then
         has_secret_source=true
     fi
@@ -747,33 +966,121 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env.splunk-mcp"
 
-_PRE_SPLUNK_MCP_URL="${SPLUNK_MCP_URL-}"
-_PRE_SPLUNK_MCP_GATEWAY_MODE="${SPLUNK_MCP_GATEWAY_MODE-}"
-_PRE_SPLUNK_MCP_INSECURE_TLS="${SPLUNK_MCP_INSECURE_TLS-}"
-_PRE_SPLUNK_MCP_TOKEN="${SPLUNK_MCP_TOKEN-}"
-_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION="${SPLUNK_MCP_HEADER_AUTHORIZATION-}"
-_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT="${SPLUNK_MCP_HEADER_SPLUNK_TENANT-}"
-_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN="${SPLUNK_MCP_HEADER_X_SF_TOKEN-}"
-_PRE_SPLUNK_MCP_HEADER_X_SF_REALM="${SPLUNK_MCP_HEADER_X_SF_REALM-}"
+if [[ -f "${ENV_FILE}" ]]; then
+  while IFS= read -r -d '' env_key && IFS= read -r -d '' env_value; do
+    case "${env_key}" in
+      SPLUNK_MCP_URL|SPLUNK_MCP_GATEWAY_MODE|SPLUNK_MCP_INSECURE_TLS|SPLUNK_MCP_TOKEN|SPLUNK_MCP_HEADER_AUTHORIZATION|SPLUNK_MCP_HEADER_SPLUNK_TENANT|SPLUNK_MCP_HEADER_X_SF_TOKEN|SPLUNK_MCP_HEADER_X_SF_REALM) ;;
+      __SPLUNK_MCP_ENV_ERROR__)
+        echo "splunk-mcp: invalid ${ENV_FILE}: ${env_value}" >&2
+        exit 1
+        ;;
+      *)
+        echo "splunk-mcp: unsupported key in ${ENV_FILE}: ${env_key}" >&2
+        exit 1
+        ;;
+    esac
+    if [[ -z "${!env_key+x}" ]]; then
+      printf -v "${env_key}" '%s' "${env_value}"
+      export "${env_key}"
+    fi
+  done < <(node - "${ENV_FILE}" <<'ENVNODE'
+const fs = require("fs");
 
-set -a
-# shellcheck source=/dev/null
-[[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
-set +a
+function emit(key, value) {
+  process.stdout.write(key + "\0" + value + "\0");
+}
 
-[[ -n "${_PRE_SPLUNK_MCP_URL}" ]] && SPLUNK_MCP_URL="${_PRE_SPLUNK_MCP_URL}"
-[[ -n "${_PRE_SPLUNK_MCP_GATEWAY_MODE}" ]] && SPLUNK_MCP_GATEWAY_MODE="${_PRE_SPLUNK_MCP_GATEWAY_MODE}"
-[[ -n "${_PRE_SPLUNK_MCP_INSECURE_TLS}" ]] && SPLUNK_MCP_INSECURE_TLS="${_PRE_SPLUNK_MCP_INSECURE_TLS}"
-[[ -n "${_PRE_SPLUNK_MCP_TOKEN}" ]] && SPLUNK_MCP_TOKEN="${_PRE_SPLUNK_MCP_TOKEN}"
-[[ -n "${_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION}" ]] && SPLUNK_MCP_HEADER_AUTHORIZATION="${_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION}"
-[[ -n "${_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT}" ]] && SPLUNK_MCP_HEADER_SPLUNK_TENANT="${_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT}"
-[[ -n "${_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN}" ]] && SPLUNK_MCP_HEADER_X_SF_TOKEN="${_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN}"
-[[ -n "${_PRE_SPLUNK_MCP_HEADER_X_SF_REALM}" ]] && SPLUNK_MCP_HEADER_X_SF_REALM="${_PRE_SPLUNK_MCP_HEADER_X_SF_REALM}"
+function parseShellWord(value) {
+  let result = "";
+  let state = "normal";
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (state === "single") {
+      if (ch === "'") state = "normal";
+      else result += ch;
+      continue;
+    }
+    if (state === "double") {
+      if (ch === '"') state = "normal";
+      else if (ch === "\\") {
+        i += 1;
+        if (i < value.length) result += value[i];
+      } else result += ch;
+      continue;
+    }
+    if (state === "ansi") {
+      if (ch === "'") state = "normal";
+      else if (ch === "\\") {
+        i += 1;
+        const next = value[i];
+        if (next === "n") result += "\n";
+        else if (next === "r") result += "\r";
+        else if (next === "t") result += "\t";
+        else if (next !== undefined) result += next;
+      } else result += ch;
+      continue;
+    }
+    if (ch === "'") state = "single";
+    else if (ch === '"') state = "double";
+    else if (ch === "$" && value[i + 1] === "'") { state = "ansi"; i += 1; }
+    else if (ch === "\\") { i += 1; if (i < value.length) result += value[i]; }
+    else result += ch;
+  }
+  if (state !== "normal") throw new Error("unterminated quoted value");
+  return result;
+}
+
+try {
+  const lines = fs.readFileSync(process.argv[2], "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 1) throw new Error("expected KEY=VALUE");
+    emit(trimmed.slice(0, eq).trim(), parseShellWord(trimmed.slice(eq + 1).trim()));
+  }
+} catch (error) {
+  emit("__SPLUNK_MCP_ENV_ERROR__", error.message);
+}
+ENVNODE
+  )
+fi
 
 if [[ -z "${SPLUNK_MCP_URL:-}" ]]; then
   echo "splunk-mcp: set SPLUNK_MCP_URL in ${ENV_FILE}" >&2
   exit 1
 fi
+
+node - "${SPLUNK_MCP_URL}" "${SPLUNK_MCP_INSECURE_TLS:-}" <<'NODE'
+const raw = process.argv[2];
+const insecure = process.argv[3] === "1";
+const net = require("net");
+let parsed;
+if (/[\u0000-\u001F\u007F]/.test(raw)) {
+  process.stderr.write("splunk-mcp: SPLUNK_MCP_URL contains control characters\n");
+  process.exit(1);
+}
+try { parsed = new URL(raw); } catch (_) {
+  process.stderr.write("splunk-mcp: SPLUNK_MCP_URL must be an absolute HTTPS URL\n");
+  process.exit(1);
+}
+const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+const loopback = host === "localhost" ||
+  (net.isIP(host) === 4 && host.startsWith("127.")) ||
+  host === "::1" || host === "0:0:0:0:0:0:0:1";
+if (parsed.username || parsed.password || !parsed.hostname || parsed.hash) {
+  process.stderr.write("splunk-mcp: SPLUNK_MCP_URL must include a host and must not contain userinfo\n");
+  process.exit(1);
+}
+if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback)) {
+  process.stderr.write("splunk-mcp: SPLUNK_MCP_URL must use HTTPS; HTTP is allowed only for loopback\n");
+  process.exit(1);
+}
+if (insecure && !loopback) {
+  process.stderr.write("splunk-mcp: SPLUNK_MCP_INSECURE_TLS=1 is restricted to loopback\n");
+  process.exit(1);
+}
+NODE
 
 SPLUNK_MCP_GATEWAY_MODE="${SPLUNK_MCP_GATEWAY_MODE:-platform}"
 case "${SPLUNK_MCP_GATEWAY_MODE}" in
@@ -809,12 +1116,56 @@ case "${SPLUNK_MCP_GATEWAY_MODE}" in
     ;;
 esac
 
+for header_name in SPLUNK_MCP_TOKEN SPLUNK_MCP_HEADER_AUTHORIZATION SPLUNK_MCP_HEADER_SPLUNK_TENANT SPLUNK_MCP_HEADER_X_SF_TOKEN SPLUNK_MCP_HEADER_X_SF_REALM; do
+  header_value="${!header_name-}"
+  if [[ "${header_value}" == *$'\n'* || "${header_value}" == *$'\r'* || ${#header_value} -gt 65536 ]]; then
+    echo "splunk-mcp: ${header_name} contains a forbidden line break or exceeds 65536 characters" >&2
+    exit 1
+  fi
+done
+
 if [[ "${SPLUNK_MCP_INSECURE_TLS:-}" == "1" ]]; then
   export NODE_TLS_REJECT_UNAUTHORIZED=0
 fi
 
 if ! command -v mcp-remote >/dev/null 2>&1; then
-  echo "splunk-mcp: install mcp-remote (for example: npm install -g mcp-remote)" >&2
+  echo "splunk-mcp: install the vetted bridge: npm install -g mcp-remote@0.1.38" >&2
+  exit 1
+fi
+
+if ! node - "$(command -v mcp-remote)" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
+let current = path.dirname(fs.realpathSync(process.argv[2]));
+let metadata = null;
+while (true) {
+  const candidate = path.join(current, "package.json");
+  if (fs.existsSync(candidate)) {
+    try {
+      const value = JSON.parse(fs.readFileSync(candidate, "utf8"));
+      if (value.name === "mcp-remote") { metadata = value; break; }
+    } catch (_) {}
+  }
+  const parent = path.dirname(current);
+  if (parent === current) break;
+  current = parent;
+}
+if (!metadata && process.platform === "win32") {
+  try {
+    const npmRoot = execFileSync("npm.cmd", ["root", "-g"], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const expectedShimDir = path.dirname(npmRoot).toLowerCase();
+    if (path.dirname(path.resolve(process.argv[2])).toLowerCase() === expectedShimDir) {
+      metadata = JSON.parse(fs.readFileSync(path.join(npmRoot, "mcp-remote", "package.json"), "utf8"));
+    }
+  } catch (_) {}
+}
+if (!metadata || metadata.name !== "mcp-remote" || metadata.version !== "0.1.38") process.exit(1);
+NODE
+then
+  echo "splunk-mcp: mcp-remote 0.1.38 is required; install it with: npm install -g mcp-remote@0.1.38" >&2
   exit 1
 fi
 
@@ -851,14 +1202,25 @@ EOF
 
 // Cross-platform MCP bridge for Splunk MCP Server.
 // Works on macOS, Linux, and Windows (Git Bash, native cmd/PowerShell).
-// Requires: node (comes with mcp-remote) and npx mcp-remote.
+// Requires: Node.js and a preinstalled, operator-vetted mcp-remote 0.1.38.
 
 const fs = require("fs");
+const net = require("net");
 const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 
 const scriptDir = __dirname;
 const envFile = path.join(scriptDir, ".env.splunk-mcp");
+const allowedEnvKeys = new Set([
+  "SPLUNK_MCP_URL",
+  "SPLUNK_MCP_GATEWAY_MODE",
+  "SPLUNK_MCP_INSECURE_TLS",
+  "SPLUNK_MCP_TOKEN",
+  "SPLUNK_MCP_HEADER_AUTHORIZATION",
+  "SPLUNK_MCP_HEADER_SPLUNK_TENANT",
+  "SPLUNK_MCP_HEADER_X_SF_TOKEN",
+  "SPLUNK_MCP_HEADER_X_SF_REALM",
+]);
 
 // Load .env.splunk-mcp if present (KEY=VALUE lines, no export, no quoting needed).
 function parseShellWord(value) {
@@ -914,6 +1276,7 @@ function parseShellWord(value) {
       result += ch;
     }
   }
+  if (state !== "normal") throw new Error("unterminated quoted value");
   return result;
 }
 
@@ -926,7 +1289,17 @@ function loadEnvFile(filePath) {
     const eq = trimmed.indexOf("=");
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    const val = parseShellWord(trimmed.slice(eq + 1).trim());
+    if (!allowedEnvKeys.has(key)) {
+      process.stderr.write("splunk-mcp: unsupported key in " + filePath + ": " + key + "\n");
+      process.exit(1);
+    }
+    let val;
+    try {
+      val = parseShellWord(trimmed.slice(eq + 1).trim());
+    } catch (error) {
+      process.stderr.write("splunk-mcp: invalid value in " + filePath + " for " + key + ": " + error.message + "\n");
+      process.exit(1);
+    }
     // Pre-existing env vars take precedence.
     if (!(key in process.env)) {
       process.env[key] = val;
@@ -951,6 +1324,46 @@ function hasEnv(name) {
 function fail(message) {
   process.stderr.write("splunk-mcp: " + message + "\n");
   process.exit(1);
+}
+
+function validateRuntimeUrl(rawUrl) {
+  let parsed;
+  if (/[\u0000-\u001F\u007F]/.test(rawUrl)) {
+    fail("SPLUNK_MCP_URL contains control characters");
+  }
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_) {
+    fail("SPLUNK_MCP_URL must be an absolute HTTPS URL");
+  }
+  if (parsed.username || parsed.password || !parsed.hostname || parsed.hash) {
+    fail("SPLUNK_MCP_URL must include a host and must not contain userinfo");
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const loopback = host === "localhost" ||
+    (net.isIP(host) === 4 && host.startsWith("127.")) ||
+    host === "::1" || host === "0:0:0:0:0:0:0:1";
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback)) {
+    fail("SPLUNK_MCP_URL must use HTTPS; HTTP is allowed only for loopback");
+  }
+  if (process.env.SPLUNK_MCP_INSECURE_TLS === "1" && !loopback) {
+    fail("SPLUNK_MCP_INSECURE_TLS=1 is restricted to loopback; configure a trusted CA for remote endpoints");
+  }
+}
+
+validateRuntimeUrl(mcpUrl);
+
+for (const name of [
+  "SPLUNK_MCP_TOKEN",
+  "SPLUNK_MCP_HEADER_AUTHORIZATION",
+  "SPLUNK_MCP_HEADER_SPLUNK_TENANT",
+  "SPLUNK_MCP_HEADER_X_SF_TOKEN",
+  "SPLUNK_MCP_HEADER_X_SF_REALM",
+]) {
+  const value = process.env[name];
+  if (value && (/\r|\n/.test(value) || value.length > 65536)) {
+    fail(name + " contains a forbidden line break or exceeds 65536 characters");
+  }
 }
 
 if (!["platform", "o11y", "combined"].includes(gatewayMode)) {
@@ -978,7 +1391,8 @@ if (process.env.SPLUNK_MCP_INSECURE_TLS === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-// Resolve mcp-remote: prefer global install, fall back to npx.
+// Resolve a preinstalled, operator-vetted mcp-remote. Never download and
+// execute a mutable npm package during MCP startup.
 function findMcpRemote() {
   try {
     // On Windows `where`, on Unix `which` -- execFileSync with a
@@ -992,11 +1406,45 @@ function findMcpRemote() {
   } catch (_) {
     // not found on PATH
   }
-  // Fall back to npx (always available if Node.js is installed).
-  return { cmd: process.platform === "win32" ? "npx.cmd" : "npx", args: ["mcp-remote"] };
+  fail("mcp-remote not found on PATH; install the vetted version with: npm install -g mcp-remote@0.1.38");
+}
+
+function readPackageMetadata(filePath) {
+  let current = path.dirname(fs.realpathSync(filePath));
+  while (true) {
+    const candidate = path.join(current, "package.json");
+    if (fs.existsSync(candidate)) {
+      try {
+        const metadata = JSON.parse(fs.readFileSync(candidate, "utf8"));
+        if (metadata.name === "mcp-remote") return metadata;
+      } catch (_) {
+        // Keep walking; a parent package.json may be the package root.
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  if (process.platform !== "win32") return null;
+  try {
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+    const npmRoot = execFileSync(npmCommand, ["root", "-g"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const expectedShimDir = path.dirname(npmRoot).toLowerCase();
+    if (path.dirname(path.resolve(filePath)).toLowerCase() !== expectedShimDir) return null;
+    return JSON.parse(fs.readFileSync(path.join(npmRoot, "mcp-remote", "package.json"), "utf8"));
+  } catch (_) {
+    return null;
+  }
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
+const mcpRemotePackage = readPackageMetadata(cmd);
+if (!mcpRemotePackage || mcpRemotePackage.name !== "mcp-remote" || mcpRemotePackage.version !== "0.1.38") {
+  fail("mcp-remote 0.1.38 is required; install it with: npm install -g mcp-remote@0.1.38");
+}
 // Pass literal placeholders so mcp-remote performs ${VAR} substitution
 // at runtime against the inherited env. This keeps secret header values out
 // of argv (visible to process listings).
@@ -1032,7 +1480,7 @@ const child = spawn(
 child.on("error", function(err) {
   process.stderr.write(
     "splunk-mcp: failed to start mcp-remote: " + err.message + "\n" +
-    "  Install it with: npm install -g mcp-remote\n"
+    "  Install it with: npm install -g mcp-remote@0.1.38\n"
   );
   process.exit(1);
 });
@@ -1135,7 +1583,7 @@ EOF
     write_text_file "${OUTPUT_DIR}/.cursor/mcp.json" "${cursor_json}"
     write_text_file "${OUTPUT_DIR}/run-splunk-mcp.sh" "${wrapper_script}"
     chmod 755 "${OUTPUT_DIR}/run-splunk-mcp.sh"
-    write_text_file "${OUTPUT_DIR}/run-splunk-mcp.js" "${js_wrapper_script}"
+    write_text_file "${OUTPUT_DIR}/run-splunk-mcp.js" "${js_wrapper_script}"$'\n'
     chmod 755 "${OUTPUT_DIR}/run-splunk-mcp.js"
     write_text_file "${OUTPUT_DIR}/register-codex-mcp.sh" "${codex_script}"
     chmod 755 "${OUTPUT_DIR}/register-codex-mcp.sh"
@@ -1145,6 +1593,7 @@ EOF
         platform)
             if [[ -n "${token_source}" ]]; then
                 token_value="$(read_secret_file "${token_source}")" || exit 1
+                validate_header_value "${token_value}" "Bearer token"
                 token_value_quoted="$(shell_quote "${token_value}")"
                 env_live="$(cat <<EOF
 SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
@@ -1156,6 +1605,7 @@ EOF
             ;;
         o11y)
             o11y_token_value="$(read_secret_file "${o11y_token_source}")" || exit 1
+            validate_header_value "${o11y_token_value}" "Observability token"
             o11y_token_value_quoted="$(shell_quote "${o11y_token_value}")"
             o11y_realm_quoted="$(shell_quote "${o11y_realm}")"
             env_live="$(cat <<EOF
@@ -1169,6 +1619,8 @@ EOF
         combined)
             o11y_token_value="$(read_secret_file "${o11y_token_source}")" || exit 1
             splunk_jwt_value="$(read_secret_file "${splunk_jwt_source}")" || exit 1
+            validate_header_value "${o11y_token_value}" "Observability token"
+            validate_header_value "${splunk_jwt_value}" "Splunk authorization token"
             splunk_auth_header="Bearer ${splunk_jwt_value}"
             splunk_auth_header_quoted="$(shell_quote "${splunk_auth_header}")"
             splunk_tenant_quoted="$(shell_quote "${SPLUNK_TENANT}")"
@@ -1191,6 +1643,9 @@ EOF
             env_live="${env_live}"$'\n''SPLUNK_MCP_INSECURE_TLS=1'
         fi
         write_secret_file "${OUTPUT_DIR}/.env.splunk-mcp" "${env_live}"
+    elif [[ -e "${OUTPUT_DIR}/.env.splunk-mcp" || -L "${OUTPUT_DIR}/.env.splunk-mcp" ]]; then
+        rm -f -- "${OUTPUT_DIR}/.env.splunk-mcp"
+        log "Removed stale live client environment because no credential source was supplied."
     fi
 
     log "Rendered shared Cursor/Codex/Claude Code MCP bridge bundle at ${output_abs}."
@@ -1309,6 +1764,8 @@ register_codex_client() {
 
     if [[ -f "${source_dir}/.env.splunk-mcp" ]]; then
         copy_file_with_mode "${source_dir}/.env.splunk-mcp" "${stable_env}" 600
+    elif [[ -e "${stable_env}" || -L "${stable_env}" ]]; then
+        rm -f -- "${stable_env}"
     fi
     if [[ -f "${source_dir}/.env.splunk-mcp.example" ]]; then
         copy_file_with_mode "${source_dir}/.env.splunk-mcp.example" "${stable_env_example}" 644
@@ -1357,7 +1814,7 @@ apply_client_setup() {
     fi
 
     if ! command -v mcp-remote >/dev/null 2>&1; then
-        log "WARNING: mcp-remote not found on PATH. Install it with: npm install -g mcp-remote"
+        log "WARNING: mcp-remote not found on PATH. Install the vetted version with: npm install -g mcp-remote@0.1.38"
         log "         The rendered bridge requires mcp-remote at runtime."
     fi
     wrapper_abs="$(resolve_abs_path "${OUTPUT_DIR}/run-splunk-mcp.sh")"
@@ -1389,6 +1846,7 @@ apply_client_setup() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install) DO_INSTALL=true; shift ;;
+        --accept-nonproduction-package) HAS_UNINSTALL_CONFLICT=true; ACCEPT_NONPRODUCTION_PACKAGE=true; shift ;;
         --uninstall) DO_UNINSTALL=true; shift ;;
         --package-file) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; PACKAGE_FILE="$2"; shift 2 ;;
         --rotate-keys) HAS_UNINSTALL_CONFLICT=true; ROTATE_KEYS=true; shift ;;
@@ -1455,6 +1913,51 @@ if [[ "${DO_UNINSTALL}" == "true" && "${HAS_UNINSTALL_CONFLICT}" == "true" ]]; t
     exit 1
 fi
 
+# A deliberately accepted evaluation install should still avoid the vendor's
+# permissive token and admission defaults. Explicit CLI values win.
+if [[ "${DO_INSTALL}" == "true" ]]; then
+    TIMEOUT="${TIMEOUT:-90}"
+    MAX_ROW_LIMIT="${MAX_ROW_LIMIT:-2000}"
+    DEFAULT_ROW_LIMIT="${DEFAULT_ROW_LIMIT:-250}"
+    SSL_VERIFY="${SSL_VERIFY:-true}"
+    REQUIRE_ENCRYPTED_TOKEN="${REQUIRE_ENCRYPTED_TOKEN:-true}"
+    LEGACY_TOKEN_GRACE_DAYS="${LEGACY_TOKEN_GRACE_DAYS:-0}"
+    TOKEN_DEFAULT_LIFETIME_SECONDS="${TOKEN_DEFAULT_LIFETIME_SECONDS:-43200}"
+    TOKEN_MAX_LIFETIME_SECONDS="${TOKEN_MAX_LIFETIME_SECONDS:-86400}"
+    TOKEN_KEY_RELOAD_INTERVAL_SECONDS="${TOKEN_KEY_RELOAD_INTERVAL_SECONDS:-300}"
+    GLOBAL_RATE_LIMIT="${GLOBAL_RATE_LIMIT:-600}"
+    ADMISSION_GLOBAL="${ADMISSION_GLOBAL:-60}"
+    TENANT_AUTHENTICATED="${TENANT_AUTHENTICATED:-240}"
+    TENANT_UNAUTHENTICATED="${TENANT_UNAUTHENTICATED:-10}"
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD="${CIRCUIT_BREAKER_FAILURE_THRESHOLD:-5}"
+    CIRCUIT_BREAKER_COOLDOWN_SECONDS="${CIRCUIT_BREAKER_COOLDOWN_SECONDS:-60}"
+fi
+
+validate_uint_option "--timeout" "${TIMEOUT}" 1 3600
+validate_uint_option "--max-row-limit" "${MAX_ROW_LIMIT}" 1 100000
+validate_uint_option "--default-row-limit" "${DEFAULT_ROW_LIMIT}" 1 100000
+validate_uint_option "--legacy-token-grace-days" "${LEGACY_TOKEN_GRACE_DAYS}" 0 365
+validate_uint_option "--token-default-lifetime-seconds" "${TOKEN_DEFAULT_LIFETIME_SECONDS}" 1 31536000
+validate_uint_option "--token-max-lifetime-seconds" "${TOKEN_MAX_LIFETIME_SECONDS}" 1 31536000
+validate_uint_option "--token-key-reload-interval-seconds" "${TOKEN_KEY_RELOAD_INTERVAL_SECONDS}" 1 86400
+validate_uint_option "--global-rate-limit" "${GLOBAL_RATE_LIMIT}" 0 1000000
+validate_uint_option "--admission-global" "${ADMISSION_GLOBAL}" 0 1000000
+validate_uint_option "--tenant-authenticated" "${TENANT_AUTHENTICATED}" 0 1000000
+validate_uint_option "--tenant-unauthenticated" "${TENANT_UNAUTHENTICATED}" 0 1000000
+validate_uint_option "--circuit-breaker-failure-threshold" "${CIRCUIT_BREAKER_FAILURE_THRESHOLD}" 1 1000000
+validate_uint_option "--circuit-breaker-cooldown-seconds" "${CIRCUIT_BREAKER_COOLDOWN_SECONDS}" 1 86400
+
+if [[ -n "${DEFAULT_ROW_LIMIT}" && -n "${MAX_ROW_LIMIT}" ]] \
+   && (( 10#${DEFAULT_ROW_LIMIT} > 10#${MAX_ROW_LIMIT} )); then
+    log "ERROR: --default-row-limit cannot exceed --max-row-limit."
+    exit 1
+fi
+if [[ -n "${TOKEN_DEFAULT_LIFETIME_SECONDS}" && -n "${TOKEN_MAX_LIFETIME_SECONDS}" ]] \
+   && (( 10#${TOKEN_DEFAULT_LIFETIME_SECONDS} > 10#${TOKEN_MAX_LIFETIME_SECONDS} )); then
+    log "ERROR: --token-default-lifetime-seconds cannot exceed --token-max-lifetime-seconds."
+    exit 1
+fi
+
 if [[ "${REQUIRE_ENCRYPTED_TOKEN}" == "false" && ( "${ROTATE_KEYS}" == "true" || -n "${WRITE_TOKEN_FILE}" ) ]]; then
     log "ERROR: /mcp_token minting and key rotation require require_encrypted_token=true."
     log "       Split this into separate runs or keep encrypted tokens enabled."
@@ -1486,8 +1989,41 @@ if [[ "${DO_INSTALL}" == "true" \
     LIVE_SPLUNK_ACTIONS=true
 fi
 
-if [[ "${LIVE_SPLUNK_ACTIONS}" == "false" && "${RENDER_CLIENTS}" != "true" ]]; then
+if [[ "${LIVE_SPLUNK_ACTIONS}" == "false" \
+   && "${RENDER_CLIENTS}" != "true" \
+   && "${DO_UNINSTALL}" != "true" ]]; then
     LIVE_SPLUNK_ACTIONS=true
+fi
+
+VENDOR_PACKAGE_ACTION=false
+if [[ "${DO_UNINSTALL}" != "true" \
+   && ( "${LIVE_SPLUNK_ACTIONS}" == "true" \
+        || ( "${RENDER_CLIENTS}" == "true" \
+             && "${GATEWAY_MODE}" == "platform" \
+             && ( "${REGISTER_CODEX}" == "true" \
+                  || "${CONFIGURE_CURSOR}" == "true" \
+                  || "${CONFIGURE_CLAUDE}" == "true" ) ) ) ]]; then
+    VENDOR_PACKAGE_ACTION=true
+fi
+
+if [[ "${VENDOR_PACKAGE_ACTION}" == "true" && "${PACKAGE_PRODUCTION_APPROVED}" != "true" ]]; then
+    if [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
+        log "ERROR: ${APP_NAME} ${EXPECTED_APP_VERSION} workflows are blocked by this repository's production review."
+        log "       review_status=${PACKAGE_REVIEW_STATUS}"
+        log "       Wait for a reviewed vendor fix. For isolated evaluation only, pass --accept-nonproduction-package."
+        exit 1
+    fi
+    log "WARNING: Continuing a non-production-approved vendor workflow for isolated evaluation only."
+elif [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" == "true" && "${VENDOR_PACKAGE_ACTION}" != "true" ]]; then
+    log "ERROR: --accept-nonproduction-package is valid only for local Splunk Platform package workflows."
+    exit 1
+fi
+
+if [[ "${VENDOR_PACKAGE_ACTION}" == "true" \
+   && "${PACKAGE_PRODUCTION_APPROVED}" == "true" \
+   && "${DO_INSTALL}" != "true" \
+   && "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
+    ensure_expected_installed_app_version
 fi
 
 if [[ "${DO_UNINSTALL}" == "true" || "${LIVE_SPLUNK_ACTIONS}" == "true" ]]; then
@@ -1496,6 +2032,12 @@ fi
 
 if [[ "${DO_INSTALL}" == "true" ]]; then
     install_or_update_app
+    if [[ "${PACKAGE_PRODUCTION_APPROVED}" == "true" \
+       && "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
+        # Verify what the installer actually exposed, and bind any platform
+        # client activation to that same reviewed Splunk endpoint.
+        ensure_expected_installed_app_version
+    fi
 fi
 
 if [[ "${DO_UNINSTALL}" == "true" ]]; then
@@ -1504,7 +2046,7 @@ if [[ "${DO_UNINSTALL}" == "true" ]]; then
 fi
 
 if [[ "${LIVE_SPLUNK_ACTIONS}" == "true" ]]; then
-    ensure_session
+    [[ -n "${SK}" ]] || ensure_session
     ensure_app_installed
     ensure_app_visible
     configure_server_settings
@@ -1539,7 +2081,13 @@ if [[ "${RENDER_CLIENTS}" == "true" ]]; then
         fi
     fi
     render_client_bundle
-    apply_client_setup
+    if [[ -f "${OUTPUT_DIR}/.env.splunk-mcp" ]]; then
+        apply_client_setup
+    elif [[ "${REGISTER_CODEX}" == "true" || "${CONFIGURE_CURSOR}" == "true" || "${CONFIGURE_CLAUDE}" == "true" ]]; then
+        log "ERROR: Refusing to register an unusable MCP bridge without a live credential environment."
+        log "       Supply the required token file(s), or pass all three --no-* client flags for render-only output."
+        exit 1
+    fi
 fi
 
 if [[ "${DO_INSTALL}" != "true" \

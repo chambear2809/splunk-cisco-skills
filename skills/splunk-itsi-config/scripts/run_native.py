@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -45,6 +46,11 @@ def main() -> int:
     args = parse_args()
     try:
         spec = load_json(args.spec_json)
+        if args.mode in {"apply", "cleanup-apply"} and os.environ.get("ITSI_CONFIG_APPLY_AUTHORIZED") != "1":
+            raise SkillError(
+                "Write mode is not authorized. Use skills/splunk-itsi-config/scripts/setup.sh "
+                "with --apply (or the documented cleanup-apply workflow)."
+            )
         client = SplunkRestClient.from_spec(spec)
         workflow = NativeWorkflow(client)
         if args.mode == "cleanup-apply":
@@ -85,7 +91,7 @@ def main() -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
         completion_failed = args.completion and contains_warning_status(payload)
         return 1 if (result.failed or completion_failed) else 0
-    except SkillError as exc:
+    except (SkillError, json.JSONDecodeError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

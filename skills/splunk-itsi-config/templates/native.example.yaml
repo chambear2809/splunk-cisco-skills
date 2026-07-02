@@ -1,3 +1,10 @@
+schema_version: 1
+metadata:
+  template: true
+  # Runtime-discovered/private-schema sections remain blocked on apply unless a
+  # target-version export fixture has been reviewed and this is explicitly true.
+  allow_experimental_api: false
+
 connection:
   base_url: https://splunk.example.com:8089
   username_env: SPLUNK_USERNAME
@@ -122,9 +129,12 @@ service_templates:
   - title: Network Device Template
     description: Template that can be linked to matching services; REST links append template entity rules.
     entity_rules:
-      - field: host
-        field_type: alias
-        value: "{{host_filter}}"
+      - rule_condition: AND
+        rule_items:
+          - field: host
+            field_type: alias
+            rule_type: matches
+            value: "{{host_filter}}"
     kpis:
       - title: Interface Errors
         kpi_base_search_id: replace-with-live-base-search-key
@@ -276,8 +286,8 @@ glass_tables:
 glass_table_icons:
   - title: Network Router
     svg_path: M0 0h24v24H0z
-    width: 24
-    height: 24
+    default_width: 24
+    default_height: 24
     category: Network
 
 deep_dives:
@@ -323,17 +333,15 @@ upgrade_readiness_prechecks:
     payload:
       status: ready
 
-summarizations:
-  - title: Example KPI Summary
-    description: Replace payload with an exported summarization object.
+summarization_rules:
+  - title: Example Event iQ Diagnose Rule
+    description: ITSI 5.0 only; replace payload with a target-version exported summarization_rule.
     payload:
-      window: 15m
+      enabled: false
 
-summarization_feedback:
-  - title: Example KPI Summary Feedback
-    description: Replace payload with exported summarization feedback.
-    payload:
-      rating: useful
+# Event iQ summarizations and summarization feedback are operational records,
+# not idempotent configuration. Inventory or operate them through a separately
+# reviewed action workflow; they are intentionally absent from this apply sample.
 
 user_preferences:
   - title: Example ITSI User Preferences

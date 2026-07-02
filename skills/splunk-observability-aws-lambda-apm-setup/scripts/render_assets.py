@@ -1006,7 +1006,7 @@ def _render_handoff_sh(spec: dict[str, Any]) -> str:
         lines.append("# Gateway OTel Collector (send Lambda OTLP to a collector instead of direct ingest)")
         lines.append("# Set local_collector_enabled: false in your spec and point OTEL_EXPORTER_OTLP_ENDPOINT")
         lines.append("# at your collector's OTLP HTTP receiver (default port 4318).")
-        lines.append("bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux")
+        lines.append("echo 'HANDOFF: bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm REALM --linux-mode gateway --listen-interface 0.0.0.0'")
         lines.append("")
         wrote_any = True
     if not wrote_any:

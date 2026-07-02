@@ -116,8 +116,10 @@ release section when cutting a release.
   handoff, and deployment-server, static-indexer, or Splunk Cloud enrollment.
 - Local `splunk-cisco-skills` MCP agent server under `agent/` with
   read-only catalog/skill/template tools, dry-run planning for Cisco product
-  setup, and a two-stage commit (plan + confirm) execution flow gated by
-  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`.
+  setup, and a two-stage commit (plan + confirm) execution flow. It is
+  plan-only by default; local execution requires
+  `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`, and generic script execution also
+  requires `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`.
 
 ### Removed
 
@@ -131,6 +133,25 @@ release section when cutting a release.
 
 ### Changed
 
+- Added Splunk Cloud Platform `10.5.2605` support while retaining verified
+  Splunk Enterprise/SOK/POD 10.4 baselines; refreshed all 119 public
+  Splunkbase registry records against a 10.5 compatibility target, updated
+  current package pins and Cloud documentation trains, and kept 14 packages
+  explicitly unsupported where their current listings do not certify 10.5.
+- Hardened the local MCP contract with strict tool schemas, random expiring
+  single-use plan capabilities, executable and full skill-tree integrity
+  binding, forced cancellation escalation, a default-off subprocess gate, and
+  mutation gating for all generic script execution.
+- Pinned the MCP runtime and patched security-sensitive transitive dependencies;
+  added Python 3.10/3.14 protocol CI and weekly dependency updates.
+- Updated `splunk-mcp-server-setup` for the official Splunk MCP Server 1.2.1
+  package with version/checksum verification, pinned `mcp-remote@0.1.38`
+  without an `npx` fallback, HTTPS enforcement with loopback-only exceptions,
+  and completion checks for the MCP handshake, `splunk_get_info`, and shipped views.
+- Marked the official 1.2.1 package as not production-approved after static
+  security and protocol review; local mutation/activation requires an explicit
+  isolated-evaluation acknowledgement, while production completion remains
+  blocked pending vendor fixes.
 - Aligned all `SKILL.md` frontmatter with the Agent Skills description limit
   and tightened the PKI skill body to stay under the progressive-disclosure
   line-count guidance.

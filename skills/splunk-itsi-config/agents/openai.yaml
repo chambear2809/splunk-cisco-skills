@@ -1,9 +1,16 @@
 interface:
-  display_name: "Splunk ITSI Config"
-  short_description: "Guide beginners through ITSI content packs, service trees, KPIs, and validation"
+  display_name: "Splunk ITSI Configuration"
+  short_description: "Safely configure an existing ITSI deployment"
   default_prompt: >-
-    Use $splunk-itsi-config to guide a beginner-friendly ITSI setup. Start with
-    references/beginner_quickstart.md, choose content-packs or topology unless
-    the user provides exported ITSI payloads, create or adapt a repo-local YAML
-    spec, preview first, apply only after confirmation, then validate and
-    summarize the report.
+    Use $splunk-itsi-config only to configure an existing, licensed, healthy
+    ITSI deployment. Never install or upgrade ITSI, install prerequisite apps,
+    apply a license, or restart Splunk; hand those needs to splunk-itsi-setup or
+    splunk-app-install. Read references/product_coverage.md before claiming
+    feature support. Start with references/beginner_quickstart.md, choose
+    content-packs or topology unless the user provides a reviewed same-version
+    ITSI export, and create a minimal gitignored template.local. Run offline
+    lint, then a GET-only live preview and applicable inventory checks. Summarize
+    the exact target, versions, permissions, creates, updates, guarded actions,
+    warnings, and handoffs. Apply only after explicit approval using --apply;
+    never use --mode apply. Finish with --completion validation and a concise
+    evidence/handoff summary. Never request or place secrets in chat or specs.

@@ -1,7 +1,10 @@
 interface:
   display_name: "Splunk Observability OTel Collector"
-  short_description: "Deploy Splunk OTel Collector to Kubernetes and Linux"
+  short_description: "Deploy pinned Splunk OTel Collector and audit its TA packages"
   default_prompt: >-
     Use $splunk-observability-otel-collector-setup to render and optionally
-    apply Splunk Observability Cloud OTel Collector deployments, including
-    Splunk Platform HEC token handoff helpers when Kubernetes logs need HEC.
+    apply and validate Linux Collector and auto-instrumentation 0.154.2 or the
+    Kubernetes chart and Collector image 0.154.0; audit Splunkbase apps 7125,
+    8698, and 8699 for deployment-server, Linux heavy-forwarder, or Linux
+    Universal-Forwarder staging; and route specialized Observability products
+    with file-backed secret, immutable-overlay, and supply-chain guardrails.

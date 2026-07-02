@@ -1,7 +1,8 @@
 # Splunk 10.4 Enterprise Deployment Notes
 
-Verified for Splunk Enterprise/Universal Forwarder `10.4.0` and Splunk Cloud
-Platform `10.4.2603` planning.
+Verified for Splunk Enterprise/Universal Forwarder `10.4.0`, current Splunk
+Cloud Platform documentation train `10.5.2605`, and previous Cloud train
+`10.4.2604` planning as of 2026-07-02.
 
 These notes are the prose companion to the machine-readable platform-version
 contract in `skills/shared/references/splunk_platform_versions.json` (loaded via
@@ -40,9 +41,11 @@ host bootstrap workflows.
   is below 7.x; upgrade KV Store on an intermediate supported release first.
 - Review custom apps for Splunk 10.4's Python 3.13 default, Python 3.9 fallback
   usage, Node.js removal exposure, and removed jQuery 2 dependencies.
-- Do not assume add-ons that worked on 10.2/10.3 are 10.4-compatible. Public
-  Splunkbase apps need explicit 10.4 compatibility metadata or an explicit
-  unsupported status in `skills/shared/app_registry.json`.
+- Do not assume add-ons that worked on older trains are compatible with the
+  current platform. Public Splunkbase apps are audited against Cloud Platform
+  `10.5` and need explicit 10.5 metadata or an `unsupported` status in
+  `skills/shared/app_registry.json`; self-managed 10.4 planning still uses each
+  package's exact listed versions.
 - Remove or replace SHA-1 certificate/signature dependencies before 10.4
   promotion. PKI renders should use SHA-256 or stronger signatures, and FIPS/STIG
   renders must keep their stricter cipher and signature choices.
@@ -72,9 +75,9 @@ host bootstrap workflows.
 
 ## Cloud And ACS
 
-- Splunk Cloud Platform 10.4 planning should use the `10.4.2603` ACS
-  documentation set for allowlists, HEC tokens, restarts, and ACS capability
-  requirements. `10.3.2512` remains a supported alternate Cloud train.
+- Current Splunk Cloud Platform planning should use the `10.5.2605`
+  documentation set. Use `10.4.2604` for stacks on the previous train;
+  `10.4.2603` is not a valid documentation train.
 - Model Cloud experience explicitly. Victoria has no IDM, does not support
   Hybrid Search, and migrations from Classic move IDM apps/configuration to the
   search tier; any IDM-era allowlists must be reviewed against search head or

@@ -1,215 +1,309 @@
 ---
 name: splunk-itsi-config
-description: Skill for previewing, applying, and validating native ITSI objects, ITSI content packs, and hybrid ITSI service-tree specs from repo-local YAML files. Use when Codex needs to manage ITSI entities, services, KPIs, dependencies, custom NEAPs, service-template links, or service trees, or when it needs to preview, install, and validate Splunk App for Content Packs catalog entries through the official ITSI content-pack REST endpoints.
+description: Configure and validate an existing, licensed Splunk IT Service Intelligence deployment from repo-local YAML. Use when managing ITSI entities, services, KPIs, dependencies, service trees, selected guarded operations, or ITSI content-pack imports; do not use it to install, upgrade, license, or restart ITSI or install prerequisite apps.
 ---
 
-# Splunk ITSI Config
+# Splunk ITSI Configuration
 
-## Shared add-on completion gate
+## Configuration-only boundary
 
-Whenever this workflow installs, configures, or hands off an ITSI content pack
-or other registry-listed app, follow the
-[shared completion gate](../shared/ta_completion_gate.md). Package delivery
-alone is not success; validate applicable data inputs, objects, and shipped
-views, or record explicit evidence that no dashboards ship.
+This skill configures an **existing, licensed, healthy ITSI deployment**. It does
+not install or upgrade ITSI, install the Splunk App for Content Packs, install a
+Technology Add-on or Domain Add-on, apply a license, or restart Splunk.
 
-This skill is rooted in `skills/splunk-itsi-config/` and supports these workflow paths:
+- Missing or unhealthy ITSI: hand off to
+  [`splunk-itsi-setup`](../splunk-itsi-setup/SKILL.md).
+- Missing prerequisite app or compatible Content Library API/provider: hand off to
+  [`splunk-app-install`](../splunk-app-install/SKILL.md) or the Splunk Cloud app
+  request process.
+- Missing source data: hand off to the matching source onboarding skill, then
+  run [`splunk-data-source-readiness-doctor`](../splunk-data-source-readiness-doctor/SKILL.md).
+- ITSI configuration work after those gates pass: remain in this skill.
 
-- Native ITSI automation for entities, services, KPIs, service dependencies, and custom NEAPs.
-- Extended native ITSI automation for teams, entity types, entity filter rules, service templates, KPI base searches, KPI templates, KPI threshold templates, custom threshold windows and service/KPI links, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views through typed REST passthrough sections.
-- Content-pack automation for preview, install, validate, and guided handoff for known ITSI content-pack profiles plus generic catalog-title or pack-ID entries.
-- Hybrid topology automation for native objects, content packs, template-backed services, and ITSI service-tree dependencies in one run.
+Do not set `itsi.install_if_missing` or `content_library.install_if_missing` in
+new specs. Legacy fields do not grant this skill permission to install apps.
+Content-pack import through ITSI is configuration; installation of the ITSI,
+legacy Content Library, or prerequisite app packages is not.
 
-## Beginner-First Operating Model
+Whenever a content-pack workflow is involved, also follow the
+[`shared completion gate`](../shared/ta_completion_gate.md). Package visibility
+alone is not success: validate its data prerequisites, ITSI objects, shipped
+views, macros, saved searches, and documented manual module steps.
 
-When a user wants ITSI configured but does not already have an ITSI spec, start in guided preview mode:
+## Coverage labels
 
-1. Translate the request into plain ITSI building blocks: business services, supporting technical services, KPIs, entities, dependencies, and optional content packs.
-2. Ask only for missing non-secret facts: Splunk platform, management URL, target app/domain, supported source products, index names, sourcetypes, service names, dependency order, and desired KPI signals.
-3. Do not ask the user for ITSI REST payload fields unless they are importing or editing exported ITSI objects.
-4. Pick the smallest workflow that gets the user to a useful preview:
-   - Use `content-packs` when the user has data for a supported packaged domain and wants Splunk-provided defaults quickly.
-   - Use `topology` when the user can name services, dependencies, and KPI searches but does not know ITSI object schemas.
-   - Use `native` only for direct ITSI object management, exported payloads, custom NEAPs, glass tables, maintenance windows, or other advanced objects.
-5. Create or adapt a repo-local YAML spec from the beginner templates, default new services to `enabled: false`, then run preview before any write.
-6. Summarize preview output in operator language: what will be created, what prerequisites are missing, which searches/macros/indexes need attention, and what will remain manual.
-7. Run `--apply` only when the user explicitly asks to apply or confirms the preview. After apply, run validate and point the user at the generated report.
+Do not equate a generic REST payload route with complete product support. This
+skill uses these labels:
 
-Useful quickstart files:
+| Label | Meaning |
+| --- | --- |
+| `typed` | The local YAML shape, references, preview, apply, and drift checks are implemented for the named fields. |
+| `guarded` | A write is non-idempotent, destructive, or operational and requires an explicit safety gate. |
+| `read-only` | The workflow performs local work or Splunk GET requests only. |
+| `handoff` | Splunk documents the feature, but this skill intentionally sends the operator to another skill or the ITSI UI. |
+| `experimental` | A version-shaped passthrough or helper exists, but end-to-end product support is not verified. Use only with exported payload evidence and a reviewed live preview. |
+| `unsupported` | The workflow intentionally does not model or mutate the feature. |
 
-- Beginner guide: `references/beginner_quickstart.md`
-- Beginner content-pack template: `templates/beginner.content-pack.yaml`
-- Beginner topology template: `templates/beginner.topology.yaml`
+Read [`references/product_coverage.md`](references/product_coverage.md) before
+claiming feature coverage. It distinguishes the ITSI 4.21 implementation
+baseline from the published ITSI 5.0 product and REST documentation. A generic
+5.0 endpoint or schema entry is not proof that a new 5.0 UI, AI, or lifecycle
+feature is safely automated; the applicable object contract must also be mapped
+and validated against a live supported 5.0 deployment.
 
-## Files
+## Safe operating sequence
 
-- Skill root: `skills/splunk-itsi-config/`
-- Native template: `templates/native.example.yaml`
-- Content-pack template: `templates/content_packs.example.yaml`
-- Topology template: `templates/topology.example.yaml`
-- Beginner content-pack template: `templates/beginner.content-pack.yaml`
-- Beginner topology template: `templates/beginner.topology.yaml`
-- Beginner quickstart reference: `references/beginner_quickstart.md`
-- Native references: `references/native_itsi.md`
-- Content-pack references: `references/content_packs.md`
-- Topology references: `references/topology.md`
-- Offline compatibility report: `references/compatibility.md`
-- Entry points:
-  - `bash scripts/setup.sh --workflow native --spec <path>`
-  - `bash scripts/setup.sh --workflow native --spec <path> --apply`
-  - `bash scripts/setup.sh --workflow native --spec <path> --mode export --output exported.native.yaml --output-format yaml`
-  - `bash scripts/setup.sh --workflow native --spec <path> --mode inventory --output inventory.json`
-  - `bash scripts/setup.sh --workflow native --spec <path> --mode prune-plan --output prune-plan.json`
-  - `bash scripts/setup.sh --workflow native --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
-  - `bash scripts/validate.sh --workflow native --spec <path>`
-  - `bash scripts/setup.sh --workflow content-packs --spec <path>`
-  - `bash scripts/setup.sh --workflow content-packs --spec <path> --apply`
-  - `bash scripts/validate.sh --workflow content-packs --spec <path>`
-  - `bash scripts/setup.sh --workflow topology --spec <path>`
-  - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
-  - `bash scripts/setup.sh --workflow topology --spec <path> --mode prune-plan --output topology-prune-plan.json`
-  - `bash scripts/setup.sh --workflow topology --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
-  - `bash scripts/validate.sh --workflow topology --spec <path>`
-  - `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
-  - `python3 scripts/native_offline_smoke.py --spec-json <path>`
-  - `python3 scripts/itsi_compatibility_report.py --format markdown`
+Every configuration run follows these gates in order.
 
-## Authentication
+### 1. Gather only non-secret intent
 
-The scripts talk to the Splunk management port through the REST API.
+Ask for the target credential profile or management URL, platform, team/security
+group, service and entity names, dependency order, data indexes/sourcetypes,
+KPI signals and thresholds, and optional content packs. Detect installed
+versions, licenses, roles, capabilities, and current objects from the target;
+do not ask the user to transcribe facts that the read-only APIs can discover.
 
-The shell wrappers load the repository credential file first, then fall back to
-`~/.splunk/credentials` or `SPLUNK_CREDENTIALS_FILE` through the shared credential
-helper. They export only the variables needed by the Python client.
+Never ask for passwords, tokens, API keys, or client secrets in chat. Never put
+them in an ITSI spec.
 
-Provide non-secret connection data directly in the spec or through the credential
-file/environment:
+### 2. Create a local spec
+
+Copy the smallest matching starter to the gitignored local intake file, then
+edit the copy rather than a committed example:
+
+```bash
+cp skills/splunk-itsi-config/templates/beginner.topology.yaml \
+  skills/splunk-itsi-config/template.local
+```
+
+For a content pack, copy `beginner.content-pack.yaml` instead. Keep the first
+run small and keep new services disabled until KPI health and thresholds have
+been reviewed. Starter files set `metadata.template: true`; change it to `false`
+only after every sample name, search, index, and placeholder has been replaced
+and the preview has been reviewed.
+
+### 3. Lint offline
+
+Lint runs before credential loading and makes no network calls:
+
+```bash
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --mode lint
+```
+
+Use `--workflow native`, `content-packs`, or `topology` to match the spec. Lint
+checks the schema version, structure, strict booleans, duplicate identities,
+inline secrets, selected references/graphs, and guarded automation tiers. Apply
+repeats lint with stricter template/example/placeholder refusal. Replace starter
+values before live preview even when they are not fatal to the basic lint pass.
+
+### 4. Preview and inspect the target read-only
+
+Preview is the default and is a GET-only live operation:
+
+```bash
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local
+```
+
+For a brownfield native estate, add the read-only inventory gate:
+
+```bash
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow native \
+  --spec skills/splunk-itsi-config/template.local \
+  --mode inventory \
+  --output /tmp/itsi-inventory.json
+```
+
+Together, lint, inventory, and preview are the current read-only preflight path.
+Inventory covers the object/app/KV Store and supported route information it can
+read; preview covers intended object changes and workflow prerequisites. There
+is no separate `doctor` command yet. A future unified GET-only doctor should add
+target/version, license, fine-grained capability/team access, and bounded data-
+readiness checks. Until those checks are implemented, gather or hand them off
+explicitly and do not claim doctor-complete evidence.
+
+Catalog discovery and refresh are writes. Set
+`content_library.refresh_catalog: true` only for an explicitly approved apply;
+preview and validate never refresh the catalog.
+
+### 5. Apply only after explicit approval
+
+Summarize the exact target, creates, updates, guarded actions, warnings, and
+manual work. Run apply only after the user explicitly approves that preview:
+
+```bash
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --apply
+```
+
+`--mode apply` is not a supported substitute for `--apply`. Never infer apply
+permission from a request to inspect, lint, preview, validate, or diagnose.
+
+### 6. Validate and hand off
+
+```bash
+bash skills/splunk-itsi-config/scripts/validate.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --completion
+```
+
+Completion must distinguish clean validation, known manual follow-up, and an
+actual failure. Report the target, detected versions, created/updated object
+keys, drift, data-readiness evidence, content-pack module work, and the exact
+next command or owner. A second preview after apply should report no unexpected
+declarative changes.
+
+## Workflow selection
+
+Choose the smallest workflow that expresses the requested outcome:
+
+- `content-packs`: import or validate a pack already available through the live
+  ITSI Content Library API. This does not install ITSI, a legacy Content Library
+  app, or the pack's prerequisite apps.
+- `topology`: create a service tree from plain service, KPI, entity, dependency,
+  and optional already-available pack references. This is the default for a new
+  service model.
+- `native`: manage direct ITSI objects, work from reviewed exports, or use
+  advanced inventory, export, prune, cleanup, and guarded operational paths.
+
+Start with [`references/beginner_quickstart.md`](references/beginner_quickstart.md).
+Use the workflow-specific references only after choosing a path:
+
+- [`references/native_itsi.md`](references/native_itsi.md)
+- [`references/content_packs.md`](references/content_packs.md)
+- [`references/topology.md`](references/topology.md)
+- [`references/compatibility.md`](references/compatibility.md)
+- [`references/product_coverage.md`](references/product_coverage.md)
+
+## Authentication and target safety
+
+The scripts use the Splunk management API, normally HTTPS on port 8089. The
+wrappers load the repository credential file, then `~/.splunk/credentials`, or
+the file named by `SPLUNK_CREDENTIALS_FILE`.
+
+Supported non-secret connection selectors are:
 
 - `connection.base_url` or `SPLUNK_SEARCH_API_URI`
 - `connection.session_key_env` or `SPLUNK_SESSION_KEY`
 - `connection.username_env` or `SPLUNK_USERNAME`
 - `connection.password_env` or `SPLUNK_PASSWORD`
 - `connection.verify_ssl` or `SPLUNK_VERIFY_SSL`
-- `connection.ca_cert_file` or `SPLUNK_CA_CERT` for a private CA bundle
-- `connection.allow_insecure_http: true` only for an explicitly accepted lab
-  endpoint that cannot serve HTTPS
+- `connection.allow_insecure_tls` or `SPLUNK_ALLOW_INSECURE_TLS`
+- `connection.ca_cert_file` or `SPLUNK_CA_CERT`
+- `connection.allow_insecure_http: true` only for a separately accepted,
+  short-lived loopback lab endpoint
 
-TLS verification defaults to `true` in every starter spec. For a private CA,
-set `SPLUNK_CA_CERT` to its CA bundle. Set `verify_ssl: false` only as an
-explicit, short-lived lab exception; never use it for production apply or
-completion evidence.
+TLS verification defaults to true. Prefer a private CA bundle over disabling
+verification. `verify_ssl: false` is rejected unless the operator also sets
+`connection.allow_insecure_tls: true` (or
+`SPLUNK_ALLOW_INSECURE_TLS=true`) for an explicitly accepted, short-lived lab
+target. Insecure HTTP and disabled certificate verification are never valid
+production completion evidence.
 
-Use a session key when possible. If you use username/password, keep the secret
-values in the credential file; the wrappers prefer Splunk REST credentials from
-`SPLUNK_USER` / `SPLUNK_PASS` and export them as `SPLUNK_USERNAME` /
-`SPLUNK_PASSWORD` for this client. Never put passwords, tokens, or API keys in
-an ITSI YAML spec or in chat.
+Use a session key when possible. Keep username/password values in the credential
+file. The spec contains environment variable names, never secret values.
 
-## Native Workflow Rules
+Official ITSI permissions are object- and team-specific. Preview should surface
+the missing capability rather than encourage a broad admin credential. Global
+objects such as service templates and KPI templates also require Global-team
+write access. See the official
+[ITSI roles and capabilities](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/administer/4.21/permissions/configure-users-and-roles-in-itsi).
 
-- Preview is the default.
-- `--apply` is required for writes.
-- Native read-only modes are available through `setup.sh --workflow native --mode export|inventory|prune-plan`. `export` writes a brownfield native spec skeleton, skips managed/default NEAPs unless the spec sets `export.include_managed_neaps: true`, `inventory` reports live ITSI object counts/app versions/KV Store status plus supported-object/alias/notable-action discovery, notable-action detail readback, entity-discovery-search readback for requested entities, retirable-entity counts, Event Management counts for episode groups and notable events, optional filtered notable-event readback, optional count-endpoint-only inventory for large estates, ticket readback, episode-export status/listing, service/KPI-base-search templatize output, and optional per-object maintenance-window status when the live endpoints expose them, and `prune-plan` reports unmanaged live objects without deleting anything.
-- Guarded cleanup is available through `setup.sh --workflow native --mode cleanup-apply --backup-output <path>`. It recomputes the current prune plan, requires `cleanup.allow_destroy: true`, `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, a matching `cleanup.plan_id`, positive `cleanup.max_deletes`, and explicit `cleanup.candidate_ids`. The CLI writes a live export backup before deleting. High-risk deletes for `custom_content_packs`, `glass_table_icons`, and `kpi_entity_thresholds` also require a fresh prune plan with `cleanup.allow_high_risk_deletes: true`, `cleanup.confirm_high_risk: DELETE_HIGH_RISK_ITSI_OBJECTS`, and every selected ID repeated in `cleanup.high_risk_candidate_ids`.
-- `python3 scripts/native_offline_smoke.py --spec-json <path>` runs native preview/apply/validate/export/inventory/prune-plan against an in-memory ITSI-shaped client. Use it for regression checks without touching a live ITSI instance.
-- Upserts are additive and idempotent for the managed fields in the spec.
-- Delete behavior is limited to guarded cleanup candidates from a fresh prune plan. Unsupported cleanup candidates, keyless objects, and protected default/shipped ITSI objects are reported for manual review rather than deleted. Set `cleanup.allow_system_objects: true` only after a separate manual review if you intentionally want the prune plan to make known system/content-pack objects delete-eligible; keep high-risk delete fields off unless the operator has separately confirmed icon/content-pack/threshold cleanup.
-- Validation diagnostics include field-level diffs for managed drift where the live object exists.
-- Preview/apply/validate emit warning diagnostics for obvious KPI/correlation-search preflight issues, such as searches without explicit index constraints or threshold fields not visible in the SPL text.
-- Core `entities`, `services`, and service `kpis` support typed convenience fields and also merge additional top-level ITSI schema fields plus `payload` into the REST body. Local DSL keys such as `depends_on`, `service_template`, and threshold helpers are not sent as raw schema fields.
-- Extended object sections set common ITSI fields (`title`, `description`, `sec_grp`, `object_type`) and merge additional top-level fields plus `payload` into the REST request body. They cover entity-management policies/rules, data-integration templates, KPI/search/template objects, Content Library authorship objects, Event Management views/searches/templates, maintenance, backup/restore, deep dives, glass tables/icons, home views, KPI entity thresholds, refresh queue jobs, sandboxes, upgrade-readiness prechecks, summarization objects, and user preferences. Use exported ITSI payload fields when managing version-specific object shapes.
-- Keyed updates on the generic ITSI, Event Management, maintenance, and backup/restore route families set `is_partial_data=1` so unmanaged fields are preserved. Full-payload special routes such as `kpi_entity_threshold`, icon collection, and content-pack authorship do not use that parameter.
-- For large native estates, `bulk_apply.enabled: true` can batch eligible existing keyed updates through `itoa_interface/<object_type>/bulk_update` while preserving normal preview/change accounting. Inventory and prune-plan use documented projection/window parameters where the route supports them. Set `bulk_apply.sections` to limit batching to sections such as `entities`, `services`, or `kpi_base_searches`; creates, special route families, dependency merges, and cleanup stay on their explicit paths.
-- Service template links are applied through the ITSI service template link endpoint after services exist and before dependencies are validated or merged. This REST path has append-only entity-rule semantics; use the ITSI UI when an operator needs replace or keep-existing choices.
-- `custom_threshold_window_links` are applied after services exist by resolving window/service/KPI titles or live IDs and calling the ITSI custom-threshold-window service/KPI association endpoint only for missing links.
-- `entity_type_titles` on entities resolve against live entity types or entity types declared earlier in the same spec.
-- Custom content packs use the ITSI content pack authorship API. Backup jobs, maintenance windows, Event Analytics, and glass-table icons use their documented ITSI route families rather than the default object route.
-- Event Management sections use the route family exposed by ITSI for each object. `event_management_states` use the core ITSI object route on tested ITSI 4.21.2 hosts; `correlation_searches`, `notable_event_email_templates`, and `neaps` use the ITSI `event_management_interface` and its `filter_data` lookup parameter. Event Management interface creates are wrapped in the documented `data` envelope; keyed updates send the object payload directly.
-- Deep dive updates preserve the existing owner fields in the payload because Splunk requires those fields on keyed deep-dive updates.
-- Operational Event Analytics records and append-only APIs, such as notable events, notable event groups, comments, and ticket/action execution, are intentionally excluded from the idempotent upsert model; notable events are available through guarded/read-only inventory filters when a live endpoint exposes them.
-- ITSI action/helper APIs such as entity retire/restore, threshold recommendations, custom threshold window stop/disconnect, and bulk time-offset shifts are intentionally excluded from the normal idempotent upsert model.
-- Guarded `operational_actions` can run selected non-idempotent helper APIs only when every action sets `allow_operational_action: true`. Use these for explicit operator-driven retire/restore, custom-threshold stop/disconnect, threshold recommendation-apply, time-offset-shift, notable-event-group update, notable-event comment append, notable-event action execution, ticket link/read/unlink, episode-export create/list/get/download/delete, service or KPI-base-search templatize, guarded bulk update, or custom content-pack submit/download work; they are not part of normal config drift validation. Custom-threshold disconnect also requires `disconnect_all: true`; `entity_retire_retirable` requires `retire_all_retirable: true` and previews the documented retirable-entity target list/count when available; notable-event action execution requires `allow_notable_event_action_execute: true` and reads action metadata before execution when available; ticket unlink requires `allow_ticket_unlink: true`; episode export deletes require `allow_episode_export_delete: true`, filter-based export deletes also require `allow_episode_export_bulk_delete: true`, bulk updates require `allow_bulk_update: true`, and episode status/state/severity changes require `allow_episode_field_change: true`. Apply mode preserves helper response payloads in informational diagnostics for audit.
-- Service dependencies are applied in a second pass after services exist.
-- Custom NEAPs use the ITSI event management interface. Managed, packaged, and default NEAPs are protected from overwrite in v1.
+## Native rules
 
-## Content-Pack Workflow Rules
+- Normal native preview/apply/validate is additive. It preserves unmanaged live
+  fields and extra KPIs unless an explicitly documented reconciliation path is
+  used.
+- Core typed coverage is entities, services, embedded KPIs, service
+  dependencies, service-template links, custom-threshold-window links, and
+  custom NEAP definitions. Consult the coverage matrix for important limits.
+- Generic object sections are experimental passthroughs, not schema-complete
+  support. Use a payload exported from the same ITSI version and review the live
+  preview.
+- Service-template REST linking has append-only entity-rule semantics in this
+  workflow. Use the ITSI UI when the operator needs replace or keep-existing
+  choices.
+- `bulk_apply`, glass-table generation, and schema passthrough are advanced and
+  remain experimental until validated against the exact live version.
+- Export, inventory, and prune-plan are read-only. A prune plan never deletes.
+- Cleanup requires a current reviewed plan, explicit candidate IDs, a delete
+  ceiling, confirmation strings, and backup output. Protected or unsupported
+  objects remain manual review.
+- `operational_actions` are non-idempotent. Do not include them in a reusable
+  declarative spec. Each invocation requires explicit operator intent and the
+  action-specific guards documented in `references/native_itsi.md`.
+- A restore, ticket/action execution, episode mutation, retire/restore, bulk
+  update, content-pack lifecycle action, threshold recommendation application,
+  or destructive transition is never implied by normal configuration intent.
 
-- On `--apply`, the workflow can bootstrap Splunk IT Service Intelligence (`SA-ITOA`) by delegating to the generic app-install path described by `../splunk-itsi-setup/SKILL.md`, using Splunkbase app `1841` by default.
-- Preview and validate remain read-only. If ITSI is missing, they stop and tell the operator to rerun with `--apply` or install app `1841` manually first.
-- On Splunk Enterprise `--apply`, the workflow can bootstrap the Splunk App for Content Packs (`DA-ITSI-ContentLibrary`) by calling the shared installer in `../splunk-app-install/scripts/install_app.sh`.
-- If the packaged `5391` archive is rejected by the REST app-install endpoint because it contains multiple top-level apps, the workflow falls back to a Splunk CLI install path on the target host.
-- Before catalog lookup, the workflow refreshes Content Library discovery through `DA-ITSI-ContentLibrary/content_library/discovery` when that endpoint is available.
-- For the content-pack API, the client probes `/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack` first and falls back to `/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack` on hosts that expose the legacy route family.
-- The default Enterprise bootstrap path installs Splunkbase app `5391`. Override the source with `content_library.source: local` and `content_library.local_file: /absolute/path/to/package.spl` if you need to use a local package instead.
-- Preview and validate remain read-only. If `DA-ITSI-ContentLibrary` is missing, they stop and tell the operator to rerun with `--apply` on Splunk Enterprise.
-- If `DA-ITSI-ContentLibrary` is missing on Splunk Cloud, stop and guide the operator to open a Splunk Support / Cloud App Request for app `5391`.
-- After ITSI bootstrap or validation, the workflow checks the bundled ITSI app set (`SA-ITOA`, `itsi`, `SA-UserAccess`, `SA-ITSI-Licensechecker`) plus KV Store readiness and key ITSI collections.
-- Prerequisite health check failures are surfaced in the JSON/report output and cause the CLI wrappers to return a nonzero exit code.
-- Pack IDs and versions are discovered live from the ITSI content-pack catalog.
-- Pack resolution is by exact catalog title, not hardcoded package ID.
-- For validation, the workflow resolves the live bundled content-pack app from profile-specific app candidates instead of assuming the catalog ID matches the installed app name.
-- Profiles that ship known companion dashboard apps report those as additional bundle-aware checks.
-- Any live Content Library pack can be declared by exact `title` / `catalog_title` or `pack_id` even when there is not yet a profile-specific validator. Generic catalog entries automate preview/install/validate and emit `automation_scope`, `follow_up_required`, and `follow_up_steps` in JSON and reports.
-- The workflow always calls the official content-pack `preview` endpoint before install.
-- Install requests default to:
-  - `resolution: skip`
-  - `enabled: false`
-  - `saved_search_action: disable`
-  - `install_all: true`
-  - `backfill: false`
-  - `prefix: ""`
-- Post-install module flows are explicit workflow state. The skill automates install/validation and reports remaining module tasks as machine-readable `follow_up_steps`; guarded service imports backed by `itsiimportobjects`, entity discovery, saved-search enablement, macro tuning, props/transforms or other app-local conf stanza tuning, Enterprise staged lookup-file create/replace, lookup refresh searches, KPI backfill dispatches, data model acceleration, dashboard XML, and navigation XML can be automated through `configured_outcome`, native sections, or topology sections when a safe declarative payload is available. Unsupported `configured_outcome` task types, such as module-driven service discovery, alert integration wizards, and sandbox publish, are reported as warning steps instead of being silently ignored.
+## Content-pack rules
 
-## Topology Workflow Rules
+- ITSI, a compatible live Content Library API/provider, and prerequisite apps
+  must already be installed or product-provided, enabled, licensed where
+  applicable, and healthy. For ITSI 4.21 this normally includes the compatible
+  Splunk App for Content Packs. Do not infer ITSI 5.0 packaging from a 4.21 spec.
+- Preview and validate are GET-only. Import uses the official ITSI content-pack
+  endpoint only after preview and explicit apply approval.
+- A catalog refresh is apply-only and opt-in with
+  `content_library.refresh_catalog: true`.
+- Pack IDs and versions are resolved from the live catalog by exact title or ID.
+- Safe import defaults keep imported services and saved searches disabled,
+  avoid backfill, use conflict resolution `skip`, and avoid non-empty prefixes.
+- Rich profiles add app/input/macro checks. Generic catalog entries provide
+  catalog/import visibility plus explicit manual follow-up; they do not imply
+  pack-specific data or dashboard validation.
+- `configured_outcome` is allowed only for the documented typed blocks and
+  guards. Unsupported module wizards, service discovery, alert integrations,
+  and sandbox publication remain handoffs.
 
-- The topology workflow is hybrid. It can combine `packs`, native `entities` / `services` / `neaps`, and a top-level `topology` block in one spec.
-- Preview is the default. `--apply` is required for writes.
-- The workflow reuses the content-pack bootstrap, ITSI health checks, and pack validation path before native object upserts and topology materialization.
-- `topology.roots` uses a nested DSL that compiles to ITSI `services_depends_on` edges.
-- `python3 scripts/topology_glass_table.py --spec-json <path> --output <path>` generates a starter native `glass_tables` spec from the same topology tree for operator review and later apply.
-- A topology node must define either `service_ref` or `service`.
-- Template-backed nodes use `service` plus `from_template`, where `from_template` resolves a content-pack profile and logical template title.
-- Shared downstream services are expressed with `ref` nodes; duplicate materialized nodes that resolve to the same service title are rejected.
-- Preview can resolve pack-relative services and templates from the content-pack `preview` response even when they are not installed yet.
-- Apply and validate require live template and service resolution for anything that must exist in ITSI after install.
-- Self-dependencies, missing references, missing explicit KPI names, and cycles fail the run.
-- Topology prune-plan and cleanup-apply are available through the native guarded cleanup model. The workflow derives managed service titles from `services` and `topology.roots` so topology-only services are protected from prune candidates; cleanup still requires the same reviewed `cleanup` guards and a backup output.
+Supported profile keys currently include:
 
-## Supported Content-Pack Profiles
+`aws`, `cisco_data_center`, `cisco_enterprise_networks`,
+`cisco_thousandeyes`, `citrix`, `example_glass_tables`,
+`ite_work_alert_routing`, `itsi_monitoring_and_alerting`, `linux`,
+`microsoft_365`, `microsoft_exchange`,
+`netapp_data_ontap_dashboards_reports`, `pivotal_cloud_foundry`, `servicenow`,
+`shared_it_infrastructure`, `soar_system_logs`, `splunk_appdynamics`,
+`splunk_observability_cloud`, `splunk_as_a_service`,
+`splunk_synthetic_monitoring`, `third_party_apm`, `unix_dashboards_reports`,
+`vmware`, `vmware_dashboards_reports`, `windows`, and
+`windows_dashboards_reports`.
 
-- `aws`
-- `cisco_data_center`
-- `cisco_enterprise_networks`
-- `cisco_thousandeyes`
-- `citrix`
-- `example_glass_tables`
-- `ite_work_alert_routing`
-- `itsi_monitoring_and_alerting`
-- `linux`
-- `microsoft_365`
-- `microsoft_exchange`
-- `netapp_data_ontap_dashboards_reports`
-- `pivotal_cloud_foundry`
-- `servicenow`
-- `shared_it_infrastructure`
-- `soar_system_logs`
-- `splunk_appdynamics`
-- `splunk_observability_cloud`
-- `splunk_as_a_service`
-- `splunk_synthetic_monitoring`
-- `third_party_apm`
-- `unix_dashboards_reports`
-- `vmware`
-- `vmware_dashboards_reports`
-- `windows`
-- `windows_dashboards_reports`
+Only AWS, Cisco, Linux, AppDynamics, Observability, VMware, and Windows profiles
+currently have richer local readiness checks. All other profiles are catalog-
+generic unless `configured_outcome` provides a reviewed typed configuration.
 
-The Cisco/AWS/Linux/AppDynamics/Observability/VMware/Windows profiles have richer app, input, and macro checks. The other documented Content Packs 2.5 profiles use catalog-generic install/visibility validation plus explicit follow-up steps. For a pack that is not listed, use `title`, `catalog_title`, or `pack_id` directly.
+## Topology rules
 
-## Reports
+- A node defines exactly one of `service_ref` or `service`.
+- Template-backed nodes use `service` plus `from_template`.
+- Reuse shared downstream services with `ref`; duplicate materializations,
+  unresolved references, self-dependencies, missing explicit KPI names, and
+  cycles fail lint or preview.
+- Pack-relative resolution is read-only in preview and must resolve to live
+  objects after an approved import.
+- Topology cleanup uses the same guarded native cleanup model. Topology-derived
+  service titles are protected from unmanaged candidates.
+- The glass-table generator creates a review starter only; it is not evidence
+  that the visual layout is accepted or useful in the target ITSI version.
 
-Every content-pack run writes a report under `reports/<timestamp>/content-pack-summary.md`.
+## Reports and evidence
 
-Every topology run writes a report under `reports/<timestamp>/topology-summary.md`.
+Content-pack runs write
+`skills/splunk-itsi-config/reports/<timestamp>/content-pack-summary.md`.
+Topology runs write
+`skills/splunk-itsi-config/reports/<timestamp>/topology-summary.md`.
+Native runs emit structured JSON and optional export/inventory/prune artifacts.
 
-Use that report to hand off the remaining module-driven steps after install.
+Do not report success from package presence or object creation alone. Completion
+evidence should include the post-apply validation result, data readiness for KPI
+searches, expected service/dependency state, content-pack dashboards or explicit
+evidence that none ship, and named manual follow-up with an owner.

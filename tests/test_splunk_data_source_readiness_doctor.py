@@ -739,8 +739,8 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
                 with self.subTest(rule=item["id"]):
                     self.assertIsNone(doctor.DIRECT_DANGEROUS_RE.search(item["apply_command"]))
 
-    def test_mcp_classifies_doctor_phases_and_apply_safely(self) -> None:
-        read_only_cases = [
+    def test_mcp_generic_doctor_scripts_are_always_mutation_gated(self) -> None:
+        generic_cases = [
             ["--phase", "doctor"],
             ["--phase", "fix-plan", "--evidence-file", str(UNREADY_FIXTURE)],
             ["--phase", "validate"],
@@ -750,12 +750,12 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
             ["--phase", "synthesize"],
             ["--phase", "apply", "--fixes", "DSRD-CIM-TAG-EVENTTYPE-GAP", "--dry-run"],
         ]
-        for args in read_only_cases:
+        for args in generic_cases:
             with self.subTest(args=args):
                 plan = core.plan_skill_script("splunk-data-source-readiness-doctor", "setup.sh", args)
-                self.assertTrue(plan["read_only"])
+                self.assertFalse(plan["read_only"])
                 direct_plan = core.plan_skill_script("splunk-data-source-readiness-doctor", "doctor.py", args)
-                self.assertTrue(direct_plan["read_only"])
+                self.assertFalse(direct_plan["read_only"])
 
         mutating_plan = core.plan_skill_script(
             "splunk-data-source-readiness-doctor",

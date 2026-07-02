@@ -128,6 +128,8 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "8365",
     "8485",
     "8566",
+    "8698",
+    "8699",
     "8704",
 }
 
@@ -146,6 +148,48 @@ def _on_disk_skill_dirs() -> set[str]:
 
 
 class RegistryRegressionTests(ShellScriptRegressionBase):
+    def test_app_registry_compatibility_status_matches_10_5_target(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        target = registry["compatibility_target"]
+        self.assertEqual(target, "10.5")
+
+        numeric_apps = [
+            app
+            for app in registry.get("apps", [])
+            if str(app.get("splunkbase_id", "")).isdigit()
+        ]
+        for app in numeric_apps:
+            with self.subTest(app_id=app["splunkbase_id"]):
+                expected = "supported" if target in app["platform_versions"] else "unsupported"
+                self.assertEqual(app["compatibility_status"], expected)
+
+        unsupported_ids = {
+            str(app["splunkbase_id"])
+            for app in numeric_apps
+            if app["compatibility_status"] == "unsupported"
+        }
+        self.assertEqual(
+            unsupported_ids,
+            {
+                "2884",
+                "2911",
+                "3172",
+                "4147",
+                "5608",
+                "5863",
+                "6415",
+                "6843",
+                "7125",
+                "7404",
+                "7539",
+                "7828",
+                "8698",
+                "8699",
+            },
+        )
+
     def test_enterprise_networking_registry_declares_companion_ta_dependency(self):
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
@@ -298,7 +342,10 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(sc4snmp["role_support"]["external-collector"], "required")
         observability_otel = skill_topologies["splunk-observability-otel-collector-setup"]
         self.assertEqual(observability_otel["role_support"]["external-collector"], "required")
-        self.assertEqual(observability_otel["cloud_pairing"], ["external-collector"])
+        self.assertEqual(
+            observability_otel["cloud_pairing"],
+            ["heavy-forwarder", "universal-forwarder", "external-collector"],
+        )
         observability_dashboards = skill_topologies["splunk-observability-dashboard-builder"]
         self.assertTrue(
             all(value == "none" for value in observability_dashboards["role_support"].values())
@@ -839,15 +886,29 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
 
 
 class PlatformVersionsContractTests(ShellScriptRegressionBase):
-    def test_shared_platform_versions_json_lists_10_4(self):
+    def test_shared_platform_versions_distinguish_cloud_10_5_from_enterprise_10_4(self):
         path = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         defaults = payload["defaults"]
         self.assertEqual(defaults["enterprise_version"], "10.4.0")
-        self.assertEqual(defaults["cloud_doc_train"], "10.4.2603")
+        self.assertEqual(defaults["cloud_doc_train"], "10.5.2605")
+        self.assertEqual(defaults["cloud_doc_train_previous"], "10.4.2604")
+        self.assertEqual(defaults["splunkbase_compatibility_target"], "10.5")
         self.assertIn("10.4", payload["enterprise_platform_versions"])
+        self.assertNotIn("10.5", payload["enterprise_platform_versions"])
+        self.assertNotIn("10.1", payload["enterprise_platform_versions"])
+        self.assertNotIn("9.2", payload["enterprise_platform_versions"])
+        self.assertIn("10.5", payload["enterprise_unreleased_trains"])
+        self.assertNotIn("10.4.2603", payload["cloud_doc_trains"])
         self.assertIn("10.4", payload["svd_enterprise_floors"])
         self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
+        pins = payload["splunkbase_pins"]
+        self.assertEqual(pins["7125"]["latest_version"], "0.154.2")
+        self.assertEqual(pins["7125"]["max_platform_version"], "10.4")
+        self.assertEqual(pins["8698"]["max_platform_version"], "10.4")
+        self.assertEqual(pins["8699"]["max_platform_version"], "10.4")
+        for app_id in ("8704", "7180", "263"):
+            self.assertEqual(pins[app_id]["max_platform_version"], "10.5")
 
         import sys
 
@@ -858,3 +919,8 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.0")
         self.assertEqual(platform_default("enterprise_version", path=path), "10.4.0")
         self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")
+
+        sys.path.insert(0, str(REPO_ROOT / "skills/shared/scripts"))
+        from audit_splunkbase_registry import default_compatibility_target
+
+        self.assertEqual(default_compatibility_target(), "10.5")

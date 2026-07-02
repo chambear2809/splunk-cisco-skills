@@ -17,6 +17,47 @@ from lib.common import ValidationError  # noqa: E402
 
 
 class SplunkRestClientTests(unittest.TestCase):
+    def test_title_lookup_fails_closed_when_live_objects_are_ambiguous(self) -> None:
+        client = SplunkRestClient(
+            ClientConfig(
+                base_url="https://example.com",
+                verify_ssl=False,
+                username=None,
+                password=None,
+                session_key="token",
+            )
+        )
+        client._request = lambda *_args, **_kwargs: {  # type: ignore[attr-defined]
+            "entry": [
+                {"content": {"_key": "team:1", "title": "Operations"}},
+                {"content": {"_key": "team:2", "title": "Operations"}},
+            ]
+        }
+
+        with self.assertRaisesRegex(ValidationError, "Ambiguous ITSI team lookup"):
+            client.find_object_by_title("team", "Operations")
+
+    def test_event_management_pagination_uses_skip_not_offset(self) -> None:
+        client = SplunkRestClient(
+            ClientConfig(
+                base_url="https://example.com",
+                verify_ssl=False,
+                username=None,
+                password=None,
+                session_key="token",
+            )
+        )
+        calls: list[object] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append(params)
+            return {"entry": []}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+        client.list_objects("notable_event_aggregation_policy", interface="event_management", limit=10, offset=20)
+
+        self.assertEqual(calls, [{"limit": 10, "skip": 20}])
+
     def test_get_app_version_returns_version_and_missing_none(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
 
@@ -166,11 +207,10 @@ class SplunkRestClientTests(unittest.TestCase):
         catalog = client.content_pack_catalog()
 
         self.assertEqual(catalog, [{"id": "DA-ITSI-CP-appdynamics", "title": "Splunk AppDynamics", "version": "1.0.1", "installed_versions": []}])
-        self.assertEqual(client.content_library_discovery_status()["status"], "ok")
+        self.assertEqual(client.content_library_discovery_status()["status"], "not_attempted")
         self.assertEqual(
             calls,
             [
-                ("POST", "/servicesNS/nobody/DA-ITSI-ContentLibrary/content_library/discovery"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack"),
             ],
@@ -188,6 +228,7 @@ class SplunkRestClientTests(unittest.TestCase):
 
         client._request = fake_request  # type: ignore[attr-defined]
 
+        client.sync_content_library_catalog()
         self.assertEqual(client.content_pack_catalog(), [])
         self.assertEqual(
             client.content_library_discovery_status(),
@@ -367,7 +408,7 @@ class SplunkRestClientTests(unittest.TestCase):
                 (
                     "GET",
                     "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service",
-                    {"count": 0, "filter": '{"title": "API"}'},
+                    {"limit": 0, "filter": '{"title": "API"}'},
                 )
             ],
         )
@@ -387,7 +428,7 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(listed, [{"_key": "service:1", "title": "API"}])
         self.assertEqual(
             calls,
-            [("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service", {"count": 0})],
+            [("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service", {"limit": 0})],
         )
 
     def test_list_objects_supports_filter_projection_and_windowing(self) -> None:
@@ -415,7 +456,7 @@ class SplunkRestClientTests(unittest.TestCase):
                 (
                     "GET",
                     "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service",
-                    {"count": 25, "filter": '{"title": "API"}', "fields": "_key,title", "offset": 50},
+                    {"limit": 25, "filter": '{"title": "API"}', "fields": "_key,title", "offset": 50},
                 )
             ],
         )
@@ -576,7 +617,7 @@ class SplunkRestClientTests(unittest.TestCase):
 
         def fake_request(method, path, params=None, payload=None):
             calls.append((method, path, params, payload))
-            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1":
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/pack%3A1":
                 raise KeyError(path)
             if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack/pack%3A1":
                 return {"_key": "pack:1"}
@@ -592,7 +633,7 @@ class SplunkRestClientTests(unittest.TestCase):
             [
                 (
                     "POST",
-                    "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/pack%3A1",
                     None,
                     payload,
                 ),
@@ -611,7 +652,7 @@ class SplunkRestClientTests(unittest.TestCase):
 
         def fake_request(method, path, params=None, payload=None):
             calls.append((method, path, params, payload))
-            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1":
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/pack%3A1":
                 return {"_key": "pack:1"}
             raise AssertionError(path)
 
@@ -622,7 +663,7 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(result, {"_key": "pack:1"})
         self.assertEqual(
             calls,
-            [("DELETE", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1", None, None)],
+            [("DELETE", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/pack%3A1", None, None)],
         )
 
     def test_backup_restore_object_uses_backup_restore_interface(self) -> None:
@@ -651,7 +692,7 @@ class SplunkRestClientTests(unittest.TestCase):
 
         def fake_request(method, path, params=None, payload=None):
             calls.append((method, path, payload))
-            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack":
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack":
                 raise KeyError(path)
             if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack":
                 return {"_key": "pack:1"}
@@ -665,7 +706,7 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack", {"title": "Network Pack"}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack", {"title": "Network Pack"}),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack", {"title": "Network Pack"}),
             ],
         )
@@ -984,9 +1025,9 @@ class SplunkRestClientTests(unittest.TestCase):
 
         def fake_request(method, path, params=None, payload=None):
             calls.append((method, path, payload))
-            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/cp%3Anetwork/submit":
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/cp%3Anetwork/submit":
                 return {"submitted": True}
-            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/files/cp%3Anetwork.tar.gz":
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/files/cp%3Anetwork.tar.gz":
                 return b"archive"
             raise AssertionError(path)
 
@@ -997,8 +1038,8 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/cp%3Anetwork/submit", None),
-                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/files/cp%3Anetwork.tar.gz", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/content_pack/cp%3Anetwork/submit", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship/files/cp%3Anetwork.tar.gz", None),
             ],
         )
 
@@ -1012,9 +1053,21 @@ class SplunkRestClientTests(unittest.TestCase):
             },
             clear=True,
         ):
-            client = SplunkRestClient.from_spec({"connection": {}})
+            client = SplunkRestClient.from_spec({"connection": {"allow_insecure_tls": True}})
 
         self.assertFalse(client.config.verify_ssl)
+
+    def test_from_spec_rejects_unacknowledged_disabled_tls_verification(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "SPLUNK_SEARCH_API_URI": "https://example.com:8089",
+                "SPLUNK_SESSION_KEY": "token",
+                "SPLUNK_VERIFY_SSL": "false",
+            },
+            clear=True,
+        ), self.assertRaisesRegex(ValidationError, "allow_insecure_tls"):
+            SplunkRestClient.from_spec({"connection": {}})
 
     def test_from_spec_verify_ssl_overrides_environment(self) -> None:
         with patch.dict(

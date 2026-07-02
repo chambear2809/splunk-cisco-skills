@@ -12,7 +12,8 @@ def test_shared_10_4_note_covers_enterprise_deployment_gates() -> None:
     text = SHARED_NOTE.read_text(encoding="utf-8")
     for phrase in (
         "10.4.0",
-        "10.4.2603",
+        "10.5.2605",
+        "10.4.2604",
         "non-root service user",
         "NT SERVICE\\Splunkd",
         "dedicated non-admin",
@@ -47,3 +48,5 @@ def test_plan_scope_references_link_shared_10_4_note() -> None:
     for rel in refs:
         text = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "splunk_10_4_enterprise_deployment_notes.md" in text, rel
+        assert "10.5.2605" in text, rel
+        assert "10.4.2603" not in text, rel

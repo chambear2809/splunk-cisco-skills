@@ -8,7 +8,8 @@ does not know ITSI object schemas yet.
 Help the user get from "I need ITSI for this environment" to one of these safe,
 previewable outcomes:
 
-- Install or validate a supported ITSI content pack.
+- Import or validate a supported ITSI content pack that is already available in
+  an existing ITSI Content Library.
 - Build a small service tree with clear parent and child services.
 - Add a few KPIs that use known SPL searches, indexes, or macros.
 - Validate the result and produce a handoff report.
@@ -23,7 +24,12 @@ Ask for missing non-secret values only:
 
 - Splunk platform: `enterprise`, `cloud`, or `auto` when the credential file URL should decide.
 - Splunk management URL, such as `https://splunk.example.com:8089`.
-- Whether ITSI and the Splunk App for Content Packs are already installed.
+- Confirmation that ITSI is already installed, licensed, and healthy. Detect
+  this from the target when possible.
+- For content packs, confirmation that the version-compatible Content Library
+  API/provider and the pack's prerequisite apps are already available. On ITSI
+  4.21 this normally means a compatible Splunk App for Content Packs. Missing
+  apps are handoffs, not automatic work in this skill.
 - Business service name, such as `Branch Network`, `Payments`, or `Campus WiFi`.
 - Supported product domains already sending data: AWS, Cisco Data Center, Cisco Enterprise Networks, Cisco ThousandEyes, Linux, AppDynamics, Splunk Observability Cloud, VMware, or Windows.
 - Indexes, sourcetypes, or macro values for the relevant data.
@@ -33,6 +39,10 @@ Ask for missing non-secret values only:
 Never ask for passwords, API keys, tokens, client secrets, or Splunkbase
 credentials in chat. If credentials are missing, use the repository credential
 setup workflow described in the root `AGENTS.md`.
+
+If ITSI itself is absent or unhealthy, stop and hand off to
+`splunk-itsi-setup`. Do not continue to apply and do not enable legacy
+`install_if_missing` fields.
 
 ## Workflow Picker
 
@@ -59,36 +69,85 @@ Use `native` when:
 
 ## Fast Path: Content Pack
 
-Start from:
+Copy the starter to the gitignored local intake file:
 
 ```bash
-bash scripts/setup.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
+cp skills/splunk-itsi-config/templates/beginner.content-pack.yaml \
+  skills/splunk-itsi-config/template.local
 ```
 
-Then apply only after the preview looks right:
+Replace the example pack/index values. Leave `metadata.template: true` while
+editing; set it to `false` only after the preview is reviewed and immediately
+before an approved apply.
+
+Lint it without credentials or network access, then run the GET-only preview:
 
 ```bash
-bash scripts/setup.sh --workflow content-packs --spec templates/beginner.content-pack.yaml --apply
-bash scripts/validate.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow content-packs \
+  --spec skills/splunk-itsi-config/template.local \
+  --mode lint
+
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow content-packs \
+  --spec skills/splunk-itsi-config/template.local
 ```
 
-For Splunk Cloud, preview and validate can identify missing apps, but installing
-the Splunk App for Content Packs may require a Splunk Support or Cloud App
-Request.
+After explicit approval of the target and preview, apply and validate:
+
+```bash
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow content-packs \
+  --spec skills/splunk-itsi-config/template.local \
+  --apply
+
+bash skills/splunk-itsi-config/scripts/validate.sh \
+  --workflow content-packs \
+  --spec skills/splunk-itsi-config/template.local \
+  --completion
+```
+
+For Splunk Cloud, missing prerequisite apps may require a Splunk Support or
+Cloud App Request. This skill reports that handoff and makes no package change.
+Catalog refresh is also a write: leave it off for preview and validation, and
+set `content_library.refresh_catalog: true` only for a separately approved
+apply when a refresh is actually required.
 
 ## Fast Path: Service Tree
 
-Start from:
+Copy the starter, replace all sample service names/searches/indexes, and lint:
 
 ```bash
-bash scripts/setup.sh --workflow topology --spec templates/beginner.topology.yaml
+cp skills/splunk-itsi-config/templates/beginner.topology.yaml \
+  skills/splunk-itsi-config/template.local
+
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --mode lint
 ```
 
-Then apply only after the preview looks right:
+The apply gate rejects a copied starter while `metadata.template: true` or a
+known placeholder remains. Set the marker to `false` only after completing and
+reviewing the local spec.
+
+Run the GET-only preview, then apply only after the target and changes are
+explicitly approved:
 
 ```bash
-bash scripts/setup.sh --workflow topology --spec templates/beginner.topology.yaml --apply
-bash scripts/validate.sh --workflow topology --spec templates/beginner.topology.yaml
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local
+
+bash skills/splunk-itsi-config/scripts/setup.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --apply
+
+bash skills/splunk-itsi-config/scripts/validate.sh \
+  --workflow topology \
+  --spec skills/splunk-itsi-config/template.local \
+  --completion
 ```
 
 Keep services disabled in the first pass unless the user explicitly wants ITSI
@@ -98,9 +157,22 @@ health scoring and alerting enabled immediately.
 
 Before preview, confirm:
 
+- Bash, Python 3, and Ruby are available; the wrapper uses Ruby's standard YAML
+  parser before the Python offline validator.
+- Offline lint passes; before apply, the stricter lint gate also confirms
+  `metadata.template: false` and no starter placeholder remains.
 - `connection.base_url` points at the Splunk management API, usually port `8089`,
   or it is blank and `SPLUNK_SEARCH_API_URI` is set in the credential file.
 - `connection.platform` is set to `auto`, `enterprise`, or `cloud`.
+- ITSI is already installed, licensed, enabled, and healthy; content-pack
+  prerequisites are already installed when that workflow is selected.
+- TLS verification is enabled, or a readable private CA bundle is configured.
+  A lab-only `verify_ssl: false` target is rejected unless
+  `connection.allow_insecure_tls: true` (or
+  `SPLUNK_ALLOW_INSECURE_TLS=true`) explicitly acknowledges that risk; it can
+  never satisfy production completion.
+- The authenticated user has the required ITSI object capability and write
+  access to the target team (and Global-team access for Global objects).
 - New services have clear names and descriptions.
 - Each KPI has a search that returns the `threshold_field`.
 - Dependency edges point from the parent service to the service it depends on.
@@ -126,6 +198,7 @@ When summarizing preview output for a beginner, use this shape:
 
 ```text
 Preview result:
+- Target and detected versions: <stack/host, Splunk, ITSI, Content Library>
 - Ready to create/update: <services, KPIs, dependencies, packs>
 - Needs attention before apply: <missing apps, indexes, macros, searches>
 - Will stay manual: <content-pack module steps without a safe configured_outcome>
@@ -136,8 +209,11 @@ Preview result:
 
 A beginner setup is ready to hand off when:
 
+- Lint passed and preview made no writes.
 - Preview has no unexpected destructive actions.
 - Apply finishes without prerequisite errors.
-- Validate passes or returns only known manual follow-up items.
+- Completion validation passes, including bounded data/search checks where
+  available, or returns only explicitly owned manual follow-up items.
 - The generated report identifies installed packs, created services, dependency
-  edges, configured outcomes, and remaining module steps.
+  edges, configured outcomes, target/version evidence, and remaining module
+  steps.

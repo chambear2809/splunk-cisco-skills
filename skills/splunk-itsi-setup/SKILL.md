@@ -2,10 +2,10 @@
 name: splunk-itsi-setup
 description: >-
   Install and validate Splunk IT Service Intelligence (ITSI) on Splunk Cloud or
-  Splunk Enterprise. Handles installation from Splunkbase with local fallback,
-  validates core ITSI components, and checks integration readiness for apps
-  like Cisco ThousandEyes. Use when the user asks about ITSI, IT Service
-  Intelligence, AIOps, service monitoring, SA-ITOA, or event analytics.
+  Splunk Enterprise. Use when the outcome is ITSI product/package installation,
+  upgrade, license readiness, restart, core-app health, or installation
+  validation; route post-install entities, services, KPIs, dependencies, Event
+  Analytics configuration, and content-pack import to splunk-itsi-config.
 ---
 
 # Splunk ITSI Setup Automation
@@ -30,6 +30,19 @@ bidirectional integrations in apps like Cisco ThousandEyes.
 
 ITSI requires a valid Splunk ITSI license. The install skill handles package
 delivery but does not manage licensing.
+
+## Routing boundary
+
+Use this skill when the requested outcome is to install, upgrade, restart, or
+validate the **ITSI product and its core app bundle**. After ITSI is installed,
+licensed, enabled, and healthy, stop this workflow and hand configuration to
+[`splunk-itsi-config`](../splunk-itsi-config/SKILL.md).
+
+Examples owned by `splunk-itsi-config` include entities, services, KPIs,
+thresholds, dependencies, service trees, service-template links, custom NEAPs,
+maintenance and other reviewed native objects, and content-pack catalog/import
+work. The configuration skill must never call this installation workflow
+automatically; a missing-product finding is an explicit user-visible handoff.
 
 ## Package Model
 

@@ -1,6 +1,17 @@
 # Native ITSI Workflow
 
-The native workflow manages live ITSI objects through the ITSI REST API:
+The native workflow configures an existing ITSI deployment. It does not install,
+upgrade, license, or restart ITSI and it does not install prerequisite apps.
+Run repo-root lint first, then GET-only preview/inventory, explicit `--apply`,
+and completion validation as described in `../SKILL.md`.
+
+The following list is a route inventory, not a claim that every object has a
+typed and live-certified local schema. See `product_coverage.md`: core entities,
+services, embedded KPIs, dependencies, and selected links are typed; many
+extended objects below are experimental same-version passthroughs; operational
+helpers are guarded.
+
+The route inventory includes:
 
 - `team`
 - `entity`
@@ -35,19 +46,36 @@ The native workflow manages live ITSI objects through the ITSI REST API:
 - `upgrade_readiness_prechecks`
 - `summarization`
 - `summarization_feedback`
+- `summarization_rule` (ITSI 5.0)
 - `user_preference`
 
-The core `entity`, `service`, service `kpis`, and `neaps` sections keep their typed convenience fields and also merge additional top-level ITSI schema fields plus `payload` into the REST body. The extended ITSI object sections are typed passthrough upserts: the skill sets `title`, `description`, `sec_grp`, and `object_type`, then merges any additional top-level keys and `payload` into the REST body. Use `payload` for exact exported ITSI schema fields when Splunk changes object shapes between ITSI versions.
+The core `entity`, `service`, service `kpis`, and custom `neaps` sections keep
+typed convenience fields and can merge reviewed ITSI schema fields from
+`payload`. Extended object sections are **experimental passthroughs**: the skill
+can select a route and merge fields, but it does not prove the complete schema,
+mutability, permissions, or lifecycle semantics. Use only payloads exported
+from the same ITSI version, lint them, and require a clean live preview. Do not
+describe a passthrough as full product-feature support.
 
 ## Supported Native Spec Shape
 
+The following block is a field catalog for advanced review. It is not a starter
+spec and must not be applied as written: it contains placeholder identifiers,
+experimental passthrough objects, and enabled examples of non-idempotent helper
+actions. Build a minimal `template.local` containing only the requested object
+families.
+
 ```yaml
+schema_version: 1
+metadata:
+  template: true
+
 connection:
   base_url: https://splunk.example.com:8089
   username_env: SPLUNK_USERNAME
   password_env: SPLUNK_PASSWORD
   session_key_env: SPLUNK_SESSION_KEY
-  verify_ssl: false
+  verify_ssl: true
 
 defaults:
   sec_grp: default_itsi_security_group
@@ -261,15 +289,15 @@ upgrade_readiness_prechecks:
     payload:
       status: ready
 
-summarizations:
-  - title: Example KPI Summary
+summarization_rules:
+  - title: Example Event iQ Diagnose Rule
+    description: ITSI 5.0 only; replace with a target-version exported rule.
     payload:
-      window: 15m
+      enabled: false
 
-summarization_feedback:
-  - title: Example KPI Summary Feedback
-    payload:
-      rating: useful
+# `summarizations` and `summarization_feedback` are operational records, not
+# declarative configuration. Apply rejects them. Use read-only inventory or a
+# separately reviewed operational workflow instead.
 
 user_preferences:
   - title: Example ITSI User Preferences
@@ -348,16 +376,39 @@ operational_actions:
     output_path: /tmp/custom-content-pack.tar.gz
 ```
 
+The single block above is a field catalog, **not a copy-and-apply starter**. It
+contains placeholder IDs and non-idempotent actions. Start from
+`templates/beginner.topology.yaml` or a small same-version export copied to
+`skills/splunk-itsi-config/template.local`. Lint refuses unresolved starter
+placeholders and unsafe reusable action intent before a live run.
+
 ## Notes
 
 - The workflow intentionally preserves unmanaged fields and extra live KPIs instead of pruning them.
-- Brownfield read-only modes are available via `setup.sh --workflow native --mode export|inventory|prune-plan`. Use `export --output exported.native.yaml --output-format yaml` to generate a native YAML skeleton from live ITSI, `inventory` for object/app/KV Store counts plus supported-object/alias/notable-action/entity-discovery discovery, and `prune-plan` to list unmanaged live objects without deleting them. Export skips managed/default NEAPs by default because preview/apply/validate intentionally protect them; set `export.include_managed_neaps: true` only when an operator needs those objects in an audit export. Export and prune-plan skip optional ITSI route families that are not exposed by the live host and report warning diagnostics/unavailable sections instead of aborting the whole run.
+- Brownfield read-only modes are available via
+  `bash skills/splunk-itsi-config/scripts/setup.sh --workflow native --spec <path> --mode export|inventory|prune-plan`.
+  Use export with `--output exported.native.yaml --output-format yaml` to
+  generate a review skeleton, inventory for object/app/KV Store counts and
+  supported discovery, and prune-plan to list unmanaged objects without
+  deleting them. These modes are GET-only. Export skips managed/default NEAPs
+  by default; set `export.include_managed_neaps: true` only for an explicit
+  audit need. Unavailable optional route families are warnings and remain
+  unverified, not silently “supported.”
 - `inventory.use_count_endpoints: true` records documented REST count-endpoint totals alongside listed objects, and `inventory.count_only: true` uses those count endpoints without collecting titles for large estates. Normal inventory/prune scans request only lightweight identity/source fields where the route supports field projections. `inventory.maintenance_object_keys` adds read-only active/window-count checks for specific live service or entity keys. `inventory.entity_discovery_entity_keys` reads the documented entity-discovery-searches route for specific live entities. `inventory.notable_event_group_filter` and `inventory.notable_event_filter` are passed to Event Management count/read endpoints when the host exposes them; set `inventory.list_notable_events: true`, `inventory.notable_event_limit`, and `inventory.notable_event_fields` for bounded notable-event readback. `inventory.notable_event_action_names`, `inventory.ticket_episode_keys`, `inventory.episode_export_filter`, `inventory.episode_export_keys`, and `inventory.templatize_objects` add read-only action-detail, ticket, export, and template-generation coverage. Inventory also reports the `entity/count_retirable` target list/count when the live host exposes it.
 - `bulk_apply.enabled: true` is an opt-in native apply mode for large estates. It batches eligible existing keyed updates through `itoa_interface/<object_type>/bulk_update` while preserving per-object preview and change records. Use `bulk_apply.sections` to restrict the batch to known-safe sections; creates, special route families, dependency merges, high-risk cleanup, and explicit operational actions keep their separate guarded paths.
-- Guarded cleanup is available via `setup.sh --workflow native --mode cleanup-apply --backup-output cleanup-backup.native.yaml`. A cleanup spec must copy the current `prune-plan` `plan_id` and selected `candidate_ids`, set `cleanup.allow_destroy: true`, set `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, and set a positive `cleanup.max_deletes`. The CLI writes the backup export before any delete call.
+- Guarded cleanup is available via
+  `bash skills/splunk-itsi-config/scripts/setup.sh --workflow native --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`.
+  A cleanup spec must copy the current prune-plan `plan_id` and selected
+  `candidate_ids`, set `cleanup.allow_destroy: true`, set
+  `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, and set a positive
+  `cleanup.max_deletes`. The local backup export is evidence, not a guarantee of
+  full ITSI restore capability.
 - High-risk cleanup candidates for `custom_content_packs`, `glass_table_icons`, and `kpi_entity_thresholds` are manual-review by default. To make them delete-eligible, rerun `prune-plan` with `cleanup.allow_high_risk_deletes: true` and `cleanup.confirm_high_risk: DELETE_HIGH_RISK_ITSI_OBJECTS`; `cleanup-apply` also requires every selected high-risk `candidate_id` to appear in `cleanup.high_risk_candidate_ids`.
 - Cleanup defaults are conservative. Keyless objects, unsupported route families, and known default/shipped ITSI or content-pack objects are marked manual-review only. Set `cleanup.allow_system_objects: true` only when you intentionally want those protected candidates to become delete-eligible after reviewing the current prune plan.
-- `python3 scripts/native_offline_smoke.py --spec-json <path>` exercises native preview/apply/validate/export/inventory/prune-plan plus an in-memory cleanup delete and never connects to Splunk.
+- `python3 skills/splunk-itsi-config/scripts/native_offline_smoke.py --spec-json <path>`
+  exercises native preview/apply/validate/export/inventory/prune-plan plus an
+  in-memory cleanup delete and never connects to Splunk. Prefer the supported
+  repo-root `setup.sh ... --mode lint` gate for a YAML intake spec.
 - Validation diagnostics include field-level diffs for managed drift where the live object exists.
 - Preview/apply/validate emit warning diagnostics for obvious KPI/correlation-search preflight issues, such as searches without explicit index constraints or threshold fields not visible in the SPL text.
 - Core `entities`, `services`, and service `kpis` accept documented ITSI schema fields at the top level. Use `payload` for fields that need exact exported object shape or would conflict with local DSL keys.
@@ -368,16 +419,41 @@ operational_actions:
 - Custom threshold window stop and disconnect actions are operational/destructive transitions, so they are intentionally outside the additive upsert model.
 - Entities can declare `entity_type_titles`; these resolve against live `entity_type` objects or entity types created earlier in the same spec.
 - Custom NEAP support accepts top-level policy fields and `payload`; both are merged into the live aggregation-policy body through the ITSI event management interface. Managed, packaged, and default NEAPs are protected from overwrite.
-- Extended sections are additive/idempotent and do not delete unmanaged objects. They include entity-management policies/rules, data-integration templates, refresh queue jobs, sandboxes, sandbox services/sync logs, upgrade-readiness prechecks, summarizations/feedback, and user preferences as schema passthrough sections.
-- `custom_content_packs` use the ITSI content pack authorship route. Submit and download are explicit guarded operational actions because they are lifecycle transitions, not idempotent upserts. This is separate from the `packs` installation workflow in `references/content_packs.md`.
+- Extended sections are experimental passthroughs and do not imply safe,
+  complete, or idempotent feature management. They include entity-management
+  policies/rules, data-integration templates, refresh queue jobs, sandboxes,
+  sandbox services/sync logs, upgrade-readiness prechecks, ITSI 5.0
+  `summarization_rules`, and user preferences. Require same-version export
+  evidence and live preview for each use. `summarizations` and
+  `summarization_feedback` represent operational Event iQ request/result and
+  per-user feedback records; apply rejects those sections rather than treating
+  them as titled desired-state objects.
+- `custom_content_packs` use the ITSI content pack authorship route. Submit and download are explicit guarded operational actions because they are lifecycle transitions, not idempotent upserts. This is separate from the `packs` import workflow in `references/content_packs.md`.
 - `event_management_states` use the core ITSI object route on tested ITSI 4.21.2 hosts. `correlation_searches`, `notable_event_email_templates`, and `neaps` use the ITSI `event_management_interface`; lookups use that route's `filter_data` request parameter rather than the core ITSI `filter` parameter. Event Management interface creates are wrapped in the documented `data` envelope; keyed updates send the object payload directly.
 - `correlation_searches` can use `title` in the YAML spec for readability; the workflow writes it as the ITSI `name` field because the correlation-search schema uses `name` as the stable object name.
 - `deep_dives` are normalized from the existing live object before update so required owner fields remain in the update payload.
 - `glass_table_icons` use the ITSI icon collection API, which upserts icons in bulk. The native workflow handles that special route behind the same preview/apply/validate behavior.
-- `backup_restore_jobs` are exposed for backup automation. Restore payloads can be destructive in a live ITSI environment and are rejected unless the spec sets `allow_restore: true`; that local guard is not sent to ITSI.
-- `operational_actions` are explicit non-idempotent helper transitions. Supported actions are `entity_retire`, `entity_restore`, `entity_retire_retirable`, `custom_threshold_window_disconnect`, `custom_threshold_window_stop`, `kpi_threshold_recommendation`, `kpi_entity_threshold_recommendation`, `shift_time_offset`, `notable_event_group_update`, `notable_event_comment_create`, `notable_event_action_execute`, `ticket_link`, `ticket_read`, `ticket_unlink`, `episode_export_create`, `episode_export_list`, `episode_export_get`, `episode_export_download`, `episode_export_delete`, `episode_export_file_delete`, `templatize_object`, `bulk_update`, `custom_content_pack_submit`, and `custom_content_pack_download`. Each action is blocked unless it sets `allow_operational_action: true`; higher-risk actions require a second explicit guard such as `disconnect_all`, `retire_all_retirable`, `allow_episode_field_change`, `allow_notable_event_action_execute`, `allow_ticket_unlink`, `allow_episode_export_delete`, `allow_episode_export_bulk_delete`, or `allow_bulk_update`. `entity_retire_retirable` previews read `entity/count_retirable` targets when available, notable-event action execution reads action metadata before execution when available, and apply mode records helper response payloads in informational diagnostics.
+- `backup_restore_jobs` is an experimental payload path, not a recovery
+  guarantee. Restore can replace matching objects and is rejected unless the
+  spec sets `allow_restore: true`; that flag is only a local guard. Also verify
+  product backup dependencies, permissions, service-template sync state, and a
+  tested rollback plan. Prefer the supported ITSI backup/restore workflow for
+  production recovery.
+- `operational_actions` are explicit non-idempotent helper transitions, not
+  declarative desired state. Supported local helpers include `entity_retire`,
+  `entity_restore`, `entity_retire_retirable`, custom-threshold stop/disconnect,
+  threshold recommendations, time shifting, selected episode/comment/action and
+  ticket operations, episode exports, templatize, bulk update, and custom pack
+  submit/download. Each action needs `allow_operational_action: true`; higher-
+  risk actions need their documented second guard. Keep actions in a one-run
+  intake, preview the exact targets, remove the authorization after execution,
+  and never assume rerunning apply is safe.
 - `entity_retire` and `entity_restore` accept `entity_keys` as a convenience shorthand for the documented `payload.data` list.
 - Operational Event Analytics records and APIs such as notable events, notable event groups, notable event comments, ticket actions, and action execution are intentionally not modeled as idempotent upsert sections; use guarded `operational_actions` for explicit appends or transitions. Notable-event records are covered only by read-only inventory/count filters.
-- `entity_filter_rule` is supported as a typed passthrough section. Relationship object types (`entity_relationship` and `entity_relationship_rule`) remain outside the managed model because Splunk documents them as unused. Entity discovery searches are read-only inventory helpers rather than managed upsert objects.
+- `entity_filter_rule` is an experimental passthrough section. Relationship
+  object types (`entity_relationship` and `entity_relationship_rule`) remain
+  outside the managed model because Splunk documents them as unused. Entity
+  discovery searches are read-only inventory helpers rather than managed
+  upsert objects.
 - Cleanup deletes are intentionally narrower than the prune plan. Content-pack authorship objects, glass-table icons, and KPI entity thresholds can be deleted only with the separate high-risk guard fields described above.
 - The validator compares only the fields this skill manages, but reports path-level diffs for those managed fields when possible.

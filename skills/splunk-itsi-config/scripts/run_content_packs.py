@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -46,6 +47,10 @@ def main() -> int:
     args = parse_args()
     try:
         spec = load_json(args.spec_json)
+        if args.mode == "apply" and os.environ.get("ITSI_CONFIG_APPLY_AUTHORIZED") != "1":
+            raise SkillError(
+                "Write mode is not authorized. Use skills/splunk-itsi-config/scripts/setup.sh with --apply."
+            )
         client = SplunkRestClient.from_spec(spec)
         result = ContentPackWorkflow(client, args.report_root).run(spec, args.mode)
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -61,7 +66,7 @@ def main() -> int:
         )
         completion_failed = args.completion and contains_warning_status(result)
         return 1 if (prerequisite_failed or failed or completion_failed) else 0
-    except SkillError as exc:
+    except (SkillError, json.JSONDecodeError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
