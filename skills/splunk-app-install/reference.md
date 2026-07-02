@@ -37,6 +37,7 @@ platform behaviors, and CLI flags.
 |-----------|-----------|
 | Install (Splunkbase) | ACS `apps install splunkbase --splunkbase-id ID` |
 | Install (private app) | ACS `apps install private --app-package PATH` |
+| Targeted Victoria install | Set `SPLUNK_CLOUD_SEARCH_HEAD`; ACS selects `--target-sh` and install/uninstall uses `--scope local` (ACS CLI 2.20+) |
 | Restart | ACS restart check; only restarts when `restartRequired=true` |
 
 ## Registry Integration
@@ -81,6 +82,7 @@ return nonzero with a verification handoff.
 | `SB_USER` / `SB_PASS` | `credentials` file | Splunkbase download authentication |
 | `SPLUNK_SSH_HOST` / `SPLUNK_SSH_USER` / `SPLUNK_SSH_PASS` | `credentials` file | Remote Enterprise host staging |
 | `SPLUNK_CLOUD_STACK` | `credentials` file | ACS target stack |
+| `SPLUNK_CLOUD_SEARCH_HEAD` | `credentials` file | Optional Victoria search-head/SHC prefix for targeted local-scope app operations |
 
 ## Validation
 

@@ -74,11 +74,18 @@ The installer supports two target modes:
   (ACS) CLI. Search-tier REST access on port `8089` is optional and is used by
   other setup skills, not by the generic install/uninstall operations.
 
+Splunk Cloud `10.5.2605` Victoria stacks support targeted app installation. Set
+`SPLUNK_CLOUD_SEARCH_HEAD` to the standalone search-head or SHC prefix; the
+shared ACS context selects that target and install/uninstall commands add
+`--scope local`. Leave it unset only when the app should apply to every search
+head. Targeted installs require ACS CLI 2.20 or newer and the `sc_admin` role.
+
 | Item | Value |
 |------|-------|
 | Optional override | `SPLUNK_PLATFORM=enterprise|cloud` when a hybrid credentials file makes a run ambiguous |
 | Enterprise search-tier REST API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` in `credentials` |
+| Optional Cloud app target | `SPLUNK_CLOUD_SEARCH_HEAD` in `credentials` |
 | TA app name | varies (installs any app) |
 | Credentials | Project-root `credentials` file (fallback: `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-app-install/scripts/` (relative to repo root) |
@@ -140,6 +147,8 @@ For Splunk Cloud:
 - remaining local and downloaded packages are installed as private apps via ACS
 - Splunkbase apps are installed or updated via ACS
 - the ACS CLI must be installed and configured for the target stack
+- a non-empty `SPLUNK_CLOUD_SEARCH_HEAD` selects Victoria targeted app
+  installation and forces local scope instead of deployment to all search heads
 - completion is read back with `acs apps describe`; failed or still-pending
   states, unresolved app names, and pinned-version mismatches return nonzero
 
