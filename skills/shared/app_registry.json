@@ -6216,6 +6216,7 @@
     },
     {
       "skill": "splunk-observability-azure-integration",
+      "relationship": "handoff-only",
       "app_name": "Splunk_TA_microsoft-cloudservices",
       "splunkbase_id": "3110",
       "label": "Splunk Add-on for Microsoft Cloud Services",
@@ -6257,6 +6258,7 @@
     },
     {
       "skill": "splunk-observability-azure-integration",
+      "relationship": "handoff-only",
       "app_name": "microsoft_azure_app",
       "splunkbase_id": "4882",
       "label": "Microsoft Azure App for Splunk",
@@ -6300,6 +6302,7 @@
     },
     {
       "skill": "splunk-observability-gcp-integration",
+      "relationship": "handoff-only",
       "app_name": "Splunk_TA_google-cloudplatform",
       "splunkbase_id": "3088",
       "label": "Splunk Add-on for Google Cloud Platform",
@@ -8297,6 +8300,7 @@
     },
     {
       "skill": "splunk-data-source-readiness-doctor",
+      "relationship": "optional",
       "app_name": "ocsf_cim_addon_for_splunk",
       "splunkbase_id": "6841",
       "label": "OCSF-CIM Add-On for Splunk",

@@ -27,8 +27,8 @@ def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
     assert payload["skill_count"] == 165
     assert payload["status_counts"] == {
         "blocked": 0,
-        "conditional": 93,
-        "delegated": 6,
+        "conditional": 94,
+        "delegated": 5,
         "not-applicable": 53,
         "self-managed-10.4": 10,
         "supported": 3,
@@ -63,6 +63,8 @@ def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> 
     )
     offenders = []
     for app in registry["apps"]:
+        if app.get("relationship", "primary") not in {"primary", "private-primary"}:
+            continue
         if app.get("compatibility_status") != "unsupported":
             continue
         if statuses[app["skill"]] == "supported":

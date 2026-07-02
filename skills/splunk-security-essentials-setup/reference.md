@@ -12,7 +12,7 @@
 - Splunk platform compatibility researched: Splunk Enterprise / Cloud Platform
   9.0 through 10.5
 - Repository interpretation: `10.5` is the current Splunk Cloud target;
-  self-managed Splunk Enterprise remains on the `10.4.0` default. Do not treat
+  self-managed Splunk Enterprise remains on the `10.4.1` default. Do not treat
   the cross-product listing as Enterprise `10.5` validation.
 
 ## Setup Checklist

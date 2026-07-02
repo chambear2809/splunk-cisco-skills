@@ -94,22 +94,62 @@ def test_registry_audit_cloud_fields_are_explicit_but_optional_for_legacy_rows()
     }
     assert module.audit_offline([explicit], "10.5") == []
 
-    parsed = module.parse_cloud_release_metadata(
-        [
-            {
-                "name": "0.4.1",
-                "product_versions": ["10.5", "10.4"],
-                "cloud_compatible": False,
-                "install_method_single": "rejected",
-                "install_method_distributed": "rejected",
-            }
-        ]
-    )
+    releases = [
+        {
+            "name": "0.4.1",
+            "product_versions": ["10.5", "10.4"],
+            "cloud_compatible": False,
+            "install_method_single": "rejected",
+            "install_method_distributed": "rejected",
+        },
+        {
+            "name": "0.4.0",
+            "product_versions": ["10.4", "10.3"],
+            "cloud_compatible": True,
+        },
+    ]
+    parsed = module.parse_cloud_release_metadata(releases)
     assert parsed == {
         "cloud_compatible": False,
         "install_method_single": "rejected",
         "install_method_distributed": "rejected",
     }
+    assert module.parse_cloud_release_metadata({"results": releases}) == parsed
+    assert module.parse_verified_platform_versions(releases, "0.4.0") == [
+        "10.4",
+        "10.3",
+    ]
+    assert module.parse_verified_platform_versions(releases, "missing") == []
+
+
+def test_registry_audit_requires_verified_platforms_only_for_split_versions() -> None:
+    spec = importlib.util.spec_from_file_location("splunkbase_registry_audit_split", REGISTRY_AUDIT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    split = {
+        "splunkbase_id": "7539",
+        "platform_versions": ["10.4"],
+        "compatibility_status": "unsupported",
+        "latest_verified_version": "3.1.0",
+        "latest_verified_date": "May 16, 2025",
+        "latest_release_version": "3.2.0",
+        "latest_release_date": "June 3, 2026",
+        "last_verified_date": "July 2, 2026",
+    }
+    findings = module.audit_offline([split], "10.5")
+    assert [finding["field"] for finding in findings] == ["verified_platform_versions"]
+
+    assert module.audit_offline(
+        [{**split, "verified_platform_versions": []}],
+        "10.5",
+    ) == []
+    findings = module.audit_offline(
+        [{**split, "verified_platform_versions": ["10.5", 10.4]}],
+        "10.5",
+    )
+    assert [finding["field"] for finding in findings] == ["verified_platform_versions"]
 
 
 def test_registry_live_audit_compares_only_explicit_cloud_fields(monkeypatch) -> None:
@@ -140,7 +180,12 @@ def test_registry_live_audit_compares_only_explicit_cloud_fields(monkeypatch) ->
     ]
     requested: dict[str, bool] = {}
 
-    def fake_fetch(app_id: str, include_cloud_metadata: bool = False) -> dict:
+    def fake_fetch(
+        app_id: str,
+        include_cloud_metadata: bool = False,
+        verified_release_version: str | None = None,
+    ) -> dict:
+        assert verified_release_version is None
         requested[app_id] = include_cloud_metadata
         result = {
             "splunkbase_id": app_id,
@@ -162,6 +207,59 @@ def test_registry_live_audit_compares_only_explicit_cloud_fields(monkeypatch) ->
     _, findings = module.audit_live(apps, "10.5", max_workers=2)
     assert findings == []
     assert requested == {"8704": True, "9999": False}
+
+
+def test_registry_live_audit_compares_exact_verified_release_platforms(monkeypatch) -> None:
+    spec = importlib.util.spec_from_file_location("splunkbase_registry_audit_verified", REGISTRY_AUDIT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    app = {
+        "splunkbase_id": "7539",
+        "app_name": "cisco-catalyst-app",
+        "platform_versions": ["10.4", "10.3"],
+        "compatibility_status": "unsupported",
+        "latest_verified_version": "3.1.0",
+        "latest_verified_date": "May 16, 2025",
+        "verified_platform_versions": ["10.5", "10.4", "10.3"],
+        "latest_release_version": "3.2.0",
+        "latest_release_date": "June 3, 2026",
+        "last_verified_date": "July 2, 2026",
+    }
+    requested: list[str | None] = []
+
+    def fake_fetch(
+        app_id: str,
+        include_cloud_metadata: bool = False,
+        verified_release_version: str | None = None,
+    ) -> dict:
+        assert app_id == "7539"
+        assert include_cloud_metadata is False
+        requested.append(verified_release_version)
+        return {
+            "splunkbase_id": app_id,
+            "latest_version": "3.2.0",
+            "latest_release_date": "June 3, 2026",
+            "platform_versions": ["10.4", "10.3"],
+            "verified_platform_versions": ["10.5", "10.4", "10.3"],
+        }
+
+    monkeypatch.setattr(module, "fetch_splunkbase", fake_fetch)
+    _, findings = module.audit_live([app], "10.5", max_workers=1)
+    assert findings == []
+    assert requested == ["3.1.0"]
+
+    def fake_reordered_fetch(*args, **kwargs) -> dict:
+        result = fake_fetch(*args, **kwargs)
+        result["verified_platform_versions"] = ["10.3", "10.4", "10.5"]
+        return result
+
+    monkeypatch.setattr(module, "fetch_splunkbase", fake_reordered_fetch)
+    _, findings = module.audit_live([app], "10.5", max_workers=1)
+    assert [finding["field"] for finding in findings] == [
+        "verified_platform_versions"
+    ]
 
 
 def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:

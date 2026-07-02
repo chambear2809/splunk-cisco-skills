@@ -31,9 +31,11 @@ package in `splunk-ta/` when needed.**
 This applies to both Splunk Cloud and Splunk Enterprise targets.
 
 - Primary path: `--source splunkbase --app-id <ID>` pins a known app to the
-  registry's repo-verified release. Use `--app-version` for another reviewed
-  release, or `--accept-unverified-release` to request public latest without
-  claiming repository verification.
+  registry's repo-verified release. `--app-version` selects another exact,
+  operator-reviewed release, but an unregistered version has no reusable
+  compatibility evidence and fails closed without a documented
+  `--accept-unsupported-platform` exception. Use `--accept-unverified-release`
+  to request public latest without claiming repository verification.
 - Fallback path: if Splunkbase is unavailable (no credentials, download
   failure, private app), the caller must rerun with `--source local`; in
   interactive mode the installer lists packages in `splunk-ta/`. It does not
@@ -45,9 +47,12 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
 - For known Cisco packages, the installer auto-resolves the Splunkbase ID and
   license-ack URL from `skills/shared/app_registry.json`.
 - Known registry packages are checked against the target Splunk minor before
-  any ACS/REST install call. Cloud defaults to `10.5`; a listing gap fails
-  closed unless `--accept-unsupported-platform` is explicitly supplied with
-  documented vendor/operator approval.
+  any ACS/REST install call. The check follows the selected release: a
+  repo-verified pin uses `verified_platform_versions`, while
+  `--accept-unverified-release` evaluates the current public release against
+  `platform_versions`. Cloud defaults to `10.5`; missing evidence for the
+  selected release fails closed unless `--accept-unsupported-platform` is
+  explicitly supplied with documented vendor/operator approval.
 - `_unpacked` app directories are for review only and are not part of the
   normal install workflow.
 
@@ -63,7 +68,7 @@ If neither file exists, guide the user to create it:
 bash skills/shared/scripts/setup_credentials.sh
 ```
 
-The agent should always try Splunkbase first (latest version), then fall back
+The agent should always try Splunkbase first (repo-verified version), then fall back
 to local packages in `splunk-ta/` if Splunkbase is not available. Ask the user
 only for:
 - **Splunkbase app ID** — if not already known from the skill's registry entry
@@ -71,7 +76,7 @@ only for:
 
 Do not prompt for source type or version unless the user specifically requests
 a pinned version or a remote URL. The default flow is:
-1. Try `--source splunkbase --app-id <ID>` (latest version).
+1. Try `--source splunkbase --app-id <ID>` (repo-verified version).
 2. If that fails, retry with `--source local` to pick from `splunk-ta/`.
 
 ## Environment
@@ -181,7 +186,7 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Pin a specific reviewed Splunkbase version |
+| `--app-version VER` | Select an exact operator-reviewed release; unregistered release evidence fails closed |
 | `--target-splunk-version VER` | Override the shared Cloud/Enterprise compatibility target |
 | `--accept-unsupported-platform` | Explicitly override a known platform-listing gap with documented approval |
 | `--accept-unverified-release` | Request public latest instead of the repo-verified version; does not certify it |
@@ -238,7 +243,8 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 2. **Look up the app ID** from `skills/shared/app_registry.json` when
    available. Only ask the user for the app ID if it is not already known.
 3. **Try Splunkbase first**: run with `--source splunkbase --app-id <ID>`
-   to pull the latest version.
+   to pull the repo-verified version (or public latest only when explicitly
+   requested with `--accept-unverified-release`).
 4. **Fall back to local**: if Splunkbase fails (no creds, download error,
    private app), retry with `--source local` to install from `splunk-ta/`.
 5. **Enterprise**: wait for the automatic restart and management API recovery.

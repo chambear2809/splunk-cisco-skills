@@ -15,6 +15,119 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write
 
 
 class InstallRegressionTests(ShellScriptRegressionBase):
+    def build_selected_release_cloud_env(self, tmp_path: Path) -> tuple[dict, Path]:
+        """Build a Cloud/ACS mock that preserves selected install versions."""
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        acs_log = tmp_path / "acs.log"
+        credentials_file = tmp_path / "credentials"
+
+        write_executable(
+            bin_dir / "acs",
+            """\
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+            from pathlib import Path
+
+            args = sys.argv[1:]
+            cmd = " ".join(args)
+            with Path(os.environ["ACS_LOG"]).open("a", encoding="utf-8") as handle:
+                handle.write(cmd + "\\n")
+
+            apps = {
+                "7538": ("TA_cisco_catalyst", "3.1.0"),
+                "7539": ("cisco-catalyst-app", "3.2.0"),
+                "1761": ("Splunk_TA_cisco-esa", "1.7.1"),
+            }
+
+            if "config current-stack" in cmd:
+                print("Current Search Head: sh-i-release-test")
+                raise SystemExit(0)
+
+            if "apps list" in cmd:
+                print(json.dumps({"apps": []}))
+                raise SystemExit(0)
+
+            marker = "apps install splunkbase --splunkbase-id "
+            if marker in cmd:
+                app_id = cmd.split(marker, 1)[1].split()[0]
+                app_name, public_version = apps[app_id]
+                version = public_version
+                if " --version " in f" {cmd} ":
+                    version = cmd.split(" --version ", 1)[1].split()[0]
+                print(json.dumps({"name": app_name, "version": version, "status": "installed"}))
+                raise SystemExit(0)
+
+            marker = "apps describe "
+            if marker in cmd:
+                app_name = cmd.split(marker, 1)[1].strip()
+                app_id, public_version = next(
+                    (app_id, version)
+                    for app_id, (name, version) in apps.items()
+                    if name == app_name
+                )
+                version = public_version
+                install_marker = f"apps install splunkbase --splunkbase-id {app_id}"
+                prior = Path(os.environ["ACS_LOG"]).read_text(encoding="utf-8").splitlines()
+                install_cmd = next((line for line in reversed(prior) if install_marker in line), "")
+                if " --version " in f" {install_cmd} ":
+                    version = install_cmd.split(" --version ", 1)[1].split()[0]
+                print(json.dumps({"name": app_name, "version": version, "status": "installed"}))
+                raise SystemExit(0)
+
+            print(json.dumps({}))
+            raise SystemExit(0)
+            """,
+        )
+        write_executable(
+            bin_dir / "curl",
+            """\
+            #!/usr/bin/env python3
+            import json
+            import sys
+            from urllib.parse import unquote, urlparse
+
+            args = sys.argv[1:]
+            url = next((arg for arg in args if arg.startswith(("http://", "https://"))), "")
+            path = urlparse(url).path
+            if path.endswith("/services/auth/login"):
+                print("<response><sessionKey>test-session</sessionKey></response>", end="")
+                raise SystemExit(0)
+            if "/configs/conf-app/package" in path:
+                app_name = unquote(path.split("/servicesNS/nobody/", 1)[1].split("/", 1)[0])
+                print(json.dumps({"entry": [{"content": {"id": app_name}}]}), end="")
+                raise SystemExit(0)
+            if "%{http_code}" in args:
+                print("200", end="")
+            raise SystemExit(0)
+            """,
+        )
+        write_executable(bin_dir / "nc", "#!/usr/bin/env bash\nexit 0\n")
+        credentials_file.write_text(
+            textwrap.dedent(
+                """\
+                SPLUNK_PLATFORM="cloud"
+                SPLUNK_CLOUD_STACK="example-stack"
+                SPLUNK_CLOUD_SEARCH_HEAD="sh-i-release-test"
+                ACS_SERVER="https://staging.admin.splunk.com"
+                STACK_TOKEN="token"
+                SPLUNK_SEARCH_API_URI="https://sh-i-release-test.example-stack.stg.splunkcloud.com:8089"
+                SPLUNK_USER="user"
+                SPLUNK_PASS="pass"
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["ACS_LOG"] = str(acs_log)
+        env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+        env["SPLUNK_SKIP_ALLOWLIST"] = "true"
+        return env, acs_log
+
     def test_splunk_ai_assistant_cloud_install_uses_acs_without_preinstall_rest_auth(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1026,101 +1139,37 @@ class InstallRegressionTests(ShellScriptRegressionBase):
     def test_cloud_batch_install_expands_enterprise_networking_dependency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            bin_dir = tmp_path / "bin"
-            bin_dir.mkdir()
-            acs_log = tmp_path / "acs.log"
-            credentials_file = tmp_path / "credentials"
+            env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            write_executable(
-                bin_dir / "acs",
-                """\
-                #!/usr/bin/env python3
-                import json
-                import os
-                import sys
-                from pathlib import Path
-
-                args = sys.argv[1:]
-                cmd = " ".join(args)
-                log_path = Path(os.environ["ACS_LOG"])
-                with log_path.open("a", encoding="utf-8") as handle:
-                    handle.write(cmd + "\\n")
-
-                if "apps install splunkbase --splunkbase-id 7538" in cmd:
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
-                    raise SystemExit(0)
-                if "apps install splunkbase --splunkbase-id 7539" in cmd:
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
-                    raise SystemExit(0)
-                if "apps describe TA_cisco_catalyst" in cmd:
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
-                    raise SystemExit(0)
-                if "apps describe cisco-catalyst-app" in cmd:
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
-                    raise SystemExit(0)
-
-                raise SystemExit(0)
-                """,
-            )
-            write_executable(
-                bin_dir / "curl",
-                """\
-                #!/usr/bin/env python3
-                import sys
-
-                args = " ".join(sys.argv[1:])
-                if "%{http_code}" in args:
-                    sys.stdout.write("401")
-                raise SystemExit(0)
-                """,
-            )
-            write_executable(
-                bin_dir / "nc",
-                """\
-                #!/usr/bin/env bash
-                exit 0
-                """,
-            )
-
-            credentials_file.write_text(
-                textwrap.dedent(
-                    """\
-                    SPLUNK_CLOUD_STACK="example-stack"
-                    ACS_SERVER="https://staging.admin.splunk.com"
-                    STACK_TOKEN="token"
-                    SPLUNK_USER="user"
-                    SPLUNK_PASS="pass"
-                    """
-                ),
-                encoding="utf-8",
-            )
-
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env['PATH']}"
-            env["ACS_LOG"] = str(acs_log)
-            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
-
-            blocked_result = self.run_script(
+            public_result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-unverified-release",
                 "7539",
                 env=env,
             )
-
-            blocked_output = blocked_result.stdout + blocked_result.stderr
-            self.assertEqual(blocked_result.returncode, 1, msg=blocked_output)
-            self.assertIn("Refusing the entire batch before ACS mutation", blocked_output)
+            public_output = public_result.stdout + public_result.stderr
+            self.assertEqual(public_result.returncode, 1, msg=public_output)
+            self.assertIn(
+                "cisco-catalyst-app version 3.2.0 (public-latest) does not advertise Splunk 10.5",
+                public_output,
+            )
+            self.assertIn("--accept-unsupported-platform", public_output)
             self.assertFalse(acs_log.exists())
 
             result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
-                "--accept-unsupported-platform",
                 "7539",
                 env=env,
             )
 
-            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn(
+                "cisco-catalyst-app version 3.1.0 (repo-verified) advertises Splunk 10.5",
+                output,
+            )
 
             install_lines = [
                 line
@@ -1342,43 +1391,31 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("1 app(s) failed to install", result.stdout)
 
 
-    def test_install_app_blocks_known_unsupported_cloud_10_5_package(self):
+    def test_install_app_uses_verified_7539_pin_and_blocks_unverified_public_latest(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            bin_dir = tmp_path / "bin"
-            bin_dir.mkdir()
-            acs_log = tmp_path / "acs.log"
-            credentials_file = tmp_path / "credentials"
+            env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            write_executable(
-                bin_dir / "acs",
-                """\
-                #!/usr/bin/env python3
-                import os
-                import sys
-                from pathlib import Path
-
-                with Path(os.environ["ACS_LOG"]).open("a", encoding="utf-8") as handle:
-                    handle.write(" ".join(sys.argv[1:]) + "\\n")
-                raise SystemExit(0)
-                """,
+            public_result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "7539",
+                "--accept-unverified-release",
+                "--no-update",
+                "--no-restart",
+                env=env,
             )
-            credentials_file.write_text(
-                textwrap.dedent(
-                    """\
-                    SPLUNK_PLATFORM="cloud"
-                    SPLUNK_CLOUD_STACK="example-stack"
-                    ACS_SERVER="https://staging.admin.splunk.com"
-                    STACK_TOKEN="token"
-                    """
-                ),
-                encoding="utf-8",
+            public_output = public_result.stdout + public_result.stderr
+            self.assertEqual(public_result.returncode, 1, msg=public_output)
+            self.assertIn(
+                "cisco-catalyst-app version 3.2.0 (public-latest) does not advertise Splunk 10.5",
+                public_output,
             )
+            self.assertIn("--accept-unsupported-platform", public_output)
+            self.assertFalse(acs_log.exists())
 
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env['PATH']}"
-            env["ACS_LOG"] = str(acs_log)
-            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
             result = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
                 "--source",
@@ -1389,12 +1426,113 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "--no-restart",
                 env=env,
             )
-
             output = result.stdout + result.stderr
-            self.assertEqual(result.returncode, 1, msg=output)
-            self.assertIn("does not advertise Splunk 10.5 compatibility", output)
-            acs_output = acs_log.read_text(encoding="utf-8") if acs_log.exists() else ""
-            self.assertNotIn("apps install", acs_output)
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn(
+                "cisco-catalyst-app version 3.1.0 (repo-verified) advertises Splunk 10.5",
+                output,
+            )
+            install_lines = [
+                line
+                for line in acs_log.read_text(encoding="utf-8").splitlines()
+                if "apps install splunkbase" in line
+            ]
+            self.assertEqual(len(install_lines), 2)
+            self.assertTrue(all("--version 3.1.0" in line for line in install_lines))
+
+    def test_install_app_requires_public_latest_review_when_verified_pin_has_no_10_5_evidence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, acs_log = self.build_selected_release_cloud_env(tmp_path)
+
+            blocked = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "1761",
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+            blocked_output = blocked.stdout + blocked.stderr
+            self.assertEqual(blocked.returncode, 1, msg=blocked_output)
+            self.assertIn(
+                "Splunk_TA_cisco-esa version 1.7.0 (repo-verified) does not advertise Splunk 10.5",
+                blocked_output,
+            )
+            self.assertIn(
+                "review the newer public release with --accept-unverified-release",
+                blocked_output,
+            )
+            self.assertFalse(acs_log.exists())
+
+            accepted = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "1761",
+                "--accept-unverified-release",
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+            accepted_output = accepted.stdout + accepted.stderr
+            self.assertEqual(accepted.returncode, 0, msg=accepted_output)
+            self.assertIn(
+                "Splunk_TA_cisco-esa version 1.7.1 (public-latest) advertises Splunk 10.5",
+                accepted_output,
+            )
+            install_line = next(
+                line
+                for line in acs_log.read_text(encoding="utf-8").splitlines()
+                if "apps install splunkbase --splunkbase-id 1761" in line
+            )
+            self.assertNotIn("--version", install_line)
+
+    def test_cloud_batch_requires_public_latest_review_when_verified_pin_has_no_10_5_evidence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, acs_log = self.build_selected_release_cloud_env(tmp_path)
+
+            blocked = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "1761",
+                env=env,
+            )
+            blocked_output = blocked.stdout + blocked.stderr
+            self.assertEqual(blocked.returncode, 1, msg=blocked_output)
+            self.assertIn(
+                "Splunk_TA_cisco-esa version 1.7.0 (repo-verified) does not advertise Splunk 10.5",
+                blocked_output,
+            )
+            self.assertIn(
+                "use --accept-unverified-release to review public latest",
+                blocked_output,
+            )
+            self.assertFalse(acs_log.exists())
+
+            accepted = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "--accept-unverified-release",
+                "1761",
+                env=env,
+            )
+            accepted_output = accepted.stdout + accepted.stderr
+            self.assertEqual(accepted.returncode, 0, msg=accepted_output)
+            self.assertIn(
+                "Splunk_TA_cisco-esa version 1.7.1 (public-latest) advertises Splunk 10.5",
+                accepted_output,
+            )
+            install_line = next(
+                line
+                for line in acs_log.read_text(encoding="utf-8").splitlines()
+                if "apps install splunkbase --splunkbase-id 1761" in line
+            )
+            self.assertNotIn("--version", install_line)
 
     def test_cloud_installers_block_explicit_cloud_incompatibility_before_mutation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2667,10 +2805,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
         self.assertNotIn("local delete_code", script_text)
 
 
-    def test_install_app_defaults_splunkbase_to_latest_without_version_prompt(self):
+    def test_install_app_defaults_known_splunkbase_apps_to_repo_verified_release(self):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/install_app.sh").read_text(encoding="utf-8")
         self.assertNotIn("App version (leave blank for latest):", script_text)
-        self.assertIn("Pin a specific Splunkbase version (default: latest)", script_text)
+        self.assertNotIn("Pin a specific Splunkbase version (default: latest)", script_text)
+        self.assertIn("default: repo-verified", script_text)
+        self.assertIn("use the repo-verified release for known apps (default)", script_text)
+        self.assertIn("--accept-unverified-release", script_text)
+        self.assertIn("request public latest instead of the repo-verified", script_text)
 
 
     def test_cloud_batch_uninstall_returns_nonzero_when_failures_cannot_be_verified(self):

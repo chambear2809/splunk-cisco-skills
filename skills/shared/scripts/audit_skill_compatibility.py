@@ -28,6 +28,7 @@ FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
 STATUS_KEY = "splunk_cloud_10_5"
 VERIFIED_KEY = "compatibility_verified"
 VERIFIED_DATE = "2026-07-02"
+BLOCKING_PACKAGE_RELATIONSHIPS = {"primary", "private-primary"}
 
 COMPATIBILITY_TEXT = {
     "supported": (
@@ -41,8 +42,9 @@ COMPATIBILITY_TEXT = {
     ),
     "blocked": (
         "Splunk Cloud Platform 10.5.2605: blocked for the primary package because "
-        "current upstream compatibility metadata does not advertise 10.5; render "
-        "or hand off only unless an explicit approved override is recorded."
+        "no repo-selected or otherwise approved release has 10.5 compatibility "
+        "evidence; render or hand off only unless an explicit approved override "
+        "is recorded."
     ),
     "self-managed-10.4": (
         "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime "
@@ -197,12 +199,16 @@ def audit() -> dict[str, Any]:
         unsupported = [
             str(app.get("splunkbase_id", ""))
             for app in apps
-            if app.get("compatibility_status") == "unsupported"
+            if str(app.get("relationship", "primary"))
+            in BLOCKING_PACKAGE_RELATIONSHIPS
+            and app.get("compatibility_status") == "unsupported"
         ]
         verified_supported = [
             str(app.get("splunkbase_id", ""))
             for app in apps
-            if "10.5" in (app.get("verified_platform_versions") or [])
+            if str(app.get("relationship", "primary"))
+            in BLOCKING_PACKAGE_RELATIONSHIPS
+            and "10.5" in (app.get("verified_platform_versions") or [])
         ]
 
         if status not in COMPATIBILITY_TEXT:

@@ -226,25 +226,44 @@ resolve_target_splunk_version() {
 registry_app_compatibility_by_app_id() {
     local app_id="${1:-}"
     local target="${2:-}"
+    local selected_version="${3:-}"
     [[ -f "${REGISTRY_FILE}" ]] || return 0
-    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" <<'PY'
+    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" "${selected_version}" <<'PY'
 import json
 import sys
 
-registry_path, target_id, target_version = sys.argv[1:]
+registry_path, target_id, target_version, requested_version = sys.argv[1:]
 with open(registry_path, encoding="utf-8") as handle:
     registry = json.load(handle)
 for app in registry.get("apps", []):
     if str(app.get("splunkbase_id", "")) != target_id:
         continue
-    platforms = [str(item) for item in app.get("platform_versions", [])]
+    verified = str(app.get("latest_verified_version", ""))
+    release = str(app.get("latest_release_version", ""))
+    selected = requested_version or release
+    if selected == verified:
+        if "verified_platform_versions" in app:
+            platforms = [str(item) for item in app["verified_platform_versions"]]
+        elif verified == release:
+            platforms = [str(item) for item in app.get("platform_versions", [])]
+        else:
+            platforms = []
+        evidence = "repo-verified"
+    elif selected == release:
+        platforms = [str(item) for item in app.get("platform_versions", [])]
+        evidence = "public-latest"
+    else:
+        platforms = []
+        evidence = "unregistered-version"
     status = "supported" if target_version in platforms else "unsupported"
     fields = (
         status,
         str(app.get("app_name", "")),
         ",".join(platforms),
-        str(app.get("latest_verified_version", "")),
-        str(app.get("latest_release_version", "")),
+        verified,
+        release,
+        selected,
+        evidence,
         str(app.get("cloud_compatible", "")).lower(),
         str(app.get("install_method_single", "")),
         str(app.get("install_method_distributed", "")),
@@ -276,6 +295,7 @@ apply_registry_verified_version_default() {
 
 preflight_current_install_target_compatibility() {
     local target_app_id metadata status app_name platforms verified release
+    local selected_version evidence
     local cloud_compatible install_method_single install_method_distributed
 
     resolve_target_splunk_version || exit 1
@@ -285,12 +305,16 @@ preflight_current_install_target_compatibility() {
         return 0
     fi
 
-    metadata="$(registry_app_compatibility_by_app_id "${target_app_id}" "${TARGET_SPLUNK_VERSION}")"
+    selected_version="${APP_VERSION}"
+    if [[ "${SOURCE}" != "splunkbase" && -z "${selected_version}" && "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
+        selected_version="__unknown_local_package__"
+    fi
+    metadata="$(registry_app_compatibility_by_app_id "${target_app_id}" "${TARGET_SPLUNK_VERSION}" "${selected_version}")"
     if [[ -z "${metadata}" ]]; then
         log "INFO: App ID ${target_app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
         return 0
     fi
-    IFS='|' read -r status app_name platforms verified release cloud_compatible \
+    IFS='|' read -r status app_name platforms verified release selected_version evidence cloud_compatible \
         install_method_single install_method_distributed <<< "${metadata}"
     if is_splunk_cloud && [[ "${cloud_compatible}" == "false" ]]; then
         if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
@@ -305,18 +329,23 @@ preflight_current_install_target_compatibility() {
         fi
     fi
     if [[ "${status}" == "supported" ]]; then
-        log "Compatibility preflight passed: ${app_name:-app ID ${target_app_id}} advertises Splunk ${TARGET_SPLUNK_VERSION}."
+        log "Compatibility preflight passed: ${app_name:-app ID ${target_app_id}} version ${selected_version:-unknown} (${evidence}) advertises Splunk ${TARGET_SPLUNK_VERSION}."
         return 0
     fi
 
     if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
-        log "WARNING: Explicit override accepted for ${app_name:-app ID ${target_app_id}} on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
+        log "WARNING: Explicit override accepted for ${app_name:-app ID ${target_app_id}} version ${selected_version:-unknown} (${evidence}) on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
         export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true
         return 0
     fi
 
-    log "ERROR: ${app_name:-App ID ${target_app_id}} does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
-    log "Advertised platform versions: ${platforms:-none}."
+    log "ERROR: ${app_name:-App ID ${target_app_id}} version ${selected_version:-unknown} (${evidence}) does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
+    log "Selected-release platform versions: ${platforms:-none}."
+    if [[ "${evidence}" == "repo-verified" && -z "${platforms}" && "${release}" != "${verified}" ]]; then
+        log "The repo-verified pin has no current public compatibility evidence for this target; review the newer public release with --accept-unverified-release."
+    elif [[ "${evidence}" == "unregistered-version" ]]; then
+        log "Supply a registry-known --app-version or document an explicit compatibility exception."
+    fi
     log "Refusing installation. Use a supported package/workflow, or pass --accept-unsupported-platform only with documented vendor approval."
     exit 1
 }
@@ -554,7 +583,7 @@ cloud_prefer_splunkbase_for_known_package() {
     if [[ -n "${APP_VERSION}" ]]; then
         log "Known Splunkbase package detected for Splunk Cloud; switching to ACS Splunkbase install for app ID ${APP_ID} version ${APP_VERSION}."
     else
-        log "Known Splunkbase package detected for Splunk Cloud; switching to ACS Splunkbase install for the latest compatible version (app ID ${APP_ID})."
+        log "Known Splunkbase package detected for Splunk Cloud; switching to ACS Splunkbase install for the registry-selected version (app ID ${APP_ID})."
     fi
 }
 
@@ -591,7 +620,8 @@ Optional flags (skip the corresponding prompt):
   --expected-sha256 HEX 64-char hex SHA-256 of the package; required for non-Splunkbase URL
                         downloads to be installed (defense against compromised mirrors).
   --app-id ID           Splunkbase app ID
-  --app-version VER     Pin a specific Splunkbase version (default: latest)
+  --app-version VER     Pin a specific Splunkbase version (default: repo-verified
+                        version for known apps)
   --license-ack-url URL Third-party Splunkbase license URL for ACS installs
   --update              Upgrade mode
   --no-update           Fresh install (skip upgrade prompt)
@@ -634,7 +664,7 @@ prompt_source() {
     fi
     echo ""
     echo "How do you want to install the app?"
-    echo "  1) Splunkbase        — download latest from splunkbase.splunk.com (default)"
+    echo "  1) Splunkbase        — use the repo-verified release for known apps (default)"
     echo "  2) Local             — .tgz/.spl file on this server or in the project"
     echo "  3) Remote            — download from a remote URL"
     echo ""

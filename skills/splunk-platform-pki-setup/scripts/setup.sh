@@ -176,7 +176,7 @@ FIPS:
 
 Splunk runtime:
   --splunk-home PATH                                             (default: /opt/splunk)
-  --splunk-version X.Y.Z                                         (default: 10.4.0)
+  --splunk-version X.Y.Z                                         (default: 10.4.1)
   --cert-install-subdir NAME                                     (default: myssl)
 
 Secrets (file paths only, never values on argv):

@@ -13,7 +13,7 @@
 - Splunkbase compatibility researched: Splunk Enterprise / Cloud Platform
   `9.3` through `10.5`
 - Repository interpretation: `10.5` is the current Splunk Cloud compatibility
-  target. Self-managed Splunk Enterprise remains on the `10.4.0` default; this
+  target. Self-managed Splunk Enterprise remains on the `10.4.1` default; this
   listing is not a self-managed Enterprise `10.5` certification.
 - Documentation compatibility signal: ARI `1.2.x` / `1.1.3` on `9.1.3+`
   including `10.x`; warn below `9.1.3`, do not hard-fail solely because the

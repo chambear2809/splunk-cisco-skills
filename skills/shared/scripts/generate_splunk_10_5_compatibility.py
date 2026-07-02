@@ -90,9 +90,10 @@ def render() -> str:
     lines.extend(
         [
             "",
-            "`Blocked` means the primary upstream package currently omits 10.5. The",
-            "generic installer refuses known incompatible packages unless an explicit",
-            "approved override is supplied. `Conditional` includes entitlement, package,",
+            "`Blocked` means no repo-selected or otherwise approved primary package",
+            "release has 10.5 evidence. The generic installer refuses a selected release",
+            "without compatibility evidence unless an explicit approved override is",
+            "supplied. `Conditional` includes entitlement, package,",
             "topology, customer-managed runtime, or product-specific prerequisites.",
             "",
             "## Complete Matrix",

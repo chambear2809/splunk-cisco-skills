@@ -22,10 +22,11 @@ Splunk Enterprise, Universal Forwarder, Splunk Operator for Kubernetes, and
 Splunk POD remain on their verified 10.4 baselines. As of July 2, 2026, the
 public Enterprise and Universal Forwarder downloads and Enterprise release
 manual remain on 10.4, so this repository does not yet enable a self-managed
-10.5 runtime. Splunkbase package compatibility is evaluated individually
-against `10.5`; packages whose current listing omits 10.5 are marked
-unsupported in the registry and must not inherit compatibility merely because
-Splunk Cloud Platform supports that train.
+10.5 runtime. Splunkbase package compatibility is evaluated per release
+against `10.5`: repo-verified pins and current public releases keep separate
+platform-version evidence. A selected release with no 10.5 evidence fails
+closed and must not inherit compatibility merely because Splunk Cloud Platform
+supports that train or a different package release advertises it.
 
 Every skill now declares a machine-readable 10.5 status in its `SKILL.md`
 frontmatter. See the generated

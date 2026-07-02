@@ -3,6 +3,10 @@
 All conf-file shapes below were verified by extracting each Splunkbase
 package and reading its `default/` and `README/*.spec` files.
 
+The `9.0–10.5` ranges below reproduce package-listing compatibility metadata.
+They support the Splunk Cloud 10.5 decision only; they do not claim that a
+public self-managed Splunk Enterprise 10.5 runtime exists.
+
 ## Splunkbase 3546 — Splunk On-Call (VictorOps) alert action
 
 - App folder name: **`victorops_app`** (the package retained the legacy id;

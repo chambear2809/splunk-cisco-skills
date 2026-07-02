@@ -347,7 +347,9 @@ COMPATIBILITY_ROWS = [
         "id": "outcome-validation",
         "area": "Live outcome validation",
         "status": "read-only/handoff",
-        "versions": ["All supported targets"],
+        "versions": [
+            "ITSI 4.21 baseline; other targets require live route and capability preflight"
+        ],
         "coverage": (
             "Offline drift and heuristic SPL checks, plus read-only hooks for object counts, maintenance status, episodes, "
             "tickets, exports, and health inventory."

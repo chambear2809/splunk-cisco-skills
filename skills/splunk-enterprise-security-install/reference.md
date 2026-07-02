@@ -16,7 +16,7 @@ local package `splunk-ta/splunk-enterprise-security_851.spl`.
   Splunk Cloud, platform versions `10.5`, `10.4`, `10.3`, `10.2`, `10.1`,
   `10.0`, `9.4`, `9.3`, CIM `8.x`
 - Repository interpretation: `10.5` is the current Splunk Cloud target;
-  self-managed Splunk Enterprise remains on the `10.4.0` default. Confirm the
+  self-managed Splunk Enterprise remains on the `10.4.1` default. Confirm the
   target-specific ES matrix and do not treat the cross-product listing as
   self-managed Enterprise `10.5` validation.
 

@@ -15,7 +15,7 @@ platform behaviors, and CLI flags.
 
 | Source | Flag | Behavior |
 |--------|------|----------|
-| Splunkbase | `--source splunkbase --app-id ID` | Uses the registry's repo-verified version for known apps; use `--app-version` for another reviewed release |
+| Splunkbase | `--source splunkbase --app-id ID` | Uses the registry's repo-verified version for known apps; an exact `--app-version` without registry evidence fails closed unless explicitly approved |
 | Local | `--source local --file PATH` | Installs from a `.tgz` or `.spl` file |
 | Remote URL | `--source remote --url URL` | Downloads then installs |
 
@@ -46,7 +46,9 @@ The installer resolves Cisco app metadata from
 `skills/shared/app_registry.json`:
 
 - Splunkbase ID and license acknowledgment URL
-- target-minor compatibility from `platform_versions`
+- selected-release target-minor compatibility from
+  `verified_platform_versions` for the repo-verified pin or
+  `platform_versions` for the current public release
 - repo-verified and current public release versions
 - `install_requires` dependencies (auto-installed first)
 - `role_support` for deployment role warnings
@@ -60,7 +62,7 @@ The installer resolves Cisco app metadata from
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Pin a specific reviewed Splunkbase version |
+| `--app-version VER` | Select an exact operator-reviewed release; unregistered compatibility evidence fails closed |
 | `--target-splunk-version VER` | Override the shared compatibility target (`MAJOR.MINOR[.PATCH]`) |
 | `--accept-unsupported-platform` | Override a known listing gap only with documented vendor/operator approval |
 | `--accept-unverified-release` | Request public latest rather than the repo-verified version; does not certify it |
@@ -78,6 +80,11 @@ absence cannot be verified.
 Cloud install also requires a recognizable post-operation app record; known
 failure/in-progress statuses and pinned-version mismatches are incomplete and
 return nonzero with a verification handoff.
+
+Compatibility is release-specific. The default repo-verified pin is checked
+against its own `verified_platform_versions` evidence. Passing
+`--accept-unverified-release` selects and checks the current public release; it
+does not transfer compatibility evidence from either release to the other.
 
 ## Credentials
 

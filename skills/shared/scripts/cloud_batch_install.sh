@@ -161,24 +161,43 @@ resolve_target_splunk_version() {
 resolve_app_compatibility() {
     local app_id="$1"
     local target="$2"
+    local selected_version="${3:-}"
     [[ -f "${REGISTRY_FILE}" ]] || return 0
-    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" <<'PY'
+    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" "${selected_version}" <<'PY'
 import json
 import sys
 
-registry_path, target_id, target_version = sys.argv[1:]
+registry_path, target_id, target_version, requested_version = sys.argv[1:]
 with open(registry_path, encoding="utf-8") as handle:
     registry = json.load(handle)
 for app in registry.get("apps", []):
     if str(app.get("splunkbase_id", "")) != target_id:
         continue
-    platforms = [str(item) for item in app.get("platform_versions", [])]
+    verified = str(app.get("latest_verified_version", ""))
+    release = str(app.get("latest_release_version", ""))
+    selected = requested_version or release
+    if selected == verified:
+        if "verified_platform_versions" in app:
+            platforms = [str(item) for item in app["verified_platform_versions"]]
+        elif verified == release:
+            platforms = [str(item) for item in app.get("platform_versions", [])]
+        else:
+            platforms = []
+        evidence = "repo-verified"
+    elif selected == release:
+        platforms = [str(item) for item in app.get("platform_versions", [])]
+        evidence = "public-latest"
+    else:
+        platforms = []
+        evidence = "unregistered-version"
     fields = (
         "supported" if target_version in platforms else "unsupported",
         str(app.get("app_name", "")),
         ",".join(platforms),
-        str(app.get("latest_verified_version", "")),
-        str(app.get("latest_release_version", "")),
+        verified,
+        release,
+        selected,
+        evidence,
         str(app.get("cloud_compatible", "")).lower(),
         str(app.get("install_method_single", "")),
         str(app.get("install_method_distributed", "")),
@@ -191,14 +210,16 @@ PY
 preflight_app_compatibility() {
     local app_id="$1"
     local metadata status app_name platforms verified release
+    local selected_version evidence
     local cloud_compatible install_method_single install_method_distributed
-    metadata="$(resolve_app_compatibility "${app_id}" "${TARGET_SPLUNK_VERSION}")"
+    selected_version="$(resolve_app_install_version "${app_id}")"
+    metadata="$(resolve_app_compatibility "${app_id}" "${TARGET_SPLUNK_VERSION}" "${selected_version}")"
     if [[ -z "${metadata}" ]]; then
         log "INFO: App ID ${app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
         return 0
     fi
 
-    IFS='|' read -r status app_name platforms verified release cloud_compatible \
+    IFS='|' read -r status app_name platforms verified release selected_version evidence cloud_compatible \
         install_method_single install_method_distributed <<< "${metadata}"
     if [[ "${cloud_compatible}" == "false" ]]; then
         if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
@@ -213,15 +234,18 @@ preflight_app_compatibility() {
     fi
     if [[ "${status}" != "supported" ]]; then
         if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
-            log "WARNING: Explicit override accepted for ${app_name:-app ID ${app_id}} on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
+            log "WARNING: Explicit override accepted for ${app_name:-app ID ${app_id}} version ${selected_version:-unknown} (${evidence}) on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
         else
-            log "ERROR: ${app_name:-App ID ${app_id}} does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
-            log "Advertised platform versions: ${platforms:-none}."
+            log "ERROR: ${app_name:-App ID ${app_id}} version ${selected_version:-unknown} (${evidence}) does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
+            log "Selected-release platform versions: ${platforms:-none}."
+            if [[ "${evidence}" == "repo-verified" && -z "${platforms}" && "${release}" != "${verified}" ]]; then
+                log "The repo-verified pin has no current public compatibility evidence for this target; use --accept-unverified-release to review public latest."
+            fi
             log "Refusing the entire batch before ACS mutation. Pass --accept-unsupported-platform only with documented vendor approval."
             return 1
         fi
     else
-        log "Compatibility preflight passed: ${app_name:-app ID ${app_id}} advertises Splunk ${TARGET_SPLUNK_VERSION}."
+        log "Compatibility preflight passed: ${app_name:-app ID ${app_id}} version ${selected_version:-unknown} (${evidence}) advertises Splunk ${TARGET_SPLUNK_VERSION}."
     fi
 
     if [[ -z "${APP_VERSION}" && "${ACCEPT_UNVERIFIED_RELEASE}" != "true" && -n "${verified}" ]]; then

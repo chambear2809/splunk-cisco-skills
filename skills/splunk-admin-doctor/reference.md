@@ -125,7 +125,7 @@ in the MCP safety map, and documented here.
 
 ## Splunk 10.4 enterprise deployment notes
 
-For Splunk Enterprise `10.4.0`, Splunk Cloud Platform `10.5.2605`, and the
+For Splunk Enterprise `10.4.1`, Splunk Cloud Platform `10.5.2605`, and the
 previous Cloud documentation train `10.4.2604` planning,
 read this skill alongside
 [`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),

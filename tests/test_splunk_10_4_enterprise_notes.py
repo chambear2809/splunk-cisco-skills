@@ -11,7 +11,7 @@ SHARED_NOTE = REPO_ROOT / "skills/shared/splunk_10_4_enterprise_deployment_notes
 def test_shared_10_4_note_covers_enterprise_deployment_gates() -> None:
     text = SHARED_NOTE.read_text(encoding="utf-8")
     for phrase in (
-        "10.4.0",
+        "10.4.1",
         "10.5.2605",
         "10.4.2604",
         "non-root service user",

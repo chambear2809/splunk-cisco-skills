@@ -1,6 +1,6 @@
 # Splunk 10.4 Enterprise Deployment Notes
 
-Verified for Splunk Enterprise/Universal Forwarder `10.4.0`, current Splunk
+Verified for Splunk Enterprise/Universal Forwarder `10.4.1`, current Splunk
 Cloud Platform documentation train `10.5.2605`, and previous Cloud train
 `10.4.2604` planning as of 2026-07-02.
 

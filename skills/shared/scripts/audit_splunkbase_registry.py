@@ -91,30 +91,61 @@ def registry_apps(registry: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def parse_cloud_release_metadata(payload: Any) -> dict[str, Any]:
-    """Extract optional Cloud install facts from a Splunkbase release response."""
+def release_objects(payload: Any) -> list[dict[str, Any]]:
+    """Return release objects from supported Splunkbase API response shapes."""
 
     if isinstance(payload, list):
         releases = payload
     elif isinstance(payload, dict):
+        # Preserve parse_cloud_release_metadata's existing wrapper fallbacks.
         releases = payload.get("releases") or payload.get("results") or [payload]
     else:
         releases = []
-    release = next((item for item in releases if isinstance(item, dict)), None)
+    return [item for item in releases if isinstance(item, dict)]
+
+
+def parse_cloud_release_metadata(payload: Any) -> dict[str, Any]:
+    """Extract optional Cloud install facts from a Splunkbase release response."""
+
+    release = next(iter(release_objects(payload)), None)
     if release is None:
         raise ValueError("Splunkbase release API returned no release object")
     return {field: release.get(field) for field in CLOUD_RELEASE_FIELDS}
 
 
-def fetch_cloud_release_metadata(app_id: str) -> dict[str, Any]:
+def parse_verified_platform_versions(payload: Any, verified_version: str) -> list[Any]:
+    """Return the exact product_versions for a verified release, or [] if absent."""
+
+    release = next(
+        (
+            item
+            for item in release_objects(payload)
+            if str(item.get("name", "")).strip() == str(verified_version).strip()
+        ),
+        None,
+    )
+    if release is None:
+        return []
+    product_versions = release.get("product_versions")
+    return product_versions if isinstance(product_versions, list) else []
+
+
+def fetch_release_payload(app_id: str) -> Any:
     url = f"https://splunkbase.splunk.com/api/v1/app/{app_id}/release/"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=25) as response:
-        payload = json.loads(response.read().decode("utf-8", "replace"))
-    return parse_cloud_release_metadata(payload)
+        return json.loads(response.read().decode("utf-8", "replace"))
 
 
-def fetch_splunkbase(app_id: str, include_cloud_metadata: bool = False) -> dict[str, Any]:
+def fetch_cloud_release_metadata(app_id: str) -> dict[str, Any]:
+    return parse_cloud_release_metadata(fetch_release_payload(app_id))
+
+
+def fetch_splunkbase(
+    app_id: str,
+    include_cloud_metadata: bool = False,
+    verified_release_version: str | None = None,
+) -> dict[str, Any]:
     url = f"https://splunkbase.splunk.com/app/{app_id}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=25) as response:
@@ -140,7 +171,15 @@ def fetch_splunkbase(app_id: str, include_cloud_metadata: bool = False) -> dict[
         "platform_raw": platform,
         "url": url,
     }
-    if include_cloud_metadata:
+    if verified_release_version is not None:
+        release_payload = fetch_release_payload(app_id)
+        if include_cloud_metadata:
+            result.update(parse_cloud_release_metadata(release_payload))
+        result["verified_platform_versions"] = parse_verified_platform_versions(
+            release_payload,
+            verified_release_version,
+        )
+    elif include_cloud_metadata:
         result.update(fetch_cloud_release_metadata(app_id))
     return result
 
@@ -214,6 +253,22 @@ def audit_offline(apps: list[dict[str, Any]], target: str) -> list[dict[str, Any
                             "message": "must be a non-empty string when explicitly declared",
                         }
                     )
+        if app.get("latest_verified_version") != app.get("latest_release_version"):
+            verified_platforms = app.get("verified_platform_versions")
+            if not isinstance(verified_platforms, list) or not all(
+                isinstance(item, str) for item in verified_platforms
+            ):
+                findings.append(
+                    {
+                        "id": app_id,
+                        "severity": "error",
+                        "field": "verified_platform_versions",
+                        "message": (
+                            "must be a list of strings when latest_verified_version "
+                            "differs from latest_release_version"
+                        ),
+                    }
+                )
         for field in (
             "latest_verified_version",
             "latest_verified_date",
@@ -236,6 +291,12 @@ def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tup
                 fetch_splunkbase,
                 app_id,
                 any(field in app for field in CLOUD_RELEASE_FIELDS),
+                (
+                    str(app.get("latest_verified_version", "")).strip()
+                    if app.get("latest_verified_version")
+                    != app.get("latest_release_version")
+                    else None
+                ),
             ): app_id
             for app_id, app in by_id.items()
         }
@@ -266,6 +327,11 @@ def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tup
         for field in CLOUD_RELEASE_FIELDS:
             if field in app:
                 comparisons[field] = live.get(field)
+        if app.get("latest_verified_version") != app.get("latest_release_version"):
+            comparisons["verified_platform_versions"] = live.get(
+                "verified_platform_versions",
+                [],
+            )
         for field, expected in comparisons.items():
             actual = app.get(field)
             if actual != expected:
