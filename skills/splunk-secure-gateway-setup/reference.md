@@ -28,11 +28,31 @@ Based on current Splunk Secure Gateway documentation:
 ## Apply Transport
 
 App enable/disable uses the Splunk REST `apps/local/<app>` endpoint
-(`disabled=0|1`) via the shared session-key helpers. There is no public REST API
-for Spacebridge device registration or for most deployment settings, so this
-skill validates egress and renders the Splunk Web / MDM runbooks. Enabling the
-app opens outbound Spacebridge connectivity and is gated behind
-`--accept-spacebridge-egress`.
+(`disabled=0|1`) via the shared session-key helpers only for Splunk Enterprise.
+There is no public REST API for Spacebridge device registration or for most
+deployment settings, so this skill validates egress and renders the Splunk Web /
+MDM runbooks. Enabling the app opens outbound Spacebridge connectivity and is
+gated behind `--accept-spacebridge-egress`.
+
+## Splunk Cloud Managed Boundary
+
+Splunk Cloud manages Secure Gateway app state and Spacebridge configuration.
+`scripts/setup.sh` accepts `--platform auto|cloud|enterprise` and defaults to
+`auto`. Before apply, the configured target is resolved through the shared
+credential helpers. A Cloud target renders the review assets, refuses enable,
+disable, and configure mutations, prints a handoff, and exits `2`.
+
+For Splunk Cloud Platform 10.5.2605, render the managed-service readiness bundle
+with:
+
+```bash
+bash skills/splunk-secure-gateway/scripts/setup.sh \
+  --platform cloud --phase render
+```
+
+Run egress validation from an Enterprise search head only. On Splunk Cloud,
+connectivity originates from Splunk-managed infrastructure and must be handled
+through the Cloud readiness/support workflow.
 
 ## Validation
 

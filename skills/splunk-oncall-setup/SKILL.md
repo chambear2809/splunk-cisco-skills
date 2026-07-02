@@ -1,6 +1,10 @@
 ---
 name: splunk-oncall-setup
 description: Render, validate, and apply the full Splunk On-Call (formerly VictorOps) lifecycle — teams, users + contact methods, rotations, escalation policies, routing keys, scheduled overrides, personal paging policies, alert rules / Rules Engine, maintenance mode, incidents, notes, chat, stakeholder messages, REST endpoint and generic email alert payloads — plus Splunk-side companions (Splunkbase 3546 alert action, 4886 Add-on, 5863 SOAR connector, ITSI NEAP, ES Adaptive Response). Use when the user asks about Splunk On-Call, VictorOps, on-call schedules, escalation, paging, X-VO-Api-Id/X-VO-Api-Key, the alert.victorops.com REST endpoint, or victorops_app.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk On-Call Setup
@@ -35,7 +39,9 @@ Every rendered object gets an explicit coverage status:
 - `install_apply`: the skill installs or configures a Splunk-side companion
   app or saved search via Splunkbase + REST (Splunkbase 3546 and 4886).
   Splunkbase 5863 is a Splunk SOAR connector and remains an explicit SOAR
-  handoff rather than a Splunk Platform install.
+  handoff rather than a Splunk Platform install. Splunk Platform/Cloud `10.5`
+  compatibility is therefore **not applicable** to `5863`; validate it against
+  the connector's listed Splunk SOAR versions instead.
 
 Do not mark UI-only workflows as `api_apply`.
 

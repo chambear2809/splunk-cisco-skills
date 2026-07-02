@@ -15,7 +15,7 @@ platform behaviors, and CLI flags.
 
 | Source | Flag | Behavior |
 |--------|------|----------|
-| Splunkbase | `--source splunkbase --app-id ID` | Downloads latest (or `--app-version`) from Splunkbase |
+| Splunkbase | `--source splunkbase --app-id ID` | Uses the registry's repo-verified version for known apps; use `--app-version` for another reviewed release |
 | Local | `--source local --file PATH` | Installs from a `.tgz` or `.spl` file |
 | Remote URL | `--source remote --url URL` | Downloads then installs |
 
@@ -46,6 +46,8 @@ The installer resolves Cisco app metadata from
 `skills/shared/app_registry.json`:
 
 - Splunkbase ID and license acknowledgment URL
+- target-minor compatibility from `platform_versions`
+- repo-verified and current public release versions
 - `install_requires` dependencies (auto-installed first)
 - `role_support` for deployment role warnings
 - `package_patterns` for local file matching
@@ -58,7 +60,10 @@ The installer resolves Cisco app metadata from
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Pin a specific Splunkbase version (omit for latest) |
+| `--app-version VER` | Pin a specific reviewed Splunkbase version |
+| `--target-splunk-version VER` | Override the shared compatibility target (`MAJOR.MINOR[.PATCH]`) |
+| `--accept-unsupported-platform` | Override a known listing gap only with documented vendor/operator approval |
+| `--accept-unverified-release` | Request public latest rather than the repo-verified version; does not certify it |
 | `--expected-sha256 HEX` | Required publisher SHA-256 for a remote URL package |
 | `--license-ack-url URL` | Third-party license acknowledgment URL for ACS |
 | `--pre-vetted` | Skip ACS private-app inspection only after external review |

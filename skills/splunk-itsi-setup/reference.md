@@ -13,6 +13,8 @@ trees) lives in the separate `splunk-itsi-config` skill.
 | Product name | Splunk IT Service Intelligence |
 | Premium license | Required (separate from Splunk Enterprise license) |
 | Splunkbase listing | [App ID 1841](https://splunkbase.splunk.com/app/1841) |
+| Repository-verified baseline | `4.21.2` |
+| Current public release | `5.0.0` (lists Splunk 10.5; package not verified here) |
 | Primary internal app | `SA-ITOA` (the engine; UI ships in `itsi`) |
 | Bundled apps | `SA-ITOA`, `itsi`, `SA-UserAccess`, `SA-ITSI-Licensechecker`, plus optional `DA-ITSI-*` content packs |
 | Deployment placement | Search-tier role (search head, SHC member via deployer) |
@@ -22,6 +24,12 @@ Refer to Splunk Docs for canonical version compatibility:
 - [Splunk ITSI install / upgrade overview](https://docs.splunk.com/Documentation/ITSI/latest/Install/Overview)
 - [ITSI version compatibility matrix](https://docs.splunk.com/Documentation/ITSI/latest/Install/Hardwareandsoftwarerequirements)
 - [Splunk Apps and ITSI Cloud requirements](https://docs.splunk.com/Documentation/ITSI/latest/Install/Splunkclouddeploymentguidelines)
+
+The shared installer defaults to verified `4.21.2`; only the explicit
+`--accept-unverified-release` override follows public `5.0.0`. Public
+compatibility metadata is not package verification. After that override,
+install and health-check 5.0 independently, then review its native-object
+contracts before using `splunk-itsi-config`.
 
 ## Topology Placement
 
@@ -85,6 +93,9 @@ The validator confirms presence of these signals:
 5. **Restart semantics.** Enterprise: `splunk restart` on the search head
    (members via SHC deployer push). Cloud: `acs status current-stack` first,
    only restart when ACS asks.
+6. **ITSI 5.0 boundary.** The public `5.0.0` listing advertises Splunk 10.5,
+   but the package and native-object API shapes are not repository-verified.
+   Do not promote 4.21.2 configuration assumptions to 5.0 without review.
 
 ## Troubleshooting
 

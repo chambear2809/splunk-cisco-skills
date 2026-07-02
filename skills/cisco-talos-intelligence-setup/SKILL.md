@@ -7,6 +7,10 @@ description: >-
   optional collection index, and disabled IP blacklist threatlist checks. Use
   when the user asks about Cisco Talos Intelligence, Talos reputation
   enrichment, Splunk_TA_Talos_Intelligence, or Talos ES Cloud readiness.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Talos Intelligence Setup
@@ -32,6 +36,16 @@ This is not a normal polling input add-on. The package provides:
 - adaptive response actions for collection and enrichment
 - an encrypted Talos service account certificate/private-key stanza
 - a disabled Talos IP blacklist threatlist
+
+## Package Verification Boundary
+
+This skill's package-derived capability, REST-handler, and alert-action model
+was verified against `1.0.1`. The current public release is `1.0.3` and
+advertises Splunk 10.5 support, but this repository has not inspected that
+newer package. The shared installer defaults to verified `1.0.1`; only
+`--accept-unverified-release` follows public `1.0.3`. After that explicit
+override, repeat the capability, action, configuration-stanza, and
+dashboard/package-evidence checks before declaring readiness.
 
 ## Support Posture
 

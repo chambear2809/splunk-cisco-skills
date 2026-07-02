@@ -6,6 +6,10 @@ description: >-
   acceleration, and validates dashboards. Use when the user asks about Cisco
   Enterprise Networking app, cisco-catalyst-app, Catalyst dashboards, ISE
   dashboards, SD-WAN dashboards, or Cyber Vision dashboards.
+compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+metadata:
+  splunk_cloud_10_5: "blocked"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Enterprise Networking App Setup Automation

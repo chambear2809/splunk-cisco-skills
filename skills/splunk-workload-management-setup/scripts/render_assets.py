@@ -10,6 +10,7 @@ import shlex
 import stat
 from pathlib import Path
 
+_PLATFORM_VERSION_HELPERS = Path(__file__).resolve().parents[2] / "shared" / "lib" / "platform_version_helpers.sh"
 
 GENERATED_FILES = {
     "README.md",
@@ -85,7 +86,21 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
 
 
 def make_script(body: str) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
+    first, separator, remainder = body.lstrip().partition("\n")
+    if not separator:
+        die("internal renderer error: local script body has no runtime assignment")
+    helper_default = shell_quote(_PLATFORM_VERSION_HELPERS)
+    gate = f"""_platform_helpers_default={helper_default}
+platform_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_platform_helpers_default}}}}"
+[[ -r "${{platform_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_helpers}}"
+runtime_home="${{splunk_home:-}}"
+[[ -n "${{runtime_home}}" ]] || {{ echo "ERROR: rendered script did not set splunk_home." >&2; exit 1; }}
+installed_version="$(spv_require_supported_splunk_home "${{runtime_home}}")"
+echo "PASS: supported Splunk Enterprise runtime ${{installed_version}}."
+"""
+    return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + first + "\n" + gate + remainder
 
 
 def clean_render_dir(render_dir: Path) -> None:

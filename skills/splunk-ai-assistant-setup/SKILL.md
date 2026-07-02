@@ -8,6 +8,10 @@ description: >-
   activation, and proxy configuration. Use when the user asks about
   splunk-ai-assistant, Splunk AI Assistant, Splunk AI Assistant for SPL,
   AI Assistant for SPL, or the `Splunk_AI_Assistant_Cloud` app.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AI Assistant Setup
@@ -42,12 +46,21 @@ this app.
 - Primary path: Splunkbase app ID `7245`
 - Internal app name: `Splunk_AI_Assistant_Cloud`
 - Latest verified Splunkbase release: `2.0.0` (April 9, 2026)
+- Current public Splunkbase release: `2.1.1` (June 25, 2026); the listing
+  advertises Splunk 10.5 support, but this package is not verified here
 - Install on search heads only
-- Prefer the latest compatible release by omitting `--app-version`
+- The shared installer defaults to verified `2.0.0`; its explicit
+  `--accept-unverified-release` override follows public `2.1.1`
 - Do not model this as a private-app upload on Splunk Cloud
-- For latest `2.0.0`, Splunkbase lists platform compatibility with Splunk
+- For the verified `2.0.0` baseline, Splunkbase lists compatibility with Splunk
   Enterprise `9.3+` and Splunk Cloud. Agent Mode requires Splunk platform
   `10.1+`.
+
+Do not apply the `2.0.0` Agent Mode, FedRAMP, Context, or Model Runtime behavior
+claims to `2.1.1` without reviewing that release's package and documentation.
+Keep the default `2.0.0` pin for repository-reviewed behavior. If the shared
+installer is invoked with `--accept-unverified-release`, treat `2.1.1` as
+package delivery followed by fresh feature and onboarding validation.
 
 For Splunk Cloud, the shared installer uses ACS Splunkbase install behavior.
 For Splunk Enterprise, the shared installer downloads from Splunkbase and
@@ -138,9 +151,10 @@ python3 skills/splunk-ai-assistant-setup/scripts/cloud_onboarding_plan.py \
 **Splunk Enterprise (cloud connected)**
 
 - The search head must be able to reach `*.scs.splunk.com` on `443`
-- Use the current public Splunkbase app unless the target is pinned for a
-  documented compatibility reason. For latest `2.0.0`, prefer Enterprise
-  `9.3+`; older app pins can still be relevant for older Enterprise estates.
+- The shared installer defaults to verified `2.0.0`. Public `2.1.1` requires
+  its explicit unverified-release override and is not package-verified here.
+  Confirm current release documentation rather than inheriting the `2.0.0`
+  Enterprise `9.3+` statement automatically.
 - Optional: configure the outbound proxy first if the search head needs one:
 
 ```bash

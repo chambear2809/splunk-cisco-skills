@@ -8,6 +8,10 @@ description: >-
   Collector handoffs, and Splunk Observability dashboards/detectors. Use when
   the user asks to govern runtime agent behavior with Agent Control and wire
   control events to Splunk Platform or Splunk Observability Cloud.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Galileo Agent Control Setup

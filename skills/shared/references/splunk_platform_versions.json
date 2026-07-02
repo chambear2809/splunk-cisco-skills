@@ -1,8 +1,8 @@
 {
   "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-07-02. Enterprise entries list currently supported minor trains; Cloud entries identify current documentation trains.",
   "defaults": {
-    "enterprise_version": "10.4.0",
-    "enterprise_image": "splunk/splunk:10.4.0",
+    "enterprise_version": "10.4.1",
+    "enterprise_image": "splunk/splunk:10.4.1",
     "enterprise_doc_train": "10.4",
     "cloud_doc_train": "10.5.2605",
     "cloud_doc_train_previous": "10.4.2604",
@@ -28,7 +28,9 @@
   ],
   "enterprise_cloud_only_trains": [
     "10.1",
-    "10.3",
+    "10.3"
+  ],
+  "enterprise_not_publicly_released_trains": [
     "10.5"
   ],
   "enterprise_support_end_dates": {

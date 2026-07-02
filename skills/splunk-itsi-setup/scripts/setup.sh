@@ -8,6 +8,8 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 INSTALL_APP_SCRIPT="${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 ITSI_APP_ID="1841"
+VERIFIED_ITSI_VERSION="4.21.2"
+CURRENT_PUBLIC_ITSI_VERSION="5.0.0"
 
 SOURCE="splunkbase"
 APP_VERSION=""
@@ -121,6 +123,12 @@ payload = {
     "ok": True,
     "dry_run": True,
     "app_id": os.environ["ITSI_APP_ID"],
+    "latest_verified_version": os.environ["VERIFIED_ITSI_VERSION"],
+    "current_public_version": os.environ["CURRENT_PUBLIC_ITSI_VERSION"],
+    "package_verification_warning": (
+        "The current public ITSI release is not package-verified by this repository; "
+        "the shared installer defaults to the verified baseline."
+    ),
     "phases": os.environ.get("JSON_PHASES", "").split(sep)
     if os.environ.get("JSON_PHASES")
     else [],
@@ -140,6 +148,9 @@ PY
     else
         echo "Planned phases:"
         printf '  - %s\n' "${phases[@]}"
+        if [[ "${SOURCE}" == "splunkbase" && -z "${APP_VERSION}" ]]; then
+            echo "Package boundary: the shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; public ${CURRENT_PUBLIC_ITSI_VERSION} requires its explicit unverified-release override."
+        fi
         if [[ "${INSTALL}" == "true" ]]; then
             echo "Install command:"
             echo "  $(render_shell_command "${INSTALL_CMD[@]}")"
@@ -166,6 +177,8 @@ if [[ "${DRY_RUN}" == "true" ]]; then
     JSON_FALLBACK_COMMAND="$(join_unit "${FALLBACK_CMD[@]}")" \
     JSON_VALIDATE_COMMAND="$(join_unit "${VALIDATE_CMD[@]}")" \
     ITSI_APP_ID="${ITSI_APP_ID}" \
+    VERIFIED_ITSI_VERSION="${VERIFIED_ITSI_VERSION}" \
+    CURRENT_PUBLIC_ITSI_VERSION="${CURRENT_PUBLIC_ITSI_VERSION}" \
     emit_plan
     exit 0
 fi
@@ -182,6 +195,9 @@ fi
 if [[ "${INSTALL}" == "true" ]]; then
     build_install_command
     build_fallback_command
+    if [[ "${SOURCE}" == "splunkbase" && -z "${APP_VERSION}" ]]; then
+        echo "INFO: shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; public ${CURRENT_PUBLIC_ITSI_VERSION} requires its explicit unverified-release override." >&2
+    fi
     if ! "${INSTALL_CMD[@]}"; then
         if [[ -n "${FALLBACK_CMD[0]+set}" ]]; then
             echo "WARN: Splunkbase ITSI install failed; trying local fallback package." >&2

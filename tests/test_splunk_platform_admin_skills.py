@@ -230,6 +230,7 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             server_conf = (render_dir / "server.conf").read_text(encoding="utf-8")
             limits_conf = (render_dir / "limits.conf").read_text(encoding="utf-8")
             all_assets = self.read_all_assets(render_dir)
+            apply_script = (render_dir / "apply-cluster-manager.sh").read_text(encoding="utf-8")
 
             self.assertIn("[volume:remote_store]", indexes_conf)
             self.assertIn("storageType = remote", indexes_conf)
@@ -248,6 +249,7 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             self.assertIn("max_cache_size = 262144", server_conf)
             self.assertIn("eviction_padding = 1024", server_conf)
             self.assertIn("[remote_storage]", limits_conf)
+            self.assertIn("spv_require_supported_splunk_home", apply_script)
             self.assertIn("bucket_localize_max_timeout_sec = 600", limits_conf)
             self.assertNotIn("AKIA_TEST_SECRET", all_assets)
             self.assertNotIn("VERY_SECRET_S3_KEY", all_assets)
@@ -521,6 +523,7 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             savedsearches = (render_dir / "savedsearches.conf").read_text(encoding="utf-8")
             peer_helper = (render_dir / "add-search-peers.sh").read_text(encoding="utf-8")
             metadata = (render_dir / "metadata.json").read_text(encoding="utf-8")
+            preflight = (render_dir / "preflight.sh").read_text(encoding="utf-8")
 
             self.assertIn("mc_auto_config = enabled", assets_conf)
             self.assertIn("[distributedSearch]", distsearch)
@@ -533,6 +536,7 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             self.assertIn("cm01.example.com:8089", peer_helper)
             self.assertIn("peer_scheme=https", peer_helper)
             self.assertIn('echo "Peer: ${peer_scheme}://${peer}"', peer_helper)
+            self.assertIn("spv_require_supported_splunk_home", preflight)
             self.assertIn("process argument", peer_helper)
             self.assertNotIn("-remotePassword", peer_helper)
             self.assertNotIn("peer_password", metadata)

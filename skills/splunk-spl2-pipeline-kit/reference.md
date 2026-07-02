@@ -53,10 +53,10 @@ Warnings:
 
 - Ingest Processor pipeline syntax:
   <https://help.splunk.com/en/data-management/transform-and-route-data/process-data-at-ingest-time/working-with-pipelines/ingest-processor-pipeline-syntax>
-- Create custom pipeline templates:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/process-data-at-ingest-time/working-with-pipelines/create-custom-pipeline-templates>
+- Create pipelines and use the current custom-template workflow:
+  <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/working-with-pipelines/create-pipelines-for-ingest-processor>
 - SPL to SPL2 Conversion tool:
-  <https://help.splunk.com/en/splunk-cloud-platform/search/spl2-search-reference/introduction/spl-to-spl2-conversion-tool>
+  <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/working-with-pipelines/spl-to-spl2-conversion-tool>
 - Convert RE2 regular expressions to PCRE2:
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/working-with-pipelines/convert-re2-regular-expressions-to-pcre2-regular-expressions>
 - Generate logs into metrics with Ingest Processor:

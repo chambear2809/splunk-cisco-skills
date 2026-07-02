@@ -8,6 +8,10 @@ description: >-
   NetApp ONTAP, Carbon Black, Symantec Endpoint Protection, Splunk_TA_nix,
   Splunk_TA_Linux, Linux CollectD, auditd, *nix scripted inputs, or router
   guidance before using splunk-app-install.
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+metadata:
+  splunk_cloud_10_5: "delegated"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Supported Add-ons Setup

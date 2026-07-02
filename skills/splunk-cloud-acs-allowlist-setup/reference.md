@@ -28,17 +28,16 @@ This skill follows current Splunk Cloud ACS documentation:
   allow list operations and can be used as an alternative or alongside this
   skill.
 
-Official references (the ACS manual currently publishes this surface under
-Cloud doc train `10.4.2604`; the workflow also applies to `10.5.2605` stacks):
+Official references for Cloud doc train `10.5.2605`:
 
 - IP allow list configuration:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allowlists-for-splunk-cloud-platform>
 - ACS API endpoint reference:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.0.2503/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
 - ACS CLI:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSCLI>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-cli/administer-splunk-cloud-platform-using-the-acs-cli>
 - Manage ACS API access with capabilities:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
 - Splunk Cloud Platform Terraform Provider (`splunk/scp`):
   <https://registry.terraform.io/providers/splunk/scp/latest>
 

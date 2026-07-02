@@ -7,6 +7,10 @@ description: >-
   verify the WideField default parser, prepare feed handoffs, or collect
   parser evidence while failing closed for undocumented Google SecOps live
   feed mutation.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # WideField Google SecOps Setup

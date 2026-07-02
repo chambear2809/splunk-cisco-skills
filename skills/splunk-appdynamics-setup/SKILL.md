@@ -13,6 +13,10 @@ description: >-
   report from the checked-in taxonomy. Use when the user asks for AppDynamics
   setup, AppDynamics coverage, AppDynamics product routing, or a full
   AppDynamics doctor/gap report.
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+metadata:
+  splunk_cloud_10_5: "delegated"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Setup

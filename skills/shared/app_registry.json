@@ -3592,7 +3592,8 @@
         "10.0",
         "9.4"
       ],
-      "compatibility_status": "unsupported"
+      "compatibility_status": "unsupported",
+      "notes": "Cisco Enterprise Networking visualization app. The current public release does not list Splunk 10.5 support; do not install it on a 10.5 search tier. Assess its supported TA_cisco_catalyst dependency separately."
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -3676,7 +3677,8 @@
         "9.2",
         "9.1"
       ],
-      "compatibility_status": "unsupported"
+      "compatibility_status": "unsupported",
+      "notes": "Cisco Security Cloud app. The current public release does not list Splunk 10.5 support; do not install it on a Splunk 10.5 search tier until Cisco or Splunk publishes compatible package metadata."
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3798,7 +3800,8 @@
         "9.4",
         "9.3"
       ],
-      "compatibility_status": "unsupported"
+      "compatibility_status": "unsupported",
+      "notes": "Cisco Intersight Add-On. The current public release does not list Splunk 10.5 support; do not install it on a Splunk 10.5 search tier or heavy forwarder until a compatible package is published."
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -4873,7 +4876,8 @@
         "9.3",
         "9.2"
       ],
-      "compatibility_status": "unsupported"
+      "compatibility_status": "unsupported",
+      "notes": "Legacy UBA Kafka ingestion app. Splunkbase does not list Splunk 10.5 support; use only for an explicitly supported legacy UBA deployment or follow the ES Premier UEBA migration handoff."
     },
     {
       "skill": "splunk-security-content-update-setup",
@@ -8057,7 +8061,9 @@
         "5.1"
       ],
       "compatibility_status": "unsupported",
-      "notes": "Splunk SOAR connector, not a Splunk Enterprise app. It is listed here so the On-Call skill's Splunkbase references have explicit audit coverage; 10.5 is not a SOAR platform version."
+      "compatibility_classification": "not_applicable",
+      "target_product": "Splunk SOAR",
+      "notes": "Splunk SOAR-only connector, not a Splunk Enterprise or Splunk Cloud Platform app. The mechanical compatibility_status is unsupported because 10.5 is a Splunk Platform target, but Platform 10.5 compatibility is not applicable to this package. Install and validate it only against a listed Splunk SOAR release."
     },
     {
       "skill": "splunk-okta-ta-setup",

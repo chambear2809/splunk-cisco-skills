@@ -9,6 +9,10 @@ description: >-
   snow:<table> source types, and validates ingestion. Use when the user asks
   about Splunk_TA_snow, the Splunk Add-on for ServiceNow, ServiceNow incident or
   change or CMDB ingestion, snow:// inputs, or ITSM data onboarding in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Add-on for ServiceNow Setup
@@ -31,6 +35,16 @@ source type.
 
 The add-on runs on the search tier or a heavy forwarder. Run a given table input
 on a single node to avoid duplicate collection.
+
+## Package Verification Boundary
+
+This skill's package-derived inputs and handlers were verified against
+`10.0.1`. The current public release is `11.0.0` and advertises Splunk 10.5
+support, but its package contents have not been verified by this repository.
+The shared installer defaults to verified `10.0.1`; only
+`--accept-unverified-release` follows public `11.0.0`. After that explicit
+override, inspect its input/account schema and repeat the completion-gate
+validation before applying these templates.
 
 ## Tables And Source Types
 

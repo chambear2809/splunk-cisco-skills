@@ -6,6 +6,10 @@ description: >-
   upgrade, license readiness, restart, core-app health, or installation
   validation; route post-install entities, services, KPIs, dependencies, Event
   Analytics configuration, and content-pack import to splunk-itsi-config.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk ITSI Setup Automation
@@ -46,10 +50,18 @@ automatically; a missing-product finding is an explicit user-visible handoff.
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use `splunk-app-install` with `--source splunkbase --app-id 1841` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
-in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+**Pull from Splunkbase first, fall back to `splunk-ta/`.** Use
+`splunk-app-install` with `--source splunkbase --app-id 1841`; the shared
+installer pins the repository-verified release by default. If Splunkbase is
+unavailable, fall back to the local package in `splunk-ta/`.
+
+The repository-verified package and configuration baseline is ITSI `4.21.2`.
+The current public listing is `5.0.0` and advertises Splunk 10.5 support, but
+the `5.0.0` package and native-object contracts have not been verified by this
+repository. The shared installer defaults to `4.21.2`; only an explicit
+`--accept-unverified-release` follows public `5.0.0`. After that override,
+limit this skill to package installation and core-health validation, then
+review ITSI 5.0 before handing native object changes to `splunk-itsi-config`.
 
 After installation, use this skill to validate the deployment and check
 integration readiness for dependent apps (e.g., ThousandEyes).
@@ -94,6 +106,10 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 bash skills/splunk-app-install/scripts/install_app.sh \
   --source splunkbase --app-id 1841
 ```
+
+That command defaults to the repository-reviewed `4.21.2` package. To request
+public `5.0.0`, add `--accept-unverified-release` and follow the compatibility
+review boundary above.
 
 If Splunkbase is unavailable, fall back to a local package:
 

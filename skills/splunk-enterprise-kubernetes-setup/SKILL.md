@@ -6,6 +6,10 @@ description: >-
   Covers SOK S1/C3/M4, guarded C3 indexing and ingestion separation, reviewed
   Helm overlays, and POD Small through X-Large with ES, ITSI, and TLS variants.
   Use when planning, installing, upgrading, or validating either runtime.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Enterprise Kubernetes Setup
@@ -25,7 +29,7 @@ operations.
 
 ## Supported Baselines
 
-- SOK: Operator and charts `3.1.0`, Splunk Enterprise `10.4.0` by default.
+- SOK: Operator and charts `3.1.0`, Splunk Enterprise `10.4.1` by default.
   The renderer enforces the current 3.1.0 release matrix. Kubernetes 1.25-1.34
   is supported subject to the Splunk version rules in the official release.
 - POD: coupled bundle `10.4.0_1.6.0`. Do not independently select its SOK,

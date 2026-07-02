@@ -1,6 +1,6 @@
 # TLS Hardening Reference
 
-Splunk Enterprise's documented baseline (still current in 10.2):
+Splunk Enterprise's documented TLS 1.2 baseline:
 
 ```
 sslVersions = tls1.2
@@ -27,8 +27,8 @@ of truth in `scripts/render_assets.py`:
 `--enable-tls13 true --tls-policy tls12_13` emits `sslVersions = tls1.2,
 tls1.3`. Use only when:
 
-- Target Splunk Enterprise is 10.x (older versions have inconsistent
-  TLS 1.3 ALPN and compatibility issues).
+- Target Splunk Enterprise is 10.4 or later. The renderer rejects TLS 1.3
+  policy on older Enterprise trains.
 - The platform OpenSSL has TLS 1.3 support.
 - All inter-Splunk peers are on the same baseline (mixed-version
   clusters can fail to negotiate).
@@ -103,5 +103,6 @@ handshake after upgrade even if Splunk-side `sslVersions` already targeted TLS
 
 ## Post-quantum / hybrid
 
-Splunk Enterprise does NOT support PQC / hybrid TLS as of 10.2. Do not
-configure SNTRUP / ML-KEM. Track Splunk release notes for support.
+Splunk Enterprise 10.4 adds platform support for post-quantum TLS. This
+renderer does not configure PQC groups: keep the TLS policy at the documented
+TLS 1.2/1.3 baseline and use the PKI workflow for a reviewed 10.4 PQC rollout.

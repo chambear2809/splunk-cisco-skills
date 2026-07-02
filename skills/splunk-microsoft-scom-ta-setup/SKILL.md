@@ -7,6 +7,10 @@ description: >-
   lookups, index readiness, and readiness-doctor handoffs. Use when the user
   asks to onboard, configure, or validate Microsoft System Center Operations
   Manager data in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Microsoft SCOM Supported Add-on Setup

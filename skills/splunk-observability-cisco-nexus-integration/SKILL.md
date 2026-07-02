@@ -14,6 +14,10 @@ description: >-
   to send Cisco Nexus, NX-OS, IOS-XE, or IOS-XR device metrics to Splunk
   Observability Cloud, configure the cisco_os receiver, set up multi-device
   Nexus telemetry, or render dashboards/detectors for Cisco data center fabric.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Cisco Nexus Integration

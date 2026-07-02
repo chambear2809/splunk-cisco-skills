@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 PROJECT_TA_DIR="${SCRIPT_DIR}/../../../splunk-ta"
@@ -20,6 +21,9 @@ UPDATE=false
 UPDATE_SET=false
 RESTART_SPLUNK=true
 PRE_VETTED=false
+TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
+ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
+ACCEPT_UNVERIFIED_RELEASE="${SPLUNK_ACCEPT_UNVERIFIED_RELEASE:-false}"
 CLOUD_APP_NAME=""
 CLOUD_APP_VERSION=""
 CLOUD_APP_STATUS=""
@@ -186,6 +190,118 @@ for app in registry.get('apps', []):
 
 registry_app_label_by_app_id() {
     registry_app_field_by_app_id "${1:-}" "label"
+}
+
+normalize_splunk_minor_version() {
+    python3 - "${1:-}" <<'PY'
+import re
+import sys
+
+value = sys.argv[1].strip()
+match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+)?", value)
+if not match:
+    raise SystemExit(1)
+print(f"{match.group(1)}.{match.group(2)}", end="")
+PY
+}
+
+resolve_target_splunk_version() {
+    local raw="${TARGET_SPLUNK_VERSION:-}"
+    if [[ -z "${raw}" ]]; then
+        if is_splunk_cloud; then
+            raw="$(spv_cloud_doc_train_default)"
+        else
+            raw="$(spv_enterprise_default)"
+        fi
+    fi
+    if ! TARGET_SPLUNK_VERSION="$(normalize_splunk_minor_version "${raw}")"; then
+        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        return 1
+    fi
+    export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
+    export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM="${ACCEPT_UNSUPPORTED_PLATFORM}"
+    export SPLUNK_ACCEPT_UNVERIFIED_RELEASE="${ACCEPT_UNVERIFIED_RELEASE}"
+}
+
+registry_app_compatibility_by_app_id() {
+    local app_id="${1:-}"
+    local target="${2:-}"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" <<'PY'
+import json
+import sys
+
+registry_path, target_id, target_version = sys.argv[1:]
+with open(registry_path, encoding="utf-8") as handle:
+    registry = json.load(handle)
+for app in registry.get("apps", []):
+    if str(app.get("splunkbase_id", "")) != target_id:
+        continue
+    platforms = [str(item) for item in app.get("platform_versions", [])]
+    status = "supported" if target_version in platforms else "unsupported"
+    fields = (
+        status,
+        str(app.get("app_name", "")),
+        ",".join(platforms),
+        str(app.get("latest_verified_version", "")),
+        str(app.get("latest_release_version", "")),
+    )
+    print("|".join(fields), end="")
+    break
+PY
+}
+
+apply_registry_verified_version_default() {
+    local verified release
+    [[ "${SOURCE}" == "splunkbase" ]] || return 0
+    [[ -n "${APP_ID}" && -z "${APP_VERSION}" ]] || return 0
+    [[ "${ACCEPT_UNVERIFIED_RELEASE}" == "true" ]] && {
+        log "WARNING: Latest public release requested without repository package verification."
+        return 0
+    }
+    verified="$(registry_app_field_by_app_id "${APP_ID}" "latest_verified_version")"
+    release="$(registry_app_field_by_app_id "${APP_ID}" "latest_release_version")"
+    if [[ -n "${verified}" ]]; then
+        APP_VERSION="${verified}"
+        if [[ -n "${release}" && "${release}" != "${verified}" ]]; then
+            log "Using repo-verified version ${verified} for app ID ${APP_ID}; public latest ${release} remains unverified by this repo."
+        else
+            log "Using repo-verified version ${verified} for app ID ${APP_ID}."
+        fi
+    fi
+}
+
+preflight_current_install_target_compatibility() {
+    local target_app_id metadata status app_name platforms verified release
+
+    resolve_target_splunk_version || exit 1
+    target_app_id="$(registry_target_app_id)"
+    if [[ -z "${target_app_id}" ]]; then
+        log "INFO: No registry app ID resolved; package compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
+        return 0
+    fi
+
+    metadata="$(registry_app_compatibility_by_app_id "${target_app_id}" "${TARGET_SPLUNK_VERSION}")"
+    if [[ -z "${metadata}" ]]; then
+        log "INFO: App ID ${target_app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
+        return 0
+    fi
+    IFS='|' read -r status app_name platforms verified release <<< "${metadata}"
+    if [[ "${status}" == "supported" ]]; then
+        log "Compatibility preflight passed: ${app_name:-app ID ${target_app_id}} advertises Splunk ${TARGET_SPLUNK_VERSION}."
+        return 0
+    fi
+
+    if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+        log "WARNING: Explicit override accepted for ${app_name:-app ID ${target_app_id}} on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
+        export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true
+        return 0
+    fi
+
+    log "ERROR: ${app_name:-App ID ${target_app_id}} does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
+    log "Advertised platform versions: ${platforms:-none}."
+    log "Refusing installation. Use a supported package/workflow, or pass --accept-unsupported-platform only with documented vendor approval."
+    exit 1
 }
 
 guess_app_name_from_package() {
@@ -439,6 +555,9 @@ while [[ $# -gt 0 ]]; do
         --no-update)    UPDATE=false; UPDATE_SET=true;  shift ;;
         --no-restart)   RESTART_SPLUNK=false; shift ;;
         --pre-vetted)   PRE_VETTED=true; shift ;;
+        --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
+        --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
+        --accept-unverified-release) ACCEPT_UNVERIFIED_RELEASE=true; shift ;;
         --help)
             cat <<EOF
 Splunk App Installer (interactive)
@@ -461,6 +580,15 @@ Optional flags (skip the corresponding prompt):
   --no-update           Fresh install (skip upgrade prompt)
   --no-restart          Skip the automatic restart after install
   --pre-vetted          Skip ACS app inspection for pre-vetted private apps
+  --target-splunk-version VER
+                        Compatibility target (MAJOR.MINOR[.PATCH]); defaults to the
+                        shared Cloud or Enterprise platform contract.
+  --accept-unsupported-platform
+                        Override a known registry incompatibility only with documented
+                        vendor/operator approval.
+  --accept-unverified-release
+                        For a known app, request public latest instead of the repo-verified
+                        version. This does not certify that release.
 
 Credentials and remote host settings are read from the project-root credentials file automatically.
 For Splunk Cloud installs, configure ACS access. If one credentials file contains
@@ -1368,6 +1496,8 @@ main() {
         esac
 
         prompt_update
+        apply_registry_verified_version_default
+        preflight_current_install_target_compatibility
         warn_for_current_install_target_role
         install_required_dependencies
         cloud_install_app
@@ -1384,6 +1514,8 @@ main() {
             ;;
         splunkbase)
             prompt_splunkbase
+            apply_registry_verified_version_default
+            preflight_current_install_target_compatibility
             download_from_splunkbase
             ;;
         *)
@@ -1393,6 +1525,9 @@ main() {
     esac
 
     prompt_update
+    if [[ "${SOURCE}" != "splunkbase" ]]; then
+        preflight_current_install_target_compatibility
+    fi
     warn_for_current_install_target_role
     prompt_splunk_creds
     splunk_auth

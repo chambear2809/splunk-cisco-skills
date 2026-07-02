@@ -141,7 +141,7 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   supported sourcetype/event-type conversion behavior:
   `https://help.splunk.com/en/data-management/common-information-model/6.3/introduction/overview-of-the-ocsf-cim-add-on/configuring-ocsf-cim-add-on`
   and
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security`
+  `https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security`
 - Splunk ES ships most correlation searches disabled and requires operators to
   enable relevant content and response actions; SSE data inventory introspection
   and content mapping are separate readiness inputs for security content
@@ -183,11 +183,11 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   Edge Processor and Ingest Processor documentation expose pipeline, processor,
   and destination metrics that determine whether expected events reach searchable
   indexes and sourcetypes:
-  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/about-ingest-monitoring`
-  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/metrics/review-data-ingest-latency-metrics`
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/monitor-edge-processors/metrics-for-edge-processors`
+  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.2/about-ingest-monitoring`
+  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.2/latency-in-the-ingest-monitoring-dashboard`
+  `https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/monitor-system-health-and-activity/edge-processor-metrics-reference`
   and
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors-for-splunk-cloud-platform/9.3.2411/monitor-ingest-processors/monitor-data-destinations-pipeline-metrics`
+  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors/monitor-system-health-and-activity/view-data-flow-information-about-an-ingest-processor-pipeline`
 - Splunk indexes age through buckets and can move data out of searchable
   retention; `frozenTimePeriodInSecs` defines a minimum availability window.
   Data model acceleration summaries and ITSI backfill also depend on historical
@@ -201,17 +201,16 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   lookups, lookup definitions, field aliases, and calculated fields; Splunk also
   documents the order of search-time operations, which matters when enrichment
   fields feed CIM, ES, ITSI, ARI, and dashboards:
-  `https://help.splunk.com/en/splunk-enterprise/knowledge-manager-manual/10.0/use-the-configuration-files-to-configure-lookups/define-an-automatic-lookup-in-splunk-web`
+  `https://help.splunk.com/en/splunk-enterprise/manage-knowledge-objects`
   `https://help.splunk.com/en/splunk-enterprise/rest-api-reference/9.4/knowledge-endpoints/knowledge-endpoint-descriptions`
-  and
-  `https://help.splunk.com/en/splunk-enterprise/knowledge-manager-manual/9.4/get-started-with-knowledge-objects/the-sequence-of-search-time-operations`
+  and the current Knowledge Manager navigation under the first link.
 - Federated Search uses provider and federated-index definitions; Splunk's REST
   API documents `data/federated/provider` and `data/federated/index`, and
   Splunk Secured Federated Analytics documents Amazon Security Lake searches:
-  `https://help.splunk.com/en/splunk-enterprise/search/federated-search/9.3/about-federated-search/about-federated-search`
+  `https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions`
   `https://help.splunk.com/en/splunk-enterprise/rest-api-reference/9.3/federated-search-endpoints`
   and
-  `https://help.splunk.com/splunk-enterprise-security-8/splunk-secured-federated-analytics/8.2/amazon-security-lake/search-amazon-security-lake-with-splunk-secured-federated-analytics`
+  `https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets/about-federated-analytics`
 - ES correlation searches can be real-time or scheduled, and skipped real-time
   searches do not backfill data gaps. Dashboard Studio saved-search data
   sources depend on scheduled reports and concurrency limits:
@@ -239,7 +238,7 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
 - Data Manager inputs expose deployment and ingestion status through the Data
   Management UI, CloudFormation StackSets, HEC token checks, and AWS
   troubleshooting workflows:
-  `https://help.splunk.com/en/splunk-cloud-platform/ingest-data-from-cloud-services/data-manager-user-manual/1.13/amazon-web-services-data/verify-the-data-input-for-aws-in-data-manager`
+  `https://help.splunk.com/en/splunk-cloud-platform/ingest-data-from-cloud-services/data-inputs-user-manual/1.16/amazon-web-services-data/verify-the-data-input-for-aws-in-data-manager`
   and
   `https://help.splunk.com/en/splunk-cloud-platform/ingest-data-from-cloud-services/data-manager-troubleshooting-manual`
 - ARI requires `ari_staging`, `ari_asset`, `ari_internal`, and `ari_ta`; ARI

@@ -1,6 +1,10 @@
 ---
 name: splunk-itsi-config
 description: Configure and validate an existing, licensed Splunk IT Service Intelligence deployment from repo-local YAML. Use when managing ITSI entities, services, KPIs, dependencies, service trees, selected guarded operations, or ITSI content-pack imports; do not use it to install, upgrade, license, or restart ITSI or install prerequisite apps.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk ITSI Configuration

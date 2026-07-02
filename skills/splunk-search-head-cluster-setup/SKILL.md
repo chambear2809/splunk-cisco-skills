@@ -15,6 +15,10 @@ description: >-
   deployer bundle, perform a searchable rolling restart, transfer the captain,
   add or remove a member, troubleshoot KV Store replication lag, migrate a
   standalone search head to SHC, or replace a deployer.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Search Head Cluster Setup

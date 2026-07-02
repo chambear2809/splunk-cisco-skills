@@ -334,12 +334,20 @@ def test_svd_floor_accepts_at_or_above_floor(tmp_path: Path) -> None:
     assert result_104.returncode == 0, result_104.stderr
 
 
-def test_svd_floor_unknown_series_does_not_refuse(tmp_path: Path) -> None:
+def test_svd_floor_unknown_or_unsupported_series_refuses(tmp_path: Path) -> None:
     out = tmp_path / "out"
-    # 8.x is end-of-life; the floor JSON has no entry. The renderer should
-    # not refuse on unknown series — it lets preflight decide.
+    # 8.0 is outside the centrally supported public self-managed trains and
+    # has no current SVD floor, so public-exposure rendering must fail closed.
     result = run_render(*base_render_args(out, **{"--splunk-version": "8.0.10"}))
-    assert result.returncode == 0, result.stderr
+    assert result.returncode != 0
+    assert "supported public self-managed trains" in (result.stderr + result.stdout)
+
+
+def test_enterprise_10_5_is_not_treated_as_a_public_runtime(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = run_render(*base_render_args(out, **{"--splunk-version": "10.5.0"}))
+    assert result.returncode != 0
+    assert "not-publicly-released" in (result.stderr + result.stdout)
 
 
 def test_svd_floor_external_override(tmp_path: Path) -> None:

@@ -67,6 +67,17 @@ class KvstoreAdminTests(unittest.TestCase):
             self.assertIn("start-shcluster-migration kvstore -storageEngine wiredTiger", migrate)
             self.assertIn("start-shcluster-upgrade kvstore -version", upgrade)
             self.assertIn("backup kvstore -pointInTime true", backup)
+            self.assertIn("spv_require_supported_splunk_home", backup)
+
+    def test_rejects_arbitrary_enterprise_version_as_kvstore_server_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--topology", "shc",
+                "--target-kvstore-version", "10.5",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("supported 7.0 or 8.0.x", result.stderr)
 
     def test_rejects_bad_field_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

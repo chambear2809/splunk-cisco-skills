@@ -10,6 +10,10 @@ description: >-
   the hosted SCS MCP Gateway for Splunk Observability Cloud, Cursor MCP,
   Codex MCP, Claude Code MCP connectivity to Splunk, or Cisco Data Fabric
   agentic/tool access through Splunk MCP.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk MCP Server Setup

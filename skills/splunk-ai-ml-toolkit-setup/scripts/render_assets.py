@@ -194,7 +194,9 @@ def choose_psc_target(raw_target: str, platform: str, warnings: list[str]) -> st
             "PSC target defaulted to linux64. For live Enterprise installs, set --psc-target to the actual search-head OS."
         )
     if PSC_TARGETS[target]["legacy"]:
-        warnings.append("PSC Linux 32-bit is legacy-only and must not be used for new AI Toolkit installs.")
+        warnings.append(
+            "PSC Linux 32-bit (Splunkbase 2884) is legacy/migration-only and must not be installed on Splunk 10.5."
+        )
     return target
 
 
@@ -649,8 +651,9 @@ def write_legacy_migration(path: Path, ctx: dict[str, Any]) -> None:
         "# Legacy Anomaly Migration",
         "",
         f"- Audit requested: `{str(ctx['legacy_anomaly_audit']).lower()}`",
-        "- Splunk App for Anomaly Detection (`6843`) is migration-only in this skill.",
-        "- Smart Alerts Assistant beta (`6415`) is migration-only in this skill.",
+        "- Splunk App for Anomaly Detection (`6843`) is migration-only and must not be installed on Splunk 10.5.",
+        "- Smart Alerts Assistant beta (`6415`) is migration-only and must not be installed on Splunk 10.5.",
+        "- PSC Linux 32-bit (`2884`) is migration-only; use a supported 64-bit PSC package on Splunk 10.5.",
         "- New anomaly work should route to Splunk AI Toolkit assistants, ML-SPL searches, or Cisco Deep Time Series anomaly workflows.",
         "",
         "## Audit Targets",

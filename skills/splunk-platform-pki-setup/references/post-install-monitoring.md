@@ -13,18 +13,43 @@ visibility into:
 - Drift from the rendered configuration (someone edits
   `server.conf` by hand).
 
-## SSL Certificate Checker (Splunkbase 3172)
+## Native expiry monitoring (required for Splunk 10.5)
+
+SSL Certificate Checker (Splunkbase `3172`, internal app name
+`ssl_certificate_checker`) does not list Splunk 10.5 support. **Do not install
+it on Splunk 10.5.** Use the renderer's package-independent helpers instead:
+
+```bash
+# Emits one EXPIRING line per certificate inside the threshold.
+bash splunk-platform-pki-rendered/platform-pki/pki/rotate/expire-watch.sh \
+  /opt/splunk/etc/auth 30
+
+# Records path, subject, and notAfter for every discovered PEM/CRT.
+bash skills/splunk-platform-pki-setup/scripts/setup.sh \
+  --phase inventory --target all \
+  --admin-password-file /tmp/splunk_admin_password
+```
+
+Schedule `expire-watch.sh` for 30, 14, and 7-day thresholds, forward its
+`EXPIRING:` output to the platform team's existing monitored log/index, and
+alert from that source. This remains the default even when an older target can
+use the optional add-on.
+
+## Optional legacy SSL Certificate Checker (Splunkbase 3172)
 
 Splunk publishes the
 [SSL Certificate Checker Add-on](https://splunkbase.splunk.com/app/3172).
 It walks the filesystem, finds PEM files, and indexes their
 expiry dates + subjects to `index=ssl_certificate_checker`.
 
+Only consider this optional path when Splunkbase explicitly lists the target
+Splunk version. It is blocked for 10.5.
+
 ```bash
-# Install
+# Older listed platform only; never run for a Splunk 10.5 target.
 bash skills/splunk-app-install/scripts/setup.sh \
-    --app splunk_ssl_certificate_checker \
-    --splunkbase-id 3172
+    --source splunkbase \
+    --app-id 3172
 
 # Configure on each Splunk host (the add-on auto-discovers most
 # Splunk paths). Add custom paths if the renderer placed certs
@@ -81,7 +106,7 @@ provides standardized fields for cert lifecycle events:
 `cert_validity_start`, `cert_validity_end`, plus tags `certificate`
 and `key`.
 
-The SSL Certificate Checker output is CIM-compliant. ES /
+The legacy SSL Certificate Checker output is CIM-compliant. ES /
 Mission Control / ITSI dashboards can hang off the data model.
 
 ## Splunk Health Assistant Add-on

@@ -70,6 +70,9 @@ def test_render_produces_required_files(tmp_path: Path) -> None:
     ]
     for f in required:
         assert (tmp_path / f).exists(), f"Missing rendered file: {f}"
+    validate_text = (tmp_path / "shc/validate.sh").read_text(encoding="utf-8")
+    assert "spv_require_supported_enterprise_server_info" in validate_text
+    assert "SHC members are on different Splunk Enterprise patch versions" in validate_text
 
 
 def test_render_pass4symmkey_not_inlined(tmp_path: Path) -> None:

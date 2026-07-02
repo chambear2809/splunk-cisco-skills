@@ -10,7 +10,7 @@ This reference describes what the current renderer and entrypoints do. Use
 | Splunk Operator for Kubernetes | `3.1.0` | SOK 3.1.0 GitHub release |
 | Operator Helm chart | follows `--operator-version` | official Splunk Helm repository |
 | Enterprise Helm chart | follows `--operator-version` | official Splunk Helm repository |
-| SOK Splunk Enterprise image | `splunk/splunk:10.4.0` | shared platform default plus SOK matrix |
+| SOK Splunk Enterprise image | `splunk/splunk:10.4.1` | shared platform default plus SOK matrix |
 | SOK Kubernetes range | `1.25` through `1.34`, conditional | SOK 3.1.0 release matrix |
 | Splunk POD bundle | `10.4.0_1.6.0` | POD 10.4 release notes |
 | Render root | `./splunk-enterprise-k8s-rendered/` | repository workflow |
@@ -47,7 +47,7 @@ Verified SOK 3.1.0 artifact SHA-256 values:
 A custom image with an opaque tag or a digest-only reference cannot be matched
 to the release matrix. It requires the non-production unverified-version
 override; production fails closed. Preserve a numeric Splunk tag before the
-digest, for example `splunk:10.4.0@sha256:...`, when compatibility must be
+digest, for example `splunk:10.4.1@sha256:...`, when compatibility must be
 asserted.
 
 POD versions have the form `<Splunk version>_<installer version>`, for example

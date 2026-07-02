@@ -1,6 +1,10 @@
 ---
 name: splunk-observability-deep-native-workflows
 description: Render and validate Digital Experience Analytics (DXA), Metrics Pipeline Management (MPM), and deep native Splunk Observability Cloud operator workflows for modern dashboards, APM service maps, service views, business transactions, Trace Analyzer and trace waterfalls, AlwaysOn Profiling flame graphs, RUM session replay for browser and mobile, RUM error analysis, RUM URL grouping, Database Monitoring query and explain-plan triage, Synthetic waterfall details and artifacts, SLO creation and burn-rate alerting, Infrastructure/Kubernetes/Network Explorer navigators, Related Content, AI Assistant investigations, and Splunk Observability Cloud for Mobile app workflows. Use when the user asks for full native UI/product workflow coverage beyond collection, classic dashboards, or basic detector setup, including emerging Cisco/Splunk Observability routes such as Digital Experience Analytics, DXA, Metrics Pipeline Management, MPM, or telemetry pipeline management.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Deep Native Workflows

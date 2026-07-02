@@ -1,6 +1,10 @@
 ---
 name: splunk-observability-database-monitoring-setup
 description: Render and validate Splunk Observability Cloud Database Monitoring collector configuration for PostgreSQL, Microsoft SQL Server, and Oracle Database using the Splunk Distribution of OpenTelemetry Collector. Use when a user asks to set up Splunk Database Monitoring, DBMon, database query samples, top query events, or database receiver wiring through the Splunk OTel Collector on Kubernetes or Linux.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Database Monitoring Setup

@@ -12,6 +12,10 @@ description: >-
   auth, Galileo project/log-stream handoffs, detailed beta tracing for Galileo
   Luna span scorers, non-public Galileo tenant support, and content-capture
   gating.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Claude Code Instrumentation Setup

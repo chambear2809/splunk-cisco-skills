@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+AUDIT_PATH = REPO_ROOT / "skills/shared/scripts/audit_skill_compatibility.py"
+GENERATOR_PATH = (
+    REPO_ROOT / "skills/shared/scripts/generate_splunk_10_5_compatibility.py"
+)
+
+
+def load_audit_module():
+    spec = importlib.util.spec_from_file_location("skill_compatibility_audit", AUDIT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
+    payload = load_audit_module().audit()
+    assert payload["ok"], payload["findings"]
+    assert payload["target"] == "10.5.2605"
+    assert payload["skill_count"] == 165
+    assert payload["status_counts"] == {
+        "blocked": 3,
+        "conditional": 89,
+        "delegated": 6,
+        "not-applicable": 54,
+        "self-managed-10.4": 10,
+        "supported": 3,
+    }
+
+
+def test_primary_packages_missing_10_5_are_blocked() -> None:
+    payload = load_audit_module().audit()
+    blocked = {
+        row["skill"] for row in payload["skills"] if row["status"] == "blocked"
+    }
+    assert blocked == {
+        "cisco-enterprise-networking-setup",
+        "cisco-intersight-setup",
+        "cisco-security-cloud-setup",
+    }
+
+
+def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> None:
+    payload = load_audit_module().audit()
+    statuses = {row["skill"]: row["status"] for row in payload["skills"]}
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+    offenders = []
+    for app in registry["apps"]:
+        if app.get("compatibility_status") != "unsupported":
+            continue
+        if statuses[app["skill"]] == "supported":
+            offenders.append(f"{app['splunkbase_id']}:{app['skill']}")
+    assert offenders == []
+
+
+def test_generic_installer_contains_fail_closed_version_and_release_gates() -> None:
+    text = (
+        REPO_ROOT / "skills/splunk-app-install/scripts/install_app.sh"
+    ).read_text(encoding="utf-8")
+    for phrase in (
+        "preflight_current_install_target_compatibility",
+        "apply_registry_verified_version_default",
+        "--target-splunk-version",
+        "--accept-unsupported-platform",
+        "--accept-unverified-release",
+        "does not advertise Splunk",
+    ):
+        assert phrase in text
+
+
+def test_cloud_batch_installer_uses_the_same_fail_closed_contract() -> None:
+    text = (
+        REPO_ROOT / "skills/shared/scripts/cloud_batch_install.sh"
+    ).read_text(encoding="utf-8")
+    for phrase in (
+        "preflight_app_compatibility",
+        "resolve_app_install_version",
+        "--target-splunk-version",
+        "--accept-unsupported-platform",
+        "--accept-unverified-release",
+        "before ACS mutation",
+    ):
+        assert phrase in text
+
+
+def test_generated_compatibility_matrix_is_current() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "skill_compatibility_generator", GENERATOR_PATH
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    expected = module.render()
+    actual = (REPO_ROOT / "SPLUNK_10_5_COMPATIBILITY.md").read_text(
+        encoding="utf-8"
+    )
+    assert actual == expected

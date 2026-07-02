@@ -12,6 +12,10 @@ description: >-
   install the Infrastructure Monitoring Add-on, configure Related Content or
   Log Observer Connect, bring O11y metrics into Splunk with sim, or navigate
   from Splunk Platform into Observability workflows.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Platform <-> Splunk Observability Cloud Integration Setup
@@ -227,8 +231,10 @@ For per-section flag references and REST payload shapes, read
 
 - Splunk Add-on for OpenTelemetry Collector (Splunkbase 7125) — handled by
   `splunk-observability-otel-collector-setup`.
-- Splunk Synthetic Monitoring Add-on (Splunkbase 5608) — archived; replaced by
-  SIM Add-on streams.
+- Splunk Synthetic Monitoring Add-on (Splunkbase `5608`) — archived and not
+  listed for Splunk 10.5. Do not install it on a new or upgraded 10.5 stack.
+  Use SIM Add-on streams for in-platform metrics and native Splunk
+  Observability Cloud Synthetics workflows for browser/API tests.
 - Splunk On-Call wiring — handled by `splunk-oncall-setup`.
 - ITSI Content Pack content management — handled by `splunk-itsi-config`.
 - Splunk Observability Cloud dashboards / detectors / Synthetics / RUM CRUD —

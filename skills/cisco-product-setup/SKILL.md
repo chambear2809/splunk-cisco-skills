@@ -5,6 +5,10 @@ description: >-
   configuration, and validation through the correct existing setup skill. Use
   when the user asks to set up Splunk for a Cisco product such as ACI, Nexus
   9000, Duo, Meraki, or ThousandEyes.
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+metadata:
+  splunk_cloud_10_5: "delegated"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Product Setup

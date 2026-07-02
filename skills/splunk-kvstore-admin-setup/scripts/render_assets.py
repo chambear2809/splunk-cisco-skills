@@ -10,6 +10,7 @@ import shlex
 import stat
 from pathlib import Path
 
+_PLATFORM_VERSION_HELPERS = Path(__file__).resolve().parents[2] / "shared" / "lib" / "platform_version_helpers.sh"
 GENERATED_FILES = {
     "README.md",
     "metadata.json",
@@ -74,7 +75,21 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
 
 
 def make_script(body: str) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
+    first, separator, remainder = body.lstrip().partition("\n")
+    if not separator:
+        die("internal renderer error: local script body has no runtime assignment")
+    helper_default = shell_quote(_PLATFORM_VERSION_HELPERS)
+    gate = f"""_platform_helpers_default={helper_default}
+platform_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_platform_helpers_default}}}}"
+[[ -r "${{platform_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_helpers}}"
+runtime_home="${{splunk_home:-}}"
+[[ -n "${{runtime_home}}" ]] || {{ echo "ERROR: rendered script did not set splunk_home." >&2; exit 1; }}
+installed_version="$(spv_require_supported_splunk_home "${{runtime_home}}")"
+echo "PASS: supported Splunk Enterprise runtime ${{installed_version}}."
+"""
+    return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + first + "\n" + gate + remainder
 
 
 def clean_render_dir(render_dir: Path) -> None:
@@ -104,8 +119,8 @@ def validate(args: argparse.Namespace) -> list[tuple[str, str]]:
     no_newline(args.backup_archive_name, "--backup-archive-name")
     if args.backup_archive_name and not re.fullmatch(r"[A-Za-z0-9._-]+", args.backup_archive_name):
         die("--backup-archive-name must contain only letters, numbers, dot, underscore, and hyphen.")
-    if args.target_kvstore_version and not re.fullmatch(r"[0-9]+(\.[0-9]+){0,2}", args.target_kvstore_version):
-        die("--target-kvstore-version must look like 7.0 or 8.0.x.")
+    if args.target_kvstore_version and not re.fullmatch(r"(?:7|8)\.0(?:\.[0-9]+)?", args.target_kvstore_version):
+        die("--target-kvstore-version must be a supported 7.0 or 8.0.x KV Store server version.")
     fields = parse_fields(args.collection_fields)
     if args.collection_name and not re.fullmatch(r"[A-Za-z0-9_]+", args.collection_name):
         die("--collection-name must contain only letters, numbers, and underscores.")

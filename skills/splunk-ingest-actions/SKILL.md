@@ -9,6 +9,10 @@ description: >-
   Ingest Actions rulesets, configure an S3 or filesystem RFS destination, route
   events to an alternate index or to S3, drop noisy events before indexing, or
   audit existing ingest rulesets on Splunk Cloud Platform or Splunk Enterprise.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Ingest Actions

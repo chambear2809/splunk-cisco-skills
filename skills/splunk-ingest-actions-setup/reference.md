@@ -12,8 +12,9 @@ Based on current Splunk Ingest Actions documentation (verified 2026):
   Splunk validated architecture guidance notes that rulesets are represented in
   props.conf and transforms.conf and are compatible with existing
   configuration-file management and distribution; this skill renders that
-  representation and can write it via the REST `configs/conf-*` endpoints for
-  automation, while the UI/endpoint remains the recommended interactive path.
+  representation and can write it via the REST `configs/conf-*` endpoints only
+  for Splunk Enterprise/customer-managed automation, while the UI/rulesets
+  endpoint remains the supported managed Splunk Cloud path.
 - Ingest Actions adds `RULESET` processing to the indexer/heavy-forwarder
   pipeline. A `RULESET` setting behaves like `TRANSFORMS`; if both apply to the
   same source type, `TRANSFORMS` runs first. Rules are commonly expressed with
@@ -27,10 +28,29 @@ Based on current Splunk Ingest Actions documentation (verified 2026):
 - Deployment differs by topology: standalone indexers/forwarders apply
   immediately; indexer clusters require an explicit deploy from the cluster
   manager; heavy forwarders are managed through a dedicated deployment server;
-  Splunk Cloud Victoria deploys automatically from the search head.
+  rulesets authored through the supported Splunk Cloud Victoria workflow deploy
+  automatically.
 - CAUTION: transformations are applied before indexing and cannot be reverted
   for already-indexed data. Use the clone-events pattern when you must keep the
   original.
+
+## Platform Boundary
+
+`scripts/setup.sh` accepts `--platform auto|cloud|enterprise` and defaults to
+`auto`. Before any live apply, `auto` resolves the configured target through the
+shared credential helpers. A managed Splunk Cloud target is a hard gate: the
+workflow renders review assets, prints the supported handoff, makes no conf-file
+REST mutation, and exits `2`.
+
+Use the following Cloud routes:
+
+- `splunk-ingest-actions --platform cloud --phase render` for an Ingest Actions
+  ruleset specification and Splunk Web `/services/data/ingest/rulesets` handoff.
+- `splunk-ingest-processor-setup` for Splunk Cloud control-plane pipelines.
+- `splunk-edge-processor-setup` for transformations on Edge Processors.
+
+The `--platform enterprise` apply path remains available for Splunk Enterprise
+and customer-managed heavy-forwarder/indexer targets.
 
 ## Rule Types
 

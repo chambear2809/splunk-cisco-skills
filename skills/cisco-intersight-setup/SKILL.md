@@ -7,6 +7,10 @@ description: >-
   inputs, stores credentials securely, and validates the deployment. Use when the
   user asks about Cisco Intersight, UCS, HyperFlex, Intersight TA setup,
   Splunk_TA_Cisco_Intersight, or compute infrastructure monitoring.
+compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+metadata:
+  splunk_cloud_10_5: "blocked"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Intersight TA Setup Automation

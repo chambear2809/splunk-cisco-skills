@@ -53,11 +53,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps describe Splunk AI Assistant for SPL":
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "1.5.1", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "status current-stack":
@@ -132,6 +132,10 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn(
+                "apps install splunkbase --splunkbase-id 7245 --version 2.0.0",
+                acs_log.read_text(encoding="utf-8"),
+            )
             self.assertIn(
                 "apps install splunkbase --splunkbase-id 7245",
                 acs_log.read_text(encoding="utf-8"),
@@ -1096,9 +1100,22 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["ACS_LOG"] = str(acs_log)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
+            blocked_result = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "7539",
+                env=env,
+            )
+
+            blocked_output = blocked_result.stdout + blocked_result.stderr
+            self.assertEqual(blocked_result.returncode, 1, msg=blocked_output)
+            self.assertIn("Refusing the entire batch before ACS mutation", blocked_output)
+            self.assertFalse(acs_log.exists())
+
             result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-unsupported-platform",
                 "7539",
                 env=env,
             )
@@ -1116,6 +1133,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 if re.search(r"--splunkbase-id (\d+)", line)
             ]
             self.assertEqual(install_ids, ["7538", "7539"])
+            self.assertTrue(all("--version 3.1.0" in line for line in install_lines))
 
 
     def test_cloud_batch_install_hybrid_uses_search_tier_role_and_cloud_verification(self):
@@ -1233,6 +1251,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-unsupported-platform",
                 "7539",
                 env=env,
             )
@@ -1323,6 +1342,60 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("1 app(s) failed to install", result.stdout)
 
 
+    def test_install_app_blocks_known_unsupported_cloud_10_5_package(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            acs_log = tmp_path / "acs.log"
+            credentials_file = tmp_path / "credentials"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                with Path(os.environ["ACS_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(" ".join(sys.argv[1:]) + "\\n")
+                raise SystemExit(0)
+                """,
+            )
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    ACS_SERVER="https://staging.admin.splunk.com"
+                    STACK_TOKEN="token"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["ACS_LOG"] = str(acs_log)
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "7539",
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 1, msg=output)
+            self.assertIn("does not advertise Splunk 10.5 compatibility", output)
+            acs_output = acs_log.read_text(encoding="utf-8") if acs_log.exists() else ""
+            self.assertNotIn("apps install", acs_output)
+
     def test_install_app_auto_installs_enterprise_networking_dependency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1387,6 +1460,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "7539",
                 "--app-version",
                 "3.0.0",
+                "--accept-unsupported-platform",
                 "--no-update",
                 "--no-restart",
                 env=env,
@@ -1540,7 +1614,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7539"):
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.1.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps describe TA_cisco_catalyst":
@@ -1548,7 +1622,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd == "apps describe cisco-catalyst-app":
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.1.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps list --splunkbase --count 100 --offset 0":
@@ -1589,6 +1663,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "splunkbase",
                 "--app-id",
                 "7539",
+                "--accept-unsupported-platform",
                 "--no-update",
                 "--no-restart",
                 env=env,

@@ -166,6 +166,21 @@ def make_script(body: str) -> str:
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
 
 
+def enterprise_version_gate(args: argparse.Namespace) -> str:
+    helper = shell_quote(
+        Path(__file__).resolve().parents[2]
+        / "shared/lib/platform_version_helpers.sh"
+    )
+    splunk_home = shell_quote(args.splunk_home)
+    return f'''platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-{helper}}}"
+[[ -r "${{platform_version_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_version_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_version_helpers}}"
+enterprise_version="$(spv_require_supported_splunk_home {splunk_home})"
+echo "PASS: supported Splunk Enterprise runtime ${{enterprise_version}}."
+'''
+
+
 def clean_render_dir(render_dir: Path) -> None:
     for rel in GENERATED_FILES:
         candidate = render_dir / rel
@@ -989,7 +1004,8 @@ stack={stack}
         )
     splunk_home = shell_quote(args.splunk_home)
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(args)
+        + f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
 "${{splunk_home}}/bin/splunk" btool server list cachemanager --debug >/dev/null
@@ -1427,7 +1443,8 @@ def render_apply(args: argparse.Namespace, cluster: bool) -> str:
     )
     final_block = bundle_block if cluster else restart_block
     return make_script(
-        f"""rendered_operation={shell_quote(args.operation)}
+        enterprise_version_gate(args)
+        + f"""rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "smartstore" ]] || {{ echo "ERROR: this helper was not rendered for a SmartStore operation." >&2; exit 2; }}
 splunk_home={splunk_home}
 app_name={app_name}
@@ -1530,7 +1547,8 @@ def render_status(args: argparse.Namespace) -> str:
         else 'echo "INFO: standalone deployment; cluster bundle status is not applicable."\n'
     )
     return make_script(
-        f"""rendered_operation={shell_quote(args.operation)}
+        enterprise_version_gate(args)
+        + f"""rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
 splunk_home={splunk_home}
 volume_output="$("${{splunk_home}}/bin/splunk" btool indexes list {volume} --debug)"
@@ -1566,7 +1584,8 @@ def render_apply_retention_enterprise(args: argparse.Namespace) -> str:
         )
     )
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(args)
+        + f"""splunk_home={splunk_home}
 app_name={app_name}
 target_dir="{base}/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
@@ -1705,6 +1724,7 @@ evidence_file={evidence_file}
 python3 - "${{owner_approval_file}}" "${{evidence_file}}" <<'PY'
 {disruptive_gate_python()}
 PY
+{enterprise_version_gate(args)}
 target_dir="${{splunk_home}}/etc/manager-apps/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
 python3 - "${{target_dir}}/indexes.conf" indexes-disable.conf.template '' '' <<'PY'
@@ -1721,6 +1741,7 @@ indexes_csv={shell_quote(indexes)}
 python3 - "${{owner_approval_file}}" "${{evidence_file}}" <<'PY'
 {disruptive_gate_python()}
 PY
+{enterprise_version_gate(args)}
 IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
 for idx in "${{indexes[@]}}"; do
   [[ -n "${{idx}}" ]] || continue
@@ -1917,6 +1938,7 @@ PY
         )
         return make_script(
             gate
+            + enterprise_version_gate(args)
             + f"""splunk_home={splunk_home}
 app_name={app_name}
 target_conf="${{splunk_home}}/etc/manager-apps/${{app_name}}/local/indexes.conf"
@@ -1983,6 +2005,7 @@ PY
         )
     return make_script(
         gate
+        + enterprise_version_gate(args)
         + f"""splunk_home={splunk_home}
 IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
 for idx in "${{indexes[@]}}"; do
@@ -2037,6 +2060,7 @@ confirm_tokens_csv={confirm_tokens}
 python3 - "${{evidence_file}}" "${{indexes_csv}}" "${{confirm_tokens_csv}}" "${{owner_approval_file}}" "${{backup_evidence_file}}" <<'PY'
 {destructive_gate_python()}
 PY
+{enterprise_version_gate(args)}
 IFS=',' read -r -a indexes <<< "${{indexes_csv}}"
 for idx in "${{indexes[@]}}"; do
   "${{splunk_home}}/bin/splunk" clean eventdata -index "${{idx}}" -f

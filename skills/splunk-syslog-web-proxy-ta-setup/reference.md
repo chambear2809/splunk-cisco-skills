@@ -22,9 +22,10 @@
 The repo-verified Tomcat package remains `4.0.0`. The latest public listing
 observed July 2, 2026 was `4.0.1`, with platform versions `9.1` through `10.4`
 and no advertised Splunk Cloud `10.5` support. For a `10.5` Cloud target,
-surface that warning and require operator/vendor confirmation before production
-use. Do not add an installer block; updated listing metadata or separately
-reviewed vendor evidence can satisfy the handoff.
+keep the workflow render-only. The shared installer refuses app `2911` before
+mutation. Use `--accept-unsupported-platform` only when separately reviewed
+vendor evidence and the operator's exception record explicitly cover that
+package and target.
 
 ## Guardrails
 

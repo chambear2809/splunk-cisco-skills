@@ -228,12 +228,28 @@ def helper_path() -> Path:
     return project_root / "skills/shared/lib/credential_helpers.sh"
 
 
+def enterprise_version_gate(args: argparse.Namespace) -> str:
+    helper = shell_quote(
+        Path(__file__).resolve().parents[2]
+        / "shared/lib/platform_version_helpers.sh"
+    )
+    splunk_home = shell_quote(args.splunk_home)
+    return f'''platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-{helper}}}"
+[[ -r "${{platform_version_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_version_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_version_helpers}}"
+enterprise_version="$(spv_require_supported_splunk_home {splunk_home})"
+echo "PASS: supported Splunk Enterprise runtime ${{enterprise_version}}."
+'''
+
+
 def render_preflight(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     helper = shell_quote(helper_path())
     if args.platform == "enterprise":
         return make_script(
-            f"""splunk_home={splunk_home}
+            enterprise_version_gate(args)
+            + f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" btool inputs list http --debug >/dev/null
 """
@@ -273,7 +289,8 @@ bash "${{restart_orchestrator}}" --restart --accept-restart --operation "HEC inp
         else 'echo "Splunk restart skipped. Restart is normally required for HEC inputs.conf changes."\n'
     )
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(args)
+        + f"""splunk_home={splunk_home}
 app_name={app_name}
 token_file={token_file}
 target_role="${{SPLUNK_TARGET_ROLE:-standalone}}"
@@ -730,7 +747,8 @@ def render_status_enterprise(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     token_name = shell_quote(f"http://{args.token_name}")
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(args)
+        + f"""splunk_home={splunk_home}
 output="$("${{splunk_home}}/bin/splunk" btool inputs list {token_name} --debug 2>/dev/null)" || {{
   echo "ERROR: Unable to query HEC stanza {args.token_name}." >&2
   exit 1

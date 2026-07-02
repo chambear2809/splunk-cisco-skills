@@ -11,6 +11,10 @@ description: >-
   permissions, private connectivity, outbound ports, DDSS, ACS limits,
   maintenance windows, restart current-stack, ACS license state, Observability
   pairing, or to audit Splunk Cloud control-plane configuration.
+compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
+metadata:
+  splunk_cloud_10_5: "supported"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Cloud ACS Admin Setup

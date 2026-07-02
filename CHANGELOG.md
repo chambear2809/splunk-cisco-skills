@@ -138,6 +138,12 @@ release section when cutting a release.
   Splunkbase registry records against a 10.5 compatibility target, updated
   current package pins and Cloud documentation trains, and kept 14 packages
   explicitly unsupported where their current listings do not certify 10.5.
+- Classified all 165 skills for Splunk Cloud 10.5 in machine-readable
+  frontmatter and a generated compatibility matrix; added fail-closed audits
+  so new or unclassified skills cannot silently inherit platform support.
+- Made the generic app installer enforce target-minor package compatibility and
+  default known apps to repo-verified releases. Unsupported or newer unverified
+  releases now require explicit, auditable override flags.
 - Hardened the local MCP contract with strict tool schemas, random expiring
   single-use plan capabilities, executable and full skill-tree integrity
   binding, forced cancellation escalation, a default-off subprocess gate, and

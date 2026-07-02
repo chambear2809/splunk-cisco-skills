@@ -8,6 +8,10 @@ description: >-
   file/UF, Windows UF, or SC4S/syslog transport handoffs with package-backed
   source types. Use when the user asks to onboard, configure, render, or
   validate these web, proxy, DNS/DHCP, ADC, or appliance logs in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Syslog, Web, And Proxy Supported Add-on Setup
@@ -32,9 +36,10 @@ syslog handoff.
 Tomcat is a compatibility exception for the repository's current Splunk Cloud
 `10.5` target: as of July 2, 2026, Splunkbase app `2911` advertises versions
 only through `10.4`. When `tomcat` is selected for a `10.5` Cloud stack, record
-the warning and require operator/vendor confirmation before production use.
-Rendering and installation remain available; this skill does not enforce the
-listing gap in the installer.
+the warning and keep the workflow render-only. The shared installer refuses
+app `2911` on a `10.5` target before mutation. Use
+`--accept-unsupported-platform` only when vendor approval and the operator's
+exception record explicitly cover that package and target.
 
 ## Workflow
 

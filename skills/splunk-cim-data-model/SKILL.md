@@ -9,6 +9,10 @@ description: >-
   enable or tune data model acceleration, set earliest/backfill ranges, rebuild
   an accelerated data model, audit CIM field compliance or model population, or
   prepare Splunk_SA_CIM acceleration overrides for Enterprise Security and ITSI.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk CIM Data-Model Management

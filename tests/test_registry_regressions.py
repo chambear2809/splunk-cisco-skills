@@ -915,7 +915,8 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         path = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         defaults = payload["defaults"]
-        self.assertEqual(defaults["enterprise_version"], "10.4.0")
+        self.assertEqual(defaults["enterprise_version"], "10.4.1")
+        self.assertEqual(defaults["enterprise_image"], "splunk/splunk:10.4.1")
         self.assertEqual(defaults["cloud_doc_train"], "10.5.2605")
         self.assertEqual(defaults["cloud_doc_train_previous"], "10.4.2604")
         self.assertEqual(defaults["splunkbase_compatibility_target"], "10.5")
@@ -923,7 +924,8 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertNotIn("10.5", payload["enterprise_platform_versions"])
         self.assertNotIn("10.1", payload["enterprise_platform_versions"])
         self.assertNotIn("9.2", payload["enterprise_platform_versions"])
-        self.assertIn("10.5", payload["enterprise_cloud_only_trains"])
+        self.assertNotIn("10.5", payload["enterprise_cloud_only_trains"])
+        self.assertIn("10.5", payload["enterprise_not_publicly_released_trains"])
         self.assertNotIn("10.4.2603", payload["cloud_doc_trains"])
         self.assertIn("10.4", payload["svd_enterprise_floors"])
         self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
@@ -938,12 +940,28 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         import sys
 
         sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
-        from platform_versions import load_platform_versions, platform_default, svd_enterprise_floors
+        from platform_versions import (
+            classify_enterprise_version,
+            load_platform_versions,
+            platform_default,
+            require_supported_enterprise_version,
+            svd_enterprise_floors,
+        )
 
         loaded = load_platform_versions(path)
-        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.0")
-        self.assertEqual(platform_default("enterprise_version", path=path), "10.4.0")
+        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.1")
+        self.assertEqual(platform_default("enterprise_version", path=path), "10.4.1")
         self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")
+        self.assertEqual(classify_enterprise_version("10.4.1", path=path), "supported")
+        self.assertEqual(
+            classify_enterprise_version("10.5.0", path=path),
+            "not-publicly-released",
+        )
+        self.assertEqual(classify_enterprise_version("10.3.0", path=path), "cloud-only")
+        self.assertEqual(classify_enterprise_version("11.0.0", path=path), "unsupported")
+        self.assertEqual(require_supported_enterprise_version("10.4.1", path=path), "10.4")
+        with self.assertRaises(ValueError):
+            require_supported_enterprise_version("10.5.0", path=path)
 
         sys.path.insert(0, str(REPO_ROOT / "skills/shared/scripts"))
         from audit_splunkbase_registry import (

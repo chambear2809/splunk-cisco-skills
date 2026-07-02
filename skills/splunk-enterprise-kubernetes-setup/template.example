@@ -29,8 +29,8 @@
 # ARCHITECTURE=s1                  # s1 | c3 | m4
 # OPERATOR_VERSION=3.1.0
 # CHART_VERSION=3.1.0              # verified path matches operator version
-# SPLUNK_VERSION=10.4.0
-# SPLUNK_IMAGE=splunk/splunk:10.4.0
+# SPLUNK_VERSION=10.4.1
+# SPLUNK_IMAGE=splunk/splunk:10.4.1
 # OPERATOR_IMAGE=docker.io/splunk/splunk-operator:3.1.0
 # KUBERNETES_VERSION=1.33          # live preflight also checks the server
 # ACCEPT_SPLUNK_GENERAL_TERMS=true # required for every SOK Operator reconcile
@@ -41,7 +41,7 @@
 # ENTERPRISE_CHART_ARCHIVE=/reviewed/splunk-enterprise-3.1.0.tgz
 # CRD_MANIFEST=/reviewed/splunk-operator-crds-3.1.0.yaml
 # OPERATOR_IMAGE=registry.example.com/splunk/splunk-operator:3.1.0@sha256:<64-hex>
-# SPLUNK_IMAGE=registry.example.com/splunk/splunk:10.4.0@sha256:<64-hex>
+# SPLUNK_IMAGE=registry.example.com/splunk/splunk:10.4.1@sha256:<64-hex>
 
 # Operator RBAC and namespaces:
 # OPERATOR_SCOPE=namespace         # namespace | cluster

@@ -13,6 +13,10 @@ description: >-
   multi-account AWS Organizations onboarding, audit drift, or migrate polling
   to Metric Streams. Hand off Lambda APM, AWS logs, dashboards, detectors, and
   EC2/EKS host telemetry to their owning skills.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Cloud <-> AWS Integration

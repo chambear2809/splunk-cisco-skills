@@ -1272,6 +1272,9 @@ class MCPRegressionTests(ShellScriptRegressionBase):
     def test_splunk_mcp_approved_install_binds_platform_client_target(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
+            archive_path = REPO_ROOT / "splunk-ta/splunk-mcp-server_121.tgz"
+            if not archive_path.is_file():
+                self.skipTest("Splunk MCP Server 1.2.1 archive is not present in this checkout")
             env, _ = mcp_validation_env(tmp_path)
             env["SPLUNK_URI"] = "https://127.0.0.1:8089"
             fake_python = Path(env["PATH"].split(os.pathsep, 1)[0]) / "python3"

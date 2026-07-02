@@ -6,6 +6,10 @@ description: >-
   Analytic Story Detail navigation, content inventory checks, correlation-search
   activation review, and ES configuration handoff. Use when the user asks to
   install, upgrade, review, or validate ESCU or Splunk security content.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Security Content Update Setup
@@ -22,6 +26,15 @@ reviewable install/upgrade plan, ES placement checks, analytic-story inventory
 SPL, correlation-search activation review, and handoffs to ES configuration.
 Its explicit `--install` and `--all` modes install the ESCU package; search
 enablement and content mutation remain outside this skill.
+
+## Package Verification Boundary
+
+The repository's reviewed ESCU baseline is `6.0.0`. The current public release
+is `6.1.0` and advertises Splunk 10.5 support, but its analytic-story and
+correlation-search contents have not been package-verified here. The shared
+installer defaults to verified `6.0.0`; only `--accept-unverified-release`
+follows public `6.1.0`. After that explicit override, inventory its shipped
+content and repeat the activation review before enabling anything.
 
 ## Workflow
 

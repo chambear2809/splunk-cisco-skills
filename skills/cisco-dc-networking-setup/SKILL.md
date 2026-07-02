@@ -6,6 +6,10 @@ description: >-
   inputs, stores credentials securely, and validates the deployment. Use when
   the user asks about Cisco DC networking, ACI, APIC, Nexus Dashboard, Nexus
   9K TA setup, Splunk TA automation, or cisco_dc_networking_app_for_splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco DC Networking TA Setup Automation

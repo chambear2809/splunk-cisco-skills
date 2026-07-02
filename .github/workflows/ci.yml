@@ -204,6 +204,12 @@ jobs:
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check
 
+      - name: Check skill UX and Splunk 10.5 compatibility docs
+        run: |
+          python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
+          python3 skills/shared/scripts/audit_skill_compatibility.py
+          python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
+
       - name: Check SKILL.md frontmatter
         run: python3 tests/check_skill_frontmatter.py
 

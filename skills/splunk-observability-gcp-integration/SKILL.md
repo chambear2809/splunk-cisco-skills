@@ -10,6 +10,10 @@ description: >-
   to connect Splunk Observability Cloud to GCP metrics, configure Service
   Account or official generated WIF credentials, manage the GCP REST integration, or set
   up GCP dashboards, detectors, logs, or GKE telemetry handoffs.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Cloud — GCP Integration Setup
@@ -25,6 +29,16 @@ dashboards against data.
 Render-first skill that owns the complete lifecycle of the Splunk O11y GCP
 integration. The workflow is render-first by default. The Splunk O11y REST API
 is only called when the operator explicitly runs `--apply`.
+
+## Splunk Platform Add-on Verification Boundary
+
+The separate log-ingestion handoff uses Splunkbase `3088`. Its package-derived
+baseline is `5.0.2`; the current public release is `5.0.3` and advertises
+Splunk 10.5 support, but this repository has not inspected the `5.0.3` package.
+The shared installer defaults to verified `5.0.2`; if the handoff explicitly
+uses `--accept-unverified-release`, verify the `5.0.3` manifest, modular-input
+schema, source types, and dashboards before completion. This warning does not
+change the Observability Cloud GCP metrics REST integration owned by this skill.
 
 ## Coverage Model
 

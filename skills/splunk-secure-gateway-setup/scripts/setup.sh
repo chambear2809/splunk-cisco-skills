@@ -12,6 +12,7 @@ DRY_RUN=false
 JSON_OUTPUT=false
 APPLY=false
 OUTPUT_DIR=""
+TARGET_PLATFORM="auto"
 APP_NAME="splunk_secure_gateway"
 ACTION="configure"
 DEPLOYMENT_NAME=""
@@ -34,6 +35,7 @@ Options:
   --phase render|preflight|apply|status|all
   --apply | --dry-run | --json
   --output-dir PATH
+  --platform auto|cloud|enterprise  (default auto; resolves configured target before apply)
   --app-name NAME                  (default splunk_secure_gateway)
   --action configure|enable|disable
   --deployment-name NAME
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
+        --platform) require_arg "$1" $# || exit 1; TARGET_PLATFORM="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --action) require_arg "$1" $# || exit 1; ACTION="$2"; shift 2 ;;
         --deployment-name) require_arg "$1" $# || exit 1; DEPLOYMENT_NAME="$2"; shift 2 ;;
@@ -97,6 +100,7 @@ PY
 
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
+    validate_choice "${TARGET_PLATFORM}" auto cloud enterprise
     validate_choice "${ACTION}" configure enable disable
     validate_choice "${PRIVATE_SPACEBRIDGE}" true false
     validate_choice "${CLIENT_CERT_REQUIRED}" true false
@@ -114,6 +118,7 @@ validate_args() {
 build_renderer_args() {
     RENDER_ARGS=(
         --output-dir "${OUTPUT_DIR}"
+        --platform "${TARGET_PLATFORM}"
         --app-name "${APP_NAME}"
         --action "${ACTION}"
         --deployment-name "${DEPLOYMENT_NAME}"
@@ -172,7 +177,36 @@ set_app_state() {
     log "$(log_platform_restart_guidance "Secure Gateway app state change")"
 }
 
+effective_target_platform() {
+    case "${TARGET_PLATFORM}" in
+        cloud|enterprise) printf '%s' "${TARGET_PLATFORM}" ;;
+        auto) resolve_splunk_platform ;;
+    esac
+}
+
+guard_managed_cloud_apply() {
+    local platform
+    if ! platform="$(effective_target_platform)"; then
+        log "ERROR: Could not resolve the Splunk target platform."
+        return 1
+    fi
+    if [[ "${platform}" != "cloud" ]]; then
+        return 0
+    fi
+
+    log "ERROR: Splunk Cloud manages Secure Gateway app state and Spacebridge configuration."
+    log "       This workflow will not enable, disable, or configure splunk_secure_gateway"
+    log "       on a managed Cloud search tier."
+    log "HANDOFF: render the supported Cloud readiness bundle with:"
+    log "  bash skills/splunk-secure-gateway/scripts/setup.sh --platform cloud --phase render"
+    return 2
+}
+
 apply_live() {
+    local guard_rc=0
+    guard_managed_cloud_apply || guard_rc=$?
+    (( guard_rc == 0 )) || return "${guard_rc}"
+
     case "${ACTION}" in
         enable)
             if [[ "${ACCEPT_SPACEBRIDGE_EGRESS}" != "true" ]]; then

@@ -7,6 +7,10 @@ description: >-
   Intrusion_Detection readiness, and ES/firewall dashboard evidence. Use when
   the user asks to onboard, configure, route, or validate Cisco ASA or FTD data
   in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco ASA TA Setup

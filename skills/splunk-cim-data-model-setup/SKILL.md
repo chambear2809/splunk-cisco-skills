@@ -10,6 +10,10 @@ description: >-
   compliance, or manage datamodels.conf for CIM or custom data models. Not for
   Enterprise Security-specific acceleration, which lives in
   splunk-enterprise-security-config.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk CIM Data Model Setup

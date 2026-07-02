@@ -2590,6 +2590,10 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
     if platform == "enterprise":
         supported = [str(item) for item in contract.get("enterprise_platform_versions", [])]
         cloud_only = {str(item) for item in contract.get("enterprise_cloud_only_trains", [])}
+        not_public = {
+            str(item)
+            for item in contract.get("enterprise_not_publicly_released_trains", [])
+        }
         lifecycle.setdefault("supported_minor_trains", supported)
         if minor in supported:
             lifecycle.setdefault("version_unsupported", False)
@@ -2599,6 +2603,15 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
             if isinstance(upgrade_issues, list):
                 upgrade_issues.append(
                     f"Splunk platform {minor} is Cloud-only and is not a Splunk Enterprise release train."
+                )
+        elif minor in not_public:
+            lifecycle.setdefault("version_unsupported", True)
+            upgrade_issues = lifecycle.setdefault("upgrade_path_issues", [])
+            if isinstance(upgrade_issues, list):
+                upgrade_issues.append(
+                    f"Splunk Enterprise {minor} is not in the current public "
+                    "Enterprise release contract; keep the verified 10.4 baseline "
+                    "until public Enterprise packages and documentation are available."
                 )
         else:
             supported_parts = [version_tuple(item) for item in supported]

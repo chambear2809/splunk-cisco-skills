@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -107,6 +108,7 @@ class IngestActionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
                 "--output-dir", tmpdir,
+                "--platform", "enterprise",
                 "--phase", "apply",
                 "--ruleset-sourcetype", "cisco:asa",
                 "--ruleset-name", "drop_debug",
@@ -120,6 +122,7 @@ class IngestActionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
                 "--output-dir", tmpdir,
+                "--platform", "enterprise",
                 "--dry-run", "--phase", "apply",
                 "--ruleset-sourcetype", "cisco:asa",
                 "--ruleset-name", "drop_debug",
@@ -129,6 +132,27 @@ class IngestActionsTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("DRY RUN", result.stdout + result.stderr)
+
+    def test_cloud_apply_is_blocked_and_routed_without_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_setup(
+                "--output-dir", tmpdir,
+                "--platform", "cloud",
+                "--phase", "apply",
+                "--ruleset-sourcetype", "cisco:asa",
+                "--ruleset-name", "drop_debug",
+                "--rule-type", "drop",
+                "--drop-regex", "level=DEBUG",
+                "--accept-irreversible-ingest",
+            )
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 2, msg=output)
+            self.assertIn("will not write", output)
+            self.assertIn("splunk-ingest-actions/scripts/setup.sh --platform cloud", output)
+            metadata = json.loads(
+                (Path(tmpdir) / "ingest-actions" / "metadata.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(metadata["platform"], "cloud")
 
 
 if __name__ == "__main__":

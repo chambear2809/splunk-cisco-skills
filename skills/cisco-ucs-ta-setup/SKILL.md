@@ -6,6 +6,10 @@ description: >-
   passwords, default/custom templates, cisco_ucs_task inputs, indexes, and
   cisco:ucs data validation. Use when the user asks about Cisco UCS, UCS
   Manager, Fabric Interconnects, Splunk_TA_cisco-ucs, or cisco:ucs telemetry.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco UCS TA Setup

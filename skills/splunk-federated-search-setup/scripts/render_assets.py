@@ -189,6 +189,21 @@ def make_script(body: str) -> str:
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
 
 
+def enterprise_version_gate(spec: Spec) -> str:
+    helper = shell_quote(
+        Path(__file__).resolve().parents[2]
+        / "shared/lib/platform_version_helpers.sh"
+    )
+    splunk_home = shell_quote(spec.splunk_home)
+    return f'''platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-{helper}}}"
+[[ -r "${{platform_version_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_version_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_version_helpers}}"
+enterprise_version="$(spv_require_supported_splunk_home {splunk_home})"
+echo "PASS: supported Splunk Enterprise runtime ${{enterprise_version}}."
+'''
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -914,7 +929,8 @@ def render_readme(spec: Spec) -> str:
 def render_preflight(spec: Spec) -> str:
     splunk_home = shell_quote(spec.splunk_home)
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(spec)
+        + f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" btool federated list --debug >/dev/null
 "${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
@@ -998,7 +1014,8 @@ def render_apply_local(spec: Spec, *, shc: bool) -> str:
         else 'echo "INFO: No FSS2S federated indexes in spec; indexes.conf not copied."\n'
     )
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(spec)
+        + f"""splunk_home={splunk_home}
 app_name={app_name}
 
 target_dir="{base}/${{app_name}}/local"

@@ -118,6 +118,8 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
             self.assertIn("[search_filter_rule:block_alltime_searches]", rules)
             self.assertIn("action = filter", rules)
             self.assertIn("admission_rules_enabled = 1", policy)
+            preflight = (render_dir / "preflight.sh").read_text(encoding="utf-8")
+            self.assertIn("spv_require_supported_splunk_home", preflight)
             guardrail_stanza = rules.split("[workload_rule:long_running_search_guardrail]", 1)[1].split("\n\n", 1)[0]
             self.assertIn("action = abort", guardrail_stanza)
             self.assertNotIn("workload_pool =", guardrail_stanza)
@@ -203,6 +205,7 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
             self.assertIn("indexes = app,summary", template)
             self.assertIn("token_path.read_text", apply_script)
             self.assertIn("uuid.UUID(token)", apply_script)
+            self.assertIn("spv_require_supported_splunk_home", apply_script)
             self.assertNotIn("SUPER_SECRET_HEC_TOKEN", all_assets)
 
     def test_hec_cloud_render_includes_acs_payloads_and_command_groups(self) -> None:

@@ -15,6 +15,10 @@ description: >-
   ThousandEyes telemetry into Splunk Observability Cloud, configure
   Integrations 2.0 APM trace linking, manage TE tests/alert rules/templates
   for an O11y integration, or produce the per-test-type O11y dashboards.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability ThousandEyes Integration

@@ -359,7 +359,7 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertFalse(cloud["lifecycle"]["version_unsupported"])
         self.assertIn("10.5.2605", cloud["lifecycle"]["documented_cloud_trains"])
         self.assertTrue(enterprise["lifecycle"]["version_unsupported"])
-        self.assertIn("Cloud-only", enterprise["lifecycle"]["upgrade_path_issues"][0])
+        self.assertIn("not in the current public Enterprise release contract", enterprise["lifecycle"]["upgrade_path_issues"][0])
 
     def test_apply_selected_fix_renders_local_packet_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -94,9 +94,10 @@ optional features must be marked this way rather than silently omitted.
 
 - As of 2026-07-02, the shared Enterprise support contract lists 9.3, 9.4,
   10.0, 10.2, and 10.4. Enterprise 9.2 and older are EOS; 10.1 and 10.3 were
-  not released Enterprise trains, and current Cloud train 10.5 is Cloud-only;
-  there is no self-managed Enterprise 10.5 train. The doctor derives lifecycle
-  findings from `server.version` and the shared version contract.
+  Cloud-only trains. Current Cloud train 10.5 is not in the public Enterprise
+  download or release-manual contract yet, so the doctor retains the verified
+  10.4 self-managed baseline. The doctor derives lifecycle findings from
+  `server.version` and the shared version contract.
 - Cloud 10.3.2512+ supports configuration validation through the btool REST
   API; it is not `not_applicable`.
 - Cloud administrators can manage workload rules, admission rules, and pool

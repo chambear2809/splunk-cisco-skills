@@ -7,6 +7,10 @@ description: >-
   Security, plan identity threat detection and response, connect WideField to
   identity/SIEM/SOAR/governance tools, or coordinate WideField child skill
   execution without using undocumented WideField APIs.
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+metadata:
+  splunk_cloud_10_5: "delegated"
+  compatibility_verified: "2026-07-02"
 ---
 
 # WideField Security Setup

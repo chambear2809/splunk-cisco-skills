@@ -5,10 +5,17 @@ description: >-
   evaluate, drop, or route data before indexing, plus Remote File System (RFS)
   S3 destinations for routing to object storage. Renders the equivalent
   props.conf RULESET, transforms.conf INGEST_EVAL, and outputs.conf [rfs:]
-  representation and applies them via REST. Use when the user asks to set up
-  Ingest Actions, filter or mask data at ingest, drop noisy events before
-  indexing, route data to S3 with RFS, or manage ingest-time rulesets. Not for
-  Ingest Processor or Edge Processor pipelines, which are separate skills.
+  representation and applies them via REST only to Splunk Enterprise or a
+  customer-managed heavy forwarder. Splunk Cloud targets render a review bundle
+  and route to the supported managed-service workflow without mutation. Use when
+  the user asks to set up Ingest Actions, filter or mask data at ingest, drop
+  noisy events before indexing, route data to S3 with RFS, or manage ingest-time
+  rulesets. Not for Ingest Processor or Edge Processor pipelines, which are
+  separate skills.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Ingest Actions Setup
@@ -27,7 +34,15 @@ time, never placed on argv. Apply refuses to run without
 Ingest Actions rulesets are normally authored in Splunk Web (Settings > Data >
 Ingest Actions) or through the `/services/data/ingest/rulesets` REST endpoint.
 This skill renders the equivalent props/transforms for review and
-config-management distribution and can write them via REST.
+config-management distribution. Direct conf-file REST apply is limited to an
+explicit Splunk Enterprise/customer-managed target. Before apply, `--platform
+auto` resolves the configured target; a managed Splunk Cloud target exits `2`
+without writing `props.conf`, `transforms.conf`, or `outputs.conf`.
+
+For Splunk Cloud Platform 10.5.2605, render the supported ruleset handoff with
+`splunk-ingest-actions --platform cloud --phase render`. Use
+`splunk-ingest-processor-setup` when the request is for a Cloud control-plane
+pipeline rather than an Ingest Actions ruleset.
 
 ## Quick Start
 
@@ -42,6 +57,7 @@ Apply it live (gated):
 
 ```bash
 bash skills/splunk-ingest-actions-setup/scripts/setup.sh --phase apply \
+  --platform enterprise \
   --ruleset-sourcetype cisco:asa --ruleset-name drop_debug \
   --rule-type drop --drop-regex 'level=DEBUG' --accept-irreversible-ingest
 ```
@@ -50,6 +66,7 @@ Stage an S3 destination and emit the supported ruleset handoff:
 
 ```bash
 bash skills/splunk-ingest-actions-setup/scripts/setup.sh --phase apply \
+  --platform enterprise \
   --ruleset-sourcetype cisco:asa --ruleset-name archive_asa --rule-type route-s3 \
   --s3-destination-name asa_archive --s3-path s3://my-bucket/asa --s3-auth-region us-east-1 \
   --s3-access-key-file /tmp/s3_access --s3-secret-key-file /tmp/s3_secret \
@@ -67,6 +84,8 @@ For `route-s3`, the skill applies only the `[rfs:]` destination, emits the
 "Route to Destination" handoff, and exits nonzero so that destination staging
 cannot be mistaken for completed routing. Author and verify the rule in the
 Ingest Actions UI / rulesets endpoint (the internal RFS routing transform is
-not hand-authored). Only one ruleset is supported per source type. Hand ingest-time routing on
-Splunk Cloud control planes to `splunk-ingest-processor-setup` and edge
-transformation to `splunk-edge-processor-setup`.
+not hand-authored). Only one ruleset is supported per source type.
+
+For managed Splunk Cloud targets, use `splunk-ingest-actions` for the supported
+UI/REST handoff, `splunk-ingest-processor-setup` for Cloud control-plane
+pipelines, and `splunk-edge-processor-setup` for edge transformation.

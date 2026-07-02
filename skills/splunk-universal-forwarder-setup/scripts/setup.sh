@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 source "${SCRIPT_DIR}/../../shared/lib/host_bootstrap_helpers.sh"
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 PROJECT_PKG_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
@@ -797,6 +798,12 @@ pick_package_path() {
         hbs_verify_sha512_checksum "${PACKAGE_PATH}" "${sidecar_hash}" || exit 1
     fi
     hbs_verify_checksum "${PACKAGE_PATH}" "${CHECKSUM}"
+    PACKAGE_VERSION="$(resolve_requested_package_version)"
+    if [[ -z "${PACKAGE_VERSION}" ]]; then
+        log "ERROR: Could not determine the Universal Forwarder package version; retain the official versioned filename or use --url latest."
+        exit 1
+    fi
+    spv_require_supported_enterprise_version "${PACKAGE_VERSION}" || exit 1
 }
 
 splunk_cli_cmd() {
@@ -858,6 +865,16 @@ capture_installed_splunk_version() {
     version_output="$(capture_splunk_as_service_user "$(splunk_cli_cmd version)" 2>/dev/null || true)"
     version="$(hbs_extract_splunk_version "${version_output}")"
     printf '%s' "${version}"
+}
+
+require_supported_installed_uf_version() {
+    local installed_version
+    installed_version="$(capture_installed_splunk_version)"
+    if [[ -z "${installed_version}" ]]; then
+        log "ERROR: Could not determine the installed Universal Forwarder version."
+        exit 1
+    fi
+    spv_require_supported_enterprise_version "${installed_version}" || exit 1
 }
 
 determine_install_action() {
@@ -1329,10 +1346,12 @@ if phase_includes_install; then
 fi
 
 if phase_includes_enroll; then
+    require_supported_installed_uf_version
     apply_enrollment
 fi
 
 if phase_includes_status; then
+    require_supported_installed_uf_version
     run_status
 fi
 

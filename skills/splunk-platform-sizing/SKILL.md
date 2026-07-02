@@ -10,6 +10,10 @@ description: >-
   Splunk cluster, decide how many indexers or search heads they need, plan
   reference hardware, evaluate an All-In-One vs distributed deployment, size
   Splunk on Kubernetes, or estimate storage for a retention requirement.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Platform Sizing

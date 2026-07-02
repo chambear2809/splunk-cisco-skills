@@ -9,6 +9,10 @@ description: >-
   DCGM, DCGM Exporter, GPU Operator, DGX, AI Pod, or CUDA workload telemetry to
   Splunk Observability Cloud, configure receiver_creator/dcgm-cisco, enable
   per-pod DCGM labels, or render GPU dashboards and detectors.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability NVIDIA GPU Integration

@@ -488,6 +488,7 @@ apply_local_leaf() {
 
 main() {
     validate_args
+    spv_require_supported_enterprise_version "${SPLUNK_VERSION}"
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then

@@ -17,6 +17,7 @@ REQUIRED_TOP_LEVEL = [
     "SECURITY.md",
     "LICENSE",
     "CHANGELOG.md",
+    "SPLUNK_10_5_COMPATIBILITY.md",
     "SKILL_REQUIREMENTS.md",
     ".gitattributes",
     ".github/CODEOWNERS",
@@ -257,7 +258,11 @@ def check_required_files(errors: list[str]) -> None:
 def check_catalog_sync(errors: list[str]) -> None:
     expected = set(skill_names())
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    for required_link in ("SKILL_UX_CATALOG.md", "SKILL_REQUIREMENTS.md"):
+    for required_link in (
+        "SKILL_UX_CATALOG.md",
+        "SKILL_REQUIREMENTS.md",
+        "SPLUNK_10_5_COMPATIBILITY.md",
+    ):
         if required_link not in readme_text:
             errors.append(f"README.md: missing operator catalog link: {required_link}")
 

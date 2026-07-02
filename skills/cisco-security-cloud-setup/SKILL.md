@@ -5,6 +5,10 @@ description: >-
   Cisco Duo, XDR, Secure Endpoint, Secure Firewall, ETD, Secure Network
   Analytics, CII, Secure Workload, and other Cisco Security Cloud inputs. Use
   when the user asks about Cisco Security Cloud, app ID 7404, or CiscoSecurityCloud.
+compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+metadata:
+  splunk_cloud_10_5: "blocked"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Security Cloud Setup

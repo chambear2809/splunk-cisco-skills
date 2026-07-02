@@ -51,6 +51,21 @@ def write_spec(tmp_path: Path, name: str, payload: dict) -> Path:
     return path
 
 
+def write_supported_fake_splunk_home(path: Path) -> None:
+    binary = path / "bin/splunk"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${1:-}\" == version ]]; then\n"
+        "  echo 'Splunk 10.4.1 (build test)'\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o755)
+
+
 # ---------------------------------------------------------------------------
 # Single-provider back-compat
 # ---------------------------------------------------------------------------
@@ -434,6 +449,7 @@ def test_rendered_apply_search_head_substitutes_passwords(tmp_path: Path) -> Non
     os.chmod(pw_a, 0o600)
     os.chmod(pw_b, 0o600)
     fake_home = tmp_path / "splunk"
+    write_supported_fake_splunk_home(fake_home)
     # When --spec is set, CLI single-provider flags are NOT used. The spec must
     # carry splunk_home / app_name / restart_splunk for the apply test.
     spec = {
@@ -489,6 +505,7 @@ def test_rendered_apply_search_head_substitutes_passwords(tmp_path: Path) -> Non
 
 def test_rendered_apply_fails_loudly_when_password_file_missing(tmp_path: Path) -> None:
     fake_home = tmp_path / "splunk"
+    write_supported_fake_splunk_home(fake_home)
     spec = {
         "splunk_home": str(fake_home),
         "restart_splunk": False,

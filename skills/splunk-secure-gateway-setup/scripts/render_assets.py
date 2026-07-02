@@ -24,6 +24,7 @@ SPACEBRIDGE_HOST = "prod.spacebridge.spl.mobi"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk Secure Gateway assets.")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--platform", choices=("auto", "cloud", "enterprise"), default="auto")
     parser.add_argument("--app-name", default="splunk_secure_gateway")
     parser.add_argument("--action", choices=("configure", "enable", "disable"), default="configure")
     parser.add_argument("--deployment-name", default="")
@@ -176,8 +177,26 @@ MDM / in-app registration at scale:
 
 
 def render_readme(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        platform_note = (
+            "Splunk Cloud manages Secure Gateway app state and Spacebridge configuration. "
+            "This setup workflow renders review assets but refuses enable, disable, and "
+            "configure mutations. Use `splunk-secure-gateway --platform cloud` for the "
+            "managed-service readiness and operator handoff bundle."
+        )
+    elif args.platform == "enterprise":
+        platform_note = (
+            "App-state mutation is limited to an explicitly selected Splunk Enterprise "
+            "search head."
+        )
+    else:
+        platform_note = (
+            "Platform is auto-detected from the configured target before apply. Managed "
+            "Splunk Cloud targets are refused and routed to the supported Cloud workflow."
+        )
     return f"""# Splunk Secure Gateway Rendered Assets
 
+Platform: `{args.platform}`
 App: `{args.app_name}`
 Action: `{args.action}`
 Private Spacebridge: `{args.private_spacebridge}`
@@ -193,6 +212,8 @@ Splunk Secure Gateway connects mobile devices through Spacebridge over outbound
 443 to `{SPACEBRIDGE_HOST}` (no inbound ports). Enabling the app opens that
 egress and requires `--accept-spacebridge-egress`. Deployment settings and
 device registration are Splunk Web / MDM operations.
+
+{platform_note}
 """
 
 
@@ -206,6 +227,7 @@ def render(args: argparse.Namespace) -> dict:
             "README.md": render_readme(args),
             "metadata.json": json.dumps(
                 {
+                    "platform": args.platform,
                     "app_name": args.app_name,
                     "action": args.action,
                     "deployment_name": args.deployment_name,
@@ -227,6 +249,7 @@ def render(args: argparse.Namespace) -> dict:
             assets.append(rel)
     return {
         "target": "secure-gateway",
+        "platform": args.platform,
         "app_name": args.app_name,
         "action": args.action,
         "output_dir": str(output_dir),

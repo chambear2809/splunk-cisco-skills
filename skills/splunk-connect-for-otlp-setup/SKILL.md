@@ -6,6 +6,10 @@ description: >-
   when the user asks to deploy the OTLP modular input, expose OTLP gRPC/HTTP
   listeners, configure OTel SDK or Collector senders to Splunk Platform, verify
   HEC token/index routing, or troubleshoot Splunk Connect for OTLP.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Connect for OTLP Setup

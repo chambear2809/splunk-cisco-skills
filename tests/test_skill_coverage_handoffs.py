@@ -63,6 +63,9 @@ def test_ai_assistant_cloud_onboarding_plan_keeps_cloud_ui_gate_explicit() -> No
     payload = json.loads(result.stdout)
     assert payload["workflow"] == "splunk-ai-assistant-cloud-onboarding"
     assert payload["platform"] == "cloud"
+    assert payload["latest_verified_version"] == "2.0.0"
+    assert payload["current_public_version"] == "2.1.1"
+    assert payload["package_verification_status"] == "current_public_release_unverified"
     assert any(step["automation"] == "manual-gate" for step in payload["steps"])
     assert any("app ID 7245" in detail for step in payload["steps"] for detail in step.get("details", []))
 

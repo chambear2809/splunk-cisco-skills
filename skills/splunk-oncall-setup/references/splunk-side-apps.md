@@ -182,6 +182,10 @@ that the path is reachable.
 
 ## Splunkbase 5863 — Splunk On-Call SOAR connector
 
+- Product classification: Splunk SOAR-only. This is not a Splunk Enterprise
+  or Splunk Cloud Platform app, so the repository's Platform `10.5`
+  compatibility target is not applicable. Do not send this package through a
+  Platform app installer.
 - App folder name: **`splunkoncall`** (package: `phantom_splunkoncall`,
   `appid: 623de41b-eac0-4a4a-970c-974e8d7ac2cb`).
 - Splunkbase v2.2.4 (2025-08-01). Splunk SOAR 5.1.0+. Python 3.9 / 3.13.

@@ -10,6 +10,10 @@ description: >-
   Use when the user asks about Splunk_TA_aws, the Splunk Add-on for AWS,
   CloudTrail, AWS Config, or GuardDuty log ingestion, SQS-based S3 inputs, or a
   manual AWS TA configuration alternative to Data Manager.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Add-on for AWS Setup

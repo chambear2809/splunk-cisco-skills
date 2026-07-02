@@ -64,7 +64,8 @@ class SecureGatewayTests(unittest.TestCase):
     def test_enable_refused_without_egress_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
-                "--output-dir", tmpdir, "--phase", "apply", "--action", "enable",
+                "--output-dir", tmpdir, "--platform", "enterprise",
+                "--phase", "apply", "--action", "enable",
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--accept-spacebridge-egress", result.stdout + result.stderr)
@@ -72,11 +73,28 @@ class SecureGatewayTests(unittest.TestCase):
     def test_dry_run_enable_does_not_execute(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
-                "--output-dir", tmpdir, "--dry-run", "--phase", "apply",
+                "--output-dir", tmpdir, "--platform", "enterprise",
+                "--dry-run", "--phase", "apply",
                 "--action", "enable", "--accept-spacebridge-egress",
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("DRY RUN", result.stdout + result.stderr)
+
+    def test_cloud_apply_is_blocked_and_routed_without_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_setup(
+                "--output-dir", tmpdir, "--platform", "cloud",
+                "--phase", "apply", "--action", "enable",
+                "--accept-spacebridge-egress",
+            )
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 2, msg=output)
+            self.assertIn("will not enable, disable, or configure", output)
+            self.assertIn("splunk-secure-gateway/scripts/setup.sh --platform cloud", output)
+            metadata = json.loads(
+                (Path(tmpdir) / "secure-gateway" / "metadata.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(metadata["platform"], "cloud")
 
 
 if __name__ == "__main__":

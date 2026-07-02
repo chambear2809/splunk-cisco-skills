@@ -6,6 +6,10 @@ description: >-
   ingestion handoffs, source/sourcetype coverage, and CIM validation. Use when
   the user asks about Cisco Secure Email Gateway, ESA, WSA, IronPort, email
   security, web security, or Cisco ESA/WSA Splunk add-ons.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Secure Email/Web Gateway Setup
@@ -31,6 +35,16 @@ Automates Splunk-side setup for:
 These packages are parser/search-time add-ons. They do not contain device API
 inputs, credentials, or custom REST account handlers. Collection is handled by
 ESA/WSA syslog export, SC4S, or file-monitor deployment.
+
+## Package Verification Boundary
+
+The repository's ESA package-derived behavior was verified against `1.7.0`.
+The current public ESA listing is `1.7.1` and advertises Splunk 10.5 support,
+but this repository has not inspected that newer package. The shared installer
+defaults to verified `1.7.0`; only `--accept-unverified-release` follows public
+`1.7.1`. After that explicit override, re-check its manifest, source types,
+eventtypes, and parser/dashboard evidence. The WSA package has no corresponding
+verified/public-version drift in the registry.
 
 ## Workflow
 

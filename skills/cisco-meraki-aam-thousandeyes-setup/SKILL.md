@@ -9,6 +9,10 @@ description: >-
   agents inside Meraki networks, inspect or summarize Meraki Dashboard HAR/POST
   requests for the AAM wizard, or validate the resulting ThousandEyes agents,
   tests, and results.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Meraki AAM ThousandEyes Setup

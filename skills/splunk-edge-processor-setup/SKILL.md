@@ -11,6 +11,10 @@ description: >-
   Processor, managing EP pipelines, routing forwarders, or handling Cisco Data
   Fabric / telemetry pipeline management requests that need Splunk Platform
   edge routing and transformation.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Edge Processor Setup

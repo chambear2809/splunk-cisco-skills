@@ -149,7 +149,7 @@ SOK options:
   --operator-chart-archive PATH            Reviewed local Operator chart archive
   --enterprise-chart-archive PATH          Reviewed local Enterprise chart archive
   --crd-manifest PATH                      Reviewed local SOK CRD manifest
-  --splunk-version VERSION                 Splunk Enterprise version (default: 10.4.0)
+  --splunk-version VERSION                 Splunk Enterprise version (default: $(spv_enterprise_default))
   --splunk-image IMAGE                     Override Splunk Enterprise image
   --storage-class NAME                     Kubernetes StorageClass override
   --etc-storage SIZE                       /opt/splunk/etc PVC size (default: 10Gi)

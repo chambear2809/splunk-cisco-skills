@@ -1,6 +1,10 @@
 ---
 name: splunk-observability-otel-collector-setup
 description: Use when rendering, preflighting, applying, validating, diagnosing, and removing the Splunk Distribution of OpenTelemetry Collector for Kubernetes and Linux; audit and stage Splunkbase apps 7125, 8698, and 8699 through deployment servers, Linux heavy forwarders, or Linux Universal Forwarders; configure guarded Splunk Platform HEC or Splunk Connect for OTLP destinations; and route specialized Observability products to their owning skills.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability OTel Collector Setup

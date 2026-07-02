@@ -8,6 +8,10 @@ description: >-
   Database Agent, database collector creation or updates, Database Visibility
   API payloads, DB credential redaction, DB server validation, DB node
   validation, or database event checks.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Database Visibility Setup

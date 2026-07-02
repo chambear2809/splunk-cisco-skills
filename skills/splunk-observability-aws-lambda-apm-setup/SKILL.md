@@ -11,6 +11,10 @@ description: >-
   Lambda functions for APM/tracing, attach the Splunk OTel Lambda layer, wire
   SPLUNK_ACCESS_TOKEN safely, set up Lambda APM dashboards or detectors, or
   migrate from Datadog, New Relic, or ADOT to Splunk OTel.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Cloud — AWS Lambda APM Setup

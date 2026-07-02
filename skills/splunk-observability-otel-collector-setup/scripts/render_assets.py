@@ -4996,7 +4996,7 @@ rollback_instrumentation() {{
     resources="$(discover_instrumentation_api)" || return 1
     if ! grep -qx 'instrumentations.opentelemetry.io' <<<"${{resources}}"; then
         [[ "${{instrumentation_prestate}}" == "absent" ]]
-        return
+        return 0
     fi
     kubectl {kube_prefix}-n "${{namespace}}" get instrumentation {shell_quote(collector_fullname)} \
         --ignore-not-found -o json > "${{instrumentation_current}}" || return 1
@@ -6292,7 +6292,7 @@ if [[ ! -f "${{ssh_key_file}}" || -L "${{ssh_key_file}}" || ! -r "${{ssh_key_fil
     echo "ERROR: SSH private key must be a readable, nonempty, non-symlink regular file." >&2
     exit 1
 fi
-ssh_key_mode="$(stat -f '%A' "${{ssh_key_file}}" 2>/dev/null || stat -c '%a' "${{ssh_key_file}}" 2>/dev/null || true)"
+ssh_key_mode="$(stat -c '%a' "${{ssh_key_file}}" 2>/dev/null || stat -f '%A' "${{ssh_key_file}}" 2>/dev/null || true)"
 if [[ "${{ssh_key_mode}}" != "600" && "${{ssh_key_mode}}" != "0600" ]]; then
     echo "ERROR: SSH private key must have mode 600 (found ${{ssh_key_mode:-unknown}})." >&2
     exit 1
@@ -7953,7 +7953,7 @@ TA_SECRET_MODE={shell_quote(args.ta_secret_mode)}
 ACCEPT_TA_TOKEN_IN_CONF={shell_quote(str(args.accept_ta_token_in_conf).lower())}
 
 file_mode() {{
-    stat -f '%A' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null || true
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%A' "$1" 2>/dev/null || true
 }}
 
 validate_ta_token_file() {{
