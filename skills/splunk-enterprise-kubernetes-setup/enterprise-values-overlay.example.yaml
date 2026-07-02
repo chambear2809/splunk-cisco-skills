@@ -1,0 +1,159 @@
+searchHeadCluster:
+  additionalLabels:
+    example.com/reviewed-overlay: "true"
+# Reviewed, non-secret Splunk Enterprise chart 3.1.0 overlay example.
+#
+# Copy this file, replace or extend the harmless example label above with the
+# required settings, and pass the copy with --enterprise-values-overlay. The
+# overlay is applied after generated values and therefore wins on matching keys.
+# Never include object-store keys, passwords, tokens, or private-key contents.
+# Verify every key against:
+#   helm show values splunk/splunk-enterprise --version 3.1.0
+#
+# -----------------------------------------------------------------------------
+# Common Enterprise scheduling examples
+# -----------------------------------------------------------------------------
+# The Splunk image is protected; select it with --splunk-image. Enterprise
+# imagePullSecrets is not in this strict overlay allowlist and requires a
+# first-class renderer/platform handoff. Operator imagePullSecrets remains an
+# accepted Operator-overlay Secret reference.
+#
+# searchHeadCluster:
+#   additionalLabels:
+#     workload.example.com/tier: search
+#   additionalAnnotations:
+#     example.com/owner: splunk-platform
+#   tolerations:
+#     - key: workload.example.com/splunk
+#       operator: Equal
+#       value: "true"
+#       effect: NoSchedule
+#   topologySpreadConstraints:
+#     - maxSkew: 1
+#       topologyKey: topology.kubernetes.io/zone
+#       whenUnsatisfiable: DoNotSchedule
+#       labelSelector:
+#         matchLabels:
+#           app.kubernetes.io/instance: splunk-enterprise
+#   # Development example. For production set each request equal to its limit.
+#   resources:
+#     requests:
+#       cpu: "8"
+#       memory: 16Gi
+#     limits:
+#       cpu: "16"
+#       memory: 32Gi
+#
+# Use the same role-specific pattern for standalone, clusterManager,
+# indexerCluster, licenseManager, monitoringConsole, and ingestorCluster only
+# after sizing and chart-value review. In production, every Splunk role and the
+# SHC deployer must keep complete CPU/memory requests equal to limits; reviewed
+# equal-pair quantities may differ from the generated defaults.
+
+# -----------------------------------------------------------------------------
+# App Framework: AWS S3 example for indexer app distribution
+# -----------------------------------------------------------------------------
+# IndexerCluster does not own appRepo. Put indexer apps on ClusterManager with
+# cluster scope. The optional existing Secret name below is a reference, not
+# secret material. Omit it only after separately proving supported provider IAM
+# on the Operator/Splunk pods. AppRepo serviceAccount is not in v4.
+# clusterManager:
+#   appRepo:
+#     appsRepoPollIntervalSeconds: 900
+#     defaults:
+#       volumeName: indexer-apps-volume
+#       scope: cluster
+#     appSources:
+#       - name: indexer-apps
+#         location: indexer/
+#     volumes:
+#       - name: indexer-apps-volume
+#         storageType: s3
+#         provider: aws
+#         path: splunk-app-framework/indexers
+#         endpoint: https://s3.us-west-2.amazonaws.com
+#         region: us-west-2
+#         secretRef: splunk-app-framework-s3
+
+# -----------------------------------------------------------------------------
+# App Framework: Search Head Cluster scopes
+# -----------------------------------------------------------------------------
+# searchHeadCluster:
+#   appRepo:
+#     appsRepoPollIntervalSeconds: 900
+#     defaults:
+#       volumeName: search-apps-volume
+#       scope: cluster
+#     appSources:
+#       - name: search-cluster-apps
+#         location: cluster/
+#         scope: cluster
+#       - name: deployer-local-apps
+#         location: local/
+#         scope: local
+#       # Enterprise Security is an upstream premium-app flow. Verify the exact
+#       # SOK/ES versions and required indexer package before enabling it.
+#       - name: enterprise-security
+#         location: premium/es/
+#         scope: premiumApps
+#         premiumAppsProps:
+#           type: enterpriseSecurity
+#           esDefaults:
+#             sslEnablement: strict
+#     volumes:
+#       - name: search-apps-volume
+#         storageType: s3
+#         provider: aws
+#         path: splunk-app-framework/search
+#         endpoint: https://s3.us-west-2.amazonaws.com
+#         region: us-west-2
+#         secretRef: splunk-app-framework-s3
+
+# Standalone, LicenseManager, MonitoringConsole, and IngestorCluster use local
+# App Framework scope. Preserve separate source locations for different roles.
+
+# -----------------------------------------------------------------------------
+# Provider variants for an appRepo volume
+# -----------------------------------------------------------------------------
+# Azure Blob:
+#   - name: azure-apps
+#     storageType: blob
+#     provider: azure
+#     path: splunk-apps/container-prefix
+#     endpoint: https://ACCOUNT.blob.core.windows.net
+#     secretRef: splunk-app-framework-azure
+#
+# GCP Cloud Storage:
+#   - name: gcp-apps
+#     storageType: gcs
+#     provider: gcp
+#     path: splunk-apps/prefix
+#     endpoint: https://storage.googleapis.com
+#     secretRef: splunk-app-framework-gcp
+#
+# S3-compatible/MinIO:
+#   - name: minio-apps
+#     storageType: s3
+#     provider: minio
+#     path: splunk-apps/prefix
+#     endpoint: https://minio.example.com
+#     secretRef: splunk-app-framework-minio
+#
+# App Framework volumes may optionally reference an existing Secret by name.
+# Provider IAM/managed identity must be attached and proven outside appRepo;
+# create buckets, identities, bindings, and Secrets outside this overlay.
+
+# -----------------------------------------------------------------------------
+# Protected capabilities and handoffs
+# -----------------------------------------------------------------------------
+# This skill intentionally rejects images, serviceAccount overrides,
+# service/serviceTemplate, probes, commands, arbitrary env, security/host
+# fields, storage/topology ownership, licenseUrl/defaultsUrl/defaultsUrlApps,
+# arbitrary volumes/volumeMounts, extraManifests, and namespace/watch changes.
+# Use the matching first-class CLI option or the explicit handoff in coverage.md.
+#
+# Enterprise overlays accept only the seven role roots. Within a role, accepted
+# non-AppRepo keys are additionalLabels, additionalAnnotations, affinity,
+# tolerations, topologySpreadConstraints, and resources. Unknown/misspelled
+# roots or keys, nodeSelector, schedulerName, and AppRepo serviceAccount are
+# rejected. Exact template/live CR readback still does not prove app behavior.

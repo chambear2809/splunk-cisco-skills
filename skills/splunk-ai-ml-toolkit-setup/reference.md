@@ -17,9 +17,13 @@ Legacy/migration-only coverage:
 
 | Product | Splunkbase | Package ID | Status |
 | --- | --- | --- | --- |
-| PSC Linux 32-bit | `2884` | `Splunk_SA_Scientific_Python_linux_x86` | Legacy only; not a modern install target |
-| Splunk App for Anomaly Detection | `6843` | unknown public manifest | EOL/migration-only |
-| Smart Alerts Assistant for Splunk (beta) | `6415` | `Smart_Alerts_Assistant` | Legacy beta/migration-only |
+| PSC Linux 32-bit | `2884` | `Splunk_SA_Scientific_Python_linux_x86` | Legacy/migration only; no new Splunk 10.5 install |
+| Splunk App for Anomaly Detection | `6843` | unknown public manifest | EOL/migration-only; no new Splunk 10.5 install |
+| Smart Alerts Assistant for Splunk (beta) | `6415` | `Smart_Alerts_Assistant` | Legacy beta/migration-only; no new Splunk 10.5 install |
+
+The registry retains these IDs for discovery and migration evidence. None of
+the three listings advertises Splunk 10.5 compatibility, and this skill must
+never emit an install command for them on a 10.5 target.
 
 ## AI Toolkit Feature Coverage
 

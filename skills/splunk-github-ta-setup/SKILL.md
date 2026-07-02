@@ -9,6 +9,10 @@ description: >-
   for GitHub audit logs, GitHub Enterprise Cloud, GHES audit, GitHub security
   scanning alerts, or Splunk_TA_github onboarding. Use when the user asks to
   onboard, configure, render, or validate GitHub audit/security data in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Add-on for GitHub Setup
@@ -28,6 +32,15 @@ Render-first automation for `Splunk_TA_github` (Splunkbase `6254`, verified
 `3.3.0`). The renderer emits reviewable GitHub Cloud API inputs, a PAT account
 runbook, HEC/syslog handoffs, and validation SPL. It never handles PAT or HEC
 token values.
+
+## Package Verification Boundary
+
+The current public release is `3.3.1` and advertises Splunk 10.5 support;
+this repository's package-derived baseline remains `3.3.0`. The shared
+installer defaults to verified `3.3.0`; only `--accept-unverified-release`
+follows public `3.3.1`. After that explicit override, re-check its
+modular-input/account schema, source types, and shipped views before applying
+the rendered `3.3.0`-based templates.
 
 ## Workflow
 

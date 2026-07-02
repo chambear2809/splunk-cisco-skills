@@ -8,6 +8,10 @@ description: >-
   single-site clustered topologies. Use when the user asks to bootstrap a
   Splunk host, install a heavy forwarder, build a search/index/forwarder tier,
   or configure clustered Splunk Enterprise nodes.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Enterprise Host Setup
@@ -167,7 +171,7 @@ bash skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh \
 
 Splunk Enterprise has **no 10.3 release train**. Supported paths to **10.4**
 include **10.2 → 10.4**, **10.0 → 10.2 → 10.4**, and fresh installs on
-**10.4.0** (default in this repo).
+**10.4.1** (default in this repo).
 
 Invalid or high-risk jumps this skill should warn about during planning:
 

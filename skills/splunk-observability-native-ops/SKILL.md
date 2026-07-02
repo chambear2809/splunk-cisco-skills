@@ -1,6 +1,10 @@
 ---
 name: splunk-observability-native-ops
 description: Use when configuring native Splunk Observability Cloud operations beyond collection and classic dashboards, including detectors, alert routing, On-Call handoffs, APM service maps and traces, RUM session workflows, Synthetic tests and waterfall artifacts, and modern logs chart handoffs.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Native Ops

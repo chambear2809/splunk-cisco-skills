@@ -119,6 +119,11 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-workload-management-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-hec-service-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-connect-for-otlp-setup` | 8704 |", self.cloud_matrix)
+        self.assertIn(
+            "| `splunk-connect-for-otlp-setup` | 8704 | No Victoria search-tier ACS install:",
+            self.cloud_matrix,
+        )
+        self.assertIn("cloud_compatible=false", self.cloud_matrix)
         self.assertIn("| `splunk-db-connect-setup` | 2686 |", self.cloud_matrix)
         self.assertIn("| `splunk-db-connect-setup` SQL Server JDBC add-on | 6150 |", self.cloud_matrix)
         self.assertIn("| `splunk-db-connect-setup` PostgreSQL JDBC add-on | 6152 |", self.cloud_matrix)
@@ -154,6 +159,10 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-workload-management-setup` | Supported | Supported | None | None | None |", self.role_matrix)
         self.assertIn("| `splunk-hec-service-setup` | Supported | Supported | Supported | None | None |", self.role_matrix)
         self.assertIn("| `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported |", self.role_matrix)
+        self.assertIn(
+            "| `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported | HF or External collector |",
+            self.role_matrix,
+        )
         self.assertIn("| `splunk-db-connect-setup` | Supported | None | Supported | None | None |", self.role_matrix)
         self.assertIn("| `splunk_app_db_connect` | `splunk-db-connect-setup` | Supported | None | Supported | None | None |", self.role_matrix)
         self.assertIn("| `splunk-federated-search-setup` | Required | None | None | None | None |", self.role_matrix)

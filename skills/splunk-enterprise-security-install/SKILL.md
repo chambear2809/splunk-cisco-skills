@@ -6,6 +6,10 @@ description: >-
   deployer workflows, required ES framework apps, local splunk-ta packages, and
   Splunkbase app 263 fallback. Use when the user asks to install, upgrade,
   bootstrap, post-install, or validate Splunk Enterprise Security.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Enterprise Security Install
@@ -37,6 +41,12 @@ a specific Splunkbase version.
 For Splunk Cloud Platform, do not self-service install ES unless the customer
 has an explicitly supported ACS/support process. Splunk Cloud customers usually
 coordinate ES search-head access and installation with Splunk Support.
+
+The public ES `8.5.1` listing includes platform `10.5`. In this repository,
+`10.5` is the current Splunk Cloud target and does not change the self-managed
+Enterprise default from `10.4.0`. Confirm the target-specific ES compatibility
+matrix and supported Cloud installation process rather than presenting the
+cross-product listing as self-managed Enterprise `10.5` validation.
 
 ## Environment
 

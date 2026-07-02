@@ -36,8 +36,8 @@ splunk_jwt_file=
 token_user=
 
 # Token lifetime expression accepted by /servicesNS/nobody/Splunk_MCP_Server/mcp_token
-# Examples: +30d, +12h, 2026-12-31T23:59:59Z
-token_expires_on=+30d
+# Examples: +12h, +1d, 2026-12-31T23:59:59Z
+token_expires_on=+12h
 
 # If the client bridge must ignore TLS validation for lab/self-signed certificates:
 #   true
@@ -48,20 +48,22 @@ client_insecure_tls=false
 timeout=90
 max_row_limit=2000
 default_row_limit=250
+# Configuration intent only: vendor release 1.2.1 does not enforce this value
+# for its internal HTTP calls and therefore cannot be production-certified.
 ssl_verify=true
 require_encrypted_token=true
-legacy_token_grace_days=30
-mcp_token_default_lifetime_seconds=2592000
-mcp_token_max_lifetime_seconds=7776000
-token_key_reload_interval_seconds=
+legacy_token_grace_days=0
+mcp_token_default_lifetime_seconds=43200
+mcp_token_max_lifetime_seconds=86400
+token_key_reload_interval_seconds=300
 
 # Suggested rate-limit values
 global_rate_limit=600
-admission_global=0
+admission_global=60
 tenant_authenticated=240
-tenant_unauthenticated=60
-circuit_breaker_failure_threshold=20
-circuit_breaker_cooldown_seconds=30
+tenant_unauthenticated=10
+circuit_breaker_failure_threshold=5
+circuit_breaker_cooldown_seconds=60
 
 # Optional render target for the shared client bridge bundle
 render_output_dir=./splunk-mcp-rendered

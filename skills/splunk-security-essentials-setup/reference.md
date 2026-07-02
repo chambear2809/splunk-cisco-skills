@@ -1,6 +1,6 @@
 # Splunk Security Essentials Reference
 
-`last_verified: 2026-05-03`
+`last_verified: 2026-07-02`
 
 ## Splunkbase
 
@@ -10,7 +10,10 @@
 - Package pattern: `splunk-security-essentials_*`
 - Access: unrestricted
 - Splunk platform compatibility researched: Splunk Enterprise / Cloud Platform
-  9.0 through 10.4 (default 10.4; also 10.3 Cloud / 10.2 / older Enterprise trains)
+  9.0 through 10.5
+- Repository interpretation: `10.5` is the current Splunk Cloud target;
+  self-managed Splunk Enterprise remains on the `10.4.0` default. Do not treat
+  the cross-product listing as Enterprise `10.5` validation.
 
 ## Setup Checklist
 

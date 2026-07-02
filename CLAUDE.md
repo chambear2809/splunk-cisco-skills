@@ -157,7 +157,7 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-platform-sizing` | Splunk deployment sizing | Size indexers, search heads, storage, and topology from a use case (ingest, retention, search load, ES/ITSI, HA) across All-In-One standalone, distributed SVAs, Splunk on Kubernetes (SOK + POD), and Splunk Cloud; render a sizing report + JSON with deploy-skill hand-offs |
-| `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
+| `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector + TA apps 7125/8698/8699 | Render, preflight, apply, validate, diagnose, and remove pinned Kubernetes/Linux Collector deployments; audit and atomically stage multi-OS/Linux/Windows TA artifacts for deployment-server, UF, or HF paths; configure guarded HEC/OTLP destinations, TLS/mTLS, FIPS, events/entities, Target Allocator, and explicit lifecycle/product handoffs |
 | `splunk-observability-ai-agent-monitoring-setup` | Splunk AI Agent Monitoring + AI Infrastructure Monitoring | Render, validate, diagnose, and safely apply AI Agent Monitoring setup plans, including GenAI Python instrumentation packages, instrumentation-side evaluations, histogram collector readiness, HEC/Log Observer Connect handoffs, dashboards, detectors, and full AI Infrastructure Monitoring product coverage |
 | `splunk-observability-coding-agent-instrumentation-setup` | Coding-agent telemetry router | Resolve Codex or Claude Code telemetry requests and emit non-mutating child orchestration plans for local collector, external collector, direct, or all destinations |
 | `splunk-observability-codex-instrumentation-setup` | Codex CLI -> Splunk Observability | Render, validate, diagnose, and safely apply user-level Codex OTel profiles, direct Splunk OTLP/HTTP trace and metric profiles, collector-mode native logs, JSONL runtime helpers, and optional fail-soft hooks |
@@ -232,11 +232,16 @@ exists, so Claude Code and Cursor do not need to inherit an activated shell.
 Claude Code reads `.mcp.json`; Cursor reads `.cursor/mcp.json`; Codex needs a
 one-time registration with `bash agent/register-codex-splunk-cisco-skills-mcp.sh`.
 
-This server provides read-only skill catalog, template, product-resolution, and
-planning tools by default. Read-only plans can run with explicit confirmation.
-Mutating setup, install, or configure scripts are disabled unless the MCP server
-process is started with `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; all execution tools
-require a matching plan hash and explicit confirmation.
+This server is discovery-and-plan-only by default. Every local subprocess,
+including product resolution and dry-run planning, requires the MCP server
+process to start with `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`. Generic script
+execution is always mutation-gated and additionally requires
+`SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; all execution tools require a matching
+plan hash and explicit confirmation.
+
+Plans are also bound to the complete `skills/` dependency-tree snapshot and
+revalidated after the execution lock is acquired. Changes to shared helpers,
+catalogs, policies, or delegated scripts invalidate the plan.
 
 Plans are single-use and stored in memory for the MCP server session: a plan
 is consumed when it executes, and the entire plan store is lost if the server

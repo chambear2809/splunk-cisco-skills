@@ -8,6 +8,10 @@ description: >-
   member, resync KV Store replication, change kvstore server.conf settings, or
   check kvstore-status and replication on standalone search heads or search head
   clusters.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk KV Store Administration

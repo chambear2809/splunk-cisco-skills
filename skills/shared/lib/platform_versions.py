@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -47,3 +48,68 @@ def splunkbase_pin(app_id: str, *, path: Path | None = None) -> dict[str, Any]:
     if not isinstance(entry, dict):
         raise KeyError(f"splunkbase_pins.{app_id} is missing")
     return entry
+
+
+def platform_minor_train(value: str) -> str:
+    """Return MAJOR.MINOR from an exact numeric platform version.
+
+    Runtime classifiers intentionally fail closed on prerelease labels, Cloud
+    date-builds used as Enterprise versions, and arbitrary text. Callers that
+    discover a normal Enterprise patch version such as ``10.4.1`` receive the
+    corresponding ``10.4`` train.
+    """
+
+    match = re.fullmatch(r"\s*(\d+)\.(\d+)(?:\.\d+)?\s*", value or "")
+    if not match:
+        raise ValueError(
+            f"invalid Splunk platform version {value!r}; expected MAJOR.MINOR or MAJOR.MINOR.PATCH"
+        )
+    return f"{int(match.group(1))}.{int(match.group(2))}"
+
+
+def classify_enterprise_version(
+    value: str, *, path: Path | None = None
+) -> str:
+    """Classify a version against the public self-managed Enterprise contract.
+
+    Returns one of ``supported``, ``cloud-only``, ``not-publicly-released``, or
+    ``unsupported``. Splunkbase compatibility targets and Splunk Cloud doc
+    trains are deliberately not accepted as Enterprise runtime evidence.
+    """
+
+    train = platform_minor_train(value)
+    payload = load_platform_versions(path)
+    supported = {str(item) for item in payload.get("enterprise_platform_versions", [])}
+    cloud_only = {str(item) for item in payload.get("enterprise_cloud_only_trains", [])}
+    not_public = {
+        str(item)
+        for item in payload.get("enterprise_not_publicly_released_trains", [])
+    }
+    if train in supported:
+        return "supported"
+    if train in cloud_only:
+        return "cloud-only"
+    if train in not_public:
+        return "not-publicly-released"
+    return "unsupported"
+
+
+def require_supported_enterprise_version(
+    value: str, *, path: Path | None = None
+) -> str:
+    """Return the normalized train or raise for an unsupported runtime target."""
+
+    train = platform_minor_train(value)
+    classification = classify_enterprise_version(value, path=path)
+    if classification != "supported":
+        raise ValueError(
+            f"Splunk Enterprise {value} is {classification}; supported public "
+            "self-managed trains are "
+            + ", ".join(
+                str(item)
+                for item in load_platform_versions(path).get(
+                    "enterprise_platform_versions", []
+                )
+            )
+        )
+    return train

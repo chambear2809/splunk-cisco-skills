@@ -29,6 +29,12 @@ def _maybe_reexec_repo_venv() -> None:
         if not candidate.is_file() or not os.access(candidate, os.X_OK):
             continue
         os.environ["SPLUNK_CISCO_SKILLS_MCP_REEXECED"] = "1"
+        # Re-exec alone does not activate a virtual environment. Prepending its
+        # bin directory ensures Python helpers launched by Bash skill scripts
+        # resolve the same dependency set as this MCP process.
+        bin_dir = str(venv_dir / "bin")
+        current_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = bin_dir if not current_path else f"{bin_dir}{os.pathsep}{current_path}"
         os.execv(str(candidate), [str(candidate), str(RUNNER_PATH), *sys.argv[1:]])
 
 

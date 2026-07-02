@@ -1,0 +1,14 @@
+# Explicit Kubernetes object-receiver inventory. Nothing is collected unless
+# this file is passed with --k8s-objects-file.
+- name: pods
+  mode: pull
+  namespaces:
+    - default
+  label_selector: app.kubernetes.io/part-of=my-application
+  interval: 6h
+
+- name: deployments
+  group: apps
+  mode: watch
+  namespaces:
+    - default

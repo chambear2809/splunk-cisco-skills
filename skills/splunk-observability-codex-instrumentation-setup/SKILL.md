@@ -1,6 +1,10 @@
 ---
 name: splunk-observability-codex-instrumentation-setup
 description: Render, validate, diagnose, and safely apply Splunk Observability instrumentation for Codex CLI profiles, OTel destinations, JSONL runtime helpers, and optional hooks. Use when instrumenting Codex itself for Splunk Observability or AI Agent Monitoring.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Codex Instrumentation Setup

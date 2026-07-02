@@ -1,6 +1,10 @@
 # Beginner content-pack starter.
 # Replace the connection and pack profile values, then run:
-#   bash scripts/setup.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
+#   bash skills/splunk-itsi-config/scripts/setup.sh --workflow content-packs --spec my-itsi-content-pack.yaml --mode lint
+
+schema_version: 1
+metadata:
+  template: true
 
 connection:
   # Leave blank to use SPLUNK_SEARCH_API_URI from the credentials file.
@@ -11,16 +15,11 @@ connection:
 
 itsi:
   require_present: true
-  install_if_missing: true
-  source: splunkbase
-  app_id: "1841"
 
 content_library:
   require_present: true
-  install_if_missing: true
-  source: splunkbase
-  app_id: "5391"
-  refresh_catalog: true
+  # A refresh is an explicit write and therefore runs only with --apply.
+  refresh_catalog: false
 
 # Rich profiles include app/input/macro checks:
 # aws, cisco_data_center, cisco_enterprise_networks, cisco_thousandeyes,

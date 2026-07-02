@@ -9,13 +9,23 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from agent.splunk_cisco_skills_mcp import core
 
 
 class AgentMCPCoreTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._env_patcher = mock.patch.dict(os.environ, {}, clear=False)
+        self._env_patcher.start()
+        self.addCleanup(self._env_patcher.stop)
+        os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+        os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
+
     def test_list_skills_includes_catalog_and_script_metadata(self) -> None:
         payload = core.list_skills()
         skills = {item["name"]: item for item in payload["skills"]}
@@ -219,57 +229,45 @@ class AgentMCPCoreTests(unittest.TestCase):
                         args,
                     )
 
-    def test_oncall_setup_render_only_invocations_are_read_only(self) -> None:
-        # No mutation flag → read-only.
-        plan = core.plan_skill_script(
-            "splunk-oncall-setup",
-            "setup.sh",
-            ["--render", "--spec", "skills/splunk-oncall-setup/templates/oncall.example.yaml"],
+    def test_generic_script_plans_are_always_mutation_gated(self) -> None:
+        cases = (
+            ("splunk-oncall-setup", "setup.sh", ["--render"]),
+            ("splunk-oncall-setup", "setup.sh", ["--apply", "--dry-run"]),
+            ("cisco-product-setup", "resolve_product.sh", ["--help"]),
+            ("cisco-product-setup", "setup.sh", ["--list-products"]),
+            ("splunk-cloud-acs-admin-setup", "smoke_offline.sh", []),
+            ("splunk-universal-forwarder-setup", "setup.sh", []),
+            (
+                "splunk-observability-mobile-rum-setup",
+                "setup.sh",
+                ["--source-mode", "apply-patches"],
+            ),
         )
-        self.assertTrue(plan["read_only"])
+        # This test enumerates every script and is concerned only with the
+        # authorization classification. Avoid recomputing the whole-tree
+        # integrity snapshot hundreds of times here; dedicated tests cover it.
+        with mock.patch.object(core, "_skills_snapshot_sha256", return_value="1" * 64):
+            for skill, script, args in cases:
+                with self.subTest(skill=skill, script=script, args=args):
+                    plan = core.plan_skill_script(skill, script, args)
+                    self.assertFalse(plan["read_only"])
 
-    def test_oncall_setup_apply_invocations_are_treated_as_mutating(self) -> None:
-        # --self-test is a mutation flag because the script's own argv parser
-        # flips SEND_ALERT=true on --self-test, which fires synthetic INFO +
-        # RECOVERY alerts against the live On-Call REST endpoint.
-        mutation_flags = (
-            "--apply",
-            "--send-alert",
-            "--install-splunk-app",
-            "--uninstall",
-            "--self-test",
-        )
-        for mutation_flag in mutation_flags:
-            with self.subTest(mutation_flag=mutation_flag):
-                plan = core.plan_skill_script(
-                    "splunk-oncall-setup",
-                    "setup.sh",
-                    [mutation_flag, "--spec", "skills/splunk-oncall-setup/templates/oncall.example.yaml"],
-                )
-                self.assertFalse(plan["read_only"])
-        # --dry-run downgrades any of the above mutation invocations to a
-        # read-only preview because the scripts honour DRY_RUN end-to-end.
-        for mutation_flag in mutation_flags:
-            with self.subTest(mutation_flag=mutation_flag, dry_run=True):
-                plan = core.plan_skill_script(
-                    "splunk-oncall-setup",
-                    "setup.sh",
-                    [
-                        mutation_flag,
-                        "--dry-run",
-                        "--spec",
-                        "skills/splunk-oncall-setup/templates/oncall.example.yaml",
-                    ],
-                )
-                self.assertTrue(plan["read_only"])
-
-    def test_native_ops_apply_invocations_are_treated_as_mutating(self) -> None:
-        plan = core.plan_skill_script(
-            "splunk-observability-native-ops",
-            "setup.sh",
-            ["--apply", "--spec", "skills/splunk-observability-native-ops/templates/native-ops.example.yaml"],
-        )
-        self.assertFalse(plan["read_only"])
+            planned = 0
+            for skill_dir in core._skill_dirs():
+                scripts_dir = skill_dir / "scripts"
+                if not scripts_dir.is_dir():
+                    continue
+                for path in scripts_dir.iterdir():
+                    supported = path.suffix.lower() in {".sh", ".py", ".rb"} or os.access(
+                        path, os.X_OK
+                    )
+                    if not path.is_file() or not supported:
+                        continue
+                    with self.subTest(skill=skill_dir.name, script=path.name):
+                        plan = core.plan_skill_script(skill_dir.name, path.name, [])
+                        self.assertFalse(plan["read_only"])
+                        planned += 1
+            self.assertGreater(planned, 0)
 
     def test_generic_script_plan_allows_file_based_secret_flags(self) -> None:
         plan = core.plan_skill_script(
@@ -313,23 +311,31 @@ class AgentMCPCoreTests(unittest.TestCase):
         python_plan = core.plan_skill_script("cisco-product-setup", "build_catalog.py", ["--check"])
         ruby_plan = core.plan_skill_script("splunk-itsi-config", "spec_to_json.rb", ["--help"])
 
-        self.assertEqual(python_plan["command"][0], "python3")
+        self.assertEqual(python_plan["command"][0], sys.executable)
         self.assertEqual(ruby_plan["command"][0], "ruby")
 
-    def test_execute_read_only_plan_does_not_require_mutation_gate(self) -> None:
-        previous = os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-        try:
-            plan = core.plan_skill_script(
-                "cisco-product-setup",
-                "resolve_product.sh",
-                ["--help"],
-            )
+    def test_all_execution_requires_explicit_enable_gate(self) -> None:
+        plan = core._store_plan(
+            kind="typed_read_only_test",
+            command=[
+                "bash",
+                "skills/cisco-product-setup/scripts/resolve_product.sh",
+                "--help",
+            ],
+            summary="read-only execution gate test",
+            read_only=True,
+        )
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION", None)
+            os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
+            with self.assertRaisesRegex(core.SkillMCPError, "Subprocess execution is disabled"):
+                core.execute_plan(plan["plan_hash"], confirm=True)
+
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
             result = core.execute_plan(plan["plan_hash"], confirm=True)
-            self.assertEqual(result["returncode"], 0)
-            self.assertIn("Usage:", result["stdout"] + result["stderr"])
-        finally:
-            if previous is not None:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
+
+        self.assertEqual(result["returncode"], 0)
+        self.assertIn("Usage:", result["stdout"] + result["stderr"])
 
     def test_product_validate_only_plan_is_read_only(self) -> None:
         plan = core.plan_cisco_product_setup("Cisco ACI", phase="validate")
@@ -337,8 +343,9 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(plan["read_only"])
 
     def test_execute_mutating_plan_requires_mutation_gate(self) -> None:
-        previous = os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-        try:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
                 "configure_account.sh",
@@ -346,9 +353,6 @@ class AgentMCPCoreTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(core.SkillMCPError, "Mutating execution is disabled"):
                 core.execute_plan(plan["plan_hash"], confirm=True)
-        finally:
-            if previous is not None:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
 
     def test_execute_mutating_plan_runs_when_gate_is_open(self) -> None:
         # Complement to test_execute_mutating_plan_requires_mutation_gate:
@@ -357,9 +361,9 @@ class AgentMCPCoreTests(unittest.TestCase):
         # configure_account.sh with empty args so the script fails fast on
         # missing required flags (returncode != 0) without contacting Splunk
         # — what we are asserting is that the gate did NOT block execution.
-        previous = os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_MUTATION")
-        os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
-        try:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
                 "configure_account.sh",
@@ -372,11 +376,6 @@ class AgentMCPCoreTests(unittest.TestCase):
             # args, which is the expected behavior for this guard test.
             self.assertNotEqual(result["returncode"], 0)
             self.assertIn("returncode", result)
-        finally:
-            if previous is None:
-                os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-            else:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
 
     def test_runner_reports_missing_mcp_dependency_without_traceback(self) -> None:
         result = subprocess.run(
@@ -435,8 +434,9 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertNotIn('echo "the_secret"', text)
 
     def test_execute_plan_consumes_plan_on_success(self) -> None:
-        previous = os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-        try:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-product-setup",
                 "resolve_product.sh",
@@ -446,26 +446,27 @@ class AgentMCPCoreTests(unittest.TestCase):
             core.execute_plan(plan_hash, confirm=True)
             with self.assertRaisesRegex(core.SkillMCPError, "Unknown plan_hash"):
                 core.execute_plan(plan_hash, confirm=True)
-        finally:
-            if previous is not None:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
 
     def test_execute_plan_keeps_plan_when_confirm_missing(self) -> None:
-        plan = core.plan_skill_script(
-            "cisco-product-setup",
-            "resolve_product.sh",
-            ["--help"],
-        )
-        plan_hash = plan["plan_hash"]
-        with self.assertRaisesRegex(core.SkillMCPError, "confirm=true"):
-            core.execute_plan(plan_hash, confirm=False)
-        # Plan must still exist so the operator can retry with confirm=True.
-        result = core.execute_plan(plan_hash, confirm=True)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
+            plan = core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                ["--help"],
+            )
+            plan_hash = plan["plan_hash"]
+            with self.assertRaisesRegex(core.SkillMCPError, "confirm=true"):
+                core.execute_plan(plan_hash, confirm=False)
+            # Plan must still exist so the operator can retry with confirm=True.
+            result = core.execute_plan(plan_hash, confirm=True)
         self.assertEqual(result["returncode"], 0)
 
     def test_execute_plan_keeps_plan_when_mutation_gate_blocks(self) -> None:
-        previous = os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-        try:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
                 "configure_account.sh",
@@ -478,9 +479,6 @@ class AgentMCPCoreTests(unittest.TestCase):
             # can fix the env var and retry.
             with self.assertRaisesRegex(core.SkillMCPError, "Mutating execution is disabled"):
                 core.execute_plan(plan_hash, confirm=True)
-        finally:
-            if previous is not None:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
 
     def test_execute_plan_rejects_malformed_hash(self) -> None:
         with self.assertRaisesRegex(core.SkillMCPError, "64-character lowercase hex"):
@@ -522,570 +520,122 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertEqual(result.stdout.strip(), "7200 60 3600")
 
-    def test_dry_run_flag_does_not_make_arbitrary_scripts_read_only(self) -> None:
-        # A script that does not actually implement --dry-run must NOT be
-        # classified as read-only just because the caller passed --dry-run.
-        plan = core.plan_skill_script(
-            "splunk-app-install",
-            "install_app.sh",
-            ["--dry-run"],
-        )
-        self.assertFalse(plan["read_only"])
-
-    def test_cisco_product_setup_dry_run_is_read_only_via_allowlist(self) -> None:
-        plan = core.plan_skill_script(
+    def test_replanning_identical_command_uses_random_single_use_ids(self) -> None:
+        first = core.plan_skill_script(
             "cisco-product-setup",
-            "setup.sh",
-            ["--dry-run", "--product", "Cisco ACI"],
+            "resolve_product.sh",
+            ["--help"],
         )
-        self.assertTrue(plan["read_only"])
-
-    def test_render_first_setup_phases_are_read_only_via_allowlist(self) -> None:
-        render_plan = core.plan_skill_script(
-            "splunk-agent-management-setup",
-            "setup.sh",
-            ["--phase", "render"],
-        )
-        uf_download_plan = core.plan_skill_script(
-            "splunk-universal-forwarder-setup",
-            "setup.sh",
-            ["--phase", "download"],
-        )
-        preflight_plan = core.plan_skill_script(
-            "splunk-workload-management-setup",
-            "setup.sh",
-            ["--phase=preflight"],
-        )
-        apply_plan = core.plan_skill_script(
-            "splunk-hec-service-setup",
-            "setup.sh",
-            ["--phase", "apply"],
+        second = core.plan_skill_script(
+            "cisco-product-setup",
+            "resolve_product.sh",
+            ["--help"],
         )
 
-        self.assertTrue(render_plan["read_only"])
-        self.assertTrue(uf_download_plan["read_only"])
-        self.assertTrue(preflight_plan["read_only"])
-        self.assertFalse(apply_plan["read_only"])
+        self.assertRegex(first["plan_hash"], core.PLAN_HASH_RE)
+        self.assertRegex(second["plan_hash"], core.PLAN_HASH_RE)
+        self.assertNotEqual(first["plan_hash"], second["plan_hash"])
+        self.assertEqual(first["executable_sha256"], second["executable_sha256"])
+        self.assertEqual(first["repository_sha256"], second["repository_sha256"])
 
-    def test_new_render_first_skills_read_only_phases(self) -> None:
-        # Covers skills added after the initial READ_ONLY_PHASE_SCRIPTS map:
-        # ACS admin/allowlist, Edge Processor, Indexer Cluster, License Manager, SOAR.
-        cases = [
-            ("splunk-cloud-acs-admin-setup", ["--phase", "audit"], True),
-            ("splunk-cloud-acs-admin-setup", ["--phase", "validate"], True),
-            ("splunk-cloud-acs-admin-setup", ["--phase", "apply"], False),
-            ("splunk-cloud-acs-allowlist-setup", ["--phase", "audit"], True),
-            ("splunk-cloud-acs-allowlist-setup", ["--phase", "validate"], True),
-            ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"], False),
-            ("splunk-edge-processor-setup", ["--phase", "preflight"], True),
-            ("splunk-edge-processor-setup", ["--phase", "apply"], False),
-            ("splunk-ingest-processor-setup", ["--phase", "all"], True),
-            ("splunk-spl2-pipeline-kit", ["--phase", "lint"], True),
-            ("splunk-indexer-cluster-setup", ["--phase", "bundle-validate"], True),
-            ("splunk-indexer-cluster-setup", ["--phase", "bundle-status"], True),
-            ("splunk-indexer-cluster-setup", ["--phase", "rolling-restart"], False),
-            ("splunk-license-manager-setup", ["--phase", "validate"], True),
-            ("splunk-license-manager-setup", ["--phase", "apply"], False),
-            ("splunk-soar-setup", ["--phase", "cloud-onboard"], True),
-            ("splunk-soar-setup", ["--phase", "apply"], False),
-        ]
-        for skill, args, expected_read_only in cases:
-            plan = core.plan_skill_script(skill, "setup.sh", args)
-            self.assertEqual(
-                plan["read_only"],
-                expected_read_only,
-                msg=f"{skill} {args} read_only expected {expected_read_only}",
-            )
-
-    def test_flag_based_mode_skills_read_only_unless_apply(self) -> None:
-        # Observability native ops and dashboard builder use --apply as the
-        # mutation gate rather than a --phase arg.
-        native_render = core.plan_skill_script(
-            "splunk-observability-native-ops",
-            "setup.sh",
-            ["--render", "--spec", "spec.yaml"],
-        )
-        native_apply = core.plan_skill_script(
-            "splunk-observability-native-ops",
-            "setup.sh",
-            ["--apply", "--spec", "spec.yaml", "--token-file", "/tmp/t"],
-        )
-        dashboard_render = core.plan_skill_script(
-            "splunk-observability-dashboard-builder",
-            "setup.sh",
-            ["--spec", "dashboard.json"],
-        )
-
-        self.assertTrue(native_render["read_only"])
-        self.assertFalse(native_apply["read_only"])
-        self.assertTrue(dashboard_render["read_only"])
-
-        galileo_render = core.plan_skill_script(
-            "galileo-platform-setup",
-            "setup.sh",
-            ["--render", "--output-dir", "galileo-platform-rendered"],
-        )
-        galileo_apply = core.plan_skill_script(
-            "galileo-platform-setup",
-            "setup.sh",
-            [
-                "--apply",
-                "observe-export",
-                "--galileo-api-key-file",
-                "/tmp/galileo",
-                "--splunk-hec-token-file",
-                "/tmp/hec",
-            ],
-        )
-        agent_control_render = core.plan_skill_script(
-            "galileo-agent-control-setup",
-            "setup.sh",
-            ["--render", "--output-dir", "galileo-agent-control-rendered"],
-        )
-        agent_control_apply = core.plan_skill_script(
-            "galileo-agent-control-setup",
-            "setup.sh",
-            [
-                "--apply",
-                "splunk-sink",
-                "--agent-control-api-key-file",
-                "/tmp/agent-control",
-                "--splunk-hec-token-file",
-                "/tmp/hec",
-            ],
-        )
-        self.assertTrue(galileo_render["read_only"])
-        self.assertFalse(galileo_apply["read_only"])
-        self.assertTrue(agent_control_render["read_only"])
-        self.assertFalse(agent_control_apply["read_only"])
-
-    def test_universal_forwarder_latest_smoke_is_read_only(self) -> None:
-        plan = core.plan_skill_script(
-            "splunk-universal-forwarder-setup",
-            "smoke_latest_resolution.sh",
-            ["--target-os", "linux", "--package-type", "tgz"],
-        )
-
-        self.assertTrue(plan["read_only"])
-
-    def test_observability_dashboard_apply_dry_run_is_read_only(self) -> None:
-        plan = core.plan_skill_script(
-            "splunk-observability-dashboard-builder",
-            "setup.sh",
-            ["--apply", "--dry-run", "--spec", "dashboard.json"],
-        )
-
-        self.assertTrue(plan["read_only"])
-
-    def test_observability_native_ops_apply_dry_run_is_read_only(self) -> None:
-        plan = core.plan_skill_script(
-            "splunk-observability-native-ops",
-            "setup.sh",
-            [
-                "--apply",
-                "--dry-run",
-                "--spec",
-                "skills/splunk-observability-native-ops/templates/native-ops.example.yaml",
-            ],
-        )
-
-        self.assertTrue(plan["read_only"])
-
-    def test_render_first_phase_skills_dry_run_downgrades_apply(self) -> None:
-        # Each of these skills has a --phase apply / similar mutating phase
-        # AND honours --dry-run as a clean short-circuit (rendered scripts
-        # are logged, never executed). The MCP must classify those previews
-        # as read-only so operators can see what apply would do without
-        # opening the SPLUNK_SKILLS_MCP_ALLOW_MUTATION gate.
-        cases = [
-            ("splunk-cloud-acs-admin-setup", ["--phase", "apply"]),
-            ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"]),
-            ("splunk-edge-processor-setup", ["--phase", "apply"]),
-            ("splunk-federated-search-setup", ["--phase", "apply"]),
-            ("splunk-indexer-cluster-setup", ["--phase", "rolling-restart"]),
-            ("splunk-license-manager-setup", ["--phase", "apply"]),
-            ("splunk-soar-setup", ["--phase", "onprem-single"]),
-        ]
-        for skill, args in cases:
-            with self.subTest(skill=skill):
-                # Without --dry-run the apply phase is mutating.
-                mutating = core.plan_skill_script(skill, "setup.sh", args)
-                self.assertFalse(mutating["read_only"], msg=f"{skill} {args}")
-                # With --dry-run it must downgrade to read-only.
-                preview = core.plan_skill_script(
-                    skill, "setup.sh", [*args, "--dry-run"]
-                )
-                self.assertTrue(preview["read_only"], msg=f"{skill} {args} --dry-run")
-
-    def test_resolve_product_list_products_is_read_only(self) -> None:
+    def test_generic_plan_records_executable_digest(self) -> None:
         plan = core.plan_skill_script(
             "cisco-product-setup",
             "resolve_product.sh",
-            ["--list-products"],
+            ["--help"],
         )
-        self.assertTrue(plan["read_only"])
 
-    def test_federated_search_phases_classify_correctly(self) -> None:
-        cases = [
-            (["--phase", "render"], True),
-            (["--phase", "preflight"], True),
-            (["--phase", "status"], True),
-            (["--phase", "apply"], False),
-            (["--phase", "render", "--apply"], False),
-            (["--phase", "global-toggle"], False),
-        ]
-        for args, expected_read_only in cases:
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-federated-search-setup", "setup.sh", args
-                )
-                self.assertEqual(plan["read_only"], expected_read_only)
+        executable = Path(plan["executable_path"])
+        self.assertTrue(executable.is_file())
+        self.assertEqual(plan["executable_sha256"], core._file_sha256(executable))
+        self.assertEqual(plan["repository_sha256"], core._skills_snapshot_sha256())
 
-    def test_edge_processor_status_validate_phases_are_read_only(self) -> None:
-        for phase in ("status", "validate"):
-            with self.subTest(phase=phase):
-                plan = core.plan_skill_script(
-                    "splunk-edge-processor-setup", "setup.sh", ["--phase", phase]
-                )
-                self.assertTrue(plan["read_only"])
-        # install-instance / uninstall-instance / all remain mutating.
-        for phase in ("install-instance", "uninstall-instance", "all"):
-            with self.subTest(phase=phase):
-                plan = core.plan_skill_script(
-                    "splunk-edge-processor-setup", "setup.sh", ["--phase", phase]
-                )
-                self.assertFalse(plan["read_only"])
+    def test_execute_invalidates_plan_when_executable_digest_changes(self) -> None:
+        plan = core.plan_skill_script(
+            "cisco-product-setup",
+            "resolve_product.sh",
+            ["--help"],
+        )
+        plan_hash = plan["plan_hash"]
 
-    def test_security_dry_run_skills_are_read_only_with_dry_run(self) -> None:
-        # All of these surface --dry-run as a read-only preview path.
-        skills = [
-            "splunk-asset-risk-intelligence-setup",
-            "splunk-attack-analyzer-setup",
-            "splunk-security-essentials-setup",
-            "splunk-security-portfolio-setup",
-            "splunk-itsi-setup",
-            "splunk-uba-setup",
-        ]
-        for skill in skills:
-            with self.subTest(skill=skill):
-                read_only_plan = core.plan_skill_script(
-                    skill, "setup.sh", ["--dry-run"]
-                )
-                self.assertTrue(read_only_plan["read_only"])
-                # Without --dry-run these scripts do mutate Splunk, so the
-                # plan must remain mutating by default.
-                mutating_plan = core.plan_skill_script(skill, "setup.sh", [])
-                self.assertFalse(mutating_plan["read_only"])
-
-    def test_sc4s_render_only_is_read_only_apply_or_prep_is_mutating(self) -> None:
-        cases = [
-            (["--render-host", "--hec-token-file", "/tmp/t"], True),
-            (["--render-k8s", "--hec-token-file", "/tmp/t"], True),
-            (
-                ["--render-host", "--apply-host", "--hec-token-file", "/tmp/t"],
-                False,
-            ),
-            (
-                ["--render-k8s", "--apply-k8s", "--hec-token-file", "/tmp/t"],
-                False,
-            ),
-            (["--splunk-prep"], False),
-        ]
-        for args, expected_read_only in cases:
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-connect-for-syslog-setup", "setup.sh", args
-                )
-                self.assertEqual(plan["read_only"], expected_read_only)
-
-    def test_sc4snmp_render_only_is_read_only_apply_or_prep_is_mutating(self) -> None:
-        cases = [
-            (["--render-compose", "--hec-token-file", "/tmp/t"], True),
-            (["--render-k8s", "--hec-token-file", "/tmp/t"], True),
-            (
-                ["--render-compose", "--apply-compose", "--hec-token-file", "/tmp/t"],
-                False,
-            ),
-            (
-                ["--render-k8s", "--apply-k8s", "--hec-token-file", "/tmp/t"],
-                False,
-            ),
-            (["--splunk-prep"], False),
-        ]
-        for args, expected_read_only in cases:
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-connect-for-snmp-setup", "setup.sh", args
-                )
-                self.assertEqual(plan["read_only"], expected_read_only)
-
-    def test_otel_collector_render_is_read_only_apply_is_mutating(self) -> None:
-        cases = [
-            (["--render-k8s"], True),
-            (["--render-linux"], True),
-            (["--render-k8s", "--apply-k8s", "--platform-hec-token-file", "/tmp/t"], False),
-            (["--render-linux", "--apply-linux", "--platform-hec-token-file", "/tmp/t"], False),
-            # --dry-run keeps it read-only even with --apply-k8s.
-            (
-                [
-                    "--render-k8s",
-                    "--apply-k8s",
-                    "--dry-run",
-                    "--platform-hec-token-file",
-                    "/tmp/t",
-                ],
-                True,
-            ),
-        ]
-        for args, expected_read_only in cases:
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-otel-collector-setup", "setup.sh", args
-                )
-                self.assertEqual(plan["read_only"], expected_read_only)
-
-    def test_smoke_offline_scripts_are_read_only(self) -> None:
-        for skill in (
-            "splunk-cloud-acs-admin-setup",
-            "splunk-cloud-acs-allowlist-setup",
-            "splunk-edge-processor-setup",
-            "splunk-enterprise-public-exposure-hardening",
-            "splunk-indexer-cluster-setup",
-            "splunk-license-manager-setup",
-            "splunk-observability-cloud-integration-setup",
-            "splunk-oncall-setup",
-            "splunk-soar-setup",
+        with (
+            mock.patch.dict(os.environ, {}, clear=False),
+            mock.patch.object(core, "_file_sha256", return_value="0" * 64),
         ):
-            with self.subTest(skill=skill):
-                plan = core.plan_skill_script(skill, "smoke_offline.sh", [])
-                self.assertTrue(plan["read_only"])
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
+            with self.assertRaisesRegex(core.SkillMCPError, "changed after review"):
+                core.execute_plan(plan_hash, confirm=True)
 
-    def test_enterprise_public_exposure_phase_classification(self) -> None:
-        cases = [
-            (["--phase", "render"], True),
-            (["--phase", "preflight"], True),
-            (["--phase", "validate"], True),
-            (["--phase", "apply"], False),
-            (["--phase", "all"], False),
-            (["--phase", "render", "--apply"], False),
-            (["--dry-run", "--phase", "apply"], True),
-        ]
-        for args, expected_read_only in cases:
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-enterprise-public-exposure-hardening", "setup.sh", args
-                )
-                self.assertEqual(plan["read_only"], expected_read_only)
+        self.assertNotIn(plan_hash, core._PLANS)
 
-    def test_observability_cloud_integration_setup_classification(self) -> None:
-        # Render-only / inspect-only modes stay read-only.
-        for args in (
-            [],
-            ["--render", "--spec", "spec.yaml"],
-            ["--validate", "--spec", "spec.yaml"],
-            ["--doctor", "--spec", "spec.yaml"],
-            ["--discover", "--spec", "spec.yaml"],
-            ["--explain", "--spec", "spec.yaml"],
-            ["--list-sim-templates"],
-            ["--render-sim-templates", "k8s_metrics_aggregation"],
-            ["--rollback", "pairing", "--spec", "spec.yaml"],
-            ["--make-default-deeplink", "--realm", "us0"],
+    def test_execute_invalidates_plan_when_skill_repository_changes(self) -> None:
+        plan = core.plan_skill_script(
+            "cisco-product-setup",
+            "resolve_product.sh",
+            ["--help"],
+        )
+        plan_hash = plan["plan_hash"]
+
+        with mock.patch.dict(os.environ, {}, clear=False), mock.patch.object(
+            core, "_skills_snapshot_sha256", return_value="0" * 64
         ):
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-cloud-integration-setup", "setup.sh", args
-                )
-                self.assertTrue(plan["read_only"], msg=f"{args}")
-        # Mutation modes flip to read_only=False.
-        for args in (
-            ["--apply", "pairing", "--spec", "spec.yaml"],
-            ["--quickstart", "--spec", "spec.yaml"],
-            ["--quickstart-enterprise", "--spec", "spec.yaml"],
-            ["--enable-token-auth", "--spec", "spec.yaml"],
-        ):
-            with self.subTest(args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-cloud-integration-setup", "setup.sh", args
-                )
-                self.assertFalse(plan["read_only"], msg=f"{args}")
-        # --dry-run downgrades a mutating mode to a read-only preview.
-        for args in (
-            ["--apply", "pairing", "--dry-run", "--spec", "spec.yaml"],
-            ["--quickstart", "--dry-run", "--spec", "spec.yaml"],
-        ):
-            with self.subTest(args=args, dry_run=True):
-                plan = core.plan_skill_script(
-                    "splunk-observability-cloud-integration-setup", "setup.sh", args
-                )
-                self.assertTrue(plan["read_only"], msg=f"{args}")
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
+            with self.assertRaisesRegex(core.SkillMCPError, "repository changed"):
+                core.execute_plan(plan_hash, confirm=True)
 
-    def test_apply_aware_integration_setups_classification(self) -> None:
-        # Skills with an --apply mode in their setup.sh wrapper.
-        for skill in (
-            "cisco-thousandeyes-mcp-setup",
-            "splunk-observability-thousandeyes-integration",
-            "cisco-isovalent-platform-setup",
-        ):
-            with self.subTest(skill=skill, mode="render"):
-                plan = core.plan_skill_script(skill, "setup.sh", ["--render"])
-                self.assertTrue(plan["read_only"])
-            with self.subTest(skill=skill, mode="apply"):
-                plan = core.plan_skill_script(skill, "setup.sh", ["--apply"])
-                self.assertFalse(plan["read_only"])
-            with self.subTest(skill=skill, mode="apply+dry-run"):
-                plan = core.plan_skill_script(
-                    skill, "setup.sh", ["--apply", "--dry-run"]
-                )
-                self.assertTrue(plan["read_only"])
+        self.assertNotIn(plan_hash, core._PLANS)
 
-    def test_render_only_observability_integrations_are_always_read_only(self) -> None:
-        # These five wrappers do not expose --apply at all; the rendered
-        # helpers (helm install, kubectl apply, etc.) are run separately
-        # by the operator, so any invocation through the MCP is read-only.
-        skills = (
-            "splunk-observability-cisco-nexus-integration",
-            "splunk-observability-cisco-intersight-integration",
-            "splunk-observability-isovalent-integration",
-            "splunk-observability-nvidia-gpu-integration",
-            "splunk-observability-cisco-ai-pod-integration",
-        )
-        for skill in skills:
-            for args in (
-                [],
-                ["--render"],
-                ["--validate"],
-                ["--dry-run"],
-                ["--render", "--explain"],
-            ):
-                with self.subTest(skill=skill, args=args):
-                    plan = core.plan_skill_script(skill, "setup.sh", args)
-                    self.assertTrue(plan["read_only"])
+    def test_generic_script_argument_limits_fail_closed(self) -> None:
+        with self.assertRaisesRegex(core.SkillMCPError, "more than"):
+            core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                ["x"] * (core.MAX_ARG_COUNT + 1),
+            )
+        with self.assertRaisesRegex(core.SkillMCPError, "character limit"):
+            core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                ["x" * (core.MAX_ARG_CHARS + 1)],
+            )
+        per_arg = "x" * core.MAX_ARG_CHARS
+        count = core.MAX_TOTAL_ARG_CHARS // core.MAX_ARG_CHARS + 1
+        with self.assertRaisesRegex(core.SkillMCPError, "aggregate limit"):
+            core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                [per_arg] * count,
+            )
 
-    def test_newer_render_first_observability_setups_classify_correctly(self) -> None:
-        aws_read_only = (
-            [],
-            ["--render"],
-            ["--validate"],
-            ["--doctor"],
-            ["--discover"],
-            ["--quickstart-from-live"],
-            ["--explain"],
-            ["--rollback", "integration"],
-            ["--list-namespaces"],
-            ["--list-recommended-stats"],
+    def test_generic_script_rejects_inline_secret_payloads(self) -> None:
+        secret_payloads = (
+            "Authorization: Bearer abcdefghijklmnop",
+            '{"clientSecret":"abcdefghijklmnop"}',
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.signature",
+            "-----BEGIN PRIVATE KEY-----secret",
         )
-        for args in aws_read_only:
-            with self.subTest(skill="aws", args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-aws-integration", "setup.sh", list(args)
-                )
-                self.assertTrue(plan["read_only"])
-        for args in (["--apply"], ["--quickstart"], ["--quickstart", "--dry-run"]):
-            with self.subTest(skill="aws", args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-aws-integration", "setup.sh", args
-                )
-                self.assertFalse(plan["read_only"])
+        for payload in secret_payloads:
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(core.SkillMCPError, "inline secret"):
+                    core.plan_skill_script(
+                        "cisco-product-setup",
+                        "resolve_product.sh",
+                        ["--header", payload],
+                    )
 
-        for args in ([], ["--render"], ["--validate"], ["--validate", "--api"], ["--explain"], ["--dry-run"]):
-            with self.subTest(skill="dbmon", args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-database-monitoring-setup", "setup.sh", args
-                )
-                self.assertTrue(plan["read_only"])
-
-        rum_read_only = (
-            [],
-            ["--render"],
-            ["--discover-frontend-workloads"],
-            ["--validate"],
-            ["--guided"],
-            ["--explain"],
-            ["--gitops-mode"],
-            ["--dry-run"],
-        )
-        for args in rum_read_only:
-            with self.subTest(skill="rum", args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-k8s-frontend-rum-setup", "setup.sh", list(args)
-                )
-                self.assertTrue(plan["read_only"])
-        for args in (["--apply-injection"], ["--uninstall-injection"], ["--apply-injection", "--dry-run"]):
-            with self.subTest(skill="rum", args=args):
-                plan = core.plan_skill_script(
-                    "splunk-observability-k8s-frontend-rum-setup", "setup.sh", args
-                )
-                self.assertFalse(plan["read_only"])
-
-    def test_appdynamics_suite_setup_classification(self) -> None:
-        appd_skills = (
-            "splunk-appdynamics-setup",
-            "splunk-appdynamics-platform-setup",
-            "splunk-appdynamics-controller-admin-setup",
-            "splunk-appdynamics-agent-management-setup",
-            "splunk-appdynamics-dual-agent-setup",
-            "splunk-appdynamics-apm-setup",
-            "splunk-appdynamics-k8s-cluster-agent-setup",
-            "splunk-appdynamics-infrastructure-visibility-setup",
-            "splunk-appdynamics-machine-agent-otel-collector-setup",
-            "splunk-appdynamics-database-visibility-setup",
-            "splunk-appdynamics-analytics-setup",
-            "splunk-appdynamics-eum-setup",
-            "splunk-appdynamics-synthetic-monitoring-setup",
-            "splunk-appdynamics-log-observer-connect-setup",
-            "splunk-appdynamics-alerting-content-setup",
-            "splunk-appdynamics-dashboards-reports-setup",
-            "splunk-appdynamics-tags-extensions-setup",
-            "splunk-appdynamics-security-ai-setup",
-            "splunk-appdynamics-sap-agent-setup",
-        )
-        read_only_modes = (
-            [],
-            ["--render"],
-            ["--validate"],
-            ["--doctor"],
-            ["--quickstart"],
-            ["--rollback", "all"],
-        )
-        for skill in appd_skills:
-            for args in read_only_modes:
-                with self.subTest(skill=skill, args=args):
-                    plan = core.plan_skill_script(skill, "setup.sh", list(args))
-                    self.assertTrue(plan["read_only"])
-            with self.subTest(skill=skill, args=["--apply"]):
-                plan = core.plan_skill_script(skill, "setup.sh", ["--apply"])
-                self.assertFalse(plan["read_only"])
-
-        gated_cases = (
-            ("splunk-appdynamics-platform-setup", ["--accept-enterprise-console-mutation"]),
-            ("splunk-appdynamics-agent-management-setup", ["--accept-remote-execution"]),
-            ("splunk-appdynamics-dual-agent-setup", ["--accept-host-mutation"]),
-            ("splunk-appdynamics-dual-agent-setup", ["--accept-app-restart"]),
-            ("splunk-appdynamics-machine-agent-otel-collector-setup", ["--accept-host-mutation"]),
-            ("splunk-appdynamics-k8s-cluster-agent-setup", ["--accept-k8s-rollout"]),
-            ("splunk-appdynamics-analytics-setup", ["--accept-analytics-event-publish"]),
-            ("splunk-appdynamics-eum-setup", ["--accept-eum-source-edit"]),
-        )
-        for skill, args in gated_cases:
-            with self.subTest(skill=skill, args=args):
-                plan = core.plan_skill_script(skill, "setup.sh", args)
-                self.assertFalse(plan["read_only"])
-
-    def test_matches_mutation_flag_handles_prefix_and_equals_form(self) -> None:
-        patterns = ("--apply-", "--splunk-prep")
-        # Prefix match catches --apply-host, --apply-k8s, etc.
-        self.assertTrue(core._matches_mutation_flag(["--apply-host"], patterns))
-        self.assertTrue(
-            core._matches_mutation_flag(["--apply-k8s=true"], patterns)
-        )
-        # Exact match for --splunk-prep, including --flag=value form.
-        self.assertTrue(core._matches_mutation_flag(["--splunk-prep"], patterns))
-        # Patterns ending in '-' must NOT match the unsuffixed flag.
-        self.assertFalse(core._matches_mutation_flag(["--apply"], patterns))
-        # Other args pass through cleanly.
-        self.assertFalse(
-            core._matches_mutation_flag(["--render-host", "--spec", "x"], patterns)
-        )
+    def test_typed_mapping_limits_fail_closed(self) -> None:
+        with self.assertRaisesRegex(core.SkillMCPError, "more than"):
+            core.plan_cisco_product_setup(
+                "Cisco ACI",
+                set_values={f"key_{index}": "value" for index in range(core.MAX_MAPPING_ENTRIES + 1)},
+            )
+        with self.assertRaisesRegex(core.SkillMCPError, "character limit"):
+            core.plan_cisco_product_setup(
+                "Cisco ACI",
+                set_values={"hostname": "x" * (core.MAX_ARG_CHARS + 1)},
+            )
 
     def test_list_skills_surfaces_templates_directory_files(self) -> None:
         payload = core.list_skills()
@@ -1130,8 +680,9 @@ class AgentMCPCoreTests(unittest.TestCase):
             core.read_skill_file("cisco-product-setup", "template")
 
     def test_execute_plan_keeps_plan_when_kind_mismatches(self) -> None:
-        previous = os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-        try:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-product-setup",
                 "resolve_product.sh",
@@ -1148,9 +699,6 @@ class AgentMCPCoreTests(unittest.TestCase):
                 plan_hash, confirm=True, expected_kind="skill_script"
             )
             self.assertEqual(result["returncode"], 0)
-        finally:
-            if previous is not None:
-                os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
 
     def test_run_command_isolates_stdin_and_process_group(self) -> None:
         class FakeProc:
@@ -1183,6 +731,156 @@ class AgentMCPCoreTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 127)
         self.assertIn("Failed to start command", result.stderr)
+
+    def test_run_command_requires_enable_execution_gate(self) -> None:
+        with (
+            mock.patch.dict(os.environ, {}, clear=False),
+            mock.patch.object(core.subprocess, "Popen") as popen,
+        ):
+            os.environ.pop("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION", None)
+            with self.assertRaisesRegex(core.SkillMCPError, "Subprocess execution is disabled"):
+                core._run_command(["never-started"], timeout_seconds=1)
+        popen.assert_not_called()
+
+    def test_command_cancellation_terminates_active_process(self) -> None:
+        cancellation = core.CommandCancellation()
+        outcome: dict[str, object] = {}
+
+        def run() -> None:
+            outcome["result"] = core._run_command(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                timeout_seconds=60,
+                cancellation=cancellation,
+            )
+
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with cancellation._lock:
+                if cancellation._process is not None:
+                    break
+            time.sleep(0.01)
+        else:
+            cancellation.cancel()
+            self.fail("subprocess was not attached to its cancellation handle")
+
+        cancellation.cancel()
+        worker.join(timeout=10)
+        self.assertFalse(worker.is_alive(), "cancelled subprocess did not terminate")
+        result = outcome["result"]
+        self.assertIsInstance(result, core._BoundedResult)
+        self.assertTrue(result.cancelled)  # type: ignore[union-attr]
+        self.assertFalse(result.timed_out)  # type: ignore[union-attr]
+
+    @unittest.skipUnless(os.name == "posix", "POSIX signals are required")
+    def test_command_cancellation_kills_sigterm_ignoring_process(self) -> None:
+        cancellation = core.CommandCancellation()
+        outcome: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ready = Path(tmpdir) / "ready"
+            command = [
+                sys.executable,
+                "-c",
+                (
+                    "import pathlib,signal,time; "
+                    "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                    f"pathlib.Path({str(ready)!r}).write_text('ready'); "
+                    "time.sleep(30)"
+                ),
+            ]
+
+            def run() -> None:
+                outcome["result"] = core._run_command(
+                    command,
+                    timeout_seconds=60,
+                    cancellation=cancellation,
+                )
+
+            worker = threading.Thread(target=run, daemon=True)
+            worker.start()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not ready.exists():
+                time.sleep(0.01)
+            self.assertTrue(ready.exists(), "child never installed its SIGTERM handler")
+
+            started = time.monotonic()
+            cancellation.cancel()
+            worker.join(timeout=5)
+            elapsed = time.monotonic() - started
+
+        self.assertFalse(worker.is_alive(), "SIGTERM-ignoring child survived cancellation")
+        self.assertLess(elapsed, 3)
+        result = outcome["result"]
+        self.assertIsInstance(result, core._BoundedResult)
+        self.assertTrue(result.cancelled)  # type: ignore[union-attr]
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process groups are required")
+    def test_command_cancellation_kills_descendant_after_leader_exits(self) -> None:
+        cancellation = core.CommandCancellation()
+        outcome: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ready = Path(tmpdir) / "descendant-ready"
+            survived = Path(tmpdir) / "descendant-survived"
+            child_code = (
+                "import pathlib,signal,time; "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                f"pathlib.Path({str(ready)!r}).write_text('ready'); "
+                "time.sleep(2); "
+                f"pathlib.Path({str(survived)!r}).write_text('survived'); "
+                "time.sleep(30)"
+            )
+            parent_code = (
+                "import subprocess,sys,time; "
+                f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
+                "time.sleep(30)"
+            )
+
+            def run() -> None:
+                outcome["result"] = core._run_command(
+                    [sys.executable, "-c", parent_code],
+                    timeout_seconds=60,
+                    cancellation=cancellation,
+                )
+
+            worker = threading.Thread(target=run, daemon=True)
+            worker.start()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not ready.exists():
+                time.sleep(0.01)
+            self.assertTrue(ready.exists(), "descendant never installed its SIGTERM handler")
+
+            cancellation.cancel()
+            worker.join(timeout=5)
+            self.assertFalse(worker.is_alive(), "cancelled process group did not terminate")
+            time.sleep(1.25)
+            self.assertFalse(
+                survived.exists(),
+                "SIGTERM-ignoring descendant survived after its group leader exited",
+            )
+
+        result = outcome["result"]
+        self.assertIsInstance(result, core._BoundedResult)
+        self.assertTrue(result.cancelled)  # type: ignore[union-attr]
+
+    def test_bounded_resource_reader_does_not_load_entire_file(self) -> None:
+        path = mock.Mock()
+        path.name = "oversized.txt"
+        path.stat.return_value.st_size = 10_000
+        handle = mock.mock_open(read_data=b"x" * 10_000)
+        path.open = handle
+
+        text = core._read_bounded_text(path, 64)
+
+        handle().read.assert_called_once_with(65)
+        self.assertTrue(text.startswith("x" * 64))
+        self.assertIn("truncated", text)
+
+    def test_resource_file_count_limit_fails_closed(self) -> None:
+        skill_dir = core.SKILLS_DIR / "splunk-observability-dashboard-builder"
+        with mock.patch.object(core, "MAX_RESOURCE_FILES", 1):
+            with self.assertRaisesRegex(core.SkillMCPError, "too many reference files"):
+                core._skill_reference_files(skill_dir)
 
     def test_catalog_non_secret_keys_do_not_match_secret_regex(self) -> None:
         """Defense against future catalog edits.
@@ -1280,7 +978,7 @@ class SecretRedactionTests(unittest.TestCase):
         )
         redacted = core._redact_secrets(text)
         self.assertNotIn("VERY_SENSITIVE_KEY_MATERIAL_HERE", redacted)
-        self.assertIn("[REDACTED]", redacted)
+        self.assertIn("[REDACTED-PRIVATE-KEY]", redacted)
 
     def test_does_not_mangle_short_or_non_secret_values(self) -> None:
         # Short values (<6 chars after KEY=) and unrelated text pass through.

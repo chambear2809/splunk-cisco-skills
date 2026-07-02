@@ -14,6 +14,10 @@ description: >-
   .NET, Database, Java, Machine, Node.js, PHP, or Python agents, package
   download automation, checksum validation, signature validation, or release
   compatibility.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Agent Management Setup

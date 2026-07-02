@@ -11,6 +11,10 @@ description: >-
   permissions, private connectivity, outbound ports, DDSS, ACS limits,
   maintenance windows, restart current-stack, ACS license state, Observability
   pairing, or to audit Splunk Cloud control-plane configuration.
+compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
+metadata:
+  splunk_cloud_10_5: "supported"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Cloud ACS Admin Setup
@@ -19,9 +23,9 @@ This skill is the broad Splunk Cloud Admin Config Service workflow. It replaces
 the older allowlist-only workflow while preserving the proven IPv4/IPv6
 allowlist convergence logic and lock-out protection.
 
-Doc links and examples in this skill default to Cloud stack train
-**10.4.2603**. Stacks still on **10.3.2512** can substitute that train in help
-URLs; ACS API behavior is unchanged between those trains.
+Cloud Platform planning defaults to **10.5.2605**, with **10.4.2604** as the
+previous train. Use the train-specific canonical sources in `reference.md`
+when reviewing an ACS operation.
 
 ## Agent Behavior
 

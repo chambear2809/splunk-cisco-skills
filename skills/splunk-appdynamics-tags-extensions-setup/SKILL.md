@@ -8,6 +8,10 @@ description: >-
   the user asks for AppDynamics custom tags, tag APIs, extensions, Machine Agent
   custom metrics, Integration Modules, ServiceNow, Jira, Scalyr, Agent Command
   Center, or Log Auto-Discovery.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Tags Extensions Setup

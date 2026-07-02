@@ -55,6 +55,7 @@ class FakeContentPackClient:
         kvstore_status_value: str | None = "ready",
         kvstore_collections: dict[tuple[str, str], dict[str, str]] | None = None,
         discovery_status: dict | None = None,
+        catalog_available: bool = True,
     ):
         self.apps = set(apps or set())
         self.app_versions = dict(app_versions or {})
@@ -75,6 +76,7 @@ class FakeContentPackClient:
         self.kvstore_status_value = kvstore_status_value
         self.kvstore_collections = dict(kvstore_collections or {})
         self.discovery_status = dict(discovery_status or {"attempted": False, "status": "not_attempted"})
+        self.catalog_available = catalog_available
         self.install_requests: list[tuple[str, str, dict]] = []
         self.refresh_calls = 0
         self.macro_updates: list[tuple[str, str, dict]] = []
@@ -111,6 +113,8 @@ class FakeContentPackClient:
         return None
 
     def content_pack_catalog(self) -> list[dict]:
+        if not self.catalog_available:
+            raise ValidationError("content-pack catalog endpoint unavailable")
         return list(self.catalog)
 
     def content_library_discovery_status(self) -> dict:
@@ -276,6 +280,58 @@ class FakeItsiInstaller:
 
 
 class ContentPackTests(unittest.TestCase):
+    def test_catalog_refresh_is_explicit_apply_only(self) -> None:
+        spec = {
+            "schema_version": 1,
+            "content_library": {"require_present": True, "refresh_catalog": True},
+            "packs": [],
+        }
+        preview_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP})
+        apply_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP})
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            preview = ContentPackWorkflow(preview_client, tempdir).run(spec, "preview")
+            applied = ContentPackWorkflow(apply_client, tempdir).run(spec, "apply")
+
+        self.assertEqual(preview_client.refresh_calls, 0)
+        self.assertEqual(preview["content_library"]["catalog_refresh"]["status"], "read-only")
+        self.assertEqual(apply_client.refresh_calls, 1)
+        self.assertEqual(applied["content_library"]["catalog_refresh"]["status"], "ok")
+
+    def test_apply_skips_exact_content_pack_version_unless_forced(self) -> None:
+        catalog_entry = {
+            "id": "DA-ITSI-CP-third-party-apm",
+            "title": "Third-Party APM",
+            "version": "1.4.0",
+            "installed_versions": ["1.4.0"],
+        }
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-third-party-apm"},
+            catalog=[catalog_entry],
+            previews={(catalog_entry["id"], catalog_entry["version"]): {}},
+        )
+        spec = {"schema_version": 1, "packs": [{"title": "Third-Party APM"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(client.install_requests, [])
+        self.assertTrue(any("reinstall skipped" in item["message"] for item in result["runs"][0]["findings"]))
+
+    def test_legacy_content_pack_app_is_blocked_on_itsi_5(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP},
+            app_versions={ITSI_APP: "5.0.0", CONTENT_LIBRARY_APP: "2.5.0"},
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir, self.assertRaisesRegex(
+            ValidationError, "documented for ITSI 4.20/4.21"
+        ):
+            ContentPackWorkflow(client, tempdir).run(
+                {"schema_version": 1, "packs": []},
+                "preview",
+            )
+
     def test_infer_platform_uses_credential_file_url_when_spec_is_auto(self) -> None:
         with patch.dict(os.environ, {"SPLUNK_SEARCH_API_URI": "https://example.splunkcloud.com:8089"}, clear=True):
             self.assertEqual(infer_platform({"connection": {"platform": "auto", "base_url": ""}}), "cloud")
@@ -712,7 +768,7 @@ class ContentPackTests(unittest.TestCase):
             result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
 
         run = result["runs"][0]
-        self.assertEqual(client.refresh_calls, 1)
+        self.assertEqual(client.refresh_calls, 0)
         self.assertEqual(run["pack_status"]["success"][0]["id"], "DA-ITSI-CP-third-party-apm")
         self.assertEqual(run["pack_detail"]["content_keys"], ["service_template"])
         outcome_steps = {(step["kind"], step["title"]): step["detail"] for step in run["configured_outcome"]["steps"]}
@@ -1402,30 +1458,29 @@ class ContentPackTests(unittest.TestCase):
 
     def test_missing_content_library_guidance_differs_for_enterprise_and_cloud(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            enterprise_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
+            enterprise_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS, catalog_available=False)
             enterprise_workflow = ContentPackWorkflow(enterprise_client, tempdir)
             enterprise_spec = {"connection": {"platform": "enterprise"}, "content_library": {"require_present": True}, "packs": []}
             with self.assertRaises(ValidationError) as enterprise_error:
                 enterprise_workflow.run(enterprise_spec, "preview")
-            self.assertIn("--apply", str(enterprise_error.exception))
+            self.assertIn("splunk-app-install", str(enterprise_error.exception))
 
-            cloud_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
+            cloud_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS, catalog_available=False)
             cloud_workflow = ContentPackWorkflow(cloud_client, tempdir)
             cloud_spec = {"connection": {"platform": "cloud"}, "content_library": {"require_present": True}, "packs": []}
             with self.assertRaises(ValidationError) as cloud_error:
                 cloud_workflow.run(cloud_spec, "preview")
             self.assertIn("Cloud App Request", str(cloud_error.exception))
 
-    def test_missing_itsi_guidance_requires_apply(self) -> None:
+    def test_missing_itsi_guidance_routes_to_install_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             workflow = ContentPackWorkflow(FakeContentPackClient(apps={CONTENT_LIBRARY_APP}), tempdir)
             spec = {"connection": {"platform": "enterprise"}, "content_library": {"require_present": True}, "packs": []}
             with self.assertRaises(ValidationError) as error:
                 workflow.run(spec, "preview")
-        self.assertIn("--apply", str(error.exception))
-        self.assertIn("1841", str(error.exception))
+        self.assertIn("splunk-itsi-setup", str(error.exception))
 
-    def test_apply_bootstraps_missing_itsi_before_content_library(self) -> None:
+    def test_apply_never_bootstraps_missing_itsi_or_content_library(self) -> None:
         itsi_installer = FakeItsiInstaller()
         content_library_installer = FakeContentLibraryInstaller(message="Installed content library for test.")
         client = FakeContentPackClient(
@@ -1444,21 +1499,16 @@ class ContentPackTests(unittest.TestCase):
         spec = {"connection": {"platform": "enterprise"}, "packs": [{"profile": "cisco_data_center"}]}
 
         with tempfile.TemporaryDirectory() as tempdir:
-            workflow = ContentPackWorkflow(
-                client,
-                tempdir,
-                content_library_installer=content_library_installer,
-                itsi_installer=itsi_installer,
-            )
-            result = workflow.run(spec, "apply")
+            workflow = ContentPackWorkflow(client, tempdir)
+            with self.assertRaises(ValidationError) as error:
+                workflow.run(spec, "apply")
 
-        self.assertEqual(len(itsi_installer.calls), 1)
-        self.assertEqual(len(content_library_installer.calls), 1)
-        self.assertTrue(result["itsi"]["installed_in_this_run"])
-        self.assertTrue(result["content_library"]["installed_in_this_run"])
-        self.assertEqual(len(client.install_requests), 1)
+        self.assertIn("splunk-itsi-setup", str(error.exception))
+        self.assertEqual(itsi_installer.calls, [])
+        self.assertEqual(content_library_installer.calls, [])
+        self.assertEqual(client.install_requests, [])
 
-    def test_apply_missing_itsi_respects_disabled_bootstrap(self) -> None:
+    def test_apply_missing_itsi_never_attempts_bootstrap(self) -> None:
         client = FakeContentPackClient(apps={CONTENT_LIBRARY_APP})
         spec = {
             "connection": {"platform": "enterprise"},
@@ -1468,16 +1518,17 @@ class ContentPackTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as tempdir:
-            workflow = ContentPackWorkflow(client, tempdir, itsi_installer=FakeItsiInstaller())
+            workflow = ContentPackWorkflow(client, tempdir)
             with self.assertRaises(ValidationError) as error:
                 workflow.run(spec, "apply")
 
-        self.assertIn("Automatic bootstrap is disabled", str(error.exception))
+        self.assertIn("splunk-itsi-setup", str(error.exception))
 
-    def test_apply_bootstraps_missing_content_library_on_enterprise(self) -> None:
+    def test_apply_never_bootstraps_missing_content_library_on_enterprise(self) -> None:
         installer = FakeContentLibraryInstaller(message="Installed content library for test.")
         client = FakeContentPackClient(
             apps=HEALTHY_ITSI_APPS | {"cisco_dc_networking_app_for_splunk"},
+            catalog_available=False,
             catalog=[{"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": []}],
             previews={("DA-ITSI-CP-cisco-data-center", "1.0.0"): {"service": [{"id": "svc-1"}]}},
             inputs={
@@ -1492,27 +1543,28 @@ class ContentPackTests(unittest.TestCase):
         spec = {"connection": {"platform": "enterprise"}, "content_library": {"require_present": True}, "packs": [{"profile": "cisco_data_center"}]}
 
         with tempfile.TemporaryDirectory() as tempdir:
-            workflow = ContentPackWorkflow(client, tempdir, content_library_installer=installer)
-            result = workflow.run(spec, "apply")
+            workflow = ContentPackWorkflow(client, tempdir)
+            with self.assertRaises(ValidationError) as error:
+                workflow.run(spec, "apply")
 
-        self.assertEqual(len(installer.calls), 1)
-        self.assertTrue(result["content_library"]["installed_in_this_run"])
-        self.assertEqual(len(client.install_requests), 1)
+        self.assertIn("splunk-app-install", str(error.exception))
+        self.assertEqual(installer.calls, [])
+        self.assertEqual(client.install_requests, [])
 
-    def test_apply_missing_content_library_respects_disabled_bootstrap(self) -> None:
+    def test_install_if_missing_is_rejected_for_content_library(self) -> None:
         client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
         spec = {
             "connection": {"platform": "enterprise"},
-            "content_library": {"require_present": True, "install_if_missing": False},
+            "content_library": {"require_present": True, "install_if_missing": True},
             "packs": [],
         }
 
         with tempfile.TemporaryDirectory() as tempdir:
-            workflow = ContentPackWorkflow(client, tempdir, content_library_installer=FakeContentLibraryInstaller())
+            workflow = ContentPackWorkflow(client, tempdir)
             with self.assertRaises(ValidationError) as error:
                 workflow.run(spec, "apply")
 
-        self.assertIn("Automatic bootstrap is disabled", str(error.exception))
+        self.assertIn("not supported by this configuration skill", str(error.exception))
 
     def test_workflow_reports_itsi_health_checks(self) -> None:
         client = FakeContentPackClient(
@@ -1530,9 +1582,9 @@ class ContentPackTests(unittest.TestCase):
 
         checks = result["itsi"]["checks"]
         self.assertTrue(any(check["status"] == "error" and "itsi is not installed" in check["message"] for check in checks), checks)
-        self.assertTrue(any(check["status"] == "warn" and "KVStore status is failed" in check["message"] for check in checks), checks)
+        self.assertTrue(any(check["status"] == "error" and "KVStore status is failed" in check["message"] for check in checks), checks)
         self.assertTrue(any(check["status"] == "warn" and "itsi_kpi_template" in check["message"] for check in checks), checks)
-        self.assertTrue(any(check["status"] == "warn" and "itsi_notable_event_group" in check["message"] for check in checks), checks)
+        self.assertTrue(any(check["status"] == "error" and "itsi_notable_event_group" in check["message"] for check in checks), checks)
 
     def test_apply_skips_pack_install_when_itsi_health_checks_fail(self) -> None:
         client = FakeContentPackClient(

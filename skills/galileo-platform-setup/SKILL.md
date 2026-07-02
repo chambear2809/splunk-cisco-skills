@@ -9,6 +9,10 @@ description: >-
   metadata-only media export, HEC/OTLP/OTel handoffs, dashboards, and detectors.
   Use when configuring Galileo-to-Splunk Platform or Splunk Observability Cloud setup,
   including multimodal traces and multi-model experiment comparison evidence.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Galileo Platform Setup

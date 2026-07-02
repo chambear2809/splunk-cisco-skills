@@ -7,6 +7,8 @@ REPO_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck source=../../shared/lib/credential_helpers.sh
 source "${REPO_ROOT}/skills/shared/lib/credential_helpers.sh"
+# shellcheck source=../../shared/lib/platform_version_helpers.sh
+source "${REPO_ROOT}/skills/shared/lib/platform_version_helpers.sh"
 
 MODE="plan"
 OPERATION="changes"
@@ -244,6 +246,23 @@ run_restart() {
         return 1
     fi
     sk="$(get_session_key "${SPLUNK_URI}")"
+    if ! is_splunk_cloud 2>/dev/null; then
+        local server_info_file enterprise_version
+        server_info_file="$(mktemp)"
+        chmod 600 "${server_info_file}"
+        if ! splunk_curl "${sk}" --fail-with-body --show-error \
+            "${SPLUNK_URI%/}/services/server/info?output_mode=json" >"${server_info_file}"; then
+            rm -f "${server_info_file}"
+            log "ERROR: Could not read /services/server/info before the Enterprise restart."
+            return 1
+        fi
+        if ! enterprise_version="$(spv_require_supported_enterprise_server_info "${server_info_file}")"; then
+            rm -f "${server_info_file}"
+            return 1
+        fi
+        rm -f "${server_info_file}"
+        log "Validated supported Splunk Enterprise runtime ${enterprise_version} before restart."
+    fi
     if ! platform_restart_or_exit "${sk}" "${SPLUNK_URI}" "${OPERATION}" \
         "Restart manually before relying on ${OPERATION}."; then
         return 1

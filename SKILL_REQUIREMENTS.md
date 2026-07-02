@@ -10,7 +10,7 @@ workflow dependencies halfway through an apply.
 All skills assume:
 
 - `bash`, `curl`, `python3`, and the repository root as the working directory.
-- A repo virtual environment with `pip install -r requirements-agent.txt` when
+- Python 3.10+ and a repo virtual environment with `pip install -r requirements-agent.txt` when
   using the local MCP server or YAML-heavy Python renderers.
 - A local `credentials` file or `SPLUNK_CREDENTIALS_FILE`, mode `0600`, plus
   separate secret files for tokens, passwords, API keys, and client secrets.
@@ -171,7 +171,7 @@ plan by itself is not successful completion of a requested live change.
 | `splunk-observability-mobile-rum-setup` | Mobile app build context; optional `splunk-rum`, Xcode tooling for dSYMs, Android Gradle build output for mapping files, Node/Expo tooling for React Native, Flutter/Dart tooling for Flutter. | Splunk RUM token file or build-time token reference; Splunk Observability token file for dSYM/mapping upload helpers; local app source roots when rendering or applying source patches. |
 | `splunk-observability-native-ops` | `PyYAML` for YAML specs. | Splunk Observability API token file with detector, alert-routing, synthetics, APM, RUM, or logs permissions; optional On-Call handoff. |
 | `splunk-observability-nvidia-gpu-integration` | `kubectl`, `helm`, `yq`. | Splunk Observability token files; NVIDIA GPU Operator or DCGM Exporter in the target cluster. |
-| `splunk-observability-otel-collector-setup` | `kubectl` and `helm` for Kubernetes; `ssh`, `scp`, `systemctl`, and `sudo` for Linux host apply; optional `npm` for generated helpers. | Splunk Observability realm/token files; target Kubernetes cluster or Linux host access; optional Splunk HEC token file for platform log export. |
+| `splunk-observability-otel-collector-setup` | Python 3; `curl` plus `sha256sum`/`shasum`; `kubectl` and Helm for Kubernetes; `ssh`, `scp`, `systemctl`, and `sudo` for Linux apply; Splunk CLI for local UF/HF status; AWS CLI only for the optional EKS kubeconfig helper. | Splunk Observability realm and mode-600 token file when Observability is enabled; target cluster/host access; optional HEC token and TLS/mTLS files; audited app 7125/8698/8699 package access and deployment-server/UF/HF paths for TA workflows. |
 | `splunk-observability-slo-setup` | Shared baseline; delegates deeper rendering to `splunk-observability-deep-native-workflows`. | Splunk Observability realm, SLI source, target/window, and service or metric details; token file only if downstream API apply is requested. |
 | `splunk-observability-synthetics-setup` | Shared baseline; delegates API apply to `splunk-observability-native-ops`. | Splunk Observability realm, Synthetic test target URL, location, and frequency; API token file only for downstream live apply/run retrieval. |
 | `splunk-observability-thousandeyes-integration` | `curl`, optional `jq`; `codex` only for MCP/client handoff snippets. | ThousandEyes OAuth/API credentials in files; Splunk Observability token files; TE test/stream/template permissions. |
@@ -246,10 +246,10 @@ plan by itself is not successful completion of a requested live change.
 | `splunk-indexer-cluster-setup` | `ssh`, `scp`, `sudo`; `curl`. | Cluster manager/peer/search head admin access; bundle apply and rolling-restart authority. |
 | `splunk-search-head-cluster-setup` | `ssh`, `scp`, `sudo`; `curl`; `python3`. | Deployer and all SHC member admin access; SHC shared secret file; rolling-restart authority; KV Store reset acceptance if needed. |
 | `splunk-deployment-server-setup` | `ssh`, `rsync`, `curl`; `python3`. | Splunk Enterprise admin access on DS host; `phoneHome` tuning authority; HA pair networking if applicable. |
-| `splunk-itsi-config` | `PyYAML`; optional `ssh`, `scp`, and `sshpass` for content/file staging. | ITSI REST access; `SA-ITOA` and content-pack readiness; native object specs and ownership lookups. |
+| `splunk-itsi-config` | Bash, Python 3, and Ruby (standard YAML/JSON libraries); optional `ssh`/`scp` only for separately reviewed file staging. | Existing licensed/healthy ITSI REST access; `SA-ITOA`, KV Store, capabilities/team access, and any compatible Content Library provider or prerequisite apps must already be ready. |
 | `splunk-itsi-setup` | Shared baseline. | Splunk app workflow access; ITSI package/Splunkbase entitlement and license readiness. |
 | `splunk-license-manager-setup` | `curl`; optional SSH/file-copy tooling for license file placement. | Splunk Enterprise license manager and peer admin access; license file(s) available locally. |
-| `splunk-mcp-server-setup` | `node`, `npm`/`npx`, `mcp-remote`; `codex` for Codex registration. | Splunk MCP Server app package/install access; Splunk bearer token file or token-minting permissions; target MCP clients. |
+| `splunk-mcp-server-setup` | `node`, `npm`, operator-installed `mcp-remote@0.1.38`; `codex` for Codex registration. | Splunk MCP Server app package/install access; Splunk bearer token file or token-minting permissions; target MCP clients. |
 | `splunk-monitoring-console-setup` | Shared baseline. | Splunk Enterprise Monitoring Console and peer REST access; distributed mode peer/group details. |
 | `splunk-platform-restart-orchestrator` | Shared baseline; optional `acs`, `ssh`, `sshpass`, `systemctl`, and noninteractive `sudo` depending on target topology. | Splunk Cloud ACS or Splunk Enterprise management access; host-local restart/reload authority or an operator handoff path; target role/topology details. |
 | `splunk-platform-pki-setup` | `openssl`, `jq`; optional `ssh`, `scp`, and `sudo` for distribution/rotation handoffs. | Private CA or public CSR workflow inputs; per-component hostname/SAN inventory; Vault/AD CS/EJBCA/ACME handoffs when used. |

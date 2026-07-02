@@ -48,6 +48,7 @@ SPLUNK_REST_TIMEOUT_SECONDS = 90
 
 
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/@\s]+)@"), r"\1[REDACTED]@"),
     (
         re.compile(
             r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?"
@@ -69,7 +70,8 @@ SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(
             r"(?i)("
             r"splunk[_-]?pass|splunk[_-]?password|sb[_-]?pass|sb[_-]?password|"
-            r"password|passwd|pwd|secret|"
+            r"password|passwd|pwd|credential|credentials|secret|sslpassword|"
+            r"privatekeypassword|pass4symmkey|"
             r"api[_-]?key|api[_-]?secret|client[_-]?secret|"
             r"access[_-]?token|refresh[_-]?token|bearer[_-]?token|"
             r"hec[_-]?token|auth[_-]?token|session[_-]?key|skey|ikey|"
@@ -83,7 +85,7 @@ SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
             r"(?i)("
-            r"\"(?:password|secret|token|apiKey|api_key|clientSecret|client_secret|sessionKey)\""
+            r"\"(?:password|credential|credentials|secret|token|authToken|auth_token|apiKey|api_key|clientSecret|client_secret|sessionKey|sslPassword|privateKeyPassword|pass4SymmKey)\""
             r"\s*:\s*\")([^\"]{6,})(\")"
         ),
         r"\1[REDACTED]\3",
@@ -137,134 +139,6 @@ if [[ -z "${raw_cmd}" ]]; then
   exit 2
 fi
 hbs_capture_as_user_cmd ssh "${service_user}" "${raw_cmd}"
-"""
-
-
-REMOTE_RENDERED_APPLY_SCRIPT = r"""
-set -euo pipefail
-source skills/shared/lib/credential_helpers.sh
-source skills/shared/lib/host_bootstrap_helpers.sh
-
-skill="$1"
-output_dir="$2"
-rendered_subdir="$3"
-apply_script="$4"
-service_user="${5:-splunk}"
-shift 5
-
-"$@"
-
-archive="$(mktemp "/tmp/${skill}.XXXXXX.tgz")"
-tar -C "${output_dir}" -czf "${archive}" "${rendered_subdir}"
-remote_archive="$(hbs_stage_file_for_execution ssh "${archive}" "${skill}.$$.tgz")"
-rm -f "${archive}"
-remote_dir="$(hbs_capture_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join mktemp -d "/tmp/${skill}.XXXXXX")")")"
-if [[ -z "${remote_dir}" ]]; then
-  echo "ERROR: failed to create a remote staging directory" >&2
-  exit 1
-fi
-cleanup_cmd="$(hbs_prefix_with_sudo ssh "$(hbs_shell_join rm -rf "${remote_dir}" "${remote_archive}")")"
-hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join tar -xzf "${remote_archive}" -C "${remote_dir}")")"
-hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join chown -R "${service_user}:${service_user}" "${remote_dir}")")" >/dev/null 2>&1 || true
-remote_workdir="${remote_dir}/${rendered_subdir}"
-if [[ "${apply_script}" != */* ]]; then
-  remote_apply="./${apply_script}"
-else
-  remote_apply="${apply_script}"
-fi
-if hbs_run_as_user_cmd ssh "${service_user}" "cd $(printf '%q' "${remote_workdir}") && bash $(printf '%q' "${remote_apply}")"; then
-  hbs_run_target_cmd ssh "${cleanup_cmd}" >/dev/null 2>&1 || true
-  exit 0
-fi
-rc=$?
-hbs_run_target_cmd ssh "${cleanup_cmd}" >/dev/null 2>&1 || true
-exit "${rc}"
-"""
-
-
-ENTERPRISE_HEC_CLEANUP_COMMAND = r"""
-set -euo pipefail
-target="/opt/splunk/etc/apps/splunk_httpinput/local/inputs.conf"
-stanza="http://codex_live_validation_hec"
-if [[ ! -f "${target}" ]]; then
-  echo "hec_inputs_file_present=false"
-  exit 0
-fi
-python3 - "${target}" "${stanza}" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-stanza = sys.argv[2]
-lines = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
-output = []
-skip = False
-removed = False
-for line in lines:
-    stripped = line.strip()
-    if stripped.startswith("[") and stripped.endswith("]"):
-        name = stripped[1:-1]
-        skip = name == stanza
-        if skip:
-            removed = True
-            continue
-    if not skip:
-        output.append(line)
-if removed:
-    path.write_text("".join(output), encoding="utf-8")
-print(f"hec_stanza_removed={'true' if removed else 'false'}")
-PY
-removed_backups=0
-for backup in "${target}".bak.*; do
-  [[ -f "${backup}" ]] || continue
-  if grep -q '^\[http://codex_live_validation_hec\]' "${backup}"; then
-    rm -f "${backup}"
-    removed_backups=$((removed_backups + 1))
-  fi
-done
-echo "hec_backup_files_removed=${removed_backups}"
-"""
-
-
-ENTERPRISE_WORKLOAD_CLEANUP_COMMAND = r"""
-set -euo pipefail
-app="/opt/splunk/etc/apps/ZZZ_codex_live_validation_workload_management"
-if [[ -d "${app}" ]]; then
-  rm -rf "${app}"
-  echo "workload_app_removed=true"
-else
-  echo "workload_app_removed=false"
-fi
-"""
-
-
-ENTERPRISE_HEC_CLEANUP_VALIDATION_COMMAND = r"""
-set -euo pipefail
-target="/opt/splunk/etc/apps/splunk_httpinput/local/inputs.conf"
-if /opt/splunk/bin/splunk btool inputs list --debug 2>/dev/null | grep -q '^\[http://codex_live_validation_hec\]'; then
-  echo "hec_stanza_present=true"
-  exit 1
-fi
-for backup in "${target}".bak.*; do
-  [[ -f "${backup}" ]] || continue
-  if grep -q '^\[http://codex_live_validation_hec\]' "${backup}"; then
-    echo "hec_validation_backup_present=true"
-    exit 1
-  fi
-done
-echo "hec_stanza_present=false"
-echo "hec_validation_backup_present=false"
-"""
-
-
-ENTERPRISE_WORKLOAD_CLEANUP_VALIDATION_COMMAND = r"""
-set -euo pipefail
-app="/opt/splunk/etc/apps/ZZZ_codex_live_validation_workload_management"
-if [[ -d "${app}" ]]; then
-  echo "workload_app_present=true"
-  exit 1
-fi
-echo "workload_app_present=false"
 """
 
 
@@ -387,10 +261,13 @@ def redact_obj(value: Any) -> Any:
             # contains words like "token". Secret-bearing field names are
             # simple keys; path-like or id-like keys are structural.
             structural_key = ":" in key_text or "/" in key_text
-            if not structural_key and re.search(
-                r"(?i)^(.*[_-])?(password|secret|token|session|private[_-]?key|api[_-]?key)([_-].*)?$",
-                key_text,
-            ):
+            normalized_key = re.sub(r"[^a-z0-9]", "", key_text.lower())
+            if not structural_key and normalized_key in {
+                "password", "passwd", "pwd", "credential", "credentials", "secret",
+                "token", "authtoken", "accesstoken", "refreshtoken", "sessionkey",
+                "privatekey", "privatekeypassword", "apikey", "apisecret", "clientsecret",
+                "sslpassword", "pass4symmkey", "hectoken",
+            }:
                 out[key] = "[REDACTED]"
             else:
                 out[key] = redact_obj(item)
@@ -402,15 +279,28 @@ def redact_obj(value: Any) -> Any:
     return value
 
 
+def write_text_secure(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    path.chmod(0o600)
+
+
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(redact_obj(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    write_text_secure(temporary, json.dumps(redact_obj(payload), indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, path)
+    path.chmod(0o600)
 
 
 def append_jsonl(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(redact_obj(payload), sort_keys=True) + "\n")
+    path.chmod(0o600)
 
 
 def skill_dirs() -> list[Path]:
@@ -563,9 +453,10 @@ def classify_failure(step: ValidationStep, returncode: int | None, stdout: str, 
         or "timed out" in text
     ):
         return "live_environment_constraint"
+    if "command not found" in text or "unknown option" in text:
+        return "code_bug"
     if "not found" in text or "does not exist" in text or "no such file or directory" in text:
-        if "unknown option" not in text:
-            return "expected_missing_external_dependency"
+        return "expected_missing_external_dependency"
     if "rendered script is missing" in text or "checking universal forwarder" in text:
         return "expected_missing_external_dependency"
     if (
@@ -578,21 +469,18 @@ def classify_failure(step: ValidationStep, returncode: int | None, stdout: str, 
         return "expected_missing_external_dependency"
     if returncode and text.strip().startswith("rendered ") and "error" not in text:
         return "expected_missing_external_dependency"
-    if "no such file or directory" in text or "command not found" in text or "unknown option" in text:
-        return "code_bug"
-    if step.skill.startswith(("cisco-", "splunk-observability-", "splunk-oncall", "splunk-soar")):
-        return "expected_missing_external_dependency"
     return "unclassified_failure"
 
 
 def should_intentional_skip(step: ValidationStep, classification: str) -> bool:
-    if step.final_on_failure == "intentional-skip":
-        return True
-    if not step.required and classification in {
+    skippable = {
         "expected_missing_external_dependency",
         "live_environment_constraint",
         "credentials_profile_issue",
-    }:
+    }
+    if step.final_on_failure == "intentional-skip" and classification in skippable:
+        return True
+    if not step.required and classification in skippable:
         return True
     return False
 
@@ -657,8 +545,8 @@ def execute_step(
 
     stdout_redacted = redact(stdout)
     stderr_redacted = redact(stderr)
-    stdout_log.write_text(stdout_redacted, encoding="utf-8")
-    stderr_log.write_text(stderr_redacted, encoding="utf-8")
+    write_text_secure(stdout_log, stdout_redacted)
+    write_text_secure(stderr_log, stderr_redacted)
 
     classification = "" if returncode == 0 else classify_failure(step, returncode, stdout, stderr)
     if returncode == 0:
@@ -759,18 +647,65 @@ def profile_metadata(profile: str) -> dict[str, Any]:
     return parse_json_output(result)
 
 
-def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
+def nested_status_findings(value: Any, prefix: str = "") -> list[str]:
+    findings: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            normalized_key = str(key).lower()
+            normalized_value = str(child).strip().lower() if not isinstance(child, (dict, list)) else ""
+            if normalized_value in {"red", "yellow", "degraded", "failed", "down", "unhealthy"}:
+                findings.append(f"{path}={child}")
+            if normalized_key in {"replication_factor_met", "search_factor_met", "service_ready", "is_healthy"} and child is False:
+                findings.append(f"{path}=false")
+            findings.extend(nested_status_findings(child, path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            findings.extend(nested_status_findings(child, f"{prefix}[{index}]"))
+    return findings
+
+
+def nested_bool(value: Any, candidate_keys: set[str]) -> bool | None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key).lower() in candidate_keys:
+                if isinstance(child, bool):
+                    return child
+                if str(child).strip().lower() in {"true", "1", "yes"}:
+                    return True
+                if str(child).strip().lower() in {"false", "0", "no"}:
+                    return False
+            nested = nested_bool(child, candidate_keys)
+            if nested is not None:
+                return nested
+    elif isinstance(value, list):
+        for child in value:
+            nested = nested_bool(child, candidate_keys)
+            if nested is not None:
+                return nested
+    return None
+
+
+def collect_live_evidence(
+    profile: str,
+    run_dir: Path,
+    requested_platform: str = "auto",
+) -> dict[str, Any]:
     metadata = profile_metadata(profile)
+    declared_platform = str(metadata.get("platform", "")).strip().lower()
+    platform = requested_platform if requested_platform in {"cloud", "enterprise"} else (
+        "cloud" if "cloud" in declared_platform else "enterprise"
+    )
     evidence: dict[str, Any] = {
-        "platform": "enterprise",
+        "platform": platform,
         "collection": {
             "profile": profile,
             "collected_at": utc_now(),
             "notes": [],
         },
         "rest": {
-            "reachable": True,
-            "denied": False,
+            "reachable": None,
+            "denied": None,
             "tls_verified": str(metadata.get("verify_ssl", "true")).lower() not in {"0", "false", "no"},
         },
         "inputs": {
@@ -800,7 +735,22 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
         if returncode != 0:
             evidence["collection"]["notes"].append(f"{name} endpoint returned {returncode}.")
 
-    write_json(run_dir / "evidence" / "splunk-rest-raw.redacted.json", raw)
+    required_probe_codes = [raw[name]["returncode"] for name in ("server_info", "server_sysinfo", "apps")]
+    evidence["rest"]["reachable"] = any(code == 0 for code in required_probe_codes)
+    evidence["rest"]["denied"] = False if all(code == 0 for code in required_probe_codes) else None
+    evidence["rest"]["probe_errors"] = [
+        name for name in ("server_info", "server_sysinfo", "apps") if raw[name]["returncode"] != 0
+    ]
+
+    probe_summary = {
+        name: {
+            "returncode": item["returncode"],
+            "entry_count": len(parse_splunk_entries(item.get("payload", {}))),
+            "response_present": bool(item.get("payload")),
+        }
+        for name, item in raw.items()
+    }
+    write_json(run_dir / "evidence" / "splunk-rest-probes.redacted.json", probe_summary)
 
     server_entries = parse_splunk_entries(raw["server_info"].get("payload", {}))
     if server_entries:
@@ -815,7 +765,6 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
     app_entries = parse_splunk_entries(raw["apps"].get("payload", {}))
     apps = []
     restart_required = []
-    premium_detected = []
     for entry in app_entries:
         name = str(entry.get("name", ""))
         content = entry.get("content", {})
@@ -829,27 +778,24 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
         )
         if content.get("restart_required"):
             restart_required.append(name)
-        lowered = name.lower()
-        if any(marker in lowered for marker in ("enterprise", "itsi", "soar", "observability", "oncall", "cisco")):
-            premium_detected.append(name)
     evidence["apps"] = {"installed": apps, "restart_required": restart_required}
-    if premium_detected:
-        evidence["premium_products"] = {"detected": sorted(set(premium_detected))}
 
     index_entries = parse_splunk_entries(raw["indexes"].get("payload", {}))
     evidence["indexes"] = {
         "present": sorted(entry.get("name", "") for entry in index_entries if entry.get("name")),
-        "missing": [],
     }
 
     hec_entries = parse_splunk_entries(raw["hec"].get("payload", {}))
-    hec_disabled = False
-    if hec_entries:
+    if raw["hec"]["returncode"] != 0:
+        evidence["hec"] = {"enabled": None, "assessed": False, "token_count": None}
+    elif hec_entries:
         # The global HEC endpoint usually appears as http. If every stanza is
         # disabled, call the HEC service unavailable.
         disabled_values = [entry.get("content", {}).get("disabled") for entry in hec_entries]
         hec_disabled = all(str(value).lower() in {"1", "true"} for value in disabled_values)
-    evidence["hec"] = {"enabled": bool(hec_entries) and not hec_disabled, "token_count": len(hec_entries)}
+        evidence["hec"] = {"enabled": not hec_disabled, "assessed": True, "token_count": len(hec_entries)}
+    else:
+        evidence["hec"] = {"enabled": False, "assessed": True, "token_count": 0}
 
     health_payload = raw["splunkd_health"].get("payload", {})
     health_entries = parse_splunk_entries(health_payload)
@@ -874,15 +820,23 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
     evidence["kvstore"] = {"status": kv_status}
 
     license_entries = parse_splunk_entries(raw["license_messages"].get("payload", {}))
-    evidence["license"] = {"messages": [entry.get("name", "") for entry in license_entries], "violation_count": len(license_entries)}
-
-    saved_entries = parse_splunk_entries(raw["saved_searches"].get("payload", {}))
-    skipped = []
-    for entry in saved_entries:
+    violation_messages = []
+    for entry in license_entries:
         content = entry.get("content", {})
-        if content.get("is_scheduled") and content.get("next_scheduled_time") in {"", None}:
-            skipped.append(entry.get("name", ""))
-    evidence["scheduler"] = {"skipped_count": len(skipped), "skipped_searches": skipped[:25]}
+        classification = " ".join(
+            str(content.get(key, "")) for key in ("category", "severity", "type", "message")
+        ).lower()
+        if any(marker in classification for marker in ("violation", "error", "exceeded")):
+            violation_messages.append(entry.get("name", ""))
+    evidence["license"] = {
+        "messages": violation_messages,
+        "violation_count": len(violation_messages),
+        "message_count": len(license_entries),
+    }
+
+    # Saved-search metadata does not prove scheduler skips. Leave the skip
+    # signal explicitly unassessed unless scheduler/internal-log evidence is supplied.
+    evidence["scheduler"] = {"skipped_count": None, "skipped_searches": None}
 
     peer_entries = parse_splunk_entries(raw["distsearch"].get("payload", {}))
     peers_down = []
@@ -895,27 +849,46 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
 
     shc_rc = raw["shc"]["returncode"]
     if shc_rc == 0:
-        evidence["shc"] = {"status": "unknown", "issues": []}
+        shc_payload = raw["shc"].get("payload", {})
+        shc_issues = nested_status_findings(shc_payload)
+        replication_healthy = nested_bool(shc_payload, {"replication_healthy", "is_healthy", "service_ready"})
+        evidence["shc"] = {
+            "status": "degraded" if shc_issues else "healthy",
+            "issues": shc_issues,
+            "replication_healthy": replication_healthy,
+        }
     else:
-        evidence["shc"] = {"status": "not_configured", "issues": []}
+        evidence["shc"] = {"status": "not_assessed", "issues": None}
     idxc_rc = raw["indexer_cluster"]["returncode"]
     if idxc_rc == 0:
-        evidence["indexer_cluster"] = {"status": "unknown", "issues": []}
+        idxc_payload = raw["indexer_cluster"].get("payload", {})
+        idxc_issues = nested_status_findings(idxc_payload)
+        evidence["indexer_cluster"] = {
+            "status": "degraded" if idxc_issues else "healthy",
+            "issues": idxc_issues,
+            "rf_met": nested_bool(idxc_payload, {"replication_factor_met", "rf_met"}),
+            "sf_met": nested_bool(idxc_payload, {"search_factor_met", "sf_met"}),
+        }
     else:
-        evidence["indexer_cluster"] = {"status": "not_configured", "issues": []}
+        evidence["indexer_cluster"] = {"status": "not_assessed", "issues": None}
 
     evidence["monitoring_console"] = {
-        "configured": any(app["name"] == "splunk_monitoring_console" and not app["disabled"] for app in apps),
+        "installed": any(app["name"] == "splunk_monitoring_console" and not app["disabled"] for app in apps),
+        "configured": None,
         "platform_alerts_enabled": None,
     }
     evidence["support"] = {"diag_ready": True, "diag_blockers": []}
     evidence["backup"] = {"last_config_backup_stale": None}
     evidence["security"] = {
-        "weak_tls": not evidence["rest"]["tls_verified"],
-        "tls_findings": ["SPLUNK_VERIFY_SSL=false"] if not evidence["rest"]["tls_verified"] else [],
+        "local_tls_verification_disabled": not evidence["rest"]["tls_verified"],
     }
 
-    remote_summary: dict[str, Any] = {"enabled": True, "checks": {}}
+    remote_summary: dict[str, Any] = {"enabled": platform == "enterprise", "checks": {}}
+    if platform != "enterprise":
+        remote_summary["reason"] = "Enterprise SSH probes are not applicable to a Cloud profile."
+        evidence["remote_splunk_home"] = remote_summary
+        write_json(run_dir / "evidence" / "live-evidence.redacted.json", evidence)
+        return evidence
     version_out, version_err, version_rc = ssh_cli_probe(
         "hostname; test -x /opt/splunk/bin/splunk; /opt/splunk/bin/splunk version",
         profile=profile,
@@ -984,7 +957,11 @@ def collect_live_evidence(profile: str, run_dir: Path) -> dict[str, Any]:
     return evidence
 
 
-def build_baseline_steps(profile: str, run_dir: Path) -> list[ValidationStep]:
+def build_baseline_steps(
+    profile: str,
+    run_dir: Path,
+    platform: str = "enterprise",
+) -> list[ValidationStep]:
     endpoints = {
         "server-info": "/services/server/info?output_mode=json",
         "server-sysinfo": "/services/server/sysinfo?output_mode=json",
@@ -1024,51 +1001,35 @@ def build_baseline_steps(profile: str, run_dir: Path) -> list[ValidationStep]:
             required=False,
             final_on_failure="intentional-skip",
         ),
-        ValidationStep(
-            step_id="baseline-ssh-splunk-version",
-            category="baseline",
-            command=[
-                "bash",
-                "-c",
-                SSH_SPLUNK_CLI_SCRIPT,
-                "ssh-splunk-cli",
-                "splunk",
-                "hostname; test -x /opt/splunk/bin/splunk; /opt/splunk/bin/splunk version",
-            ],
-            mode="ssh:splunk-version",
-            timeout_seconds=90,
-        ),
-        ValidationStep(
-            step_id="baseline-ssh-splunk-status",
-            category="baseline",
-            command=[
-                "bash",
-                "-c",
-                SSH_SPLUNK_CLI_SCRIPT,
-                "ssh-splunk-cli",
-                "splunk",
-                "/opt/splunk/bin/splunk status",
-            ],
-            mode="ssh:splunk-status",
-            timeout_seconds=90,
-        ),
-        ValidationStep(
-            step_id="baseline-ssh-btool-check",
-            category="baseline",
-            command=[
-                "bash",
-                "-c",
-                SSH_SPLUNK_CLI_SCRIPT,
-                "ssh-splunk-cli",
-                "splunk",
-                "/opt/splunk/bin/splunk btool check --debug",
-            ],
-            mode="ssh:btool-check",
-            timeout_seconds=180,
-            required=False,
-            final_on_failure="intentional-skip",
-        ),
     ]
+    if platform == "enterprise":
+        steps.extend(
+            [
+                ValidationStep(
+                    step_id="baseline-ssh-splunk-version",
+                    category="baseline",
+                    command=["bash", "-c", SSH_SPLUNK_CLI_SCRIPT, "ssh-splunk-cli", "splunk", "hostname; test -x /opt/splunk/bin/splunk; /opt/splunk/bin/splunk version"],
+                    mode="ssh:splunk-version",
+                    timeout_seconds=90,
+                ),
+                ValidationStep(
+                    step_id="baseline-ssh-splunk-status",
+                    category="baseline",
+                    command=["bash", "-c", SSH_SPLUNK_CLI_SCRIPT, "ssh-splunk-cli", "splunk", "/opt/splunk/bin/splunk status"],
+                    mode="ssh:splunk-status",
+                    timeout_seconds=90,
+                ),
+                ValidationStep(
+                    step_id="baseline-ssh-btool-check",
+                    category="baseline",
+                    command=["bash", "-c", SSH_SPLUNK_CLI_SCRIPT, "ssh-splunk-cli", "splunk", "/opt/splunk/bin/splunk btool check --debug"],
+                    mode="ssh:btool-check",
+                    timeout_seconds=180,
+                    required=False,
+                    final_on_failure="intentional-skip",
+                ),
+            ]
+        )
     for label, endpoint in endpoints.items():
         required = label in {"server-info", "server-sysinfo", "apps"}
         steps.append(
@@ -1085,9 +1046,13 @@ def build_baseline_steps(profile: str, run_dir: Path) -> list[ValidationStep]:
     return steps
 
 
-def read_only_mode_steps(skill: str, run_dir: Path) -> list[ValidationStep]:
+def read_only_mode_steps(
+    skill: str,
+    run_dir: Path,
+    platform: str = "enterprise",
+) -> list[ValidationStep]:
     steps: list[ValidationStep] = []
-    live_modes_excluded = skill in ONPREM_LIVE_MODE_EXCLUDED_SKILLS
+    live_modes_excluded = platform == "enterprise" and skill in ONPREM_LIVE_MODE_EXCLUDED_SKILLS
     if has_script(skill, "setup.sh"):
         steps.append(
             ValidationStep(
@@ -1187,47 +1152,22 @@ def read_only_mode_steps(skill: str, run_dir: Path) -> list[ValidationStep]:
     return steps
 
 
-def write_o11y_dashboard_spec(run_dir: Path, realm: str = "us0") -> Path:
-    spec_path = run_dir / "generated-specs" / "o11y-dashboard-live-validation.json"
-    spec = {
-        "api_version": "splunk-observability-dashboard-builder/v1",
-        "mode": "classic-api",
-        "realm": realm,
-        "dashboard_group": {
-            "name": "codex_live_validation_skill_checks",
-            "description": "Created by splunk-cisco-skills live validation.",
-        },
-        "dashboard": {
-            "name": "codex_live_validation_dashboard",
-            "description": "Low-impact validation dashboard for the skill runner.",
-            "chart_density": "DEFAULT",
-        },
-        "charts": [
-            {
-                "id": "validation-note",
-                "name": "Validation note",
-                "type": "Text",
-                "row": 0,
-                "column": 0,
-                "width": 12,
-                "height": 1,
-                "markdown": "codex_live_validation dashboard builder smoke object.",
-            }
-        ],
-    }
-    write_json(spec_path, spec)
-    return spec_path
-
-
-def build_apply_steps(run_dir: Path, allow_apply: bool) -> list[ValidationStep]:
+def build_apply_steps(
+    run_dir: Path,
+    allow_apply: bool,
+    platform: str = "enterprise",
+) -> list[ValidationStep]:
     if not allow_apply:
         return []
     output_root = run_dir / "apply-rendered"
-    dashboard_spec = write_o11y_dashboard_spec(run_dir)
-    dashboard_output = output_root / "splunk-observability-dashboard-builder"
-    steps: list[ValidationStep] = [
+    # Live mutation smokes are intentionally disabled. The former MC, HEC,
+    # WLM, and Observability workflows could overwrite pre-existing state and
+    # did not provide byte-for-byte rollback. Keep --allow-apply bounded to a
+    # local fix-plan render until target-bound snapshots and cleanup-finally
+    # semantics are implemented and tested.
+    return [
         ValidationStep(
-            step_id="splunk-admin-doctor:apply-safe-packet",
+            step_id="splunk-admin-doctor:render-fix-plan",
             category="apply",
             skill="splunk-admin-doctor",
             command=script_command(
@@ -1235,307 +1175,28 @@ def build_apply_steps(run_dir: Path, allow_apply: bool) -> list[ValidationStep]:
                 "setup.sh",
                 [
                     "--phase",
-                    "apply",
+                    "fix-plan",
                     "--platform",
-                    "enterprise",
+                    platform,
                     "--evidence-file",
                     str(run_dir / "evidence" / "live-evidence.redacted.json"),
                     "--output-dir",
                     str(output_root / "splunk-admin-doctor"),
-                    "--fixes",
-                    "SAD-CONNECTIVITY-TLS-UNVERIFIED",
                     "--json",
                 ],
             ),
-            mode="apply",
+            mode="render-fix-plan",
             read_only=False,
             mutates=False,
             timeout_seconds=180,
-            metadata={"rollback_or_validation": "Rerun splunk-admin-doctor doctor/status; no live mutation is performed."},
-        ),
-        ValidationStep(
-            step_id="splunk-observability-dashboard-builder:apply-live-smoke",
-            category="apply",
-            skill="splunk-observability-dashboard-builder",
-            command=script_command(
-                "splunk-observability-dashboard-builder",
-                "setup.sh",
-                [
-                    "--apply",
-                    "--spec",
-                    str(dashboard_spec),
-                    "--output-dir",
-                    str(dashboard_output),
-                ],
-            ),
-            mode="apply",
-            read_only=False,
-            mutates=True,
-            required=False,
-            timeout_seconds=420,
-            final_on_failure="intentional-skip",
             metadata={
-                "rollback_or_validation": "The follow-up cleanup step deletes the codex_live_validation dashboard, charts, and created dashboard group from apply-result.json.",
+                "rollback_or_validation": (
+                    "Local report and packet files only; no live Splunk or "
+                    "Observability mutation is performed."
+                )
             },
-        ),
-        ValidationStep(
-            step_id="splunk-observability-dashboard-builder:cleanup-live-smoke",
-            category="apply-cleanup",
-            skill="splunk-observability-dashboard-builder",
-            command=script_command(
-                "splunk-observability-dashboard-builder",
-                "setup.sh",
-                [
-                    "--cleanup",
-                    "--apply-result",
-                    str(dashboard_output / "apply-result.json"),
-                ],
-            ),
-            mode="cleanup",
-            read_only=False,
-            mutates=True,
-            required=False,
-            timeout_seconds=420,
-            final_on_failure="intentional-skip",
-            metadata={
-                "rollback_or_validation": "Cleanup is guarded to codex_live_validation* dashboard plans and treats missing objects as already absent.",
-            },
-        ),
-    ]
-
-    remote_apply_specs = [
-        {
-            "skill": "splunk-monitoring-console-setup",
-            "step_id": "splunk-monitoring-console-setup:apply-ssh-no-restart",
-            "rendered_subdir": "monitoring-console",
-            "apply_script": "apply.sh",
-            "render_args": [
-                "--phase",
-                "render",
-                "--mode",
-                "standalone",
-                "--restart-splunk",
-                "false",
-            ],
-            "rollback_or_validation": "Remote files are under /opt/splunk/etc/apps/splunk_monitoring_console/local; rerun status or restore from Splunk config backup if rollback is required.",
-        },
-        {
-            "skill": "splunk-hec-service-setup",
-            "step_id": "splunk-hec-service-setup:apply-ssh-token-no-restart",
-            "rendered_subdir": "hec-service",
-            "apply_script": "apply-enterprise-files.sh",
-            "render_args": [
-                "--phase",
-                "render",
-                "--platform",
-                "enterprise",
-                "--token-name",
-                "codex_live_validation_hec",
-                "--default-index",
-                "main",
-                "--allowed-indexes",
-                "main",
-                "--token-file",
-                ".codex_live_validation_hec.token",
-                "--restart-splunk",
-                "false",
-            ],
-            "rollback_or_validation": "Remote inputs.conf is backed up before overwrite; restart is skipped, so validate with btool/status before enabling the token.",
-        },
-        {
-            "skill": "splunk-workload-management-setup",
-            "step_id": "splunk-workload-management-setup:apply-ssh-no-enable",
-            "rendered_subdir": "workload-management",
-            "apply_script": "apply.sh",
-            "render_args": [
-                "--phase",
-                "render",
-                "--app-name",
-                "ZZZ_codex_live_validation_workload_management",
-            ],
-            "rollback_or_validation": "Disable/remove /opt/splunk/etc/apps/ZZZ_codex_live_validation_workload_management if rollback is required.",
-        },
-    ]
-    for spec in remote_apply_specs:
-        skill = str(spec["skill"])
-        output_dir = output_root / skill
-        render_cmd = script_command(
-            skill,
-            "setup.sh",
-            [*list(spec["render_args"]), "--output-dir", str(output_dir)],
         )
-        steps.append(
-            ValidationStep(
-                step_id=str(spec["step_id"]),
-                category="apply",
-                skill=skill,
-                command=[
-                    "bash",
-                    "-c",
-                    REMOTE_RENDERED_APPLY_SCRIPT,
-                    "remote-rendered-apply",
-                    skill,
-                    str(output_dir),
-                    str(spec["rendered_subdir"]),
-                    str(spec["apply_script"]),
-                    "splunk",
-                    *render_cmd,
-                ],
-                mode="ssh-apply",
-                read_only=False,
-                mutates=True,
-                required=False,
-                timeout_seconds=600,
-                final_on_failure="intentional-skip",
-                metadata={"rollback_or_validation": str(spec["rollback_or_validation"])},
-            )
-        )
-    post_apply_ssh_checks = [
-        {
-            "step_id": "splunk-enterprise:post-apply-ssh-status",
-            "mode": "ssh:post-apply-status",
-            "command": (
-                'if /opt/splunk/bin/splunk status 2>/dev/null | grep -qi "splunkd is running"; '
-                'then echo "splunkd_running=true"; else echo "splunkd_running=false"; exit 1; fi'
-            ),
-            "validation": "Confirms splunkd is still running after low-risk SSH apply steps.",
-        },
-        {
-            "step_id": "splunk-monitoring-console-setup:post-apply-ssh-check",
-            "skill": "splunk-monitoring-console-setup",
-            "mode": "ssh:post-apply-monitoring-console",
-            "command": (
-                "test -d /opt/splunk/etc/apps/splunk_monitoring_console/local "
-                '&& echo "monitoring_console_local=true"'
-            ),
-            "validation": "Confirms the Monitoring Console local app directory exists after apply.",
-        },
-        {
-            "step_id": "splunk-hec-service-setup:post-apply-ssh-check",
-            "skill": "splunk-hec-service-setup",
-            "mode": "ssh:post-apply-hec",
-            "command": (
-                "/opt/splunk/bin/splunk btool inputs list --debug 2>/dev/null | awk '"
-                "/\\[http:\\/\\/codex_live_validation_hec\\]/ {found=1; in_stanza=1} "
-                "/^\\[/ && !/\\[http:\\/\\/codex_live_validation_hec\\]/ {in_stanza=0} "
-                "in_stanza && /index = main/ {idx=1} "
-                'END {printf "hec_stanza_present=%s\\n", found ? "true" : "false"; '
-                'printf "hec_index_main=%s\\n", idx ? "true" : "false"; '
-                "exit (found && idx) ? 0 : 1}'"
-            ),
-            "validation": "Confirms the rendered HEC stanza is visible through btool without printing token values.",
-        },
-        {
-            "step_id": "splunk-workload-management-setup:post-apply-ssh-check",
-            "skill": "splunk-workload-management-setup",
-            "mode": "ssh:post-apply-workload-management",
-            "command": (
-                "test -d /opt/splunk/etc/apps/ZZZ_codex_live_validation_workload_management "
-                '&& echo "workload_app_present=true"'
-            ),
-            "validation": "Confirms the workload-management validation app exists after apply.",
-        },
     ]
-    for spec in post_apply_ssh_checks:
-        steps.append(
-            ValidationStep(
-                step_id=str(spec["step_id"]),
-                category="apply-validation",
-                skill=str(spec.get("skill", "")),
-                command=[
-                    "bash",
-                    "-c",
-                    SSH_SPLUNK_CLI_SCRIPT,
-                    "ssh-splunk-cli",
-                    "splunk",
-                    str(spec["command"]),
-                ],
-                mode=str(spec["mode"]),
-                read_only=True,
-                mutates=False,
-                timeout_seconds=120,
-                metadata={"rollback_or_validation": str(spec["validation"])},
-            )
-        )
-    enterprise_cleanup_steps = [
-        {
-            "step_id": "splunk-hec-service-setup:cleanup-ssh-validation-token",
-            "skill": "splunk-hec-service-setup",
-            "mode": "ssh:cleanup-hec",
-            "command": ENTERPRISE_HEC_CLEANUP_COMMAND,
-            "validation": "Removes only the codex_live_validation_hec stanza and generated backups that contain that validation stanza.",
-        },
-        {
-            "step_id": "splunk-workload-management-setup:cleanup-ssh-validation-app",
-            "skill": "splunk-workload-management-setup",
-            "mode": "ssh:cleanup-workload-management",
-            "command": ENTERPRISE_WORKLOAD_CLEANUP_COMMAND,
-            "validation": "Removes only /opt/splunk/etc/apps/ZZZ_codex_live_validation_workload_management.",
-        },
-    ]
-    for spec in enterprise_cleanup_steps:
-        steps.append(
-            ValidationStep(
-                step_id=str(spec["step_id"]),
-                category="apply-cleanup",
-                skill=str(spec["skill"]),
-                command=[
-                    "bash",
-                    "-c",
-                    SSH_SPLUNK_CLI_SCRIPT,
-                    "ssh-splunk-cli",
-                    "splunk",
-                    str(spec["command"]),
-                ],
-                mode=str(spec["mode"]),
-                read_only=False,
-                mutates=True,
-                required=False,
-                timeout_seconds=120,
-                final_on_failure="intentional-skip",
-                metadata={"rollback_or_validation": str(spec["validation"])},
-            )
-        )
-    post_cleanup_checks = [
-        {
-            "step_id": "splunk-hec-service-setup:post-cleanup-ssh-check",
-            "skill": "splunk-hec-service-setup",
-            "mode": "ssh:post-cleanup-hec",
-            "command": ENTERPRISE_HEC_CLEANUP_VALIDATION_COMMAND,
-            "validation": "Confirms the codex_live_validation_hec stanza and generated backups are absent without printing token values.",
-        },
-        {
-            "step_id": "splunk-workload-management-setup:post-cleanup-ssh-check",
-            "skill": "splunk-workload-management-setup",
-            "mode": "ssh:post-cleanup-workload-management",
-            "command": ENTERPRISE_WORKLOAD_CLEANUP_VALIDATION_COMMAND,
-            "validation": "Confirms the workload-management validation app is absent after cleanup.",
-        },
-    ]
-    for spec in post_cleanup_checks:
-        steps.append(
-            ValidationStep(
-                step_id=str(spec["step_id"]),
-                category="apply-cleanup-validation",
-                skill=str(spec["skill"]),
-                command=[
-                    "bash",
-                    "-c",
-                    SSH_SPLUNK_CLI_SCRIPT,
-                    "ssh-splunk-cli",
-                    "splunk",
-                    str(spec["command"]),
-                ],
-                mode=str(spec["mode"]),
-                read_only=True,
-                mutates=False,
-                required=False,
-                timeout_seconds=120,
-                final_on_failure="intentional-skip",
-                metadata={"rollback_or_validation": str(spec["validation"])},
-            )
-        )
-    return steps
 
 
 def build_plan(
@@ -1543,12 +1204,13 @@ def build_plan(
     profile: str,
     run_dir: Path,
     allow_apply: bool,
+    platform: str = "enterprise",
     selected_skills: set[str] | None = None,
     skip_skills: set[str] | None = None,
 ) -> list[ValidationStep]:
     selected_skills = selected_skills or set()
     skip_skills = skip_skills or set()
-    steps = build_baseline_steps(profile, run_dir)
+    steps = build_baseline_steps(profile, run_dir, platform)
     for skill_dir in skill_dirs():
         skill = skill_dir.name
         if selected_skills and skill not in selected_skills:
@@ -1566,32 +1228,38 @@ def build_plan(
                 )
             )
             continue
-        steps.extend(read_only_mode_steps(skill, run_dir))
-    steps.append(
-        ValidationStep(
-            step_id="splunk-admin-doctor:doctor-live-evidence",
-            category="doctor",
-            skill="splunk-admin-doctor",
-            command=script_command(
-                "splunk-admin-doctor",
-                "setup.sh",
-                [
-                    "--phase",
-                    "doctor",
-                    "--platform",
-                    "enterprise",
-                    "--evidence-file",
-                    str(run_dir / "evidence" / "live-evidence.redacted.json"),
-                    "--output-dir",
-                    str(run_dir / "doctor"),
-                    "--json",
-                ],
-            ),
-            mode="doctor",
-            timeout_seconds=180,
-        )
+        steps.extend(read_only_mode_steps(skill, run_dir, platform))
+    doctor_in_scope = (
+        "splunk-admin-doctor" not in skip_skills
+        and (not selected_skills or "splunk-admin-doctor" in selected_skills)
     )
-    steps.extend(build_apply_steps(run_dir, allow_apply))
+    if doctor_in_scope:
+        steps.append(
+            ValidationStep(
+                step_id="splunk-admin-doctor:doctor-live-evidence",
+                category="doctor",
+                skill="splunk-admin-doctor",
+                command=script_command(
+                    "splunk-admin-doctor",
+                    "setup.sh",
+                    [
+                        "--phase",
+                        "doctor",
+                        "--platform",
+                        platform,
+                        "--evidence-file",
+                        str(run_dir / "evidence" / "live-evidence.redacted.json"),
+                        "--output-dir",
+                        str(run_dir / "doctor"),
+                        "--json",
+                        "--strict",
+                    ],
+                ),
+                mode="doctor",
+                timeout_seconds=180,
+            )
+        )
+        steps.extend(build_apply_steps(run_dir, allow_apply, platform))
     return steps
 
 
@@ -1614,12 +1282,20 @@ def save_checkpoint(path: Path, checkpoint: dict[str, Any]) -> None:
     write_json(path, checkpoint)
 
 
-def checkpoint_result_is_reusable(prior: Any, *, force_rerun: bool, category: str) -> bool:
+def checkpoint_result_is_reusable(
+    prior: Any,
+    *,
+    force_rerun: bool,
+    category: str,
+    command: str = "",
+) -> bool:
     return (
         isinstance(prior, dict)
-        and prior.get("status") in FINAL_STATUSES
+        and prior.get("status") in {"pass", "fixed-pass"}
         and not force_rerun
         and category == "apply"
+        and bool(command)
+        and prior.get("command") == command
     )
 
 
@@ -1642,9 +1318,12 @@ def summarize_skill_status(results: list[StepResult], all_steps: list[Validation
             final = "pass"
         else:
             final = "intentional-skip"
+        substantive = [row for row in rows if not row.mode.endswith("-help") and row.mode != "setup-help"]
         summary[skill] = {
             "status": final,
+            "validation_depth": "feature_validation" if substantive else "interface_only",
             "steps": len(rows),
+            "substantive_steps": len(substantive),
             "passed": sum(1 for row in rows if row.status == "pass"),
             "skipped": sum(1 for row in rows if row.status == "intentional-skip"),
             "failed": sum(1 for row in rows if row.status == "fail"),
@@ -1658,6 +1337,7 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
         "",
         f"- Run ID: `{payload['run_id']}`",
         f"- Profile: `{payload['profile']}`",
+        f"- Platform: `{payload['platform']}`",
         f"- Started: `{payload['started_at']}`",
         f"- Ended: `{payload['ended_at']}`",
         f"- Allow apply: `{payload['allow_apply']}`",
@@ -1670,7 +1350,11 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
         lines.append(f"- {key}: {totals.get(key, 0)}")
     lines.extend(["", "## Skill Status", ""])
     for skill, item in sorted(payload["skills"].items()):
-        lines.append(f"- `{skill}`: {item['status']} ({item.get('passed', 0)} pass, {item.get('skipped', 0)} skip, {item.get('failed', 0)} fail)")
+        lines.append(
+            f"- `{skill}`: {item['status']} / {item.get('validation_depth', 'unknown')} "
+            f"({item.get('passed', 0)} pass, {item.get('skipped', 0)} skip, "
+            f"{item.get('failed', 0)} fail)"
+        )
     failures = [row for row in payload["results"] if row["status"] == "fail"]
     if failures:
         lines.extend(["", "## Failures", ""])
@@ -1680,7 +1364,7 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
                 f"(stdout `{row['stdout_log']}`, stderr `{row['stderr_log']}`)"
             )
     lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text_secure(path, "\n".join(lines))
 
 
 def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
@@ -1693,22 +1377,22 @@ def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
     started = utc_now()
 
-    evidence = collect_live_evidence(args.profile, run_dir)
-    write_json(run_dir / "evidence" / "live-evidence.redacted.json", evidence)
-
     selected_skills = set(args.skill or [])
     skip_skills = set(args.skip_skill or [])
-    steps = build_plan(
-        profile=args.profile,
-        run_dir=run_dir,
-        allow_apply=args.allow_apply,
-        selected_skills=selected_skills,
-        skip_skills=skip_skills,
-    )
     if args.plan_only:
+        effective_platform = args.platform if args.platform != "auto" else "enterprise"
+        steps = build_plan(
+            profile=args.profile,
+            run_dir=run_dir,
+            allow_apply=args.allow_apply,
+            platform=effective_platform,
+            selected_skills=selected_skills,
+            skip_skills=skip_skills,
+        )
         payload = {
             "run_id": run_id,
             "profile": args.profile,
+            "platform": effective_platform,
             "allow_apply": args.allow_apply,
             "steps": [asdict(step) for step in steps],
         }
@@ -1717,11 +1401,28 @@ def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
             print(json.dumps(redact_obj(payload), indent=2, sort_keys=True))
         return payload
 
+    evidence = collect_live_evidence(args.profile, run_dir, args.platform)
+    write_json(run_dir / "evidence" / "live-evidence.redacted.json", evidence)
+    effective_platform = str(evidence.get("platform", "enterprise"))
+    steps = build_plan(
+        profile=args.profile,
+        run_dir=run_dir,
+        allow_apply=args.allow_apply,
+        platform=effective_platform,
+        selected_skills=selected_skills,
+        skip_skills=skip_skills,
+    )
+
     ledger_path = run_dir / "ledger.jsonl"
     results: list[StepResult] = []
     for step in steps:
         prior = checkpoint.get("steps", {}).get(step.step_id)
-        if checkpoint_result_is_reusable(prior, force_rerun=args.force_rerun, category=step.category):
+        if checkpoint_result_is_reusable(
+            prior,
+            force_rerun=args.force_rerun,
+            category=step.category,
+            command=shell_join(step.command),
+        ):
             skipped = StepResult(
                 step_id=step.step_id,
                 category=step.category,
@@ -1762,6 +1463,7 @@ def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
     payload = {
         "run_id": run_id,
         "profile": args.profile,
+        "platform": effective_platform,
         "allow_apply": args.allow_apply,
         "started_at": started,
         "ended_at": utc_now(),
@@ -1776,6 +1478,8 @@ def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
                 "skills/splunk-admin-doctor/scripts/live_validate_all.py",
                 "--profile",
                 args.profile,
+                "--platform",
+                effective_platform,
                 "--output-dir",
                 str(output_dir),
                 "--allow-apply" if args.allow_apply else "--once",
@@ -1805,8 +1509,13 @@ def run_once(args: argparse.Namespace, *, iteration: int = 1) -> dict[str, Any]:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run continuous live validation for every repo skill.")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Splunk credential profile to use.")
+    parser.add_argument("--platform", choices=("auto", "cloud", "enterprise"), default="auto")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Gitignored output/checkpoint directory.")
-    parser.add_argument("--allow-apply", action="store_true", help="Enable the bounded apply sweep.")
+    parser.add_argument(
+        "--allow-apply",
+        action="store_true",
+        help="Render the bounded local doctor fix plan; live mutation smokes are disabled.",
+    )
     parser.add_argument("--once", action="store_true", help="Run one sweep and exit.")
     parser.add_argument("--watch", action="store_true", help="Repeat sweeps until stopped.")
     parser.add_argument("--watch-interval-seconds", type=int, default=1800, help="Delay between steady-state sweeps.")

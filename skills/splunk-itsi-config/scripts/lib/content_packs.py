@@ -28,6 +28,7 @@ from .common import (
     timestamp_slug,
     write_text,
 )
+from .spec_validation import validate_spec
 from .native import NativeResult, NativeWorkflow
 from .topology import (
     ServiceTopologyWorkflow,
@@ -1369,12 +1370,14 @@ def _run_itsi_health_checks(client: Any) -> list[dict[str, str]]:
     checks: list[dict[str, str]] = []
     for app_meta in ITSI_HEALTH_APPS:
         try:
+            present = client.app_exists(app_meta["app"])
             version = client.get_app_version(app_meta["app"])
         except ValidationError as exc:
             checks.append(_finding("warn", "app", f"Could not inspect {app_meta['label']}: {exc}"))
             continue
-        if version:
-            checks.append(_finding("pass", "app", f"{app_meta['label']} is installed (version: {version})."))
+        if present:
+            version_detail = f"version: {version}" if version else "version metadata unavailable"
+            checks.append(_finding("pass", "app", f"{app_meta['label']} is installed and enabled ({version_detail})."))
         else:
             checks.append(_finding(app_meta["status"], "app", app_meta["message"]))
 
@@ -1386,9 +1389,9 @@ def _run_itsi_health_checks(client: Any) -> list[dict[str, str]]:
     if kvstore_status == "ready":
         checks.append(_finding("pass", "kvstore", "KVStore status is ready."))
     elif kvstore_status:
-        checks.append(_finding("warn", "kvstore", f"KVStore status is {kvstore_status}. ITSI requires a healthy KVStore."))
+        checks.append(_finding("error", "kvstore", f"KVStore status is {kvstore_status}. ITSI requires a healthy KVStore."))
     else:
-        checks.append(_finding("warn", "kvstore", "KVStore status could not be determined."))
+        checks.append(_finding("error", "kvstore", "KVStore status could not be determined."))
 
     for collection_name in ITSI_KVSTORE_COLLECTIONS:
         health = client.kvstore_collection_health(ITSI_APP, collection_name)
@@ -1406,7 +1409,7 @@ def _run_itsi_health_checks(client: Any) -> list[dict[str, str]]:
             )
         else:
             detail = f": {message}" if message else ""
-            checks.append(_finding("warn", "kvstore", f"KVStore collection '{collection_name}' could not be validated{detail}"))
+            checks.append(_finding("error", "kvstore", f"KVStore collection '{collection_name}' could not be validated{detail}"))
     return checks
 
 
@@ -1450,19 +1453,20 @@ def _check_pack_bundle_visibility(
 def _ensure_managed_app(
     client: Any,
     *,
-    mode: str,
     spec: dict[str, Any],
     spec_key: str,
     app_name: str,
-    app_id: str,
     display_name: str,
-    installer: Any,
     disabled_message: str,
     missing_message: str | None = None,
 ) -> dict[str, Any]:
     section = spec.get(spec_key, {})
-    require_present = bool_from_any(section.get("require_present"), default=True)
-    install_if_missing = bool_from_any(section.get("install_if_missing"), default=True)
+    require_present = bool_from_any(
+        section.get("require_present"), default=True, field=f"{spec_key}.require_present"
+    )
+    install_if_missing = bool_from_any(
+        section.get("install_if_missing"), default=False, field=f"{spec_key}.install_if_missing"
+    )
     state = {
         "required": require_present,
         "present_before": False,
@@ -1475,55 +1479,43 @@ def _ensure_managed_app(
     if not require_present:
         return state
 
+    if install_if_missing:
+        raise ValidationError(
+            f"{spec_key}.install_if_missing is not supported by this configuration skill. "
+            "Install or upgrade ITSI with splunk-itsi-setup; install prerequisite apps with "
+            "splunk-app-install or the Splunk Cloud app-request process, then rerun this workflow."
+        )
+
     if client.app_exists(app_name):
         state["present_before"] = True
         state["message"] = f"{display_name} is already installed."
         return state
 
-    if missing_message:
-        raise ValidationError(missing_message)
-
-    if mode != "apply":
-        if install_if_missing:
-            raise ValidationError(
-                f"{display_name} is not installed. Rerun with --apply to bootstrap Splunkbase app {app_id} automatically, or install it manually first."
-            )
-        raise ValidationError(disabled_message)
-
-    if not install_if_missing:
-        raise ValidationError(disabled_message)
-
-    install_result = installer.install(spec, client)
-    if not _wait_for_app_visibility(client, app_name):
-        raise ValidationError(
-            f"Attempted to install {display_name}, but app {app_name} is still not visible through the Splunk REST API."
-        )
-    state["installed_in_this_run"] = True
-    state["source"] = install_result.get("source")
-    state["app_id"] = install_result.get("app_id")
-    state["message"] = str(install_result.get("message") or f"Installed {display_name}.")
-    return state
+    raise ValidationError(missing_message or disabled_message)
 
 
 def _ensure_itsi(
     client: Any,
     *,
-    mode: str,
     spec: dict[str, Any],
-    installer: Any,
 ) -> dict[str, Any]:
+    itsi_section = spec.get("itsi") if isinstance(spec.get("itsi"), dict) else {}
+    if not bool_from_any(
+        itsi_section.get("require_present"), default=True, field="itsi.require_present"
+    ):
+        raise ValidationError(
+            "itsi.require_present cannot be disabled: this skill configures an existing ITSI deployment. "
+            "Use splunk-itsi-setup when ITSI is not installed."
+        )
     state = _ensure_managed_app(
         client,
-        mode=mode,
         spec=spec,
         spec_key="itsi",
         app_name=ITSI_APP,
-        app_id=ITSI_APP_ID,
         display_name="Splunk IT Service Intelligence",
-        installer=installer,
         disabled_message=(
-            "Splunk IT Service Intelligence is not installed. Automatic bootstrap is disabled. "
-            "Set itsi.install_if_missing=true or install Splunkbase app 1841 before using content-pack automation."
+            "Splunk IT Service Intelligence is not installed or not visible on this target. "
+            "Run splunk-itsi-setup to install and validate ITSI, then rerun this configuration workflow."
         ),
     )
     if state.get("required"):
@@ -1535,10 +1527,63 @@ def _ensure_content_library(
     client: Any,
     *,
     platform: str,
-    mode: str,
     spec: dict[str, Any],
-    installer: Any,
 ) -> dict[str, Any]:
+    section = spec.get("content_library") if isinstance(spec.get("content_library"), dict) else {}
+    require_present = bool_from_any(
+        section.get("require_present"), default=True, field="content_library.require_present"
+    )
+    install_if_missing = bool_from_any(
+        section.get("install_if_missing"), default=False, field="content_library.install_if_missing"
+    )
+    if install_if_missing:
+        raise ValidationError(
+            "content_library.install_if_missing is not supported by this configuration skill. "
+            "Use splunk-app-install on Splunk Enterprise or the Splunk Cloud app-request process."
+        )
+    if not require_present:
+        return {
+            "required": False,
+            "present_before": False,
+            "installed_in_this_run": False,
+            "source": None,
+            "app_id": None,
+            "checks": [],
+            "message": "Content Library presence checks are disabled.",
+        }
+    if client.app_exists(CONTENT_LIBRARY_APP) and hasattr(client, "get_app_version"):
+        itsi_version = str(client.get_app_version(ITSI_APP) or "").strip()
+        library_version = str(client.get_app_version(CONTENT_LIBRARY_APP) or "").strip()
+        itsi_major_match = re.match(r"^(\d+)", itsi_version)
+        library_version_match = re.match(r"^(\d+)\.(\d+)", library_version)
+        if (
+            itsi_major_match
+            and int(itsi_major_match.group(1)) >= 5
+            and library_version_match
+            and (int(library_version_match.group(1)), int(library_version_match.group(2))) <= (2, 5)
+        ):
+            raise ValidationError(
+                "Splunk App for Content Packs 2.5 is documented for ITSI 4.20/4.21, not ITSI 5.0. "
+                f"Observed SA-ITOA {itsi_version} and {CONTENT_LIBRARY_APP} {library_version}. "
+                "Use the ITSI 5.0 Content Library or install a release explicitly documented as compatible."
+            )
+    if not client.app_exists(CONTENT_LIBRARY_APP):
+        # ITSI 5.0 can expose Content Library through ITSI itself. A successful
+        # documented catalog GET is stronger evidence than the legacy app name.
+        try:
+            client.content_pack_catalog()
+        except (KeyError, ValidationError):
+            pass
+        else:
+            return {
+                "required": True,
+                "present_before": True,
+                "installed_in_this_run": False,
+                "source": "itsi-built-in",
+                "app_id": None,
+                "checks": [],
+                "message": "The ITSI Content Library REST catalog is available without the legacy app.",
+            }
     missing_message = None
     if platform == "cloud":
         missing_message = (
@@ -1546,16 +1591,14 @@ def _ensure_content_library(
         )
     return _ensure_managed_app(
         client,
-        mode=mode,
         spec=spec,
         spec_key="content_library",
         app_name=CONTENT_LIBRARY_APP,
-        app_id=CONTENT_LIBRARY_APP_ID,
         display_name="Splunk App for Content Packs",
-        installer=installer,
         disabled_message=(
-            "Splunk App for Content Packs is not installed. Automatic bootstrap is disabled. "
-            "Set content_library.install_if_missing=true or install Splunkbase app 5391 before using content-pack automation."
+            "The Splunk App for Content Packs is not installed and the built-in ITSI Content Library "
+            "catalog was not detected. Install the version compatible with this ITSI release using "
+            "splunk-app-install, then rerun this configuration workflow."
         ),
         missing_message=missing_message,
     )
@@ -2099,15 +2142,35 @@ def _install_failures(install_result: Any) -> list[str]:
     return failures
 
 
-def _maybe_refresh_content_pack_catalog(client: Any, content_library_state: dict[str, Any], spec: dict[str, Any]) -> None:
+def _maybe_refresh_content_pack_catalog(
+    client: Any,
+    content_library_state: dict[str, Any],
+    spec: dict[str, Any],
+    *,
+    mode: str,
+) -> None:
     section = spec.get("content_library", {}) if isinstance(spec.get("content_library"), dict) else {}
-    if not bool_from_any(section.get("refresh_catalog"), default=True):
+    requested = bool_from_any(
+        section.get("refresh_catalog"),
+        default=False,
+        field="content_library.refresh_catalog",
+    )
+    if mode != "apply":
+        content_library_state["catalog_refresh"] = {
+            "attempted": False,
+            "status": "read-only",
+            "requested": requested,
+        }
+        return
+    if not requested:
         content_library_state["catalog_refresh"] = {"attempted": False, "status": "skipped"}
         return
     if not hasattr(client, "refresh_content_pack_catalog"):
         content_library_state["catalog_refresh"] = {"attempted": False, "status": "unsupported"}
         return
     try:
+        if hasattr(client, "sync_content_library_catalog"):
+            client.sync_content_library_catalog()
         response = client.refresh_content_pack_catalog()
         content_library_state["catalog_refresh"] = {"attempted": True, "status": "ok", "response": response}
         content_library_state.setdefault("checks", []).append(
@@ -3210,33 +3273,26 @@ class ContentPackWorkflow:
         self,
         client: Any,
         report_root: str | Path,
-        content_library_installer: Any | None = None,
-        itsi_installer: Any | None = None,
     ):
         self.client = client
         self.report_root = Path(report_root)
-        self.content_library_installer = content_library_installer or ShellContentLibraryInstaller()
-        self.itsi_installer = itsi_installer or ShellItsiInstaller()
 
     def run(self, spec: dict[str, Any], mode: str) -> dict[str, Any]:
         if mode not in {"preview", "apply", "validate"}:
             raise ValidationError(f"Unsupported content-pack mode '{mode}'.")
+        validate_spec(spec, "content-packs", for_apply=mode == "apply")
         platform = infer_platform(spec)
         itsi_state = _ensure_itsi(
             self.client,
-            mode=mode,
             spec=spec,
-            installer=self.itsi_installer,
         )
         content_library_state = _ensure_content_library(
             self.client,
             platform=platform,
-            mode=mode,
             spec=spec,
-            installer=self.content_library_installer,
         )
         report_dir = ensure_dir(self.report_root / timestamp_slug())
-        _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec)
+        _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec, mode=mode)
         catalog = self.client.content_pack_catalog()
         _record_content_library_discovery_state(self.client, content_library_state)
         prerequisite_errors = _state_has_error(itsi_state) or _state_has_error(content_library_state)
@@ -3270,16 +3326,32 @@ class ContentPackWorkflow:
                 preview_summary = _preview_summary(preview)
             if mode == "apply" and not prerequisite_errors and not _has_error(findings):
                 install_payload = build_install_payload(pack_spec)
-                try:
-                    install_result = self.client.install_content_pack(catalog_entry["id"], catalog_entry["version"], install_payload)
-                except KeyError as exc:
-                    raise ValidationError(
-                        f"Install failed because content pack '{pack_title}' version {catalog_entry['version']} could not be resolved."
-                    ) from exc
-                installed = True
-                for failure_message in _install_failures(install_result):
-                    findings.append(_finding("error", "install", failure_message))
-                _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
+                already_installed = catalog_entry["version"] in _installed_versions(catalog_entry)
+                force_reinstall = bool_from_any(
+                    pack_spec.get("force_reinstall"),
+                    default=False,
+                    field=f"packs[{index}].force_reinstall",
+                )
+                if already_installed and not force_reinstall:
+                    findings.append(
+                        _finding(
+                            "pass",
+                            "install",
+                            f"{pack_title} version {catalog_entry['version']} is already installed; reinstall skipped.",
+                        )
+                    )
+                    install_payload = None
+                else:
+                    try:
+                        install_result = self.client.install_content_pack(catalog_entry["id"], catalog_entry["version"], install_payload)
+                    except KeyError as exc:
+                        raise ValidationError(
+                            f"Install failed because content pack '{pack_title}' version {catalog_entry['version']} could not be resolved."
+                        ) from exc
+                    installed = True
+                    for failure_message in _install_failures(install_result):
+                        findings.append(_finding("error", "install", failure_message))
+                    _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
             elif mode == "preview":
                 install_payload = build_install_payload(pack_spec)
             if not prerequisite_errors and not _has_error(findings):
@@ -3320,17 +3392,14 @@ class TopologyWorkflow:
         self,
         client: Any,
         report_root: str | Path,
-        content_library_installer: Any | None = None,
-        itsi_installer: Any | None = None,
     ):
         self.client = client
         self.report_root = Path(report_root)
-        self.content_library_installer = content_library_installer or ShellContentLibraryInstaller()
-        self.itsi_installer = itsi_installer or ShellItsiInstaller()
 
     def run(self, spec: dict[str, Any], mode: str) -> dict[str, Any]:
         if mode not in {"preview", "apply", "validate", "prune-plan", "cleanup-apply"}:
             raise ValidationError(f"Unsupported topology mode '{mode}'.")
+        validate_spec(spec, "topology", for_apply=mode in {"apply", "cleanup-apply"})
         if mode in {"prune-plan", "cleanup-apply"}:
             return self._run_cleanup_mode(spec, mode)
         platform = infer_platform(spec)
@@ -3353,19 +3422,15 @@ class TopologyWorkflow:
             )
         itsi_state = _ensure_itsi(
             self.client,
-            mode=mode,
             spec=spec,
-            installer=self.itsi_installer,
         )
         if pack_specs:
             content_library_state = _ensure_content_library(
                 self.client,
                 platform=platform,
-                mode=mode,
                 spec=spec,
-                installer=self.content_library_installer,
             )
-            _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec)
+            _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec, mode=mode)
             catalog = self.client.content_pack_catalog()
             _record_content_library_discovery_state(self.client, content_library_state)
         else:
@@ -3414,7 +3479,22 @@ class TopologyWorkflow:
                     ) from exc
                 preview_summary = _preview_summary(preview_payload)
             if mode == "apply" and not prerequisite_errors and not _has_error(findings):
-                install_payload = build_install_payload(pack_spec)
+                already_installed = catalog_entry["version"] in _installed_versions(catalog_entry)
+                force_reinstall = bool_from_any(
+                    pack_spec.get("force_reinstall"),
+                    default=False,
+                    field=f"packs[{index}].force_reinstall",
+                )
+                if already_installed and not force_reinstall:
+                    findings.append(
+                        _finding(
+                            "pass",
+                            "install",
+                            f"{pack_title} version {catalog_entry['version']} is already installed; reinstall skipped.",
+                        )
+                    )
+                else:
+                    install_payload = build_install_payload(pack_spec)
             elif mode == "preview":
                 install_payload = build_install_payload(pack_spec)
             if mode in {"preview", "validate"} and not prerequisite_errors and not _has_error(findings):
@@ -3461,20 +3541,19 @@ class TopologyWorkflow:
                 require_live_templates=False,
             )
             for run in runs:
-                if not run.install_payload:
-                    continue
-                try:
-                    run.install_result = self.client.install_content_pack(run.pack_id or "", run.version or "", run.install_payload)
-                except KeyError as exc:
-                    raise ValidationError(
-                        f"Install failed because content pack '{run.title}' version {run.version} could not be resolved."
-                    ) from exc
-                run.installed = True
-                for failure_message in _install_failures(run.install_result):
-                    run.findings.append(_finding("error", "install", failure_message))
                 profile_meta = profile_meta_by_key[run.profile]
                 pack_app_name = resolve_pack_app_name(self.client, profile_meta, run.pack_id)
-                _check_pack_bundle_visibility(self.client, run.findings, profile_meta, pack_app_name=pack_app_name)
+                if run.install_payload:
+                    try:
+                        run.install_result = self.client.install_content_pack(run.pack_id or "", run.version or "", run.install_payload)
+                    except KeyError as exc:
+                        raise ValidationError(
+                            f"Install failed because content pack '{run.title}' version {run.version} could not be resolved."
+                        ) from exc
+                    run.installed = True
+                    for failure_message in _install_failures(run.install_result):
+                        run.findings.append(_finding("error", "install", failure_message))
+                    _check_pack_bundle_visibility(self.client, run.findings, profile_meta, pack_app_name=pack_app_name)
                 pack_spec = next(context["pack_spec"] for context in pack_contexts if context["profile"] == run.profile)
                 run.configured_outcome = _run_configured_outcome(self.client, pack_spec, spec, mode, pack_app_name=pack_app_name)
                 if run.configured_outcome:
@@ -3532,9 +3611,7 @@ class TopologyWorkflow:
         )
         itsi_state = _ensure_itsi(
             self.client,
-            mode="preview",
             spec=spec,
-            installer=self.itsi_installer,
         )
         content_library_state = {
             "required": False,

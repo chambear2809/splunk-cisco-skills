@@ -7,6 +7,10 @@ description: >-
   delegated specs, and dashboard/detector follow-ups. Use when the user asks
   to create, configure, validate, or operate Splunk Synthetic Monitoring tests
   without loading the broader native-ops workflow first.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Synthetics Setup

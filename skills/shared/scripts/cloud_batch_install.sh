@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/credential_helpers.sh"
+source "${SCRIPT_DIR}/../lib/platform_version_helpers.sh"
 
 REGISTRY_FILE="${REGISTRY_FILE:-${_PROJECT_ROOT}/skills/shared/app_registry.json}"
 
@@ -16,7 +17,16 @@ ACS restart at the end. Uses the app registry for license-ack URLs.
 Usage: $(basename "$0") [OPTIONS] <app_id> [app_id...]
 
 Options:
-  --version VER        Version to install (applies to all; blank = latest)
+  --version VER        Version to install (applies to all apps)
+  --target-splunk-version VER
+                       Compatibility target (MAJOR.MINOR[.PATCH]); defaults to
+                       the shared Splunk Cloud platform contract
+  --accept-unsupported-platform
+                       Override a known incompatibility only with documented
+                       vendor/operator approval
+  --accept-unverified-release
+                       Request public latest instead of each repo-verified version;
+                       this does not certify those releases
   --no-restart         Skip the final ACS restart
   --help               Show this help
 
@@ -29,10 +39,16 @@ EOF
 APP_IDS=()
 APP_VERSION=""
 RESTART=true
+TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
+ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
+ACCEPT_UNVERIFIED_RELEASE="${SPLUNK_ACCEPT_UNVERIFIED_RELEASE:-false}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
+        --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
+        --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
+        --accept-unverified-release) ACCEPT_UNVERIFIED_RELEASE=true; shift ;;
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
         --*) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
@@ -115,6 +131,129 @@ for app in registry.get('apps', []):
     fi
 }
 
+normalize_splunk_minor_version() {
+    python3 - "${1:-}" <<'PY'
+import re
+import sys
+
+value = sys.argv[1].strip()
+match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+)?", value)
+if not match:
+    raise SystemExit(1)
+print(f"{match.group(1)}.{match.group(2)}", end="")
+PY
+}
+
+resolve_target_splunk_version() {
+    local raw="${TARGET_SPLUNK_VERSION:-}"
+    if [[ -z "${raw}" ]]; then
+        raw="$(spv_cloud_doc_train_default)"
+    fi
+    if ! TARGET_SPLUNK_VERSION="$(normalize_splunk_minor_version "${raw}")"; then
+        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        return 1
+    fi
+    export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
+    export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM="${ACCEPT_UNSUPPORTED_PLATFORM}"
+    export SPLUNK_ACCEPT_UNVERIFIED_RELEASE="${ACCEPT_UNVERIFIED_RELEASE}"
+}
+
+resolve_app_compatibility() {
+    local app_id="$1"
+    local target="$2"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 - "${REGISTRY_FILE}" "${app_id}" "${target}" <<'PY'
+import json
+import sys
+
+registry_path, target_id, target_version = sys.argv[1:]
+with open(registry_path, encoding="utf-8") as handle:
+    registry = json.load(handle)
+for app in registry.get("apps", []):
+    if str(app.get("splunkbase_id", "")) != target_id:
+        continue
+    platforms = [str(item) for item in app.get("platform_versions", [])]
+    fields = (
+        "supported" if target_version in platforms else "unsupported",
+        str(app.get("app_name", "")),
+        ",".join(platforms),
+        str(app.get("latest_verified_version", "")),
+        str(app.get("latest_release_version", "")),
+        str(app.get("cloud_compatible", "")).lower(),
+        str(app.get("install_method_single", "")),
+        str(app.get("install_method_distributed", "")),
+    )
+    print("|".join(fields), end="")
+    break
+PY
+}
+
+preflight_app_compatibility() {
+    local app_id="$1"
+    local metadata status app_name platforms verified release
+    local cloud_compatible install_method_single install_method_distributed
+    metadata="$(resolve_app_compatibility "${app_id}" "${TARGET_SPLUNK_VERSION}")"
+    if [[ -z "${metadata}" ]]; then
+        log "INFO: App ID ${app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
+        return 0
+    fi
+
+    IFS='|' read -r status app_name platforms verified release cloud_compatible \
+        install_method_single install_method_distributed <<< "${metadata}"
+    if [[ "${cloud_compatible}" == "false" ]]; then
+        if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+            log "WARNING: Explicit Cloud-placement override accepted for ${app_name:-app ID ${app_id}} even though Splunkbase marks cloud_compatible=false (single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown})."
+            log "WARNING: Proceed only with documented Splunk Support/vendor approval for this exact package and topology."
+        else
+            log "ERROR: ${app_name:-App ID ${app_id}} is explicitly cloud_compatible=false on Splunkbase."
+            log "Cloud install methods: single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown}."
+            log "Refusing the entire batch before ACS mutation. Use a customer-managed runtime or pass --accept-unsupported-platform only with documented Splunk Support/vendor approval."
+            return 1
+        fi
+    fi
+    if [[ "${status}" != "supported" ]]; then
+        if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+            log "WARNING: Explicit override accepted for ${app_name:-app ID ${app_id}} on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."
+        else
+            log "ERROR: ${app_name:-App ID ${app_id}} does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
+            log "Advertised platform versions: ${platforms:-none}."
+            log "Refusing the entire batch before ACS mutation. Pass --accept-unsupported-platform only with documented vendor approval."
+            return 1
+        fi
+    else
+        log "Compatibility preflight passed: ${app_name:-app ID ${app_id}} advertises Splunk ${TARGET_SPLUNK_VERSION}."
+    fi
+
+    if [[ -z "${APP_VERSION}" && "${ACCEPT_UNVERIFIED_RELEASE}" != "true" && -n "${verified}" ]]; then
+        if [[ -n "${release}" && "${release}" != "${verified}" ]]; then
+            log "App ID ${app_id}: using repo-verified version ${verified}; public latest ${release} remains unverified by this repo."
+        else
+            log "App ID ${app_id}: using repo-verified version ${verified}."
+        fi
+    elif [[ -z "${APP_VERSION}" && "${ACCEPT_UNVERIFIED_RELEASE}" == "true" ]]; then
+        log "WARNING: App ID ${app_id}: public latest requested without repository package verification."
+    fi
+}
+
+resolve_app_install_version() {
+    local app_id="$1"
+    if [[ -n "${APP_VERSION}" ]]; then
+        printf '%s' "${APP_VERSION}"
+        return 0
+    fi
+    if [[ "${ACCEPT_UNVERIFIED_RELEASE}" != "true" && -f "${REGISTRY_FILE}" ]]; then
+        python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    if str(app.get('splunkbase_id', '')) == sys.argv[2]:
+        print(app.get('latest_verified_version', ''), end='')
+        break
+" "${REGISTRY_FILE}" "${app_id}" 2>/dev/null || true
+    fi
+}
+
 verify_app_identity() {
     local sk="$1" uri="$2" app_name="$3"
     local actual_id
@@ -150,6 +289,11 @@ if (( ${#expanded_app_ids[@]} > 0 )); then
     APP_IDS=("${expanded_app_ids[@]}")
 fi
 
+resolve_target_splunk_version || exit 1
+for app_id in "${APP_IDS[@]}"; do
+    preflight_app_compatibility "${app_id}" || exit 1
+done
+
 acs_prepare_context || exit 1
 
 log "=== Cloud Batch Install ==="
@@ -163,9 +307,10 @@ for app_id in "${APP_IDS[@]}"; do
     warn_if_role_unsupported_for_app_id "${app_id}"
 
     license_ack="$(resolve_license_ack "${app_id}")"
+    install_version="$(resolve_app_install_version "${app_id}")"
 
     declare -a cmd=(apps install splunkbase --splunkbase-id "${app_id}")
-    [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
+    [[ -n "${install_version}" ]] && cmd+=(--version "${install_version}")
     [[ -n "${license_ack}" ]] && cmd+=(--acs-licensing-ack "${license_ack}")
     cloud_requires_local_scope && cmd+=(--scope local)
 

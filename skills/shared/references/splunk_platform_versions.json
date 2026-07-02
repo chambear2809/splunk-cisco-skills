@@ -1,28 +1,23 @@
 {
-  "_comment": "Shared Splunk Platform version defaults and compatibility metadata. Defaults target 10.4; older Enterprise and Cloud trains remain supported.",
+  "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-07-02. Enterprise entries list currently supported minor trains; Cloud entries identify current documentation trains.",
   "defaults": {
-    "enterprise_version": "10.4.0",
-    "enterprise_image": "splunk/splunk:10.4.0",
+    "enterprise_version": "10.4.1",
+    "enterprise_image": "splunk/splunk:10.4.1",
     "enterprise_doc_train": "10.4",
-    "cloud_doc_train": "10.4.2603",
-    "cloud_doc_train_previous": "10.3.2512"
+    "cloud_doc_train": "10.5.2605",
+    "cloud_doc_train_previous": "10.4.2604",
+    "splunkbase_compatibility_target": "10.5"
   },
   "enterprise_platform_versions": [
     "10.4",
     "10.2",
-    "10.1",
     "10.0",
     "9.4",
-    "9.3",
-    "9.2",
-    "9.1",
-    "9.0",
-    "8.2",
-    "8.1",
-    "8.0"
+    "9.3"
   ],
   "cloud_doc_trains": [
-    "10.4.2603",
+    "10.5.2605",
+    "10.4.2604",
     "10.3.2512"
   ],
   "enterprise_upgrade_ladder": [
@@ -31,6 +26,16 @@
     "10.2",
     "10.4"
   ],
+  "enterprise_cloud_only_trains": [
+    "10.1",
+    "10.3"
+  ],
+  "enterprise_not_publicly_released_trains": [
+    "10.5"
+  ],
+  "enterprise_support_end_dates": {
+    "9.3": "2026-07-24"
+  },
   "svd_enterprise_floors": {
     "10.4": "10.4.0",
     "10.2": "10.2.2",
@@ -41,26 +46,38 @@
   "splunkbase_pins": {
     "7125": {
       "app_name": "Splunk_TA_otel",
-      "latest_version": "0.153.0",
-      "published_date": "2026-05-27",
+      "latest_version": "0.154.2",
+      "published_date": "2026-06-17",
       "max_platform_version": "10.4"
     },
     "8704": {
       "app_name": "splunk-connect-for-otlp",
       "latest_version": "0.4.1",
       "published_date": "2026-05-01",
-      "max_platform_version": "10.4"
+      "max_platform_version": "10.5"
     },
     "7180": {
       "app_name": "SplunkAssetRiskIntelligence",
       "latest_version": "1.2.2",
       "published_date": "2026-06-10",
-      "max_platform_version": "10.4"
+      "max_platform_version": "10.5"
     },
     "263": {
       "app_name": "SplunkEnterpriseSecuritySuite",
       "latest_version": "8.5.1",
       "published_date": "2026-04-16",
+      "max_platform_version": "10.5"
+    },
+    "8698": {
+      "app_name": "Splunk_TA_otel_linux_x86_64",
+      "latest_version": "0.154.2",
+      "published_date": "2026-06-17",
+      "max_platform_version": "10.4"
+    },
+    "8699": {
+      "app_name": "Splunk_TA_otel_windows_x86_64",
+      "latest_version": "0.154.2",
+      "published_date": "2026-06-17",
       "max_platform_version": "10.4"
     }
   },

@@ -10,6 +10,10 @@ description: >-
   apply or roll back a cluster bundle, perform searchable rolling restarts,
   take a peer offline, migrate single-site to multisite, decommission a site,
   or set up cluster manager redundancy.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Indexer Cluster Setup

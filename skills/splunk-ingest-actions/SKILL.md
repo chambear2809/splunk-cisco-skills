@@ -9,6 +9,10 @@ description: >-
   Ingest Actions rulesets, configure an S3 or filesystem RFS destination, route
   events to an alternate index or to S3, drop noisy events before indexing, or
   audit existing ingest rulesets on Splunk Cloud Platform or Splunk Enterprise.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Ingest Actions
@@ -77,9 +81,10 @@ bash skills/splunk-ingest-actions/scripts/validate.sh --live
 - `ruleset.json` — structured ruleset spec for the Ingest Actions UI / REST
 - `props_transforms_preview.conf` — manual heavy-forwarder preview (filter to
   nullQueue, mask via INGEST_EVAL/SEDCMD)
-- `apply.sh` — stage the RFS destination into `splunk_ingest_actions/local`,
-  print the ruleset UI/REST handoff, and exit nonzero until that ruleset is
-  authored and verified
+- `apply.sh` — on an Enterprise/customer-managed target, stage the RFS
+  destination into `splunk_ingest_actions/local`, print the ruleset UI/REST
+  handoff, and exit nonzero until that ruleset is authored and verified; a
+  Cloud-rendered script exits `2` before any local runtime write
 - `status.sh` — list rulesets and surface RFS upload errors from `_internal`
 - `README.md` / `metadata.json` — review context
 
@@ -89,8 +94,11 @@ bash skills/splunk-ingest-actions/scripts/validate.sh --live
 - If a ruleset routes to a destination that does not exist or is invalid, Splunk
   blocks queues and pipelines rather than dropping data. Create destinations
   first.
-- On Splunk Cloud (Victoria), rulesets deploy automatically; on Classic and on
-  indexer clusters you must deploy explicitly.
+- On managed Splunk Cloud, create destinations and rulesets through Splunk Web
+  or the supported REST/control-plane workflow. `--platform cloud --phase
+  apply` exits `2` before rendering or writing a local `$SPLUNK_HOME` path.
+- On Victoria, rulesets deploy automatically; on Classic and on indexer
+  clusters you must deploy explicitly.
 - On heavy forwarders managed by a deployment server, configure S3 destinations
   on each forwarder individually.
 

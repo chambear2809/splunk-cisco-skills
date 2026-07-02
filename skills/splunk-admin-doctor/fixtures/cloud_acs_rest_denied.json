@@ -29,7 +29,8 @@
     }
   },
   "hec": {
-    "enabled": false
+    "enabled": false,
+    "expected_but_disabled": true
   },
   "apps": {
     "update_gaps": [

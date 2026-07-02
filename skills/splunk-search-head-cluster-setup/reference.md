@@ -187,7 +187,7 @@ splunk transfer shcluster-captain \
 
 ## Splunk 10.4 enterprise deployment notes
 
-For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+For Splunk Enterprise `10.4.1` and Splunk Cloud Platform `10.5.2605` planning,
 read this skill alongside
 [`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
 the prose companion to the

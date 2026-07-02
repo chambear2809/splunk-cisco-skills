@@ -8,6 +8,10 @@ description: >-
   Echo, upgrade, and uninstall prerequisite handoffs. Use when a user asks to
   set up ARI, Splunk Asset and Risk Intelligence, asset/identity risk
   inventory, or ARI-backed ES Exposure Analytics readiness.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Asset and Risk Intelligence Setup
@@ -38,9 +42,11 @@ setup-plus-handoff coverage, not ARI config-as-code.
   (the search-tier role placement is `required`); this skill does not split
   per-member work.
 - Treat Splunk platform compatibility carefully: Splunkbase lists ARI `1.2.2`
-  for Splunk `9.0` through `10.4` (default `10.4`; also `10.3` Cloud / `10.2` /
-  older Enterprise trains), while ARI docs signal `9.1.3+` for current
-  ARI releases. Warn below `9.1.3`; do not hard-fail only on that conflict.
+  for Splunk `9.3` through `10.5`, while ARI docs signal `9.1.3+` for current
+  ARI releases. In this repository, `10.5` is the current Splunk Cloud target;
+  the self-managed Enterprise default remains `10.4.0`. Do not use the
+  cross-product Splunkbase listing as evidence for a self-managed Enterprise
+  `10.5` deployment. Warn below `9.1.3`; do not hard-fail only on that conflict.
 
 ## Primary Commands
 

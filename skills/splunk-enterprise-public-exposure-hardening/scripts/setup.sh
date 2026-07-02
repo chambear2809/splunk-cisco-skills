@@ -130,7 +130,7 @@ Surface enables:
 Splunk runtime:
   --splunk-home PATH            (default: /opt/splunk)
   --service-user NAME           (default: splunk)
-  --splunk-version X.Y.Z        (default: 10.4.0; SVD floor enforced)
+  --splunk-version X.Y.Z        (default: $(spv_enterprise_default); supported train + SVD floor enforced)
 
 Crypto:
   --tls-policy tls12|tls12_13   (default: tls12)

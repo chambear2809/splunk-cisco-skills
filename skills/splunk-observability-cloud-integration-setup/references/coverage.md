@@ -87,9 +87,12 @@ These adjacent surfaces are intentionally NOT in this skill:
   `splunk-observability-otel-collector-setup`. That skill manages OTel
   collector deployment on Kubernetes / Linux; this skill only orchestrates
   the platform-side pairing and SIM streaming.
-- Splunk Synthetic Monitoring Add-on (Splunkbase 5608) — archived since 2022;
-  replaced by SIM Add-on streams. Marked `deprecated: true` in
-  `skills/shared/app_registry.json` for honesty.
+- Splunk Synthetic Monitoring Add-on (Splunkbase `5608`) — archived since
+  2022 and not listed for Splunk 10.5. It is a migration reference only: do
+  not install it on a new or upgraded 10.5 stack. Use SIM Add-on streams for
+  in-platform metrics and native Splunk Observability Cloud Synthetics for
+  browser/API tests. The shared registry records it as unsupported for the
+  10.5 compatibility target.
 - Splunk On-Call wiring — handled by `splunk-oncall-setup`. That skill owns
   the API-id / X-VO-Api-Key flow, REST endpoint integration, and the
   Splunk-side Splunkbase 3546 / 4886 / 5863 apps.

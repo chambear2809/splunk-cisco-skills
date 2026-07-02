@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import unittest
@@ -67,6 +68,17 @@ class KvstoreAdminTests(unittest.TestCase):
             self.assertIn("start-shcluster-migration kvstore -storageEngine wiredTiger", migrate)
             self.assertIn("start-shcluster-upgrade kvstore -version", upgrade)
             self.assertIn("backup kvstore -pointInTime true", backup)
+            self.assertIn("spv_require_supported_splunk_home", backup)
+
+    def test_rejects_arbitrary_enterprise_version_as_kvstore_server_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--topology", "shc",
+                "--target-kvstore-version", "10.5",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("supported 7.0 or 8.0.x", result.stderr)
 
     def test_rejects_bad_field_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -91,6 +103,7 @@ class KvstoreAdminTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
                 "--output-dir", tmpdir,
+                "--platform", "enterprise",
                 "--phase", "apply",
                 "--operation", "restore",
                 "--backup-archive-name", "kvdump.tar.gz",
@@ -102,6 +115,7 @@ class KvstoreAdminTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
                 "--output-dir", tmpdir,
+                "--platform", "enterprise",
                 "--phase", "apply",
                 "--operation", "clean",
             )
@@ -112,6 +126,7 @@ class KvstoreAdminTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_setup(
                 "--output-dir", tmpdir,
+                "--platform", "enterprise",
                 "--dry-run",
                 "--phase", "apply",
                 "--operation", "collections",
@@ -119,6 +134,89 @@ class KvstoreAdminTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("DRY RUN", result.stdout + result.stderr)
+
+    def test_cloud_host_lifecycle_apply_exits_before_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for operation in ("backup", "restore", "clean", "migrate", "upgrade"):
+                with self.subTest(operation=operation):
+                    output_dir = Path(tmpdir) / operation
+                    output_dir.mkdir()
+                    sentinel = output_dir / "operator-note.txt"
+                    sentinel.write_text("preserve me\n", encoding="utf-8")
+                    result = self.run_setup(
+                        "--output-dir", str(output_dir),
+                        "--platform", "cloud",
+                        "--phase", "apply",
+                        "--operation", operation,
+                    )
+                    output = result.stdout + result.stderr
+                    self.assertEqual(result.returncode, 2, msg=output)
+                    self.assertIn("not customer-managed on Splunk Cloud", output)
+                    self.assertFalse((output_dir / "kvstore").exists())
+                    self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve me\n")
+
+    def test_auto_platform_resolves_cloud_before_lifecycle_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            env = os.environ.copy()
+            env["SPLUNK_PLATFORM"] = "cloud"
+            result = subprocess.run(
+                [
+                    "bash", str(SETUP),
+                    "--output-dir", str(output_dir),
+                    "--phase", "apply",
+                    "--operation", "backup",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 2, msg=result.stdout + result.stderr)
+            self.assertFalse(output_dir.exists())
+
+    def test_cloud_rendered_host_script_is_a_non_mutating_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            splunk_home = Path(tmpdir) / "managed-cloud-must-not-exist"
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--platform", "cloud",
+                "--splunk-home", str(splunk_home),
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "kvstore"
+            for name in ("backup.sh", "restore.sh", "clean.sh", "migrate.sh", "upgrade.sh"):
+                with self.subTest(script=name):
+                    script = render_dir / name
+                    applied = subprocess.run(
+                        ["bash", str(script)],
+                        cwd=script.parent,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=60,
+                    )
+                    self.assertEqual(applied.returncode, 2, msg=applied.stdout + applied.stderr)
+                    self.assertIn("Managed Splunk Cloud owns KV Store host lifecycle", applied.stderr)
+            self.assertFalse(splunk_home.exists())
+
+    def test_cloud_collection_governance_dry_run_is_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_setup(
+                "--output-dir", tmpdir,
+                "--platform", "cloud",
+                "--dry-run",
+                "--phase", "apply",
+                "--operation", "collections",
+                "--collection-name", "asset_inventory",
+                "--collection-fields", "ip:string,risk:number",
+                "--lookup-definition-name", "asset_inventory_lookup",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("via REST", result.stdout + result.stderr)
+            self.assertIn("on cloud", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

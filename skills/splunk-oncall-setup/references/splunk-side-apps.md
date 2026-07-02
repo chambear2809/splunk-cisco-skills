@@ -8,7 +8,7 @@ package and reading its `default/` and `README/*.spec` files.
 - App folder name: **`victorops_app`** (the package retained the legacy id;
   the skill must reference this exact id for `passwords.conf`, ACS install,
   and `is_configured` checks).
-- Splunkbase v1.0.42 (2026-01-28). Splunk Enterprise / Splunk Cloud 8.0–10.4 (default 10.4; also 10.3 Cloud / 10.2 / older trains).
+- Splunkbase v1.0.42 (2026-01-28). Splunk Enterprise / Splunk Cloud 9.0–10.5.
   Requires Python 3.13.
 - Install target: search head, or SHC deployer for SHC deployments.
 
@@ -126,7 +126,7 @@ writes it via the REST API.
 ## Splunkbase 4886 — Splunk Add-on for On-Call (VictorOps)
 
 - App folder name: **`TA-splunk-add-on-for-victorops`**.
-- Splunkbase v2.0.0. Splunk Enterprise / Splunk Cloud 8.0–10.4 (default 10.4; also 10.3 Cloud / 10.2 / older trains).
+- Splunkbase v2.0.0. Splunk Enterprise / Splunk Cloud 9.0–10.5.
 - Install target: **heavy forwarder** (the Add-on calls the public API and
   produces JSON events that flow into Splunk indexes).
 
@@ -182,6 +182,10 @@ that the path is reachable.
 
 ## Splunkbase 5863 — Splunk On-Call SOAR connector
 
+- Product classification: Splunk SOAR-only. This is not a Splunk Enterprise
+  or Splunk Cloud Platform app, so the repository's Platform `10.5`
+  compatibility target is not applicable. Do not send this package through a
+  Platform app installer.
 - App folder name: **`splunkoncall`** (package: `phantom_splunkoncall`,
   `appid: 623de41b-eac0-4a4a-970c-974e8d7ac2cb`).
 - Splunkbase v2.2.4 (2025-08-01). Splunk SOAR 5.1.0+. Python 3.9 / 3.13.

@@ -404,6 +404,8 @@ _CLUSTER_MGR_SK_BLOCK = (
     'source "${LIB_DIR}/credential_helpers.sh"\n'
     "# shellcheck disable=SC1091\n"
     'source "${LIB_DIR}/cluster_helpers.sh"\n'
+    "# shellcheck disable=SC1091\n"
+    'source "${LIB_DIR}/platform_version_helpers.sh"\n'
     "\n"
     'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
     'ADMIN_PW_FILE="${SPLUNK_ADMIN_PASSWORD_FILE:-/tmp/splunk_admin_password}"\n'
@@ -412,6 +414,16 @@ _CLUSTER_MGR_SK_BLOCK = (
     "  exit 1\n"
     "fi\n"
     'SK="$(get_session_key_from_password_file "${MANAGER_URI}" "${ADMIN_PW_FILE}" "${AUTH_USER}")"\n'
+    '_SPV_SERVER_INFO="$(mktemp)"\n'
+    'chmod 600 "${_SPV_SERVER_INFO}"\n'
+    'if ! splunk_curl "${SK}" --fail-with-body --show-error \\\n'
+    '  "${MANAGER_URI}/services/server/info?output_mode=json" > "${_SPV_SERVER_INFO}"; then\n'
+    '  rm -f "${_SPV_SERVER_INFO}"\n'
+    '  echo "ERROR: Could not read cluster-manager /services/server/info." >&2\n'
+    '  exit 1\n'
+    'fi\n'
+    'MANAGER_SPLUNK_VERSION="$(spv_require_supported_enterprise_server_info "${_SPV_SERVER_INFO}")"\n'
+    'rm -f "${_SPV_SERVER_INFO}"\n'
 )
 
 
@@ -777,6 +789,10 @@ def render_validate(cluster_manager_uri: str) -> str:
         + "# cluster_audit_snapshot creates the dir 0700 and writes each\n"
         + "# JSON payload with umask 077.\n"
         + 'cluster_audit_snapshot "${MANAGER_URI}" "${SK}" "${AUDIT_DIR}"\n'
+        + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
+        + '  "${MANAGER_URI}/services/server/info?output_mode=json" > "${AUDIT_DIR}/manager-server-info.json"\n'
+        + 'manager_version="$(spv_require_supported_enterprise_server_info "${AUDIT_DIR}/manager-server-info.json")"\n'
+        + 'echo "PASS: Cluster manager runs supported Splunk Enterprise ${manager_version}."\n'
         + "\n"
         + "# Use the structured /info payload to gate on pre-flight readiness.\n"
         + 'preflight_failed=$(python3 - "${AUDIT_DIR}/manager-info.json" <<\'PY\'\n'

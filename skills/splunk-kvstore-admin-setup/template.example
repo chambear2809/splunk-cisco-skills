@@ -5,6 +5,7 @@
 
 phase: render
 operation: none
+platform: auto  # auto | cloud | enterprise; Cloud host lifecycle is Support-owned
 
 splunk_home: /opt/splunk
 topology: standalone

@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/../../shared/lib/host_bootstrap_helpers.sh"
 APP_NAME="Splunk_AI_Assistant_Cloud"
 APP_ID="7245"
 LATEST_VERIFIED_APP_VERSION="2.0.0"
+CURRENT_PUBLIC_APP_VERSION="2.1.1"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
 VALIDATE_SCRIPT="${VALIDATE_SCRIPT:-${SCRIPT_DIR}/validate.sh}"
 
@@ -49,7 +50,7 @@ Operations:
   (no flags)                         Install/update and then validate
 
 Options:
-  --app-version VER                  Pin a specific Splunkbase version instead of latest (${LATEST_VERIFIED_APP_VERSION})
+  --app-version VER                  Pin a version (verified baseline: ${LATEST_VERIFIED_APP_VERSION}; public: ${CURRENT_PUBLIC_APP_VERSION})
   --email EMAIL                      Onboarding contact email
   --region REGION                    Onboarding region token such as usa
   --company-name NAME                Customer company name for onboarding submission
@@ -387,6 +388,10 @@ install_or_update() {
         cmd+=(--app-version "${APP_VERSION}")
     fi
 
+    if [[ -z "${APP_VERSION}" ]]; then
+        log "Package boundary: shared installer pins verified ${LATEST_VERIFIED_APP_VERSION}; public ${CURRENT_PUBLIC_APP_VERSION} requires its explicit unverified-release override."
+    fi
+
     "${cmd[@]}"
 }
 
@@ -394,12 +399,14 @@ print_platform_notes() {
     log ""
     if is_splunk_cloud; then
         log "Splunk Cloud note: keep this app on the public Splunkbase install path."
-        log "Latest verified release is ${LATEST_VERIFIED_APP_VERSION}; Agent Mode is limited to supported AWS commercial regions."
+        log "Verified baseline is ${LATEST_VERIFIED_APP_VERSION}; public release ${CURRENT_PUBLIC_APP_VERSION} is not package-verified here."
+        log "The ${LATEST_VERIFIED_APP_VERSION} Agent Mode behavior is limited to supported AWS commercial regions; re-check current-release behavior."
         log "FedRAMP IL2 support is limited in ${LATEST_VERIFIED_APP_VERSION}: no Agent Mode, training/fine-tuning data off by default, and Splunk-hosted models only."
         log "Open the app in Splunk Web after install to confirm Context, Model Runtime, and feature availability on the target stack."
     else
         log "Splunk Enterprise note: this app still uses Splunk-managed cloud services."
-        log "Latest verified release is ${LATEST_VERIFIED_APP_VERSION}; prefer Splunk Enterprise 9.3+ for unpinned latest installs."
+        log "Verified baseline is ${LATEST_VERIFIED_APP_VERSION}; public release ${CURRENT_PUBLIC_APP_VERSION} is not package-verified here."
+        log "Confirm current public release requirements instead of inheriting the ${LATEST_VERIFIED_APP_VERSION} Enterprise 9.3+ baseline."
         log "Allow outbound HTTPS to *.scs.splunk.com:443 from the search head."
         log "Use --submit-onboarding-form, --complete-onboarding, and optional proxy settings to drive the cloud-connected setup flow."
         log "If the target is an SHC and deployer-target credentials are configured, the shared installer can use deployer bundle delivery."

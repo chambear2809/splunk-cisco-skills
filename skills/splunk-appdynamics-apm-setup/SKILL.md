@@ -11,6 +11,10 @@ description: >-
   information points, metrics, AWS Lambda/serverless APM, development
   monitoring, OpenTelemetry ingestion, OTel collector setup, or application
   server agent instrumentation snippets.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics APM Setup

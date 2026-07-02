@@ -6,6 +6,10 @@ description: >-
   or Kubernetes Helm configuration, and validates SC4S startup. Use when the
   user asks about SC4S, Splunk Connect for Syslog, syslog-ng collector setup, or
   syslog ingestion through HEC.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Connect for Syslog Setup

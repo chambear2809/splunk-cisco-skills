@@ -12,6 +12,10 @@ description: >-
   Splunk anomaly detection assistants, Smart Alerts Assistant, or AI/ML product
   coverage outside Splunk AI Assistant, including Cisco Data Fabric requests
   about AI Toolkit or machine-data model workflows.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AI/ML Toolkit Setup
@@ -59,6 +63,16 @@ This skill covers Splunk-owned and Splunk-supported AI/ML products:
 Third-party AI-tagged Splunkbase apps are out of scope unless another skill
 explicitly routes them.
 
+## Splunk 10.5 Legacy Package Guardrail
+
+Splunkbase does not list Splunk 10.5 support for PSC Linux 32-bit (`2884`),
+Splunk App for Anomaly Detection (`6843`), or Smart Alerts Assistant beta
+(`6415`). Do not install any of these three packages on a new or upgraded
+Splunk 10.5 deployment. They remain in this skill only so an existing estate
+can inventory dependencies and render a migration plan. Use a supported
+64-bit PSC package and current Splunk AI Toolkit workflows for replacement
+coverage.
+
 ## Safety Rules
 
 - Never ask for Splunk passwords, Splunkbase passwords, HEC tokens, LLM API
@@ -68,8 +82,9 @@ explicitly routes them.
 - LLM provider credentials, HEC tokens, Splunk access tokens, Docker registry
   secrets, Kubernetes kubeconfigs, and TLS key material must be file-backed or
   delegated to the owning setup skill.
-- Do not install legacy EOL/beta anomaly apps by default. Audit and migrate
-  them to current AI Toolkit workflows.
+- Do not install legacy EOL/beta anomaly apps by default, and never install
+  `2884`, `6415`, or `6843` on Splunk 10.5. Audit and migrate them to current
+  AI Toolkit workflows.
 - Do not claim DSDL runtime automation for Docker, Kubernetes, OpenShift, HPC,
   GPU, air-gapped images, Jupyter notebooks, or model governance unless the
   workflow is rendered as a handoff or an owning runtime skill applies it.
@@ -137,7 +152,8 @@ Validation must fail for:
 
 - Unknown coverage statuses in `coverage-report.json`
 - AI Toolkit install plans without a selected compatible PSC target
-- PSC Linux 32-bit as a new install target unless explicitly audited as legacy
+- PSC Linux 32-bit as a new install target; on Splunk 10.5 it is inventory and
+  migration coverage only
 - DSDL requested without AI Toolkit and PSC coverage in the same plan
 - Direct-secret flags such as `--token`, `--api-token`, `--password`,
   `--client-secret`, or `--llm-api-key`
@@ -147,7 +163,8 @@ Validation must warn for:
 - DSDL Docker runtime in production because TLS, image provenance, and network
   isolation must be handled by the operator
 - AI Toolkit/PSC versions lower than the latest audited compatibility pair
-- Legacy Anomaly Detection or Smart Alerts Assistant beta installs
+- Any attempted Splunk 10.5 install of legacy Anomaly Detection or Smart
+  Alerts Assistant beta
 - MLTK model objects created before the MLTK 5.3 compatibility break, which
   may need retraining
 

@@ -10,6 +10,10 @@ description: >-
   the user asks about Splunk_TA_okta_identity_cloud, the Splunk Add-on for Okta
   Identity Cloud, Okta System Log, OktaIM2, Okta Universal Directory, or Okta
   authentication onboarding in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Add-on for Okta Identity Cloud Setup
@@ -32,6 +36,16 @@ Okta's REST API, with full CIM coverage for Enterprise Security.
 
 The add-on runs on the search tier or a heavy forwarder (no indexer or
 Universal Forwarder role). Run inputs on a single node to avoid duplicates.
+
+## Package Verification Boundary
+
+This skill's package-derived input/account model was verified against `5.0.2`.
+The current public release is `5.0.3` and advertises Splunk 10.5 support, but
+its package contents have not been verified by this repository. The shared
+installer defaults to verified `5.0.2`; only `--accept-unverified-release`
+follows public `5.0.3`. After that explicit override, inspect its UCC schema,
+metrics, source types, and shipped views before applying the `5.0.2`-based
+templates.
 
 ## Metrics And Source Types
 

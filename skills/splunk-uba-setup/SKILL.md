@@ -4,6 +4,10 @@ description: >-
   Use when validating Splunk UBA / UEBA readiness, optional UBA Kafka ingestion
   app placement, and migration guidance to Splunk Enterprise Security Premier
   UEBA without installing standalone UBA servers.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk UBA Setup
@@ -64,3 +68,10 @@ pretend to automate a supported UBA server installation. This skill provides:
   UBA end-of-sale and end-of-support dates.
 - Prefer ES Premier UEBA migration guidance for new work.
 - Treat Kafka app installation as optional and legacy/readiness-focused.
+- Splunkbase app `4147` version `1.4.6` currently advertises `9.2` through
+  `10.2` on selected release trains and does not advertise `10.5`. For the
+  repository's Splunk Cloud `10.5` target, the shared installer refuses the
+  known-incompatible package before mutation. Only
+  `--accept-unsupported-platform`, backed by documented vendor approval for
+  this exact legacy package and stack, can override the refusal; the override
+  is not compatibility certification.

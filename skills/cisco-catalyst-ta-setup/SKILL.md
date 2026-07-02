@@ -7,6 +7,10 @@ description: >-
   securely, and validates the deployment. Use when the user asks about Cisco
   Catalyst Center, DNA Center, DNAC, ISE, SD-WAN, Cyber Vision TA setup,
   or TA_cisco_catalyst.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Catalyst TA Setup Automation
@@ -26,14 +30,23 @@ Automates the **Cisco Catalyst Add-on for Splunk** (`TA_cisco_catalyst`).
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use `splunk-app-install` with `--source splunkbase --app-id 7538` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
-in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+**Pull from Splunkbase first, fall back to `splunk-ta/`.** Use
+`splunk-app-install` with `--source splunkbase --app-id 7538`; the shared
+installer defaults to the repository-verified release. If Splunkbase is
+unavailable, fall back to the local package in `splunk-ta/`.
 
 After installation, use this skill to configure accounts, inputs, and
 validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
 review-only.
+
+### Package Verification Boundary
+
+The repository's package-derived account/input baseline is `3.1.0`. The
+current public release is `3.2.35` and advertises Splunk 10.5 support, but its
+package contents have not been verified here. The shared installer defaults to
+verified `3.1.0`; only `--accept-unverified-release` follows public `3.2.35`.
+After that explicit override, review the UCC REST handlers, account/input
+schemas, source types, and dashboards before using `3.1.0` assumptions.
 
 ## Agent Behavior — Credentials
 

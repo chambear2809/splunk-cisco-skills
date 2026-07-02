@@ -51,6 +51,21 @@ def write_spec(tmp_path: Path, name: str, payload: dict) -> Path:
     return path
 
 
+def write_supported_fake_splunk_home(path: Path) -> None:
+    binary = path / "bin/splunk"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${1:-}\" == version ]]; then\n"
+        "  echo 'Splunk 10.4.1 (build test)'\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o755)
+
+
 # ---------------------------------------------------------------------------
 # Single-provider back-compat
 # ---------------------------------------------------------------------------
@@ -210,6 +225,54 @@ def test_fss3_provider_renders_rest_payload_and_aws_readme(tmp_path: Path) -> No
     # FSS2S federated.conf.template should NOT contain the FSS3 provider name
     fed = (out / "federated-search/federated.conf.template").read_text()
     assert "aws_logs" not in fed
+
+
+def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
+    tmp_path: Path,
+) -> None:
+    spec_path = write_spec(tmp_path, "fss3.json", _fss3_provider_spec(tmp_path))
+    out = tmp_path / "out"
+    result = run_render("--output-dir", str(out), "--spec", str(spec_path))
+    assert result.returncode == 0, result.stderr
+
+    handoff = (out / "federated-search/data-management-federation-handoff.md").read_text()
+    metadata = json.loads((out / "federated-search/metadata.json").read_text())
+    expected = {
+        "amazon_s3_data_management",
+        "microsoft_azure",
+        "azure_databricks",
+        "snowflake",
+        "ddss",
+    }
+    assert expected == {
+        item["key"] for item in metadata["data_management_federation_handoffs"]
+    }
+    handoffs = {
+        item["key"]: item for item in metadata["data_management_federation_handoffs"]
+    }
+    assert "available by activation" in handoffs["snowflake"]["stage"]
+    assert "available by activation" in handoffs["ddss"]["stage"]
+    assert "Contact Splunk sales for activation" in handoffs["snowflake"]["activation"]
+    assert "Contact Splunk sales for activation" in handoffs["ddss"]["activation"]
+    for label in ("Microsoft Azure", "Azure Databricks", "Snowflake", "DDSS"):
+        assert f"Federated Search for {label}" in handoff
+    assert "edit_connections" in handoff
+    assert "edit_datasets" in handoff
+    assert "required federated-search activation and Data Scan Unit entitlement" not in handoff
+    assert "do not infer one universal Data Scan Unit model" in handoff
+
+    # Snowflake 10.5 provider-side prerequisites.
+    assert "`USAGE` on the warehouse, database, and schema" in handoff
+    assert "Splunk-region IPv4 ingress network rule" in handoff
+    assert "Snowflake network policy" in handoff
+    assert "service-user authentication policy" in handoff
+    assert "programmatic access token (PAT) kept outside this repository" in handoff
+
+    # DDSS 10.5 catalog synchronization and access-policy prerequisites.
+    assert "associated DDSS index" in handoff
+    assert "SQS queue and S3 event notification" in handoff
+    assert "generated S3 bucket and SQS queue policies" in handoff
+    assert "does not support DDSS locations in Azure or GCP" in handoff
 
 
 def test_fss3_payload_omits_kms_when_not_provided(tmp_path: Path) -> None:
@@ -386,6 +449,7 @@ def test_rendered_apply_search_head_substitutes_passwords(tmp_path: Path) -> Non
     os.chmod(pw_a, 0o600)
     os.chmod(pw_b, 0o600)
     fake_home = tmp_path / "splunk"
+    write_supported_fake_splunk_home(fake_home)
     # When --spec is set, CLI single-provider flags are NOT used. The spec must
     # carry splunk_home / app_name / restart_splunk for the apply test.
     spec = {
@@ -441,6 +505,7 @@ def test_rendered_apply_search_head_substitutes_passwords(tmp_path: Path) -> Non
 
 def test_rendered_apply_fails_loudly_when_password_file_missing(tmp_path: Path) -> None:
     fake_home = tmp_path / "splunk"
+    write_supported_fake_splunk_home(fake_home)
     spec = {
         "splunk_home": str(fake_home),
         "restart_splunk": False,

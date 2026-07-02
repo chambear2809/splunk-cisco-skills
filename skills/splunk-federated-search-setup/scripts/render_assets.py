@@ -9,10 +9,10 @@ Supports the full Splunk Federated Search product surface:
 - Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform
   only), rendered as a REST payload because FSS3 cannot be configured through
   federated.conf and is created by POSTing to /services/data/federated/provider.
-- Data Management app federation handoffs for current Amazon S3
-  connection/dataset workflows and Controlled Availability Microsoft Azure
-  and Azure Databricks workflows. These are rendered as readiness handoffs,
-  not legacy provider payloads.
+- Data Management app federation handoffs for current Amazon S3,
+  Microsoft Azure, Azure Databricks, Snowflake, and DDSS connection/dataset
+  workflows. These are rendered as readiness handoffs, not legacy provider
+  payloads.
 - File-based apply for Splunk Enterprise standalone search heads, a fail-closed
   SHC deployer bundle handoff, plus a REST apply path that works on both Splunk
   Enterprise and Splunk Cloud Platform.
@@ -63,29 +63,47 @@ DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
     {
         "key": "amazon_s3_data_management",
         "label": "Federated Search for Amazon S3 through the Data Management app",
-        "stage": "available by entitlement",
+        "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact Splunk sales or use the approved access path for existing FSS3/Federated Analytics users.",
+        "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics customers can have a tenant-specific access path.",
         "dataset_model": "Data Management app connections and datasets; datasets can support federated search and, where documented, data routing.",
         "notes": "Use the legacy `aws_s3` REST payload path in this renderer only when that provider model is still the reviewed target for the tenant.",
     },
     {
         "key": "microsoft_azure",
         "label": "Federated Search for Microsoft Azure",
-        "stage": "Controlled Availability",
+        "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact a Splunk representative for activation and DSU entitlement review.",
+        "activation": "Contact Splunk sales for activation and confirm target-tenant commercial terms before building the connection.",
         "dataset_model": "Data Management app connection plus datasets over Azure Data Lake Storage and Azure Blob Storage containers.",
         "notes": "Azure datasets can be federated-search-only or data-routing-plus-federated-search when the tenant supports the documented Data Management workflow.",
     },
     {
         "key": "azure_databricks",
         "label": "Federated Search for Azure Databricks",
-        "stage": "Controlled Availability",
+        "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact a Splunk representative; existing FSS3/Federated Analytics users apply through the documented access path.",
+        "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics users apply through the documented access path.",
         "dataset_model": "Data Management app connection using Azure Databricks Delta Sharing to Unity Catalog schemas and tables.",
-        "notes": "Searches use SPL2 and the `sdselect` command family. This renderer does not create Databricks Delta Sharing credentials or Unity Catalog datasets.",
+        "notes": "Searches use SPL2. This renderer does not create Databricks Delta Sharing credentials or Unity Catalog datasets.",
+    },
+    {
+        "key": "snowflake",
+        "label": "Federated Search for Snowflake",
+        "stage": "available by activation in Splunk Cloud 10.5",
+        "availability": "Splunk Cloud Platform deployments in AWS regions; Snowflake warehouses must run on AWS",
+        "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
+        "dataset_model": "Data Management app connection for one Snowflake warehouse/database/schema plus datasets backed by tables or views.",
+        "notes": "Require USAGE on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token kept outside this repo.",
+    },
+    {
+        "key": "ddss",
+        "label": "Federated Search for DDSS",
+        "stage": "available by activation in Splunk Cloud 10.5",
+        "availability": "Splunk Cloud Platform deployments in AWS regions with DDSS data stored in Amazon S3",
+        "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
+        "dataset_model": "Data Management app DDSS dataset identified by a configured S3 bucket path and its associated DDSS index.",
+        "notes": "Require an SQS queue, S3 event notification, and the generated S3 bucket and SQS queue policies. Current federated search does not support DDSS locations in Azure or GCP.",
     },
 ]
 
@@ -169,6 +187,21 @@ def shell_quote(value: object) -> str:
 
 def make_script(body: str) -> str:
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
+
+
+def enterprise_version_gate(spec: Spec) -> str:
+    helper = shell_quote(
+        Path(__file__).resolve().parents[2]
+        / "shared/lib/platform_version_helpers.sh"
+    )
+    splunk_home = shell_quote(spec.splunk_home)
+    return f'''platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-{helper}}}"
+[[ -r "${{platform_version_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_version_helpers}}" >&2; exit 1; }}
+# shellcheck disable=SC1090
+source "${{platform_version_helpers}}"
+enterprise_version="$(spv_require_supported_splunk_home {splunk_home})"
+echo "PASS: supported Splunk Enterprise runtime ${{enterprise_version}}."
+'''
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -800,13 +833,16 @@ def render_data_management_handoff() -> str:
             "",
             "## Readiness Checklist",
             "",
-            "- Confirm the tenant has the required federated-search activation and Data Scan Unit entitlement.",
+            "- Contact Splunk sales to activate each requested Data Management federation surface. Confirm any applicable commercial entitlement for the target tenant; do not infer one universal Data Scan Unit model across all surfaces.",
             "- Confirm the Splunk Cloud deployment region and provider-region constraints before designing datasets.",
             "- Define connections and datasets in the Data Management app where the current docs require UI-driven setup.",
             "- For Azure datasets, decide whether each dataset is federated-search-only or data-routing-plus-federated-search.",
             "- For Azure Databricks, collect Delta Sharing and Unity Catalog readiness without placing credentials in this repo.",
+            "- For Snowflake, require a role with `USAGE` on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token (PAT) kept outside this repository. Azure/GCP Snowflake warehouses are unsupported.",
+            "- For DDSS, confirm the S3 self-storage location and associated DDSS index already exist, then create an SQS queue and S3 event notification and apply the generated S3 bucket and SQS queue policies. Route DDSS location lifecycle ownership to `splunk-cloud-acs-admin-setup`.",
             "- For current Amazon S3 workflows, prefer the Data Management app connection/dataset model unless the tenant is intentionally using the older provider payload path.",
-            "- Validate SPL2 or `sdselect` searches against representative time fields and partitions before production routing.",
+            "- Confirm roles have the current `edit_connections` and `edit_datasets` capabilities before the Data Management handoff.",
+            "- Validate SPL2 searches against representative time fields and partitions before production routing.",
             "",
             "## Per-Surface Notes",
             "",
@@ -826,7 +862,7 @@ def render_data_management_handoff() -> str:
         [
             "## Boundary",
             "",
-            "No Microsoft Azure, Azure Databricks, Snowflake, Apache Iceberg, Delta Lake,",
+            "No Microsoft Azure, Azure Databricks, Snowflake, DDSS, Apache Iceberg, Delta Lake,",
             "or Data Management app connection/dataset API writes are emitted by this",
             "renderer. Add a first-class apply path only after Splunk publishes a stable",
             "public contract that matches the tenant experience.",
@@ -861,7 +897,7 @@ def render_readme(spec: Spec) -> str:
         "- `status.sh` — REST GET /services/data/federated/provider; reports connectivityStatus per provider",
         "- `global-enable.sh` / `global-disable.sh` — toggle the global federated-search switch",
         "- `aws-s3-providers/<name>.json` — REST payload for each FSS3 provider (Splunk Cloud only)",
-        "- `data-management-federation-handoff.md` — current Data Management app federation readiness for Amazon S3, Microsoft Azure, and Azure Databricks",
+        "- `data-management-federation-handoff.md` — current Data Management app federation readiness for Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, and DDSS",
         "- `metadata.json` — machine-readable summary of the rendered plan",
         "",
         "Service-account passwords are never embedded. Apply scripts read them from",
@@ -872,7 +908,7 @@ def render_readme(spec: Spec) -> str:
         "",
         "- Splunk Cloud IP allow-lists (use Splunk Web → Settings → Server settings → IP allow list).",
         "- AWS Glue tables, S3 bucket policies, or KMS key policies (operator/AWS admin task).",
-        "- Data Management app connections or datasets for current Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, Apache Iceberg, or Delta Lake workflows.",
+        "- Data Management app connections or datasets for current Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, Apache Iceberg, or Delta Lake workflows.",
         "- Service accounts on remote Splunk deployments. Standard mode requires the",
         "  service account role on the remote SH to read the mapped datasets;",
         "  transparent mode against an SHC additionally requires the",
@@ -893,7 +929,8 @@ def render_readme(spec: Spec) -> str:
 def render_preflight(spec: Spec) -> str:
     splunk_home = shell_quote(spec.splunk_home)
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(spec)
+        + f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" btool federated list --debug >/dev/null
 "${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
@@ -977,7 +1014,8 @@ def render_apply_local(spec: Spec, *, shc: bool) -> str:
         else 'echo "INFO: No FSS2S federated indexes in spec; indexes.conf not copied."\n'
     )
     return make_script(
-        f"""splunk_home={splunk_home}
+        enterprise_version_gate(spec)
+        + f"""splunk_home={splunk_home}
 app_name={app_name}
 
 target_dir="{base}/${{app_name}}/local"

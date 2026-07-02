@@ -6,6 +6,10 @@ description: >-
   SLO API payload intent, /slo/validate handoffs, deeplinks, detector follow-up,
   and deep-native-workflow delegated specs. Use when the user asks to create,
   validate, or operationalize Splunk Observability SLOs.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability SLO Setup

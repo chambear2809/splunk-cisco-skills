@@ -12,9 +12,23 @@
 #
 # Splunk Cloud admins must POST reviewed legacy aws_s3 providers via REST or
 # the Web UI; FSS3 cannot be configured by editing federated.conf in Cloud.
-# Current Data Management app federation for Amazon S3, Microsoft Azure, and
-# Azure Databricks is rendered as a handoff in
+# Current Data Management app federation for Amazon S3, Microsoft Azure,
+# Azure Databricks, Snowflake, and DDSS is rendered as a handoff in
 # data-management-federation-handoff.md, not as `providers:` entries here.
+# The current overview requires Splunk sales activation for these Data
+# Management federation surfaces. Confirm commercial terms per tenant; do not
+# assume one universal Data Scan Unit entitlement across all five surfaces.
+#
+# Snowflake handoff intake (keep the PAT outside this file):
+# - AWS-hosted Splunk Cloud and AWS-hosted Snowflake region
+# - warehouse, database, and schema; Snowflake role with USAGE on all three
+# - Splunk-region IPv4 ingress network rule and Snowflake network policy
+# - service-user authentication policy that permits a programmatic access token
+#
+# DDSS handoff intake:
+# - configured S3 bucket path and associated DDSS index
+# - SQS queue and S3 event notification for catalog synchronization
+# - generated S3 bucket and SQS queue policies applied by the AWS owner
 
 phase: render
 apply_target: search-head            # search-head | shc-deployer | rest

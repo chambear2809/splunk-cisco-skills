@@ -7,6 +7,10 @@ description: >-
   (`Splunk_App_SAA`, app 7000). Use when a user asks for Attack Analyzer, SAA,
   phishing and malware analysis data ingestion, the `saa` index, `saa_indexes`
   macro, or Enterprise Security adaptive response readiness.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Attack Analyzer Setup
@@ -35,6 +39,10 @@ Use this skill for the Splunk platform side of Splunk Attack Analyzer.
   `skills/splunk-app-install/scripts/install_app.sh`. This wrapper handles
   Splunkbase auth, ACS upload, and version pinning so the Attack Analyzer
   setup never embeds those flows.
+- Splunkbase lists both packages through platform `10.5`. In this repository,
+  that is the current Splunk Cloud target; the self-managed Enterprise default
+  remains `10.4.0`. Do not reinterpret the cross-product listing as validation
+  of a self-managed Enterprise `10.5` deployment.
 
 ## Primary Commands
 

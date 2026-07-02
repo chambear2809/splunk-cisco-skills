@@ -20,7 +20,11 @@ from pathlib import Path
 _SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
 if str(_SHARED_LIB) not in sys.path:
     sys.path.insert(0, str(_SHARED_LIB))
-from platform_versions import platform_default, svd_enterprise_floors  # noqa: E402
+from platform_versions import (  # noqa: E402
+    platform_default,
+    require_supported_enterprise_version,
+    svd_enterprise_floors,
+)
 
 DEFAULT_SPLUNK_VERSION = platform_default("enterprise_version")
 
@@ -372,6 +376,10 @@ def validate_index_name(value: str, option: str) -> None:
 
 
 def validate(args: argparse.Namespace) -> None:
+    try:
+        require_supported_enterprise_version(args.splunk_version)
+    except ValueError as exc:
+        die(str(exc))
     validate_fqdn(args.public_fqdn, "--public-fqdn")
     if args.hec_fqdn:
         validate_fqdn(args.hec_fqdn, "--hec-fqdn")
@@ -395,6 +403,8 @@ def validate(args: argparse.Namespace) -> None:
         die("--proxy-sso-trusted-ip is required when --auth-mode=reverse-proxy-sso.")
     if args.tls_policy == "tls12_13" and args.enable_tls13 != "true":
         die("--tls-policy=tls12_13 requires --enable-tls13=true.")
+    if args.tls_policy == "tls12_13" and parse_version(args.splunk_version) < (10, 4, 0):
+        die("--tls-policy=tls12_13 requires Splunk Enterprise 10.4.0 or later.")
     if args.auth_mode == "ldap":
         validate_ldap_args(args)
 
@@ -490,9 +500,10 @@ def check_svd_floor(args: argparse.Namespace, floor: dict[str, str]) -> None:
     series = f"{running[0]}.{running[1]}"
     fixed = floor.get(series)
     if fixed is None:
-        # Unknown series: warn via comment but don't refuse — let preflight
-        # decide if upgrade is appropriate.
-        return
+        die(
+            f"Splunk version {args.splunk_version} has no published SVD floor "
+            f"for the {series}.x series; refusing to render public-exposure assets."
+        )
     if running < parse_version(fixed):
         die(
             f"Splunk version {args.splunk_version} is below the SVD floor "
@@ -2613,6 +2624,8 @@ def render_preflight(args: argparse.Namespace) -> str:
     proxy_cidr = shell_quote(args.proxy_cidr)
     probe = shell_quote(args.external_probe_cmd or "")
     helper = shell_quote(helper_path())
+    platform_helper = shell_quote(helper_path().with_name("platform_version_helpers.sh"))
+    target_version = shell_quote(args.splunk_version)
     cert_path = shell_quote(args.server_cert_path)
     allow_scripted = "true" if args.allow_scripted_auth else "false"
     return make_script(
@@ -2622,6 +2635,8 @@ proxy_cidr={proxy_cidr}
 external_probe={probe}
 cert_path={cert_path}
 helper={helper}
+platform_helper={platform_helper}
+target_version={target_version}
 allow_scripted_auth={allow_scripted}
 
 failures=0
@@ -2634,6 +2649,20 @@ fail() {{
 ok() {{
   echo "OK:   $1"
 }}
+
+# Fail closed if the live runtime is outside the public self-managed support
+# contract or differs from the version used to render the hardening assets.
+# shellcheck disable=SC1090
+source "${{platform_helper}}"
+if running_version="$(spv_require_supported_splunk_home "${{splunk_home}}")"; then
+  if [[ "${{running_version}}" == "${{target_version}}" ]]; then
+    ok "supported Splunk Enterprise runtime matches rendered target: ${{running_version}}"
+  else
+    fail "installed Splunk Enterprise ${{running_version}} does not match rendered target ${{target_version}}"
+  fi
+else
+  fail "installed Splunk Enterprise runtime is not a supported public self-managed train"
+fi
 
 # 1. Default-cert detection
 subject="$(openssl x509 -in "$cert_path" -noout -subject 2>/dev/null || true)"
@@ -2659,13 +2688,8 @@ else
   fail "verify-certs.sh missing or not executable"
 fi
 
-# 3. Splunk version vs SVD floor (recorded in metadata.json)
-running_version="$("${{splunk_home}}/bin/splunk" version 2>/dev/null | awk '/Splunk/ {{print $2; exit}}' || true)"
-if [[ -z "$running_version" ]]; then
-  fail "could not determine Splunk version"
-else
-  ok "Splunk version: $running_version"
-fi
+# 3. Splunk version vs SVD floor is enforced at render time and the live
+# runtime/target equality check above prevents applying that result elsewhere.
 
 # 4. pass4SymmKey not default
 if "${{splunk_home}}/bin/splunk" btool server list general 2>/dev/null \\

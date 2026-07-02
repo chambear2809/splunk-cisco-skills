@@ -703,6 +703,39 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Unsafe package archive member", result.stdout + result.stderr)
 
+    def test_unreleased_enterprise_train_package_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            package = tmp_path / "splunkforwarder-10.5.0-deadbeef-linux-amd64.tgz"
+            package.write_text("not-an-archive", encoding="utf-8")
+            password_file = tmp_path / "password"
+            password_file.write_text("abcdefgh", encoding="utf-8")
+            env = os.environ.copy()
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            result = self.run_script(
+                "bash",
+                str(SETUP),
+                "--phase",
+                "install",
+                "--target-os",
+                "linux",
+                "--source",
+                "local",
+                "--file",
+                str(package),
+                "--package-type",
+                "tgz",
+                "--splunk-home",
+                str(tmp_path / "opt/splunkforwarder"),
+                "--service-user",
+                getpass.getuser(),
+                "--admin-password-file",
+                str(password_file),
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not-publicly-released", result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

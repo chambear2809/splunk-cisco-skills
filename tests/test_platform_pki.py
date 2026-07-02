@@ -43,6 +43,8 @@ GENERATED_FILES manifest:
 22. metadata.json valid JSON; no PEM private key blocks anywhere.
 23. All rendered .sh pass bash -n.
 24. authoritative-sources.md cites the key upstream Splunk URLs.
+25. Splunk 10.5 blocks legacy SSL Certificate Checker app 3172 and renders
+    native expiry-monitoring guidance instead.
 """
 
 from __future__ import annotations
@@ -699,7 +701,43 @@ def test_authoritative_sources_md_cites_key_urls() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 25. smoke_offline.sh runs clean
+# 25. Splunk 10.5 native expiry monitoring replaces app 3172
+# ---------------------------------------------------------------------------
+
+def test_splunk_10_5_is_rejected_and_current_enterprise_renders_native_expiry(tmp_path: Path) -> None:
+    rejected = run_render(
+        *_core5_args(tmp_path / "rejected", **{"--splunk-version": "10.5.0"})
+    )
+    assert rejected.returncode != 0
+    assert "not-publicly-released" in rejected.stderr
+
+    setup_rejected = run_setup(
+        "--phase", "render", "--dry-run", "--splunk-version", "10.5.0",
+        "--output-dir", str(tmp_path / "setup-rejected"),
+    )
+    assert setup_rejected.returncode != 0
+    assert "not-publicly-released" in setup_rejected.stderr
+
+    out = tmp_path / "out"
+    result = run_render(*_core5_args(out, **{"--splunk-version": "10.4.1"}))
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    rendered = render_dir(out)
+    readme = (rendered / "README.md").read_text()
+    operator = (rendered / "handoff/operator-checklist.md").read_text()
+    monitoring = (rendered / "handoff/post-install-monitoring.md").read_text()
+    expire_watch = (rendered / "pki/rotate/expire-watch.sh").read_text()
+
+    assert "Splunkbase 3172 is blocked" in readme
+    assert "Splunkbase 3172 was not installed" in operator
+    assert "do not install SSL Certificate Checker" in monitoring
+    assert "expire-watch.sh" in monitoring
+    assert "native monitoring" in expire_watch
+    assert "SSL Certificate Checker (Splunkbase 3172) installed" not in operator
+
+
+# ---------------------------------------------------------------------------
+# 26. smoke_offline.sh runs clean
 # ---------------------------------------------------------------------------
 
 def test_smoke_offline_passes() -> None:

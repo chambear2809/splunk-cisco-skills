@@ -18,6 +18,7 @@ EVIDENCE_FILE=""
 FIXES=""
 JSON_OUTPUT=false
 STRICT=false
+REQUIRE_COMPLETE_EVIDENCE=false
 DRY_RUN=false
 
 usage() {
@@ -38,6 +39,7 @@ Options:
   --fixes FIX_ID[,FIX_ID]
   --json
   --strict
+  --require-complete-evidence
   --dry-run
   --help
 
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
         --fixes) require_arg "$1" $# || exit 1; FIXES="$2"; shift 2 ;;
         --json) JSON_OUTPUT=true; shift ;;
         --strict) STRICT=true; shift ;;
+        --require-complete-evidence) REQUIRE_COMPLETE_EVIDENCE=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
@@ -94,7 +97,7 @@ validate_args() {
     else
         OUTPUT_DIR="$(resolve_abs_path "${_PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}")"
     fi
-    if [[ "${PHASE}" == "apply" && -z "${FIXES}" && "${DRY_RUN}" != "true" ]]; then
+    if [[ "${PHASE}" == "apply" && -z "${FIXES}" ]]; then
         log "ERROR: --phase apply requires --fixes FIX_ID[,FIX_ID]."
         exit 1
     fi
@@ -113,6 +116,7 @@ build_args() {
     [[ -n "${FIXES}" ]] && DOCTOR_ARGS+=(--fixes "${FIXES}")
     [[ "${JSON_OUTPUT}" == "true" ]] && DOCTOR_ARGS+=(--json)
     [[ "${STRICT}" == "true" ]] && DOCTOR_ARGS+=(--strict)
+    [[ "${REQUIRE_COMPLETE_EVIDENCE}" == "true" ]] && DOCTOR_ARGS+=(--require-complete-evidence)
     [[ "${DRY_RUN}" == "true" ]] && DOCTOR_ARGS+=(--dry-run)
     return 0
 }

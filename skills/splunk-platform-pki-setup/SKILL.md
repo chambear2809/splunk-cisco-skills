@@ -12,6 +12,10 @@ description: >-
   PKI, mint certs, prepare third-party CA CSRs, replace default certs, configure
   mTLS, fix KV Store cert validation, encrypt replication traffic, configure
   SAML/LDAPS trust, or rotate Splunk TLS certificates.
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "self-managed-10.4"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Platform PKI Setup
@@ -310,13 +314,15 @@ Under the project root in `splunk-platform-pki-rendered/`:
   swap-trust-anchor.sh, swap-replication-port-to-ssl.sh,
   expire-watch.sh}` — rotation helpers with the delegated
   rolling-restart runbook.
-- `handoff/` — Markdown checklists for Vault PKI, ACME / cert-manager,
-  Microsoft AD CS, EJBCA, Splunk Cloud UFCP / BYOC, FIPS migration,
-  Edge Processor upload, post-install monitoring (SSL Cert Checker
-  Splunkbase 3172, `/server/health/splunkd` REST endpoint, CIM
-  Certificates data model), and the operator checklist.
-- `preflight.sh`, `validate.sh`, `inventory.sh`, `README.md`,
-  `metadata.json`.
+- `handoff/` — CA, Cloud, FIPS, Edge Processor, native expiry monitoring,
+  optional legacy Splunkbase 3172, health, CIM, and operator checklists.
+- `preflight.sh`, `validate.sh`, `inventory.sh`, `README.md`, `metadata.json`.
+
+## Certificate-Monitoring Guardrail
+
+SSL Certificate Checker (`3172`, app `ssl_certificate_checker`) stops at 9.4
+and must not be installed on Cloud 10.5. Use `expire-watch.sh` plus
+`inventory.sh`; see [post-install monitoring](references/post-install-monitoring.md).
 
 ## Phases
 

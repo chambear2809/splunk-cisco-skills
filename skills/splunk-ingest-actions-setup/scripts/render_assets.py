@@ -24,6 +24,7 @@ RULE_TYPES = ("eval", "mask", "drop", "route-s3")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk Ingest Actions assets.")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--platform", choices=("auto", "cloud", "enterprise"), default="auto")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_ingest_actions")
     parser.add_argument("--ruleset-sourcetype", required=True)
     parser.add_argument("--ruleset-name", required=True)
@@ -192,8 +193,27 @@ def render_status(args: argparse.Namespace) -> str:
 
 
 def render_readme(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        platform_note = (
+            "Splunk Cloud is a managed target. This setup workflow will not apply the "
+            "rendered conf files to a Cloud search tier. Use `splunk-ingest-actions "
+            "--platform cloud --phase render` for the supported UI/REST handoff, or "
+            "`splunk-ingest-processor-setup` for Cloud control-plane pipelines."
+        )
+    elif args.platform == "enterprise":
+        platform_note = (
+            "Direct conf-file REST apply is limited to an explicitly selected "
+            "Splunk Enterprise or customer-managed heavy-forwarder target."
+        )
+    else:
+        platform_note = (
+            "Platform is auto-detected from the configured target before apply. "
+            "Managed Splunk Cloud targets are refused and routed to the supported "
+            "Cloud workflows."
+        )
     return f"""# Splunk Ingest Actions Rendered Assets
 
+Platform: `{args.platform}`
 Source type: `{args.ruleset_sourcetype}`
 Ruleset: `{args.ruleset_name}`
 Rule type: `{args.rule_type}`
@@ -214,6 +234,8 @@ REST. Transformations are applied before indexing and cannot be reverted for
 already-indexed data; apply requires `--accept-irreversible-ingest`. Only one
 ruleset is supported per source type, and a Splunk deployment supports a maximum
 of 8 S3 destinations.
+
+{platform_note}
 """
 
 
@@ -227,6 +249,7 @@ def render(args: argparse.Namespace) -> dict:
             "README.md": render_readme(args),
             "metadata.json": json.dumps(
                 {
+                    "platform": args.platform,
                     "ruleset_sourcetype": args.ruleset_sourcetype,
                     "ruleset_name": args.ruleset_name,
                     "rule_type": args.rule_type,
@@ -250,6 +273,7 @@ def render(args: argparse.Namespace) -> dict:
             assets.append(rel)
     return {
         "target": "ingest-actions",
+        "platform": args.platform,
         "ruleset_name": args.ruleset_name,
         "rule_type": args.rule_type,
         "output_dir": str(output_dir),

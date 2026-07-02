@@ -30,6 +30,15 @@ MAX_DESCRIPTION_LENGTH = 1024
 MAX_COMPATIBILITY_LENGTH = 500
 MAX_SKILL_MD_LINES = 500
 MAX_BODY_WORDS = 5000
+COMPATIBILITY_STATUSES = {
+    "supported",
+    "conditional",
+    "blocked",
+    "self-managed-10.4",
+    "not-applicable",
+    "delegated",
+}
+COMPATIBILITY_VERIFIED_DATE = "2026-07-02"
 
 
 def parse_frontmatter(block: str) -> dict[str, str]:
@@ -143,30 +152,40 @@ def check_skill(skill_dir: Path) -> list[str]:
         errors.append(f"{dir_name}: frontmatter license must be a string when present")
 
     compatibility = metadata.get("compatibility")
-    if compatibility is not None:
-        if not isinstance(compatibility, str) or not compatibility.strip():
-            errors.append(
-                f"{dir_name}: frontmatter compatibility must be a non-empty string"
-            )
-        elif len(compatibility.strip()) > MAX_COMPATIBILITY_LENGTH:
-            errors.append(
-                f"{dir_name}: frontmatter compatibility is "
-                f"{len(compatibility.strip())} characters; maximum is "
-                f"{MAX_COMPATIBILITY_LENGTH}"
-            )
+    if not isinstance(compatibility, str) or not compatibility.strip():
+        errors.append(
+            f"{dir_name}: frontmatter compatibility must be a non-empty string"
+        )
+    elif len(compatibility.strip()) > MAX_COMPATIBILITY_LENGTH:
+        errors.append(
+            f"{dir_name}: frontmatter compatibility is "
+            f"{len(compatibility.strip())} characters; maximum is "
+            f"{MAX_COMPATIBILITY_LENGTH}"
+        )
 
     metadata_value = metadata.get("metadata")
-    if metadata_value is not None:
-        if not isinstance(metadata_value, dict):
-            errors.append(f"{dir_name}: frontmatter metadata must be a mapping")
-        else:
-            for key, value in metadata_value.items():
-                if not isinstance(key, str) or not isinstance(value, str):
-                    errors.append(
-                        f"{dir_name}: frontmatter metadata entries must be string "
-                        "keys and string values"
-                    )
-                    break
+    if not isinstance(metadata_value, dict):
+        errors.append(f"{dir_name}: frontmatter metadata must be a mapping")
+    else:
+        for key, value in metadata_value.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                errors.append(
+                    f"{dir_name}: frontmatter metadata entries must be string "
+                    "keys and string values"
+                )
+                break
+        status = metadata_value.get("splunk_cloud_10_5")
+        if status not in COMPATIBILITY_STATUSES:
+            errors.append(
+                f"{dir_name}: metadata.splunk_cloud_10_5 must be one of "
+                + ", ".join(sorted(COMPATIBILITY_STATUSES))
+            )
+        verified = metadata_value.get("compatibility_verified")
+        if verified != COMPATIBILITY_VERIFIED_DATE:
+            errors.append(
+                f"{dir_name}: metadata.compatibility_verified must be "
+                f"{COMPATIBILITY_VERIFIED_DATE}"
+            )
 
     allowed_tools = metadata.get("allowed-tools")
     if allowed_tools is not None and not isinstance(allowed_tools, str):

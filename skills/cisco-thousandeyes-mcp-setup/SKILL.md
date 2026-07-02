@@ -10,6 +10,10 @@ description: >-
   explicit acknowledgement. Use when the user asks to register the ThousandEyes MCP,
   set up TE in Cursor/Claude/Codex/VS Code/Kiro, configure the Cisco
   ThousandEyes Cursor plugin, or pair an AI assistant with TE.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Cisco ThousandEyes MCP Server Setup

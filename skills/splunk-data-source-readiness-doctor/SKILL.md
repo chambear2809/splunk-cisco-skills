@@ -8,6 +8,10 @@ description: >-
   population checks, ingest pipeline health, knowledge-object enrichment,
   federated data usability, ITSI summary health, or fix handoffs after
   app/input setup.
+compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
+metadata:
+  splunk_cloud_10_5: "supported"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Data Source Readiness Doctor

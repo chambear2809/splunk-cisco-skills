@@ -31,29 +31,55 @@ files without putting secret values in shell history.
 ## Local Skill MCP Server
 
 The repo-local `splunk-cisco-skills` MCP server (`agent/run-splunk-cisco-skills-mcp.py`)
-is a development assistant for trusted, single-operator use. Its security model is:
+is a development assistant for trusted, single-operator use. It starts in
+discovery-and-plan-only mode. Its security model is:
 
-- It executes only allowlisted scripts from this repo's `skills/` tree, with
-  arguments validated against per-product schemas in `cisco-product-setup/catalog.json`.
+- Every local subprocess requires the server process to start with
+  `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`. Client confirmation alone cannot
+  enable execution.
+- Every generic `plan_skill_script` plan is classified as mutating, regardless
+  of its script name or arguments. Executing one additionally requires
+  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; only typed, schema-backed workflows may
+  receive a narrower read-only classification.
+- Tool schemas are strict: unknown properties are rejected, enum values are
+  constrained, and text, list, argument, and timeout sizes are bounded.
 - Direct secret-on-argv flags (`--password`, `--api-key`, `--token`, etc.) are
   blocked. Secrets must be passed through `--*-file` flags whose paths point at
   files created with `skills/shared/scripts/write_secret_file.sh`.
-- All execution is two-stage: a `plan_*` tool produces a hash, and an
-  `execute_*` tool requires the hash plus `confirm=true`. Plans are single-use
-  and consumed on execution.
-- Mutating scripts are gated by the server-wide environment variable
-  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`. With the variable unset, execution
-  of mutating plans is refused. Read-only plans (which do not require the
-  mutation gate) are limited to: any `validate.sh`, `list_apps.sh`, or
-  `resolve_product.sh` invocation; any script invoked with `--help`; and
-  `cisco-product-setup`'s `setup.sh` invoked with `--dry-run` or
-  `--list-products`. Anything else is treated as mutating.
-- Subprocess stdout/stderr are bounded by the server before being returned to
-  the client; very large output is truncated.
+- Execution is two-stage. A `plan_*` tool returns a random 256-bit,
+  64-character `plan_hash`; the matching `execute_*` tool requires that value
+  plus `confirm=true`. Plans expire, are single-use, and are bound to the
+  planned executable's SHA-256 digest and a snapshot of every file below
+  `skills/`. The snapshot is revalidated after acquiring the execution lock,
+  so changed entrypoints, shared helpers, catalogs, policies, or delegated
+  scripts invalidate the plan.
+- Subprocesses are serialized. Their runtime and stdout/stderr are bounded,
+  cancellation escalates from process-group termination to forced kill, and
+  returned output is truncated and redacted.
 
 This server is not a sandbox. Do not expose it to untrusted clients, do not
-run it inside a multi-tenant context, and do not mark it `read_only` for
-scripts that are not in the explicit allowlist.
+run it inside a multi-tenant context, and do not treat a plan or client-side
+confirmation as a substitute for operator review.
+
+## Splunk MCP Server Package And Bridge
+
+The `splunk-mcp-server-setup` skill targets the official Splunk MCP Server
+1.2.1 package from [Splunkbase app 7931](https://splunkbase.splunk.com/app/7931).
+The default local archive must have SHA-256
+`f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db`;
+the setup script verifies both the package version and this checksum before
+installing from any path.
+
+The tracked package manifest currently marks 1.2.1 as not production-approved
+because security and protocol findings require vendor code changes. Local app
+mutation or client activation and completion validation fail closed. The
+explicit nonproduction override is for isolated evaluation only.
+
+Rendered clients require HTTPS for remote endpoints. Plain HTTP and
+`--client-insecure-tls` are restricted to explicit loopback targets. The bridge
+uses a preinstalled, operator-vetted `mcp-remote@0.1.38` and has no dynamic
+`npx` download fallback. Keep the rendered `.env.splunk-mcp` file local with
+mode `0600`.
 
 ## Supported Branches
 

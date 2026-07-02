@@ -10,9 +10,21 @@ description: >-
   the hosted SCS MCP Gateway for Splunk Observability Cloud, Cursor MCP,
   Codex MCP, Claude Code MCP connectivity to Splunk, or Cisco Data Fabric
   agentic/tool access through Splunk MCP.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk MCP Server Setup
+
+## Production release status
+
+The current official package, 1.2.1, is **not production-approved** by this
+repository's security and protocol review. Installation fails closed by
+default while vendor fixes are pending. Do not deploy it to production or
+expose it to untrusted clients. `--accept-nonproduction-package` exists only
+for isolated evaluation and does not make the package production-safe.
 
 ## Shared add-on completion gate
 
@@ -45,6 +57,10 @@ into Claude Code's `.mcp.json`. The wrapper passes header placeholders such as
 `${SPLUNK_MCP_HEADER_X_SF_TOKEN}` to `mcp-remote`, keeping token values in the
 local env file instead of command argv.
 
+`mcp-remote` is an experimental compatibility proxy. Prefer a client's native
+Streamable HTTP transport when it can supply the required headers; the pinned
+bridge is not itself a production trust boundary.
+
 ## Package Model
 
 **Use the repo-local package in `splunk-ta/` as the default install source.**
@@ -52,21 +68,16 @@ local env file instead of command argv.
 The packaged app currently lives in:
 
 ```bash
-splunk-ta/splunk-mcp-server_110.tgz
+splunk-ta/splunk-mcp-server_121.tgz
 ```
 
-Install it with the shared installer:
+The setup workflow is the required install path because it enforces package
+provenance and the production-review gate. For isolated evaluation only:
 
 ```bash
-bash skills/splunk-app-install/scripts/install_app.sh \
-  --source local \
-  --file splunk-ta/splunk-mcp-server_110.tgz
-```
-
-Or let this skill do the install/update step for you:
-
-```bash
-bash skills/splunk-mcp-server-setup/scripts/setup.sh --install
+bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --install \
+  --accept-nonproduction-package
 ```
 
 To remove the app again:
@@ -90,6 +101,7 @@ MCP bearer tokens are secrets. Always write them to a local-only file:
 
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --accept-nonproduction-package \
   --token-user "${SPLUNK_USER}" \
   --write-token-file /tmp/splunk_mcp.token
 ```
@@ -117,7 +129,7 @@ keep any filled copy local as `template.local`.
 | Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Splunk Cloud |
 | App name | `Splunk_MCP_Server` |
-| Local package | `splunk-ta/splunk-mcp-server_110.tgz` |
+| Local package | `splunk-ta/splunk-mcp-server_121.tgz` (version 1.2.1; SHA-256 verified before install) |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-mcp-server-setup/scripts/` |
 
@@ -129,8 +141,11 @@ keep any filled copy local as `template.local`.
 bash skills/splunk-mcp-server-setup/scripts/setup.sh --install
 ```
 
-The setup script detects whether `Splunk_MCP_Server` is already installed and
-uses the shared app installer in install or update mode automatically.
+This command intentionally refuses the current review-blocked release. After a
+fixed vendor release is reviewed and marked production-approved in
+`package-manifest.json`, the setup script will detect install versus update
+mode automatically. Use `--accept-nonproduction-package` only in an isolated
+lab.
 
 ### Alternative: Uninstall The App
 
@@ -147,22 +162,30 @@ render, token, or configuration flags.
 
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --accept-nonproduction-package \
   --timeout 90 \
   --max-row-limit 2000 \
   --default-row-limit 250 \
+  --ssl-verify true \
   --require-encrypted-token true \
-  --token-default-lifetime-seconds 2592000 \
-  --token-max-lifetime-seconds 7776000 \
+  --legacy-token-grace-days 0 \
+  --token-default-lifetime-seconds 43200 \
+  --token-max-lifetime-seconds 86400 \
+  --token-key-reload-interval-seconds 300 \
   --global-rate-limit 600 \
+  --admission-global 60 \
   --tenant-authenticated 240 \
-  --tenant-unauthenticated 60
+  --tenant-unauthenticated 10 \
+  --circuit-breaker-failure-threshold 5 \
+  --circuit-breaker-cooldown-seconds 60
 ```
 
 This updates supported fields in `mcp.conf`:
 - `[server] timeout`
 - `[server] max_row_limit`
 - `[server] default_row_limit`
-- `[server] ssl_verify`
+- `[server] ssl_verify` (configuration intent only; vendor 1.2.1 does not
+  enforce it for internal HTTP calls)
 - `[server] require_encrypted_token`
 - `[server] legacy_token_grace_days`
 - `[server] mcp_token_default_lifetime_seconds`
@@ -177,6 +200,7 @@ hidden in Splunk Web.
 
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --accept-nonproduction-package \
   --rotate-keys \
   --rotate-key-size 4096
 ```
@@ -185,8 +209,9 @@ bash skills/splunk-mcp-server-setup/scripts/setup.sh \
 
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --accept-nonproduction-package \
   --token-user "${SPLUNK_USER}" \
-  --token-expires-on +30d \
+  --token-expires-on +12h \
   --write-token-file /tmp/splunk_mcp.token
 ```
 
@@ -212,6 +237,7 @@ Default platform mode preserves the existing local app workflow:
 
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --accept-nonproduction-package \
   --render-clients \
   --bearer-token-file /tmp/splunk_mcp.token \
   --cursor-workspace ~/Projects/my-cursor-workspace
@@ -290,8 +316,9 @@ When `--render-clients` runs, the skill also applies client setup by default:
 Use `--no-register-codex`, `--no-configure-cursor`, or `--no-configure-claude` to opt
 out of any client update while still rendering the bundle.
 
-The shell wrapper expects `mcp-remote` on `PATH`; the Node wrapper used by client
-registrations prefers `mcp-remote` on `PATH` and falls back to `npx mcp-remote`.
+Both wrappers require an operator-installed `mcp-remote@0.1.38` on `PATH`,
+verify that exact package version, and fail closed rather than downloading code
+at startup.
 For `o11y` and `combined` gateway modes, the wrapper also passes
 `--transport http-only --allow-http` to match Splunk's hosted gateway examples.
 
@@ -302,16 +329,25 @@ headers and endpoint selection.
 ### Step 6: Validate
 
 ```bash
-bash skills/splunk-mcp-server-setup/scripts/validate.sh
+bash skills/splunk-mcp-server-setup/scripts/validate.sh \
+  --completion \
+  --mcp-bearer-token-file /tmp/splunk_mcp.token
 ```
 
 Checks:
 - app installed and visible
-- `/services/mcp` responds to a JSON-RPC `ping`
+- installed app version exactly matches the reviewed manifest (and is at least 1.2.1)
+- `/services/mcp` completes authenticated `initialize`, `notifications/initialized`, `tools/list`, and a safe `splunk_get_info` tool call
+- `/services/mcp` rejects an untrusted `Origin`
+- enabled tools exactly match the reviewed allowlist (minimal default:
+  `["splunk_get_info"]`; use `--allowed-tools-file` for a reviewed expansion)
 - key MCP REST endpoints respond
 - protected-resource metadata endpoint is reachable when configured
 - current server settings and rate-limit values are readable
+- encrypted-token, zero-grace, short-lifetime, and nonzero admission settings meet the production policy
+- `ssl_verify` is reported as configuration-only and release 1.2.1 fails because the vendor does not enforce it
 - derived `/services/mcp` URL is sane
+- the shipped `dashboard`, `monitoring`, `tools`, and `tool_settings` views are visible
 
 ## Local-Only Policy Overlays
 
@@ -336,12 +372,18 @@ See [reference.md](reference.md) for the exact implications.
 3. **The shared wrapper is the most portable client path**: Cursor, Codex, and
    Claude Code can all use the rendered `run-splunk-mcp.js` bridge via `mcp-remote`.
 4. **`mcp.conf` is the supported remote configuration surface**: use it for
-   runtime controls such as row limits, TLS verification, and token policy.
+   row limits and token policy. Release 1.2.1 does not enforce its documented
+   `ssl_verify` value, so that field cannot satisfy a TLS control.
 5. **The app needs search-tier placement**: it exposes `/services/mcp` and
    depends on custom REST handlers plus KV Store-backed tool metadata.
 6. **Hosted SCS MCP Gateway is client-side configuration**: it uses
    `--gateway-mode o11y` or `combined` and does not install hosted
    Observability tools into the local Splunk Platform app.
+7. **Safe-SPL exclusion is defective in 1.2.1**: never use `exclude_tools` to
+   disable a tool; use `mcp_tools_enabled`, and keep query tools away from
+   untrusted callers pending a vendor fix.
+8. **Evaluation data must be synthetic**: 1.2.1 logs tool arguments and SPL to
+   `_internal`. Never embed literal credentials in custom tool headers or bodies.
 
 ## Cursor IDE Integration
 

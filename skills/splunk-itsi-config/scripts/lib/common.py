@@ -23,7 +23,9 @@ def load_json(path: str | Path) -> Any:
 
 
 def write_json(path: str | Path, payload: Any) -> None:
-    Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output = Path(path)
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.chmod(0o600)
 
 
 _YAML_RESERVED_PLAIN_VALUES = {"true", "false", "null", "yes", "no", "on", "off", "y", "n"}
@@ -110,11 +112,15 @@ def render_yaml(value: Any, indent: int = 0) -> str:
 
 
 def write_yaml(path: str | Path, payload: Any) -> None:
-    Path(path).write_text(render_yaml(payload) + "\n", encoding="utf-8")
+    output = Path(path)
+    output.write_text(render_yaml(payload) + "\n", encoding="utf-8")
+    output.chmod(0o600)
 
 
 def write_text(path: str | Path, text: str) -> None:
-    Path(path).write_text(text, encoding="utf-8")
+    output = Path(path)
+    output.write_text(text, encoding="utf-8")
+    output.chmod(0o600)
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -128,20 +134,29 @@ def timestamp_slug(now: datetime | None = None) -> str:
     return current.strftime("%Y%m%dT%H%M%S%fZ")
 
 
-def bool_from_any(value: Any, default: bool = False) -> bool:
+def bool_from_any(value: Any, default: bool = False, *, field: str = "value") -> bool:
+    """Parse a boolean without treating typos as truthy.
+
+    Configuration booleans frequently guard writes and destructive operations in
+    this skill.  Python's normal truthiness rules are therefore unsafe here: for
+    example, ``bool("flase")`` is ``True``.  Keep the accepted vocabulary small
+    and fail with the field name when a value is ambiguous.
+    """
     if value is None:
         return default
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
-        return bool(value)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value in {0, 1}:
+            return bool(value)
+        raise ValidationError(f"{field} must be a boolean (true/false); got {value!r}.")
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"1", "true", "yes", "on", "enabled"}:
             return True
         if normalized in {"0", "false", "no", "off", "disabled"}:
             return False
-    return bool(value)
+    raise ValidationError(f"{field} must be a boolean (true/false); got {value!r}.")
 
 
 def listify(value: Any) -> list[Any]:
@@ -158,8 +173,6 @@ def compact(value: Any) -> Any:
         for key, child in value.items():
             normalized = compact(child)
             if normalized is None:
-                continue
-            if normalized == []:
                 continue
             compacted[key] = normalized
         return compacted

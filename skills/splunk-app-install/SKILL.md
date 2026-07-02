@@ -6,6 +6,10 @@ description: >-
   list installed apps and uninstall apps. Use when the user asks to install a
   Splunk app, TA, add-on, download from Splunkbase, deploy an app package, or
   manage installed apps.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk App Install
@@ -26,8 +30,10 @@ Automates installation, update, and management of Splunk apps and add-ons.
 package in `splunk-ta/` when needed.**
 This applies to both Splunk Cloud and Splunk Enterprise targets.
 
-- Primary path: `--source splunkbase --app-id <ID>` pulls the latest
-  compatible release from Splunkbase. Omit `--app-version` to get the latest.
+- Primary path: `--source splunkbase --app-id <ID>` pins a known app to the
+  registry's repo-verified release. Use `--app-version` for another reviewed
+  release, or `--accept-unverified-release` to request public latest without
+  claiming repository verification.
 - Fallback path: if Splunkbase is unavailable (no credentials, download
   failure, private app), the caller must rerun with `--source local`; in
   interactive mode the installer lists packages in `splunk-ta/`. It does not
@@ -38,6 +44,10 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
   are staged over SSH first.
 - For known Cisco packages, the installer auto-resolves the Splunkbase ID and
   license-ack URL from `skills/shared/app_registry.json`.
+- Known registry packages are checked against the target Splunk minor before
+  any ACS/REST install call. Cloud defaults to `10.5`; a listing gap fails
+  closed unless `--accept-unsupported-platform` is explicitly supplied with
+  documented vendor/operator approval.
 - `_unpacked` app directories are for review only and are not part of the
   normal install workflow.
 
@@ -74,11 +84,24 @@ The installer supports two target modes:
   (ACS) CLI. Search-tier REST access on port `8089` is optional and is used by
   other setup skills, not by the generic install/uninstall operations.
 
+Targeted app installation is available on Victoria stacks from `10.2.2510`
+onward, including `10.5.2605`. For an app-scoped operation, export
+`SPLUNK_CLOUD_SEARCH_HEAD` as the standalone search-head or SHC prefix; the
+shared ACS context selects that target and install/uninstall commands add
+`--scope local`. Leave it unset when the app should apply to every search head.
+Before using this path, verify that the stack is eligible, the operator has the
+`sc_admin` role, and `acs version` reports ACS CLI 2.20 or newer; the helper does
+not infer stack eligibility or enforce the CLI version. Because the shared ACS
+context is used by every Cloud workflow, prefer an app-scoped shell export (or
+a dedicated credentials profile) over a global target value, and clear it
+after the app operation.
+
 | Item | Value |
 |------|-------|
 | Optional override | `SPLUNK_PLATFORM=enterprise|cloud` when a hybrid credentials file makes a run ambiguous |
 | Enterprise search-tier REST API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` in `credentials` |
+| Optional Cloud app target | App-scoped `SPLUNK_CLOUD_SEARCH_HEAD` environment override; a dedicated `credentials` profile is also supported |
 | TA app name | varies (installs any app) |
 | Credentials | Project-root `credentials` file (fallback: `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-app-install/scripts/` (relative to repo root) |
@@ -140,6 +163,8 @@ For Splunk Cloud:
 - remaining local and downloaded packages are installed as private apps via ACS
 - Splunkbase apps are installed or updated via ACS
 - the ACS CLI must be installed and configured for the target stack
+- a non-empty `SPLUNK_CLOUD_SEARCH_HEAD` selects Victoria targeted app
+  installation and forces local scope instead of deployment to all search heads
 - completion is read back with `acs apps describe`; failed or still-pending
   states, unresolved app names, and pinned-version mismatches return nonzero
 
@@ -156,7 +181,10 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Pin a specific Splunkbase version; omit for latest |
+| `--app-version VER` | Pin a specific reviewed Splunkbase version |
+| `--target-splunk-version VER` | Override the shared Cloud/Enterprise compatibility target |
+| `--accept-unsupported-platform` | Explicitly override a known platform-listing gap with documented approval |
+| `--accept-unverified-release` | Request public latest instead of the repo-verified version; does not certify it |
 | `--expected-sha256 HEX` | Required publisher SHA-256 for non-Splunkbase URL downloads |
 | `--license-ack-url URL` | Third-party license acknowledgment URL for ACS installs |
 | `--pre-vetted` | Skip ACS inspection only for an already reviewed private app |

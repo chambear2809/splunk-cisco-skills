@@ -75,10 +75,8 @@ same parsing/finding classification but writes no files.
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/getting-started/first-time-setup-instructions-for-the-ingest-processor-solution>
 - Pipeline syntax:
   <https://help.splunk.com/en/data-management/transform-and-route-data/process-data-at-ingest-time/working-with-pipelines/ingest-processor-pipeline-syntax>
-- Create pipelines:
+- Create pipelines and use the current custom-template workflow:
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/working-with-pipelines/create-pipelines-for-ingest-processor>
-- Custom pipeline templates:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/process-data-at-ingest-time/working-with-pipelines/create-custom-pipeline-templates>
 - Destinations:
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/send-data-out-from-ingest-processor/how-the-destination-for-ingest-processor-works>
 - Queueing:

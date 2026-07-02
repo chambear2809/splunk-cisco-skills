@@ -15,7 +15,7 @@ platform behaviors, and CLI flags.
 
 | Source | Flag | Behavior |
 |--------|------|----------|
-| Splunkbase | `--source splunkbase --app-id ID` | Downloads latest (or `--app-version`) from Splunkbase |
+| Splunkbase | `--source splunkbase --app-id ID` | Uses the registry's repo-verified version for known apps; use `--app-version` for another reviewed release |
 | Local | `--source local --file PATH` | Installs from a `.tgz` or `.spl` file |
 | Remote URL | `--source remote --url URL` | Downloads then installs |
 
@@ -37,6 +37,7 @@ platform behaviors, and CLI flags.
 |-----------|-----------|
 | Install (Splunkbase) | ACS `apps install splunkbase --splunkbase-id ID` |
 | Install (private app) | ACS `apps install private --app-package PATH` |
+| Targeted Victoria install | Victoria `10.2.2510+` (including `10.5.2605`): set an app-scoped `SPLUNK_CLOUD_SEARCH_HEAD`; ACS selects `--target-sh` and install/uninstall uses `--scope local` (operator-verified ACS CLI 2.20+) |
 | Restart | ACS restart check; only restarts when `restartRequired=true` |
 
 ## Registry Integration
@@ -45,6 +46,8 @@ The installer resolves Cisco app metadata from
 `skills/shared/app_registry.json`:
 
 - Splunkbase ID and license acknowledgment URL
+- target-minor compatibility from `platform_versions`
+- repo-verified and current public release versions
 - `install_requires` dependencies (auto-installed first)
 - `role_support` for deployment role warnings
 - `package_patterns` for local file matching
@@ -57,7 +60,10 @@ The installer resolves Cisco app metadata from
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Pin a specific Splunkbase version (omit for latest) |
+| `--app-version VER` | Pin a specific reviewed Splunkbase version |
+| `--target-splunk-version VER` | Override the shared compatibility target (`MAJOR.MINOR[.PATCH]`) |
+| `--accept-unsupported-platform` | Override a known listing gap only with documented vendor/operator approval |
+| `--accept-unverified-release` | Request public latest rather than the repo-verified version; does not certify it |
 | `--expected-sha256 HEX` | Required publisher SHA-256 for a remote URL package |
 | `--license-ack-url URL` | Third-party license acknowledgment URL for ACS |
 | `--pre-vetted` | Skip ACS private-app inspection only after external review |
@@ -81,6 +87,11 @@ return nonzero with a verification handoff.
 | `SB_USER` / `SB_PASS` | `credentials` file | Splunkbase download authentication |
 | `SPLUNK_SSH_HOST` / `SPLUNK_SSH_USER` / `SPLUNK_SSH_PASS` | `credentials` file | Remote Enterprise host staging |
 | `SPLUNK_CLOUD_STACK` | `credentials` file | ACS target stack |
+| `SPLUNK_CLOUD_SEARCH_HEAD` | Prefer an app-scoped environment override; a dedicated `credentials` profile also works | Optional Victoria search-head/SHC prefix for targeted local-scope app operations. The shared ACS context affects every Cloud workflow, so clear it after app work. |
+
+The helper does not discover Victoria eligibility or enforce the ACS CLI
+version. Before a targeted operation, confirm the stack supports the feature,
+the operator has `sc_admin`, and `acs version` is 2.20 or newer.
 
 ## Validation
 

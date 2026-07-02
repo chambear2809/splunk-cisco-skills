@@ -10,6 +10,10 @@ description: >-
   schemas, transaction analytics, log analytics, browser or mobile analytics,
   synthetic analytics, IoT analytics, connected device analytics, Business Journeys, XLM, SLA,
   or experience-level reporting.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Analytics Setup

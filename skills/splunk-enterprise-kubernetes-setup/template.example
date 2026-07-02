@@ -1,97 +1,305 @@
-# Splunk Enterprise Kubernetes setup intake template
+# Splunk Enterprise Kubernetes non-secret intake checklist
 #
-# Copy this file to template.local and fill in non-secret values only.
-# Keep passwords, object-store keys, SSH private keys, HEC tokens, and license
-# contents out of this file. Use local-only files or existing Kubernetes
-# secrets and pass only paths or secret names to setup.sh.
+# Copy to template.local for planning. setup.sh does not source this file;
+# translate reviewed values into CLI flags. Never place passwords, tokens,
+# object-store keys, private-key contents, or license contents here.
 
 # -----------------------------------------------------------------------------
 # Shared workflow controls
 # -----------------------------------------------------------------------------
-# TARGET=sok
-# TARGET=pod
-# PHASE=render
+# TARGET=sok                       # sok | pod
+# PHASE=render                     # render | preflight | apply | status | all
 # OUTPUT_DIR=./splunk-enterprise-k8s-rendered
+# ALLOW_UPGRADE=false              # SOK gate; POD records evidence but deploy refuses upgrade
+# ALLOW_UNVERIFIED_VERSIONS=false  # reviewed SOK/POD exception; never support evidence
+# CONFIRM_SPLUNK_10_4_UPGRADE_READINESS=false
+#   # SOK 10.4+ upgrades only: attest restorable platform/KV backups, healthy
+#   # KV Store server 7.0+, premium app/add-on compatibility, TLS 1.2+, and
+#   # target release-note review. Invalid unless ALLOW_UPGRADE=true.
+#
+# Existing-bundle phases verify bundle-manifest.json and do not rerender.
+# The bundle root must remain current-user-owned mode 0700; tracked files retain
+# current-user ownership plus their recorded mode/SHA-256. This detects drift,
+# not provenance or a cryptographic signature.
+# Use separate render, validate, preflight, apply, and status phases for prod.
 
 # -----------------------------------------------------------------------------
-# Splunk Operator for Kubernetes
+# Splunk Operator for Kubernetes 3.1.0
 # -----------------------------------------------------------------------------
-# ARCHITECTURE=s1
-# ARCHITECTURE=c3
-# ARCHITECTURE=m4
-# NAMESPACE=splunk
+# ARCHITECTURE=s1                  # s1 | c3 | m4
+# OPERATOR_VERSION=3.1.0
+# CHART_VERSION=3.1.0              # verified path matches operator version
+# SPLUNK_VERSION=10.4.1
+# SPLUNK_IMAGE=splunk/splunk:10.4.1
+# OPERATOR_IMAGE=docker.io/splunk/splunk-operator:3.1.0
+# KUBERNETES_VERSION=1.33          # live preflight also checks the server
+# ACCEPT_SPLUNK_GENERAL_TERMS=true # required for every SOK Operator reconcile
+#
+# Production requires reviewed official local artifacts and digest-pinned
+# images. The renderer verifies the exact official 3.1.0 SHA-256 values.
+# OPERATOR_CHART_ARCHIVE=/reviewed/splunk-operator-3.1.0.tgz
+# ENTERPRISE_CHART_ARCHIVE=/reviewed/splunk-enterprise-3.1.0.tgz
+# CRD_MANIFEST=/reviewed/splunk-operator-crds-3.1.0.yaml
+# OPERATOR_IMAGE=registry.example.com/splunk/splunk-operator:3.1.0@sha256:<64-hex>
+# SPLUNK_IMAGE=registry.example.com/splunk/splunk:10.4.1@sha256:<64-hex>
+
+# Operator RBAC and namespaces:
+# OPERATOR_SCOPE=namespace         # namespace | cluster
+# NAMESPACE=splunk-operator        # must equal OPERATOR_NAMESPACE in namespace mode
 # OPERATOR_NAMESPACE=splunk-operator
+# WATCH_NAMESPACES=                # cluster mode only; must include NAMESPACE
 # RELEASE_NAME=splunk-enterprise
 # OPERATOR_RELEASE_NAME=splunk-operator
-# OPERATOR_VERSION=3.1.0
-# CHART_VERSION=3.1.0
-# SPLUNK_VERSION=10.4.0
-# SPLUNK_IMAGE=splunk/splunk:10.4.0
+#
+# Separate namespace example:
+# OPERATOR_SCOPE=cluster
+# OPERATOR_NAMESPACE=splunk-operator
+# NAMESPACE=splunk
+# WATCH_NAMESPACES=splunk
+
+# Storage, replicas, and sizing:
 # STORAGE_CLASS=gp3
 # ETC_STORAGE=10Gi
 # VAR_STORAGE=100Gi
 # STANDALONE_REPLICAS=1
-# INDEXER_REPLICAS means total indexers for C3 and indexers per site for M4.
-# INDEXER_REPLICAS=3
+# INDEXER_REPLICAS=3               # C3 total; M4 per site
 # SEARCH_HEAD_REPLICAS=3
-# SITE_COUNT=3
-# Optional: omit to avoid rendering zone node affinity for M4 indexers.
-# SITE_ZONES=us-west-2a,us-west-2b,us-west-2c
+# DEPLOYMENT_PROFILE=development   # development | production
+#
+# Production requires STORAGE_CLASS, SmartStore, license ownership, and
+# SmartStore auth. Treat generated resources as a starting point; review a
+# splunk-platform-sizing report. Reviewed resource overlays are accepted when
+# every Splunk role/deployer keeps complete CPU/memory requests equal to limits.
 
-# Required for SOK with Splunk Enterprise 10.x images:
-# ACCEPT_SPLUNK_GENERAL_TERMS=true
+# M4 failure domains:
+# SITE_COUNT=2                      # chart 3.1 M4 preset: exactly 2
+# SITE_ZONES=us-west-2a,us-west-2b
+# MANAGER_SITE=site1
+# SEARCH_HEAD_SITE=site2
+# MANAGER_ZONE=us-west-2a
+# SEARCH_HEAD_ZONE=us-west-2b
+# Three through 63 sites, search-head site0, or custom RF/SF are direct-CR
+# handoffs rather than overrides of this fixed two-site chart preset.
+# Production status requires replicas within each replicated StatefulSet on
+# distinct nodes and confirms each M4 pod's node has the reviewed zone label.
 
-# Optional EKS helper:
-# EKS_CLUSTER_NAME=splunk-prod
-# AWS_REGION=us-west-2
+# License ownership. SOK accepts one local license OR an existing manager.
+# LICENSE_FILE=/absolute/secure/path/splunk.lic
+# EXISTING_LICENSE_MANAGER=lm
+# EXISTING_LICENSE_MANAGER_NAMESPACE=splunk  # omit or equal NAMESPACE only
+# EXISTING_LICENSE_MANAGER means a ready, same-namespace SOK v4 LicenseManager
+# CR. Cross-namespace references, external non-SOK managers, and external
+# indexer clusters are direct Helm/CR/secret-management handoffs.
 
-# Optional license handling:
-# LICENSE_FILE=/absolute/path/to/splunk.lic
+# Monitoring and least-privilege SmartStore AWS IRSA identity:
+# DISABLE_MONITORING_CONSOLE=false
+# SPLUNK_SERVICE_ACCOUNT=splunk-workload-irsa
+# SPLUNK_IRSA_ROLE_ARN=arn:aws:iam::123456789012:role/splunk-smartstore
+# SPLUNK_IRSA_TOKEN_EXPIRATION=3600  # exact SA annotation; accepted 600..86400
 
-# Optional SmartStore references. Do not put access keys here.
+# AWS SmartStore. Do not put access keys here.
 # SMARTSTORE_BUCKET=splunk-smartstore-prod
 # SMARTSTORE_PREFIX=indexes
+# SMARTSTORE_INDEXES=main,security,summary
+# SMARTSTORE_PROVIDER=aws           # aws | minio
 # SMARTSTORE_REGION=us-west-2
 # SMARTSTORE_ENDPOINT=https://s3.us-west-2.amazonaws.com
 # SMARTSTORE_SECRET_REF=splunk-smartstore-s3
+# CONFIRM_SMARTSTORE_INDEX_INVENTORY=true
+# CONFIRM_SMARTSTORE_PATH_OWNERSHIP=true  # exclusive active bucket/prefix
+#
+# For minio, omit SMARTSTORE_REGION and supply an explicit HTTPS endpoint.
+#
+# Use SMARTSTORE_SECRET_REF for an existing Kubernetes Secret, or
+# SPLUNK_SERVICE_ACCOUNT plus SPLUNK_IRSA_ROLE_ARN and AWS_REGION for the
+# reviewed AWS IRSA path. The existing ServiceAccount must carry matching role
+# and token-expiration annotations plus regional STS=true; the renderer assigns
+# it only to Standalone or indexer peers. Production requires one auth path and
+# explicit confirmation that SMARTSTORE_INDEXES is complete.
+# Upstream calls direct CR installation of SmartStore indexes/configuration a
+# temporary method and recommends App Framework. Azure/GCP SmartStore requires
+# an App Framework configuration app rather than these provider flags.
+
+# Optional EKS bundle-local kubeconfig helper:
+# Authenticate to the approved AWS account/role with duo-sso before preflight.
+# EKS_CLUSTER_NAME=splunk-prod      # 1..100: alnum first, then alnum/_/-
+# AWS_REGION=us-west-2
+#
+# Production exact live-target guard (required even when EKS helper is used):
+# EXPECTED_KUBE_CONTEXT=arn:aws:eks:us-west-2:123456789012:cluster/splunk-prod
+# EXPECTED_API_SERVER=https://EXAMPLE.gr7.us-west-2.eks.amazonaws.com
+# EXPECTED_CLUSTER_UID=00000000-0000-0000-0000-000000000000
+
+# SOK 3.1 C3 indexing and ingestion separation (AWS SQS + S3 only):
+# INDEXING_INGESTION_SEPARATION=false
+# INGESTOR_REPLICAS=3
+# QUEUE_PROVIDER=sqs                # sqs | sqs_cp; default sqs
+# QUEUE_NAME=splunk-ingest
+# QUEUE_DLQ=splunk-ingest-dlq
+# QUEUE_REGION=us-west-2            # must match the narrower SOK 3.1 CRD grammar
+# QUEUE_ENDPOINT=https://sqs.us-west-2.amazonaws.com
+# QUEUE_SECRET_REF=splunk-ingest-queue-credentials
+# OBJECT_STORAGE_PATH=splunk-ingest-payloads/messages
+# OBJECT_STORAGE_ENDPOINT=https://s3.us-west-2.amazonaws.com
+#
+# Queue, DLQ, bucket, IAM/KMS, endpoint, and Secret creation are external.
+# The verified 3.1 path requires QUEUE_SECRET_REF with s3_access_key and
+# s3_secret_key and rejects INGESTOR_SERVICE_ACCOUNT/SPLUNK_SERVICE_ACCOUNT.
+
+# Reviewed, non-secret chart overlays. These files are copied into the bundle.
+# OPERATOR_VALUES_OVERLAY=/absolute/path/operator-values-overlay.yaml
+# ENTERPRISE_VALUES_OVERLAY=/absolute/path/enterprise-values-overlay.yaml
+#
+# Operator overlays accept only splunkOperator with the exact documented
+# metadata/imagePullSecret/scheduling/resources/termination keys. Enterprise
+# overlays accept only the seven role roots with labels/annotations, affinity,
+# tolerations, topology spread, resources, or validated appRepo. Unknown or
+# misspelled keys fail closed. Images, service accounts (including AppRepo
+# serviceAccount), storage, schedulerName, services, probes, commands/env,
+# security/host settings, arbitrary volumes, extraManifests, defaults/license
+# URLs, and namespaces are protected. Never put secrets or Secret objects here.
+# Omit appRepo.appInstallPeriodSeconds to keep its upstream 90-second default.
+# The strict overlay rejects it; a Splunk Support-directed change is a direct-CR
+# handoff. Scale as a separate day-2 operation, not an upgrade;
+# pause annotations and administrator-managed PVs require dedicated handoffs.
+#
+# FIPS uses the standard container images unchanged, but the Kubernetes nodes
+# must already be FIPS 140-3-compliant. Ingress remains external: preserve sticky
+# Web sessions, at least two forwarder LB IPs, no Indexer Discovery, separate
+# clear/encrypted ports, and the selected controller's TLS termination limits.
 
 # -----------------------------------------------------------------------------
-# Splunk POD on Cisco UCS
+# Splunk POD 10.4.0_1.6.0 on Cisco UCS
 # -----------------------------------------------------------------------------
 # POD_PROFILE=pod-small
 # POD_PROFILE=pod-medium
 # POD_PROFILE=pod-large
-# ES aliases render the same official profile plus premium app stanzas.
+# POD_PROFILE=pod-xlarge
 # POD_PROFILE=pod-small-es
 # POD_PROFILE=pod-medium-es
 # POD_PROFILE=pod-large-es
-# Default worker counts are 8/11/15 without ES and 9/14/18 with ES.
-# POD preflight/apply/all runs require concrete controller IPs, worker IPs,
-# LICENSE_FILE, and SSH_PRIVATE_KEY_FILE; render-only can leave placeholders.
+# POD_PROFILE=pod-xlarge-es
+# POD_PROFILE=pod-small-itsi
+# POD_PROFILE=pod-medium-itsi
+# POD_PROFILE=pod-large-itsi
+# POD_PROFILE=pod-xlarge-itsi
+#
+# -es and -itsi are skill selectors. cluster-config.yaml keeps the base profile.
+
+# Coupled bundle and local executable. POD components upgrade together.
+# POD_VERSION=10.4.0_1.6.0
+# Other coupled versions require ALLOW_UNVERIFIED_VERSIONS plus release and
+# compatibility review; that bypass does not make the bundle supported.
+# INSTALLER_PATH=/opt/splunk-pod/kubernetes-installer-standalone
+# INSTALLER_SHA256=<independently-reviewed-64-hex-sha256>
+# CONFIRM_NEW_POD_INSTALL=true     # one-time attestation; required for deploy
+
+# Exact unique node IPs. Every profile has 3 controllers.
 # CONTROLLER_IPS=10.10.10.1,10.10.10.2,10.10.10.3
-# WORKER_IPS=10.10.10.4,10.10.10.5,10.10.10.6,10.10.10.7,10.10.10.8,10.10.10.9,10.10.10.10,10.10.10.11
+# WORKER_IPS=10.10.10.4,10.10.10.5,...
+#
+# Worker counts: Small 8, Medium 11, Large 15, X-Large 30.
+# ES/ITSI counts: Small 9, Medium 14, Large 18, X-Large 33.
+
+# Bastion access. The private key must be chmod 600 or stricter.
 # SSH_USER=splunkadmin
-# SSH_PRIVATE_KEY_FILE=/absolute/path/to/ssh-private-key
-# LICENSE_FILE=/absolute/path/to/splunk.lic
-# INDEXER_APPS=/path/to/indexer-app.tgz
-# SEARCH_APPS=/path/to/sh-app.tar.gz
-# STANDALONE_APPS=./path/to/myapp.tgz
-# PREMIUM_APPS=./apps/splunk_app_es.tgz
+# SSH_PRIVATE_KEY_FILE=/absolute/secure/path/pod-ssh-key
+
+# Immutable search-tier identities. Required before a live phase.
+# PRIMARY_SEARCH_NAME=core-shc
+# SECONDARY_SEARCH_NAME=es-shc       # required for -es or -itsi
+
+# Licenses are comma-separated `.lic` paths. ES and ITSI live runs require two
+# physically distinct Enterprise and premium-product licenses.
+# LICENSE_FILE=/secure/splunk.lic
+# LICENSE_FILE=/secure/splunk.lic,/secure/itsi.lic
+
+# Optional name routing with POD's product certificate (browser warnings are
+# possible without customer trust):
+# INGRESS_DOMAIN=pod.example.com
+#
+# Optional trusted name-based TLS requires all four values. The key must be
+# owned by the rendering user and mode 0600 or stricter.
+# INGRESS_CERTIFICATE_FILE=/secure/fullchain.pem
+# INGRESS_PRIVATE_KEY_FILE=/secure/privkey.pem
+# INGRESS_CA_FILE=/secure/ca-bundle.pem
+# INGRESS_DOMAIN=pod.example.com
+
+# POD application scopes. All supplied files must exist before live phases.
+# INDEXER_APPS=/apps/Splunk_TA_ForIndexers.tgz  # ES example
+# CLUSTER_MANAGER_APPS=/apps/cm-local.tgz
+# SEARCH_APPS=/apps/core-shared.tgz
+# SEARCH_DEPLOYER_APPS=/apps/deployer-local.tgz
+# STANDALONE_APPS=/apps/core-standalone.tgz
+# PREMIUM_APPS=/apps/splunk_app_es.spl
+# ITSI_APPS=/apps/jdk.tgz,/apps/itsi.tgz,/apps/SA-IndexCreation.tgz,/apps/SA-ITOA.tgz,/apps/SA-UserAccess.tgz,...
+# INDEXER_APPS=/apps/SA-IndexCreation.tgz       # ITSI example
+# LICENSE_MANAGER_APPS=/apps/SA-ITSI-Licensechecker.tgz,/apps/SA-UserAccess.tgz
+# ITSI_SOURCE_BUNDLE=/apps/splunk-it-service-intelligence_4.21.2.spl
+# ITSI_SOURCE_SHA256=<reviewed-64-hex-sha256>
+# ITSI_JDK_SHA256=<reviewed-64-hex-sha256>
+#
+# --premium-apps is ES-only. ITSI apps are repackaged and mapped by tier;
+# include every ITSI sub-app except SA-ITSI-Licensechecker on the search tier.
+# Every -es/-itsi selector retains a primary core tier. Sole-premium and generic
+# second-tier layouts require a manual/vendor installer-config handoff.
+
+# Cisco CVD readiness is external: Cisco Intersight profiles, supported UCS and
+# Nexus hardware, RHEL 9.6, RAID/ext4 mounts, networking, DNS, and TLS must be
+# complete before installer preflight. POD allocates/limits indexer pods at
+# 36 CPU/96 GB and search-head pods at 24 CPU/96 GB; prove allocatable capacity
+# plus system/failure headroom. SeaweedFS placement/three-way replication and
+# profile retention require evidence. X-Large spans two racks/four switches
+# and needs full cross-rack reachability.
+#
+# Small/Medium/Large: 90-day cache + one-year SmartStore retention.
+# X-Large: 60-day cache + 180-day SmartStore retention.
+# The Manage guide separately says custom indexes receive one-year frozen
+# retention; require X-Large effective-setting readback/vendor clarification.
+# UF 9.4.1+ requires forcedTimeBasedAutoLB=true for the POD multi-worker path.
 
 # -----------------------------------------------------------------------------
 # Example commands
 # -----------------------------------------------------------------------------
+# Render a namespace-scoped C3 bundle:
 # bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
 #   --target sok \
 #   --architecture c3 \
-#   --namespace splunk \
-#   --storage-class gp3 \
+#   --kubernetes-version "${KUBERNETES_VERSION}" \
 #   --accept-splunk-general-terms
 #
+# Render a production C3 bundle (all referenced values/files must be reviewed):
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
+#   --target sok --architecture c3 --deployment-profile production \
+#   --operator-chart-archive "${OPERATOR_CHART_ARCHIVE}" \
+#   --enterprise-chart-archive "${ENTERPRISE_CHART_ARCHIVE}" \
+#   --crd-manifest "${CRD_MANIFEST}" \
+#   --operator-image "${OPERATOR_IMAGE}" --splunk-image "${SPLUNK_IMAGE}" \
+#   --expected-kube-context "${EXPECTED_KUBE_CONTEXT}" \
+#   --expected-api-server "${EXPECTED_API_SERVER}" \
+#   --expected-cluster-uid "${EXPECTED_CLUSTER_UID}" \
+#   --storage-class "${STORAGE_CLASS}" \
+#   --smartstore-provider "${SMARTSTORE_PROVIDER}" \
+#   --smartstore-bucket "${SMARTSTORE_BUCKET}" \
+#   --smartstore-region "${SMARTSTORE_REGION}" \
+#   --smartstore-indexes "${SMARTSTORE_INDEXES}" \
+#   --confirm-smartstore-index-inventory \
+#   --confirm-smartstore-path-ownership \
+#   --smartstore-secret-ref "${SMARTSTORE_SECRET_REF}" \
+#   --license-file "${LICENSE_FILE}" --accept-splunk-general-terms
+#
+# Render a POD bundle. Render-only can retain placeholders for review:
 # bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
 #   --target pod \
-#   --pod-profile pod-medium \
-#   --controller-ips "${CONTROLLER_IPS}" \
-#   --worker-ips "${WORKER_IPS}" \
-#   --license-file "${LICENSE_FILE}" \
-#   --ssh-private-key-file "${SSH_PRIVATE_KEY_FILE}"
+#   --pod-profile pod-medium-itsi
+#
+# Run strict static validation:
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh \
+#   --target pod \
+#   --strict
+#
+# Apply an already reviewed bundle, then run status:
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
+#   --target sok --phase apply
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
+#   --target sok --phase status

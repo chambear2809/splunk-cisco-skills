@@ -16,6 +16,23 @@ Most workflows are render-first and validation-heavy. Mutating phases are
 explicit, secrets stay in local files, and generated plans or manifests are
 review artifacts rather than source files.
 
+Current compatibility baseline: Splunk Cloud Platform `10.5.2605`, with
+`10.4.2604` retained as the previous Cloud documentation train. Self-managed
+Splunk Enterprise, Universal Forwarder, Splunk Operator for Kubernetes, and
+Splunk POD remain on their verified 10.4 baselines. As of July 2, 2026, the
+public Enterprise and Universal Forwarder downloads and Enterprise release
+manual remain on 10.4, so this repository does not yet enable a self-managed
+10.5 runtime. Splunkbase package compatibility is evaluated individually
+against `10.5`; packages whose current listing omits 10.5 are marked
+unsupported in the registry and must not inherit compatibility merely because
+Splunk Cloud Platform supports that train.
+
+Every skill now declares a machine-readable 10.5 status in its `SKILL.md`
+frontmatter. See the generated
+[`SPLUNK_10_5_COMPATIBILITY.md`](SPLUNK_10_5_COMPATIBILITY.md) matrix for all
+165 classifications, package evidence, and the meaning of supported,
+conditional, blocked, self-managed, delegated, and not-applicable statuses.
+
 ## Start Here
 
 Run commands from the repository root.
@@ -38,8 +55,8 @@ Run commands from the repository root.
    ```
 
    The main chooser is [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It lists
-   every skill, its purpose, the first file to open, a safe `--help` command,
-   validation, and deeper docs.
+   every skill, its purpose, Splunk 10.5 status, the first file to open, a safe
+   `--help` command, validation, and deeper docs.
 
 3. Open the skill entry point:
 
@@ -87,6 +104,8 @@ Run commands from the repository root.
 | I need SC4S, SC4SNMP, Stream, OTLP, Edge Processor, or external collection | [`splunk-connect-for-syslog-setup`](skills/splunk-connect-for-syslog-setup/), [`splunk-connect-for-snmp-setup`](skills/splunk-connect-for-snmp-setup/), [`splunk-connect-for-otlp-setup`](skills/splunk-connect-for-otlp-setup/), [`splunk-edge-processor-setup`](skills/splunk-edge-processor-setup/) | `rg "SC4S|SC4SNMP|Stream|OTLP|Edge Processor" SKILL_UX_CATALOG.md` |
 | I need Splunk Observability Cloud, OTel, APM, RUM, DXA, MPM, DBMon, AWS, Azure, or GCP | Search the `splunk-observability-*` skills | `rg "Observability|OTel|AWS|Azure|GCP|RUM|Digital Experience Analytics|DXA|Metrics Pipeline Management|MPM|DBMon" SKILL_UX_CATALOG.md` |
 | I need Splunk Platform paired with Splunk Observability Cloud | [`splunk-observability-cloud-integration-setup`](skills/splunk-observability-cloud-integration-setup/) | `bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --help` |
+| I need to install, upgrade, or validate the ITSI product | [`splunk-itsi-setup`](skills/splunk-itsi-setup/) | `bash skills/splunk-itsi-setup/scripts/setup.sh --help` |
+| I need to configure services, KPIs, entities, dependencies, Event Analytics, or content packs in an existing ITSI deployment | [`splunk-itsi-config`](skills/splunk-itsi-config/) | `bash skills/splunk-itsi-config/scripts/setup.sh --help` |
 | I need Cisco Data Fabric routing | [`splunk-federated-search-setup`](skills/splunk-federated-search-setup/), [`splunk-edge-processor-setup`](skills/splunk-edge-processor-setup/), [`splunk-ingest-processor-setup`](skills/splunk-ingest-processor-setup/), [`splunk-spl2-pipeline-kit`](skills/splunk-spl2-pipeline-kit/), [`splunk-ai-ml-toolkit-setup`](skills/splunk-ai-ml-toolkit-setup/), [`splunk-mcp-server-setup`](skills/splunk-mcp-server-setup/) | `rg "Cisco Data Fabric|Machine Data Lake|Data Catalog|Federated Search|Edge Processor|Ingest Processor|SPL2|AI Toolkit|MCP" SKILL_UX_CATALOG.md` |
 | I need AppDynamics product coverage | [`splunk-appdynamics-setup`](skills/splunk-appdynamics-setup/) | `bash skills/splunk-appdynamics-setup/scripts/setup.sh --help` |
 | I need Galileo MCP in Cursor, VS Code, Codex, Claude Code, or Kiro | [`galileo-mcp-server-setup`](skills/galileo-mcp-server-setup/) | `bash skills/galileo-mcp-server-setup/scripts/setup.sh --help` |
@@ -223,7 +242,7 @@ install and configuration behavior.
 
 Minimum local environment:
 
-- `bash`, `curl`, and `python3`
+- `bash`, `curl`, and Python 3.10 or newer
 - `pip install -r requirements-agent.txt` for the local MCP agent server
 - Cursor, Codex, or Claude Code for agent-driven use
 - Splunk Enterprise REST access on `8089`, or Splunk Cloud ACS plus optional
@@ -252,7 +271,8 @@ pre-commit run --all-files
 
 The repo includes a local MCP server named `splunk-cisco-skills`. It exposes
 skill discovery, skill instructions, templates, Cisco product resolution,
-dry-run planning, and gated script execution to MCP-capable clients.
+dry-run planning, and explicitly gated script execution to MCP-capable clients.
+It is discovery-and-plan-only by default.
 
 Set up its Python environment:
 
@@ -268,15 +288,54 @@ Codex stores MCP servers in user config, so register this repo once:
 bash agent/register-codex-splunk-cisco-skills-mcp.sh
 ```
 
-Read-only plans can run after explicit client confirmation. Mutating setup,
-install, or configure scripts require the MCP server to start with:
+Any local subprocess requires an operator to start the server with the
+execution gate enabled:
 
 ```bash
-SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 python3 agent/run-splunk-cisco-skills-mcp.py
+SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 \
+  python3 agent/run-splunk-cisco-skills-mcp.py
 ```
 
-Execution still requires a previously generated plan hash and explicit
-confirmation from the client.
+Generic skill-script execution is always treated as mutating and requires both
+server-side gates:
+
+```bash
+SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 \
+SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 \
+  python3 agent/run-splunk-cisco-skills-mcp.py
+```
+
+Tool inputs use strict schemas. Every execution also requires a random,
+single-use `plan_hash`, `confirm=true`, and an unchanged executable SHA-256
+digest plus an unchanged snapshot of the complete `skills/` dependency tree.
+See [`SECURITY.md`](SECURITY.md) for the complete trust model.
+
+### Official Splunk MCP Server App And Client Bridge
+
+The separate `splunk-mcp-server-setup` skill targets the official
+[Splunk MCP Server 1.2.1 package (Splunkbase app 7931)](https://splunkbase.splunk.com/app/7931).
+Place the official archive at `splunk-ta/splunk-mcp-server_121.tgz`; the setup
+script checks package version `1.2.1` and SHA-256
+`f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db`
+before installing from any path.
+
+Repository security review has blocked 1.2.1 from production approval pending
+vendor fixes. Local package mutation/activation and completion fail closed by default;
+`--accept-nonproduction-package` is for isolated evaluation only and does not
+make the release production-safe.
+
+Client bundles use a preinstalled, pinned `mcp-remote@0.1.38` with no `npx`
+fallback. Remote targets must use HTTPS; explicit HTTP or insecure TLS is
+allowed only for loopback development targets. Completion validation performs
+an authenticated MCP `initialize`, `notifications/initialized`, `tools/list`,
+and safe `splunk_get_info` call, and checks the shipped `dashboard`,
+`monitoring`, `tools`, and `tool_settings` views:
+
+```bash
+bash skills/splunk-mcp-server-setup/scripts/validate.sh \
+  --completion \
+  --mcp-bearer-token-file /tmp/splunk_mcp.token
+```
 
 ## Repository Map
 

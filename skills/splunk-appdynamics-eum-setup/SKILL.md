@@ -8,6 +8,10 @@ description: >-
   the user asks for AppDynamics EUM, Browser RUM, BRUM, Mobile RUM, IoT RUM,
   app keys, JavaScript injection, Session Replay, Mobile Session Replay, source maps, mobile SDKs, or
   EUM beacon validation.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics EUM Setup

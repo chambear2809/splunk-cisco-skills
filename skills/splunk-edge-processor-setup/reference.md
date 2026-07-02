@@ -37,25 +37,25 @@
 Official references:
 
 - Set up an Edge Processor (Cloud):
-  <https://docs.splunk.com/Documentation/SplunkCloud/9.3.2408/EdgeProcessor/CreateNode>
+  <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors/set-up-an-edge-processor>
 - Set up an Edge Processor (Enterprise):
   <https://help.splunk.com/en/splunk-enterprise/process-data-at-the-edge/use-edge-processors-for-splunk-enterprise/10.2/administer-edge-processors/set-up-an-edge-processor>
 - Set up an Edge Processor in a Docker container:
   <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors/set-up-an-edge-processor-in-a-docker-container>
 - Create pipelines for Edge Processors:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/9.2.2406/working-with-pipelines/create-pipelines-for-edge-processors>
+  <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/working-with-pipelines/create-pipelines-for-edge-processors>
 - Edge Processor pipeline syntax:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/9.2.2406/working-with-pipelines/edge-processor-pipeline-syntax>
+  <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/working-with-pipelines/edge-processor-pipeline-syntax>
 - Add or manage destinations:
   <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors>
 - Send data from Edge Processors to Amazon S3:
   <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-enterprise/10.2/send-data-out-from-edge-processors/send-data-from-edge-processors-to-amazon-s3>
 - Get syslog data into an Edge Processor:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/EdgeProcessor/SyslogSource>
+  <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/get-syslog-data-into-an-edge-processor>
 - Configure HEC token authentication in the Edge Processor service:
   <https://help.splunk.com/en/data-management/collect-http-event-data/send-hec-data-to-and-from-edge-processor/send-data-to-edge-processor-with-hec/configure-hec-token-authentication-in-the-edge-processor-service>
 - Verify your Edge Processor and pipeline configurations:
-  <https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/10.2.2510/monitor-system-health-and-activity/verify-your-edge-processor-and-pipeline-configurations>
+  <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/monitor-system-health-and-activity/verify-your-edge-processor-and-pipeline-configurations>
 
 ## Pipeline Templates
 

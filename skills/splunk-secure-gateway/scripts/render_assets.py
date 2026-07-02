@@ -84,6 +84,13 @@ def validate(args: argparse.Namespace) -> None:
 
 
 def render_connectivity(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        return make_script(
+            """echo "HANDOFF: run Spacebridge connectivity checks from the managed Splunk Cloud search tier." >&2
+echo "Local curl results do not prove managed search-head egress; use Splunk Support or the Cloud workflow." >&2
+exit 2
+"""
+        )
     primary = shell_quote(PRIMARY_SPACEBRIDGE)
     regional_host = REGIONAL_HEALTH_HOSTS[args.region]
     regional = shell_quote(regional_host)
@@ -220,6 +227,13 @@ def render_mdm(args: argparse.Namespace) -> str:
 
 
 def render_status(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        return make_script(
+            """echo "HANDOFF: inspect Secure Gateway app, token-auth, and Spacebridge state on the managed Cloud search tier." >&2
+echo "This local-host status script is not valid evidence for Splunk Cloud." >&2
+exit 2
+"""
+        )
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
     primary = shell_quote(PRIMARY_SPACEBRIDGE)
     return make_script(

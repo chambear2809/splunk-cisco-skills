@@ -193,7 +193,6 @@ def analyze_platform(findings: list[Finding], evidence: dict) -> None:
     machine = str(platform_info.get("machine", "")).lower()
     tier = str(platform_info.get("tier", "")).lower()
     cloud_topology = str(platform_info.get("cloud_topology", "")).lower()
-    inbound_reachable = platform_info.get("inbound_reachable")
 
     if os_name in {"darwin", "macos", "mac"}:
         add(
@@ -222,23 +221,18 @@ def analyze_platform(findings: list[Finding], evidence: dict) -> None:
             f"Detected architecture {machine}; the audited package only includes x86_64 binaries.",
             "Use an x86_64 Splunk runtime tier or request an upstream package for this architecture.",
         )
-    if cloud_topology == "classic" and tier in {"search-tier", "search_head", "search-head"}:
+    if cloud_topology in {"classic", "victoria", "cloud", "managed"} and tier in {
+        "search-tier",
+        "search_head",
+        "search-head",
+    }:
         add(
             findings,
-            "CLOUD_CLASSIC_REQUIRES_IDM_OR_HF",
+            "CLOUD_MANAGED_REQUIRES_IDM_OR_HF",
             "high",
-            "Splunk Cloud Classic search-tier input execution is disallowed",
-            "Classic Cloud add-on placement requires IDM or customer-managed heavy forwarder for ingestion add-ons.",
-            "Move Splunk Connect for OTLP execution to IDM or a customer-managed heavy forwarder.",
-        )
-    if cloud_topology == "victoria" and inbound_reachable is False:
-        add(
-            findings,
-            "WRONG_TIER",
-            "high",
-            "Victoria topology has unresolved inbound reachability",
-            "Direct Cloud execution is only acceptable when OTLP senders can reach the listener.",
-            "Default to a customer-managed heavy forwarder and validate firewall/LB/TLS reachability.",
+            "Managed Splunk Cloud search-tier execution is disallowed",
+            "Splunkbase marks release 0.4.1 cloud_compatible=false and rejects both Cloud install methods.",
+            "Move the receiver to a customer-managed heavy forwarder or coordinate an approved IDM placement through Splunk Support.",
         )
 
 
@@ -252,7 +246,7 @@ def analyze_app(findings: list[Finding], evidence: dict) -> None:
             "high",
             "Splunk Connect for OTLP is not installed",
             "The app metadata was not visible through Splunk REST.",
-            "Install Splunkbase app 8704 through splunk-app-install.",
+            "Install app 8704 on a customer-managed supported runtime; managed Cloud requires a heavy-forwarder or approved-IDM handoff.",
         )
     version = str(app.get("version", "") or "")
     if version and version != LATEST_VERSION:
@@ -262,7 +256,7 @@ def analyze_app(findings: list[Finding], evidence: dict) -> None:
             "medium",
             "Installed app version is not the audited release",
             f"Installed version is {version}; audited release is {LATEST_VERSION}.",
-            "Update Splunkbase app 8704 through splunk-app-install.",
+            "Update app 8704 on its customer-managed runtime; managed Cloud IDM updates remain Support-coordinated.",
         )
     if truthy(app.get("disabled")):
         add(

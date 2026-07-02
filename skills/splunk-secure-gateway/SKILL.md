@@ -9,6 +9,10 @@ description: >-
   Experiences, enable or troubleshoot Splunk Secure Gateway, verify Spacebridge
   connectivity, register mobile devices, configure MDM for Splunk Mobile, or
   check mobile alert/dashboard delivery readiness.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Secure Gateway / Mobile
@@ -73,7 +77,10 @@ bash skills/splunk-secure-gateway/scripts/validate.sh --live
   `prod.spacebridge.spl.mobi`.
 - Token (JWT) authentication must be enabled or device registration fails;
   changing a user's credentials unregisters their device.
-- On Splunk Cloud, Secure Gateway is managed for you; connectivity is from the
-  Splunk-managed search head. On Enterprise, verify egress from the search head.
+- On Splunk Cloud, Secure Gateway is managed for you and connectivity originates
+  from the Splunk-managed search head. `--platform cloud` local `preflight`,
+  `enable`, and `status` phases exit `2` with a managed-service handoff; local
+  curl or `$SPLUNK_HOME` checks are not accepted as Cloud evidence. On
+  Enterprise, verify egress from the search head.
 
 Read `reference.md` before enabling token auth broadly or rolling out MDM.

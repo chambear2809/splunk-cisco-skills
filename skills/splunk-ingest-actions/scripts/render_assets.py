@@ -316,6 +316,15 @@ def render_preview(args: argparse.Namespace) -> str:
 
 
 def render_apply(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        return make_script(
+            """echo "ERROR: managed Splunk Cloud does not permit this local outputs.conf apply path." >&2
+echo "HANDOFF: create the destination and ruleset through Settings > Ingest Actions" >&2
+echo "         or /services/data/ingest/rulesets; use splunk-ingest-processor-setup" >&2
+echo "         for a Cloud control-plane pipeline." >&2
+exit 2
+"""
+        )
     splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
     app_name = shell_quote(args.app_name)
     has_dest = "true" if args.destination_type != "none" else "false"

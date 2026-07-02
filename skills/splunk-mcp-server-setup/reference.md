@@ -1,5 +1,34 @@
 # Splunk MCP Server Reference
 
+## Supported Package And Provenance
+
+This skill supports the official [Splunk MCP Server 1.2.1 package from
+Splunkbase app 7931](https://splunkbase.splunk.com/app/7931). The matching
+[Splunk 1.2 release notes](https://help.splunk.com/en/splunk-enterprise/mcp-server-for-splunk-platform/1.2/mcp-server-release-notes)
+describe the supported 1.2.x behavior.
+
+| Property | Required value |
+|----------|----------------|
+| Splunkbase app ID | `7931` |
+| Package directory | `Splunk_MCP_Server` |
+| App version | `1.2.1` |
+| Default local cache | `splunk-ta/splunk-mcp-server_121.tgz` |
+| SHA-256 | `f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db` |
+| Provenance | Official Splunkbase app 7931 download; do not use a repacked or unverified archive |
+| Production approval | **Blocked pending vendor security fixes** |
+
+The package cache is intentionally ignored by Git. The tracked
+`package-manifest.json` is the authoritative version, filename, and checksum
+record. `setup.sh` verifies version `1.2.1` and the checksum above for every
+supplied archive, including `--package-file` overrides.
+
+Version 1.2.1 remains useful for isolated compatibility testing, but it is not
+a production-approved release. Setup blocks installation, local configuration,
+key rotation, token minting, and local Platform client activation by default;
+`--completion` cannot certify this release. The explicit
+`--accept-nonproduction-package` override records lab intent; it is not a
+remediation.
+
 ## Core Endpoints
 
 These are the main endpoints surfaced by the packaged app:
@@ -25,7 +54,8 @@ The setup skill manages these fields:
 - `timeout`
 - `max_row_limit`
 - `default_row_limit`
-- `ssl_verify`
+- `ssl_verify` (stored for forward compatibility, but **not enforced by vendor
+  release 1.2.1**; it is not a verified TLS control)
 - `require_encrypted_token`
 - `legacy_token_grace_days`
 - `mcp_token_default_lifetime_seconds`
@@ -56,8 +86,12 @@ That means:
 - Splunk Cloud targets should treat those files as package content, not as
   something this repo edits remotely
 
-If you need a stricter SPL whitelist or different excluded built-in tools, plan
-that as an app-local overlay or a new vetted package revision.
+Do not use `exclude_tools` to disable tools in release 1.2.1. The vendor code
+incorrectly interprets that list as a Safe-SPL validation bypass. Disable tools
+through `mcp_tools_enabled` only, and do not expose query-capable tools to
+untrusted callers until the vendor fixes and regression-tests this behavior.
+A stricter SPL whitelist must be delivered as a reviewed app-local overlay or a
+new vetted package revision.
 
 ## Built-In App Characteristics
 
@@ -67,6 +101,7 @@ The packaged app includes:
 - KV Store collections `mcp_tools` and `mcp_tools_enabled`
 - built-in tool definitions from `default/builtin_tools.json`
 - safe-SPL enforcement from `safe_spl.json`
+- the `dashboard`, `monitoring`, `tools`, and `tool_settings` Splunk Web views
 
 ## Cursor, Codex, And Claude Code Compatibility Model
 
@@ -85,9 +120,13 @@ Supported gateway modes:
 The rendered wrappers pass literal `${VAR}` placeholders to `mcp-remote` in
 each `--header` value. `mcp-remote` expands those placeholders from the
 wrapper environment at runtime, so token values stay in `.env.splunk-mcp` and
-do not appear in process argv.
-Hosted gateway modes also add `--transport http-only --allow-http`, matching
-Splunk's `mcp-remote` examples for the SCS endpoint.
+do not appear in process argv. Hosted gateway modes add the transport flags
+required by the SCS endpoint, but the renderer still requires an HTTPS target.
+
+Remote endpoints must use HTTPS with a trusted certificate. Explicit HTTP and
+`--client-insecure-tls` are accepted only for loopback targets such as
+`localhost`, `127.0.0.1`, or `::1`; do not use them to bypass certificate
+validation for a remote Splunk deployment.
 
 Current hosted gateway region mapping:
 
@@ -136,7 +175,7 @@ This approach is useful because:
   workspace, or through an absolute path otherwise
 - Codex can keep using stdio MCP registration without pinning the command to a repo checkout path
 - Claude Code reads `.mcp.json` at the project root and uses the same stdio wrapper
-- the same wrapper can handle `SPLUNK_MCP_INSECURE_TLS=1` for lab certificates
+- loopback-only lab targets can use `SPLUNK_MCP_INSECURE_TLS=1`
 
 Gateway mode does not alter local `Splunk_MCP_Server` custom tool manifests.
 External hosted Observability AI Assistant MCP tools remain served by Splunk's
@@ -144,14 +183,19 @@ hosted gateway rather than by local Splunk Platform app content.
 
 ## Wrapper Prerequisite
 
-The shell wrapper expects `mcp-remote` on `PATH`. The Node wrapper used by Cursor,
-Codex, and Claude Code registrations prefers `mcp-remote` on `PATH` and falls
-back to `npx mcp-remote`.
+The shell and Node wrappers require an operator-vetted `mcp-remote@0.1.38` on
+`PATH`. They fail closed when it is absent and never fall back to `npx` or
+download code at startup.
 
-Typical install:
+The upstream package describes `mcp-remote` as an experimental compatibility
+proxy. Prefer a client's native Streamable HTTP transport when it supports the
+required headers. Pinning and metadata verification reduce supply-chain drift;
+they do not turn the proxy into a production assurance boundary.
+
+Install the pinned version before registering a client:
 
 ```bash
-npm install -g mcp-remote
+npm install -g mcp-remote@0.1.38
 ```
 
 ## Recommended Defaults
@@ -161,12 +205,18 @@ For a general-purpose admin/search workflow:
 - `timeout=90`
 - `max_row_limit=2000`
 - `default_row_limit=250`
+- `ssl_verify=true` (configuration intent only; 1.2.1 does not enforce it)
 - `require_encrypted_token=true`
-- `mcp_token_default_lifetime_seconds=2592000` (30 days)
-- `mcp_token_max_lifetime_seconds=7776000` (90 days)
+- `legacy_token_grace_days=0`
+- `mcp_token_default_lifetime_seconds=43200` (12 hours)
+- `mcp_token_max_lifetime_seconds=86400` (24 hours)
+- `token_key_reload_interval_seconds=300`
 - `global=600`
+- `admission_global=60`
 - `tenant_authenticated=240`
-- `tenant_unauthenticated=60`
+- `tenant_unauthenticated=10`
+- `circuit_breaker_failure_threshold=5`
+- `circuit_breaker_cooldown_seconds=60`
 
 ## Operational Notes
 
@@ -179,3 +229,39 @@ For a general-purpose admin/search workflow:
 - live hosted-gateway validation should use standard MCP JSON-RPC calls such
   as `tools/list` and then `tools/call` against the rendered gateway URL with
   the same headers
+
+## Completion Validation
+
+Run the completion gate after install and configuration:
+
+```bash
+bash skills/splunk-mcp-server-setup/scripts/validate.sh \
+  --completion \
+  --mcp-bearer-token-file /tmp/splunk_mcp.token
+```
+
+In addition to app version, visibility, configuration, REST endpoint, KV Store,
+and ping checks, completion mode requires a successful authenticated MCP
+`initialize`, verifies that `tools/list` exposes `splunk_get_info`, and safely
+invokes `splunk_get_info` through `tools/call`. It also checks notification
+semantics, rejects an untrusted-Origin probe, and enforces bounded token and
+rate-limit settings. It uses the encrypted bearer-token file for MCP requests;
+the Splunk admin session remains limited to configuration checks. Validation
+also requires the enabled tools to exactly match a reviewed allowlist and
+rejects paginated/incomplete inventories. With no `--allowed-tools-file`, the
+minimal default allowlist is `["splunk_get_info"]`; pass a non-empty JSON array
+through `--allowed-tools-file` when additional tools have been explicitly
+reviewed. Validation requires HTTP 200 for the
+shipped `dashboard`, `monitoring`, `tools`, and `tool_settings` views.
+
+Release 1.2.1 logs complete tool arguments and SPL to `_internal`; evaluation
+must therefore use synthetic, non-sensitive data. Never place literal secrets
+in custom tool headers or bodies because the `mcp_tools` collection can expose
+those definitions broadly. Enabled-tool policy, malformed JSON-RPC handling,
+Host validation, response bounds, cache headers, CUI JWT verification, and
+cluster-wide rate-limit behavior remain vendor-review items, not controls this
+repository claims to validate.
+
+Passing configuration-value checks does not override the package review
+status or prove that vendor code consumes every documented setting. Production
+approval remains blocked until a fixed package passes static and live review.

@@ -7,6 +7,10 @@ description: >-
   infrastructure visibility, AppDynamics collector YAML, local OTLP 4317/4318
   listeners, or Splunk Observability plus AppDynamics OTel export from Linux,
   Docker, or Windows Machine Agent installs.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Machine Agent OTel Collector Setup

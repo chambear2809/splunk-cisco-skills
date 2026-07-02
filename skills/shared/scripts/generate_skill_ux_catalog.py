@@ -247,6 +247,7 @@ def skill_row(skill_dir: Path) -> tuple[str, list[str]]:
     metadata = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
     name = metadata.get("name") or skill_dir.name
     description, use_when = split_description(metadata.get("description", ""))
+    compatibility = metadata.get("compatibility", "Compatibility not classified")
     script_names = scripts(skill_dir)
     templates = template_files(skill_dir)
     references = reference_files(skill_dir)
@@ -263,6 +264,7 @@ def skill_row(skill_dir: Path) -> tuple[str, list[str]]:
     return category_for(name), [
         f"`{name}`",
         first_sentence(description),
+        first_sentence(compatibility),
         start,
         safe_first_command(name, script_names),
         validation_command(name, script_names),
@@ -298,6 +300,7 @@ def render_catalog() -> str:
     headers = [
         "Skill",
         "Plain-language purpose",
+        "Splunk 10.5 compatibility",
         "Start here",
         "Safe first command",
         "Validation",

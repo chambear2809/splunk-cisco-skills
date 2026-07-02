@@ -1,6 +1,10 @@
 # Beginner service-tree starter.
 # Replace service names, SPL searches, and threshold fields, then run:
-#   bash scripts/setup.sh --workflow topology --spec templates/beginner.topology.yaml
+#   bash skills/splunk-itsi-config/scripts/setup.sh --workflow topology --spec my-itsi-topology.yaml --mode lint
+
+schema_version: 1
+metadata:
+  template: true
 
 connection:
   # Leave blank to use SPLUNK_SEARCH_API_URI from the credentials file.
@@ -11,9 +15,6 @@ connection:
 
 itsi:
   require_present: true
-  install_if_missing: true
-  source: splunkbase
-  app_id: "1841"
 
 defaults:
   sec_grp: default_itsi_security_group

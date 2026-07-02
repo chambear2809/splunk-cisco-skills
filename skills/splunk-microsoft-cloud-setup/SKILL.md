@@ -12,6 +12,10 @@ description: >-
   Use when the user asks about Splunk_TA_o365, Office 365, Microsoft 365, Entra
   ID, Azure AD audit/sign-in, Microsoft Graph, Splunk Add-on for Microsoft
   Cloud Services, or Microsoft cloud log onboarding in Splunk.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Microsoft Cloud Add-ons Setup (Office 365, Entra ID, Graph)

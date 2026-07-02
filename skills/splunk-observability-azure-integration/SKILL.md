@@ -10,6 +10,10 @@ description: >-
   configure the Azure integration, manage service-principal credential files,
   onboard multiple subscriptions, or set up Azure dashboards, detectors, logs,
   AKS telemetry, Log Observer Connect, or HEC-token handoffs.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk Observability Cloud — Azure Integration Setup

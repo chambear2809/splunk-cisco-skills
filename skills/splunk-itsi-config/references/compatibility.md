@@ -1,21 +1,92 @@
-# ITSI Compatibility Report
+# ITSI API Compatibility Notes
 
-This report summarizes the Splunk ITSI REST API areas covered by `splunk-itsi-config` without requiring a live ITSI run.
+This is an API-path and version posture summary, not a certification that every
+ITSI product feature is automated. Read
+[`product_coverage.md`](product_coverage.md) for the feature-level matrix,
+limits, ITSI 5.0 posture, and official source ledger.
 
-Sources:
-- ITSI REST API reference: https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-reference/itsi-rest-api-reference
-- ITSI REST API schema: https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-schema/itsi-rest-api-schema
+Render the deterministic implementation inventory when a machine-readable or
+reviewable point-in-time report is useful:
 
-| Area | Status | Coverage | Notes |
-| --- | --- | --- | --- |
-| Native config upserts | supported | team, entity, entity_type, entity_filter_rule, entity_management_policies, entity_management_rules, data_integration_template, service, base_service_template, kpi_base_search, kpi_template, kpi_threshold_template, custom_threshold_windows, notable_event_aggregation_policy, event_management_state, correlation_search, notable_event_email_template, maintenance_calendar, backup_restore, deep_dive, glass_table, home_view, kpi_entity_threshold, refresh_queue_job, sandbox, sandbox_service, sandbox_sync_log, upgrade_readiness_prechecks, summarization, summarization_feedback, user_preference | Additive preview/apply/validate plus read-only export/inventory/prune-plan. Export and prune-plan skip optional route families that are unavailable on a live host and report warnings. Core entity/service/KPI objects accept typed fields plus top-level schema passthrough and payload; newer route families use the same passthrough model, and deep-dive updates preserve required owner fields. |
-| Special route families | supported | event_management_interface, maintenance_services_interface, backup_restore_interface, content_pack_authorship, icon_collection | The client uses route-specific lookup parameters and write methods; correlation searches, email templates, and NEAPs use Event Management filter_data while event_management_state uses the core object route on tested ITSI 4.21.2 hosts. Generic keyed updates use is_partial_data=1 where the route family supports it. |
-| Custom threshold links | supported | custom_threshold_windows/linked_kpis and custom_threshold_windows/<id>/associate_service_kpi | Links are additive and preserve unmanaged existing service/KPI associations. |
-| Content-pack installation | supported | content_pack catalog/status/detail, preview, install, refresh, app/bootstrap checks, generic catalog-title/pack-id installs, profile metadata for the documented Content Packs 2.5 catalog | Install remains conservative: preview first, no destructive resolution defaults, and profile runs emit machine-readable automation_scope/follow_up_steps. configured_outcome can automate safe native, macro, saved-search, app-local props/transforms or generic conf stanza, data-model acceleration, dashboard XML, navigation XML, Enterprise staged lookup-file create/replace, lookup refresh dispatch, KPI backfill dispatch, and guarded `itsiimportobjects` service-import dispatch tasks after install. |
-| Drift and readiness reporting | supported | field-level validation diffs, KPI/correlation-search SPL preflight warnings, read-only app/object/KV Store inventory, count-endpoint inventory, projected field-list inventory/prune scans, supported-object/alias/notable-action discovery, notable-action detail readback, entity-discovery-search readback, retirable-entity target counts/lists, Event Management counts, bounded notable-event readback, ticket readback, episode export status/listing, maintenance-window status checks, offline native smoke harness | Diagnostics remain non-destructive. SPL checks are heuristic preflight warnings, not full Splunk parser validation. Inventory can use count-only mode for large estates, and uses discovery/count/notable-event/entity-discovery/maintenance/ticket/export helpers when requested and available. The smoke harness uses an in-memory client and exercises cleanup without connecting to Splunk. |
-| Scale-oriented REST helpers | supported | itoa_interface/<object_type>/count, opt-in native bulk_apply for existing keyed updates, and guarded operational bulk_update | Count endpoints are available to inventory so large estates can avoid full object-list scans, and list helpers accept documented filter, fields, count, and offset controls. bulk_apply.enabled batches eligible normal native updates while keeping per-object change records; the raw bulk_update operational action remains guarded with allow_bulk_update for advanced one-off payloads. |
-| Topology workflow | supported | topology.roots service-tree materialization, starter native glass-table generation, topology-derived prune-plan and cleanup-apply | The topology workflow derives desired service titles from services and topology.roots before invoking native prune/cleanup, so topology-only services are protected from unmanaged candidates. The glass-table generator emits a reviewable starter payload; operators should review visual layout before applying it to ITSI. |
-| Operational helper actions | guarded | entity retire/restore/retire_retirable with target-list/count guard, custom threshold stop/disconnect, KPI/entity threshold recommendation application, bulk time-offset shift, notable-event-group update, notable-event comment append, notable-event action detail/read execution, ticket link/read/unlink, episode export create/list/get/download/delete, service/KPI-base-search templatize, guarded bulk_update, custom content-pack submit/download | Available only through operational_actions and blocked unless allow_operational_action: true is present on each action. Higher-risk calls require second guards such as disconnect_all, retire_all_retirable, allow_episode_field_change, allow_notable_event_action_execute, allow_ticket_unlink, allow_episode_export_delete, allow_episode_export_bulk_delete, or allow_bulk_update. Preview reads count_retirable targets before retire_retirable when available, and apply preserves helper response payloads in informational diagnostics. |
-| Episode records and actions | guarded | notable_event read/count inventory, notable_event_group update, notable_event_comment append, notable_event_actions execution, ticketing GET/POST/DELETE, episode_export POST/GET/DELETE/file GET/file DELETE | Episode interactions are modeled only as explicit operational actions or read-only inventory discovery, not declarative config upserts. Action, ticket-link, and generic helper response payloads are preserved in informational diagnostics for audit. Export deletes require explicit delete guards and filter-based deletes require a second bulk-delete guard. |
-| Deletes and destructive transitions | guarded | keyed single-object cleanup deletes, guarded episode-export key/filter/file deletes, content_pack submit/download, icon delete, kpi_entity_threshold delete | cleanup-apply deletes only supported candidates from a matching current prune-plan after explicit allow_destroy, confirmation text, max_deletes, candidate_ids, and a CLI backup export. Keyless objects and known default/shipped ITSI/content-pack objects, including objects with shipped source metadata, remain manual-review only unless protected system cleanup is explicitly allowed. Content-pack authorship objects, glass-table icons, and KPI entity thresholds require the separate high-risk confirmation plus high_risk_candidate_ids. |
-| Unused or discovery/helper APIs | excluded | entity_relationship and entity_relationship_rule | Supported-object, alias, notable-action, and entity-discovery read helpers enrich inventory. Splunk documents relationship object types as unused, so they remain outside the managed model. |
+```bash
+python3 skills/splunk-itsi-config/scripts/itsi_compatibility_report.py \
+  --format markdown
+```
+
+The report is offline evidence about local code paths, not a live target
+certification. Detect the target version, routes, capabilities, and object
+semantics before apply.
+
+## Baseline
+
+- Documentation baseline: ITSI 4.21 REST API reference and schema.
+- Existing route notes include behavior observed for ITSI 4.21.2.
+- The local automated tests use fake or in-memory clients. They verify request
+  construction and workflow logic, not live compatibility across all supported
+  Splunk Platform and ITSI combinations.
+- Splunk recommends `vLatest` or an unversioned interface for ITSI APIs. The
+  client probes the documented route family and compatible fallback where the
+  implementation explicitly supports one.
+- Splunk also publishes an ITSI 5.0 REST reference and schema. This repository
+  has not recorded live 5.0 contract evidence, so the current implementation
+  baseline remains 4.21.
+- Export-shaped payloads are version-specific. Do not reuse a 4.21 passthrough
+  payload on ITSI 5.0 without mapping it to the 5.0 schema and obtaining a clean
+  live preview.
+
+Official baseline sources:
+
+- [ITSI 4.21 REST API reference](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-reference/itsi-rest-api-reference)
+- [ITSI 4.21 REST API schema](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-schema/itsi-rest-api-schema)
+- [ITSI 5.0 REST API reference](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/5.0/itsi-rest-api-reference/itsi-rest-api-reference)
+- [ITSI 5.0 REST API schema](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/5.0/itsi-rest-api-schema/itsi-rest-api-schema)
+- [ITSI release notes and resources](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/release-notes-and-resources)
+
+## Compatibility classifications
+
+| Area | Classification | Compatibility statement |
+| --- | --- | --- |
+| Entities, services, embedded KPIs, dependencies | `typed` | Local fields and additive drift behavior are implemented. Live data/search semantics still require target validation. |
+| Service-template and custom-threshold links | `typed` with limits | Link routes are modeled. Template entity-rule choice semantics and version-shaped window objects retain UI/export handoffs. |
+| Topology DSL | `typed` | Compiles local trees to services and dependency edges; it is not a product topology-discovery API. |
+| Content-pack catalog/detail/status/preview | `read-only` | Uses live ITSI catalog data without discovery refresh in preview/validate. A stale catalog is reported. |
+| Content-pack import | `typed envelope` | Uses the selected live catalog ID/version and conservative defaults. It does not install ITSI, Content Library, or prerequisite app packages. |
+| Native export, inventory, prune-plan | `read-only` | Optional route families can be unavailable by version/entitlement; unavailability must be reported rather than promoted to support. |
+| Generic ITSI/Event Management/maintenance/backup/view objects | `experimental passthrough` | Route and payload helpers exist, but exact schema, mutability, permissions, and lifecycle semantics are not claimed across versions. |
+| Episode/action/ticket/export helpers and cleanup | `guarded` | Operational or destructive behavior requires explicit guards. It is not reusable idempotent desired state. |
+| Relationship object types documented as unused | `unsupported` | Not managed by this skill. |
+| ITSI 5.0-only experiences and AI features | `handoff` / `experimental` | Tracked in the product matrix. Published 5.0 REST documentation does not by itself prove that each new experience has a mapped, safe object contract; live evidence is still required. |
+
+## Preflight requirements
+
+Before a live preview or apply, detect and report:
+
+- Splunk Platform and ITSI versions;
+- ITSI license/app enablement and KV Store health;
+- current user roles, object capabilities, and target-team access;
+- Content Library and pack versions when packs are requested;
+- availability of every route family needed by the selected spec; and
+- any payload section that relies on same-version export evidence.
+
+If any required combination is unknown, stop with a handoff. Do not treat a
+404, a generic payload passthrough, or a successful fake-client test as evidence
+that the product feature is supported.
+
+## Read-only contract
+
+`lint`, `preview`, `validate`, `export`, `inventory`, and `prune-plan` are
+read-only. In particular, content catalog discovery and refresh endpoints use
+POST and are excluded from those modes. A requested
+`content_library.refresh_catalog: true` is apply-only and must be visible in the
+approved preview as an intended write.
+
+## ITSI 5.0
+
+Splunk's official
+[ITSI 5.0 new-features page](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/release-notes-and-resources/5.0/release-notes/new-features-in-splunk-it-service-intelligence)
+describes a new guided installer/home experience, expanded alert integrations,
+AI service and KPI discovery, content-pack lifecycle changes, Episode Review and
+central-admin changes, revised RBAC, Event iQ Detect and Diagnose, enrichment,
+and maintenance improvements. The REST reference and schema are published, but
+each new product area still needs an applicable object-contract mapping and live
+validation before it becomes typed automation here. See `product_coverage.md`.

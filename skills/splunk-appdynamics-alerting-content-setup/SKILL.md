@@ -9,6 +9,10 @@ description: >-
   schedules, email digests, action suppression, anomaly detection, automated
   RCA, dynamic baseline behavior, automated transaction diagnostics, alerting
   content import/export, rollback, or alert validation.
+compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
+metadata:
+  splunk_cloud_10_5: "not-applicable"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk AppDynamics Alerting Content Setup

@@ -6,14 +6,16 @@ safety gates can be tested with the repo's normal Python test environment.
 
 from __future__ import annotations
 
-import hashlib
 import json
+import hashlib
 import os
 import re
+import secrets
 import shlex
 import signal
 import stat
 import subprocess
+import sys
 import threading
 import time
 from collections import OrderedDict
@@ -71,6 +73,17 @@ MAX_OUTPUT_CHARS = 40000
 # output is suffixed with a truncation marker.
 MAX_OUTPUT_BYTES = 256 * 1024
 MAX_STORED_PLANS = 256
+MAX_RESOURCE_BYTES = 1024 * 1024
+MAX_RESOURCE_FILES = 256
+MAX_ARG_COUNT = 256
+MAX_MAPPING_ENTRIES = 256
+MAX_SECRET_KEYS = 128
+MAX_KEY_CHARS = 255
+MAX_ARG_CHARS = 16 * 1024
+MAX_TOTAL_ARG_CHARS = 128 * 1024
+MAX_SNAPSHOT_FILES = 10_000
+MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024
+CANCEL_KILL_GRACE_SECONDS = 1.0
 # Maximum age (in seconds) of a stored plan before execute_plan refuses to
 # run it. Plans older than this are treated as expired so that a hash that
 # was generated, then sat unexecuted across a long pause / context switch,
@@ -79,402 +92,12 @@ MAX_STORED_PLANS = 256
 # MCP_PLAN_TTL_SECONDS=<int>; values <= 0 disable the TTL guard entirely.
 PLAN_TTL_SECONDS = _env_int("MCP_PLAN_TTL_SECONDS", 3600)
 
-# Scripts whose --dry-run / --list-products invocation is genuinely read-only.
-# Any (skill, script) pair NOT in this set is treated as mutating regardless of
-# argv flags, even if the script silently ignores unknown flags.
-READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
-    ("cisco-product-setup", "setup.sh"),
-    ("splunk-agent-management-setup", "setup.sh"),
-    ("splunk-asset-risk-intelligence-setup", "setup.sh"),
-    ("splunk-attack-analyzer-setup", "setup.sh"),
-    # splunk-cloud-acs-admin-setup, splunk-cloud-acs-allowlist-setup,
-    # splunk-edge-processor-setup,
-    # splunk-federated-search-setup, splunk-indexer-cluster-setup,
-    # splunk-license-manager-setup, splunk-soar-setup all share the same
-    # render-first --dry-run contract: the renderer runs with --dry-run,
-    # any rendered script is only logged ("DRY RUN: ..."), and the wrapper
-    # exits 0 before any mutating step. Allowlisting them here lets
-    # operators preview --phase apply / --phase rolling-restart / etc.
-    # under the read-only classification.
-    ("splunk-cloud-acs-allowlist-setup", "setup.sh"),
-    ("splunk-cloud-acs-admin-setup", "setup.sh"),
-    ("splunk-edge-processor-setup", "setup.sh"),
-    ("splunk-enterprise-kubernetes-setup", "setup.sh"),
-    # splunk-enterprise-public-exposure-hardening uses --phase + --dry-run.
-    # The --dry-run preview always exits before any rendered script runs.
-    ("splunk-enterprise-public-exposure-hardening", "setup.sh"),
-    ("splunk-federated-search-setup", "setup.sh"),
-    ("splunk-hec-service-setup", "setup.sh"),
-    ("splunk-index-lifecycle-smartstore-setup", "setup.sh"),
-    ("splunk-indexer-cluster-setup", "setup.sh"),
-    ("splunk-itsi-setup", "setup.sh"),
-    ("splunk-license-manager-setup", "setup.sh"),
-    ("splunk-monitoring-console-setup", "setup.sh"),
-    ("splunk-observability-cloud-integration-setup", "setup.sh"),
-    ("splunk-observability-dashboard-builder", "setup.sh"),
-    # splunk-observability-native-ops --dry-run is forwarded into
-    # o11y_native_api.py, which skips live SignalFx / Splunk On-Call API
-    # writes. The token-file readability check is also short-circuited
-    # when --dry-run is set, so --apply --dry-run is a true preview path.
-    ("splunk-observability-native-ops", "setup.sh"),
-    ("splunk-observability-otel-collector-setup", "setup.sh"),
-    ("galileo-platform-setup", "setup.sh"),
-    ("galileo-agent-control-setup", "setup.sh"),
-    # splunk-oncall-setup --dry-run skips API/HEC writes even when the
-    # caller also passes --apply, --send-alert, or --install-splunk-app.
-    ("splunk-oncall-setup", "setup.sh"),
-    ("splunk-security-essentials-setup", "setup.sh"),
-    ("splunk-security-portfolio-setup", "setup.sh"),
-    ("splunk-soar-setup", "setup.sh"),
-    ("splunk-admin-doctor", "doctor.py"),
-    ("splunk-admin-doctor", "setup.sh"),
-    ("splunk-data-source-readiness-doctor", "doctor.py"),
-    ("splunk-data-source-readiness-doctor", "setup.sh"),
-    ("splunk-ingest-processor-setup", "setup.sh"),
-    ("splunk-spl2-pipeline-kit", "setup.sh"),
-    ("splunk-uba-setup", "setup.sh"),
-    ("splunk-universal-forwarder-setup", "setup.sh"),
-    ("splunk-workload-management-setup", "setup.sh"),
-    # New TE / MCP / Isovalent / AI Pod skills (eight). Each is render-first;
-    # --apply (or --apply STEPS) opts in to mutating action and is separately
-    # gated by the READ_ONLY_UNLESS_FLAG_SCRIPTS map below.
-    ("cisco-thousandeyes-mcp-setup", "setup.sh"),
-    ("splunk-observability-thousandeyes-integration", "setup.sh"),
-    ("cisco-isovalent-platform-setup", "setup.sh"),
-    ("splunk-observability-isovalent-integration", "setup.sh"),
-    ("splunk-observability-cisco-nexus-integration", "setup.sh"),
-    ("splunk-observability-cisco-intersight-integration", "setup.sh"),
-    ("splunk-observability-nvidia-gpu-integration", "setup.sh"),
-    ("splunk-observability-cisco-ai-pod-integration", "setup.sh"),
-    # splunk-observability-k8s-auto-instrumentation-setup is render-first with
-    # --apply-instrumentation / --apply-annotations / --uninstall-instrumentation
-    # gates; --dry-run is a pure preview (no cluster writes, no file writes beyond
-    # the plan text).
-    ("splunk-observability-k8s-auto-instrumentation-setup", "setup.sh"),
-    # splunk-observability-aws-lambda-apm-setup renders the Lambda layer + env
-    # plan by default; no AWS API calls happen without --apply or --quickstart.
-    ("splunk-observability-aws-lambda-apm-setup", "setup.sh"),
-    # Azure and GCP Observability Cloud integration skills are render-first.
-    # --apply mutates the Splunk-side integration only; no cloud-side changes.
-    ("splunk-observability-azure-integration", "setup.sh"),
-    ("splunk-observability-gcp-integration", "setup.sh"),
-}
-READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
-    ("cisco-product-setup", "setup.sh"),
-    ("cisco-product-setup", "resolve_product.sh"),
-}
-READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
-    ("splunk-agent-management-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-admin-doctor", "doctor.py"): {"doctor", "fix-plan", "validate", "status"},
-    ("splunk-admin-doctor", "setup.sh"): {"doctor", "fix-plan", "validate", "status"},
-    ("splunk-data-source-readiness-doctor", "doctor.py"): {
-        "doctor",
-        "fix-plan",
-        "validate",
-        "status",
-        "source-packs",
-        "collect",
-        "synthesize",
-    },
-    ("splunk-data-source-readiness-doctor", "setup.sh"): {
-        "doctor",
-        "fix-plan",
-        "validate",
-        "status",
-        "source-packs",
-        "collect",
-        "synthesize",
-    },
-    ("splunk-ingest-processor-setup", "setup.sh"): {
-        "render",
-        "doctor",
-        "status",
-        "validate",
-        "all",
-    },
-    ("splunk-spl2-pipeline-kit", "setup.sh"): {
-        "render",
-        "lint",
-        "validate",
-        "smoke",
-        "all",
-    },
-    ("splunk-workload-management-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-hec-service-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-index-lifecycle-smartstore-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-monitoring-console-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-enterprise-kubernetes-setup", "setup.sh"): {"render", "preflight", "status"},
-    ("splunk-universal-forwarder-setup", "setup.sh"): {"render", "download", "status"},
-    ("splunk-cloud-acs-allowlist-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "status",
-        "audit",
-        "validate",
-    },
-    ("splunk-cloud-acs-admin-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "status",
-        "audit",
-        "validate",
-    },
-    # splunk-edge-processor-setup status/validate phases re-render assets and
-    # then run validate.sh on the control plane. validate.sh only reads via
-    # the EP API and never writes back, so these phases are pure inspection.
-    ("splunk-edge-processor-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "status",
-        "validate",
-    },
-    # splunk-enterprise-public-exposure-hardening render/preflight/validate
-    # phases only render assets or run rendered preflight/validate scripts,
-    # which inspect the search head without changing it. apply/all run the
-    # search-head apply script and remain mutating.
-    ("splunk-enterprise-public-exposure-hardening", "setup.sh"): {
-        "render",
-        "preflight",
-        "validate",
-    },
-    ("splunk-federated-search-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "status",
-    },
-    ("splunk-indexer-cluster-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "bundle-validate",
-        "bundle-status",
-        "status",
-        "validate",
-    },
-    ("splunk-license-manager-setup", "setup.sh"): {
-        "render",
-        "preflight",
-        "status",
-        "validate",
-    },
-    ("splunk-soar-setup", "setup.sh"): {"render", "preflight", "cloud-onboard"},
-}
-# Scripts that use flag-based mode toggles (not --phase) and are read-only
-# whenever none of the listed mutation flag patterns are present. Each entry
-# maps (skill, script) to a tuple of patterns; a pattern ending in "-" is a
-# prefix match against the flag-only portion of the argv token (so "--apply-"
-# matches both "--apply-k8s" and "--apply-host"), otherwise it is an exact
-# flag match. The flag-only portion is the substring before "=" so that
-# "--flag=value" forms are also detected.
-#
-# Any matching invocation is still treated as mutating UNLESS the same
-# invocation also includes --dry-run AND the (skill, script) is in
-# READ_ONLY_DRY_RUN_SCRIPTS — that combined case is handled earlier in
-# plan_skill_script() and exists so operators can preview an --apply call
-# safely. That is why splunk-observability-dashboard-builder and
-# splunk-observability-otel-collector-setup appear in both this map and
-# READ_ONLY_DRY_RUN_SCRIPTS; do not "deduplicate" without first updating
-# plan_skill_script().
-READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
-    # The live validator is a read-only baseline/help/status sweep unless the
-    # operator explicitly enables its bounded apply catalog.
-    ("splunk-admin-doctor", "live_validate_all.py"): ("--allow-apply",),
-    ("splunk-observability-native-ops", "setup.sh"): ("--apply",),
-    ("splunk-observability-dashboard-builder", "setup.sh"): ("--apply",),
-    # splunk-oncall-setup mutates Splunk On-Call (or the Splunk-side companion
-    # apps, or the REST endpoint) only when --apply, --send-alert,
-    # --install-splunk-app, --uninstall, or --self-test is passed. Without
-    # any of those, the script renders + validates only. --self-test is a
-    # mutation gate because the script's own argv parser flips SEND_ALERT
-    # to true on --self-test, which fires synthetic INFO + RECOVERY alerts
-    # against the live On-Call REST endpoint.
-    ("splunk-oncall-setup", "setup.sh"): (
-        "--apply",
-        "--send-alert",
-        "--install-splunk-app",
-        "--uninstall",
-        "--self-test",
-    ),
-    ("splunk-oncall-setup", "splunk_side_install.sh"): (
-        "--apply",
-        "--uninstall",
-    ),
-    # otel-collector mutates with --apply-k8s / --apply-linux only.
-    ("splunk-observability-otel-collector-setup", "setup.sh"): ("--apply-",),
-    # splunk-observability-cloud-integration-setup mutates only when --apply,
-    # --quickstart, --quickstart-enterprise, or --enable-token-auth is passed.
-    # All other modes (--render, --validate, --doctor, --discover, --explain,
-    # --rollback, --list-sim-templates, --make-default-deeplink) are
-    # render/inspect-only.
-    ("splunk-observability-cloud-integration-setup", "setup.sh"): (
-        "--apply",
-        "--quickstart",
-        "--quickstart-enterprise",
-        "--enable-token-auth",
-    ),
-    # SC4S / SC4SNMP mutate Splunk via --splunk-prep (creates indexes / HEC
-    # tokens) and the host with --apply-host / --apply-k8s / --apply-compose.
-    # Either gate triggers full mutation classification.
-    ("splunk-connect-for-syslog-setup", "setup.sh"): (
-        "--apply-",
-        "--splunk-prep",
-    ),
-    ("splunk-connect-for-snmp-setup", "setup.sh"): (
-        "--apply-",
-        "--splunk-prep",
-    ),
-    # cisco-thousandeyes-mcp-setup, splunk-observability-thousandeyes-integration,
-    # and cisco-isovalent-platform-setup expose --apply; the other five
-    # observability-* integration wrappers only render manifests/helpers that
-    # the operator applies separately (helm install, kubectl apply, etc.) and
-    # therefore have no --apply flag in their argv parser. Listing those five
-    # with the ("--apply",) sentinel is correct and intentional: the pattern
-    # never matches an argv token they accept, so they are always classified
-    # as read-only when invoked through the MCP wrapper. Keep the entry so
-    # the (skill, script) pair is allowlisted explicitly and so adding a
-    # future --apply mode to one of these scripts immediately re-enables the
-    # mutation gate without code changes here.
-    ("cisco-thousandeyes-mcp-setup", "setup.sh"): ("--apply",),
-    ("splunk-observability-thousandeyes-integration", "setup.sh"): ("--apply",),
-    ("cisco-isovalent-platform-setup", "setup.sh"): ("--apply",),
-    ("splunk-observability-isovalent-integration", "setup.sh"): ("--apply",),
-    ("splunk-observability-cisco-nexus-integration", "setup.sh"): ("--apply",),
-    ("splunk-observability-cisco-intersight-integration", "setup.sh"): ("--apply",),
-    ("splunk-observability-nvidia-gpu-integration", "setup.sh"): ("--apply",),
-    ("splunk-observability-cisco-ai-pod-integration", "setup.sh"): ("--apply",),
-    # splunk-observability-k8s-auto-instrumentation-setup mutates via the three
-    # apply modes (--apply-instrumentation / --apply-annotations, both matched by
-    # the --apply- prefix) and the uninstall mode. The --discover-workloads,
-    # --render, --dry-run, --json, --explain, and --gitops-mode paths are read-only.
-    ("splunk-observability-k8s-auto-instrumentation-setup", "setup.sh"): (
-        "--apply-",
-        "--uninstall-instrumentation",
-    ),
-    # AWS integration renders/validates/discovers by default. --apply mutates
-    # the Splunk-side integration and/or AWS-side metric stream helpers, while
-    # --quickstart chains those apply sections and remains mutating even if an
-    # operator also passes --dry-run (some sections still invoke rendered apply
-    # helpers). Keep this out of READ_ONLY_DRY_RUN_SCRIPTS.
-    ("splunk-observability-aws-integration", "setup.sh"): (
-        "--apply",
-        "--quickstart",
-    ),
-    # DBMon only renders or performs read-only validation/API probes through
-    # setup.sh today. The sentinel keeps the pair explicitly allowlisted and
-    # will flip to mutating if a future --apply mode appears.
-    ("splunk-observability-database-monitoring-setup", "setup.sh"): ("--apply",),
-    # Frontend RUM render/discover/validate/guided modes are non-cluster
-    # changing. The injection and uninstall modes execute rendered kubectl
-    # helpers and require the mutation gate.
-    ("splunk-observability-k8s-frontend-rum-setup", "setup.sh"): (
-        "--apply-injection",
-        "--uninstall-injection",
-    ),
-    # Mobile RUM renders snippets and optional patch files by default. Only
-    # --apply-patches edits application source, and the script also requires
-    # --accept-mobile-rum-source-edit before it will run git apply.
-    ("splunk-observability-mobile-rum-setup", "setup.sh"): (
-        "--apply-patches",
-    ),
-    # Galileo platform / Agent Control skills are render-first; live work
-    # happens only through --apply sections, while --dry-run is a plan-only
-    # preview.
-    ("galileo-platform-setup", "setup.sh"): ("--apply",),
-    ("galileo-agent-control-setup", "setup.sh"): ("--apply",),
-    # Lambda APM renders/validates/discovers by default. --apply mutates
-    # AWS Lambda function configurations via the rendered aws-cli plan, while
-    # --quickstart chains render + print-apply-command (still mutating path).
-    # Keep out of READ_ONLY_DRY_RUN_SCRIPTS because --quickstart may invoke
-    # AWS helpers.
-    ("splunk-observability-aws-lambda-apm-setup", "setup.sh"): (
-        "--apply",
-        "--quickstart",
-    ),
-    # Azure and GCP integration skills are render-first. --apply mutates the
-    # Splunk O11y integration only. --quickstart chains render + apply command.
-    ("splunk-observability-azure-integration", "setup.sh"): (
-        "--apply",
-        "--quickstart",
-    ),
-    ("splunk-observability-gcp-integration", "setup.sh"): (
-        "--apply",
-        "--quickstart",
-    ),
-    # Splunk AppDynamics suite wrappers render coverage, runbooks, doctor
-    # summaries, validation, and rollback plans by default. Treat those
-    # planning modes as read-only through MCP. Apply modes are classified as
-    # mutating when the generic --apply flag or a child-specific mutation gate
-    # is present, matching the public skill contract even though the current
-    # suite renderer still emits reviewed apply plans instead of running live
-    # AppDynamics mutations.
-    ("splunk-appdynamics-setup", "setup.sh"): (
-        "--apply",
-        "--accept-remote-execution",
-        "--accept-enterprise-console-mutation",
-        "--accept-k8s-rollout",
-        "--accept-eum-source-edit",
-        "--accept-analytics-event-publish",
-    ),
-    ("splunk-appdynamics-platform-setup", "setup.sh"): (
-        "--apply",
-        "--accept-enterprise-console-mutation",
-    ),
-    ("splunk-appdynamics-controller-admin-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-agent-management-setup", "setup.sh"): (
-        "--apply",
-        "--accept-remote-execution",
-    ),
-    ("splunk-appdynamics-dual-agent-setup", "setup.sh"): (
-        "--apply",
-        "--accept-host-mutation",
-        "--accept-remote-execution",
-        "--accept-app-restart",
-        "--accept-full-restart",
-    ),
-    ("splunk-appdynamics-apm-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-k8s-cluster-agent-setup", "setup.sh"): (
-        "--apply",
-        "--accept-k8s-rollout",
-    ),
-    ("splunk-appdynamics-infrastructure-visibility-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-machine-agent-otel-collector-setup", "setup.sh"): (
-        "--apply",
-        "--accept-host-mutation",
-        "--accept-remote-execution",
-    ),
-    ("splunk-appdynamics-database-visibility-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-analytics-setup", "setup.sh"): (
-        "--apply",
-        "--accept-analytics-event-publish",
-    ),
-    ("splunk-appdynamics-eum-setup", "setup.sh"): (
-        "--apply",
-        "--accept-eum-source-edit",
-    ),
-    ("splunk-appdynamics-synthetic-monitoring-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-log-observer-connect-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-alerting-content-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-dashboards-reports-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-tags-extensions-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-security-ai-setup", "setup.sh"): ("--apply",),
-    ("splunk-appdynamics-sap-agent-setup", "setup.sh"): ("--apply",),
-}
-# Scripts that are read-only by definition (their entire purpose is to inspect
-# state). Validate scripts only check Splunk and never mutate it. The smoke_*
-# helpers render to a temp directory and assert the rendered artifacts; they
-# never touch live Splunk or the real filesystem outside their tmp tree.
-READ_ONLY_SCRIPT_NAMES: set[str] = {
-    "validate.sh",
-    "list_apps.sh",
-    "resolve_product.sh",
-    "smoke_latest_resolution.sh",
-    "smoke_offline.sh",
-}
-
 DIRECT_SECRET_FLAGS = {
     "--access-token",
     "--activation-code",
     "--admin-token",
     "--analytics-secret",
+    "--authorization",
     "--api-key",
     "--api-secret",
     "--api-token",
@@ -511,6 +134,7 @@ DIRECT_SECRET_FLAGS = {
     "--org-token",
     "--password",
     "--platform-hec-token",
+    "--project-key",
     "--proxy-password",
     "--pull-secret",
     "--refresh-token",
@@ -518,6 +142,7 @@ DIRECT_SECRET_FLAGS = {
     "--rum-token",
     "--secret",
     "--service-account-password",
+    "--service-account",
     "--session-key",
     "--skey",
     "--sf-token",
@@ -527,6 +152,7 @@ DIRECT_SECRET_FLAGS = {
     "--te-token",
     "--token",
     "--vo-api-key",
+    "--wif-config",
     "--x-vo-api-key",
 }
 
@@ -548,6 +174,33 @@ NON_SECRET_VALUE_KEYS = {
     "token_max_lifetime_seconds",
     "token_not_before",
     "token_user",
+}
+
+# Secret-shaped option names whose values are identifiers, policy settings, or
+# explicit consent markers rather than credential material. Keep this list
+# narrow: unknown secret-shaped flags fail closed in _validate_args().
+NON_SECRET_FLAG_KEYS = NON_SECRET_VALUE_KEYS | {
+    "accept_ta_token_in_conf",
+    "allow_loose_token_perms",
+    "confirm_token",
+    "enable_token_auth",
+    "expect_require_encrypted_token",
+    "expire_password_days",
+    "hec_token_name",
+    "image_pull_secret",
+    "min_password_length",
+    "password_history_count",
+    "rum_token_ref",
+    "rum_token_reference",
+    "sc4s_token_name",
+    "sc4snmp_token_name",
+    "smartstore_secret_ref",
+    "secret_id",
+    "secret_placeholder",
+    "ta_secret_mode",
+    "token_disabled",
+    "token_env_var",
+    "token_name",
 }
 
 SECRET_FILE_FLAGS = {
@@ -615,6 +268,16 @@ SECRET_KEY_RE = re.compile(
     r"secret|skey|token)($|_)",
     re.IGNORECASE,
 )
+INLINE_SECRET_RE = re.compile(
+    r"(?i)(?:"
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"
+    r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b|"
+    r"\bAuthorization\s*:\s*(?:Bearer|Basic|Splunk|Token)\s+\S{6,}|"
+    r"[\"']?(?:password|passwd|api[_-]?key|api[_-]?secret|client[_-]?secret|"
+    r"access[_-]?token|refresh[_-]?token|hec[_-]?token|session[_-]?key|"
+    r"private[_-]?key)[\"']?\s*[:=]\s*[\"']?[^\s'\",&]{6,}"
+    r")"
+)
 
 
 class SkillMCPError(ValueError):
@@ -631,14 +294,75 @@ class PlannedCommand:
     read_only: bool
     timeout_seconds: int
     dry_run: dict[str, Any] | None = None
-    # Monotonic creation time; used by _consume_plan to enforce
+    # Monotonic creation time; checked by execute_plan to enforce
     # PLAN_TTL_SECONDS so an old hash cannot be replayed indefinitely.
     # Defaulted via field(default_factory=) since this is a frozen dataclass.
     created_at: float = 0.0
+    executable_path: str = ""
+    executable_sha256: str = ""
+    repository_sha256: str = ""
 
 
 _PLANS: "OrderedDict[str, PlannedCommand]" = OrderedDict()
 _PLANS_LOCK = Lock()
+_EXECUTION_LOCK = Lock()
+_SNAPSHOT_CACHE_LOCK = Lock()
+_SNAPSHOT_FILE_CACHE: dict[
+    str,
+    tuple[tuple[int, int, int, int, int, int], bytes],
+] = {}
+
+
+def _force_kill_after_cancel(process: subprocess.Popen[bytes]) -> None:
+    """Escalate cancellation so a SIGTERM-ignoring child cannot run on."""
+    time.sleep(CANCEL_KILL_GRACE_SECONDS)
+    # Always target the process group on POSIX. The group leader may have
+    # exited on SIGTERM while a descendant in the same group ignored it.
+    _terminate_process(process, force=True)
+
+
+def _request_process_cancel(process: subprocess.Popen[bytes]) -> None:
+    _terminate_process(process, force=False)
+    threading.Thread(
+        target=_force_kill_after_cancel,
+        args=(process,),
+        daemon=True,
+    ).start()
+
+
+class CommandCancellation:
+    """Thread-safe handle used by async MCP handlers to stop a subprocess."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._process: subprocess.Popen[bytes] | None = None
+        self._cancelled = False
+
+    def attach(self, process: subprocess.Popen[bytes]) -> bool:
+        with self._lock:
+            self._process = process
+            cancelled = self._cancelled
+        if cancelled:
+            _request_process_cancel(process)
+        return cancelled
+
+    def detach(self, process: subprocess.Popen[bytes]) -> None:
+        with self._lock:
+            if self._process is process:
+                self._process = None
+
+    def cancel(self) -> None:
+        with self._lock:
+            was_cancelled = self._cancelled
+            self._cancelled = True
+            process = self._process
+        if process is not None and not was_cancelled:
+            _request_process_cancel(process)
+
+    @property
+    def cancelled(self) -> bool:
+        with self._lock:
+            return self._cancelled
 
 
 def _frontmatter(text: str) -> dict[str, str]:
@@ -682,9 +406,14 @@ def _skill_dir(skill: str) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9._-]+", skill or ""):
         raise SkillMCPError(f"Invalid skill name: {skill!r}")
     path = SKILLS_DIR / skill
-    if not (path / "SKILL.md").is_file():
+    try:
+        resolved = path.resolve(strict=True)
+        resolved.relative_to(SKILLS_DIR.resolve())
+    except (FileNotFoundError, ValueError) as exc:
+        raise SkillMCPError(f"Unknown or unsafe skill: {skill}") from exc
+    if not (resolved / "SKILL.md").is_file():
         raise SkillMCPError(f"Unknown skill: {skill}")
-    return path
+    return resolved
 
 
 def _script_path(skill: str, script: str) -> Path:
@@ -727,18 +456,57 @@ def _safe_string_mapping(
         return {}
     if not isinstance(value, Mapping):
         raise SkillMCPError(f"{label} must be an object of string keys and values")
+    if len(value) > MAX_MAPPING_ENTRIES:
+        raise SkillMCPError(
+            f"{label} cannot contain more than {MAX_MAPPING_ENTRIES} entries"
+        )
     safe: dict[str, str] = {}
+    total_chars = 0
     for raw_key, raw_value in value.items():
         key = _safe_text(raw_key, label=f"{label} key")
-        safe[key] = _safe_text(raw_value, label=f"{label}[{key}]")
+        item = _safe_text(raw_value, label=f"{label}[{key}]")
+        if len(key) > MAX_KEY_CHARS:
+            raise SkillMCPError(
+                f"{label} key exceeds the {MAX_KEY_CHARS}-character limit"
+            )
+        if len(item) > MAX_ARG_CHARS:
+            raise SkillMCPError(
+                f"{label}[{key}] exceeds the {MAX_ARG_CHARS}-character limit"
+            )
+        if INLINE_SECRET_RE.search(item):
+            raise SkillMCPError(
+                f"{label}[{key}] appears to contain inline secret material. "
+                "Use secret_files instead."
+            )
+        total_chars += len(key) + len(item)
+        if total_chars > MAX_TOTAL_ARG_CHARS:
+            raise SkillMCPError(
+                f"{label} exceeds the {MAX_TOTAL_ARG_CHARS}-character aggregate limit"
+            )
+        safe[key] = item
     return safe
 
 
+def _normalize_key(key: str) -> str:
+    """Normalize snake, kebab, dotted, and camelCase option/key names."""
+    value = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", key)
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
+    return re.sub(r"[^A-Za-z0-9]+", "_", value).strip("_").lower()
+
+
 def _looks_secret_key(key: str) -> bool:
-    if normalize_key := re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower():
+    if normalize_key := _normalize_key(key):
         if normalize_key in NON_SECRET_VALUE_KEYS:
             return False
-    return bool(SECRET_KEY_RE.search(key.replace("-", "_")))
+    return bool(SECRET_KEY_RE.search(normalize_key))
+
+
+def _is_secret_file_flag(flag: str) -> bool:
+    if flag in SECRET_FILE_FLAGS:
+        return True
+    if not flag.startswith("--") or not flag.endswith("-file"):
+        return False
+    return _looks_secret_key(flag[2:-5])
 
 
 def _validate_timeout(timeout_seconds: int) -> int:
@@ -767,7 +535,7 @@ def _script_command(path: Path, args: list[str]) -> list[str]:
     if suffix == ".sh":
         return ["bash", rel_path, *args]
     if suffix == ".py":
-        return ["python3", rel_path, *args]
+        return [sys.executable, rel_path, *args]
     if suffix == ".rb":
         return ["ruby", rel_path, *args]
     if os.access(path, os.X_OK):
@@ -778,20 +546,47 @@ def _script_command(path: Path, args: list[str]) -> list[str]:
 def _validate_args(args: list[str]) -> list[str]:
     if not isinstance(args, list):
         raise SkillMCPError("args must be a list of strings")
+    if len(args) > MAX_ARG_COUNT:
+        raise SkillMCPError(f"args cannot contain more than {MAX_ARG_COUNT} entries")
     safe_args: list[str] = []
+    total_chars = 0
     index = 0
     while index < len(args):
         arg = _safe_text(args[index], label=f"args[{index}]")
+        if len(arg) > MAX_ARG_CHARS:
+            raise SkillMCPError(
+                f"args[{index}] exceeds the {MAX_ARG_CHARS}-character limit"
+            )
+        total_chars += len(arg)
+        if total_chars > MAX_TOTAL_ARG_CHARS:
+            raise SkillMCPError(
+                f"args exceed the {MAX_TOTAL_ARG_CHARS}-character aggregate limit"
+            )
         flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
-        if flag in DIRECT_SECRET_FLAGS:
+        is_option_flag = bool(
+            re.fullmatch(r"--[A-Za-z0-9][A-Za-z0-9_-]*", flag)
+        )
+        normalized_flag = _normalize_key(flag.removeprefix("--"))
+        secret_file_flag = _is_secret_file_flag(flag)
+        if flag in DIRECT_SECRET_FLAGS or (
+            is_option_flag
+            and not secret_file_flag
+            and normalized_flag not in NON_SECRET_FLAG_KEYS
+            and _looks_secret_key(normalized_flag)
+        ):
             raise SkillMCPError(
                 f"Direct secret flag {flag} is blocked. Use the matching *-file flag."
             )
-        if arg.startswith("--") and "=" in arg and flag in SECRET_FILE_FLAGS:
+        if INLINE_SECRET_RE.search(arg):
+            raise SkillMCPError(
+                f"args[{index}] appears to contain inline secret material. "
+                "Use a matching *-file flag."
+            )
+        if arg.startswith("--") and "=" in arg and secret_file_flag:
             path_value = arg.split("=", 1)[1]
             if not path_value:
                 raise SkillMCPError(f"{flag} requires a file path")
-        elif flag in SECRET_FILE_FLAGS and flag != "--secret-file":
+        elif secret_file_flag and flag != "--secret-file":
             if index + 1 >= len(args):
                 raise SkillMCPError(f"{flag} requires a file path")
             path_value = _safe_text(args[index + 1], label=f"{flag} path")
@@ -816,61 +611,120 @@ def _validate_args(args: list[str]) -> list[str]:
     return safe_args
 
 
-def _arg_value(args: list[str], flag_name: str) -> str | None:
-    for index, arg in enumerate(args):
-        if arg == flag_name and index + 1 < len(args):
-            return args[index + 1]
-        if arg.startswith(f"{flag_name}="):
-            return arg.split("=", 1)[1]
-    return None
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(64 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def _matches_mutation_flag(args: list[str], patterns: tuple[str, ...]) -> bool:
-    """Return True if any argv token matches a mutation flag pattern.
+def _stat_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
 
-    Patterns ending in ``-`` are prefix matches (e.g. ``--apply-`` matches
-    ``--apply-k8s``, ``--apply-host``, ``--apply-linux``). All other patterns
-    must match the flag-only portion of the argv token exactly. The flag-only
-    portion is the substring before ``=`` so that ``--flag=value`` forms are
-    detected the same way as ``--flag value`` forms.
+
+def _cached_file_digest(path: Path) -> tuple[bytes, int]:
+    """Hash a stable file once, reusing it while strong stat identity matches."""
+    initial = path.stat(follow_symlinks=False)
+    identity = _stat_identity(initial)
+    cache_key = str(path)
+    with _SNAPSHOT_CACHE_LOCK:
+        cached = _SNAPSHOT_FILE_CACHE.get(cache_key)
+    if cached is not None and cached[0] == identity:
+        return cached[1], initial.st_size
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        opened_identity = _stat_identity(os.fstat(handle.fileno()))
+        if opened_identity != identity:
+            raise SkillMCPError(f"Skill file changed while opening: {path}")
+        for chunk in iter(lambda: handle.read(64 * 1024), b""):
+            digest.update(chunk)
+        final_identity = _stat_identity(os.fstat(handle.fileno()))
+    current_identity = _stat_identity(path.stat(follow_symlinks=False))
+    if final_identity != identity or current_identity != identity:
+        raise SkillMCPError(f"Skill file changed while hashing: {path}")
+
+    value = digest.digest()
+    with _SNAPSHOT_CACHE_LOCK:
+        _SNAPSHOT_FILE_CACHE[cache_key] = (identity, value)
+    return value, initial.st_size
+
+
+def _skills_snapshot_sha256() -> str:
+    """Bind a plan to all executable skill code, helpers, and local policy.
+
+    Skill entrypoints routinely source shared shell libraries, import sibling
+    Python modules, consult catalogs, and delegate to other scripts. Hashing
+    only the first executable therefore does not preserve reviewed behavior.
+    This deterministic snapshot covers every regular file and safe symlink
+    below ``skills/`` and fails closed on unexpectedly large trees.
     """
-    for arg in args:
-        flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
-        for pattern in patterns:
-            if pattern.endswith("-"):
-                if flag.startswith(pattern):
-                    return True
-            elif flag == pattern:
-                return True
-    return False
+    digest = hashlib.sha256()
+    file_count = 0
+    total_bytes = 0
+    skills_root = SKILLS_DIR.resolve()
+    try:
+        paths = sorted(SKILLS_DIR.rglob("*"), key=lambda item: item.as_posix())
+        for path in paths:
+            relative = path.relative_to(SKILLS_DIR).as_posix().encode("utf-8")
+            if path.is_symlink():
+                target = path.resolve(strict=True)
+                target.relative_to(skills_root)
+                digest.update(b"L\0" + relative + b"\0")
+                digest.update(os.readlink(path).encode("utf-8", errors="surrogateescape"))
+                digest.update(b"\0")
+                continue
+            if not path.is_file():
+                continue
+            file_count += 1
+            if file_count > MAX_SNAPSHOT_FILES:
+                raise SkillMCPError(
+                    f"Skill snapshot exceeds {MAX_SNAPSHOT_FILES} files"
+                )
+            digest.update(b"F\0" + relative + b"\0")
+            file_digest, file_size = _cached_file_digest(path)
+            total_bytes += file_size
+            if total_bytes > MAX_SNAPSHOT_BYTES:
+                raise SkillMCPError(
+                    f"Skill snapshot exceeds {MAX_SNAPSHOT_BYTES} bytes"
+                )
+            digest.update(file_digest)
+            digest.update(b"\0")
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        raise SkillMCPError(f"Could not create a stable skill snapshot: {exc}") from exc
+    return digest.hexdigest()
 
 
-def _phase_invocation_is_read_only(pair: tuple[str, str], args: list[str]) -> bool:
-    # Flag-based mode skills: read-only whenever none of the configured
-    # mutation flag patterns are present. Applies to skills that don't take
-    # a --phase argument and instead gate live mutations behind one or more
-    # explicit toggles (e.g. --apply, --apply-k8s, --splunk-prep).
-    flag_patterns = READ_ONLY_UNLESS_FLAG_SCRIPTS.get(pair)
-    if flag_patterns is not None:
-        return not _matches_mutation_flag(args, flag_patterns)
-    allowed_phases = READ_ONLY_PHASE_SCRIPTS.get(pair)
-    if not allowed_phases:
-        return False
-    if "--apply" in args:
-        return False
-    phase = _arg_value(args, "--phase") or "render"
-    return phase in allowed_phases
-
-
-def _hash_plan(command: list[str], kind: str, timeout_seconds: int) -> str:
-    payload = {
-        "command": command,
-        "cwd": str(REPO_ROOT),
-        "kind": kind,
-        "timeout_seconds": timeout_seconds,
-    }
-    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
-    return digest[:PLAN_HASH_CHARS]
+def _planned_executable(command: list[str]) -> Path:
+    if not command:
+        raise SkillMCPError("Cannot store an empty command")
+    interpreter_name = Path(command[0]).name
+    candidate_index = (
+        1
+        if interpreter_name in {"bash", "ruby"} or interpreter_name.startswith("python")
+        else 0
+    )
+    if candidate_index >= len(command):
+        raise SkillMCPError("Planned command does not include a script path")
+    candidate = Path(command[candidate_index])
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(REPO_ROOT.resolve())
+    except ValueError as exc:
+        raise SkillMCPError(f"Planned executable escapes the repository: {resolved}") from exc
+    if not resolved.is_file():
+        raise SkillMCPError(f"Planned executable is not a file: {resolved}")
+    return resolved
 
 
 def _store_plan(
@@ -883,7 +737,10 @@ def _store_plan(
     dry_run: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     timeout_seconds = _validate_timeout(timeout_seconds)
-    plan_hash = _hash_plan(command, kind, timeout_seconds)
+    executable = _planned_executable(command)
+    executable_sha256 = _file_sha256(executable)
+    repository_sha256 = _skills_snapshot_sha256()
+    plan_hash = secrets.token_hex(PLAN_HASH_CHARS // 2)
     plan = PlannedCommand(
         plan_hash=plan_hash,
         kind=kind,
@@ -894,42 +751,19 @@ def _store_plan(
         timeout_seconds=timeout_seconds,
         dry_run=dry_run,
         created_at=time.monotonic(),
+        executable_path=str(executable),
+        executable_sha256=executable_sha256,
+        repository_sha256=repository_sha256,
     )
     with _PLANS_LOCK:
-        # Re-storing the same hash refreshes recency (move to end) AND its
-        # created_at timestamp, so the TTL clock restarts whenever the plan
-        # is re-confirmed by a fresh planner call.
-        if plan_hash in _PLANS:
-            _PLANS.move_to_end(plan_hash)
+        while plan_hash in _PLANS:  # cryptographically implausible, but fail safe
+            plan_hash = secrets.token_hex(PLAN_HASH_CHARS // 2)
+            plan = PlannedCommand(**{**asdict(plan), "plan_hash": plan_hash})
         _PLANS[plan_hash] = plan
         # LRU eviction: drop the least-recently-used plan when over capacity.
         while len(_PLANS) > MAX_STORED_PLANS:
             _PLANS.popitem(last=False)
     return asdict(plan)
-
-
-def _consume_plan(plan_hash: str) -> PlannedCommand | None:
-    """Atomically remove and return a plan, or None if absent or expired.
-
-    Plans are single-use: once a client invokes execute_plan with a valid
-    hash, the plan is consumed regardless of whether the subprocess succeeds
-    or fails. This prevents replay of destructive commands and serializes
-    concurrent execute_plan calls for the same hash (only the first wins).
-
-    Plans older than PLAN_TTL_SECONDS are also evicted on consume so a hash
-    that was generated and then sat unused across a long pause cannot be
-    silently applied later. Set MCP_PLAN_TTL_SECONDS=0 to disable.
-    """
-    with _PLANS_LOCK:
-        plan = _PLANS.pop(plan_hash, None)
-    if plan is None:
-        return None
-    if PLAN_TTL_SECONDS > 0 and time.monotonic() - plan.created_at > PLAN_TTL_SECONDS:
-        # Treat an expired plan the same as a missing one: the operator must
-        # re-run the planner step to get a fresh hash. The plan was already
-        # popped above so there is nothing to clean up.
-        return None
-    return plan
 
 
 @dataclass(frozen=True)
@@ -938,6 +772,7 @@ class _BoundedResult:
     stdout: str
     stderr: str
     timed_out: bool = False
+    cancelled: bool = False
 
 
 def _drain_stream(stream: Any, sink: list[bytes], byte_cap: int, dropped: list[int]) -> None:
@@ -967,7 +802,32 @@ def _drain_stream(stream: Any, sink: list[bytes], byte_cap: int, dropped: list[i
             accumulated = byte_cap
 
 
-def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
+def _terminate_process(process: subprocess.Popen[bytes], *, force: bool) -> None:
+    """Terminate a child and, on POSIX, its isolated process group."""
+    if os.name == "posix" and hasattr(os, "killpg"):
+        sig = signal.SIGKILL if force else signal.SIGTERM
+        try:
+            os.killpg(process.pid, sig)
+            return
+        except (OSError, ProcessLookupError):
+            pass
+    if process.poll() is not None:
+        return
+    try:
+        if force:
+            process.kill()
+        else:
+            process.terminate()
+    except (OSError, ProcessLookupError):
+        pass
+
+
+def _run_command(
+    command: list[str],
+    *,
+    timeout_seconds: int,
+    cancellation: CommandCancellation | None = None,
+) -> _BoundedResult:
     """Run a command with bounded stdout/stderr buffering.
 
     Unlike subprocess.run(capture_output=True), this wrapper reads child
@@ -976,6 +836,18 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
     while waiting for the timeout.
     """
     timeout_seconds = _validate_timeout(timeout_seconds)
+    if os.environ.get("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION") != "1":
+        raise SkillMCPError(
+            "Subprocess execution is disabled. Set "
+            "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 in the MCP server environment."
+        )
+    if cancellation is not None and cancellation.cancelled:
+        return _BoundedResult(
+            returncode=130,
+            stdout="",
+            stderr="Command cancelled before start.",
+            cancelled=True,
+        )
     try:
         proc = subprocess.Popen(
             command,
@@ -984,7 +856,7 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=False,
-            start_new_session=True,
+            start_new_session=os.name == "posix",
         )
     except OSError as exc:
         return _BoundedResult(
@@ -992,6 +864,8 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
             stdout="",
             stderr=f"Failed to start command: {exc}",
         )
+    if cancellation is not None:
+        cancellation.attach(proc)
     stdout_buf: list[bytes] = []
     stderr_buf: list[bytes] = []
     stdout_dropped = [0]
@@ -1009,6 +883,7 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
     stdout_thread.start()
     stderr_thread.start()
     timed_out = False
+    cancelled = False
     try:
         returncode = proc.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
@@ -1016,24 +891,12 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
         # Send SIGTERM, then SIGKILL after a grace period if needed. The
         # child is started in a new session so this reaches subprocesses that
         # inherited the script's process group as well as the shell itself.
-        try:
-            os.killpg(proc.pid, signal.SIGTERM)
-        except (OSError, ProcessLookupError):
-            try:
-                proc.terminate()
-            except (OSError, ProcessLookupError):
-                pass
+        _terminate_process(proc, force=False)
         try:
             try:
                 returncode = proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except (OSError, ProcessLookupError):
-                    try:
-                        proc.kill()
-                    except (OSError, ProcessLookupError):
-                        pass
+                _terminate_process(proc, force=True)
                 try:
                     returncode = proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
@@ -1041,6 +904,9 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
         except (OSError, ProcessLookupError):
             returncode = -signal.SIGKILL
     finally:
+        if cancellation is not None:
+            cancelled = cancellation.cancelled
+            cancellation.detach(proc)
         # Reader threads exit when pipes close (process exit closes them).
         stdout_thread.join(timeout=5)
         stderr_thread.join(timeout=5)
@@ -1060,11 +926,14 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
         stderr_text += f"\n...[dropped {stderr_dropped[0]} bytes from stderr]"
     if timed_out:
         stderr_text += f"\n...[command exceeded timeout of {timeout_seconds}s and was terminated]"
+    if cancelled and not timed_out:
+        stderr_text += "\n...[command was cancelled and terminated]"
     return _BoundedResult(
         returncode=returncode,
         stdout=stdout_text,
         stderr=stderr_text,
         timed_out=timed_out,
+        cancelled=cancelled,
     )
 
 
@@ -1089,7 +958,7 @@ _SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
             r"-----END [A-Z0-9 ]*PRIVATE KEY-----",
             re.DOTALL,
         ),
-        "-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----",
+        "[REDACTED-PRIVATE-KEY]",
     ),
     # JWTs (three base64url segments).
     (
@@ -1115,19 +984,27 @@ _SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     # leave structure intact.
     (
         re.compile(
-            r"(?i)("
+            r"(?i)([\"']?(?:"
             r"splunk[_-]?pass|splunk[_-]?password|sb[_-]?pass|sb[_-]?password|"
             r"password|passwd|pwd|secret|"
+            r"aws[_-]?secret[_-]?access[_-]?key|"
             r"api[_-]?key|api[_-]?secret|"
             r"client[_-]?secret|access[_-]?token|refresh[_-]?token|"
             r"bearer[_-]?token|hec[_-]?token|"
             r"auth[_-]?token|session[_-]?key|skey|ikey|"
             r"private[_-]?key"
-            r")"
+            r")[\"']?)"
             r"(\s*[:=]\s*['\"]?)"
             r"[^\s'\",&]{6,}"
         ),
         r"\1\2[REDACTED]",
+    ),
+    # A truncated or malformed PEM block may not include its END marker. Do
+    # not return the partial private-key body that remains in the bounded
+    # output buffer.
+    (
+        re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*\Z", re.DOTALL),
+        "-----BEGIN PRIVATE KEY-----[REDACTED-UNTERMINATED]",
     ),
 )
 
@@ -1154,11 +1031,17 @@ def _skill_reference_files(skill_dir: Path) -> list[Path]:
     files: list[Path] = []
     primary = skill_dir / "reference.md"
     if primary.is_file():
-        files.append(primary)
+        files.append(_contained_skill_file(primary, skill_dir))
     references_dir = skill_dir / "references"
     if references_dir.is_dir():
         files.extend(
-            sorted(path for path in references_dir.glob("*.md") if path.is_file())
+            _contained_skill_file(path, skill_dir)
+            for path in sorted(references_dir.glob("*.md"))
+            if path.is_file()
+        )
+    if len(files) > MAX_RESOURCE_FILES:
+        raise SkillMCPError(
+            f"{skill_dir.name} has too many reference files ({len(files)} > {MAX_RESOURCE_FILES})"
         )
     return files
 
@@ -1168,7 +1051,20 @@ def _skill_reference_files(skill_dir: Path) -> list[Path]:
 # that ships a very large fixture under templates/. Individual file reads
 # via list_skill_template_files / read_skill_template_file are not
 # bounded by this constant.
-MAX_AGGREGATED_TEMPLATE_BYTES = 256 * 1024
+MAX_AGGREGATED_TEMPLATE_BYTES = MAX_RESOURCE_BYTES
+
+
+def _contained_skill_file(path: Path, skill_dir: Path) -> Path:
+    try:
+        resolved = path.resolve(strict=True)
+        resolved.relative_to(skill_dir.resolve())
+    except (FileNotFoundError, ValueError) as exc:
+        raise SkillMCPError(
+            f"Skill file escapes its skill directory: {path}"
+        ) from exc
+    if not resolved.is_file():
+        raise SkillMCPError(f"Skill resource is not a regular file: {path}")
+    return resolved
 
 
 def _skill_template_files(skill_dir: Path) -> list[Path]:
@@ -1183,7 +1079,7 @@ def _skill_template_files(skill_dir: Path) -> list[Path]:
     files: list[Path] = []
     primary = skill_dir / "template.example"
     if primary.is_file():
-        files.append(primary)
+        files.append(_contained_skill_file(primary, skill_dir))
     templates_dir = skill_dir / "templates"
     if templates_dir.is_dir():
         for path in sorted(templates_dir.rglob("*")):
@@ -1191,15 +1087,19 @@ def _skill_template_files(skill_dir: Path) -> list[Path]:
                 continue
             if any(part.startswith(".") for part in path.relative_to(templates_dir).parts):
                 continue
-            files.append(path)
+            files.append(_contained_skill_file(path, skill_dir))
+    if len(files) > MAX_RESOURCE_FILES:
+        raise SkillMCPError(
+            f"{skill_dir.name} has too many template files ({len(files)} > {MAX_RESOURCE_FILES})"
+        )
     return files
 
 
 def list_skills() -> dict[str, Any]:
     skills: list[dict[str, Any]] = []
     for skill_dir in _skill_dirs():
-        skill_md = skill_dir / "SKILL.md"
-        metadata = _frontmatter(skill_md.read_text(encoding="utf-8"))
+        skill_md = _contained_skill_file(skill_dir / "SKILL.md", skill_dir)
+        metadata = _frontmatter(_read_bounded_text(skill_md, MAX_RESOURCE_BYTES))
         scripts_dir = skill_dir / "scripts"
         scripts = (
             sorted(path.name for path in scripts_dir.iterdir() if path.is_file())
@@ -1238,12 +1138,19 @@ def read_skill_file(skill: str, file_name: str) -> str:
         if not reference_files:
             raise SkillMCPError(f"{skill} does not have reference.md or references/*.md")
         if len(reference_files) == 1:
-            return reference_files[0].read_text(encoding="utf-8")
+            return _read_bounded_text(reference_files[0], MAX_RESOURCE_BYTES)
         chunks = []
+        remaining = MAX_RESOURCE_BYTES
         for path in reference_files:
             rel_path = path.relative_to(skill_dir)
-            text = path.read_text(encoding="utf-8")
-            chunks.append(f"# {rel_path}\n\n{text}")
+            header = f"# {rel_path}\n\n"
+            text = _read_bounded_text(path, max(0, remaining - len(header.encode())))
+            chunk = f"{header}{text}"
+            chunks.append(chunk)
+            remaining -= len(chunk.encode("utf-8"))
+            if remaining <= 0:
+                chunks.append("\n...[aggregate resource limit reached]")
+                break
         return "\n\n".join(chunks)
     if file_name == "template":
         template_files = _skill_template_files(skill_dir)
@@ -1254,15 +1161,22 @@ def read_skill_file(skill: str, file_name: str) -> str:
         if len(template_files) == 1:
             return _read_bounded_text(template_files[0], MAX_AGGREGATED_TEMPLATE_BYTES)
         chunks = []
+        remaining = MAX_AGGREGATED_TEMPLATE_BYTES
         for path in template_files:
             rel_path = path.relative_to(skill_dir)
-            text = _read_bounded_text(path, MAX_AGGREGATED_TEMPLATE_BYTES)
-            chunks.append(f"# {rel_path}\n\n{text}")
+            header = f"# {rel_path}\n\n"
+            text = _read_bounded_text(path, max(0, remaining - len(header.encode())))
+            chunk = f"{header}{text}"
+            chunks.append(chunk)
+            remaining -= len(chunk.encode("utf-8"))
+            if remaining <= 0:
+                chunks.append("\n...[aggregate resource limit reached]")
+                break
         return "\n\n".join(chunks)
     path = skill_dir / allowed[file_name]
     if not path.is_file():
         raise SkillMCPError(f"{skill} does not have {allowed[file_name]}")
-    return path.read_text(encoding="utf-8")
+    return _read_bounded_text(_contained_skill_file(path, skill_dir), MAX_RESOURCE_BYTES)
 
 
 def _read_bounded_text(path: Path, max_bytes: int) -> str:
@@ -1273,12 +1187,19 @@ def _read_bounded_text(path: Path, max_bytes: int) -> str:
     aggregation. The truncation marker preserves the operator's ability to
     notice that the file was clipped.
     """
-    raw = path.read_bytes()
+    if max_bytes <= 0:
+        return f"...[truncated all bytes from {path.name}]"
+    with path.open("rb") as handle:
+        raw = handle.read(max_bytes + 1)
     if len(raw) <= max_bytes:
         return raw.decode("utf-8", errors="replace")
+    try:
+        omitted = max(1, path.stat().st_size - max_bytes)
+    except OSError:
+        omitted = 1
     return (
         raw[:max_bytes].decode("utf-8", errors="replace")
-        + f"\n...[truncated {len(raw) - max_bytes} bytes from {path.name}]"
+        + f"\n...[truncated {omitted} bytes from {path.name}]"
     )
 
 
@@ -1337,8 +1258,12 @@ def list_cisco_products(state: str | None = None) -> dict[str, Any]:
             f"Cisco product catalog not found at {CATALOG_PATH}. "
             "Run skills/cisco-product-setup/scripts/build_catalog.py --write first."
         )
+    if CATALOG_PATH.stat().st_size > MAX_RESOURCE_BYTES:
+        raise SkillMCPError(
+            f"Cisco product catalog exceeds the {MAX_RESOURCE_BYTES}-byte limit"
+        )
     try:
-        catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        catalog = json.loads(_read_bounded_text(CATALOG_PATH, MAX_RESOURCE_BYTES))
     except json.JSONDecodeError as exc:
         raise SkillMCPError(f"Cisco product catalog JSON is corrupted: {exc}") from exc
     products = catalog.get("products", [])
@@ -1347,10 +1272,18 @@ def list_cisco_products(state: str | None = None) -> dict[str, Any]:
     return {"products": products}
 
 
-def resolve_cisco_product(query: str) -> dict[str, Any]:
+def resolve_cisco_product(
+    query: str,
+    *,
+    cancellation: CommandCancellation | None = None,
+) -> dict[str, Any]:
     query = _safe_text(query, label="query")
     command = ["bash", str(CISCO_RESOLVE_SCRIPT), "--json", query]
-    result = _run_command(command, timeout_seconds=RESOLVE_TIMEOUT_SECONDS)
+    result = _run_command(
+        command,
+        timeout_seconds=RESOLVE_TIMEOUT_SECONDS,
+        cancellation=cancellation,
+    )
     payload: dict[str, Any]
     try:
         payload = json.loads(result.stdout or "{}")
@@ -1369,7 +1302,11 @@ def resolve_cisco_product(query: str) -> dict[str, Any]:
     return payload
 
 
-def _catalog_keys_for_product(product_query: str) -> dict[str, set[str]]:
+def _catalog_keys_for_product(
+    product_query: str,
+    *,
+    cancellation: CommandCancellation | None = None,
+) -> dict[str, set[str]]:
     """Best-effort lookup of accepted keys for a product, by query string.
 
     Returns a dict with 'non_secret' and 'secret' sets containing the union
@@ -1379,7 +1316,7 @@ def _catalog_keys_for_product(product_query: str) -> dict[str, set[str]]:
     server-side.
     """
     try:
-        result = resolve_cisco_product(product_query)
+        result = resolve_cisco_product(product_query, cancellation=cancellation)
     except SkillMCPError:
         return {"non_secret": set(), "secret": set()}
     if result.get("status") != "resolved":
@@ -1418,9 +1355,21 @@ def _catalog_keys_for_product(product_query: str) -> dict[str, set[str]]:
 
 def secret_file_instructions(secret_keys: list[str], prefix: str = "/tmp/splunk_skill") -> dict[str, Any]:
     prefix = _safe_text(prefix, label="prefix")
+    if len(prefix) > 4096:
+        raise SkillMCPError("prefix exceeds the 4096-character limit")
+    if not isinstance(secret_keys, list):
+        raise SkillMCPError("secret_keys must be a list of strings")
+    if len(secret_keys) > MAX_SECRET_KEYS:
+        raise SkillMCPError(
+            f"secret_keys cannot contain more than {MAX_SECRET_KEYS} entries"
+        )
     commands = []
     for raw_key in secret_keys:
         key = _safe_text(raw_key, label="secret key")
+        if not key or len(key) > MAX_KEY_CHARS:
+            raise SkillMCPError(
+                f"secret key must contain 1 to {MAX_KEY_CHARS} characters"
+            )
         safe_key = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_") or "secret"
         path = f"{prefix}_{safe_key}"
         argv = ["bash", "skills/shared/scripts/write_secret_file.sh", path]
@@ -1444,6 +1393,8 @@ def plan_cisco_product_setup(
     secret_files: dict[str, str] | None = None,
     phase: str = "full",
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    cancellation: CommandCancellation | None = None,
 ) -> dict[str, Any]:
     product = _safe_text(product, label="product")
     timeout_seconds = _validate_timeout(timeout_seconds)
@@ -1483,12 +1434,12 @@ def plan_cisco_product_setup(
     # whose name happens to match the secret regex (e.g., a future
     # "password_policy_id") is allowed through if the catalog says it is
     # non-secret.
-    allowlist = _catalog_keys_for_product(product)
+    allowlist = _catalog_keys_for_product(product, cancellation=cancellation)
 
     for key, value in sorted(set_values.items()):
         key = _safe_text(key, label="set_values key")
         value = _safe_text(value, label=f"set_values[{key}]")
-        normalized = re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower()
+        normalized = _normalize_key(key)
         accepted_keys = allowlist["non_secret"]
         # Treat keys allowed by the catalog as authoritatively non-secret.
         if key in accepted_keys or normalized in accepted_keys:
@@ -1508,7 +1459,11 @@ def plan_cisco_product_setup(
         dry_run_command.extend(["--secret-file", key, path])
         execute_command.extend(["--secret-file", key, path])
 
-    dry_run_result = _run_command(dry_run_command, timeout_seconds=timeout_seconds)
+    dry_run_result = _run_command(
+        dry_run_command,
+        timeout_seconds=timeout_seconds,
+        cancellation=cancellation,
+    )
     try:
         dry_run = json.loads(dry_run_result.stdout or "{}")
     except json.JSONDecodeError as exc:
@@ -1524,16 +1479,14 @@ def plan_cisco_product_setup(
         raise SkillMCPError(f"Cisco product dry-run failed: {message}")
 
     summary = f"Cisco product setup for {product} ({phase})"
-    automation_state = (
-        dry_run.get("resolved_product", {}).get("automation_state")
-        if isinstance(dry_run.get("resolved_product"), dict)
-        else ""
-    )
     plan = _store_plan(
         kind="cisco_product_setup",
         command=execute_command,
         summary=summary,
-        read_only=phase == "validate" or automation_state != "automated",
+        # Only the typed validate-only route is allowed through without the
+        # mutation gate. Manual/partial routes may still write handoff assets
+        # or delegate work, so catalog status is not an authorization signal.
+        read_only=phase == "validate",
         timeout_seconds=timeout_seconds,
         dry_run=dry_run,
     )
@@ -1552,27 +1505,13 @@ def plan_skill_script(
     safe_args = _validate_args([] if args is None else args)
     command = _script_command(path, safe_args)
     script_name = path.name
-    pair = (skill, script_name)
-    # A plan is read-only only when we can be certain the underlying script
-    # cannot mutate state. We classify four cases:
-    #   1. Scripts that are read-only by name (validate.sh, list_apps.sh, ...).
-    #   2. Any script invoked with --help (universally a usage print).
-    #   3. Scripts with explicitly allowlisted --dry-run / --list-products
-    #      semantics.
-    #   4. Render-first setup wrappers invoked in render, preflight, or status
-    #      phases without --apply.
-    if script_name in READ_ONLY_SCRIPT_NAMES:
-        read_only = True
-    elif "--help" in safe_args:
-        read_only = True
-    elif "--dry-run" in safe_args and pair in READ_ONLY_DRY_RUN_SCRIPTS:
-        read_only = True
-    elif "--list-products" in safe_args and pair in READ_ONLY_LIST_SCRIPTS:
-        read_only = True
-    elif _phase_invocation_is_read_only(pair, safe_args):
-        read_only = True
-    else:
-        read_only = False
+    # Free-form argv cannot be used as an authorization boundary. Across this
+    # repository, similarly named flags have different arity, aliases, default
+    # modes, and side effects; validators may also write files or send supplied
+    # secret files to a configured endpoint. Treat every generic script as
+    # mutating. Typed workflows (currently plan_cisco_product_setup) can retain
+    # narrower, schema-backed read-only behavior.
+    read_only = False
     return _store_plan(
         kind="skill_script",
         command=command,
@@ -1586,44 +1525,74 @@ def execute_plan(
     plan_hash: str,
     confirm: bool = False,
     expected_kind: str | None = None,
+    *,
+    cancellation: CommandCancellation | None = None,
 ) -> dict[str, Any]:
     plan_hash = _safe_text(plan_hash, label="plan_hash")
     if not PLAN_HASH_RE.match(plan_hash):
         raise SkillMCPError("plan_hash must be a 64-character lowercase hex string.")
 
-    # Peek at the plan to validate. We do not consume the plan on validation
-    # failure: a wrong expected_kind, missing confirm, or a misconfigured
-    # mutation gate is a recoverable client/operator error, and forcing a
-    # re-plan would be hostile and would also expose a destructive race
-    # between the validation error and a retry.
+    # Validate and consume the exact same immutable object under one lock.
+    # Validation errors leave the plan available for a corrected retry.
     with _PLANS_LOCK:
         plan = _PLANS.get(plan_hash)
-    if plan is None:
-        raise SkillMCPError(f"Unknown plan_hash: {plan_hash}")
-    if not confirm:
-        raise SkillMCPError("Execution requires confirm=true.")
-    if expected_kind is not None and plan.kind != expected_kind:
-        raise SkillMCPError(f"Plan {plan_hash} is {plan.kind}, not {expected_kind}.")
-    if not plan.read_only and os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_MUTATION") != "1":
-        raise SkillMCPError(
-            "Mutating execution is disabled. Set SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 "
-            "in the MCP server environment."
-        )
+        if plan is None:
+            raise SkillMCPError(f"Unknown plan_hash: {plan_hash}")
+        if PLAN_TTL_SECONDS > 0 and time.monotonic() - plan.created_at > PLAN_TTL_SECONDS:
+            _PLANS.pop(plan_hash, None)
+            raise SkillMCPError(
+                f"Plan {plan_hash} has expired; re-run the plan step."
+            )
+        if not confirm:
+            raise SkillMCPError("Execution requires confirm=true.")
+        if expected_kind is not None and plan.kind != expected_kind:
+            raise SkillMCPError(f"Plan {plan_hash} is {plan.kind}, not {expected_kind}.")
+        if os.environ.get("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION") != "1":
+            raise SkillMCPError(
+                "Subprocess execution is disabled. Set "
+                "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 in the MCP server environment."
+            )
+        if not plan.read_only and os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_MUTATION") != "1":
+            raise SkillMCPError(
+                "Mutating execution is disabled. Set SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 "
+                "in the MCP server environment."
+            )
+        plan = _PLANS.pop(plan_hash)
 
-    # All checks passed. Atomically consume the plan so it cannot be replayed
-    # and so concurrent execute_plan calls for the same hash cannot both run
-    # the command. The loser of the race gets a generic "no longer available"
-    # error, which also covers the (much rarer) case of LRU eviction between
-    # the peek and the consume.
-    plan = _consume_plan(plan_hash)
-    if plan is None:
-        raise SkillMCPError(
-            f"Plan {plan_hash} is no longer available; re-run the plan step."
+    while not _EXECUTION_LOCK.acquire(timeout=0.1):
+        if cancellation is not None and cancellation.cancelled:
+            return {
+                "ok": False,
+                "plan_hash": plan_hash,
+                "returncode": 130,
+                "stdout": "",
+                "stderr": "Command cancelled before execution.",
+                "command": plan.command,
+                "cwd": plan.cwd,
+                "timed_out": False,
+                "cancelled": True,
+            }
+    try:
+        current_path = Path(plan.executable_path)
+        if not current_path.is_file() or _file_sha256(current_path) != plan.executable_sha256:
+            raise SkillMCPError(
+                "The planned script changed after review; the plan was invalidated. "
+                "Re-run the plan step."
+            )
+        if _skills_snapshot_sha256() != plan.repository_sha256:
+            raise SkillMCPError(
+                "The skill repository changed after review; the plan was invalidated. "
+                "Re-run the plan step."
+            )
+        result = _run_command(
+            plan.command,
+            timeout_seconds=plan.timeout_seconds,
+            cancellation=cancellation,
         )
-
-    result = _run_command(plan.command, timeout_seconds=plan.timeout_seconds)
+    finally:
+        _EXECUTION_LOCK.release()
     return {
-        "ok": result.returncode == 0 and not result.timed_out,
+        "ok": result.returncode == 0 and not result.timed_out and not result.cancelled,
         "plan_hash": plan_hash,
         "returncode": result.returncode,
         "stdout": _truncate_and_redact(result.stdout),
@@ -1631,4 +1600,5 @@ def execute_plan(
         "command": plan.command,
         "cwd": plan.cwd,
         "timed_out": result.timed_out,
+        "cancelled": result.cancelled,
     }

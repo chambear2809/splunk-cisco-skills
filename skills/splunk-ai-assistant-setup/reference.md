@@ -10,6 +10,7 @@ flow exposed by [`SKILL.md`](SKILL.md).
 | Product name | Splunk AI Assistant (formerly: Splunk AI Assistant for SPL / AI Assistant in Splunk) |
 | Splunkbase listing | [App ID 7245](https://splunkbase.splunk.com/app/7245) |
 | Latest verified release | `2.0.0` (April 9, 2026) |
+| Current public release | `2.1.1` (June 25, 2026; lists Splunk 10.5, package not verified here) |
 | Internal app name | `Splunk_AI_Assistant_Cloud` |
 | Package family | `splunk-ai-assistant-for-splunk_*.tgz` |
 | Deployment placement | Search head only |
@@ -21,10 +22,10 @@ Refer to Splunk Docs for canonical references:
 - [Splunk AI Assistant Cloud install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.0.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-cloud-customers)
 - [Splunk AI Assistant Enterprise Cloud Connected install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.0.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-enterprise-customers-with-cloud-connected)
 
-## Current 2.0.0 Release Notes
+## Verified 2.0.0 Release Notes
 
-- Splunkbase shows app ID `7245` latest version `2.0.0`, published April 9,
-  2026, with compatibility for Splunk Cloud and Splunk Enterprise `9.3+`.
+- The repository-reviewed app ID `7245` baseline is `2.0.0`, published April
+  9, 2026, with compatibility for Splunk Cloud and Splunk Enterprise `9.3+`.
 - The product name is now **Splunk AI Assistant**. Older docs and customer
   language may still say **Splunk AI Assistant for SPL**.
 - Agent Mode is new in `2.0.0` and is limited to Splunk Cloud Platform
@@ -36,6 +37,12 @@ Refer to Splunk Docs for canonical references:
 - Splunk AI Assistant has limited IL2 FedRAMP support. The FedRAMP edition does
   not include Agent Mode, data for training/fine-tuning defaults off, and Model
   Runtime is fixed to Splunk-hosted models.
+
+The public listing has since advanced to `2.1.1`, which advertises Splunk 10.5
+support but has not been package-verified by this repository. Do not promote
+the version-specific statements above to `2.1.1` without reviewing its release
+notes and package. The shared installer defaults to verified `2.0.0`; only its
+explicit `--accept-unverified-release` override follows `2.1.1`.
 
 ## Topology Placement
 
@@ -107,9 +114,9 @@ not_started ──submit-onboarding-form──▶ submitted ──complete-onboa
 2. **Public Splunkbase only on Cloud.** Do not perform a private upload of a
    downloaded archive. Splunk Cloud installs must come from the public
    Splunkbase listing, served through ACS.
-3. **Latest-version baseline.** Default installs track the current Splunkbase
-   release. As of `2.0.0`, use Enterprise `9.3+` for the latest app unless you
-   intentionally pin an older release for a documented compatibility reason.
+3. **Public-versus-verified baseline.** Default installs pin verified `2.0.0`.
+   Public `2.1.1` requires the shared installer's explicit unverified-release
+   override and a fresh package/documentation review.
 4. **Agent Mode constraints.** Agent Mode is a `2.0.0` Cloud feature for
    supported AWS commercial regions and requires Splunk platform `10.1+`.
 5. **FedRAMP IL2 constraints.** The FedRAMP edition omits Agent Mode, defaults

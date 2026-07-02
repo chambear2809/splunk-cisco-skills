@@ -18,4 +18,5 @@ fixes:
 
 json: false
 strict: false
+require_complete_evidence: false
 dry_run: false

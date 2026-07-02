@@ -231,6 +231,8 @@ _SOURCE_LIB_BLOCK = (
     'source "${LIB_DIR}/credential_helpers.sh"\n'
     "# shellcheck disable=SC1091\n"
     'source "${LIB_DIR}/license_helpers.sh"\n'
+    "# shellcheck disable=SC1091\n"
+    'source "${LIB_DIR}/platform_version_helpers.sh"\n'
     "\n"
     'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
     'AUTH_PW_FILE="${SPLUNK_ADMIN_PASSWORD_FILE:-/tmp/splunk_admin_password}"\n'
@@ -242,7 +244,18 @@ _SOURCE_LIB_BLOCK = (
     "# --data-urlencode @file; password never lands on argv). All subsequent\n"
     "# REST work uses splunk_curl, which feeds the session key via -K <(...)\n"
     "# and also keeps it off argv.\n"
+    'SESSION_URI="${MANAGER_URI}"\n'
     'SK="$(get_session_key_from_password_file "${MANAGER_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+    '_SPV_SERVER_INFO="$(mktemp)"\n'
+    'chmod 600 "${_SPV_SERVER_INFO}"\n'
+    'if ! splunk_curl "${SK}" --fail-with-body --show-error \\\n'
+    '  "${SESSION_URI}/services/server/info?output_mode=json" > "${_SPV_SERVER_INFO}"; then\n'
+    '  rm -f "${_SPV_SERVER_INFO}"\n'
+    '  echo "ERROR: Could not read ${SESSION_URI}/services/server/info." >&2\n'
+    '  exit 1\n'
+    'fi\n'
+    'SESSION_SPLUNK_VERSION="$(spv_require_supported_enterprise_server_info "${_SPV_SERVER_INFO}")"\n'
+    'rm -f "${_SPV_SERVER_INFO}"\n'
 )
 
 
@@ -424,6 +437,9 @@ def render_configure_peer(args: argparse.Namespace, host: str, ssh_user: str) ->
         f'PEER_PORT="${{PEER_MANAGEMENT_PORT:-{peer_default_port}}}"\n'
         'PEER_URI="${PEER_MANAGEMENT_URL:-https://${HOST}:${PEER_PORT}}"\n'
         + _SOURCE_LIB_BLOCK.replace(
+            'SESSION_URI="${MANAGER_URI}"\n',
+            'SESSION_URI="${PEER_URI}"\n',
+        ).replace(
             'SK="$(get_session_key_from_password_file "${MANAGER_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n',
             'SK="$(get_session_key_from_password_file "${PEER_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n',
         )
@@ -456,8 +472,15 @@ def render_configure_peer(args: argparse.Namespace, host: str, ssh_user: str) ->
 
 def render_validate(args: argparse.Namespace) -> str:
     manager_uri = shell_quote(args.license_manager_uri)
+    peer_hosts = " ".join(shell_quote(host) for host in csv_list(args.peer_hosts))
+    parsed_uri = urlparse(args.license_manager_uri)
+    peer_scheme = parsed_uri.scheme
+    peer_port = parsed_uri.port or 8089
     body = _lib_dir_block() + (
         f"MANAGER_URI={manager_uri}\n"
+        + f"PEER_HOSTS=({peer_hosts})\n"
+        + f'PEER_SCHEME="${{PEER_MANAGEMENT_SCHEME:-{peer_scheme}}}"\n'
+        + f'PEER_PORT="${{PEER_MANAGEMENT_PORT:-{peer_port}}}"\n'
         + _SOURCE_LIB_BLOCK
         + (
             'TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)\n'
@@ -465,6 +488,30 @@ def render_validate(args: argparse.Namespace) -> str:
             "# license_usage_snapshot creates the dir 0700 and writes each\n"
             "# JSON payload with umask 077.\n"
             'license_usage_snapshot "${MANAGER_URI}" "${SK}" "${AUDIT_DIR}"\n'
+            'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
+            '  "${MANAGER_URI}/services/server/info?output_mode=json" > "${AUDIT_DIR}/manager-server-info.json"\n'
+            'manager_version="$(spv_require_supported_enterprise_server_info "${AUDIT_DIR}/manager-server-info.json")"\n'
+            ': > "${AUDIT_DIR}/peer-versions.txt"\n'
+            'for host in "${PEER_HOSTS[@]}"; do\n'
+            '  peer_uri="${PEER_SCHEME}://${host}:${PEER_PORT}"\n'
+            '  peer_sk="$(get_session_key_from_password_file "${peer_uri}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+            '  peer_info="${AUDIT_DIR}/peer-${host}.server-info.json"\n'
+            '  splunk_curl "${peer_sk}" --fail-with-body --show-error \\\n'
+            '    "${peer_uri}/services/server/info?output_mode=json" > "${peer_info}"\n'
+            '  peer_version="$(spv_require_supported_enterprise_server_info "${peer_info}")"\n'
+            '  printf \'%s %s\\n\' "${host}" "${peer_version}" >> "${AUDIT_DIR}/peer-versions.txt"\n'
+            '  python3 - "${manager_version}" "${peer_version}" "${host}" <<\'PY\'\n'
+            'import re, sys\n'
+            'def parsed(value):\n'
+            '    match = re.fullmatch(r"(\\d+)\\.(\\d+)(?:\\.(\\d+))?", value)\n'
+            '    if not match:\n'
+            '        raise SystemExit(f"ERROR: unparseable Splunk version: {value}")\n'
+            '    return tuple(int(part or 0) for part in match.groups())\n'
+            'if parsed(sys.argv[1]) < parsed(sys.argv[2]):\n'
+            '    raise SystemExit(f"ERROR: license manager {sys.argv[1]} is older than peer {sys.argv[3]} ({sys.argv[2]})")\n'
+            'PY\n'
+            'done\n'
+            'echo "PASS: License manager runs supported Splunk Enterprise ${manager_version} and is not older than any configured peer."\n'
             "\n"
             "# license_messages_check returns non-zero when ERROR-severity\n"
             "# messages are present and prints '<errors> <warns>' to stdout.\n"

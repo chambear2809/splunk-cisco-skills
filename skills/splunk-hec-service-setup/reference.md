@@ -33,8 +33,7 @@ Official references:
   <https://help.splunk.com/en/splunk-enterprise/get-started/get-data-in/10.4/get-data-with-http-event-collector/http-event-collector-rest-api-endpoints>
   (older trains: substitute `/10.2/` in the path)
 - Splunk Cloud ACS HEC token management:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2603/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
-  (alternate Cloud train: `10.3.2512`)
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
 
 ## Enterprise Design
 
@@ -122,7 +121,7 @@ bash skills/splunk-hec-service-setup/scripts/validate.sh --platform cloud --live
 
 ## Splunk 10.4 enterprise deployment notes
 
-For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+For Splunk Enterprise `10.4.1` and Splunk Cloud Platform `10.5.2605` planning,
 read this skill alongside
 [`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
 the prose companion to the

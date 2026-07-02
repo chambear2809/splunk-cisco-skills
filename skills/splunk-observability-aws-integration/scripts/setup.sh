@@ -362,10 +362,11 @@ ${PYTHON_BIN} ${API_CLIENT} \\
 EOF
                 ;;
             streams|metric_streams)
+                regions_file_quoted="$(printf '%q' "${OUTPUT_DIR}/03-regions-services.md")"
                 cat <<EOF
 # Rollback (render-only): streams
 # Tear down the per-region CloudFormation stacks deployed for Metric Streams.
-for region in $(bash -c "tail -n +1 ${OUTPUT_DIR}/03-regions-services.md | grep -Eo '[a-z]{2}-[a-z-]+-[0-9]+' | sort -u"); do
+for region in \$(tail -n +1 ${regions_file_quoted} | grep -Eo '[a-z]{2}-[a-z-]+-[0-9]+' | sort -u); do
   aws cloudformation delete-stack \\
     --stack-name SplunkObservability-MetricStreams-\${region} \\
     --region \${region}

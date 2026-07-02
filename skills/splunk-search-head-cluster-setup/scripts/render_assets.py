@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,8 @@ def _rest_script_head(pw_file: str) -> str:
         + _lib_dir_block()
         + "# shellcheck disable=SC1091\n"
         'source "${LIB_DIR}/credential_helpers.sh"\n'
+        + "# shellcheck disable=SC1091\n"
+        'source "${LIB_DIR}/platform_version_helpers.sh"\n'
         'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
         f'AUTH_PW_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-{pw_file}}}"\n'
         'if [[ ! -s "${AUTH_PW_FILE}" ]]; then\n'
@@ -422,11 +425,39 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     # validate.sh
+    member_hosts_shell = " ".join(shlex.quote(host) for host in members)
     (shc / "validate.sh").write_text(
         _rest_script_head(pw_file)
         + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
         + 'if [[ -z "${CAPTAIN_URI}" ]]; then echo "Set CAPTAIN_URI to the current captain." >&2; exit 1; fi\n'
         + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + f'MEMBER_HOSTS=({member_hosts_shell})\n'
+        + 'MEMBER_SCHEME="${SHC_MEMBER_SCHEME:-https}"\n'
+        + 'MEMBER_PORT="${SHC_MEMBER_PORT:-8089}"\n'
+        + 'TMP_DIR="$(mktemp -d)"\n'
+        + 'trap \'rm -rf "${TMP_DIR}"\' EXIT\n'
+        + 'VERSIONS_FILE="${TMP_DIR}/versions"\n'
+        + ': > "${VERSIONS_FILE}"\n'
+        + 'check_member_version() {\n'
+        + '  local uri="$1" label="$2" key="$3" info_file="${TMP_DIR}/${label}.json" version\n'
+        + '  splunk_curl "${key}" --fail-with-body --show-error \\\n'
+        + '    "${uri}/services/server/info?output_mode=json" > "${info_file}"\n'
+        + '  version="$(spv_require_supported_enterprise_server_info "${info_file}")"\n'
+        + '  printf \'%s\\n\' "${version}" >> "${VERSIONS_FILE}"\n'
+        + '  echo "PASS: ${label} runs supported Splunk Enterprise ${version}."\n'
+        + '}\n'
+        + 'check_member_version "${CAPTAIN_URI}" captain "${SK}"\n'
+        + 'for host in "${MEMBER_HOSTS[@]}"; do\n'
+        + '  uri="${MEMBER_SCHEME}://${host}:${MEMBER_PORT}"\n'
+        + '  member_sk="$(get_session_key_from_password_file "${uri}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + '  safe_label="member-${host//[^A-Za-z0-9_.-]/_}"\n'
+        + '  check_member_version "${uri}" "${safe_label}" "${member_sk}"\n'
+        + 'done\n'
+        + 'if [[ "$(sort -u "${VERSIONS_FILE}" | wc -l | tr -d \' \')" != "1" ]]; then\n'
+        + '  echo "FAIL: SHC members are on different Splunk Enterprise patch versions:" >&2\n'
+        + '  sort -u "${VERSIONS_FILE}" >&2\n'
+        + '  exit 1\n'
+        + 'fi\n'
         + 'echo "=== SHC Captain Info ==="\n'
         + 'splunk_curl "${SK}" --fail-with-body --show-error \\\n'
         + '  "${CAPTAIN_URI}/services/shcluster/captain/info?output_mode=json" | python3 -m json.tool\n'

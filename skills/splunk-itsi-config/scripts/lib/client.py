@@ -75,6 +75,19 @@ class SplunkRestClient:
         if verify_ssl_source is None:
             verify_ssl_source = os.environ.get("SPLUNK_VERIFY_SSL")
         verify_ssl = bool_from_any(verify_ssl_source, default=True)
+        allow_insecure_tls_source = connection.get("allow_insecure_tls")
+        if allow_insecure_tls_source is None:
+            allow_insecure_tls_source = os.environ.get("SPLUNK_ALLOW_INSECURE_TLS")
+        allow_insecure_tls = bool_from_any(
+            allow_insecure_tls_source,
+            default=False,
+            field="connection.allow_insecure_tls",
+        )
+        if not verify_ssl and not allow_insecure_tls:
+            raise ValidationError(
+                "TLS certificate verification is disabled. Set connection.allow_insecure_tls=true only for an "
+                "explicitly accepted short-lived lab target; production configuration requires verified TLS."
+            )
         ca_cert_file = str(
             connection.get("ca_cert_file") or os.environ.get("SPLUNK_CA_CERT") or ""
         ).strip()
@@ -118,6 +131,21 @@ class SplunkRestClient:
             headers["Authorization"] = f"Basic {token}"
         return headers
 
+    @staticmethod
+    def _http_error_message(method: str, path: str, status: int) -> str:
+        guidance = {
+            400: "The request payload or query is invalid for this ITSI version; compare it with a target-version export.",
+            401: "Authentication failed; refresh SPLUNK_SESSION_KEY or verify the configured account credentials.",
+            403: "The account lacks the required Splunk/ITSI capability or team permission.",
+            409: "The target object conflicts with current live state; refresh the preview and resolve duplicates or concurrent changes.",
+            429: "Splunk throttled the request; wait for the advertised retry window and rerun the read/plan step.",
+        }.get(status)
+        if guidance is None and status >= 500:
+            guidance = "Splunk returned a server error; inspect splunkd/ITSI health and retry only after the target is stable."
+        if guidance is None:
+            guidance = "Inspect Splunk server logs for the request while keeping response bodies and credentials out of reports."
+        return f"Splunk REST request failed: {method} {path} -> HTTP {status}. {guidance}"
+
     def _request(self, method: str, path: str, params: dict[str, Any] | None = None, payload: Any = None) -> Any:
         query_params = {"output_mode": "json"}
         if params:
@@ -137,10 +165,10 @@ class SplunkRestClient:
                 raw = response.read()
                 content_type = response.headers.get("Content-Type", "")
         except HTTPError as exc:
-            response_body = exc.read().decode("utf-8", errors="replace")
+            exc.read()  # Drain the response without exposing potentially sensitive content.
             if exc.code == 404:
                 raise KeyError(path) from exc
-            raise ValidationError(f"Splunk REST request failed: {method} {path} -> HTTP {exc.code}: {response_body}") from exc
+            raise ValidationError(self._http_error_message(method, path, exc.code)) from exc
         except URLError as exc:
             reason = getattr(exc, "reason", exc)
             raise ValidationError(f"Splunk REST request failed: {method} {path} -> {reason}") from exc
@@ -149,7 +177,12 @@ class SplunkRestClient:
         if not raw:
             return {}
         if "json" in content_type or raw[:1] in {b"{", b"["}:
-            return json.loads(raw.decode("utf-8"))
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValidationError(
+                    f"Splunk REST request returned malformed JSON: {method} {path}."
+                ) from exc
         if any(token in content_type.lower() for token in ("gzip", "tar", "octet-stream")):
             return raw
         return raw.decode("utf-8")
@@ -173,10 +206,10 @@ class SplunkRestClient:
                 raw = response.read()
                 content_type = response.headers.get("Content-Type", "")
         except HTTPError as exc:
-            response_body = exc.read().decode("utf-8", errors="replace")
+            exc.read()  # Drain the response without exposing potentially sensitive content.
             if exc.code == 404:
                 raise KeyError(path) from exc
-            raise ValidationError(f"Splunk REST request failed: {method} {path} -> HTTP {exc.code}: {response_body}") from exc
+            raise ValidationError(self._http_error_message(method, path, exc.code)) from exc
         except URLError as exc:
             reason = getattr(exc, "reason", exc)
             raise ValidationError(f"Splunk REST request failed: {method} {path} -> {reason}") from exc
@@ -185,7 +218,12 @@ class SplunkRestClient:
         if not raw:
             return {}
         if "json" in content_type or raw[:1] in {b"{", b"["}:
-            return json.loads(raw.decode("utf-8"))
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValidationError(
+                    f"Splunk REST request returned malformed JSON: {method} {path}."
+                ) from exc
         return raw.decode("utf-8")
 
     @staticmethod
@@ -218,14 +256,22 @@ class SplunkRestClient:
 
     def get_app(self, app_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/services/apps/local/{quote(app_name)}")
+            response = self._request("GET", f"/services/apps/local/{quote(app_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
         return entries[0] if entries else None
 
     def app_exists(self, app_name: str) -> bool:
-        return self.get_app(app_name) is not None
+        app = self.get_app(app_name)
+        if app is None:
+            return False
+        disabled = app.get("disabled")
+        if disabled is None:
+            disabled = app.get("disabled_by_default")
+        if isinstance(disabled, str):
+            return disabled.strip().lower() not in {"1", "true", "yes", "on"}
+        return not bool(disabled)
 
     def get_app_version(self, app_name: str) -> str | None:
         app = self.get_app(app_name)
@@ -253,7 +299,7 @@ class SplunkRestClient:
         return status or None
 
     def kvstore_collection_health(self, app_name: str, collection_name: str) -> dict[str, str]:
-        path = f"/servicesNS/nobody/{quote(app_name)}/storage/collections/data/{quote(collection_name)}"
+        path = f"/servicesNS/nobody/{quote(app_name, safe='')}/storage/collections/data/{quote(collection_name, safe='')}"
         try:
             self._request("GET", path, params={"count": 1})
             return {"status": "ok", "message": "accessible"}
@@ -263,11 +309,11 @@ class SplunkRestClient:
             return {"status": "error", "message": str(exc)}
 
     def list_macros(self, app_name: str) -> list[dict[str, Any]]:
-        return self._normalize_entries(self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/admin/macros", params={"count": 0}))
+        return self._normalize_entries(self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/admin/macros", params={"count": 0}))
 
     def get_macro(self, app_name: str, macro_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/admin/macros/{quote(macro_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/admin/macros/{quote(macro_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -276,7 +322,7 @@ class SplunkRestClient:
     def update_macro(self, app_name: str, macro_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/admin/macros/{quote(macro_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/admin/macros/{quote(macro_name, safe='')}",
             payload=payload,
         )
         entries = self._normalize_entries(response)
@@ -284,7 +330,7 @@ class SplunkRestClient:
 
     def get_saved_search(self, app_name: str, search_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/saved/searches/{quote(search_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/saved/searches/{quote(search_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -293,7 +339,7 @@ class SplunkRestClient:
     def update_saved_search(self, app_name: str, search_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/saved/searches/{quote(search_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/saved/searches/{quote(search_name, safe='')}",
             payload=payload,
         )
         entries = self._normalize_entries(response)
@@ -302,7 +348,7 @@ class SplunkRestClient:
     def dispatch_saved_search(self, app_name: str, search_name: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/saved/searches/{quote(search_name)}/dispatch",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/saved/searches/{quote(search_name, safe='')}/dispatch",
             payload=payload or {},
         )
         entries = self._normalize_entries(response)
@@ -311,14 +357,14 @@ class SplunkRestClient:
     def dispatch_search(self, search: str, payload: dict[str, Any] | None = None, app_name: str | None = None) -> dict[str, Any]:
         dispatch_payload = dict(payload or {})
         dispatch_payload["search"] = search
-        path = f"/servicesNS/nobody/{quote(app_name)}/search/jobs" if app_name else "/services/search/jobs"
+        path = f"/servicesNS/nobody/{quote(app_name, safe='')}/search/jobs" if app_name else "/services/search/jobs"
         response = self._request_form("POST", path, payload=dispatch_payload)
         entries = self._normalize_entries(response)
         return entries[0] if entries else (response if isinstance(response, dict) else {"response": response})
 
     def get_data_model(self, app_name: str, model_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/datamodel/model/{quote(model_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/datamodel/model/{quote(model_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -327,7 +373,7 @@ class SplunkRestClient:
     def update_data_model(self, app_name: str, model_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/datamodel/model/{quote(model_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/datamodel/model/{quote(model_name, safe='')}",
             payload=payload,
         )
         entries = self._normalize_entries(response)
@@ -335,7 +381,7 @@ class SplunkRestClient:
 
     def get_ui_view(self, app_name: str, view_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/ui/views/{quote(view_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/data/ui/views/{quote(view_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -345,7 +391,7 @@ class SplunkRestClient:
         payload = {"name": view_name, "eai:data": xml}
         if changelog:
             payload["eai:changelog"] = changelog
-        response = self._request_form("POST", f"/servicesNS/nobody/{quote(app_name)}/data/ui/views", payload=payload)
+        response = self._request_form("POST", f"/servicesNS/nobody/{quote(app_name, safe='')}/data/ui/views", payload=payload)
         entries = self._normalize_entries(response)
         return entries[0] if entries else {}
 
@@ -355,7 +401,7 @@ class SplunkRestClient:
             payload["eai:changelog"] = changelog
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/data/ui/views/{quote(view_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/data/ui/views/{quote(view_name, safe='')}",
             payload=payload,
         )
         entries = self._normalize_entries(response)
@@ -363,7 +409,7 @@ class SplunkRestClient:
 
     def get_ui_nav(self, app_name: str, nav_name: str = "default") -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/ui/nav/{quote(nav_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/data/ui/nav/{quote(nav_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -372,7 +418,7 @@ class SplunkRestClient:
     def update_ui_nav(self, app_name: str, xml: str, nav_name: str = "default") -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/data/ui/nav/{quote(nav_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/data/ui/nav/{quote(nav_name, safe='')}",
             payload={"eai:data": xml},
         )
         entries = self._normalize_entries(response)
@@ -380,7 +426,7 @@ class SplunkRestClient:
 
     def get_lookup_file(self, app_name: str, lookup_name: str) -> dict[str, Any] | None:
         try:
-            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files/{quote(lookup_name)}")
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name, safe='')}/data/lookup-table-files/{quote(lookup_name, safe='')}")
         except KeyError:
             return None
         entries = self._normalize_entries(response)
@@ -389,7 +435,7 @@ class SplunkRestClient:
     def create_lookup_file(self, app_name: str, lookup_name: str, staged_path: str) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/data/lookup-table-files",
             payload={"name": lookup_name, "eai:data": staged_path},
         )
         entries = self._normalize_entries(response)
@@ -398,7 +444,7 @@ class SplunkRestClient:
     def update_lookup_file(self, app_name: str, lookup_name: str, staged_path: str) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files/{quote(lookup_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/data/lookup-table-files/{quote(lookup_name, safe='')}",
             payload={"eai:data": staged_path},
         )
         entries = self._normalize_entries(response)
@@ -408,7 +454,7 @@ class SplunkRestClient:
         try:
             response = self._request(
                 "GET",
-                f"/servicesNS/nobody/{quote(app_name)}/configs/conf-{quote(conf_name)}/{quote(stanza_name)}",
+                f"/servicesNS/nobody/{quote(app_name, safe='')}/configs/conf-{quote(conf_name, safe='')}/{quote(stanza_name, safe='')}",
             )
         except KeyError:
             return None
@@ -420,7 +466,7 @@ class SplunkRestClient:
         stanza_payload["name"] = stanza_name
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/configs/conf-{quote(conf_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/configs/conf-{quote(conf_name, safe='')}",
             payload=stanza_payload,
         )
         entries = self._normalize_entries(response)
@@ -429,7 +475,7 @@ class SplunkRestClient:
     def update_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = self._request_form(
             "POST",
-            f"/servicesNS/nobody/{quote(app_name)}/configs/conf-{quote(conf_name)}/{quote(stanza_name)}",
+            f"/servicesNS/nobody/{quote(app_name, safe='')}/configs/conf-{quote(conf_name, safe='')}/{quote(stanza_name, safe='')}",
             payload=payload,
         )
         entries = self._normalize_entries(response)
@@ -445,7 +491,7 @@ class SplunkRestClient:
         try:
             response = self._request(
                 "GET",
-                f"/servicesNS/nobody/{quote(app_name)}/{quote(endpoint_name)}",
+                f"/servicesNS/nobody/{quote(app_name, safe='')}/{quote(endpoint_name, safe='')}",
                 params={"count": 0},
             )
         except KeyError:
@@ -459,10 +505,14 @@ class SplunkRestClient:
             "event_management": "event_management_interface",
             "maintenance": "maintenance_services_interface",
             "backup_restore": "backup_restore_interface",
-            "content_pack_authorship": "itoa_interface/content_pack_authorship",
         }
         if interface == "icon_collection":
             return ["/services/SA-ITOA/v1/icon_collection"]
+        if interface == "content_pack_authorship":
+            return [
+                "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack_authorship",
+                "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship",
+            ]
         interface_path = interface_paths.get(interface)
         if not interface_path:
             raise ValidationError(f"Unsupported ITSI REST interface '{interface}'.")
@@ -480,9 +530,9 @@ class SplunkRestClient:
     ) -> Any:
         last_missing: KeyError | None = None
         checked_paths: list[str] = []
-        suffix = "" if interface == "icon_collection" else f"/{quote(object_type)}"
+        suffix = "" if interface == "icon_collection" else f"/{quote(object_type, safe='')}"
         if key:
-            suffix = f"{suffix}/{quote(key)}"
+            suffix = f"{suffix}/{quote(key, safe='')}"
         for base_path in self._itsi_interface_base_candidates(interface):
             path = f"{base_path}{suffix}"
             checked_paths.append(path)
@@ -539,7 +589,7 @@ class SplunkRestClient:
     def _itsi_lookup_params(cls, interface: str, field: str, value: str) -> dict[str, Any]:
         params: dict[str, Any] = {cls._itsi_filter_param(interface): json.dumps({field: value})}
         if interface in {"itoa", "content_pack_authorship"}:
-            params["count"] = 0
+            params["limit"] = 0
         return params
 
     def find_object_by_field(
@@ -550,18 +600,23 @@ class SplunkRestClient:
         interface: str = "itoa",
     ) -> dict[str, Any] | None:
         if interface in {"event_management", "icon_collection"}:
-            for entry in self.list_objects(object_type, interface=interface):
-                if str(entry.get(field) or "") == value:
-                    return entry
-            return None
-        response = self._request_itsi_object(
-            "GET",
-            interface,
-            object_type,
-            params=self._itsi_lookup_params(interface, field, value),
-        )
-        entries = self._normalize_entries(response)
-        return entries[0] if entries else None
+            entries = self.list_objects(object_type, interface=interface)
+        else:
+            response = self._request_itsi_object(
+                "GET",
+                interface,
+                object_type,
+                params=self._itsi_lookup_params(interface, field, value),
+            )
+            entries = self._normalize_entries(response)
+        matches = [entry for entry in entries if str(entry.get(field) or "") == value]
+        if len(matches) > 1:
+            keys = ", ".join(str(entry.get("_key") or "<no-key>") for entry in matches[:10])
+            raise ValidationError(
+                f"Ambiguous ITSI {object_type} lookup: {field}={value!r} matched {len(matches)} objects "
+                f"(keys: {keys}). Use a stable _key instead of title-based reconciliation."
+            )
+        return matches[0] if matches else None
 
     def find_object_by_title(self, object_type: str, title: str, interface: str = "itoa") -> dict[str, Any] | None:
         return self.find_object_by_field(object_type, "title", title, interface=interface)
@@ -597,7 +652,7 @@ class SplunkRestClient:
     ) -> list[dict[str, Any]]:
         params: dict[str, Any] = {}
         if interface in {"itoa", "content_pack_authorship"}:
-            params["count"] = limit if limit is not None else 0
+            params["limit"] = limit if limit is not None else 0
         if filter_data:
             params[self._itsi_filter_param(interface)] = json.dumps(filter_data)
         fields_param = self._fields_param(fields)
@@ -606,7 +661,7 @@ class SplunkRestClient:
         if limit is not None and interface not in {"itoa", "content_pack_authorship"}:
             params["limit"] = limit
         if offset is not None:
-            params["offset"] = offset
+            params["skip" if interface == "event_management" else "offset"] = offset
         if sort_key:
             params["sort_key"] = sort_key
         if sort_dir is not None:
@@ -618,7 +673,7 @@ class SplunkRestClient:
         params: dict[str, Any] | None = None
         if filter_data:
             params = {self._itsi_filter_param(interface): json.dumps(filter_data)}
-        response = self._request_itsi_interface_path("GET", interface, f"{quote(object_type)}/count", params=params)
+        response = self._request_itsi_interface_path("GET", interface, f"{quote(object_type, safe='')}/count", params=params)
         if isinstance(response, dict) and "count" in response:
             return int(response["count"])
         return None
@@ -636,7 +691,7 @@ class SplunkRestClient:
         if not payloads:
             raise ValidationError("bulk_update_objects requires at least one payload.")
         params = {"is_partial_data": 1} if partial else None
-        return self._request_itsi_interface_path("POST", interface, f"{quote(object_type)}/bulk_update", params=params, payload=payloads)
+        return self._request_itsi_interface_path("POST", interface, f"{quote(object_type, safe='')}/bulk_update", params=params, payload=payloads)
 
     def itsi_supported_object_types(self, interface: str = "itoa") -> list[dict[str, Any]]:
         response = self._request_itsi_object("GET", interface, "get_supported_object_types")
@@ -673,7 +728,7 @@ class SplunkRestClient:
 
     def event_management_count(self, object_type: str, filter_data: dict[str, Any] | None = None) -> int | None:
         params = {"filter_data": json.dumps(filter_data)} if filter_data else None
-        response = self._request_event_management_path("GET", f"{quote(object_type)}/count", params=params)
+        response = self._request_event_management_path("GET", f"{quote(object_type, safe='')}/count", params=params)
         if isinstance(response, dict) and "count" in response:
             return int(response["count"])
         return None
@@ -693,7 +748,7 @@ class SplunkRestClient:
             params["limit"] = limit
         if fields:
             params["fields"] = fields
-        response = self._request_event_management_path("GET", quote(object_type), params=params or None)
+        response = self._request_event_management_path("GET", quote(object_type, safe=""), params=params or None)
         return self._normalize_entries(response)
 
     def get_object(self, object_type: str, key: str, interface: str = "itoa") -> dict[str, Any] | None:
@@ -769,11 +824,11 @@ class SplunkRestClient:
     def templatize_object(self, object_type: str, key: str) -> dict[str, Any]:
         if object_type not in {"service", "kpi_base_search"}:
             raise ValidationError("templatize_object supports only service and kpi_base_search objects.")
-        response = self._request_itsi_interface_path("GET", "itoa", f"{quote(object_type)}/{quote(key)}/templatize")
+        response = self._request_itsi_interface_path("GET", "itoa", f"{quote(object_type, safe='')}/{quote(key, safe='')}/templatize")
         return response if isinstance(response, dict) else {"items": response}
 
     def get_service_template_link(self, service_key: str) -> str | None:
-        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key)}/base_service_template"
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key, safe='')}/base_service_template"
         try:
             response = self._request("GET", path)
         except KeyError as exc:
@@ -786,7 +841,7 @@ class SplunkRestClient:
         return None
 
     def link_service_to_template(self, service_key: str, template_key: str) -> dict[str, Any]:
-        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key)}/base_service_template"
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key, safe='')}/base_service_template"
         try:
             return self._request("POST", path, payload={"_key": template_key})
         except KeyError as exc:
@@ -805,7 +860,7 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {}
 
     def associate_custom_threshold_window_kpis(self, window_key: str, payload: dict[str, Any]) -> dict[str, Any]:
-        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key)}/associate_service_kpi"
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key, safe='')}/associate_service_kpi"
         try:
             response = self._request("POST", path, payload=payload)
         except KeyError as exc:
@@ -815,7 +870,7 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {}
 
     def disconnect_custom_threshold_window_kpis(self, window_key: str) -> dict[str, Any]:
-        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key)}/disconnect_kpis"
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key, safe='')}/disconnect_kpis"
         try:
             response = self._request("POST", path)
         except KeyError as exc:
@@ -825,7 +880,7 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {}
 
     def stop_custom_threshold_window(self, window_key: str) -> dict[str, Any]:
-        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key)}/stop"
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/{quote(window_key, safe='')}/stop"
         try:
             response = self._request("POST", path)
         except KeyError as exc:
@@ -940,15 +995,15 @@ class SplunkRestClient:
     def link_episode_ticket(self, payload: dict[str, Any], group_key: str | None = None) -> Any:
         suffix = "ticketing"
         if group_key:
-            suffix = f"{suffix}/{quote(group_key)}"
+            suffix = f"{suffix}/{quote(group_key, safe='')}"
         return self._request_event_management_path("POST", suffix, payload=payload)
 
     def get_episode_tickets(self, group_key: str) -> list[dict[str, Any]]:
-        response = self._request_event_management_path("GET", f"ticketing/{quote(group_key)}")
+        response = self._request_event_management_path("GET", f"ticketing/{quote(group_key, safe='')}")
         return self._normalize_entries(response)
 
     def unlink_episode_ticket(self, group_key: str, ticketing_system: str, ticket_id: str) -> dict[str, Any]:
-        suffix = f"ticketing/{quote(group_key)}/{quote(ticketing_system)}/{quote(ticket_id)}"
+        suffix = f"ticketing/{quote(group_key, safe='')}/{quote(ticketing_system, safe='')}/{quote(ticket_id, safe='')}"
         response = self._request_event_management_path("DELETE", suffix)
         return response if isinstance(response, dict) else {}
 
@@ -998,15 +1053,15 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {}
 
     def active_maintenance_window(self, object_key: str) -> dict[str, Any]:
-        response = self._request_itsi_interface_path("GET", "maintenance", f"get_active_maintenance_window/{quote(object_key)}")
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_active_maintenance_window/{quote(object_key, safe='')}")
         return response if isinstance(response, dict) else {"items": response}
 
     def maintenance_windows_for_object(self, object_key: str) -> list[dict[str, Any]]:
-        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/{quote(object_key)}")
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/{quote(object_key, safe='')}")
         return self._normalize_entries(response)
 
     def maintenance_windows_count_for_object(self, object_key: str) -> int | None:
-        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/count/{quote(object_key)}")
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/count/{quote(object_key, safe='')}")
         if isinstance(response, dict) and "count" in response:
             return int(response["count"])
         return None
@@ -1060,6 +1115,15 @@ class SplunkRestClient:
     def content_library_discovery_status(self) -> dict[str, Any]:
         return deepcopy(self._content_library_discovery_status)
 
+    def sync_content_library_catalog(self) -> dict[str, Any]:
+        """Explicitly run the legacy Content Library discovery write.
+
+        Catalog reads intentionally never call this method. Workflows may invoke
+        it only during an explicitly authorized apply with refresh_catalog=true.
+        """
+        self._sync_content_library_catalog()
+        return self.content_library_discovery_status()
+
     def _content_pack_unavailable_error(self, suffix: str = "") -> ValidationError:
         checked = ", ".join(path for _, path in self._content_pack_path_candidates(suffix))
         return ValidationError(
@@ -1076,9 +1140,8 @@ class SplunkRestClient:
         return SplunkRestClient._normalize_entries(response)
 
     def content_pack_catalog(self) -> list[dict[str, Any]]:
-        self._sync_content_library_catalog()
         try:
-            response = self._request_content_pack("GET", params={"count": 0})
+            response = self._request_content_pack("GET")
         except KeyError as exc:
             raise self._content_pack_unavailable_error() from exc
         return self._normalize_content_pack_catalog(response)
@@ -1098,7 +1161,7 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {"response": response}
 
     def content_pack_detail(self, pack_id: str, version: str) -> dict[str, Any]:
-        suffix = f"/{quote(pack_id)}/{quote(version)}"
+        suffix = f"/{quote(pack_id, safe='')}/{quote(version, safe='')}"
         try:
             response = self._request_content_pack("GET", suffix)
         except KeyError as exc:
@@ -1109,14 +1172,14 @@ class SplunkRestClient:
         return response if isinstance(response, dict) else {"response": response}
 
     def preview_content_pack(self, pack_id: str, version: str) -> Any:
-        suffix = f"/{quote(pack_id)}/{quote(version)}/preview"
+        suffix = f"/{quote(pack_id, safe='')}/{quote(version, safe='')}/preview"
         try:
             return self._request_content_pack("GET", suffix)
         except KeyError as exc:
             raise self._content_pack_unavailable_error(suffix) from exc
 
     def install_content_pack(self, pack_id: str, version: str, payload: dict[str, Any]) -> Any:
-        suffix = f"/{quote(pack_id)}/{quote(version)}/install"
+        suffix = f"/{quote(pack_id, safe='')}/{quote(version, safe='')}/install"
         try:
             return self._request_content_pack("POST", suffix, payload=payload)
         except KeyError as exc:
@@ -1126,7 +1189,7 @@ class SplunkRestClient:
         response = self._request_itsi_interface_path(
             "POST",
             "content_pack_authorship",
-            f"content_pack/{quote(key)}/submit",
+            f"content_pack/{quote(key, safe='')}/submit",
         )
         return response if isinstance(response, dict) else {"response": response}
 
@@ -1134,5 +1197,5 @@ class SplunkRestClient:
         return self._request_itsi_interface_path(
             "GET",
             "content_pack_authorship",
-            f"files/{quote(key)}.tar.gz",
+            f"files/{quote(key, safe='')}.tar.gz",
         )

@@ -9,6 +9,10 @@ description: >-
   Store, migrate the KV Store storage engine, upgrade the KV Store server
   version, reset or clean the KV Store, define a KV Store collection or lookup,
   or recover KV Store on an SHC.
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+metadata:
+  splunk_cloud_10_5: "conditional"
+  compatibility_verified: "2026-07-02"
 ---
 
 # Splunk KV Store Admin Setup
@@ -25,6 +29,15 @@ the splunk user on the host after `splunk login`; collection governance uses the
 project `credentials` file via the shared helper. Restore and clean are
 destructive and refuse to run without their acceptance flag.
 
+`--platform auto|cloud|enterprise` defaults to `auto` and is resolved before
+every apply/all, preflight, or status phase. Managed Splunk Cloud is a hard
+handoff for backup, restore, clean, migrate, upgrade, maintenance, and host
+status: the wrapper exits `2` before rendering or executing host assets.
+Cloud-rendered host scripts independently exit `2` before invoking the CLI.
+The only Cloud mutation supported here is collection and lookup definition
+governance through the standard Splunk REST configuration endpoints in an
+existing, writable app namespace supplied with `--app-name`.
+
 Read `reference.md` before any restore, migrate, or upgrade. Always take a
 point-in-time backup first.
 
@@ -39,9 +52,10 @@ upgrade. After upgrade, run `status.sh` or `splunk show kvstore-status --verbose
 and confirm `serverVersion` reflects the expected MongoDB 8 train before
 collection governance or restore work.
 
-Cloud stacks on doc train **10.4.2603** inherit the same KV Store behavior on
-the Splunk-managed side; Enterprise operators still own the upgrade ladder on
-self-managed hosts.
+Cloud stacks on doc trains **10.5.2605** and **10.4.2604** inherit the same KV
+Store behavior on the Splunk-managed side. Splunk operates that lifecycle;
+customers must use Splunk Support for backup/recovery or engine/version work.
+Enterprise operators still own the upgrade ladder on self-managed hosts.
 
 ## Quick Start
 
@@ -54,20 +68,23 @@ bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --topology shc
 Take a point-in-time backup live:
 
 ```bash
-bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase apply --operation backup --point-in-time true
+bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --platform enterprise \
+  --phase apply --operation backup --point-in-time true
 ```
 
 Restore (destructive, captain on SHC):
 
 ```bash
-bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase apply --operation restore \
+bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --platform enterprise \
+  --phase apply --operation restore \
   --backup-archive-name kvdump_2026.tar.gz --accept-kvstore-restore
 ```
 
 Define a KV Store collection + lookup definition live via REST:
 
 ```bash
-bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase apply --operation collections \
+bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --platform auto \
+  --phase apply --operation collections \
   --collection-name asset_inventory --collection-fields ip:string,risk:number \
   --lookup-definition-name asset_inventory_lookup
 ```
@@ -86,6 +103,13 @@ bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase apply --operatio
 - `migrate` - SHC `start-shcluster-migration kvstore -storageEngine wiredTiger`
 - `upgrade` - SHC `start-shcluster-upgrade kvstore -version <v>`
 - `collections` - write collection + lookup definition via REST
+
+On managed Splunk Cloud, `collections` is the only live operation. Host
+lifecycle operations exit `2` with a Support handoff before any local render
+tree or host command is created. Cloud collection apply also verifies that
+`--app-name` identifies an existing writable namespace before mutation. Use
+`--phase render --platform cloud` to review collection/lookup templates and
+fail-closed host-script handoffs.
 
 Live standalone `migrate` and `upgrade` requests fail with an upgrade-workflow
 handoff because those transitions occur during a supported Splunk Enterprise

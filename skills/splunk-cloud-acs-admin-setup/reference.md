@@ -8,21 +8,21 @@ This skill follows current Splunk Cloud ACS documentation and the local
 Official references:
 
 - ACS overview:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSIntro>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/welcome-to-the-admin-config-service-acs/about-the-admin-config-service-acs-api>
 - ACS API endpoint reference:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSREF>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
 - ACS CLI:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSCLI>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-cli/administer-splunk-cloud-platform-using-the-acs-cli>
 - IP allow lists:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ConfigureIPAllowList>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allowlists-for-splunk-cloud-platform>
 - Outbound ports:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ConfigureOutboundPorts>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-outbound-ports-for-splunk-cloud-platform>
 - Private connectivity:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Security/Privateconnectivityenable>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/manage-users-and-security/10.5.2605/private-connectivity/enable-private-connectivity>
 - Limits:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ManageLimits>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-limits.conf-configurations-in-splunk-cloud-platform>
 - ACS release notes:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/ReleaseNotes/AdminConfigurationService>
+  <https://help.splunk.com/en/splunk-cloud-platform/release-notes/10.5.2605/splunk-cloud-platform-release-notes/admin-configuration-service>
 - Splunk Cloud Platform Terraform Provider (`splunk/scp`):
   <https://registry.terraform.io/providers/splunk/scp/latest>
 
@@ -182,7 +182,7 @@ also support-managed.
 
 ## Splunk 10.4 enterprise deployment notes
 
-For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.5.2605` planning,
 read this skill alongside
 [`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
 the prose companion to the

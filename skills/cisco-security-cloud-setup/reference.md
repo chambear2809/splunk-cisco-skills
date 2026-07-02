@@ -11,6 +11,18 @@ Reference for the Cisco Security Cloud package and its configurable input types.
 | Local package pattern | `cisco-security-cloud_*` |
 | Local package in repo | `splunk-ta/cisco-security-cloud_363.tar.gz` |
 | Packaged version inspected | `3.6.3` |
+| Repo-verified Splunkbase version | `3.6.6` |
+| Latest public listing observed July 2, 2026 | `3.6.7` |
+| Repo-verified `3.6.6` platforms | `9.1` through `10.5`; Cloud-compatible |
+| Public `3.6.7` platforms | `9.1` through `10.4`; no advertised `10.5` support |
+
+On Splunk Cloud `10.5`, pin repo-verified `3.6.6`. The setup wrapper delegates
+the default install to the shared installer without forcing the public-latest
+release. `--target-splunk-version` and optional `--app-version` make the
+release contract explicit. Before any post-install mutation it reads the actual
+installed version, then refuses an unverified package unless
+`--accept-unsupported-platform` is backed by documented vendor approval for
+that exact version and stack.
 
 ## App-Level Configuration
 

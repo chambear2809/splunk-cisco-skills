@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -402,7 +403,10 @@ class TopologyWorkflowTests(unittest.TestCase):
         cluster = client.find_object_by_title("service", "Demo - VMware Cluster Health")
         business = client.find_object_by_title("service", "Business Platform")
 
-        self.assertEqual(len(client.install_requests), 1)
+        self.assertEqual(len(client.install_requests), 0)
+        self.assertTrue(
+            any("already installed; reinstall skipped" in finding["message"] for finding in result["runs"][0]["findings"])
+        )
         self.assertEqual(cluster["base_service_template_id"], "template:esxi")
         self.assertTrue(any(link == ("service:cluster", "template:esxi") for link in client.template_links))
         self.assertEqual(shared_db["kpis"][0]["title"], "Availability")
@@ -985,6 +989,7 @@ class RunTopologyCliExitCodeTests(unittest.TestCase):
                  patch.object(run_topology, "TopologyWorkflow", FakeTopologyWorkflow), \
                  patch.object(run_topology, "NativeWorkflow", FakeNativeWorkflow), \
                  patch.object(sys, "argv", argv), \
+                 patch.dict(os.environ, {"ITSI_CONFIG_APPLY_AUTHORIZED": "1"}), \
                  redirect_stdout(io.StringIO()):
                 mock_client_cls.from_spec.return_value = object()
                 exit_code = run_topology.main()
