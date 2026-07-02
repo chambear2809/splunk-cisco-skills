@@ -83,7 +83,15 @@ def render() -> str:
     for row in payload["skills"]:
         apps = row["splunkbase_apps"]
         app_text = ", ".join(
-            f"{app['id']} `{app['name']}` ({app['status']})" for app in apps
+            (
+                f"{app['relationship']}: {app['id']} `{app['name']}` ({app['status']})"
+                if app["id"]
+                else (
+                    f"{app['relationship']}: private/local `{app['name']}` "
+                    f"({app['status']})"
+                )
+            )
+            for app in apps
         ) or "No direct Splunkbase package"
         lines.append(
             f"| `{row['skill']}` | {STATUS_LABELS.get(row['status'], row['status'])} "

@@ -207,8 +207,19 @@ run_rendered_script() {
     (cd "${dir}" && "./${script_name}")
 }
 
+guard_managed_cloud_apply() {
+    if [[ "${PHASE}" != "apply" || "${PLATFORM}" != "cloud" || "${DRY_RUN}" == "true" ]]; then
+        return 0
+    fi
+    log "ERROR: managed Splunk Cloud does not permit the local outputs.conf apply path."
+    log "HANDOFF: use Settings > Ingest Actions or /services/data/ingest/rulesets."
+    log "For Cloud control-plane pipelines, use splunk-ingest-processor-setup."
+    return 2
+}
+
 main() {
     validate_args
+    guard_managed_cloud_apply || exit $?
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then

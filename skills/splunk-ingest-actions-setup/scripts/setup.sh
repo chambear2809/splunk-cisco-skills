@@ -196,7 +196,7 @@ guard_managed_cloud_apply() {
     log "       or the /services/data/ingest/rulesets endpoint. This workflow will not write"
     log "       props.conf, transforms.conf, or outputs.conf to a managed Cloud search tier."
     log "HANDOFF: render the supported Cloud bundle with:"
-    log "  bash skills/splunk-ingest-actions/scripts/setup.sh --platform cloud --phase render ..."
+    log "  bash skills/splunk-ingest-actions-setup/scripts/setup.sh --platform cloud --phase render ..."
     log "For Splunk Cloud control-plane pipelines, use splunk-ingest-processor-setup."
     return 2
 }
@@ -280,6 +280,14 @@ run_status() {
 main() {
     validate_args
     build_renderer_args
+    # Applying (including the legacy --apply alias and --phase all) is a live
+    # intent. Resolve and reject managed Cloud before the renderer can create,
+    # replace, or clean any local review artifacts.
+    if [[ "${PHASE}" == "apply" || "${PHASE}" == "all" || "${APPLY}" == "true" ]]; then
+        local guard_rc=0
+        guard_managed_cloud_apply || guard_rc=$?
+        (( guard_rc == 0 )) || return "${guard_rc}"
+    fi
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then
             python3 "${RENDERER}" "${RENDER_ARGS[@]}" --dry-run --json
@@ -292,7 +300,9 @@ main() {
     case "${PHASE}" in
         render)
             render_assets
-            [[ "${APPLY}" == "true" ]] && apply_live
+            if [[ "${APPLY}" == "true" ]]; then
+                apply_live
+            fi
             ;;
         preflight) render_assets ;;
         apply) render_assets; apply_live ;;

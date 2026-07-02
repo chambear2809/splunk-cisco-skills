@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -11,7 +12,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # Keep the standalone audit usable before dev deps install.
+    yaml = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -78,8 +82,40 @@ def load_frontmatter(path: Path) -> dict[str, Any]:
     match = FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
     if not match:
         return {}
-    loaded = yaml.safe_load(match.group(1)) or {}
-    return loaded if isinstance(loaded, dict) else {}
+    if yaml is not None:
+        loaded = yaml.safe_load(match.group(1)) or {}
+        return loaded if isinstance(loaded, dict) else {}
+
+    # The audit only needs the one scalar and two metadata keys that this repo
+    # standardizes. Avoid pretending this is a general YAML implementation.
+    loaded: dict[str, Any] = {}
+    metadata: dict[str, str] = {}
+    in_metadata = False
+    for line in match.group(1).splitlines():
+        if line == "metadata:":
+            in_metadata = True
+            loaded["metadata"] = metadata
+            continue
+        if not line.startswith(" "):
+            in_metadata = False
+        if in_metadata and line.startswith("  ") and ":" in line:
+            key, raw = line.strip().split(":", 1)
+            metadata[key] = _parse_quoted_scalar(raw.strip())
+        elif line.startswith("compatibility:"):
+            loaded["compatibility"] = _parse_quoted_scalar(
+                line.split(":", 1)[1].strip()
+            )
+    return loaded
+
+
+def _parse_quoted_scalar(raw: str) -> str:
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {'"', "'"}:
+        try:
+            value = ast.literal_eval(raw)
+        except (SyntaxError, ValueError):
+            return raw[1:-1]
+        return str(value)
+    return raw
 
 
 def registry_apps_by_skill() -> dict[str, list[dict[str, Any]]]:
@@ -99,6 +135,31 @@ def audit() -> dict[str, Any]:
     findings: list[dict[str, str]] = []
     rows: list[dict[str, Any]] = []
     apps_by_skill = registry_apps_by_skill()
+
+    for app in registry.get("apps", []):
+        app_id = str(app.get("splunkbase_id", "")).strip()
+        if app_id.isdigit():
+            continue
+        if not str(app.get("app_name", "")).strip():
+            continue
+        for field in (
+            "package_source",
+            "reviewed_version",
+            "target_product",
+            "production_status",
+            "compatibility_classification",
+            "notes",
+        ):
+            if not str(app.get(field, "")).strip():
+                findings.append(
+                    {
+                        "skill": str(app.get("skill", "private-package")),
+                        "field": f"registry.{field}",
+                        "message": (
+                            f"private/local package {app.get('app_name')} must declare {field}"
+                        ),
+                    }
+                )
 
     if expected_target != "10.5":
         findings.append(
@@ -137,6 +198,11 @@ def audit() -> dict[str, Any]:
             str(app.get("splunkbase_id", ""))
             for app in apps
             if app.get("compatibility_status") == "unsupported"
+        ]
+        verified_supported = [
+            str(app.get("splunkbase_id", ""))
+            for app in apps
+            if "10.5" in (app.get("verified_platform_versions") or [])
         ]
 
         if status not in COMPATIBILITY_TEXT:
@@ -183,6 +249,17 @@ def audit() -> dict[str, Any]:
                     "message": "blocked profile requires a registry-backed 10.5 gap",
                 }
             )
+        if status == "blocked" and verified_supported:
+            findings.append(
+                {
+                    "skill": skill,
+                    "field": f"metadata.{STATUS_KEY}",
+                    "message": (
+                        "blocked profile conflicts with a repo-verified 10.5 release for app IDs "
+                        + ", ".join(verified_supported)
+                    ),
+                }
+            )
 
         rows.append(
             {
@@ -193,7 +270,13 @@ def audit() -> dict[str, Any]:
                     {
                         "id": str(app.get("splunkbase_id", "")),
                         "name": str(app.get("app_name", "")),
-                        "status": str(app.get("compatibility_status", "not-applicable")),
+                        "relationship": str(app.get("relationship", "primary")),
+                        "status": str(
+                            app.get("compatibility_status")
+                            or app.get("compatibility_classification")
+                            or app.get("production_status")
+                            or "unclassified"
+                        ),
                     }
                     for app in apps
                 ],
@@ -205,7 +288,9 @@ def audit() -> dict[str, Any]:
         "target": "10.5.2605",
         "verified": VERIFIED_DATE,
         "skill_count": len(rows),
-        "status_counts": dict(sorted(counts.items())),
+        "status_counts": {
+            status: counts.get(status, 0) for status in COMPATIBILITY_TEXT
+        },
         "findings": findings,
         "skills": rows,
         "ok": not findings,

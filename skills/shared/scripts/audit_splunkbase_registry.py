@@ -26,6 +26,11 @@ USER_AGENT = "splunk-cisco-skills/platform-compatibility-audit"
 VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*(?:[.-][A-Za-z0-9]+)?)\b")
 DATE_RE = re.compile(r"([A-Z][a-z]+ \d{1,2}, 20\d{2})")
 TARGET_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+)?$")
+CLOUD_RELEASE_FIELDS = (
+    "cloud_compatible",
+    "install_method_single",
+    "install_method_distributed",
+)
 
 
 def default_compatibility_target() -> str:
@@ -86,7 +91,30 @@ def registry_apps(registry: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def fetch_splunkbase(app_id: str) -> dict[str, Any]:
+def parse_cloud_release_metadata(payload: Any) -> dict[str, Any]:
+    """Extract optional Cloud install facts from a Splunkbase release response."""
+
+    if isinstance(payload, list):
+        releases = payload
+    elif isinstance(payload, dict):
+        releases = payload.get("releases") or payload.get("results") or [payload]
+    else:
+        releases = []
+    release = next((item for item in releases if isinstance(item, dict)), None)
+    if release is None:
+        raise ValueError("Splunkbase release API returned no release object")
+    return {field: release.get(field) for field in CLOUD_RELEASE_FIELDS}
+
+
+def fetch_cloud_release_metadata(app_id: str) -> dict[str, Any]:
+    url = f"https://splunkbase.splunk.com/api/v1/app/{app_id}/release/"
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=25) as response:
+        payload = json.loads(response.read().decode("utf-8", "replace"))
+    return parse_cloud_release_metadata(payload)
+
+
+def fetch_splunkbase(app_id: str, include_cloud_metadata: bool = False) -> dict[str, Any]:
     url = f"https://splunkbase.splunk.com/app/{app_id}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=25) as response:
@@ -104,7 +132,7 @@ def fetch_splunkbase(app_id: str) -> dict[str, Any]:
     )
     version_match = VERSION_RE.search(latest)
     date_match = DATE_RE.search(latest)
-    return {
+    result = {
         "splunkbase_id": app_id,
         "latest_version": version_match.group(1) if version_match else "",
         "latest_release_date": date_match.group(1) if date_match else "",
@@ -112,6 +140,9 @@ def fetch_splunkbase(app_id: str) -> dict[str, Any]:
         "platform_raw": platform,
         "url": url,
     }
+    if include_cloud_metadata:
+        result.update(fetch_cloud_release_metadata(app_id))
+    return result
 
 
 def compatibility_status(platform_versions: list[str], target: str) -> str:
@@ -138,6 +169,51 @@ def audit_offline(apps: list[dict[str, Any]], target: str) -> list[dict[str, Any
                     "message": f"{status} does not match platform_versions for {target}",
                 }
             )
+        if "cloud_compatible" in app:
+            if not isinstance(app.get("cloud_compatible"), bool):
+                findings.append(
+                    {
+                        "id": app_id,
+                        "severity": "error",
+                        "field": "cloud_compatible",
+                        "message": "must be boolean when explicitly declared",
+                    }
+                )
+            for field in ("install_method_single", "install_method_distributed"):
+                if not isinstance(app.get(field), str) or not app[field].strip():
+                    findings.append(
+                        {
+                            "id": app_id,
+                            "severity": "error",
+                            "field": field,
+                            "message": "must be a non-empty string when cloud_compatible is declared",
+                        }
+                    )
+            if app.get("cloud_compatible") is False:
+                for field in ("install_method_single", "install_method_distributed"):
+                    value = app.get(field)
+                    if isinstance(value, str) and value.strip() and value != "rejected":
+                        findings.append(
+                            {
+                                "id": app_id,
+                                "severity": "error",
+                                "field": field,
+                                "message": "must be rejected when cloud_compatible is false",
+                            }
+                        )
+        else:
+            for field in ("install_method_single", "install_method_distributed"):
+                if field in app and (
+                    not isinstance(app.get(field), str) or not app[field].strip()
+                ):
+                    findings.append(
+                        {
+                            "id": app_id,
+                            "severity": "error",
+                            "field": field,
+                            "message": "must be a non-empty string when explicitly declared",
+                        }
+                    )
         for field in (
             "latest_verified_version",
             "latest_verified_date",
@@ -156,7 +232,12 @@ def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tup
     findings: list[dict[str, Any]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_id = {
-            executor.submit(fetch_splunkbase, app_id): app_id for app_id in by_id
+            executor.submit(
+                fetch_splunkbase,
+                app_id,
+                any(field in app for field in CLOUD_RELEASE_FIELDS),
+            ): app_id
+            for app_id, app in by_id.items()
         }
         for future in concurrent.futures.as_completed(future_to_id):
             app_id = future_to_id[future]
@@ -182,6 +263,9 @@ def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tup
             "platform_versions": live["platform_versions"],
             "compatibility_status": expected_status,
         }
+        for field in CLOUD_RELEASE_FIELDS:
+            if field in app:
+                comparisons[field] = live.get(field)
         for field, expected in comparisons.items():
             actual = app.get(field)
             if actual != expected:

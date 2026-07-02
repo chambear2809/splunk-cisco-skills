@@ -5,13 +5,31 @@
 - Splunkbase app: `8704`
 - App/package ID: `splunk-connect-for-otlp`
 - Release: `0.4.1`
-- Published app record: May 6, 2026
+- Published app record: May 1, 2026
 - Splunk compatibility: `9.4` through `10.5`
+- Splunk Cloud compatible: `false`
+- Single-instance Cloud install method: `rejected`
+- Distributed Cloud install method: `rejected`
 - SHA256: `fde0d93532703e04ab5aa544815d52232ef62afae2c0a55e374dc74d2d58f9d1`
 - MD5: `6190585a3c12cb9f273f7f9f11cdb3be`
 
 GitHub release `v0.4.1` package hash matched the Splunkbase package metadata.
 Upstream `go test ./...` passed against the inspected release source.
+
+The Splunk version list and Cloud placement are separate contracts. Version
+`10.5` appears in `product_versions`, but the explicit Cloud fields prohibit a
+Victoria search-tier ACS install. For Splunk Cloud 10.5, run the modular input
+on a customer-managed heavy forwarder or use an IDM only through an approved
+Splunk Support workflow; route its HEC-shaped output onward to Cloud.
+
+## Managed Cloud Mutation Boundary
+
+`scripts/setup.sh` refuses app install/update/uninstall, modular-input
+create/update/enable/disable/delete, and repair mutations when the selected
+credentials resolve to a managed Splunk Cloud profile. Sender rendering,
+HEC-handoff rendering, validation, and doctor operations remain available.
+Use a customer-managed heavy-forwarder profile for live receiver changes.
+Splunk-approved IDM changes remain a Support-coordinated handoff.
 
 ## Package Contents
 
@@ -135,8 +153,8 @@ cannot mistake rendered guidance for a completed repair.
 
 | Fix ID | Behavior |
 | --- | --- |
-| `APP_MISSING` | Install app `8704` through `splunk-app-install`. |
-| `APP_OUTDATED` | Update app `8704` through `splunk-app-install`. |
+| `APP_MISSING` | Install app `8704` on a customer-managed supported runtime; managed Cloud uses the HF/approved-IDM handoff. |
+| `APP_OUTDATED` | Update app `8704` on its customer-managed runtime; managed IDM updates remain Support-coordinated. |
 | `APP_DISABLED` | Report required manual/app-management action. |
 | `WRONG_TIER` | Report topology handoff. |
 | `PLATFORM_UNSUPPORTED_LOCAL_BINARY` | Report Linux/Windows x86_64 package caveat. |
@@ -146,7 +164,7 @@ cannot mistake rendered guidance for a completed repair.
 | `PORT_CONFLICT` | Report listener conflict and keep Splunk config unchanged. |
 | `BAD_LISTEN_ADDRESS` | Reconfigure to `0.0.0.0` or a supplied listen address. |
 | `PLAINTEXT_REMOTE_LISTENER` | Enable receiver TLS or bind a lab-only sender to loopback. |
-| `CLOUD_CLASSIC_REQUIRES_IDM_OR_HF` | Render heavy-forwarder/IDM handoff. |
+| `CLOUD_MANAGED_REQUIRES_IDM_OR_HF` | Render customer-managed heavy-forwarder or approved-IDM handoff; never self-service Victoria ACS. |
 | `TLS_FILES_MISSING` | Report cert/key file repair. |
 | `TLS_SENDER_RECEIVER_MISMATCH` | Re-render sender assets matching receiver TLS mode. |
 | `HEC_GLOBAL_DISABLED` | Delegate HEC enablement to `splunk-hec-service-setup`. |

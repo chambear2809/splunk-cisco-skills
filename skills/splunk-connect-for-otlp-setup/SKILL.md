@@ -44,6 +44,13 @@ The audited release is Splunkbase app `8704`, package/app ID
 `splunk-connect-for-otlp`, version `0.4.1`, compatible with Splunk `9.4` through
 `10.5`.
 
+That platform-version list is not Cloud install approval. The public release
+API reports `cloud_compatible=false`, `install_method_single=rejected`, and
+`install_method_distributed=rejected`. Do not install `8704` on a Victoria
+search tier through ACS. Splunk Cloud 10.5 can be the data destination while
+the receiver runs on a customer-managed heavy forwarder or an IDM placement
+explicitly approved and coordinated by Splunk Support.
+
 The inspected package contains only conf/UI metadata plus platform binaries:
 
 - `default/app.conf`
@@ -60,7 +67,8 @@ REST handler, Python runtime, Darwin binary, or default `bin/` executable.
 
 ## Primary Workflow
 
-1. Install or update the app through the shared installer:
+1. On a customer-managed Splunk Enterprise search tier or heavy forwarder,
+   install or update the app through the shared installer:
 
 ```bash
 bash skills/splunk-connect-for-otlp-setup/scripts/setup.sh --install
@@ -120,16 +128,19 @@ live repair.
 
 ## Cloud And Topology
 
-Use the hybrid-gated model:
+Use the split-runtime model:
 
-- Splunk Cloud Victoria: direct modular-input configuration is allowed only
-  after topology and inbound reachability checks prove OTLP senders can reach
-  the listener.
-- Splunk Cloud Classic: do not run the add-on on the Cloud search tier; use IDM
-  when available or a customer-managed heavy forwarder.
-- If senders are outside the Splunk Cloud network path, default to a
-  customer-managed heavy forwarder with explicit firewall, load balancer, and
-  TLS validation.
+- Splunk Cloud Victoria and Classic: do not ACS-install app `8704` on the
+  managed search tier. The listing rejects both Cloud install methods.
+- Default to a customer-managed heavy forwarder with explicit firewall, load
+  balancer, TLS, HEC allowed-index, and onward Splunk Cloud routing validation.
+- An IDM placement is valid only after Splunk Support explicitly approves and
+  coordinates it; do not model that as self-service ACS installation.
+- The setup script refuses install, uninstall, input configuration, and repair
+  mutations when the active credentials resolve to a managed Cloud profile.
+  Read-only validation/doctor and sender/HEC handoff rendering remain safe.
+- The skill remains conditional for Cloud 10.5 because Cloud is a supported
+  destination for events emitted by the customer-managed/approved receiver.
 
 ## OTLP Sender Contract
 

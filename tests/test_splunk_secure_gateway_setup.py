@@ -13,6 +13,8 @@ from tests.regression_helpers import REPO_ROOT
 
 RENDERER = REPO_ROOT / "skills/splunk-secure-gateway-setup/scripts/render_assets.py"
 SETUP = REPO_ROOT / "skills/splunk-secure-gateway-setup/scripts/setup.sh"
+CANONICAL_RENDERER = REPO_ROOT / "skills/splunk-secure-gateway/scripts/render_assets.py"
+CANONICAL_SETUP = REPO_ROOT / "skills/splunk-secure-gateway/scripts/setup.sh"
 
 
 class SecureGatewayTests(unittest.TestCase):
@@ -95,6 +97,62 @@ class SecureGatewayTests(unittest.TestCase):
                 (Path(tmpdir) / "secure-gateway" / "metadata.json").read_text(encoding="utf-8")
             )
             self.assertEqual(metadata["platform"], "cloud")
+
+    def test_canonical_cloud_local_phases_exit_before_rendering(self) -> None:
+        for phase in ("preflight", "enable", "status"):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir) / "rendered"
+                result = subprocess.run(
+                    [
+                        "bash",
+                        str(CANONICAL_SETUP),
+                        "--platform",
+                        "cloud",
+                        "--phase",
+                        phase,
+                        "--output-dir",
+                        str(output_dir),
+                    ],
+                    cwd=REPO_ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=60,
+                )
+                self.assertEqual(result.returncode, 2, msg=result.stdout + result.stderr)
+                self.assertIn("managed Splunk Cloud search tier", result.stdout + result.stderr)
+                self.assertFalse(output_dir.exists())
+
+    def test_canonical_cloud_rendered_local_checks_are_handoffs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(CANONICAL_RENDERER),
+                    "--platform",
+                    "cloud",
+                    "--output-dir",
+                    tmpdir,
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "secure-gateway"
+            for script_name in ("connectivity-preflight.sh", "status.sh"):
+                run = subprocess.run(
+                    ["bash", str(render_dir / script_name)],
+                    cwd=render_dir,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=60,
+                )
+                self.assertEqual(run.returncode, 2, msg=run.stdout + run.stderr)
+                self.assertIn("HANDOFF", run.stdout + run.stderr)
 
 
 if __name__ == "__main__":

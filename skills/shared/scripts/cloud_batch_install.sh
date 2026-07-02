@@ -179,6 +179,9 @@ for app in registry.get("apps", []):
         ",".join(platforms),
         str(app.get("latest_verified_version", "")),
         str(app.get("latest_release_version", "")),
+        str(app.get("cloud_compatible", "")).lower(),
+        str(app.get("install_method_single", "")),
+        str(app.get("install_method_distributed", "")),
     )
     print("|".join(fields), end="")
     break
@@ -188,13 +191,26 @@ PY
 preflight_app_compatibility() {
     local app_id="$1"
     local metadata status app_name platforms verified release
+    local cloud_compatible install_method_single install_method_distributed
     metadata="$(resolve_app_compatibility "${app_id}" "${TARGET_SPLUNK_VERSION}")"
     if [[ -z "${metadata}" ]]; then
         log "INFO: App ID ${app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
         return 0
     fi
 
-    IFS='|' read -r status app_name platforms verified release <<< "${metadata}"
+    IFS='|' read -r status app_name platforms verified release cloud_compatible \
+        install_method_single install_method_distributed <<< "${metadata}"
+    if [[ "${cloud_compatible}" == "false" ]]; then
+        if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+            log "WARNING: Explicit Cloud-placement override accepted for ${app_name:-app ID ${app_id}} even though Splunkbase marks cloud_compatible=false (single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown})."
+            log "WARNING: Proceed only with documented Splunk Support/vendor approval for this exact package and topology."
+        else
+            log "ERROR: ${app_name:-App ID ${app_id}} is explicitly cloud_compatible=false on Splunkbase."
+            log "Cloud install methods: single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown}."
+            log "Refusing the entire batch before ACS mutation. Use a customer-managed runtime or pass --accept-unsupported-platform only with documented Splunk Support/vendor approval."
+            return 1
+        fi
+    fi
     if [[ "${status}" != "supported" ]]; then
         if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
             log "WARNING: Explicit override accepted for ${app_name:-app ID ${app_id}} on Splunk ${TARGET_SPLUNK_VERSION}; advertised versions: ${platforms:-none}."

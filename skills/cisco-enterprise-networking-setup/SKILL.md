@@ -6,9 +6,9 @@ description: >-
   acceleration, and validates dashboards. Use when the user asks about Cisco
   Enterprise Networking app, cisco-catalyst-app, Catalyst dashboards, ISE
   dashboards, SD-WAN dashboards, or Cyber Vision dashboards.
-compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
-  splunk_cloud_10_5: "blocked"
+  splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
@@ -30,16 +30,17 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use `splunk-app-install` with `--source splunkbase --app-id 7539` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
-in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
-As of July 2, 2026, the public `3.2.0` listing advertises platform versions only
-through `10.4`, not the repository's current Splunk Cloud `10.5` compatibility
-target. For a `10.5` Cloud stack, surface that package-specific warning and
-require operator/vendor compatibility confirmation before production use. The
-installer remains available for an explicitly reviewed deployment; this skill
-does not turn the listing gap into an install-time block.
+**Pull from Splunkbase first, fall back to `splunk-ta/`.** Use
+`splunk-app-install` with `--source splunkbase --app-id 7539`; the shared
+installer defaults to the repository-verified package. If Splunkbase is
+unavailable, fall back to the local package in `splunk-ta/`.
+The repo-verified `3.1.0` release explicitly advertises `10.5` and is
+Cloud-compatible. The newer public `3.2.0` listing advertises versions only
+through `10.4`. On Splunk Cloud `10.5`, keep the shared installer's verified
+`3.1.0` pin. The setup wrapper reads the actual installed version before any
+REST mutation and refuses an unverified selection unless
+`--accept-unsupported-platform` is backed by documented vendor approval for
+the exact package and stack; the override is not compatibility certification.
 The shared installer enforces the required Cisco Catalyst Add-on dependency and
 installs `TA_cisco_catalyst` (Splunkbase ID `7538`) first when it is missing,
 so the visualization app is not deployed by itself. The Cisco Catalyst

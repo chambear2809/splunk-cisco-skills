@@ -1396,6 +1396,97 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             acs_output = acs_log.read_text(encoding="utf-8") if acs_log.exists() else ""
             self.assertNotIn("apps install", acs_output)
 
+    def test_cloud_installers_block_explicit_cloud_incompatibility_before_mutation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            acs_log = tmp_path / "acs.log"
+            credentials_file = tmp_path / "credentials"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                cmd = " ".join(sys.argv[1:])
+                with Path(os.environ["ACS_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(cmd + "\\n")
+                if "apps install splunkbase --splunkbase-id 8704" in cmd:
+                    print(json.dumps({"name": "splunk-connect-for-otlp", "version": "0.4.1", "status": "installed"}))
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(bin_dir / "curl", "#!/usr/bin/env bash\nexit 0\n")
+            write_executable(bin_dir / "nc", "#!/usr/bin/env bash\nexit 0\n")
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    ACS_SERVER="https://staging.admin.splunk.com"
+                    STACK_TOKEN="token"
+                    SPLUNK_SEARCH_API_URI="https://example-stack.stg.splunkcloud.com:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["ACS_LOG"] = str(acs_log)
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_SKIP_ALLOWLIST"] = "true"
+
+            generic = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "8704",
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+            generic_output = generic.stdout + generic.stderr
+            self.assertEqual(generic.returncode, 1, msg=generic_output)
+            self.assertIn("explicitly cloud_compatible=false", generic_output)
+            self.assertIn("single=rejected, distributed=rejected", generic_output)
+            self.assertFalse(acs_log.exists())
+
+            batch = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "8704",
+                env=env,
+            )
+            batch_output = batch.stdout + batch.stderr
+            self.assertEqual(batch.returncode, 1, msg=batch_output)
+            self.assertIn("explicitly cloud_compatible=false", batch_output)
+            self.assertIn("Refusing the entire batch before ACS mutation", batch_output)
+            self.assertFalse(acs_log.exists())
+
+            approved = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "--accept-unsupported-platform",
+                "8704",
+                env=env,
+            )
+            approved_output = approved.stdout + approved.stderr
+            self.assertEqual(approved.returncode, 0, msg=approved_output)
+            self.assertIn("documented Splunk Support/vendor approval", approved_output)
+            self.assertIn(
+                "apps install splunkbase --splunkbase-id 8704 --version 0.4.1",
+                acs_log.read_text(encoding="utf-8"),
+            )
+
     def test_install_app_auto_installs_enterprise_networking_dependency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

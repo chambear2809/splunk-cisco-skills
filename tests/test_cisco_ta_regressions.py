@@ -196,6 +196,12 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 any("--app-id 7404" in line for line in install_lines),
                 msg="Cisco Security Cloud install was not invoked through the shared installer",
             )
+            security_install = next(line for line in install_lines if "--app-id 7404" in line)
+            self.assertNotIn(
+                "--app-version",
+                security_install,
+                msg="Cisco Security Cloud must let the shared installer choose its verified pin by default",
+            )
             self.assertTrue(curl_log.exists(), msg="Expected mock curl log to be written")
 
 
@@ -1326,7 +1332,9 @@ EOF
                     handle.write(json.dumps(args) + "\\n")
                 with Path(os.environ["SPLUNK_STDIN_LOG"]).open("a", encoding="utf-8") as handle:
                     handle.write(json.dumps({"args": args, "stdin": stdin_data}) + "\\n")
-                if args and args[0] == "status":
+                if args and args[0] == "version":
+                    sys.stdout.write("Splunk 10.4.1")
+                elif args and args[0] == "status":
                     sys.stdout.write("splunkd is running")
                 """,
             )
@@ -1723,7 +1731,7 @@ EOF
             tmp_path = Path(tmpdir)
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
-            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.tgz"
+            package_file = tmp_path / "splunk-10.4.1-linux-x86_64.tgz"
             splunk_home = tmp_path / "installed-splunk"
             package_root = tmp_path / "package-root" / "splunk"
             cmd_log = tmp_path / "splunk.log"
@@ -1770,7 +1778,7 @@ EOF
                 with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
                     handle.write(f"new:{command}\\n")
                 if command == "version":
-                    sys.stdout.write("Splunk 10.1.0")
+                    sys.stdout.write("Splunk 10.4.1")
                 elif command == "status":
                     sys.stdout.write("splunkd is running")
                 elif command in {"stop", "start", "restart"}:
@@ -1804,7 +1812,7 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.4.1", result.stdout)
             self.assertEqual((splunk_home / "etc/test/default.txt").read_text(encoding="utf-8"), "new-default\n")
             self.assertEqual((splunk_home / "etc/test/local-only.conf").read_text(encoding="utf-8"), "keep-me\n")
 
@@ -1820,7 +1828,7 @@ EOF
             tmp_path = Path(tmpdir)
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
-            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.tgz"
+            package_file = tmp_path / "splunk-10.4.1-linux-x86_64.tgz"
             splunk_home = tmp_path / "cluster-manager"
             package_root = tmp_path / "package-root" / "splunk"
 
@@ -1845,7 +1853,7 @@ EOF
                 """\
                 #!/usr/bin/env bash
                 case "$1" in
-                    version) echo "Splunk 10.1.0"; exit 0 ;;
+                    version) echo "Splunk 10.4.1"; exit 0 ;;
                     status) echo "splunkd is running"; exit 0 ;;
                     stop|start|restart) echo "$1"; exit 0 ;;
                     *) exit 0 ;;
@@ -1890,7 +1898,7 @@ EOF
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
             admin_password_file = tmp_path / "admin-password"
-            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.rpm"
+            package_file = tmp_path / "splunk-10.4.1-linux-x86_64.rpm"
             cmd_log = tmp_path / "splunk.log"
             install_log = tmp_path / "rpm.log"
             new_splunk = tmp_path / "new-rpm-splunk"
@@ -1934,7 +1942,7 @@ EOF
                 with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
                     handle.write(f"new:{command}\\n")
                 if command == "version":
-                    sys.stdout.write("Splunk 10.1.0")
+                    sys.stdout.write("Splunk 10.4.1")
                 elif command == "status":
                     sys.stdout.write("splunkd is running")
                 elif command in {"stop", "start", "restart"}:
@@ -1980,7 +1988,7 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.4.1", result.stdout)
             self.assertIn("-Uvh", install_log.read_text(encoding="utf-8"))
 
             commands = cmd_log.read_text(encoding="utf-8").splitlines()
@@ -1997,7 +2005,7 @@ EOF
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
             admin_password_file = tmp_path / "admin-password"
-            package_file = tmp_path / "splunk-10.1.0-linux-amd64.deb"
+            package_file = tmp_path / "splunk-10.4.1-linux-amd64.deb"
             cmd_log = tmp_path / "splunk.log"
             install_log = tmp_path / "dpkg.log"
             new_splunk = tmp_path / "new-deb-splunk"
@@ -2041,7 +2049,7 @@ EOF
                 with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
                     handle.write(f"new:{command}\\n")
                 if command == "version":
-                    sys.stdout.write("Splunk 10.1.0")
+                    sys.stdout.write("Splunk 10.4.1")
                 elif command == "status":
                     sys.stdout.write("splunkd is running")
                 elif command in {"stop", "start", "restart"}:
@@ -2087,7 +2095,7 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.4.1", result.stdout)
             self.assertIn("-i", install_log.read_text(encoding="utf-8"))
 
             commands = cmd_log.read_text(encoding="utf-8").splitlines()
@@ -2103,7 +2111,7 @@ EOF
             remote_home = remote_root / "opt/splunk"
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
-            package_file = tmp_path / "splunk-10.1.0-linux-amd64.deb"
+            package_file = tmp_path / "splunk-10.4.1-linux-amd64.deb"
 
             bin_dir.mkdir()
             (remote_home / "bin").mkdir(parents=True)
@@ -2184,6 +2192,7 @@ EOF
                 """\
                 #!/usr/bin/env bash
                 case "$1" in
+                    version) echo "Splunk 10.4.1"; exit 0 ;;
                     status) echo "splunkd is running"; exit 0 ;;
                     restart|start) exit 0 ;;
                     *) exit 0 ;;
@@ -2243,6 +2252,7 @@ EOF
                 """\
                 #!/usr/bin/env bash
                 case "$1" in
+                    version) echo "Splunk 10.4.1"; exit 0 ;;
                     status) echo "splunkd is running"; exit 0 ;;
                     restart|start) exit 0 ;;
                     *) exit 0 ;;

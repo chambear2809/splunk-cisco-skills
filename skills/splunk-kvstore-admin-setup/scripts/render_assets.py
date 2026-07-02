@@ -32,6 +32,7 @@ FIELD_TYPES = {"number", "string", "bool", "time", "cidr"}
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk KV Store administration assets.")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--platform", choices=("auto", "cloud", "enterprise"), default="auto")
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--topology", choices=("standalone", "shc"), default="standalone")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_kvstore")
@@ -74,12 +75,21 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def make_script(body: str) -> str:
+def make_script(body: str, *, platform: str) -> str:
     first, separator, remainder = body.lstrip().partition("\n")
     if not separator:
         die("internal renderer error: local script body has no runtime assignment")
     helper_default = shell_quote(_PLATFORM_VERSION_HELPERS)
-    gate = f"""_platform_helpers_default={helper_default}
+    rendered_platform = shell_quote(platform)
+    gate = f"""rendered_platform={rendered_platform}
+runtime_platform="${{SPLUNK_PLATFORM:-${{rendered_platform}}}}"
+if [[ "${{runtime_platform}}" == "cloud" ]]; then
+  echo "ERROR: Managed Splunk Cloud owns KV Store host lifecycle operations; this rendered host script will not run." >&2
+  echo "HANDOFF: Use Splunk Support for backup, restore, clean, migrate, upgrade, maintenance, or host status work." >&2
+  exit 2
+fi
+[[ "${{runtime_platform}}" == "auto" || "${{runtime_platform}}" == "enterprise" ]] || {{ echo "ERROR: invalid SPLUNK_PLATFORM=${{runtime_platform}}" >&2; exit 1; }}
+_platform_helpers_default={helper_default}
 platform_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_platform_helpers_default}}}}"
 [[ -r "${{platform_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_helpers}}" >&2; exit 1; }}
 # shellcheck disable=SC1090
@@ -191,7 +201,8 @@ test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" show kvstore-status
 df -h "${{splunk_home}}/var/lib/splunk" 2>/dev/null || true
 echo "Preflight complete. Take a backup before any restore, migrate, or upgrade."
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -205,7 +216,8 @@ def render_backup(args: argparse.Namespace) -> str:
 # $SPLUNK_DB/kvstorebackup. Take one before every restore, migrate, or upgrade.
 "${{splunk_home}}/bin/splunk" backup kvstore {pit}
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -240,7 +252,8 @@ fi
 {maint}"${{splunk_home}}/bin/splunk" restore kvstore {pit} -archiveName "${{archive_name}}"
 {maint_after}
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -256,7 +269,8 @@ if [[ "${{KVSTORE_ACCEPT_CLEAN:-false}}" != "true" ]]; then
 fi
 "${{splunk_home}}/bin/splunk" clean kvstore {scope}
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -278,7 +292,8 @@ fi
 {acceptance_gate}
 "${{splunk_home}}/bin/splunk" start-shcluster-migration kvstore -storageEngine {args.storage_engine} {dry}
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+            platform=args.platform,
         )
     return make_script(
         f"""splunk_home={splunk_home}
@@ -286,7 +301,8 @@ fi
 # upgrade to Splunk Enterprise 9.0+. This script reports current status.
 "${{splunk_home}}/bin/splunk" show kvstore-status
 echo "Storage engine: {args.storage_engine} (single-instance migration is automatic on upgrade)."
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -309,14 +325,16 @@ fi
 # Enterprise version. Take a backup first.
 "${{splunk_home}}/bin/splunk" start-shcluster-upgrade kvstore -version "${{target_version}}"
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+            platform=args.platform,
         )
     return make_script(
         f"""splunk_home={splunk_home}
 # Single-instance deployments auto-upgrade the KV Store server version about 60
 # seconds after the first start on a new Splunk Enterprise version. This reports status.
 "${{splunk_home}}/bin/splunk" show kvstore-status
-"""
+""",
+        platform=args.platform,
     )
 
 
@@ -326,13 +344,15 @@ def render_status(args: argparse.Namespace) -> str:
         f"""splunk_home={splunk_home}
 "${{splunk_home}}/bin/splunk" show kvstore-status
 "${{splunk_home}}/bin/splunk" btool server list kvstore --debug 2>/dev/null || true
-"""
+""",
+        platform=args.platform,
     )
 
 
 def render_readme(args: argparse.Namespace) -> str:
     return f"""# Splunk KV Store Admin Rendered Assets
 
+Platform: `{args.platform}`
 Topology: `{args.topology}`
 Splunk home: `{args.splunk_home}`
 Point-in-time backup: `{args.point_in_time}`
@@ -354,6 +374,11 @@ Governance config (apply with `--phase apply --operation collections`, written v
 - `server.conf` - optional `[kvstore] kvstoreUpgradeOnStartupEnabled = false`
 
 Always take a point-in-time backup before a restore, migrate, or upgrade.
+
+Managed Splunk Cloud owns every host lifecycle operation listed above. When
+rendered with `--platform cloud`, those scripts exit `2` before invoking the
+Splunk CLI. Only collection and lookup knowledge-object governance can use the
+Cloud REST apply path from this skill.
 """
 
 
@@ -367,6 +392,7 @@ def render(args: argparse.Namespace, fields: list[tuple[str, str]]) -> dict:
             "README.md": render_readme(args),
             "metadata.json": json.dumps(
                 {
+                    "platform": args.platform,
                     "topology": args.topology,
                     "splunk_home": args.splunk_home,
                     "app_name": args.app_name,
@@ -396,6 +422,7 @@ def render(args: argparse.Namespace, fields: list[tuple[str, str]]) -> dict:
             assets.append(rel)
     return {
         "target": "kvstore",
+        "platform": args.platform,
         "topology": args.topology,
         "output_dir": str(output_dir),
         "render_dir": str(render_dir),

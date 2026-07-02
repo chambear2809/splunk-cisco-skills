@@ -2814,7 +2814,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 output_dir / "sok" / "enterprise-values.yaml"
             ).read_text(encoding="utf-8")
             self.assertIn(
-                'image:\n  repository: "splunk/splunk:10.4.0"\n  imagePullPolicy: "IfNotPresent"',
+                'image:\n  repository: "splunk/splunk:10.4.1"\n  imagePullPolicy: "IfNotPresent"',
                 enterprise_values,
             )
             self.assertNotIn('\nimagePullPolicy: "IfNotPresent"', enterprise_values)

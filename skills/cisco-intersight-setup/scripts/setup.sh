@@ -3,8 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 APP_NAME="Splunk_TA_Cisco_Intersight"
+APP_ID="7828"
+VERIFIED_APP_VERSION="3.1.1"
+PUBLIC_APP_VERSION="3.2.0"
 
 INDEXES_ONLY=false
 MACROS_ONLY=false
@@ -12,6 +16,67 @@ ENABLE_INPUTS=false
 ACCOUNT=""
 INDEX=""
 INPUT_TYPE=""
+APP_VERSION="${SPLUNK_APP_VERSION:-}"
+TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
+ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
+
+resolve_configuration_target_version() {
+    local raw="${TARGET_SPLUNK_VERSION:-}"
+    if [[ -z "${raw}" ]]; then
+        if is_splunk_cloud; then
+            raw="$(spv_cloud_doc_train_default)"
+        else
+            raw="$(spv_enterprise_default)"
+        fi
+    fi
+    if [[ ! "${raw}" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]]; then
+        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        return 1
+    fi
+    TARGET_SPLUNK_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
+    export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM="${ACCEPT_UNSUPPORTED_PLATFORM}"
+}
+
+require_configuration_version_compatible() {
+    local selected_version="${1:-}"
+    local version_source="${2:-selected package}"
+
+    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
+    if [[ "${selected_version}" == "${VERIFIED_APP_VERSION}" ]]; then
+        log "Compatibility preflight passed: ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${VERIFIED_APP_VERSION} is repo-verified for Splunk 10.5."
+        return 0
+    fi
+    if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+        log "WARNING: Explicit vendor-approved override accepted for ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${selected_version:-unknown} on Splunk ${TARGET_SPLUNK_VERSION}."
+        return 0
+    fi
+
+    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    if [[ "${selected_version}" == "${PUBLIC_APP_VERSION}" ]]; then
+        log "The public ${PUBLIC_APP_VERSION} release does not advertise Splunk 10.5 compatibility."
+    fi
+    log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
+    return 1
+}
+
+preflight_configuration_platform() {
+    resolve_configuration_target_version || return 1
+    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && -n "${APP_VERSION}" ]]; then
+        require_configuration_version_compatible "${APP_VERSION}" "selected"
+        return $?
+    fi
+    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
+        log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
+    fi
+}
+
+verify_installed_package_before_mutation() {
+    local installed_version
+    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
+    installed_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || true)"
+    require_configuration_version_compatible "${installed_version}" "installed"
+}
 
 usage() {
     cat >&2 <<EOF
@@ -26,6 +91,13 @@ Options:
   --account NAME          Account name for input enablement
   --index INDEX           Target index for inputs
   --input-type TYPE       Input type: audit_alarms, inventory, metrics, all
+  --app-version VERSION   Installed package version being configured
+                          (default contract: repo-verified ${VERIFIED_APP_VERSION})
+  --target-splunk-version V
+                          Target Splunk MAJOR.MINOR[.PATCH]
+  --accept-unsupported-platform
+                          Allow an unverified package/version combination only
+                          with documented vendor approval
   --help                  Show this help
 
 With no flags, runs full setup (indexes + macros).
@@ -43,6 +115,9 @@ while [[ $# -gt 0 ]]; do
         --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
+        --app-version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
+        --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
+        --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -65,6 +140,7 @@ check_prereqs() {
         log "ERROR: Cisco Intersight TA not installed"
         exit 1
     fi
+    verify_installed_package_before_mutation || exit 1
 }
 
 create_indexes() {
@@ -261,10 +337,11 @@ enable_metrics_inputs() {
 }
 
 main() {
+    preflight_configuration_platform || exit 1
     warn_if_current_skill_role_unsupported
+    check_prereqs
 
     if $ENABLE_INPUTS; then
-        check_prereqs
         if [[ -z "${ACCOUNT}" || -z "${INDEX}" || -z "${INPUT_TYPE}" ]]; then
             log "ERROR: --enable-inputs requires --account, --index, and --input-type"
             exit 1
@@ -286,7 +363,6 @@ main() {
     fi
 
     if $MACROS_ONLY; then
-        check_prereqs
         create_macros
         exit 0
     fi
@@ -296,7 +372,6 @@ main() {
         exit 0
     fi
 
-    check_prereqs
     create_indexes
     create_macros
     ensure_app_visible

@@ -11,10 +11,10 @@ self-managed workflows retain the current public 10.4 baseline.
 | Status | Skills | Meaning |
 | --- | ---: | --- |
 | Supported | 3 | Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable. |
-| Conditional | 89 | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
+| Conditional | 90 | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | Blocked | 3 | Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded. |
 | Self-managed 10.4 | 10 | Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline. |
-| Not applicable | 54 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| Not applicable | 53 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | Delegated | 6 | Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself. |
 
 `Blocked` means the primary upstream package currently omits 10.5. The
@@ -174,7 +174,7 @@ topology, customer-managed runtime, or product-specific prerequisites.
 | `splunk-security-essentials-setup` | Conditional | 3435 `Splunk_Security_Essentials` (supported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `splunk-security-portfolio-setup` | Delegated | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself. |
 | `splunk-servicenow-ta-setup` | Conditional | 1928 `Splunk_TA_snow` (supported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
-| `splunk-soar-setup` | Not applicable | 6361 `splunk_app_soar` (supported), 3411 `phantom` (supported) | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `splunk-soar-setup` | Conditional | 6361 `splunk_app_soar` (supported), 3411 `phantom` (supported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `splunk-spl2-pipeline-kit` | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `splunk-stream-setup` | Conditional | 1809 `splunk_app_stream` (supported), 5238 `Splunk_TA_stream` (supported), 5234 `Splunk_TA_stream_wire_data` (supported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `splunk-supported-addons-setup` | Delegated | 833 `Splunk_TA_nix` (supported), 3412 `Splunk_TA_Linux` (supported) | Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself. |

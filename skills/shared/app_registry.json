@@ -46,9 +46,9 @@
         "kind": "app",
         "app_name": "CiscoSecurityCloud",
         "label": "`cisco-security-cloud-setup`",
-        "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "REST via CiscoSecurityCloud custom admin handlers",
-        "notes": "Cisco EULA license-ack required. Multi-product Cisco Security integration app with product-specific setup flows for each packaged integration."
+        "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.6.6 for Splunk 10.5; render/handoff for public 3.6.7 unless a vendor-approved override is recorded",
+        "cloud_config_path": "Target/version preflight, then REST via CiscoSecurityCloud custom admin handlers",
+        "notes": "Cisco EULA license-ack required. Verified 3.6.6 advertises Splunk 10.5 and is Cloud-compatible; public 3.6.7 does not advertise 10.5. The setup wrapper fails before REST for an unverified selection unless --accept-unsupported-platform is backed by vendor approval."
       },
       {
         "kind": "app",
@@ -126,9 +126,9 @@
         "kind": "app",
         "app_name": "Splunk_TA_Cisco_Intersight",
         "label": "`cisco-intersight-setup`",
-        "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "REST via custom account/input handlers",
-        "notes": "Cisco EULA license-ack required. Index creation uses ACS."
+        "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.1.1 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded",
+        "cloud_config_path": "Target/version preflight, then REST via custom account/input handlers",
+        "notes": "Cisco EULA license-ack required. Verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. Index creation uses ACS."
       },
       {
         "kind": "app",
@@ -142,9 +142,9 @@
         "kind": "app",
         "app_name": "cisco-catalyst-app",
         "label": "`cisco-enterprise-networking-setup`",
-        "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "REST for macros/saved searches/datamodel settings",
-        "notes": "Cisco EULA license-ack required. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
+        "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.1.0 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded",
+        "cloud_config_path": "Target/version preflight, then REST for macros/saved searches/datamodel settings",
+        "notes": "Cisco EULA license-ack required. Verified 3.1.0 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
       },
       {
         "kind": "workflow",
@@ -330,9 +330,9 @@
         "kind": "app",
         "app_name": "Splunk-UBA-SA-Kafka",
         "label": "`splunk-uba-setup` Kafka app",
-        "cloud_install_path": "ACS Splunkbase or local package when still required by an existing UBA deployment",
+        "cloud_install_path": "Render/handoff only on Splunk 10.5; install only for an existing UBA deployment with a documented vendor-approved --accept-unsupported-platform override",
         "cloud_config_path": "Readiness validation only; standalone UBA server lifecycle remains a manual/professional-services handoff",
-        "notes": "Optional legacy UBA Kafka ingestion app. New UEBA work should route to Enterprise Security Premier UEBA."
+        "notes": "Optional legacy UBA Kafka ingestion app 1.4.6 does not advertise Splunk 10.5. New UEBA work should route to Enterprise Security Premier UEBA; ordinary ACS install is not a supported 10.5 path."
       },
       {
         "kind": "app",
@@ -528,9 +528,9 @@
         "kind": "app",
         "app_name": "splunk-connect-for-otlp",
         "label": "`splunk-connect-for-otlp-setup`",
-        "cloud_install_path": "ACS Splunkbase for supported Cloud topologies; customer-managed heavy forwarder fallback when inbound OTLP reachability is not proven",
-        "cloud_config_path": "REST modular input configuration plus HEC token handoff through splunk-hec-service-setup",
-        "notes": "Hybrid-gated OTLP modular input. Victoria direct execution requires topology and inbound reachability validation; Classic routes input execution to IDM or customer-managed heavy forwarder. External collectors and SDKs are senders/clients only."
+        "cloud_install_path": "No Victoria search-tier ACS install: Splunkbase marks 0.4.1 cloud_compatible=false and rejects both install methods. Run it on a customer-managed heavy forwarder, or coordinate an approved IDM placement through Splunk Support.",
+        "cloud_config_path": "Configure the modular input on the customer-managed heavy forwarder; approved IDM configuration remains a Splunk Support handoff. Splunk Cloud 10.5 remains the HEC/data destination.",
+        "notes": "Conditional Cloud 10.5 workflow because Cloud can receive the data, not because app 8704 can run on the managed search tier. External collectors and SDKs are senders/clients only."
       },
       {
         "kind": "workflow",
@@ -1379,11 +1379,10 @@
         "external-collector": "supported"
       },
       "cloud_pairing": [
-        "search-tier",
         "heavy-forwarder",
         "external-collector"
       ],
-      "notes": "Splunkbase app 8704 modular input runs on search-tier or heavy-forwarder only after topology checks; external collectors and SDKs are OTLP senders/clients, not app install targets. Classic Cloud routes to IDM or customer-managed heavy forwarder."
+      "notes": "Splunkbase app 8704 can run on a self-managed search tier or customer-managed heavy forwarder, but its public cloud_compatible=false and rejected install-method metadata prohibit Victoria search-tier ACS installation. Cloud pairing uses a customer-managed heavy forwarder or Splunk-approved IDM; external collectors and SDKs are senders/clients only."
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -3456,6 +3455,19 @@
       },
       "latest_verified_version": "1.0.27",
       "latest_release_version": "1.0.29",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
       "latest_verified_date": "May 9, 2026",
       "latest_release_date": "June 26, 2026",
       "last_verified_date": "July 2, 2026",
@@ -3496,6 +3508,17 @@
       },
       "latest_verified_version": "3.1.0",
       "latest_release_version": "3.2.35",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
       "latest_verified_date": "March 3, 2026",
       "latest_release_date": "June 29, 2026",
       "last_verified_date": "July 2, 2026",
@@ -3581,6 +3604,17 @@
       },
       "latest_verified_version": "3.1.0",
       "latest_release_version": "3.2.0",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
       "latest_verified_date": "March 3, 2026",
       "latest_release_date": "June 23, 2026",
       "last_verified_date": "July 2, 2026",
@@ -3593,7 +3627,7 @@
         "9.4"
       ],
       "compatibility_status": "unsupported",
-      "notes": "Cisco Enterprise Networking visualization app. The current public release does not list Splunk 10.5 support; do not install it on a 10.5 search tier. Assess its supported TA_cisco_catalyst dependency separately."
+      "notes": "Cisco Enterprise Networking visualization app. Repo-verified 3.1.0 advertises Splunk 10.5 and is Cloud-compatible; current public 3.2.0 does not list 10.5. Pin 3.1.0 on a 10.5 search tier, or render/hand off unless a vendor-approved override permits another version. Assess its TA_cisco_catalyst dependency separately."
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -3663,6 +3697,18 @@
       },
       "latest_verified_version": "3.6.6",
       "latest_release_version": "3.6.7",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
       "latest_verified_date": "June 2, 2026",
       "latest_release_date": "June 17, 2026",
       "last_verified_date": "July 2, 2026",
@@ -3678,7 +3724,7 @@
         "9.1"
       ],
       "compatibility_status": "unsupported",
-      "notes": "Cisco Security Cloud app. The current public release does not list Splunk 10.5 support; do not install it on a Splunk 10.5 search tier until Cisco or Splunk publishes compatible package metadata."
+      "notes": "Cisco Security Cloud app. Repo-verified 3.6.6 advertises Splunk 10.5 and is Cloud-compatible; current public 3.6.7 does not list 10.5. Pin 3.6.6 on a Splunk 10.5 search tier, or render/hand off unless a vendor-approved override permits another version."
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3788,6 +3834,16 @@
       },
       "latest_verified_version": "3.1.1",
       "latest_release_version": "3.2.0",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
       "latest_verified_date": "March 27, 2026",
       "latest_release_date": "June 30, 2026",
       "last_verified_date": "July 2, 2026",
@@ -3801,7 +3857,7 @@
         "9.3"
       ],
       "compatibility_status": "unsupported",
-      "notes": "Cisco Intersight Add-On. The current public release does not list Splunk 10.5 support; do not install it on a Splunk 10.5 search tier or heavy forwarder until a compatible package is published."
+      "notes": "Cisco Intersight Add-On. Repo-verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; current public 3.2.0 does not list 10.5. Pin 3.1.1 on a Splunk 10.5 search tier or heavy forwarder, or render/hand off unless a vendor-approved override permits another version."
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -4046,6 +4102,7 @@
       },
       "latest_verified_version": "1.7.0",
       "latest_release_version": "1.7.1",
+      "verified_platform_versions": [],
       "latest_verified_date": "July 30, 2024",
       "latest_release_date": "June 30, 2026",
       "last_verified_date": "July 2, 2026",
@@ -4132,6 +4189,7 @@
       },
       "latest_verified_version": "1.0.1",
       "latest_release_version": "1.0.3",
+      "verified_platform_versions": [],
       "latest_verified_date": "September 16, 2025",
       "latest_release_date": "June 18, 2026",
       "last_verified_date": "July 2, 2026",
@@ -4190,6 +4248,10 @@
       "skill": "splunk-stream-setup",
       "app_name": "Splunk_TA_stream",
       "splunkbase_id": "5238",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for Stream Forwarders",
       "license_ack_url": "",
       "package_patterns": [
@@ -4342,6 +4404,17 @@
       },
       "latest_verified_version": "4.21.2",
       "latest_release_version": "5.0.0",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
       "latest_verified_date": "March 18, 2026",
       "latest_release_date": "July 1, 2026",
       "last_verified_date": "July 2, 2026",
@@ -4842,6 +4915,7 @@
       "skill": "splunk-uba-setup",
       "app_name": "Splunk-UBA-SA-Kafka",
       "splunkbase_id": "4147",
+      "relationship": "legacy-optional",
       "label": "Splunk UBA Kafka Ingestion App",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -4877,7 +4951,7 @@
         "9.2"
       ],
       "compatibility_status": "unsupported",
-      "notes": "Legacy UBA Kafka ingestion app. Splunkbase does not list Splunk 10.5 support; use only for an explicitly supported legacy UBA deployment or follow the ES Premier UEBA migration handoff."
+      "notes": "Legacy UBA Kafka ingestion app. Splunkbase does not list Splunk 10.5 support; render or hand off on 10.5 unless a documented vendor-approved --accept-unsupported-platform override permits this exact package for an existing UBA deployment. Otherwise follow the ES Premier UEBA migration handoff."
     },
     {
       "skill": "splunk-security-content-update-setup",
@@ -4909,6 +4983,19 @@
       },
       "latest_verified_version": "6.0.0",
       "latest_release_version": "6.1.0",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
       "latest_verified_date": "June 1, 2026",
       "latest_release_date": "June 17, 2026",
       "last_verified_date": "July 2, 2026",
@@ -5136,6 +5223,16 @@
       },
       "latest_verified_version": "1.7.1",
       "latest_release_version": "1.7.2",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
       "latest_verified_date": "August 1, 2025",
       "latest_release_date": "June 26, 2026",
       "last_verified_date": "July 2, 2026",
@@ -5200,6 +5297,16 @@
       "min_splunk_version": "9.3",
       "latest_verified_version": "2.0.0",
       "latest_release_version": "2.1.1",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -5498,7 +5605,13 @@
       "skill": "splunk-mcp-server-setup",
       "app_name": "Splunk_MCP_Server",
       "splunkbase_id": "",
+      "relationship": "private-primary",
       "label": "Splunk MCP Server",
+      "package_source": "repo-local private package",
+      "reviewed_version": "1.2.1",
+      "target_product": "Splunk Platform",
+      "production_status": "blocked",
+      "compatibility_classification": "nonproduction",
       "license_ack_url": "",
       "package_patterns": [
         "splunk-mcp-server_*"
@@ -5517,7 +5630,8 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "notes": "Private/local package rather than a Splunkbase listing. Version 1.2.1 is review-blocked for production; setup fails closed unless --accept-nonproduction-package is supplied for isolated evaluation. No Splunk Cloud 10.5 production compatibility is claimed."
     },
     {
       "skill": "cisco-spaces-setup",
@@ -5567,6 +5681,7 @@
       "skill": "splunk-connect-for-otlp-setup",
       "app_name": "splunk-connect-for-otlp",
       "splunkbase_id": "8704",
+      "relationship": "customer-managed-runtime",
       "label": "Splunk Connect for OTLP",
       "package_patterns": [
         "splunk-connect-for-otlp*.tgz",
@@ -5588,7 +5703,7 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only.",
+      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only. Splunkbase lists platform 10.5 but marks this release cloud_compatible=false and rejects both single-instance and distributed Cloud install methods.",
       "latest_verified_version": "0.4.1",
       "latest_release_version": "0.4.1",
       "latest_verified_date": "May 1, 2026",
@@ -5603,7 +5718,10 @@
         "10.0",
         "9.4"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -6206,6 +6324,16 @@
       "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
       "latest_verified_version": "5.0.2",
       "latest_release_version": "5.0.3",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
       "latest_verified_date": "April 22, 2026",
       "latest_release_date": "June 12, 2026",
       "last_verified_date": "July 2, 2026",
@@ -6373,6 +6501,18 @@
       },
       "latest_verified_version": "3.3.0",
       "latest_release_version": "3.3.1",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
       "latest_verified_date": "May 29, 2026",
       "latest_release_date": "June 24, 2026",
       "last_verified_date": "July 2, 2026",
@@ -6417,6 +6557,7 @@
       "notes": "Salesforce object and event-log modular inputs; run each org input set on one search tier or heavy forwarder.",
       "latest_verified_version": "6.0.2",
       "latest_release_version": "6.0.3",
+      "verified_platform_versions": [],
       "latest_verified_date": "April 8, 2026",
       "latest_release_date": "July 1, 2026",
       "last_verified_date": "July 2, 2026",
@@ -6525,6 +6666,10 @@
       "skill": "splunk-cyberark-ta-setup",
       "app_name": "Splunk_TA_cyberark",
       "splunkbase_id": "2891",
+      "relationship": "legacy-parser",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for CyberArk",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -6789,6 +6934,7 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_tomcat",
       "splunkbase_id": "2911",
+      "relationship": "profile-conditional",
       "label": "Splunk Add-on for Tomcat",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -6812,6 +6958,7 @@
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product. Splunkbase app 2911 release 4.0.1 does not currently advertise Splunk 10.5 support.",
       "latest_verified_version": "4.0.0",
       "latest_release_version": "4.0.1",
+      "verified_platform_versions": [],
       "latest_verified_date": "May 27, 2026",
       "latest_release_date": "June 22, 2026",
       "last_verified_date": "July 2, 2026",
@@ -6832,6 +6979,10 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_haproxy",
       "splunkbase_id": "3135",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for HAProxy",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -6877,6 +7028,10 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_squid",
       "splunkbase_id": "2965",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for Squid Proxy",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -6965,6 +7120,10 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_websense-cg",
       "splunkbase_id": "2966",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for Forcepoint Web Security",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7010,6 +7169,10 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_checkpoint_log_exporter",
       "splunkbase_id": "5478",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for Check Point Log Exporter",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7144,6 +7307,10 @@
       "skill": "splunk-syslog-web-proxy-ta-setup",
       "app_name": "Splunk_TA_infoblox",
       "splunkbase_id": "2934",
+      "relationship": "customer-managed-runtime",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Add-on for Infoblox",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7781,6 +7948,7 @@
       },
       "latest_verified_version": "10.0.1",
       "latest_release_version": "11.0.0",
+      "verified_platform_versions": [],
       "latest_verified_date": "June 5, 2026",
       "latest_release_date": "July 1, 2026",
       "last_verified_date": "July 2, 2026",
@@ -7801,6 +7969,7 @@
       "skill": "splunk-platform-pki-setup",
       "app_name": "ssl_certificate_checker",
       "splunkbase_id": "3172",
+      "relationship": "optional",
       "label": "SSL Certificate Checker",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7976,6 +8145,7 @@
       "skill": "splunk-observability-cloud-integration-setup",
       "app_name": "splunk_synthetic_monitoring",
       "splunkbase_id": "5608",
+      "relationship": "legacy-replaced",
       "label": "Splunk Synthetic Monitoring Add-on",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8015,6 +8185,7 @@
       "skill": "splunk-oncall-setup",
       "app_name": "splunkoncall",
       "splunkbase_id": "5863",
+      "relationship": "handoff-only",
       "label": "Splunk On-Call SOAR connector",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8092,6 +8263,19 @@
       },
       "latest_verified_version": "5.0.2",
       "latest_release_version": "5.0.3",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
       "latest_verified_date": "April 21, 2026",
       "latest_release_date": "June 30, 2026",
       "last_verified_date": "July 2, 2026",
@@ -8161,6 +8345,7 @@
       "skill": "splunk-ai-ml-toolkit-setup",
       "app_name": "Splunk_App_for_Anomaly_Detection",
       "splunkbase_id": "6843",
+      "relationship": "legacy-replaced",
       "label": "Splunk App for Anomaly Detection",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8200,6 +8385,7 @@
       "skill": "splunk-observability-otel-collector-setup",
       "app_name": "Splunk_TA_otel",
       "splunkbase_id": "7125",
+      "relationship": "customer-managed-runtime",
       "label": "Splunk Add-On for OpenTelemetry Collector",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8246,6 +8432,7 @@
       "skill": "splunk-observability-otel-collector-setup",
       "app_name": "Splunk_TA_otel_linux_x86_64",
       "splunkbase_id": "8698",
+      "relationship": "customer-managed-runtime",
       "label": "Splunk Add-On for OpenTelemetry Collector for Linux x86_64",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8291,6 +8478,7 @@
       "skill": "splunk-observability-otel-collector-setup",
       "app_name": "Splunk_TA_otel_windows_x86_64",
       "splunkbase_id": "8699",
+      "relationship": "customer-managed-runtime",
       "label": "Splunk Add-On for OpenTelemetry Collector for Windows x86_64",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8336,6 +8524,7 @@
       "skill": "splunk-ai-ml-toolkit-setup",
       "app_name": "Splunk_SA_Scientific_Python_linux_x86",
       "splunkbase_id": "2884",
+      "relationship": "legacy-replaced",
       "label": "Python for Scientific Computing for Linux 32-bit",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8413,6 +8602,10 @@
       "skill": "splunk-platform-pki-setup",
       "app_name": "splunk_health_assistant_addon",
       "splunkbase_id": "4603",
+      "relationship": "optional",
+      "cloud_compatible": false,
+      "install_method_single": "rejected",
+      "install_method_distributed": "rejected",
       "label": "Splunk Health Assistant Add-on",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -8498,6 +8691,7 @@
       "skill": "splunk-ai-ml-toolkit-setup",
       "app_name": "Smart_Alerts_Assistant",
       "splunkbase_id": "6415",
+      "relationship": "legacy-replaced",
       "label": "Smart Alerts Assistant for Splunk",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [

@@ -40,6 +40,28 @@ Store lookups are defined in `transforms.conf` with `external_type = kvstore`,
 writes both via the REST `configs/conf-*` endpoints (SHC-deployer-bundle aware)
 so no restart is required for the collection definition itself.
 
+## Platform Boundary
+
+The wrapper accepts `--platform auto|cloud|enterprise`. Before any live apply,
+all phase, preflight, or status action, `auto` resolves the configured target
+with the shared platform helpers.
+
+- Splunk Enterprise/customer-managed runtimes can use host lifecycle scripts
+  after the supported Enterprise-version gate succeeds.
+- Managed Splunk Cloud owns backup, restore, clean/reset, maintenance mode,
+  storage-engine migration, server-version upgrade, and host KV Store status.
+  Those requests exit `2` before rendering or running host assets and route to
+  Splunk Support.
+- Collection definitions and KV Store lookup definitions are customer-managed
+  knowledge objects on Cloud and can be applied through the standard Splunk
+  REST configuration endpoints only in an existing writable app namespace.
+  The workflow verifies that namespace before mutation and forces direct REST
+  delivery so unrelated deployer credentials cannot select a local bundle
+  path. This exception does not grant access to any host lifecycle command.
+
+When assets are rendered explicitly with `--platform cloud`, every host script
+contains an independent Cloud gate and exits `2` before invoking `splunk`.
+
 ## Topology Notes
 
 - Standalone: storage-engine migration and server-version upgrade are automatic

@@ -13,6 +13,8 @@ from tests.regression_helpers import REPO_ROOT
 
 RENDERER = REPO_ROOT / "skills/splunk-ingest-actions-setup/scripts/render_assets.py"
 SETUP = REPO_ROOT / "skills/splunk-ingest-actions-setup/scripts/setup.sh"
+CANONICAL_RENDERER = REPO_ROOT / "skills/splunk-ingest-actions/scripts/render_assets.py"
+CANONICAL_SETUP = REPO_ROOT / "skills/splunk-ingest-actions/scripts/setup.sh"
 
 
 class IngestActionsTests(unittest.TestCase):
@@ -135,8 +137,12 @@ class IngestActionsTests(unittest.TestCase):
 
     def test_cloud_apply_is_blocked_and_routed_without_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "existing-output"
+            output_dir.mkdir()
+            sentinel = output_dir / "operator-note.txt"
+            sentinel.write_text("preserve me\n", encoding="utf-8")
             result = self.run_setup(
-                "--output-dir", tmpdir,
+                "--output-dir", str(output_dir),
                 "--platform", "cloud",
                 "--phase", "apply",
                 "--ruleset-sourcetype", "cisco:asa",
@@ -148,11 +154,100 @@ class IngestActionsTests(unittest.TestCase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 2, msg=output)
             self.assertIn("will not write", output)
-            self.assertIn("splunk-ingest-actions/scripts/setup.sh --platform cloud", output)
+            self.assertIn("splunk-ingest-actions-setup/scripts/setup.sh --platform cloud", output)
+            self.assertFalse((output_dir / "ingest-actions").exists())
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve me\n")
+
+    def test_cloud_render_only_emits_review_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_setup(
+                "--output-dir", tmpdir,
+                "--platform", "cloud",
+                "--phase", "render",
+                "--ruleset-sourcetype", "cisco:asa",
+                "--ruleset-name", "drop_debug",
+                "--rule-type", "drop",
+                "--drop-regex", "level=DEBUG",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             metadata = json.loads(
                 (Path(tmpdir) / "ingest-actions" / "metadata.json").read_text(encoding="utf-8")
             )
             self.assertEqual(metadata["platform"], "cloud")
+
+    def test_canonical_cloud_apply_exits_before_rendering_or_local_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            splunk_home = Path(tmpdir) / "managed-cloud-must-not-exist"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CANONICAL_SETUP),
+                    "--phase",
+                    "apply",
+                    "--platform",
+                    "cloud",
+                    "--output-dir",
+                    str(output_dir),
+                    "--splunk-home",
+                    str(splunk_home),
+                    "--destination-type",
+                    "s3",
+                    "--destination-name",
+                    "archive",
+                    "--s3-path",
+                    "s3://example/archive",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 2, msg=output)
+            self.assertIn("managed Splunk Cloud", output)
+            self.assertFalse(output_dir.exists())
+            self.assertFalse(splunk_home.exists())
+
+    def test_canonical_cloud_rendered_apply_is_also_non_mutating(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            splunk_home = Path(tmpdir) / "managed-cloud-must-not-exist"
+            render = subprocess.run(
+                [
+                    "python3",
+                    str(CANONICAL_RENDERER),
+                    "--output-dir",
+                    str(output_dir),
+                    "--platform",
+                    "cloud",
+                    "--splunk-home",
+                    str(splunk_home),
+                    "--destination-type",
+                    "s3",
+                    "--destination-name",
+                    "archive",
+                    "--s3-path",
+                    "s3://example/archive",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(render.returncode, 0, msg=render.stdout + render.stderr)
+            apply = subprocess.run(
+                ["bash", str(output_dir / "ingest-actions" / "apply.sh")],
+                cwd=output_dir / "ingest-actions",
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(apply.returncode, 2, msg=apply.stdout + apply.stderr)
+            self.assertFalse(splunk_home.exists())
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -17,9 +18,14 @@ SETUP = SKILL_DIR / "scripts/setup.sh"
 VALIDATE = SKILL_DIR / "scripts/validate.sh"
 RENDER = SKILL_DIR / "scripts/render_sender_assets.py"
 DOCTOR = SKILL_DIR / "scripts/doctor.py"
+REGISTRY_AUDIT = REPO_ROOT / "skills/shared/scripts/audit_splunkbase_registry.py"
 
 
-def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run_cmd(
+    *args: str,
+    check: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         list(args),
         cwd=REPO_ROOT,
@@ -27,6 +33,7 @@ def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
         timeout=120,
+        env=env,
     )
     if check:
         assert result.returncode == 0, result.stdout + result.stderr
@@ -55,6 +62,106 @@ def test_registry_entry_covers_splunkbase_8704() -> None:
     assert entry["capabilities"]["needs_python_runtime"] is False
     assert entry["role_support"]["heavy-forwarder"] == "supported"
     assert topology["role_support"]["external-collector"] == "supported"
+    assert entry["cloud_compatible"] is False
+    assert entry["install_method_single"] == "rejected"
+    assert entry["install_method_distributed"] == "rejected"
+    assert "search-tier" not in topology["cloud_pairing"]
+
+
+def test_registry_audit_cloud_fields_are_explicit_but_optional_for_legacy_rows() -> None:
+    spec = importlib.util.spec_from_file_location("splunkbase_registry_audit", REGISTRY_AUDIT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    base = {
+        "splunkbase_id": "8704",
+        "platform_versions": ["10.5"],
+        "compatibility_status": "supported",
+        "latest_verified_version": "0.4.1",
+        "latest_verified_date": "May 1, 2026",
+        "latest_release_version": "0.4.1",
+        "latest_release_date": "May 1, 2026",
+        "last_verified_date": "July 2, 2026",
+    }
+    assert module.audit_offline([base], "10.5") == []
+
+    explicit = {
+        **base,
+        "cloud_compatible": False,
+        "install_method_single": "rejected",
+        "install_method_distributed": "rejected",
+    }
+    assert module.audit_offline([explicit], "10.5") == []
+
+    parsed = module.parse_cloud_release_metadata(
+        [
+            {
+                "name": "0.4.1",
+                "product_versions": ["10.5", "10.4"],
+                "cloud_compatible": False,
+                "install_method_single": "rejected",
+                "install_method_distributed": "rejected",
+            }
+        ]
+    )
+    assert parsed == {
+        "cloud_compatible": False,
+        "install_method_single": "rejected",
+        "install_method_distributed": "rejected",
+    }
+
+
+def test_registry_live_audit_compares_only_explicit_cloud_fields(monkeypatch) -> None:
+    spec = importlib.util.spec_from_file_location("splunkbase_registry_audit_live", REGISTRY_AUDIT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    base = {
+        "platform_versions": ["10.5"],
+        "compatibility_status": "supported",
+        "latest_verified_version": "0.4.1",
+        "latest_verified_date": "May 1, 2026",
+        "latest_release_version": "0.4.1",
+        "latest_release_date": "May 1, 2026",
+        "last_verified_date": "July 2, 2026",
+    }
+    apps = [
+        {
+            **base,
+            "splunkbase_id": "8704",
+            "app_name": "splunk-connect-for-otlp",
+            "cloud_compatible": False,
+            "install_method_single": "rejected",
+            "install_method_distributed": "rejected",
+        },
+        {**base, "splunkbase_id": "9999", "app_name": "legacy-row"},
+    ]
+    requested: dict[str, bool] = {}
+
+    def fake_fetch(app_id: str, include_cloud_metadata: bool = False) -> dict:
+        requested[app_id] = include_cloud_metadata
+        result = {
+            "splunkbase_id": app_id,
+            "latest_version": "0.4.1",
+            "latest_release_date": "May 1, 2026",
+            "platform_versions": ["10.5"],
+        }
+        if include_cloud_metadata:
+            result.update(
+                {
+                    "cloud_compatible": False,
+                    "install_method_single": "rejected",
+                    "install_method_distributed": "rejected",
+                }
+            )
+        return result
+
+    monkeypatch.setattr(module, "fetch_splunkbase", fake_fetch)
+    _, findings = module.audit_live(apps, "10.5", max_workers=2)
+    assert findings == []
+    assert requested == {"8704": True, "9999": False}
 
 
 def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
@@ -76,6 +183,8 @@ def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
     payload = json.loads(result.stdout)
 
     assert payload["app"]["splunkbase_id"] == "8704"
+    assert payload["app"]["cloud_compatible"] is False
+    assert payload["app"]["install_method_single"] == "rejected"
     assert payload["operations"] == ["configure-input"]
     assert payload["input"]["grpc_port"] == 4317
     assert payload["input"]["http_port"] == 4318
@@ -85,6 +194,50 @@ def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
     assert payload["sender"]["token_value_rendered"] is False
     assert payload["hec_handoff"]["skill"] == "splunk-hec-service-setup"
     assert "SECRET" not in result.stdout
+
+
+def test_setup_refuses_mutation_on_managed_cloud_profile(tmp_path: Path) -> None:
+    credentials_file = tmp_path / "credentials"
+    credentials_file.write_text(
+        'SPLUNK_PLATFORM="cloud"\n'
+        'SPLUNK_CLOUD_STACK="example-stack"\n'
+        'STACK_TOKEN="token"\n',
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+    env["SPLUNK_PLATFORM"] = "cloud"
+
+    plan = run_cmd(
+        "bash",
+        str(SETUP),
+        "--dry-run",
+        "--json",
+        "--configure-input",
+        "--server-cert",
+        "/opt/splunk/etc/auth/otlp/server.pem",
+        "--server-key",
+        "/opt/splunk/etc/auth/otlp/server.key",
+        env=env,
+    )
+    assert json.loads(plan.stdout)["app"]["cloud_compatible"] is False
+
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--configure-input",
+        "--server-cert",
+        "/opt/splunk/etc/auth/otlp/server.pem",
+        "--server-key",
+        "/opt/splunk/etc/auth/otlp/server.key",
+        check=False,
+        env=env,
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "cloud_compatible=false" in output
+    assert "managed Splunk Cloud profile is refused" in output
+    assert "customer-managed heavy forwarder" in output
 
 
 def test_validate_guards_missing_app_and_unbound_ports() -> None:
@@ -190,7 +343,7 @@ def test_doctor_classifies_topology_hec_sender_and_internal_failures(tmp_path: P
     payload = json.loads(result.stdout)
     fix_ids = {item["fix_id"] for item in payload["report"]["findings"]}
 
-    assert "CLOUD_CLASSIC_REQUIRES_IDM_OR_HF" in fix_ids
+    assert "CLOUD_MANAGED_REQUIRES_IDM_OR_HF" in fix_ids
     assert "APP_MISSING" in fix_ids
     assert "INPUT_DISABLED" in fix_ids
     assert "BAD_PORT" in fix_ids

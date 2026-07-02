@@ -6,11 +6,15 @@ Complete catalog of all data inputs, account fields, sourcetypes, and sizing.
 
 - Repo-verified package: `3.1.1`.
 - Latest public listing observed July 2, 2026: `3.2.0`.
-- Splunkbase app `7828` currently lists `9.3` through `10.4`; it does not
-  advertise the repository's Splunk Cloud `10.5` target.
-- On `10.5`, preserve the warning in the deployment handoff and obtain explicit
-  operator/vendor confirmation. Do not interpret this note as an installer
-  block or as proof of incompatibility.
+- The release record for repo-verified `3.1.1` explicitly includes `10.5` and
+  marks the package Cloud-compatible. The newer public `3.2.0` release lists
+  versions only through `10.4`.
+- On Splunk Cloud `10.5`, pin `3.1.1`. The setup wrapper accepts
+  `--target-splunk-version` and `--app-version` and defaults the package
+  contract to `3.1.1`. Before any mutation it reads the actual installed
+  version, then refuses an unverified package unless
+  `--accept-unsupported-platform` is backed by documented vendor approval for
+  that exact version and stack.
 
 ## Account Configuration
 

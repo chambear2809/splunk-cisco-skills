@@ -3,10 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 APP_NAME="CiscoSecurityCloud"
 APP_LABEL="Cisco Security Cloud"
 APP_ID="7404"
+VERIFIED_APP_VERSION="3.6.6"
+PUBLIC_APP_VERSION="3.6.7"
 PACKAGE_PATTERN="cisco-security-cloud_*"
 SETTINGS_CONF="ciscosecuritycloud_settings"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
@@ -17,6 +20,75 @@ INSTALL_APP=false
 RESTART_SPLUNK=true
 SET_LOG_LEVEL=""
 SK=""
+APP_VERSION="${SPLUNK_APP_VERSION:-}"
+TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
+ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
+
+resolve_configuration_target_version() {
+    local raw="${TARGET_SPLUNK_VERSION:-}"
+    if [[ -z "${raw}" ]]; then
+        if is_splunk_cloud; then
+            raw="$(spv_cloud_doc_train_default)"
+        else
+            raw="$(spv_enterprise_default)"
+        fi
+    fi
+    if [[ ! "${raw}" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]]; then
+        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        return 1
+    fi
+    TARGET_SPLUNK_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
+    export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM="${ACCEPT_UNSUPPORTED_PLATFORM}"
+}
+
+require_configuration_version_compatible() {
+    local selected_version="${1:-}"
+    local version_source="${2:-selected package}"
+
+    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
+    if [[ "${selected_version}" == "${VERIFIED_APP_VERSION}" ]]; then
+        log "Compatibility preflight passed: ${version_source} ${APP_NAME} ${VERIFIED_APP_VERSION} is repo-verified for Splunk 10.5."
+        return 0
+    fi
+    if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+        log "WARNING: Explicit vendor-approved override accepted for ${version_source} ${APP_NAME} ${selected_version:-unknown} on Splunk ${TARGET_SPLUNK_VERSION}."
+        return 0
+    fi
+
+    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    if [[ "${selected_version}" == "${PUBLIC_APP_VERSION}" ]]; then
+        log "The public ${PUBLIC_APP_VERSION} release does not advertise Splunk 10.5 compatibility."
+    fi
+    log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
+    return 1
+}
+
+preflight_configuration_platform() {
+    resolve_configuration_target_version || return 1
+    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && -n "${APP_VERSION}" ]]; then
+        require_configuration_version_compatible "${APP_VERSION}" "selected"
+        return $?
+    fi
+    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
+        if $INSTALL_APP; then
+            log "INFO: No --app-version supplied; the shared installer will select repo-verified ${VERIFIED_APP_VERSION}, and the installed version will be read before any post-install REST mutation."
+        else
+            log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
+        fi
+    fi
+}
+
+verify_installed_package_before_mutation() {
+    local installed_version
+    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
+    if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
+        log "ERROR: ${APP_LABEL} is not installed; cannot verify a package version before mutation."
+        return 1
+    fi
+    installed_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || true)"
+    require_configuration_version_compatible "${installed_version}" "installed"
+}
 
 usage() {
     cat >&2 <<EOF
@@ -28,6 +100,12 @@ Options:
   --install                  Install the app first
   --set-log-level LEVEL      Set app logging level (DEBUG|INFO|WARN|ERROR|CRITICAL)
   --no-restart               Skip restart when --install is used
+  --app-version VERSION      Package version to install/configure
+                             (default contract: repo-verified ${VERIFIED_APP_VERSION})
+  --target-splunk-version V  Target Splunk MAJOR.MINOR[.PATCH]
+  --accept-unsupported-platform
+                             Allow an unverified package/version combination only
+                             with documented vendor approval
   --help                     Show this help
 
 With no flags, reports installation status and current logging settings.
@@ -40,6 +118,9 @@ while [[ $# -gt 0 ]]; do
         --install) INSTALL_APP=true; shift ;;
         --set-log-level) require_arg "$1" $# || exit 1; SET_LOG_LEVEL="$2"; shift 2 ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
+        --app-version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
+        --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
+        --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -84,34 +165,17 @@ for raw_dir in sys.argv[2:]:
 " "${PACKAGE_PATTERN}" "${PROJECT_TA_DIR}" "${TA_CACHE}" 2>/dev/null || true
 }
 
-resolve_latest_version() {
-    if ! _set_splunkbase_curl_tls_args; then
-        log "ERROR: Could not configure Splunkbase TLS settings for version resolution."
-        log "Check SPLUNKBASE_CA_CERT (must be a readable file) or unset it to use system roots."
-        return 1
-    fi
-    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
-        "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
-        | python3 -c "
-import json
-import sys
-try:
-    releases = json.load(sys.stdin)
-    if isinstance(releases, list) and releases:
-        print(releases[0].get('name', ''), end='')
-except Exception:
-    pass
-" 2>/dev/null || true
-}
-
 ensure_session() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 }
 
 install_app_package() {
-    local version package_path
+    local package_path
+    local -a install_args=(--target-splunk-version "${TARGET_SPLUNK_VERSION}")
+    [[ -n "${APP_VERSION}" ]] && install_args+=(--app-version "${APP_VERSION}")
+    [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]] && install_args+=(--accept-unsupported-platform)
+    [[ "${RESTART_SPLUNK}" == "false" ]] && install_args+=(--no-restart)
 
     ensure_session
     if rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME"; then
@@ -119,22 +183,11 @@ install_app_package() {
         return 0
     fi
 
-    version="$(resolve_latest_version)"
-    if [[ -n "${version}" ]]; then
-        log "Trying Splunkbase install for ${APP_LABEL} (app ID ${APP_ID}, version ${version})..."
-        if [[ "${RESTART_SPLUNK}" == "true" ]]; then
-            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --app-version "${version}" --no-update; then
-                return 0
-            fi
-        else
-            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --app-version "${version}" --no-update --no-restart; then
-                return 0
-            fi
-        fi
-        log "Splunkbase install failed for ${APP_LABEL}; falling back to local package."
-    else
-        log "WARNING: Could not resolve the latest Splunkbase version for app ID ${APP_ID}; using local fallback if available."
+    log "Trying Splunkbase install for ${APP_LABEL} (app ID ${APP_ID}); the shared installer selects repo-verified ${VERIFIED_APP_VERSION} unless --app-version is explicit."
+    if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --no-update "${install_args[@]}"; then
+        return 0
     fi
+    log "Splunkbase install failed for ${APP_LABEL}; falling back to local package."
 
     package_path="$(find_local_package)"
     if [[ -z "${package_path}" ]]; then
@@ -143,11 +196,7 @@ install_app_package() {
     fi
 
     log "Installing ${APP_LABEL} from ${package_path}..."
-    if [[ "${RESTART_SPLUNK}" == "true" ]]; then
-        bash "${APP_INSTALL_SCRIPT}" --source local --file "${package_path}" --no-update
-    else
-        bash "${APP_INSTALL_SCRIPT}" --source local --file "${package_path}" --no-update --no-restart
-    fi
+    bash "${APP_INSTALL_SCRIPT}" --source local --file "${package_path}" --no-update "${install_args[@]}"
 }
 
 set_logging_level() {
@@ -175,6 +224,10 @@ report_status() {
     current_level=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "${SETTINGS_CONF}" "logging" "loglevel" 2>/dev/null || true)
 
     log "Installed app: ${APP_NAME} (version: ${version})"
+    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && "${version}" != "${VERIFIED_APP_VERSION}" ]]; then
+        log "WARNING: Installed ${APP_NAME} ${version} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+        log "Status reporting is read-only; any later mutation requires a supported version or a documented vendor-approved --accept-unsupported-platform override."
+    fi
     if [[ -n "${current_level}" ]]; then
         log "Current log level: ${current_level}"
     else
@@ -185,6 +238,11 @@ report_status() {
 }
 
 main() {
+    if $INSTALL_APP || [[ -n "${SET_LOG_LEVEL}" ]]; then
+        preflight_configuration_platform || exit 1
+    else
+        resolve_configuration_target_version || exit 1
+    fi
     warn_if_current_skill_role_unsupported
 
     validate_log_level "${SET_LOG_LEVEL}"
@@ -194,6 +252,9 @@ main() {
     fi
 
     ensure_session
+    if $INSTALL_APP || [[ -n "${SET_LOG_LEVEL}" ]]; then
+        verify_installed_package_before_mutation || exit 1
+    fi
     set_logging_level
     report_status
 }

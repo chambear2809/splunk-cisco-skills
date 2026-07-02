@@ -245,6 +245,9 @@ for app in registry.get("apps", []):
         ",".join(platforms),
         str(app.get("latest_verified_version", "")),
         str(app.get("latest_release_version", "")),
+        str(app.get("cloud_compatible", "")).lower(),
+        str(app.get("install_method_single", "")),
+        str(app.get("install_method_distributed", "")),
     )
     print("|".join(fields), end="")
     break
@@ -273,6 +276,7 @@ apply_registry_verified_version_default() {
 
 preflight_current_install_target_compatibility() {
     local target_app_id metadata status app_name platforms verified release
+    local cloud_compatible install_method_single install_method_distributed
 
     resolve_target_splunk_version || exit 1
     target_app_id="$(registry_target_app_id)"
@@ -286,7 +290,20 @@ preflight_current_install_target_compatibility() {
         log "INFO: App ID ${target_app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
         return 0
     fi
-    IFS='|' read -r status app_name platforms verified release <<< "${metadata}"
+    IFS='|' read -r status app_name platforms verified release cloud_compatible \
+        install_method_single install_method_distributed <<< "${metadata}"
+    if is_splunk_cloud && [[ "${cloud_compatible}" == "false" ]]; then
+        if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
+            log "WARNING: Explicit Cloud-placement override accepted for ${app_name:-app ID ${target_app_id}} even though Splunkbase marks cloud_compatible=false (single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown})."
+            log "WARNING: Proceed only with documented Splunk Support/vendor approval for this exact package and topology."
+            export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true
+        else
+            log "ERROR: ${app_name:-App ID ${target_app_id}} is explicitly cloud_compatible=false on Splunkbase."
+            log "Cloud install methods: single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown}."
+            log "Refusing installation before Cloud mutation. Use a customer-managed runtime or pass --accept-unsupported-platform only with documented Splunk Support/vendor approval."
+            exit 1
+        fi
+    fi
     if [[ "${status}" == "supported" ]]; then
         log "Compatibility preflight passed: ${app_name:-app ID ${target_app_id}} advertises Splunk ${TARGET_SPLUNK_VERSION}."
         return 0

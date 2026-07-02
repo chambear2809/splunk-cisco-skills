@@ -124,8 +124,22 @@ run_rendered_script() {
     (cd "${dir}" && "./${script_name}")
 }
 
+guard_managed_cloud_local_phase() {
+    if [[ "${PLATFORM}" != "cloud" || "${DRY_RUN}" == "true" ]]; then
+        return 0
+    fi
+    case "${PHASE}" in
+        preflight|enable|status)
+            log "HANDOFF: phase '${PHASE}' must run on the managed Splunk Cloud search tier."
+            log "Local-host checks or app enablement are not valid Cloud evidence."
+            return 2
+            ;;
+    esac
+}
+
 main() {
     validate_args
+    guard_managed_cloud_local_phase || exit $?
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then

@@ -7,9 +7,9 @@ description: >-
   inputs, stores credentials securely, and validates the deployment. Use when the
   user asks about Cisco Intersight, UCS, HyperFlex, Intersight TA setup,
   Splunk_TA_Cisco_Intersight, or compute infrastructure monitoring.
-compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
-  splunk_cloud_10_5: "blocked"
+  splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
@@ -30,16 +30,18 @@ Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersigh
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use `splunk-app-install` with `--source splunkbase --app-id 7828` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
-in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+**Pull from Splunkbase first, fall back to `splunk-ta/`.** Use
+`splunk-app-install` with `--source splunkbase --app-id 7828`; the shared
+installer defaults to the repository-verified package. If Splunkbase is
+unavailable, fall back to the local package in `splunk-ta/`.
 
-As of July 2, 2026, the public `3.2.0` listing advertises platform versions only
-through `10.4`, not the repository's current Splunk Cloud `10.5` compatibility
-target. Warn and obtain operator/vendor confirmation before production use on a
-`10.5` Cloud stack. The package installer remains warning-oriented and is not
-blocked by this documentation-level compatibility gap.
+The repo-verified `3.1.1` release explicitly advertises `10.5` and is
+Cloud-compatible. The newer public `3.2.0` listing advertises versions only
+through `10.4`. On Splunk Cloud `10.5`, keep the shared installer's verified
+`3.1.1` pin. The setup wrapper reads the actual installed version before any
+REST mutation and refuses an unverified selection unless
+`--accept-unsupported-platform` is backed by documented vendor approval for
+the exact package and stack; the override is not compatibility certification.
 
 After installation, use this skill to configure the account, inputs, macros,
 and validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is

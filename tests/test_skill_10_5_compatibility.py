@@ -26,25 +26,33 @@ def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
     assert payload["target"] == "10.5.2605"
     assert payload["skill_count"] == 165
     assert payload["status_counts"] == {
-        "blocked": 3,
-        "conditional": 89,
+        "blocked": 0,
+        "conditional": 93,
         "delegated": 6,
-        "not-applicable": 54,
+        "not-applicable": 53,
         "self-managed-10.4": 10,
         "supported": 3,
     }
 
 
-def test_primary_packages_missing_10_5_are_blocked() -> None:
+def test_latest_release_gaps_use_verified_10_5_pins() -> None:
     payload = load_audit_module().audit()
-    blocked = {
-        row["skill"] for row in payload["skills"] if row["status"] == "blocked"
-    }
-    assert blocked == {
+    statuses = {row["skill"]: row["status"] for row in payload["skills"]}
+    release_specific = {
         "cisco-enterprise-networking-setup",
         "cisco-intersight-setup",
         "cisco-security-cloud-setup",
     }
+    assert {skill: statuses[skill] for skill in release_specific} == {
+        skill: "conditional" for skill in release_specific
+    }
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+    by_skill = {app["skill"]: app for app in registry["apps"]}
+    for skill in release_specific:
+        assert "10.5" not in by_skill[skill]["platform_versions"]
+        assert "10.5" in by_skill[skill]["verified_platform_versions"]
 
 
 def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> None:
@@ -60,6 +68,19 @@ def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> 
         if statuses[app["skill"]] == "supported":
             offenders.append(f"{app['splunkbase_id']}:{app['skill']}")
     assert offenders == []
+
+
+def test_private_packages_are_explicitly_classified() -> None:
+    payload = load_audit_module().audit()
+    mcp = next(row for row in payload["skills"] if row["skill"] == "splunk-mcp-server-setup")
+    assert mcp["splunkbase_apps"] == [
+        {
+            "id": "",
+            "name": "Splunk_MCP_Server",
+            "relationship": "private-primary",
+            "status": "nonproduction",
+        }
+    ]
 
 
 def test_generic_installer_contains_fail_closed_version_and_release_gates() -> None:

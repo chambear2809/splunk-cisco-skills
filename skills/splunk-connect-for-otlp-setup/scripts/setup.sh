@@ -69,9 +69,9 @@ Splunk Connect for OTLP Setup
 Usage: $(basename "$0") [OPTIONS]
 
 Lifecycle:
-  --install                         Install Splunkbase app 8704
-  --update                          Update Splunkbase app 8704
-  --uninstall                       Uninstall splunk-connect-for-otlp
+  --install                         Install app 8704 on a customer-managed runtime
+  --update                          Update app 8704 on a customer-managed runtime
+  --uninstall                       Uninstall from a customer-managed runtime
   --local-package PATH              Use a verified local 0.4.1 package instead of Splunkbase
   --no-restart                      Pass --no-restart to shared app installer
 
@@ -315,6 +315,23 @@ validate_common_args() {
     fi
 }
 
+managed_cloud_mutation_requested() {
+    [[ "${DO_INSTALL}" == "true" || "${DO_UPDATE}" == "true" \
+        || "${DO_UNINSTALL}" == "true" || "${CONFIGURE_INPUT}" == "true" \
+        || "${ENABLE_INPUT}" == "true" || "${DISABLE_INPUT}" == "true" \
+        || "${DELETE_INPUT}" == "true" || "${DO_REPAIR}" == "true" ]]
+}
+
+guard_managed_cloud_mutation() {
+    managed_cloud_mutation_requested || return 0
+    [[ "${DRY_RUN}" == "true" ]] && return 0
+    is_splunk_cloud || return 0
+    log "ERROR: Splunkbase app 8704 is cloud_compatible=false and both Cloud install methods are rejected."
+    log "Direct install or modular-input mutation on a managed Splunk Cloud profile is refused."
+    log "Run the receiver on a customer-managed heavy forwarder, or coordinate an approved IDM placement through Splunk Support."
+    return 1
+}
+
 json_plan() {
     DO_INSTALL="${DO_INSTALL}" DO_UPDATE="${DO_UPDATE}" DO_UNINSTALL="${DO_UNINSTALL}" \
     CONFIGURE_INPUT="${CONFIGURE_INPUT}" ENABLE_INPUT="${ENABLE_INPUT}" \
@@ -351,6 +368,9 @@ payload = {
         "name": os.environ["APP_NAME"],
         "splunkbase_id": os.environ["APP_ID"],
         "latest_verified_version": os.environ["APP_VERSION"],
+        "cloud_compatible": False,
+        "install_method_single": "rejected",
+        "install_method_distributed": "rejected",
     },
     "dry_run": True,
     "operations": [name for name, env in op_names if os.environ.get(env) == "true"],
@@ -674,6 +694,7 @@ run_repair() {
 
 main() {
     validate_common_args
+    guard_managed_cloud_mutation
     if [[ "${DRY_RUN}" == "true" && "${JSON_OUTPUT}" == "true" ]]; then
         json_plan
         exit 0

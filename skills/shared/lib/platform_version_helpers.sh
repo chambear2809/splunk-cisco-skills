@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # Shared Splunk Platform version defaults for shell skills.
-# Source after SCRIPT_DIR is set, or pass an explicit repo skills root.
+# The library normally resolves the skills root from its own location. Set
+# SPV_SKILLS_ROOT only when the helper has been copied away from the repo.
 
 spv_skills_root() {
+    local helper_root
     if [[ -n "${SPV_SKILLS_ROOT:-}" ]]; then
         printf '%s' "${SPV_SKILLS_ROOT}"
+        return 0
+    fi
+    helper_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    if [[ -f "${helper_root}/shared/references/splunk_platform_versions.json" ]]; then
+        printf '%s' "${helper_root}"
         return 0
     fi
     if [[ -n "${SCRIPT_DIR:-}" ]]; then
         printf '%s' "$(cd "${SCRIPT_DIR}/../.." && pwd)"
         return 0
     fi
-    echo "ERROR: spv_skills_root requires SCRIPT_DIR or SPV_SKILLS_ROOT" >&2
+    echo "ERROR: Could not locate the skills root; set SPV_SKILLS_ROOT." >&2
     return 1
 }
 

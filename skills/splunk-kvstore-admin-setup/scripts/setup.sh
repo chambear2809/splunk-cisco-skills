@@ -13,6 +13,8 @@ DRY_RUN=false
 JSON_OUTPUT=false
 APPLY=false
 OUTPUT_DIR=""
+TARGET_PLATFORM="auto"
+EFFECTIVE_PLATFORM=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 TOPOLOGY="standalone"
 APP_NAME="ZZZ_cisco_skills_kvstore"
@@ -45,6 +47,7 @@ Options:
   --dry-run
   --json
   --output-dir PATH
+  --platform auto|cloud|enterprise  (default auto; resolved before live phases)
   --splunk-home PATH
   --topology standalone|shc
   --app-name NAME
@@ -82,6 +85,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
+        --platform) require_arg "$1" $# || exit 1; TARGET_PLATFORM="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --topology) require_arg "$1" $# || exit 1; TOPOLOGY="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
@@ -125,6 +129,7 @@ PY
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
     validate_choice "${OPERATION}" none backup restore clean migrate upgrade collections
+    validate_choice "${TARGET_PLATFORM}" auto cloud enterprise
     validate_choice "${TOPOLOGY}" standalone shc
     validate_choice "${POINT_IN_TIME}" true false
     validate_choice "${STORAGE_ENGINE}" wiredTiger mmapv1
@@ -149,6 +154,7 @@ validate_args() {
 build_renderer_args() {
     RENDER_ARGS=(
         --output-dir "${OUTPUT_DIR}"
+        --platform "${EFFECTIVE_PLATFORM:-${TARGET_PLATFORM}}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --topology "${TOPOLOGY}"
         --app-name "${APP_NAME}"
@@ -175,6 +181,47 @@ render_assets() {
     python3 "${RENDERER}" "${RENDER_ARGS[@]}" ${extra_args[@]+"${extra_args[@]}"}
 }
 
+resolve_effective_platform() {
+    local resolved
+    case "${TARGET_PLATFORM}" in
+        cloud|enterprise) resolved="${TARGET_PLATFORM}" ;;
+        auto)
+            if ! resolved="$(resolve_splunk_platform)"; then
+                log "ERROR: Could not resolve the Splunk target platform."
+                return 1
+            fi
+            ;;
+    esac
+    case "${resolved}" in
+        cloud|enterprise) EFFECTIVE_PLATFORM="${resolved}" ;;
+        *)
+            log "ERROR: Resolved an unsupported Splunk platform value: ${resolved:-<empty>}"
+            return 1
+            ;;
+    esac
+    SPLUNK_PLATFORM="${EFFECTIVE_PLATFORM}"
+    export SPLUNK_PLATFORM
+}
+
+cloud_lifecycle_handoff() {
+    log "ERROR: KV Store host lifecycle operation '${OPERATION}' is not customer-managed on Splunk Cloud."
+    log "       Splunk Cloud owns KV Store backup, restore, clean, storage-engine migration,"
+    log "       server-version upgrade, maintenance mode, and host status operations."
+    log "HANDOFF: Open a Splunk Support case for managed KV Store lifecycle or recovery work."
+    log "Only --phase apply --operation collections is supported here for Cloud-side"
+    log "collection and lookup knowledge-object governance through Splunk REST."
+    return 2
+}
+
+guard_cloud_live_request() {
+    [[ "${EFFECTIVE_PLATFORM}" == "cloud" ]] || return 0
+    if [[ "${OPERATION}" == "collections" ]] \
+        && { [[ "${PHASE}" == "apply" ]] || { [[ "${PHASE}" == "render" ]] && [[ "${APPLY}" == "true" ]]; }; }; then
+        return 0
+    fi
+    cloud_lifecycle_handoff
+}
+
 run_rendered_script() {
     local script_name="$1" dir
     dir="$(render_dir)"
@@ -187,6 +234,7 @@ run_rendered_script() {
         exit 1
     fi
     (cd "${dir}" && \
+        SPLUNK_PLATFORM="${EFFECTIVE_PLATFORM:-${TARGET_PLATFORM}}" \
         KVSTORE_ACCEPT_RESTORE="${ACCEPT_KVSTORE_RESTORE}" \
         KVSTORE_ACCEPT_CLEAN="${ACCEPT_KVSTORE_CLEAN}" \
         KVSTORE_ACCEPT_MIGRATION="${ACCEPT_KVSTORE_MIGRATE}" \
@@ -200,12 +248,24 @@ apply_collections_via_rest() {
         exit 1
     fi
     if [[ "${DRY_RUN}" == "true" ]]; then
-        log "DRY RUN: would write collections.conf/[${COLLECTION_NAME}] and transforms.conf via REST to app ${APP_NAME}."
+        log "DRY RUN: would write collections.conf/[${COLLECTION_NAME}] and transforms.conf via REST to app ${APP_NAME} on ${EFFECTIVE_PLATFORM:-${TARGET_PLATFORM}}."
         return 0
     fi
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     local sk
     sk=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+    if [[ "${EFFECTIVE_PLATFORM:-${TARGET_PLATFORM}}" == "cloud" ]]; then
+        if ! rest_check_app "${sk}" "${SPLUNK_URI}" "${APP_NAME}"; then
+            log "ERROR: Cloud collection governance requires an existing, writable app namespace; '${APP_NAME}' was not found."
+            log "HANDOFF: Re-run with --app-name set to an approved existing app, or package the knowledge objects through the supported Cloud app workflow."
+            return 2
+        fi
+        # A managed Cloud search tier must never fall through to an SHC deployer
+        # or local bundle path inferred from unrelated credentials.
+        SPLUNK_DELIVERY_PLANE="rest"
+        export SPLUNK_DELIVERY_PLANE
+        log "Applying supported Splunk Cloud collection/lookup knowledge-object governance only; no host KV Store lifecycle command will run."
+    fi
     local body entry name field_type pair
     local -a _collection_field_parts
     body=$(form_urlencode_pairs replicate "${COLLECTION_REPLICATE}")
@@ -259,6 +319,10 @@ operation_script() {
 }
 
 apply_operation() {
+    if [[ "${EFFECTIVE_PLATFORM:-${TARGET_PLATFORM}}" == "cloud" && "${OPERATION}" != "collections" ]]; then
+        cloud_lifecycle_handoff
+        return $?
+    fi
     case "${OPERATION}" in
         none)
             log "ERROR: Apply requested without an operation."
@@ -317,6 +381,14 @@ apply_operation() {
 
 main() {
     validate_args
+    local guard_rc=0
+    if [[ "${PHASE}" == "preflight" || "${PHASE}" == "apply" || "${PHASE}" == "status" || "${PHASE}" == "all" || "${APPLY}" == "true" ]]; then
+        resolve_effective_platform || return 1
+        guard_cloud_live_request || guard_rc=$?
+        (( guard_rc == 0 )) || return "${guard_rc}"
+    else
+        EFFECTIVE_PLATFORM="${TARGET_PLATFORM}"
+    fi
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then
@@ -330,7 +402,9 @@ main() {
     case "${PHASE}" in
         render)
             render_assets
-            [[ "${APPLY}" == "true" ]] && apply_operation
+            if [[ "${APPLY}" == "true" ]]; then
+                apply_operation
+            fi
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
         apply) render_assets; apply_operation ;;

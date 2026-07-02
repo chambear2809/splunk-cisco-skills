@@ -5,9 +5,9 @@ description: >-
   Cisco Duo, XDR, Secure Endpoint, Secure Firewall, ETD, Secure Network
   Analytics, CII, Secure Workload, and other Cisco Security Cloud inputs. Use
   when the user asks about Cisco Security Cloud, app ID 7404, or CiscoSecurityCloud.
-compatibility: "Splunk Cloud Platform 10.5.2605: blocked for the primary package because current upstream compatibility metadata does not advertise 10.5; render or hand off only unless an explicit approved override is recorded."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
-  splunk_cloud_10_5: "blocked"
+  splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
@@ -29,16 +29,20 @@ Automates installation and input configuration of **Cisco Security Cloud**
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
+**Pull from Splunkbase first, fall back to `splunk-ta/`.**
 Use the setup script with `--install` to install app ID `7404`. The script uses
-the shared installer and falls back to the local package
-`cisco-security-cloud_*.tar.gz` when needed.
+the shared installer, which defaults to the verified package, and falls back
+to the local package `cisco-security-cloud_*.tar.gz` when needed.
 
-As of July 2, 2026, the public `3.6.7` listing advertises platform versions only
-through `10.4`; it does not advertise the repository's current Splunk Cloud
-`10.5` compatibility target. Warn before production use on a `10.5` Cloud stack
-and require operator/vendor compatibility confirmation. Keep this advisory in
-the plan and handoff rather than adding an installer block.
+The repo-verified `3.6.6` release explicitly advertises `10.5` and is
+Cloud-compatible. The newer public `3.6.7` listing advertises versions only
+through `10.4`. On Splunk Cloud `10.5`, the setup wrapper lets the shared
+installer select verified `3.6.6` instead of forcing public-latest. Before any
+post-install REST mutation it reads the actual installed version and refuses
+an unverified selection unless `--accept-unsupported-platform` is backed by
+documented vendor approval for the exact package and stack; the override is
+not compatibility certification. Status-only runs remain read-only and report
+the compatibility warning without refusing.
 
 This package is a multi-input Cisco Security app. It supports many product
 integrations through app-managed custom REST handlers rather than simple flat

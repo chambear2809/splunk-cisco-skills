@@ -70,6 +70,8 @@ pretend to automate a supported UBA server installation. This skill provides:
 - Treat Kafka app installation as optional and legacy/readiness-focused.
 - Splunkbase app `4147` version `1.4.6` currently advertises `9.2` through
   `10.2` on selected release trains and does not advertise `10.5`. For the
-  repository's Splunk Cloud `10.5` target, warn and obtain operator/vendor
-  confirmation before retaining this legacy app. Do not enforce the warning in
-  the installer.
+  repository's Splunk Cloud `10.5` target, the shared installer refuses the
+  known-incompatible package before mutation. Only
+  `--accept-unsupported-platform`, backed by documented vendor approval for
+  this exact legacy package and stack, can override the refusal; the override
+  is not compatibility certification.
