@@ -367,11 +367,15 @@ that rerunning `install-local.sh` or `install-ssh.sh` performs an upgrade.
 
 ## TA `7125` / `8698` / `8699` contract
 
-Current audited metadata:
+Current audited metadata, rechecked July 2, 2026:
 
 - Version `0.154.2`, June 17, 2026.
-- Exact listed Splunk versions `9.0` through `10.4`; `10.5` remains a hard
-  compatibility rejection until apps `7125`, `8698`, and `8699` list it.
+- Exact listed Splunk versions `9.0` through `10.4`. If
+  `--splunk-version 10.5` is supplied, the renderer rejects it until apps
+  `7125`, `8698`, and `8699` list that train. When `--splunk-version` is
+  omitted, the renderer does not run the optional platform compatibility
+  assertion; successful package audit/rendering is not evidence of `10.5`
+  support.
 - App `7125`, root `Splunk_TA_otel`: multi-OS package, Splunk Cloud compatible.
 - App `8698`, root `Splunk_TA_otel_linux_x86_64`: Linux `x86_64` package,
   Splunk Cloud compatibility metadata false.

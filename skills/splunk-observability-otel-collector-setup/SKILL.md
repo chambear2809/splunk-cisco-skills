@@ -17,11 +17,13 @@ This workflow is pinned and tested against:
   manifest digests recorded in `references/sources.md`; unknown custom images
   are accepted only when already pinned with `@sha256:<64 lowercase hex>`.
 - Splunkbase apps `7125`, `8698`, and `8699`, version `0.154.2`, published
-  June 17, 2026. App `7125` is the multi-OS/root artifact; `8698` and `8699`
-  are the Linux and Windows x86_64 split artifacts.
+  June 17, 2026 and rechecked July 2, 2026. App `7125` is the multi-OS/root
+  artifact; `8698` and `8699` are the Linux and Windows x86_64 split artifacts.
 - Splunk Platform versions explicitly listed for this TA release: `9.0`
-  through `10.4`. Splunk `10.5` is rejected until the package listings certify
-  that train.
+  through `10.4`. When the caller supplies `--splunk-version`, a `10.5` value is
+  rejected until the package listings certify that train. Omitting
+  `--splunk-version` skips that optional compatibility assertion; it allows
+  package audit/rendering but does not certify the package for `10.5`.
 
 Treat a newer release as unaudited until `--check-upstream`, the regression
 suite, and the source ledger in `references/sources.md` have been updated.

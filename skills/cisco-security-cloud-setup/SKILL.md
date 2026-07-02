@@ -30,6 +30,12 @@ Use the setup script with `--install` to install app ID `7404`. The script uses
 the shared installer and falls back to the local package
 `cisco-security-cloud_*.tar.gz` when needed.
 
+As of July 2, 2026, the public `3.6.7` listing advertises platform versions only
+through `10.4`; it does not advertise the repository's current Splunk Cloud
+`10.5` compatibility target. Warn before production use on a `10.5` Cloud stack
+and require operator/vendor compatibility confirmation. Keep this advisory in
+the plan and handoff rather than adding an installer block.
+
 This package is a multi-input Cisco Security app. It supports many product
 integrations through app-managed custom REST handlers rather than simple flat
 conf-file edits.

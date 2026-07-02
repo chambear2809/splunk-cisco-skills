@@ -31,6 +31,12 @@ Use `splunk-app-install` with `--source splunkbase --app-id 7828` to get the
 latest release. If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
+As of July 2, 2026, the public `3.2.0` listing advertises platform versions only
+through `10.4`, not the repository's current Splunk Cloud `10.5` compatibility
+target. Warn and obtain operator/vendor confirmation before production use on a
+`10.5` Cloud stack. The package installer remains warning-oriented and is not
+blocked by this documentation-level compatibility gap.
+
 After installation, use this skill to configure the account, inputs, macros,
 and validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
 review-only.

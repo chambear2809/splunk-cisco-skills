@@ -56,13 +56,13 @@ SOURCE_DOCS = {
     "agent_management": "https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.0/agent-management/about-agent-management",
     "audit": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/audit-splunk-activity/about-audit-trail-events",
     "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.4/first-steps/use-btool-to-troubleshoot-configurations",
-    "cloud_config_validation": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.3.2512/configure-your-splunk-cloud-platform-deployment/validating-configurations-using-the-btool-rest-api",
+    "cloud_config_validation": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/configure-your-splunk-cloud-platform-deployment/validating-configurations-using-the-btool-rest-api",
     "cloud_cmc": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/monitor-your-splunk-cloud-platform-deployment/introduction-to-the-cloud-monitoring-console",
     "cloud_rest": "https://help.splunk.com/en/splunk-cloud-platform/leverage-rest-apis",
     "config_validation": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/administer-splunk-enterprise-with-configuration-files/validate-configuration-changes",
     "data_management": "https://help.splunk.com/en/data-management/transform-and-route-data/explore-data-management-solutions/data-management-solutions",
     "dashboard_studio": "https://help.splunk.com/en/splunk-enterprise/create-dashboards-and-reports/dashboard-studio/10.4/whats-new-in-dashboard-studio/whats-new-in-dashboard-studio",
-    "ddaa": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.4.2604/manage-your-indexes-and-data-in-splunk-cloud-platform/store-expired-splunk-cloud-platform-data-in-a-splunk-managed-archive",
+    "ddaa": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/manage-your-indexes-and-data-in-splunk-cloud-platform/store-expired-splunk-cloud-platform-data-in-a-splunk-managed-archive",
     "kvstore": "https://help.splunk.com/en?resourceId=Splunk_Admin_TroubleshootKVstore",
     "cim": "https://help.splunk.com/en/splunk-enterprise/common-information-model/6.1/introduction/overview-of-the-splunk-common-information-model",
     "diag": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/9.1/contact-splunk-support/generate-a-diagnostic-file",
@@ -2589,15 +2589,17 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
     lifecycle.setdefault("assessed_version", version)
     if platform == "enterprise":
         supported = [str(item) for item in contract.get("enterprise_platform_versions", [])]
-        unreleased = {str(item) for item in contract.get("enterprise_unreleased_trains", [])}
+        cloud_only = {str(item) for item in contract.get("enterprise_cloud_only_trains", [])}
         lifecycle.setdefault("supported_minor_trains", supported)
         if minor in supported:
             lifecycle.setdefault("version_unsupported", False)
-        elif minor in unreleased:
+        elif minor in cloud_only:
             lifecycle.setdefault("version_unsupported", True)
             upgrade_issues = lifecycle.setdefault("upgrade_path_issues", [])
             if isinstance(upgrade_issues, list):
-                upgrade_issues.append(f"Splunk Enterprise {minor} was not a released train.")
+                upgrade_issues.append(
+                    f"Splunk platform {minor} is Cloud-only and is not a Splunk Enterprise release train."
+                )
         else:
             supported_parts = [version_tuple(item) for item in supported]
             if supported_parts and parts[:2] < min(supported_parts):

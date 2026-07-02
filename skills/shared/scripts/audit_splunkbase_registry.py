@@ -25,6 +25,7 @@ PLATFORM_VERSIONS_PATH = REPO_ROOT / "skills/shared/references/splunk_platform_v
 USER_AGENT = "splunk-cisco-skills/platform-compatibility-audit"
 VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*(?:[.-][A-Za-z0-9]+)?)\b")
 DATE_RE = re.compile(r"([A-Z][a-z]+ \d{1,2}, 20\d{2})")
+TARGET_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+)?$")
 
 
 def default_compatibility_target() -> str:
@@ -38,12 +39,22 @@ def default_compatibility_target() -> str:
     return target
 
 
+def normalize_compatibility_target(value: str) -> str:
+    match = TARGET_RE.fullmatch(str(value).strip())
+    if not match:
+        raise argparse.ArgumentTypeError(
+            "target Splunk version must use MAJOR.MINOR or MAJOR.MINOR.PATCH"
+        )
+    return f"{match.group(1)}.{match.group(2)}"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit Splunkbase registry metadata.")
     parser.add_argument("--registry", default=str(REGISTRY_PATH))
     parser.add_argument(
         "--target-splunk-version",
-        default=default_compatibility_target(),
+        default=normalize_compatibility_target(default_compatibility_target()),
+        type=normalize_compatibility_target,
         help="Platform compatibility target (default: shared platform-version contract).",
     )
     parser.add_argument("--live", action="store_true", help="Fetch public Splunkbase pages.")
@@ -127,7 +138,13 @@ def audit_offline(apps: list[dict[str, Any]], target: str) -> list[dict[str, Any
                     "message": f"{status} does not match platform_versions for {target}",
                 }
             )
-        for field in ("latest_verified_version", "latest_release_date", "latest_verified_date", "last_verified_date"):
+        for field in (
+            "latest_verified_version",
+            "latest_verified_date",
+            "latest_release_version",
+            "latest_release_date",
+            "last_verified_date",
+        ):
             if not isinstance(app.get(field), str) or not app[field].strip():
                 findings.append({"id": app_id, "severity": "error", "field": field, "message": "missing or invalid"})
     return findings
@@ -160,9 +177,8 @@ def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tup
         app = by_id[live["splunkbase_id"]]
         expected_status = compatibility_status(live["platform_versions"], target)
         comparisons = {
-            "latest_verified_version": live["latest_version"],
+            "latest_release_version": live["latest_version"],
             "latest_release_date": live["latest_release_date"],
-            "latest_verified_date": live["latest_release_date"],
             "platform_versions": live["platform_versions"],
             "compatibility_status": expected_status,
         }
@@ -187,6 +203,19 @@ def main() -> int:
     registry = json.loads(Path(args.registry).read_text(encoding="utf-8"))
     apps = registry_apps(registry)
     offline_findings = audit_offline(apps, args.target_splunk_version)
+    configuration_findings: list[dict[str, Any]] = []
+    declared_target = str(registry.get("compatibility_target", "")).strip()
+    contract_target = default_compatibility_target()
+    if declared_target != contract_target:
+        configuration_findings.append(
+            {
+                "id": "registry",
+                "severity": "error",
+                "field": "compatibility_target",
+                "actual": declared_target,
+                "expected": contract_target,
+            }
+        )
 
     live_entries: list[dict[str, Any]] = []
     live_findings: list[dict[str, Any]] = []
@@ -197,10 +226,11 @@ def main() -> int:
         "registry": str(Path(args.registry)),
         "target_splunk_version": args.target_splunk_version,
         "splunkbase_app_count": len(apps),
+        "configuration_findings": configuration_findings,
         "offline_findings": offline_findings,
         "live_findings": live_findings,
         "live_entries": live_entries,
-        "ok": not offline_findings and not live_findings,
+        "ok": not configuration_findings and not offline_findings and not live_findings,
     }
 
     if args.json:
@@ -208,7 +238,7 @@ def main() -> int:
     else:
         print(f"Splunkbase registry apps: {len(apps)}")
         print(f"Target Splunk version: {args.target_splunk_version}")
-        for finding in offline_findings + live_findings:
+        for finding in configuration_findings + offline_findings + live_findings:
             print(
                 "ERROR "
                 f"{finding.get('id')}/{finding.get('app_name', '')} "

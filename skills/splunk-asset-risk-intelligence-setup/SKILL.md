@@ -39,7 +39,10 @@ setup-plus-handoff coverage, not ARI config-as-code.
   per-member work.
 - Treat Splunk platform compatibility carefully: Splunkbase lists ARI `1.2.2`
   for Splunk `9.3` through `10.5`, while ARI docs signal `9.1.3+` for current
-  ARI releases. Warn below `9.1.3`; do not hard-fail only on that conflict.
+  ARI releases. In this repository, `10.5` is the current Splunk Cloud target;
+  the self-managed Enterprise default remains `10.4.0`. Do not use the
+  cross-product Splunkbase listing as evidence for a self-managed Enterprise
+  `10.5` deployment. Warn below `9.1.3`; do not hard-fail only on that conflict.
 
 ## Primary Commands
 

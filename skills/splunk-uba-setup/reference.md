@@ -1,6 +1,6 @@
 # Splunk UBA Setup Reference
 
-last_verified: 2026-05-03
+last_verified: 2026-07-02
 
 ## Product Status
 
@@ -15,7 +15,7 @@ the newer UEBA capability in Splunk Enterprise Security Premier.
 |------|--------|--------|-------|
 | Standalone UBA server | UBA appliance/software | manual_gap | Professional Services / supported migration handoff only. |
 | UEBA in ES Premier | Enterprise Security Premier UEBA | handoff | Route to `splunk-enterprise-security-config` for ES readiness and cloud integrations. |
-| UBA Kafka ingestion | `Splunk-UBA-SA-Kafka`, Splunkbase `4147` | optional | Install only when requested and package access exists. |
+| UBA Kafka ingestion | `Splunk-UBA-SA-Kafka`, Splunkbase `4147` | optional | Version `1.4.6` lists `9.2`, `9.3`, `9.4`, `10.0`, and `10.2`; it does not advertise Splunk Cloud `10.5`. Install only when requested, package access exists, and the compatibility warning is accepted. |
 | ES/UEBA support apps | `SA-UEBA`, `DA-ESS-UEBA`, `Splunk_TA_ueba` | validate | Presence checks for existing deployments. |
 | UBA indexes | `ueba`, `ueba_summaries`, `ubaroute`, `ers` | validate | Readiness checks only; no default index creation. |
 
@@ -27,6 +27,9 @@ the newer UEBA capability in Splunk Enterprise Security Premier.
   standalone UBA server deployment.
 - Keep any Kafka ingestion app work tightly scoped to existing deployments and
   customer-approved transition plans.
+- For a Splunk Cloud `10.5` target, record app `4147` as an unadvertised
+  compatibility combination and obtain operator/vendor confirmation. This is a
+  warning-only handoff and does not change installer behavior.
 
 ## Sources
 

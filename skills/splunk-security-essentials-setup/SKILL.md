@@ -52,6 +52,9 @@ bash skills/splunk-security-essentials-setup/scripts/validate.sh
 - Keep SSE on the search tier or search head cluster deployer path.
 - Do not treat SSE as an Enterprise Security replacement. It can safely coexist
   with ES and includes content references from ES, ES Content Update, and UBA.
+- Splunkbase lists SSE through platform `10.5`. Treat that entry as the
+  repository's Splunk Cloud compatibility target; it does not change the
+  self-managed Enterprise default from `10.4.0` or certify Enterprise `10.5`.
 - After install, guide operators through the setup checklist: Data Inventory
   Introspection, Content Mapping, app configuration review, and optional
   posture dashboards.

@@ -29,6 +29,13 @@ profiles default to local file/Universal Forwarder monitors, IIS defaults to a
 Windows UF handoff, and network/proxy/security appliances default to SC4S or
 syslog handoff.
 
+Tomcat is a compatibility exception for the repository's current Splunk Cloud
+`10.5` target: as of July 2, 2026, Splunkbase app `2911` advertises versions
+only through `10.4`. When `tomcat` is selected for a `10.5` Cloud stack, record
+the warning and require operator/vendor confirmation before production use.
+Rendering and installation remain available; this skill does not enforce the
+listing gap in the installer.
+
 ## Workflow
 
 ```bash

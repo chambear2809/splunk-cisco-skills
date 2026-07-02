@@ -1,6 +1,6 @@
 # Splunk Security Essentials Reference
 
-`last_verified: 2026-05-03`
+`last_verified: 2026-07-02`
 
 ## Splunkbase
 
@@ -11,6 +11,9 @@
 - Access: unrestricted
 - Splunk platform compatibility researched: Splunk Enterprise / Cloud Platform
   9.0 through 10.5
+- Repository interpretation: `10.5` is the current Splunk Cloud target;
+  self-managed Splunk Enterprise remains on the `10.4.0` default. Do not treat
+  the cross-product listing as Enterprise `10.5` validation.
 
 ## Setup Checklist
 

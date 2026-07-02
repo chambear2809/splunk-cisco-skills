@@ -348,7 +348,7 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertTrue(eos["lifecycle"]["version_unsupported"])
         self.assertTrue(eos["lifecycle"]["eos"])
         self.assertTrue(unreleased["lifecycle"]["version_unsupported"])
-        self.assertIn("not a released train", unreleased["lifecycle"]["upgrade_path_issues"][0])
+        self.assertIn("Cloud-only", unreleased["lifecycle"]["upgrade_path_issues"][0])
 
     def test_lifecycle_contract_recognizes_cloud_10_5_and_rejects_enterprise_10_5(self) -> None:
         cloud = {"server": {"version": "10.5.2605"}}
@@ -359,7 +359,7 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertFalse(cloud["lifecycle"]["version_unsupported"])
         self.assertIn("10.5.2605", cloud["lifecycle"]["documented_cloud_trains"])
         self.assertTrue(enterprise["lifecycle"]["version_unsupported"])
-        self.assertIn("not a released train", enterprise["lifecycle"]["upgrade_path_issues"][0])
+        self.assertIn("Cloud-only", enterprise["lifecycle"]["upgrade_path_issues"][0])
 
     def test_apply_selected_fix_renders_local_packet_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

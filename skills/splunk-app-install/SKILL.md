@@ -74,18 +74,24 @@ The installer supports two target modes:
   (ACS) CLI. Search-tier REST access on port `8089` is optional and is used by
   other setup skills, not by the generic install/uninstall operations.
 
-Splunk Cloud `10.5.2605` Victoria stacks support targeted app installation. Set
-`SPLUNK_CLOUD_SEARCH_HEAD` to the standalone search-head or SHC prefix; the
+Targeted app installation is available on Victoria stacks from `10.2.2510`
+onward, including `10.5.2605`. For an app-scoped operation, export
+`SPLUNK_CLOUD_SEARCH_HEAD` as the standalone search-head or SHC prefix; the
 shared ACS context selects that target and install/uninstall commands add
-`--scope local`. Leave it unset only when the app should apply to every search
-head. Targeted installs require ACS CLI 2.20 or newer and the `sc_admin` role.
+`--scope local`. Leave it unset when the app should apply to every search head.
+Before using this path, verify that the stack is eligible, the operator has the
+`sc_admin` role, and `acs version` reports ACS CLI 2.20 or newer; the helper does
+not infer stack eligibility or enforce the CLI version. Because the shared ACS
+context is used by every Cloud workflow, prefer an app-scoped shell export (or
+a dedicated credentials profile) over a global target value, and clear it
+after the app operation.
 
 | Item | Value |
 |------|-------|
 | Optional override | `SPLUNK_PLATFORM=enterprise|cloud` when a hybrid credentials file makes a run ambiguous |
 | Enterprise search-tier REST API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` in `credentials` |
-| Optional Cloud app target | `SPLUNK_CLOUD_SEARCH_HEAD` in `credentials` |
+| Optional Cloud app target | App-scoped `SPLUNK_CLOUD_SEARCH_HEAD` environment override; a dedicated `credentials` profile is also supported |
 | TA app name | varies (installs any app) |
 | Credentials | Project-root `credentials` file (fallback: `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-app-install/scripts/` (relative to repo root) |

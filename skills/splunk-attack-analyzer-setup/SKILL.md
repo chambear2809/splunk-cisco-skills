@@ -35,6 +35,10 @@ Use this skill for the Splunk platform side of Splunk Attack Analyzer.
   `skills/splunk-app-install/scripts/install_app.sh`. This wrapper handles
   Splunkbase auth, ACS upload, and version pinning so the Attack Analyzer
   setup never embeds those flows.
+- Splunkbase lists both packages through platform `10.5`. In this repository,
+  that is the current Splunk Cloud target; the self-managed Enterprise default
+  remains `10.4.0`. Do not reinterpret the cross-product listing as validation
+  of a self-managed Enterprise `10.5` deployment.
 
 ## Primary Commands
 

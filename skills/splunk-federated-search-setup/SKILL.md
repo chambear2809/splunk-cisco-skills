@@ -41,8 +41,10 @@ Covered:
   `federated.conf`).
 - **Data Management app federation handoff** — readiness notes for the current
   connection/dataset model for Amazon S3, Microsoft Azure, Azure Databricks,
-  Snowflake, and DDSS. These are UI/entitlement handoffs until a stable public
-  API contract is available.
+  Snowflake, and DDSS. These are UI/activation handoffs until a stable public
+  API contract is available. The current overview requires Splunk sales
+  activation for each surface; confirm commercial terms per tenant and do not
+  infer one universal Data Scan Unit requirement.
 - **Global federated-search switch** — enable or disable Federated Search
   for the entire deployment via
   `/services/data/federated/settings/general`.
@@ -155,7 +157,7 @@ bash skills/splunk-federated-search-setup/scripts/validate.sh --live
 | `indexes.conf` | One `[federated:X]` stanza per FSS2S federated index |
 | `server.conf` | `[shclustering] conf_replication_include.indexes = true` for SHC deployer use |
 | `aws-s3-providers/<name>.json` | REST payload per reviewed legacy FSS3 provider, plus an AWS prerequisites README |
-| `data-management-federation-handoff.md` | Current Data Management app federation handoff for Amazon S3, Microsoft Azure, and Azure Databricks |
+| `data-management-federation-handoff.md` | Current Data Management app federation handoff for Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, and DDSS, including provider-side prerequisites |
 | `apply-search-head.sh` | File-based apply on a standalone Enterprise SH |
 | `apply-shc-deployer.sh` | Fail-closed handoff to `splunk-search-head-cluster-setup`; staging files alone is not reported as a completed SHC bundle apply |
 | `apply-rest.sh` | REST apply for Splunk Enterprise OR Splunk Cloud |

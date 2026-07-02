@@ -3998,7 +3998,7 @@ platform_token_required={shell_quote('true' if platform_token_required else 'fal
 {tls_assignments}
 
 file_mode() {{
-    stat -f '%A' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null || true
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%A' "$1" 2>/dev/null || true
 }}
 
 validate_file() {{
@@ -8025,15 +8025,15 @@ target_base={target_expr}
 {render_ta_shell_array("gateway_hashes", gateway_hashes)}
 
 file_mode() {{
-    stat -f '%A' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null || true
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%A' "$1" 2>/dev/null || true
 }}
 
 file_uid() {{
-    stat -f '%u' "$1" 2>/dev/null || stat -c '%u' "$1" 2>/dev/null
+    stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1" 2>/dev/null
 }}
 
 file_gid() {{
-    stat -f '%g' "$1" 2>/dev/null || stat -c '%g' "$1" 2>/dev/null
+    stat -c '%g' "$1" 2>/dev/null || stat -f '%g' "$1" 2>/dev/null
 }}
 
 validate_token_file() {{
@@ -8416,7 +8416,7 @@ done
 {secret_preflight}
 
 path_uid() {{
-    stat -f '%u' "$1" 2>/dev/null || stat -c '%u' "$1" 2>/dev/null
+    stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1" 2>/dev/null
 }}
 
 if [[ "$(id -u)" -ne 0 ]]; then

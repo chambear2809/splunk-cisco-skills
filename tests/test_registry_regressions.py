@@ -152,8 +152,17 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
         )
+        platform_contract = json.loads(
+            (REPO_ROOT / "skills/shared/references/splunk_platform_versions.json").read_text(
+                encoding="utf-8"
+            )
+        )
         target = registry["compatibility_target"]
         self.assertEqual(target, "10.5")
+        self.assertEqual(
+            target,
+            platform_contract["defaults"]["splunkbase_compatibility_target"],
+        )
 
         numeric_apps = [
             app
@@ -692,8 +701,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("SplunkEnterpriseSecuritySuite", seeded)
         self.assertIn("Splunk_AI_Assistant_Cloud", seeded)
 
-    def test_splunkbase_apps_track_latest_verified_release_metadata(self):
-        """Every Splunkbase-backed registry app records the latest version we audited."""
+    def test_splunkbase_apps_separate_verified_and_current_release_metadata(self):
+        """Package verification must remain distinct from the current public release."""
         import re
 
         registry = json.loads(
@@ -707,14 +716,30 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             app_id = str(app.get("splunkbase_id", "")).strip()
             if not app_id.isdigit():
                 continue
-            version = app.get("latest_verified_version")
-            date = app.get("latest_verified_date")
-            if not isinstance(version, str) or not version_re.fullmatch(version):
-                offenders.append(f"{app_id}/{app.get('app_name')}: bad latest_verified_version {version!r}")
-            if not isinstance(date, str) or not date_re.fullmatch(date):
-                offenders.append(f"{app_id}/{app.get('app_name')}: bad latest_verified_date {date!r}")
+            for version_field in ("latest_verified_version", "latest_release_version"):
+                version = app.get(version_field)
+                if not isinstance(version, str) or not version_re.fullmatch(version):
+                    offenders.append(
+                        f"{app_id}/{app.get('app_name')}: bad {version_field} {version!r}"
+                    )
+            for date_field in (
+                "latest_verified_date",
+                "latest_release_date",
+                "last_verified_date",
+            ):
+                date = app.get(date_field)
+                if not isinstance(date, str) or not date_re.fullmatch(date):
+                    offenders.append(
+                        f"{app_id}/{app.get('app_name')}: bad {date_field} {date!r}"
+                    )
 
         self.assertEqual(offenders, [], msg="Invalid Splunkbase latest metadata: " + ", ".join(offenders))
+
+        ai_assistant = next(
+            app for app in registry["apps"] if app.get("splunkbase_id") == "7245"
+        )
+        self.assertEqual(ai_assistant["latest_verified_version"], "2.0.0")
+        self.assertEqual(ai_assistant["latest_release_version"], "2.1.1")
 
     def test_splunkbase_app_coverage_ids_match_latest_audit_set(self):
         """The audited public Splunkbase app set should not shrink or grow silently."""
@@ -898,7 +923,7 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertNotIn("10.5", payload["enterprise_platform_versions"])
         self.assertNotIn("10.1", payload["enterprise_platform_versions"])
         self.assertNotIn("9.2", payload["enterprise_platform_versions"])
-        self.assertIn("10.5", payload["enterprise_unreleased_trains"])
+        self.assertIn("10.5", payload["enterprise_cloud_only_trains"])
         self.assertNotIn("10.4.2603", payload["cloud_doc_trains"])
         self.assertIn("10.4", payload["svd_enterprise_floors"])
         self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
@@ -921,6 +946,10 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")
 
         sys.path.insert(0, str(REPO_ROOT / "skills/shared/scripts"))
-        from audit_splunkbase_registry import default_compatibility_target
+        from audit_splunkbase_registry import (
+            default_compatibility_target,
+            normalize_compatibility_target,
+        )
 
         self.assertEqual(default_compatibility_target(), "10.5")
+        self.assertEqual(normalize_compatibility_target("10.5.0"), "10.5")

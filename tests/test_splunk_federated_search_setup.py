@@ -232,10 +232,31 @@ def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
     assert expected == {
         item["key"] for item in metadata["data_management_federation_handoffs"]
     }
+    handoffs = {
+        item["key"]: item for item in metadata["data_management_federation_handoffs"]
+    }
+    assert "available by activation" in handoffs["snowflake"]["stage"]
+    assert "available by activation" in handoffs["ddss"]["stage"]
+    assert "Contact Splunk sales for activation" in handoffs["snowflake"]["activation"]
+    assert "Contact Splunk sales for activation" in handoffs["ddss"]["activation"]
     for label in ("Microsoft Azure", "Azure Databricks", "Snowflake", "DDSS"):
         assert f"Federated Search for {label}" in handoff
     assert "edit_connections" in handoff
     assert "edit_datasets" in handoff
+    assert "required federated-search activation and Data Scan Unit entitlement" not in handoff
+    assert "do not infer one universal Data Scan Unit model" in handoff
+
+    # Snowflake 10.5 provider-side prerequisites.
+    assert "`USAGE` on the warehouse, database, and schema" in handoff
+    assert "Splunk-region IPv4 ingress network rule" in handoff
+    assert "Snowflake network policy" in handoff
+    assert "service-user authentication policy" in handoff
+    assert "programmatic access token (PAT) kept outside this repository" in handoff
+
+    # DDSS 10.5 catalog synchronization and access-policy prerequisites.
+    assert "associated DDSS index" in handoff
+    assert "SQS queue and S3 event notification" in handoff
+    assert "generated S3 bucket and SQS queue policies" in handoff
     assert "does not support DDSS locations in Azure or GCP" in handoff
 
 

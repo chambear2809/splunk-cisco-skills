@@ -9,10 +9,10 @@ Supports the full Splunk Federated Search product surface:
 - Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform
   only), rendered as a REST payload because FSS3 cannot be configured through
   federated.conf and is created by POSTing to /services/data/federated/provider.
-- Data Management app federation handoffs for current Amazon S3
-  connection/dataset workflows and Controlled Availability Microsoft Azure
-  and Azure Databricks workflows. These are rendered as readiness handoffs,
-  not legacy provider payloads.
+- Data Management app federation handoffs for current Amazon S3,
+  Microsoft Azure, Azure Databricks, Snowflake, and DDSS connection/dataset
+  workflows. These are rendered as readiness handoffs, not legacy provider
+  payloads.
 - File-based apply for Splunk Enterprise standalone search heads, a fail-closed
   SHC deployer bundle handoff, plus a REST apply path that works on both Splunk
   Enterprise and Splunk Cloud Platform.
@@ -63,9 +63,9 @@ DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
     {
         "key": "amazon_s3_data_management",
         "label": "Federated Search for Amazon S3 through the Data Management app",
-        "stage": "available by entitlement",
+        "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact Splunk sales or use the approved access path for existing FSS3/Federated Analytics users.",
+        "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics customers can have a tenant-specific access path.",
         "dataset_model": "Data Management app connections and datasets; datasets can support federated search and, where documented, data routing.",
         "notes": "Use the legacy `aws_s3` REST payload path in this renderer only when that provider model is still the reviewed target for the tenant.",
     },
@@ -74,7 +74,7 @@ DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
         "label": "Federated Search for Microsoft Azure",
         "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact a Splunk representative for activation and DSU entitlement review.",
+        "activation": "Contact Splunk sales for activation and confirm target-tenant commercial terms before building the connection.",
         "dataset_model": "Data Management app connection plus datasets over Azure Data Lake Storage and Azure Blob Storage containers.",
         "notes": "Azure datasets can be federated-search-only or data-routing-plus-federated-search when the tenant supports the documented Data Management workflow.",
     },
@@ -83,27 +83,27 @@ DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
         "label": "Federated Search for Azure Databricks",
         "stage": "available by activation",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
-        "activation": "Contact a Splunk representative; existing FSS3/Federated Analytics users apply through the documented access path.",
+        "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics users apply through the documented access path.",
         "dataset_model": "Data Management app connection using Azure Databricks Delta Sharing to Unity Catalog schemas and tables.",
         "notes": "Searches use SPL2. This renderer does not create Databricks Delta Sharing credentials or Unity Catalog datasets.",
     },
     {
         "key": "snowflake",
         "label": "Federated Search for Snowflake",
-        "stage": "available by activation",
+        "stage": "available by activation in Splunk Cloud 10.5",
         "availability": "Splunk Cloud Platform deployments in AWS regions; Snowflake warehouses must run on AWS",
-        "activation": "Contact a Splunk representative for activation and data-scan entitlement review.",
+        "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
         "dataset_model": "Data Management app connection for one Snowflake warehouse/database/schema plus datasets backed by tables or views.",
-        "notes": "Authentication uses a Snowflake service-user programmatic access token. Keep the PAT outside this repo and prefer the same AWS region for Splunk Cloud and Snowflake.",
+        "notes": "Require USAGE on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token kept outside this repo.",
     },
     {
         "key": "ddss",
         "label": "Federated Search for DDSS",
-        "stage": "available by activation",
+        "stage": "available by activation in Splunk Cloud 10.5",
         "availability": "Splunk Cloud Platform deployments in AWS regions with DDSS data stored in Amazon S3",
-        "activation": "Contact a Splunk representative for activation.",
-        "dataset_model": "Data Management app DDSS datasets representing configured AWS DDSS self-storage locations.",
-        "notes": "Current federated search does not support DDSS locations in Azure or GCP. Configure self-storage ownership through the ACS/DDSS workflow before dataset handoff.",
+        "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
+        "dataset_model": "Data Management app DDSS dataset identified by a configured S3 bucket path and its associated DDSS index.",
+        "notes": "Require an SQS queue, S3 event notification, and the generated S3 bucket and SQS queue policies. Current federated search does not support DDSS locations in Azure or GCP.",
     },
 ]
 
@@ -818,13 +818,13 @@ def render_data_management_handoff() -> str:
             "",
             "## Readiness Checklist",
             "",
-            "- Confirm the tenant has the required federated-search activation and Data Scan Unit entitlement.",
+            "- Contact Splunk sales to activate each requested Data Management federation surface. Confirm any applicable commercial entitlement for the target tenant; do not infer one universal Data Scan Unit model across all surfaces.",
             "- Confirm the Splunk Cloud deployment region and provider-region constraints before designing datasets.",
             "- Define connections and datasets in the Data Management app where the current docs require UI-driven setup.",
             "- For Azure datasets, decide whether each dataset is federated-search-only or data-routing-plus-federated-search.",
             "- For Azure Databricks, collect Delta Sharing and Unity Catalog readiness without placing credentials in this repo.",
-            "- For Snowflake, collect the AWS warehouse, database, schema, service user, and file-backed PAT handoff; Azure/GCP Snowflake warehouses are unsupported.",
-            "- For DDSS, confirm the AWS self-storage location already exists and route its lifecycle ownership to `splunk-cloud-acs-admin-setup`.",
+            "- For Snowflake, require a role with `USAGE` on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token (PAT) kept outside this repository. Azure/GCP Snowflake warehouses are unsupported.",
+            "- For DDSS, confirm the S3 self-storage location and associated DDSS index already exist, then create an SQS queue and S3 event notification and apply the generated S3 bucket and SQS queue policies. Route DDSS location lifecycle ownership to `splunk-cloud-acs-admin-setup`.",
             "- For current Amazon S3 workflows, prefer the Data Management app connection/dataset model unless the tenant is intentionally using the older provider payload path.",
             "- Confirm roles have the current `edit_connections` and `edit_datasets` capabilities before the Data Management handoff.",
             "- Validate SPL2 searches against representative time fields and partitions before production routing.",

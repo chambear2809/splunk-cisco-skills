@@ -33,9 +33,7 @@ Official references:
   <https://help.splunk.com/en/splunk-enterprise/get-started/get-data-in/10.4/get-data-with-http-event-collector/http-event-collector-rest-api-endpoints>
   (older trains: substitute `/10.2/` in the path)
 - Splunk Cloud ACS HEC token management:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
-  (the ACS manual currently publishes this surface under `10.4.2604`; it also
-  applies to `10.5.2605` stacks)
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.5.2605/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
 
 ## Enterprise Design
 

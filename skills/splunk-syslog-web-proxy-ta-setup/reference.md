@@ -17,6 +17,15 @@
 | `citrix` | `Splunk_TA_citrix-netscaler` | `2770` | `8.2.3` | SC4S/syslog or NITRO/IPFIX inputs |
 | `infoblox` | `Splunk_TA_infoblox` | `2934` | `2.2.0` | SC4S/syslog handoff |
 
+### Tomcat `10.5` compatibility note
+
+The repo-verified Tomcat package remains `4.0.0`. The latest public listing
+observed July 2, 2026 was `4.0.1`, with platform versions `9.1` through `10.4`
+and no advertised Splunk Cloud `10.5` support. For a `10.5` Cloud target,
+surface that warning and require operator/vendor confirmation before production
+use. Do not add an installer block; updated listing metadata or separately
+reviewed vendor evidence can satisfy the handoff.
+
 ## Guardrails
 
 - Do not match broad generic source types such as `syslog`, `_json`,

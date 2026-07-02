@@ -991,11 +991,11 @@ fi
 _token_perm_octal() {
     local target="$1"
     local mode=""
-    if mode="$(stat -f '%A' "${target}" 2>/dev/null)"; then
+    if mode="$(stat -c '%a' "${target}" 2>/dev/null)"; then
         printf '%s' "${mode}"
         return 0
     fi
-    if mode="$(stat -c '%a' "${target}" 2>/dev/null)"; then
+    if mode="$(stat -f '%A' "${target}" 2>/dev/null)"; then
         printf '%s' "${mode}"
         return 0
     fi

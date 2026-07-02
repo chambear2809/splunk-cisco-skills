@@ -38,6 +38,12 @@ For Splunk Cloud Platform, do not self-service install ES unless the customer
 has an explicitly supported ACS/support process. Splunk Cloud customers usually
 coordinate ES search-head access and installation with Splunk Support.
 
+The public ES `8.5.1` listing includes platform `10.5`. In this repository,
+`10.5` is the current Splunk Cloud target and does not change the self-managed
+Enterprise default from `10.4.0`. Confirm the target-specific ES compatibility
+matrix and supported Cloud installation process rather than presenting the
+cross-product listing as self-managed Enterprise `10.5` validation.
+
 ## Environment
 
 | Item | Value |

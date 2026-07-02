@@ -11,6 +11,14 @@ Reference for the Cisco Security Cloud package and its configurable input types.
 | Local package pattern | `cisco-security-cloud_*` |
 | Local package in repo | `splunk-ta/cisco-security-cloud_363.tar.gz` |
 | Packaged version inspected | `3.6.3` |
+| Repo-verified Splunkbase version | `3.6.6` |
+| Latest public listing observed July 2, 2026 | `3.6.7` |
+| Public platform versions | `9.1` through `10.4`; no advertised `10.5` support |
+
+The repository's `10.5` target is Splunk Cloud-specific; it does not change the
+package listing above. On a `10.5` Cloud stack, report the compatibility gap and
+obtain explicit operator/vendor confirmation before production enablement. This
+is advisory documentation, not an installer enforcement rule.
 
 ## App-Level Configuration
 

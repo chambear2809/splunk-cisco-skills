@@ -2,6 +2,16 @@
 
 Complete catalog of all data inputs, account fields, sourcetypes, and sizing.
 
+## Platform Compatibility
+
+- Repo-verified package: `3.1.1`.
+- Latest public listing observed July 2, 2026: `3.2.0`.
+- Splunkbase app `7828` currently lists `9.3` through `10.4`; it does not
+  advertise the repository's Splunk Cloud `10.5` target.
+- On `10.5`, preserve the warning in the deployment handoff and obtain explicit
+  operator/vendor confirmation. Do not interpret this note as an installer
+  block or as proof of incompatibility.
+
 ## Account Configuration
 
 Single account type: Intersight (OAuth2).

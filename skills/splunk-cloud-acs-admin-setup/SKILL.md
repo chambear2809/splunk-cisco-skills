@@ -20,8 +20,8 @@ the older allowlist-only workflow while preserving the proven IPv4/IPv6
 allowlist convergence logic and lock-out protection.
 
 Cloud Platform planning defaults to **10.5.2605**, with **10.4.2604** as the
-previous train. Some ACS manual pages are currently published under the
-10.4.2604 documentation path and apply unchanged to 10.5.2605 stacks.
+previous train. Use the train-specific canonical sources in `reference.md`
+when reviewing an ACS operation.
 
 ## Agent Behavior
 

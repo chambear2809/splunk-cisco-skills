@@ -64,3 +64,8 @@ pretend to automate a supported UBA server installation. This skill provides:
   UBA end-of-sale and end-of-support dates.
 - Prefer ES Premier UEBA migration guidance for new work.
 - Treat Kafka app installation as optional and legacy/readiness-focused.
+- Splunkbase app `4147` version `1.4.6` currently advertises `9.2` through
+  `10.2` on selected release trains and does not advertise `10.5`. For the
+  repository's Splunk Cloud `10.5` target, warn and obtain operator/vendor
+  confirmation before retaining this legacy app. Do not enforce the warning in
+  the installer.

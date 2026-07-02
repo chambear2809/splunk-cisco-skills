@@ -19,10 +19,11 @@ review artifacts rather than source files.
 Current compatibility baseline: Splunk Cloud Platform `10.5.2605`, with
 `10.4.2604` retained as the previous Cloud documentation train. Self-managed
 Splunk Enterprise, Universal Forwarder, Splunk Operator for Kubernetes, and
-Splunk POD remain on their verified 10.4 baselines until official 10.5 release
-and runtime evidence exists. Splunkbase package compatibility is evaluated
-individually against `10.5`; packages whose current listing omits 10.5 fail
-closed instead of inheriting platform support.
+Splunk POD remain on their verified 10.4 baselines; there is no self-managed
+Splunk Enterprise 10.5 train. Splunkbase package compatibility is evaluated
+individually against `10.5`; packages whose current listing omits 10.5 are
+marked unsupported in the registry and must not inherit compatibility merely
+because Splunk Cloud Platform supports that train.
 
 ## Start Here
 

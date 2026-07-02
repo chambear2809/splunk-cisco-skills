@@ -30,6 +30,12 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 Use `splunk-app-install` with `--source splunkbase --app-id 7539` to get the
 latest release. If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+As of July 2, 2026, the public `3.2.0` listing advertises platform versions only
+through `10.4`, not the repository's current Splunk Cloud `10.5` compatibility
+target. For a `10.5` Cloud stack, surface that package-specific warning and
+require operator/vendor compatibility confirmation before production use. The
+installer remains available for an explicitly reviewed deployment; this skill
+does not turn the listing gap into an install-time block.
 The shared installer enforces the required Cisco Catalyst Add-on dependency and
 installs `TA_cisco_catalyst` (Splunkbase ID `7538`) first when it is missing,
 so the visualization app is not deployed by itself. The Cisco Catalyst
