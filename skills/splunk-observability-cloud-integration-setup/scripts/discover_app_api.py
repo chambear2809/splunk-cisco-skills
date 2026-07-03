@@ -33,12 +33,39 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _apply_state import append_step, read_secret_file, redact  # noqa: E402
+from _apply_state import append_step, redact  # noqa: E402
 
 DISCOVER_APP = "discover_splunk_observability_cloud"
 SAFE_ROLE_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 O11Y_API_REALMS = {"us0", "us1", "us2", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
 _INSECURE_WARNING_EMITTED = False
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so Splunk Basic credentials stay on the target URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_authenticated_url(url: str) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise RuntimeError("authenticated Splunk REST URL contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or any(ch.isspace() for ch in url)
+    ):
+        raise RuntimeError(
+            "authenticated Splunk REST requests require an absolute HTTPS URL "
+            "without embedded credentials, fragments, or whitespace"
+        )
 
 
 def _ssl_ctx() -> ssl.SSLContext | None:
@@ -63,6 +90,7 @@ def _ssl_ctx() -> ssl.SSLContext | None:
 def _splunk_request(
     method: str, url: str, data: dict[str, str] | None = None
 ) -> tuple[int, dict]:
+    _validate_authenticated_url(url)
     user = os.environ.get("SPLUNK_USER")
     password = os.environ.get("SPLUNK_PASS")
     if not user or not password:
@@ -73,7 +101,11 @@ def _splunk_request(
     if data is not None:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as resp:
+    opener = urllib.request.build_opener(
+        _NoRedirectHandler(),
+        urllib.request.HTTPSHandler(context=_ssl_ctx()),
+    )
+    with opener.open(req, timeout=30) as resp:
         body = resp.read().decode("utf-8")
         try:
             return resp.status, json.loads(body)
@@ -222,22 +254,15 @@ def configure_access_tokens(realm: str, token_file: str, state_dir: Path | None 
     idem = f"discover_app:access_tokens:{realm}"
     url = f"{_splunk_base()}/servicesNS/nobody/{DISCOVER_APP}/access_tokens"
     _splunk_get(url)
-    token = read_secret_file(token_file)
-    try:
-        code, body = _splunk_post(url, {"realm": realm, "access_token": token})
-    finally:
-        token = ""  # zero out the token reference
-    _, readback = _splunk_get(url)
-    realms = {str(value) for value in _values_for_key(readback, "realm")}
-    if realm not in realms:
-        raise RuntimeError(f"access-token readback did not contain configured realm {realm!r}")
-    result = "success"
-    if state_dir is not None:
-        # Body is redacted by append_step, but we strip the field anyway for safety.
-        sanitized = {"realm": realm, "status": "configured" if result == "success" else "failed"}
-        sanitized["readback_realm"] = realm
-        append_step(state_dir, "discover_app", "access_tokens", idem, result, response=sanitized)
-    return {"result": result, "status_code": code, "readback_realm": realm}
+    # A realm-only readback can be satisfied by a pre-existing entry and does
+    # not prove that the submitted token was accepted. No documented public
+    # token-test endpoint or non-secret token identity is available here, so
+    # fail before reading or posting the token.
+    del token_file, state_dir, idem
+    raise RuntimeError(
+        "Discover app access-token mutation is a handoff: realm-only readback "
+        "cannot prove the submitted token, so no mutation was attempted"
+    )
 
 
 def grant_read_permission(roles: list[str], state_dir: Path | None = None) -> dict:

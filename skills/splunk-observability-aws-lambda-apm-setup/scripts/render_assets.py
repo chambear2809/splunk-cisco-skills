@@ -20,10 +20,15 @@ AWS Secrets Manager/SSM and keep the literal out of process arguments.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import shlex
+import shutil
+import stat
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -52,6 +57,11 @@ GOVCLOUD_REGION_PREFIX = "us-gov-"
 CHINA_REGION_PREFIX = "cn-"
 
 SECRET_BACKENDS: tuple[str, ...] = ("secretsmanager", "ssm")
+LAMBDA_FUNCTION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+LAMBDA_FUNCTION_ARN_RE = re.compile(
+    r"^arn:aws:lambda:(?P<region>[a-z0-9-]+):(?P<account>[0-9]{12}):"
+    r"function:(?P<name>[A-Za-z0-9_-]{1,64})$"
+)
 
 VENDOR_CONFLICT_ENV_PATTERNS: tuple[tuple[str, str], ...] = (
     ("DD_", "Datadog"),
@@ -163,6 +173,22 @@ def _is_unsupported_runtime(manifest: dict[str, Any], runtime: str) -> bool:
     return runtime in unsupported or _runtime_family(runtime) == "unknown"
 
 
+def _target_identifier(function_name: str, region: str, *, style: str) -> str:
+    """Return a deterministic collision-resistant identifier for rendered IaC."""
+    display_name = function_name.rsplit(":function:", 1)[-1]
+    digest = hashlib.sha256(f"{region}:{function_name}".encode()).hexdigest()[:10]
+    if style == "cloudformation":
+        base = re.sub(r"[^A-Za-z0-9]", "", display_name)[:40] or "Function"
+        return f"Fn{base}{digest}"
+    base = re.sub(r"[^A-Za-z0-9_]", "_", display_name)[:40].strip("_") or "function"
+    return f"fn_{base}_{digest}"
+
+
+def _dockerfile_name(function_name: str, region: str, runtime: str) -> str:
+    identifier = _target_identifier(function_name, region, style="code").lower()
+    return f"Dockerfile.{identifier}.{runtime}"
+
+
 # ---------------------------------------------------------------------------
 # Errors.
 # ---------------------------------------------------------------------------
@@ -177,8 +203,8 @@ class RendererError(ValueError):
 
 def validate_spec(raw: dict[str, Any]) -> dict[str, Any]:
     spec = dict(raw)
-    if spec.get("api_version", "").split("/")[0] != SKILL_NAME:
-        spec.setdefault("api_version", API_VERSION)
+    if spec.get("api_version") != API_VERSION:
+        raise RendererError(f"api_version must be exactly {API_VERSION!r}.")
 
     realm = spec.get("realm", "us1")
     if realm not in SUPPORTED_REALMS:
@@ -193,11 +219,36 @@ def validate_spec(raw: dict[str, Any]) -> dict[str, Any]:
     spec["realm"] = realm
 
     # Accept-beta gate.
+    if not isinstance(spec.get("accept_beta", False), bool):
+        raise RendererError("accept_beta must be true or false.")
     if not spec.get("accept_beta", False):
         raise RendererError(
             "The Splunk OpenTelemetry Lambda layer (signalfx/splunk-otel-lambda) is BETA. "
             "Set accept_beta: true in the spec or pass --accept-beta to acknowledge."
         )
+
+    for boolean_name, default in (
+        ("local_collector_enabled", True),
+        ("xray_coexistence", False),
+        ("metrics_extension", False),
+    ):
+        value = spec.setdefault(boolean_name, default)
+        if not isinstance(value, bool):
+            raise RendererError(f"{boolean_name} must be true or false.")
+
+    handoffs = spec.setdefault("handoffs", {})
+    if not isinstance(handoffs, dict):
+        raise RendererError("handoffs must be an object.")
+    for handoff_name in (
+        "cloudwatch_metrics",
+        "dashboards",
+        "detectors",
+        "logs",
+        "gateway_otel_collector",
+    ):
+        value = handoffs.setdefault(handoff_name, False)
+        if not isinstance(value, bool):
+            raise RendererError(f"handoffs.{handoff_name} must be true or false.")
 
     targets = spec.get("targets", [])
     if not isinstance(targets, list) or len(targets) == 0:
@@ -207,29 +258,60 @@ def validate_spec(raw: dict[str, Any]) -> dict[str, Any]:
         )
 
     manifest = _load_manifest()
+    supported_runtimes = {
+        runtime
+        for family in ("nodejs", "python", "java")
+        for runtime in manifest.get("supported_runtimes", {}).get(family, [])
+    }
+    unsupported_runtimes = set(manifest.get("supported_runtimes", {}).get("unsupported", []))
+    seen_targets: set[tuple[str, str]] = set()
 
     for idx, tgt in enumerate(targets):
+        if not isinstance(tgt, dict):
+            raise RendererError(f"targets[{idx}] must be an object.")
         fn = tgt.get("function_name", "")
-        if not fn:
-            raise RendererError(f"targets[{idx}].function_name is required.")
+        if not isinstance(fn, str) or not fn:
+            raise RendererError(f"targets[{idx}].function_name is required and must be a string.")
+        arn_match = LAMBDA_FUNCTION_ARN_RE.fullmatch(fn)
+        if not LAMBDA_FUNCTION_NAME_RE.fullmatch(fn) and arn_match is None:
+            raise RendererError(
+                f"targets[{idx}].function_name must be a Lambda function name "
+                "(1-64 letters, digits, hyphens, or underscores) or an unqualified "
+                "commercial-partition Lambda ARN."
+            )
 
         region = tgt.get("region", "")
-        if not region:
+        if not isinstance(region, str) or not region:
             raise RendererError(f"targets[{idx}].region is required.")
+        if arn_match is not None and arn_match.group("region") != region:
+            raise RendererError(
+                f"targets[{idx}].function_name ARN region {arn_match.group('region')!r} "
+                f"does not match targets[{idx}].region {region!r}."
+            )
 
         if region.startswith(GOVCLOUD_REGION_PREFIX) or region.startswith(CHINA_REGION_PREFIX):
             raise RendererError(
                 f"targets[{idx}] region '{region}': GovCloud and China regions have no published "
                 "Splunk Lambda APM layers (coverage: not_applicable). Remove this target or use a commercial region."
             )
+        supported_regions = set(manifest.get("x86_64", {}))
+        if region not in supported_regions:
+            raise RendererError(
+                f"targets[{idx}].region {region!r} is not a supported commercial Lambda layer region."
+            )
+
+        target_identity = (fn, region)
+        if target_identity in seen_targets:
+            raise RendererError(
+                f"targets[{idx}] duplicates function_name/region target {fn!r} in {region!r}."
+            )
+        seen_targets.add(target_identity)
 
         runtime = tgt.get("runtime", "")
-        if not runtime:
+        if not isinstance(runtime, str) or not runtime:
             raise RendererError(f"targets[{idx}].runtime is required (e.g. python3.11, nodejs20.x, java17).")
-
-        if _is_unsupported_runtime(manifest, runtime):
-            unsupported = manifest.get("supported_runtimes", {}).get("unsupported", [])
-            if runtime in unsupported:
+        if runtime not in supported_runtimes:
+            if runtime in unsupported_runtimes:
                 raise RendererError(
                     f"targets[{idx}] runtime '{runtime}' has no published Splunk Lambda APM layer. "
                     "Unsupported runtimes: Go, Ruby, .NET, provided.al2/al2023. "
@@ -238,6 +320,55 @@ def validate_spec(raw: dict[str, Any]) -> dict[str, Any]:
             raise RendererError(
                 f"targets[{idx}] runtime '{runtime}' is unrecognised. "
                 "Use Node.js (nodejs18.x/20.x/22.x), Python (python3.8-3.13), or Java (java8/8.al2/11/17/21)."
+            )
+
+        arch = tgt.get("arch", "x86_64")
+        if not isinstance(arch, str) or arch not in {"x86_64", "arm64"}:
+            raise RendererError(f"targets[{idx}].arch must be 'x86_64' or 'arm64'.")
+        tgt["arch"] = arch
+        if arch == "arm64" and region not in manifest.get("arm64", {}):
+            raise RendererError(
+                f"targets[{idx}] arm64 layer is not published in region {region!r}."
+            )
+
+        package_type = tgt.get("package_type", "zip")
+        if not isinstance(package_type, str) or package_type not in {"zip", "image"}:
+            raise RendererError(f"targets[{idx}].package_type must be 'zip' or 'image'.")
+        tgt["package_type"] = package_type
+
+        handler_type = tgt.get("handler_type", "default")
+        allowed_handlers = (
+            {"default", "stream", "apigw_proxy", "sqs"}
+            if _runtime_family(runtime) == "java"
+            else {"default"}
+        )
+        if not isinstance(handler_type, str) or handler_type not in allowed_handlers:
+            raise RendererError(
+                f"targets[{idx}].handler_type {handler_type!r} is invalid for runtime {runtime!r}; "
+                f"allowed: {', '.join(sorted(allowed_handlers))}."
+            )
+        tgt["handler_type"] = handler_type
+
+        execution_modes = tgt.setdefault("execution_modes", {})
+        if execution_modes is None:
+            execution_modes = {}
+            tgt["execution_modes"] = execution_modes
+        if not isinstance(execution_modes, dict):
+            raise RendererError(f"targets[{idx}].execution_modes must be an object.")
+        for mode_name in ("snapstart", "lambda_at_edge"):
+            mode_value = execution_modes.setdefault(mode_name, False)
+            if not isinstance(mode_value, bool):
+                raise RendererError(
+                    f"targets[{idx}].execution_modes.{mode_name} must be true or false."
+                )
+        provisioned = execution_modes.setdefault("provisioned_concurrency", 0)
+        if isinstance(provisioned, bool) or not isinstance(provisioned, int):
+            raise RendererError(
+                f"targets[{idx}].execution_modes.provisioned_concurrency must be an integer."
+            )
+        if not 0 <= provisioned <= 1000:
+            raise RendererError(
+                f"targets[{idx}].execution_modes.provisioned_concurrency must be between 0 and 1000."
             )
 
         # Warn on AWS-deprecated runtime.
@@ -396,8 +527,8 @@ def _render_layers(spec: dict[str, Any], manifest: dict[str, Any]) -> str:
         lines.append(f"## {fn}")
         lines.append("```bash")
         lines.append("aws lambda get-function-configuration \\")
-        lines.append(f"  --function-name {fn} \\")
-        lines.append(f"  --region {region} \\")
+        lines.append(f"  --function-name {shlex.quote(fn)} \\")
+        lines.append(f"  --region {shlex.quote(region)} \\")
         lines.append("  --query 'Layers[].Arn'")
         lines.append("```")
         lines.append("")
@@ -479,7 +610,16 @@ def _render_validation(spec: dict[str, Any]) -> str:
     lines.append("cloud.account.id = <aws-account-id>")
     lines.append("```\n")
 
-    lines.append("## Live trace probe")
+    lines.append("## Optional endpoint reachability check")
+    lines.append("`validate.sh --live` performs only an unauthenticated ingest-endpoint")
+    lines.append("reachability probe. It does **not** validate Lambda configuration,")
+    lines.append("token authorization, span export, or APM data arrival.")
+    lines.append("```bash")
+    lines.append(f"SPLUNK_O11Y_REALM={realm} bash skills/{SKILL_NAME}/scripts/validate.sh \\")
+    lines.append("  --output-dir splunk-observability-aws-lambda-apm-rendered --live")
+    lines.append("```\n")
+
+    lines.append("## Configured-state acceptance: invoke and verify a trace")
     lines.append("```bash")
     lines.append("aws lambda invoke \\")
     lines.append("  --function-name <function-name> \\")
@@ -570,7 +710,18 @@ def _render_aws_cli_plan(
             '  --output text)"',
         ]
 
-    lines = ["#!/usr/bin/env bash", "set -euo pipefail", "# AWS CLI apply plan — review before running", ""]
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'if [[ "$-" == *x* ]]; then',
+        '  echo "ERROR: shell xtrace is enabled; refusing to fetch or process SPLUNK_ACCESS_TOKEN." >&2',
+        "  exit 2",
+        "fi",
+        "",
+        "# AWS CLI apply plan — review before running",
+        "",
+    ]
     lines.extend(
         [
             'APPLY_SECTIONS="${APPLY_SECTIONS:-layer,env}"',
@@ -628,10 +779,11 @@ def _render_aws_cli_plan(
 
         if tgt.get("package_type", "zip") == "image":
             lines.append(f"# --- {fn} (container image) ---")
-            lines.append(
-                f'echo "HANDOFF: {fn} uses package_type=image; rebuild and deploy the rendered '
-                f'container-image/Dockerfile.{_runtime_family(runtime)} instead of attaching a Lambda layer."'
+            handoff = (
+                f"HANDOFF: {fn} uses package_type=image; rebuild and deploy the rendered "
+                f"container-image/Dockerfile.{_runtime_family(runtime)} instead of attaching a Lambda layer."
             )
+            lines.append(f"echo {shlex.quote(handoff)}")
             lines.append("")
             continue
 
@@ -639,7 +791,8 @@ def _render_aws_cli_plan(
             layer_arn = _resolve_layer_arn(manifest, region, arch)
             wrapper = _exec_wrapper(wrappers, runtime, handler_type)
         except RendererError as e:
-            lines.append(f"# ERROR for {fn}: {e}")
+            error_lines = str(e).splitlines() or ["unknown render error"]
+            lines.extend(f"# ERROR for {fn}: {line}" for line in error_lines)
             lines.append("")
             continue
 
@@ -677,8 +830,13 @@ def _render_aws_cli_plan(
         cli_json = json.dumps(cli_input, indent=2)
 
         lines.append(f"# --- {fn} ---")
-        lines.append(f'if ! target_selected {shlex.quote(fn)}; then echo "==> Skipping {fn} (TARGET_FILTER)"; else')
-        lines.append(f'echo "==> Updating {fn} in {region}..."')
+        skip_message = f"==> Skipping {fn} (TARGET_FILTER)"
+        update_message = f"==> Updating {fn} in {region}..."
+        lines.append(
+            f"if ! target_selected {shlex.quote(fn)}; then "
+            f"echo {shlex.quote(skip_message)}; else"
+        )
+        lines.append(f"echo {shlex.quote(update_message)}")
         lines.append('_CURRENT_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-current.XXXXXX")"')
         lines.append('_DESIRED_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-desired.XXXXXX")"')
         lines.append('_CFG_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-cfg.XXXXXX")"')
@@ -752,6 +910,11 @@ def _render_terraform(spec: dict[str, Any], manifest: dict[str, Any], wrappers: 
     lines = [
         "# Terraform — Splunk Lambda APM layer attachment",
         "# Provider: hashicorp/aws ~> 5.0",
+        "# SECURITY: Terraform reads SPLUNK_ACCESS_TOKEN as plaintext and stores it",
+        "# in state as part of the Lambda environment. Use an encrypted, access-",
+        "# controlled remote backend with locking; never commit local state. Prefer",
+        "# the CloudFormation dynamic-reference or guarded AWS CLI path when state",
+        "# cannot be protected to the same standard as the token.",
         "",
     ]
 
@@ -788,7 +951,7 @@ def _render_terraform(spec: dict[str, Any], manifest: dict[str, Any], wrappers: 
             lines.append("")
             continue
 
-        safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", fn)
+        safe_name = _target_identifier(fn, region, style="terraform")
         env_vars: dict[str, str] = {
             "AWS_LAMBDA_EXEC_WRAPPER": wrapper,
             "SPLUNK_REALM": realm,
@@ -879,10 +1042,11 @@ def _render_cloudformation(spec: dict[str, Any], manifest: dict[str, Any], wrapp
         for k, v in env_vars.items():
             env_yaml_lines.append(f"          {k}: {v!r}")
 
+        logical_id = _target_identifier(fn, region, style="cloudformation")
         lines += [
             f"# Function: {fn}",
             "  # Add to your Resources section:",
-            f"  {fn}:",
+            f"  {logical_id}:",
             "    Type: AWS::Lambda::Function",
             "    Properties:",
             "      # ... other properties ...",
@@ -901,52 +1065,252 @@ def _render_cloudformation(spec: dict[str, Any], manifest: dict[str, Any], wrapp
 
 def _render_write_token_sh(spec: dict[str, Any]) -> str:
     backend = spec.get("secret_backend", "secretsmanager")
-    # The token is read from TOKEN_FILE into a chmod-600 --cli-input-json file
-    # (built via python, trailing newline stripped to match historical "$(cat)"
-    # behavior) so the literal token never appears on any command's argv.
+    # One Python process opens TOKEN_FILE once with O_NOFOLLOW, validates that
+    # descriptor, reads it with a strict bound, verifies a stable fingerprint,
+    # and generates the chmod-600 AWS CLI payload. The source token is never
+    # reopened after validation and never appears on a command's argv.
     _mk_input = (
+        'umask 077\n'
         '_SECRET_JSON="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-secret.XXXXXX")"\n'
         'chmod 600 "${_SECRET_JSON}"\n'
-        'trap \'rm -f "${_SECRET_JSON}"\' EXIT\n'
+        '_cleanup_secret_json() { rm -f -- "${_SECRET_JSON}"; }\n'
+        'trap _cleanup_secret_json EXIT\n'
+        'trap \'exit 130\' HUP INT TERM\n'
     )
+    _secure_payload = r'''python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" "${_PAYLOAD_KIND}" "${ALLOW_LOOSE_TOKEN_PERMS:-false}" <<'PY'
+import hashlib
+import hmac
+import json
+import os
+import stat
+import sys
+import tempfile
+
+token_path, payload_path, payload_kind, allow_loose_raw = sys.argv[1:]
+if payload_kind not in {"secretsmanager-put", "secretsmanager-create", "ssm"}:
+    raise SystemExit(f"ERROR: unknown payload kind: {payload_kind}")
+if allow_loose_raw not in {"true", "false"}:
+    raise SystemExit("ERROR: ALLOW_LOOSE_TOKEN_PERMS must be true or false")
+allow_loose = allow_loose_raw == "true"
+MAX_SECRET_BYTES = 4096 if payload_kind == "ssm" else 64 * 1024
+
+
+def fail(message: str) -> None:
+    print(f"ERROR: TOKEN_FILE {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def fingerprint(info: os.stat_result) -> tuple[int, ...]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_nlink,
+        info.st_uid,
+        info.st_gid,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
+def read_bounded(descriptor: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = os.read(descriptor, min(8192, MAX_SECRET_BYTES + 1 - total))
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_SECRET_BYTES:
+            fail(f"exceeds the {MAX_SECRET_BYTES}-byte limit")
+
+
+if not hasattr(os, "O_NOFOLLOW"):
+    fail("cannot be opened safely because this platform lacks O_NOFOLLOW")
+
+try:
+    path_before = os.lstat(token_path)
+except OSError as exc:
+    fail(f"is missing or unreadable: {exc}")
+if not stat.S_ISREG(path_before.st_mode):
+    fail("must be a regular, non-symlink file")
+
+token_fd = -1
+try:
+    token_fd = os.open(
+        token_path,
+        os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+    )
+    opened_before = os.fstat(token_fd)
+    if not stat.S_ISREG(opened_before.st_mode):
+        fail("must remain a regular file while open")
+    if opened_before.st_nlink != 1:
+        fail("must have exactly one hard link")
+    source_mode = stat.S_IMODE(opened_before.st_mode)
+    if source_mode != 0o600:
+        if not allow_loose:
+            fail(f"must have mode 0600 (found {source_mode:04o})")
+        print(
+            f"WARNING: TOKEN_FILE mode {source_mode:04o} accepted only because "
+            "ALLOW_LOOSE_TOKEN_PERMS=true",
+            file=sys.stderr,
+        )
+    if (path_before.st_dev, path_before.st_ino) != (
+        opened_before.st_dev,
+        opened_before.st_ino,
+    ):
+        fail("changed while it was being opened")
+    if opened_before.st_size == 0:
+        fail("is empty")
+    if opened_before.st_size > MAX_SECRET_BYTES:
+        fail(f"exceeds the {MAX_SECRET_BYTES}-byte limit")
+
+    token_bytes = read_bounded(token_fd)
+    first_digest = hashlib.sha256(token_bytes).digest()
+    os.lseek(token_fd, 0, os.SEEK_SET)
+    verification_bytes = read_bounded(token_fd)
+    if not hmac.compare_digest(
+        first_digest,
+        hashlib.sha256(verification_bytes).digest(),
+    ):
+        fail("changed while it was being read")
+
+    opened_after = os.fstat(token_fd)
+    try:
+        path_after = os.lstat(token_path)
+    except OSError as exc:
+        fail(f"changed while it was being read: {exc}")
+    if fingerprint(opened_before) != fingerprint(opened_after):
+        fail("metadata changed while it was being read")
+    if fingerprint(opened_after) != fingerprint(path_after):
+        fail("path changed while it was being read")
+except OSError as exc:
+    fail(f"could not be read safely: {exc}")
+finally:
+    if token_fd >= 0:
+        os.close(token_fd)
+
+try:
+    text = token_bytes.decode("utf-8", errors="strict")
+except UnicodeDecodeError:
+    fail("must contain valid UTF-8")
+if text.endswith("\r\n"):
+    token = text[:-2]
+elif text.endswith("\n"):
+    token = text[:-1]
+else:
+    token = text
+if (
+    not token
+    or "\r" in token
+    or "\n" in token
+    or any(not (0x21 <= ord(character) <= 0x7E) for character in token)
+):
+    fail(
+        "must contain exactly one non-empty UTF-8 line using printable-ASCII "
+        "with at most one trailing LF or CRLF"
+    )
+
+if payload_kind == "secretsmanager-put":
+    payload = {
+        "SecretId": "splunk-lambda-access-token",
+        "SecretString": token,
+    }
+elif payload_kind == "secretsmanager-create":
+    payload = {
+        "Name": "splunk-lambda-access-token",
+        "SecretString": token,
+    }
+elif payload_kind == "ssm":
+    payload = {
+        "Name": "/splunk/lambda/access-token",
+        "Value": token,
+        "Type": "SecureString",
+        "Overwrite": True,
+    }
+payload_dir = os.path.dirname(os.path.abspath(payload_path))
+payload_dir_info = os.lstat(payload_dir)
+if not stat.S_ISDIR(payload_dir_info.st_mode) or stat.S_ISLNK(payload_dir_info.st_mode):
+    raise SystemExit("ERROR: private AWS CLI payload directory failed validation")
+payload_fd, payload_tmp = tempfile.mkstemp(
+    dir=payload_dir,
+    prefix=".splunk-lambda-payload.",
+)
+try:
+    os.fchmod(payload_fd, 0o600)
+    payload_opened = os.fstat(payload_fd)
+    if (
+        not stat.S_ISREG(payload_opened.st_mode)
+        or payload_opened.st_nlink != 1
+        or stat.S_IMODE(payload_opened.st_mode) != 0o600
+    ):
+        raise SystemExit("ERROR: private AWS CLI temporary payload failed validation")
+    with os.fdopen(payload_fd, "w", encoding="utf-8") as destination:
+        payload_fd = -1
+        json.dump(payload, destination)
+        destination.flush()
+        os.fsync(destination.fileno())
+    written = os.lstat(payload_tmp)
+    if (
+        not stat.S_ISREG(written.st_mode)
+        or written.st_nlink != 1
+        or stat.S_IMODE(written.st_mode) != 0o600
+    ):
+        raise SystemExit("ERROR: private AWS CLI temporary payload changed while writing")
+    os.replace(payload_tmp, payload_path)
+    payload_tmp = ""
+    final = os.lstat(payload_path)
+    if (
+        not stat.S_ISREG(final.st_mode)
+        or final.st_nlink != 1
+        or stat.S_IMODE(final.st_mode) != 0o600
+    ):
+        raise SystemExit("ERROR: private AWS CLI payload failed final validation")
+finally:
+    if payload_fd >= 0:
+        os.close(payload_fd)
+    if payload_tmp:
+        try:
+            os.unlink(payload_tmp)
+        except FileNotFoundError:
+            pass
+PY
+'''
     if backend == "secretsmanager":
         apply_cmd = (
             _mk_input
-            + 'python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" <<\'PY\'\n'
-            'import json, sys\n'
-            'token = open(sys.argv[1]).read().rstrip("\\n")\n'
-            'json.dump({"SecretString": token}, open(sys.argv[2], "w"))\n'
-            'PY\n'
-            'if aws secretsmanager describe-secret --secret-id splunk-lambda-access-token >/dev/null 2>&1; then\n'
-            '  python3 - "${_SECRET_JSON}" <<\'PY\'\n'
-            'import json, sys\n'
-            'p = sys.argv[1]; data = json.load(open(p)); data["SecretId"] = "splunk-lambda-access-token"; json.dump(data, open(p, "w"))\n'
-            'PY\n'
+            + 'if aws secretsmanager describe-secret --secret-id splunk-lambda-access-token >/dev/null 2>&1; then\n'
+            '  _PAYLOAD_KIND="secretsmanager-put"\n'
+            'else\n'
+            '  _PAYLOAD_KIND="secretsmanager-create"\n'
+            'fi\n'
+            + _secure_payload
+            + 'if [[ "${_PAYLOAD_KIND}" == "secretsmanager-put" ]]; then\n'
             '  aws secretsmanager put-secret-value --cli-input-json "file://${_SECRET_JSON}"\n'
             'else\n'
-            '  python3 - "${_SECRET_JSON}" <<\'PY\'\n'
-            'import json, sys\n'
-            'p = sys.argv[1]; data = json.load(open(p)); data["Name"] = "splunk-lambda-access-token"; json.dump(data, open(p, "w"))\n'
-            'PY\n'
             '  aws secretsmanager create-secret --cli-input-json "file://${_SECRET_JSON}"\n'
             'fi\n'
-            'rm -f "${_SECRET_JSON}"'
+            'rm -f -- "${_SECRET_JSON}"'
         )
         note = "Secret name: splunk-lambda-access-token"
     else:
         apply_cmd = (
             _mk_input
-            + 'python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" <<\'PY\'\n'
-            'import json, sys\n'
-            'token = open(sys.argv[1]).read().rstrip("\\n")\n'
-            'json.dump({"Name": "/splunk/lambda/access-token", "Value": token, "Type": "SecureString", "Overwrite": True}, open(sys.argv[2], "w"))\n'
-            'PY\n'
-            'aws ssm put-parameter --cli-input-json "file://${_SECRET_JSON}"\n'
-            'rm -f "${_SECRET_JSON}"'
+            + '_PAYLOAD_KIND="ssm"\n'
+            + _secure_payload
+            + 'aws ssm put-parameter --cli-input-json "file://${_SECRET_JSON}"\n'
+            'rm -f -- "${_SECRET_JSON}"'
         )
         note = "Parameter name: /splunk/lambda/access-token (SecureString)"
     return f"""#!/usr/bin/env bash
 set -euo pipefail
+
+if [[ "$-" == *x* ]]; then
+  echo "ERROR: shell xtrace is enabled; refusing to process TOKEN_FILE." >&2
+  exit 2
+fi
 
 # Write the Splunk Observability Cloud access token to {backend}.
 # Run before applying Lambda environment updates. Existing values are rotated
@@ -958,19 +1322,10 @@ set -euo pipefail
 #
 # Usage:
 #   bash scripts/write-splunk-token.sh
+# Set ALLOW_LOOSE_TOKEN_PERMS=true only for the explicit development escape;
+# regular-file, single-hardlink, fingerprint, size, and content checks remain enforced.
 
 : "${{TOKEN_FILE:?Set TOKEN_FILE to a chmod-600 file containing the Splunk O11y access token}}"
-
-if [[ ! -f "${{TOKEN_FILE}}" ]]; then
-  echo "ERROR: TOKEN_FILE (${{TOKEN_FILE}}) does not exist." >&2
-  exit 2
-fi
-
-OCTAL=$(python3 -c "import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), '03o'))" "${{TOKEN_FILE}}")
-if [[ "${{OCTAL}}" != "600" ]]; then
-  echo "ERROR: TOKEN_FILE has loose permissions (${{OCTAL}}); chmod 600 ${{TOKEN_FILE}}" >&2
-  exit 2
-fi
 
 echo "==> Writing token to {backend}..."
 {apply_cmd}
@@ -980,33 +1335,54 @@ echo "==> Done. Delete ${{TOKEN_FILE}} after confirming the secret is stored."
 
 def _render_handoff_sh(spec: dict[str, Any]) -> str:
     h = spec.get("handoffs", {})
-    lines = ["#!/usr/bin/env bash", "set -euo pipefail", "# Cross-skill handoffs", ""]
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "# Cross-skill handoffs",
+        f"PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}",
+        "",
+    ]
     wrote_any = False
     if h.get("cloudwatch_metrics"):
         lines.append("# CloudWatch metrics for Lambda namespace")
-        lines.append("bash skills/splunk-observability-aws-integration/scripts/setup.sh --render")
+        lines.append(
+            'bash "${PROJECT_ROOT}/skills/splunk-observability-aws-integration/scripts/setup.sh" --render'
+        )
         lines.append("")
         wrote_any = True
     if h.get("dashboards"):
         lines.append("# Lambda APM dashboards")
-        lines.append("echo 'HANDOFF: bash skills/splunk-observability-dashboard-builder/scripts/setup.sh --render --spec /path/to/lambda-dashboard.yaml'")
+        lines.append(
+            'echo "HANDOFF: bash ${PROJECT_ROOT}/skills/splunk-observability-dashboard-builder/'
+            'scripts/setup.sh --render --spec /path/to/lambda-dashboard.yaml"'
+        )
         lines.append("")
         wrote_any = True
     if h.get("detectors"):
         lines.append("# Lambda APM detectors (cold start / error / latency)")
-        lines.append("echo 'HANDOFF: bash skills/splunk-observability-native-ops/scripts/setup.sh --apply --spec /path/to/lambda-detectors.json --token-file /path/to/token'")
+        lines.append(
+            'echo "HANDOFF: bash ${PROJECT_ROOT}/skills/splunk-observability-native-ops/'
+            'scripts/setup.sh --apply --spec /path/to/lambda-detectors.json '
+            '--token-file /path/to/token"'
+        )
         lines.append("")
         wrote_any = True
     if h.get("logs"):
         lines.append("# Lambda log ingestion via Splunk Connect for OTLP")
-        lines.append("bash skills/splunk-connect-for-otlp-setup/scripts/setup.sh --render")
+        lines.append(
+            'bash "${PROJECT_ROOT}/skills/splunk-connect-for-otlp-setup/scripts/setup.sh" --render'
+        )
         lines.append("")
         wrote_any = True
     if h.get("gateway_otel_collector"):
         lines.append("# Gateway OTel Collector (send Lambda OTLP to a collector instead of direct ingest)")
         lines.append("# Set local_collector_enabled: false in your spec and point OTEL_EXPORTER_OTLP_ENDPOINT")
         lines.append("# at your collector's OTLP HTTP receiver (default port 4318).")
-        lines.append("echo 'HANDOFF: bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm REALM --linux-mode gateway --listen-interface 0.0.0.0'")
+        lines.append(
+            'echo "HANDOFF: bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/'
+            'scripts/setup.sh --render-linux --realm REALM --linux-mode gateway '
+            '--listen-interface 0.0.0.0"'
+        )
         lines.append("")
         wrote_any = True
     if not wrote_any:
@@ -1050,7 +1426,10 @@ def _render_sam(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
         snapstart = exec_modes.get("snapstart", False) if exec_modes else False
 
         if pkg_type == "image":
-            lines.append(f"  # {fn}: container-image function — see container-image/Dockerfile.{runtime.split('.')[0].replace('nodejs', 'node')} for instrumentation snippet.")
+            lines.append(
+                f"  # {fn}: container-image function — see "
+                f"container-image/{_dockerfile_name(fn, region, runtime)} for instrumentation snippet."
+            )
             lines.append("  # AWS_LAMBDA_EXEC_WRAPPER is NOT honored for container Lambdas; instrument programmatically.")
             lines.append("")
             continue
@@ -1083,7 +1462,7 @@ def _render_sam(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
         if _runtime_family(runtime) == "nodejs":
             env_vars["SPLUNK_TRACE_RESPONSE_HEADER_ENABLED"] = "true"
 
-        safe_name = re.sub(r"[^a-zA-Z0-9]", "", fn.title().replace("-", "").replace("_", ""))
+        safe_name = _target_identifier(fn, region, style="cloudformation")
 
         env_lines = [f"          {k}: {repr(v)}" for k, v in env_vars.items()]
 
@@ -1093,8 +1472,8 @@ def _render_sam(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
             f"  {safe_name}:",
             "    Type: AWS::Serverless::Function",
             "    Properties:",
-            f"      FunctionName: {fn}",
-            f"      Runtime: {runtime}",
+            f"      FunctionName: {json.dumps(fn)}",
+            f"      Runtime: {json.dumps(runtime)}",
             "      Architectures:",
             f"        - {arch_sam}",
             "      Layers:",
@@ -1184,8 +1563,8 @@ def _render_cdk(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
 
         metrics_arn = _resolve_metrics_layer_arn(metrics_manifest, region, arch) if use_metrics else None
 
-        safe_ts = re.sub(r"[^a-zA-Z0-9]", "_", fn)
-        safe_py = re.sub(r"[^a-zA-Z0-9]", "_", fn)
+        safe_ts = _target_identifier(fn, region, style="code")
+        safe_py = safe_ts
 
         env_dict_ts = {
             "AWS_LAMBDA_EXEC_WRAPPER": wrapper,
@@ -1373,7 +1752,7 @@ CMD ["com.example.Handler::handleRequest"]
         else:
             content = f"# No container-image Dockerfile for unsupported runtime '{runtime}'.\n"
 
-        key = f"Dockerfile.{runtime}"
+        key = _dockerfile_name(fn, tgt["region"], runtime)
         files[key] = content
 
     return files
@@ -1412,8 +1791,43 @@ def _validate_execution_modes(spec: dict[str, Any]) -> list[str]:
 # Top-level render.
 # ---------------------------------------------------------------------------
 
+
+def _safe_directory(path: Path) -> None:
+    if path.is_symlink():
+        raise RendererError(f"refusing symlink output directory: {path}")
+    if path.exists() and not path.is_dir():
+        raise RendererError(f"output path is not a directory: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise RendererError(f"output directory failed validation: {path}")
+
+
+def _atomic_write(path: Path, content: str, *, mode: int = 0o644) -> None:
+    _safe_directory(path.parent)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), mode)
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
 def render(spec: dict[str, Any], output_dir: Path, *, gitops_mode: bool = False) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _safe_directory(output_dir)
     manifest = _load_manifest()
     metrics_manifest = _load_metrics_manifest()
     wrappers = _load_wrappers()
@@ -1433,11 +1847,12 @@ def render(spec: dict[str, Any], output_dir: Path, *, gitops_mode: bool = False)
         "05-validation.md": _render_validation(spec),
     }
     for fname, content in plan_contents.items():
-        (output_dir / fname).write_text(content, encoding="utf-8")
+        _atomic_write(output_dir / fname, content)
 
     # README.
     n = len(spec.get("targets", []))
-    (output_dir / "README.md").write_text(
+    _atomic_write(
+        output_dir / "README.md",
         f"# AWS Lambda APM — rendered {ts}\n\n"
         f"Realm: {spec['realm']} | Functions: {n}\n\n"
         "## Quick reference\n\n"
@@ -1457,84 +1872,79 @@ def render(spec: dict[str, Any], output_dir: Path, *, gitops_mode: bool = False)
         "| `container-image/` | Dockerfile snippets for image-package targets |\n"
         "| `scripts/write-splunk-token.sh` | One-time token write to secret backend |\n"
         "| `coverage-report.json` | Per-section coverage status |\n",
-        encoding="utf-8",
     )
 
     # IAM.
     iam_dir = output_dir / "iam"
-    iam_dir.mkdir(exist_ok=True)
+    _safe_directory(iam_dir)
     local = spec.get("local_collector_enabled", True)
     if not local:
         iam_policy = _render_iam_ingest_egress(spec)
-        (iam_dir / "iam-ingest-egress.json").write_text(
-            json.dumps(iam_policy, indent=2), encoding="utf-8"
-        )
+        _atomic_write(iam_dir / "iam-ingest-egress.json", json.dumps(iam_policy, indent=2))
     else:
-        (iam_dir / "iam-not-required.md").write_text(
+        _atomic_write(
+            iam_dir / "iam-not-required.md",
             "# IAM\n\nNo additional IAM policy is required when `local_collector_enabled=true`.\n"
             "The Lambda Extension (local collector) handles OTLP forwarding internally.\n",
-            encoding="utf-8",
         )
 
     # AWS CLI plan is intentionally absent in GitOps-only renders.
     aws_cli_dir = output_dir / "aws-cli"
     if gitops_mode:
+        if aws_cli_dir.is_symlink():
+            raise RendererError(f"refusing symlink output directory: {aws_cli_dir}")
         if aws_cli_dir.exists():
-            import shutil
             shutil.rmtree(aws_cli_dir)
     else:
-        aws_cli_dir.mkdir(exist_ok=True)
+        _safe_directory(aws_cli_dir)
         cli_plan = _render_aws_cli_plan(spec, manifest, metrics_manifest, wrappers)
         plan_path = aws_cli_dir / "apply-plan.sh"
-        plan_path.write_text(cli_plan, encoding="utf-8")
-        plan_path.chmod(0o755)
+        _atomic_write(plan_path, cli_plan, mode=0o755)
 
     # Terraform.
     tf_dir = output_dir / "terraform"
-    tf_dir.mkdir(exist_ok=True)
-    (tf_dir / "main.tf").write_text(_render_terraform(spec, manifest, wrappers), encoding="utf-8")
+    _safe_directory(tf_dir)
+    _atomic_write(tf_dir / "main.tf", _render_terraform(spec, manifest, wrappers))
 
     # CloudFormation.
     cfn_dir = output_dir / "cloudformation"
-    cfn_dir.mkdir(exist_ok=True)
-    (cfn_dir / "snippets.yaml").write_text(_render_cloudformation(spec, manifest, wrappers), encoding="utf-8")
+    _safe_directory(cfn_dir)
+    _atomic_write(cfn_dir / "snippets.yaml", _render_cloudformation(spec, manifest, wrappers))
 
     # SAM.
     sam_dir = output_dir / "sam"
-    sam_dir.mkdir(exist_ok=True)
-    (sam_dir / "template.yaml").write_text(_render_sam(spec, manifest, metrics_manifest, wrappers), encoding="utf-8")
+    _safe_directory(sam_dir)
+    _atomic_write(sam_dir / "template.yaml", _render_sam(spec, manifest, metrics_manifest, wrappers))
 
     # CDK.
     cdk_dir = output_dir / "cdk"
-    cdk_dir.mkdir(exist_ok=True)
+    _safe_directory(cdk_dir)
     cdk_ts, cdk_py = _render_cdk(spec, manifest, metrics_manifest, wrappers)
-    (cdk_dir / "lambda-apm-stack.ts").write_text(cdk_ts, encoding="utf-8")
-    (cdk_dir / "lambda_apm_stack.py").write_text(cdk_py, encoding="utf-8")
+    _atomic_write(cdk_dir / "lambda-apm-stack.ts", cdk_ts)
+    _atomic_write(cdk_dir / "lambda_apm_stack.py", cdk_py)
 
     # SAR advisory.
     sar_dir = output_dir / "sar"
-    sar_dir.mkdir(exist_ok=True)
-    (sar_dir / "README.md").write_text(_render_sar_readme(), encoding="utf-8")
+    _safe_directory(sar_dir)
+    _atomic_write(sar_dir / "README.md", _render_sar_readme())
 
     # Container-image Dockerfiles.
     has_image_targets = any(t.get("package_type") == "image" for t in spec.get("targets", []))
     if has_image_targets:
         ci_dir = output_dir / "container-image"
-        ci_dir.mkdir(exist_ok=True)
+        _safe_directory(ci_dir)
         for fname, content in _render_container_image(spec).items():
-            (ci_dir / fname).write_text(content, encoding="utf-8")
+            _atomic_write(ci_dir / fname, content)
 
     # Scripts.
     scripts_dir = output_dir / "scripts"
-    scripts_dir.mkdir(exist_ok=True)
+    _safe_directory(scripts_dir)
 
     write_token = scripts_dir / "write-splunk-token.sh"
-    write_token.write_text(_render_write_token_sh(spec), encoding="utf-8")
-    write_token.chmod(0o755)
+    _atomic_write(write_token, _render_write_token_sh(spec), mode=0o755)
 
     handoff = scripts_dir / "handoffs.sh"
-    handoff.write_text(_render_handoff_sh(spec), encoding="utf-8")
-    handoff.chmod(0o755)
+    _atomic_write(handoff, _render_handoff_sh(spec), mode=0o755)
 
     # Coverage report.
     cov = coverage_for(spec)
@@ -1548,9 +1958,7 @@ def render(spec: dict[str, Any], output_dir: Path, *, gitops_mode: bool = False)
         "by_status": {s: len(keys) for s, keys in by_status.items()},
         "detail": cov,
     }
-    (output_dir / "coverage-report.json").write_text(
-        json.dumps(coverage_obj, indent=2), encoding="utf-8"
-    )
+    _atomic_write(output_dir / "coverage-report.json", json.dumps(coverage_obj, indent=2))
 
     return {"coverage_summary": coverage_obj}
 

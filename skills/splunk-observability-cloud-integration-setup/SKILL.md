@@ -74,8 +74,20 @@ claim API parity that does not exist.
   used by the Splunk Infrastructure Monitoring Add-on account.
 - Use `--service-account-password-file` for the Log Observer Connect
   service-account password.
-- Token files must be regular, non-empty files with mode `600`. `--apply`
-  aborts on symlinks, empty files, or looser permissions.
+- Token and password files must be regular, single-hardlink, non-empty files
+  with mode `600` and no more than 64 KiB. Tokens contain one printable-ASCII
+  value; passwords may contain printable UTF-8. Either permits at most one
+  trailing LF or CRLF; all other controls and Unicode line separators fail.
+  Authenticated
+  clients use `O_NOFOLLOW`, bounded double reads, and stable metadata/content
+  fingerprints; `--apply` aborts on any mismatch.
+- Authenticated REST calls require HTTPS before credentials are attached and
+  refuse every redirect so Basic, bearer, JWT, and O11y token headers cannot be
+  forwarded to a different URL.
+- Generated authenticated curl helpers put `-q` first so user or system curl
+  configuration cannot relax TLS/redirect policy. Log Observer Connect converts
+  its password file directly from the validated descriptor into a private curl
+  config; the password is never loaded into a shell variable or reopened.
 - Reject direct secret flags such as `--token`, `--access-token`,
   `--api-token`, `--o11y-token`, `--admin-token`, `--org-token`, `--sf-token`,
   `--service-account-password`, and `--password`.

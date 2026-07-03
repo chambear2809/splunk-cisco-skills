@@ -25,7 +25,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,6 +59,26 @@ def _load_apply_state():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _load_api_script(script_name: str):
+    """Import one API client with this skill's private _apply_state module."""
+    local_apply_state = _load_apply_state()
+    previous = sys.modules.get("_apply_state")
+    sys.modules["_apply_state"] = local_apply_state
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"soics_{script_name}", SCRIPTS_DIR / f"{script_name}.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        if previous is None:
+            sys.modules.pop("_apply_state", None)
+        else:
+            sys.modules["_apply_state"] = previous
 
 
 def _spec(**overrides):
@@ -139,7 +161,7 @@ def test_enterprise_target_collapses_uid_sections_to_not_applicable(tmp_path: Pa
     # Enterprise skips both Cloud pairing modes and uses its separate LOC
     # service-account workflow while retaining SIM support.
     assert coverage["pairing.sa"]["status"] == "not_applicable"
-    assert coverage["log_observer_connect.user"]["status"] == "api_apply"
+    assert coverage["log_observer_connect.user"]["status"] == "handoff"
     assert coverage["sim_addon.account"]["status"] == "api_apply"
     assert coverage["log_observer_connect.tls_cert"]["status"] == "handoff"
     assert coverage["sim_addon.victoria_hec"]["status"] == "not_applicable"
@@ -153,8 +175,9 @@ def test_govcloud_or_gcp_carve_out_disables_uid(tmp_path: Path) -> None:
     assert coverage["pairing.uid"]["status"] == "not_applicable"
     assert coverage["centralized_rbac.capabilities"]["status"] == "not_applicable"
     assert coverage["centralized_rbac.cutover"]["status"] == "not_applicable"
-    # Service Account pairing is still available as the fallback.
-    assert coverage["pairing.sa"]["status"] == "api_apply"
+    # Service-account pairing fails closed because realm-only readback cannot
+    # prove the submitted token.
+    assert coverage["pairing.sa"]["status"] == "handoff"
 
 
 def test_unknown_realm_fails_validation() -> None:
@@ -299,6 +322,54 @@ def test_apply_state_records_step(tmp_path: Path) -> None:
     assert apply_state.has_step(state_dir, "pairing:us0:test-stack")
 
 
+def test_rendered_state_is_private_and_accepts_first_append(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    apply_state = _load_apply_state()
+    renderer.render(renderer.validate_spec(_spec()), tmp_path)
+    state_dir = tmp_path / "state"
+    state_path = state_dir / "apply-state.json"
+    assert stat.S_IMODE(state_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
+    apply_state.append_step(
+        state_dir,
+        section="pairing",
+        step="first-live-append",
+        idempotency_key="pairing:first-live-append",
+        result="success",
+    )
+    assert apply_state.has_step(state_dir, "pairing:first-live-append")
+
+
+def test_apply_state_read_rejects_path_swap_to_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_state = _load_apply_state()
+    state_dir = tmp_path / "state"
+    apply_state.append_step(
+        state_dir,
+        section="pairing",
+        step="trusted",
+        idempotency_key="trusted",
+        result="success",
+    )
+    state_path = state_dir / "apply-state.json"
+    replacement = tmp_path / "replacement.json"
+    replacement.write_text('{"steps": []}\n', encoding="utf-8")
+    os.chmod(replacement, 0o600)
+    original_open = apply_state.os.open
+
+    def swapping_open(path, flags, *args, **kwargs):
+        if Path(path) == state_path:
+            state_path.unlink()
+            state_path.symlink_to(replacement)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(apply_state.os, "open", swapping_open)
+    with pytest.raises(PermissionError, match="safely|changed"):
+        apply_state.has_step(state_dir, "trusted")
+
+
 def test_apply_state_redacts_secrets() -> None:
     apply_state = _load_apply_state()
     redacted = apply_state.redact({
@@ -311,6 +382,205 @@ def test_apply_state_redacts_secrets() -> None:
     assert redacted["o11y-access-token"] == "[REDACTED]"
     assert redacted["realm"] == "us0"
     assert redacted["nested"]["password"] == "[REDACTED]"
+
+
+def test_secret_files_require_exact_0600_and_reject_symlinks(tmp_path: Path) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "token"
+    token.write_text("one-secret-line\n", encoding="utf-8")
+    os.chmod(token, 0o600)
+    assert apply_state.read_secret_file(token) == "one-secret-line"
+
+    link = tmp_path / "token-link"
+    link.symlink_to(token)
+    with pytest.raises(PermissionError, match="non-symlink"):
+        apply_state.read_secret_file(link)
+
+    os.chmod(token, 0o640)
+    with pytest.raises(PermissionError, match="0o600"):
+        apply_state.read_secret_file(token)
+
+    os.chmod(token, 0o600)
+    hardlink = tmp_path / "token-hardlink"
+    os.link(token, hardlink)
+    with pytest.raises(PermissionError, match="exactly one hard link"):
+        apply_state.read_secret_file(token)
+
+
+def test_cloud_secret_reader_rejects_oversized_files(tmp_path: Path) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "oversized-token"
+    token.write_bytes(b"x" * (apply_state.MAX_SECRET_BYTES + 1))
+    os.chmod(token, 0o600)
+    with pytest.raises(PermissionError, match="safety limit"):
+        apply_state.read_secret_file(token)
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    ["token\v", "token\f", "token\x1c", "token\u0085", "token\u2028", "token\u2029"],
+)
+def test_cloud_token_reader_rejects_all_line_controls(
+    tmp_path: Path,
+    bad_value: str,
+) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "controlled-token"
+    token.write_text(bad_value, encoding="utf-8")
+    os.chmod(token, 0o600)
+    with pytest.raises(ValueError, match="printable ASCII"):
+        apply_state.read_secret_file(token)
+
+
+def test_loc_password_helper_uses_descriptor_bound_secret_read(tmp_path: Path) -> None:
+    secret = tmp_path / "loc-password"
+    secret.write_text('value with spaces & a "quote"\\suffix\n', encoding="utf-8")
+    os.chmod(secret, 0o600)
+    output = tmp_path / "curl-config"
+    output.touch(mode=0o600)
+    os.chmod(output, 0o600)
+    helper = SCRIPTS_DIR / "secret_file_to_curl_config.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(helper),
+            "--field",
+            "password",
+            "--secret-file",
+            str(secret),
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    config = output.read_text(encoding="utf-8")
+    assert config.startswith('data-urlencode = "password=value with spaces & a \\"quote\\"')
+    assert stat.S_IMODE(output.stat().st_mode) == 0o600
+
+    link = tmp_path / "loc-password-link"
+    link.symlink_to(secret)
+    refused = subprocess.run(
+        [
+            sys.executable,
+            str(helper),
+            "--field",
+            "password",
+            "--secret-file",
+            str(link),
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert refused.returncode == 2
+    assert "non-symlink" in refused.stderr
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    ["password\v", "password\f", "password\u0085", "password\u2028", "password\u2029"],
+)
+def test_loc_password_helper_rejects_unicode_and_ascii_line_controls(
+    tmp_path: Path,
+    bad_value: str,
+) -> None:
+    secret = tmp_path / "loc-password"
+    secret.write_text(bad_value, encoding="utf-8")
+    os.chmod(secret, 0o600)
+    output = tmp_path / "curl-config"
+    output.touch(mode=0o600)
+    os.chmod(output, 0o600)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "secret_file_to_curl_config.py"),
+            "--field",
+            "password",
+            "--secret-file",
+            str(secret),
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "printable UTF-8" in result.stderr
+
+
+def test_rendered_cloud_curl_and_uid_examples_are_fail_closed(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    enterprise = renderer.validate_spec(_spec(target="enterprise"))
+    enterprise.pop("splunk_cloud_stack", None)
+    renderer.render(enterprise, tmp_path / "enterprise")
+    loc = (tmp_path / "enterprise" / "scripts" / "apply-loc.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "no mutation was attempted" in loc
+    assert "-X POST" not in loc
+    curl_helper = renderer.SPLUNK_CURL_AUTH_HELPER
+    assert "command curl -q" in curl_helper
+    assert "--proto '=https'" in curl_helper
+    assert "--location --max-redirs 0" in curl_helper
+    assert "--fail" in curl_helper
+    assert "--fail-with-body" not in curl_helper
+
+    cloud = renderer.validate_spec(_spec())
+    renderer.render(cloud, tmp_path / "cloud")
+    pairing = (tmp_path / "cloud" / "02-pairing.md").read_text(encoding="utf-8")
+    assert "o11y_pairing_api.py" in pairing
+    assert '--splunk-cloud-stack "${SPLUNK_CLOUD_STACK}"' in pairing
+    assert '--pairing-id "${PAIRING_ID}"' in pairing
+    assert "'${SPLUNK_CLOUD_STACK}'" not in pairing
+
+
+@pytest.mark.parametrize(
+    ("script_name", "request_name"),
+    [
+        ("token_auth_api", "_splunk_request"),
+        ("sim_addon_api", "_splunk_request"),
+        ("discover_app_api", "_splunk_request"),
+    ],
+)
+def test_authenticated_splunk_clients_reject_http_before_credentials(
+    script_name: str,
+    request_name: str,
+) -> None:
+    module = _load_api_script(script_name)
+    with pytest.raises(RuntimeError, match="HTTPS"):
+        getattr(module, request_name)("GET", "http://splunk.example.test:8089/services/server/info")
+
+
+@pytest.mark.parametrize(
+    "script_name",
+    ["token_auth_api", "sim_addon_api", "discover_app_api", "o11y_pairing_api"],
+)
+def test_authenticated_clients_install_no_redirect_handler(script_name: str) -> None:
+    module = _load_api_script(script_name)
+    handler = module._NoRedirectHandler()
+    assert handler.redirect_request(
+        None,
+        None,
+        302,
+        "Found",
+        {},
+        "https://attacker.example.test/steal",
+    ) is None
+
+
+def test_pairing_client_requires_pinned_https_admin_host() -> None:
+    pairing = _load_api_script("o11y_pairing_api")
+    headers = {"Authorization": "Bearer secret", "o11y-access-token": "secret"}
+    with pytest.raises(RuntimeError, match="https://admin.splunk.com"):
+        pairing._rest_request("GET", "http://admin.splunk.com/pairing", headers)
+    with pytest.raises(RuntimeError, match="https://admin.splunk.com"):
+        pairing._rest_request("GET", "https://attacker.example.test/pairing", headers)
 
 
 def test_setup_sh_help_runs() -> None:

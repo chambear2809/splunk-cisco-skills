@@ -70,6 +70,23 @@ apply helper fetches the value and merges it into Lambda environment variables;
 Lambda itself stores environment values, so access to function configuration
 must remain least-privileged.
 
+The generated token writer requires a mode-`600`, regular, single-hardlink
+token file containing one non-empty printable-ASCII value with at most one
+trailing LF or CRLF, no larger than 4 KiB for default-tier SSM or
+64 KiB for Secrets Manager. It opens that source once
+with `O_NOFOLLOW`, validates a stable inode and metadata/content fingerprint,
+and creates the AWS CLI payload from the same descriptor read.
+
+For short-lived development only, `--allow-loose-token-perms` propagates to the
+generated writer and relaxes the source file's mode check. It does not relax
+the non-symlink, regular-file, single-hardlink, size, UTF-8, or stable-fingerprint
+requirements.
+
+The rendered Terraform variant reads the token in plaintext and persists it in
+Terraform state. Protect it with an encrypted, access-controlled remote backend
+and locking, and never commit local state. Use the CloudFormation dynamic
+reference or guarded AWS CLI variant if that state posture is unavailable.
+
 ### Secrets Manager (default, `secret_backend: secretsmanager`)
 ```yaml
 SPLUNK_ACCESS_TOKEN: "{{resolve:secretsmanager:splunk-lambda-access-token:SecretString:::}}"

@@ -24,7 +24,8 @@ Provides one product-aware entrypoint for Cisco setup requests.
 
 ## What It Does
 
-- Resolves a product name, alias, or keyword against the packaged SCAN catalog.
+- Resolves a product name, alias, or keyword against the pinned normalized SCAN
+  public-catalog fixture.
 - Classifies the product as `automated`, `partial`, `manual_gap`,
   `no_plans_available`, `unsupported_legacy`, or `unsupported_roadmap`.
 - For automated products, delegates to the existing family skill already in
@@ -83,13 +84,23 @@ output lists for the resolved product.
 ## Catalog Files
 
 - `catalog_overrides.json` defines local routing overrides.
+- `scan_source.json` records the public SCAN catalog timestamp, minimum app
+  version, raw source SHA-256, and normalized fixture SHA-256.
+- `scan_products.fixture.json` is the sanitized, package-free source fixture
+  consumed by clean-clone builds.
 - `catalog.json` is the generated runtime catalog.
 - `scripts/build_catalog.py --check` verifies that `catalog.json` matches the
-  current SCAN package and overrides.
+  pinned fixture and overrides, including both provenance checksums.
 - `scripts/build_catalog.py --write` regenerates `catalog.json` after editing
-  `catalog_overrides.json` or refreshing the SCAN package in `splunk-ta/`.
-  Without a mode flag the script prints the catalog to stdout instead of
-  writing it.
+  `catalog_overrides.json`.
+- `scripts/build_catalog.py --refresh-source --write` fetches the public SCAN
+  `products.conf`, refreshes the fixture and manifest, and regenerates the
+  runtime catalog. Review all source and catalog diffs before commit.
+- `scripts/build_catalog.py --check-live-source` is the networked drift check;
+  it is scheduled separately from pull-request gating.
+- `--scan-package PATH` produces one-off comparison output from a reviewed
+  vendor package but cannot overwrite the pinned generated catalog.
+  Without a mode flag the script prints the catalog to stdout.
 
 ## Completion Validation
 

@@ -515,6 +515,19 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(content_library_entry["app_name"], "DA-ITSI-ContentLibrary")
         self.assertEqual(content_library_entry.get("install_requires"), ["1841"])
         self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))
+        self.assertEqual(content_library_entry["latest_verified_version"], "2.5.0")
+        self.assertEqual(content_library_entry["latest_release_version"], "2.5.1")
+        self.assertEqual(
+            content_library_entry["verified_platform_versions"],
+            ["10.5", "10.4", "10.3", "10.2", "10.1", "10.0", "9.4", "9.3"],
+        )
+        self.assertEqual(
+            content_library_entry["platform_versions"],
+            ["10.5", "10.4", "10.3", "10.2"],
+        )
+        self.assertTrue(content_library_entry["cloud_compatible"])
+        self.assertEqual(content_library_entry["install_method_single"], "assisted")
+        self.assertEqual(content_library_entry["install_method_distributed"], "assisted")
 
     def test_db_connect_registry_entries_are_present(self):
         registry = json.loads(

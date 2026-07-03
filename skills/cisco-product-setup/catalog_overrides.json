@@ -190,11 +190,11 @@
     },
     "cisco_appomni": {
       "automation_state": "no_plans_available",
-      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
+      "manual_gap_reason": "This product is marked under_development in the pinned SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
     },
     "cisco_radware": {
       "automation_state": "no_plans_available",
-      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
+      "manual_gap_reason": "This product is marked under_development in the pinned SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
     },
     "cisco_hyperflex": {
       "automation_state": "partial",

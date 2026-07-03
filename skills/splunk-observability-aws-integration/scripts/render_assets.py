@@ -29,8 +29,12 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
+import stat
 import sys
+import tempfile
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -380,6 +384,161 @@ def assert_no_secrets_in_text(text: str, label: str) -> None:
             )
 
 
+def require_https_template_url(label: str, value: Any) -> str:
+    """Validate an executable CloudFormation template URL."""
+    if not isinstance(value, str) or not value:
+        raise RenderError(f"{label} must be a non-empty HTTPS URL")
+    parsed = urllib.parse.urlsplit(value)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise RenderError(f"{label} contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or port not in {None, 443}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.endswith((".yaml", ".yml"))
+        or any(character.isspace() or ord(character) < 0x20 for character in value)
+    ):
+        raise RenderError(
+            f"{label} must be an absolute https://host/path.yaml URL without "
+            "credentials, a nonstandard port, query, fragment, whitespace, or control characters"
+        )
+    return value
+
+
+def require_mapping(label: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RenderError(f"{label} must be an object")
+    return value
+
+
+def require_bool(label: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise RenderError(f"{label} must be true or false")
+    return value
+
+
+def require_int(label: str, value: Any, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RenderError(f"{label} must be an integer")
+    if not minimum <= value <= maximum:
+        raise RenderError(f"{label} must be between {minimum} and {maximum}, got {value}")
+    return value
+
+
+def require_string(
+    label: str,
+    value: Any,
+    *,
+    pattern: re.Pattern[str] | None = None,
+    maximum: int = 4096,
+    allow_empty: bool = False,
+) -> str:
+    if not isinstance(value, str) or (not value and not allow_empty):
+        raise RenderError(f"{label} must be {'a string' if allow_empty else 'a non-empty string'}")
+    if len(value) > maximum or any(not character.isprintable() for character in value):
+        raise RenderError(f"{label} contains unsupported or non-printable characters")
+    if pattern is not None and value and pattern.fullmatch(value) is None:
+        raise RenderError(f"{label} has an invalid format")
+    return value
+
+
+def require_string_list(
+    label: str,
+    value: Any,
+    *,
+    pattern: re.Pattern[str] | None = None,
+) -> list[str]:
+    if not isinstance(value, list):
+        raise RenderError(f"{label} must be a list")
+    result = [require_string(f"{label}[{index}]", item, pattern=pattern) for index, item in enumerate(value)]
+    if len(result) != len(set(result)):
+        raise RenderError(f"{label} must not contain duplicates")
+    return result
+
+
+INTEGRATION_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,127}$")
+IAM_ROLE_NAME_RE = re.compile(r"^[A-Za-z0-9_+=,.@-]{1,64}$")
+NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/: -]{0,254}$")
+METRIC_OR_STAT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}$")
+PROVIDER_SOURCE_RE = re.compile(r"^(?:[a-z0-9.-]+/)?[a-z0-9-]+/[a-z0-9-]+$")
+PROVIDER_VERSION_RE = re.compile(r"^[0-9A-Za-z .<>=~!,*-]{1,128}$")
+ACCOUNT_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,127}$")
+
+
+def hcl_string(value: str) -> str:
+    """Encode an HCL string and neutralize interpolation/directive openers."""
+    return json.dumps(value, ensure_ascii=True).replace("${", "$${").replace("%{", "%%{")
+
+
+def hcl_string_list(values: list[str]) -> str:
+    return "[" + ", ".join(hcl_string(value) for value in values) + "]"
+
+
+def normalize_sync_rules(label: str, value: list[Any]) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+    for index, raw_rule in enumerate(value):
+        rule = require_mapping(f"{label}[{index}]", raw_rule)
+        namespace = require_string(
+            f"{label}[{index}].namespace", rule.get("namespace"), pattern=NAMESPACE_RE
+        )
+        filter_action = require_string(
+            f"{label}[{index}].filter_action", rule.get("filter_action")
+        )
+        default_action = require_string(
+            f"{label}[{index}].default_action", rule.get("default_action", "Exclude")
+        )
+        if filter_action not in {"Include", "Exclude"}:
+            raise RenderError(f"{label}[{index}].filter_action must be Include or Exclude")
+        if default_action not in {"Include", "Exclude"}:
+            raise RenderError(f"{label}[{index}].default_action must be Include or Exclude")
+        normalized.append(
+            {
+                "namespace": namespace,
+                "filter_action": filter_action,
+                "filter_source": require_string(
+                    f"{label}[{index}].filter_source", rule.get("filter_source")
+                ),
+                "default_action": default_action,
+            }
+        )
+    return normalized
+
+
+def normalize_metric_stats(value: list[Any]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for index, raw_entry in enumerate(value):
+        entry = require_mapping(f"services.metric_stats_to_syncs[{index}]", raw_entry)
+        stats = require_string_list(
+            f"services.metric_stats_to_syncs[{index}].stats",
+            entry.get("stats"),
+            pattern=METRIC_OR_STAT_RE,
+        )
+        if not stats:
+            raise RenderError(f"services.metric_stats_to_syncs[{index}].stats must be non-empty")
+        normalized.append(
+            {
+                "namespace": require_string(
+                    f"services.metric_stats_to_syncs[{index}].namespace",
+                    entry.get("namespace"),
+                    pattern=NAMESPACE_RE,
+                ),
+                "metric": require_string(
+                    f"services.metric_stats_to_syncs[{index}].metric",
+                    entry.get("metric"),
+                    pattern=METRIC_OR_STAT_RE,
+                ),
+                "stats": stats,
+            }
+        )
+    return normalized
+
+
 def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> dict[str, Any]:
     """Normalize spec, fill in defaults, and FAIL on hard validation errors."""
     if not isinstance(spec, dict):
@@ -411,12 +570,16 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
         )
     spec["realm"] = realm
 
-    if not spec.get("integration_name"):
-        raise RenderError("integration_name is required")
+    spec["integration_name"] = require_string(
+        "integration_name",
+        spec.get("integration_name"),
+        pattern=INTEGRATION_NAME_RE,
+        maximum=128,
+    )
 
-    auth = spec.setdefault("authentication", {})
+    auth = require_mapping("authentication", spec.setdefault("authentication", {}))
     auth.setdefault("mode", "external_id")
-    if auth["mode"] not in AUTH_MODES:
+    if not isinstance(auth["mode"], str) or auth["mode"] not in AUTH_MODES:
         raise RenderError(
             f"authentication.mode must be one of {AUTH_MODES}, got {auth['mode']!r}"
         )
@@ -426,34 +589,53 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
             raise RenderError(
                 "authentication.aws_account_id is required when mode=external_id"
             )
-        if not isinstance(auth["aws_account_id"], str) or not auth["aws_account_id"].isdigit():
+        if not isinstance(auth["aws_account_id"], str) or re.fullmatch(r"[0-9]{12}", auth["aws_account_id"]) is None:
             raise RenderError(
                 "authentication.aws_account_id must be a quoted 12-digit string"
             )
         auth.setdefault("iam_role_name", "SplunkObservabilityRole")
         auth.setdefault("external_id", "")
+        auth["iam_role_name"] = require_string(
+            "authentication.iam_role_name",
+            auth["iam_role_name"],
+            pattern=IAM_ROLE_NAME_RE,
+            maximum=64,
+        )
+        auth["external_id"] = require_string(
+            "authentication.external_id",
+            auth["external_id"],
+            allow_empty=True,
+        )
 
-    conn = spec.setdefault("connection", {})
+    conn = require_mapping("connection", spec.setdefault("connection", {}))
     conn.setdefault("mode", "polling")
     if conn["mode"] not in CONNECTION_MODES:
         raise RenderError(
             f"connection.mode must be one of {CONNECTION_MODES}, got {conn['mode']!r}"
         )
-    poll_rate = int(conn.setdefault("poll_rate_seconds", 300))
-    if not 60 <= poll_rate <= 600:
-        raise RenderError(
-            f"connection.poll_rate_seconds must be between 60 and 600, got {poll_rate}"
-        )
+    poll_rate = require_int(
+        "connection.poll_rate_seconds", conn.setdefault("poll_rate_seconds", 300), 60, 600
+    )
     conn["poll_rate_seconds"] = poll_rate
-    conn.setdefault("metadata_poll_rate_seconds", 900)
-    adaptive = conn.setdefault("adaptive_polling", {})
+    conn["metadata_poll_rate_seconds"] = require_int(
+        "connection.metadata_poll_rate_seconds",
+        conn.setdefault("metadata_poll_rate_seconds", 900),
+        60,
+        3600,
+    )
+    adaptive = require_mapping(
+        "connection.adaptive_polling", conn.setdefault("adaptive_polling", {})
+    )
     adaptive.setdefault("enabled", True)
-    inactive = int(adaptive.setdefault("inactive_seconds", 1200))
-    if not 60 <= inactive <= 3600:
-        raise RenderError(
-            f"connection.adaptive_polling.inactive_seconds must be between 60 and 3600, "
-            f"got {inactive}"
-        )
+    adaptive["enabled"] = require_bool(
+        "connection.adaptive_polling.enabled", adaptive["enabled"]
+    )
+    inactive = require_int(
+        "connection.adaptive_polling.inactive_seconds",
+        adaptive.setdefault("inactive_seconds", 1200),
+        60,
+        3600,
+    )
     adaptive["inactive_seconds"] = inactive
 
     regions = spec.get("regions") or []
@@ -463,6 +645,10 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
             "and Splunk highly discourages it because new AWS regions auto-onboard "
             "and inflate cost. Enumerate explicitly."
         )
+    if any(not isinstance(region, str) for region in regions):
+        raise RenderError("regions entries must be strings")
+    if len(regions) != len(set(regions)):
+        raise RenderError("regions must not contain duplicates")
     bad_regions = [r for r in regions if r not in ALL_AWS_REGIONS]
     if bad_regions:
         raise RenderError(f"unknown AWS regions: {', '.join(bad_regions)}")
@@ -475,7 +661,7 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
         )
     spec["regions"] = regions
 
-    services = spec.setdefault("services", {})
+    services = require_mapping("services", spec.setdefault("services", {}))
     services.setdefault("mode", "all_built_in")
     if services["mode"] not in SERVICES_MODES:
         raise RenderError(
@@ -485,6 +671,22 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
     services.setdefault("collect_only_recommended_stats", False)
     services.setdefault("metric_stats_to_syncs", [])
     services.setdefault("namespace_sync_rules", [])
+    services["explicit"] = require_string_list(
+        "services.explicit", services["explicit"], pattern=NAMESPACE_RE
+    )
+    services["collect_only_recommended_stats"] = require_bool(
+        "services.collect_only_recommended_stats", services["collect_only_recommended_stats"]
+    )
+    if not isinstance(services["metric_stats_to_syncs"], list):
+        raise RenderError("services.metric_stats_to_syncs must be a list")
+    if not isinstance(services["namespace_sync_rules"], list):
+        raise RenderError("services.namespace_sync_rules must be a list")
+    services["metric_stats_to_syncs"] = normalize_metric_stats(
+        services["metric_stats_to_syncs"]
+    )
+    services["namespace_sync_rules"] = normalize_sync_rules(
+        "services.namespace_sync_rules", services["namespace_sync_rules"]
+    )
 
     if services["mode"] == "explicit" and not services["explicit"]:
         raise RenderError("services.explicit must be non-empty when mode=explicit")
@@ -508,9 +710,17 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
             f"unknown namespaces in services.explicit: {', '.join(bad_namespaces)}"
         )
 
-    custom = spec.setdefault("custom_namespaces", {})
+    custom = require_mapping("custom_namespaces", spec.setdefault("custom_namespaces", {}))
     custom.setdefault("simple_list", [])
     custom.setdefault("sync_rules", [])
+    custom["simple_list"] = require_string_list(
+        "custom_namespaces.simple_list", custom["simple_list"], pattern=NAMESPACE_RE
+    )
+    if not isinstance(custom["sync_rules"], list):
+        raise RenderError("custom_namespaces.sync_rules must be a list")
+    custom["sync_rules"] = normalize_sync_rules(
+        "custom_namespaces.sync_rules", custom["sync_rules"]
+    )
     if custom["simple_list"] and custom["sync_rules"]:
         raise RenderError(
             "custom_namespaces.simple_list and custom_namespaces.sync_rules conflict "
@@ -518,14 +728,24 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
             "Pick one."
         )
     spec.setdefault("sync_custom_namespaces_only", False)
+    spec["sync_custom_namespaces_only"] = require_bool(
+        "sync_custom_namespaces_only", spec["sync_custom_namespaces_only"]
+    )
 
-    guards = spec.setdefault("guards", {})
+    guards = require_mapping("guards", spec.setdefault("guards", {}))
     guards.setdefault("enable_check_large_volume", True)
     guards.setdefault("ignore_all_status_metrics", False)
     guards.setdefault("sync_load_balancer_target_group_tags", False)
     guards.setdefault("enable_aws_usage", False)
+    for guard_name in (
+        "enable_check_large_volume",
+        "ignore_all_status_metrics",
+        "sync_load_balancer_target_group_tags",
+        "enable_aws_usage",
+    ):
+        guards[guard_name] = require_bool(f"guards.{guard_name}", guards[guard_name])
 
-    streams = spec.setdefault("metric_streams", {})
+    streams = require_mapping("metric_streams", spec.setdefault("metric_streams", {}))
     streams.setdefault("use_metric_streams_sync", conn["mode"] in (
         "streaming_splunk_managed", "streaming_aws_managed"
     ))
@@ -535,46 +755,119 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
     streams.setdefault("cloudformation_template_url", "")
     streams.setdefault("use_stack_sets", False)
     streams.setdefault("terraform", False)
+    for stream_bool in (
+        "use_metric_streams_sync",
+        "managed_externally",
+        "cloudformation",
+        "use_stack_sets",
+        "terraform",
+    ):
+        streams[stream_bool] = require_bool(
+            f"metric_streams.{stream_bool}", streams[stream_bool]
+        )
+    streams["named_token"] = require_string(
+        "metric_streams.named_token", streams["named_token"], allow_empty=True, maximum=256
+    )
     if streams["managed_externally"] and not streams["use_metric_streams_sync"]:
         raise RenderError(
             "metric_streams.managed_externally=true requires metric_streams.use_metric_streams_sync=true "
             "per the canonical AWSCloudWatch schema."
         )
+    if streams["cloudformation_template_url"]:
+        streams["cloudformation_template_url"] = require_https_template_url(
+            "metric_streams.cloudformation_template_url",
+            streams["cloudformation_template_url"],
+        )
 
-    pl = spec.setdefault("private_link", {})
+    pl = require_mapping("private_link", spec.setdefault("private_link", {}))
     pl.setdefault("enable", False)
     pl.setdefault("endpoint_types", ["ingest", "api", "stream"])
     pl.setdefault("service_name_overrides", {})
     pl.setdefault("domain", "legacy")
+    pl["enable"] = require_bool("private_link.enable", pl["enable"])
+    pl["endpoint_types"] = require_string_list(
+        "private_link.endpoint_types", pl["endpoint_types"]
+    )
+    unknown_endpoint_types = set(pl["endpoint_types"]) - {"ingest", "api", "stream", "backfill"}
+    if unknown_endpoint_types:
+        raise RenderError(
+            f"private_link.endpoint_types contains unsupported values: {sorted(unknown_endpoint_types)}"
+        )
+    require_mapping("private_link.service_name_overrides", pl["service_name_overrides"])
     if pl["domain"] not in {"legacy", "new"}:
         raise RenderError(
             f"private_link.domain must be 'legacy' or 'new', got {pl['domain']!r}"
         )
 
-    tf = spec.setdefault("terraform_provider", {})
+    tf = require_mapping("terraform_provider", spec.setdefault("terraform_provider", {}))
     tf.setdefault("source", "splunk-terraform/signalfx")
     tf.setdefault("version", TERRAFORM_PROVIDER_VERSION_DEFAULT)
+    tf["source"] = require_string(
+        "terraform_provider.source", tf["source"], pattern=PROVIDER_SOURCE_RE
+    )
+    tf["version"] = require_string(
+        "terraform_provider.version", tf["version"], pattern=PROVIDER_VERSION_RE
+    )
 
-    multi = spec.setdefault("multi_account", {})
+    multi = require_mapping("multi_account", spec.setdefault("multi_account", {}))
     multi.setdefault("enabled", False)
     multi.setdefault("control_account_id", "")
     multi.setdefault("member_accounts", [])
-    cfn_ss = multi.setdefault("cfn_stacksets", {})
+    multi["enabled"] = require_bool("multi_account.enabled", multi["enabled"])
+    if not isinstance(multi["member_accounts"], list):
+        raise RenderError("multi_account.member_accounts must be a list")
+    cfn_ss = require_mapping(
+        "multi_account.cfn_stacksets", multi.setdefault("cfn_stacksets", {})
+    )
     cfn_ss.setdefault("template_url", "")
     cfn_ss.setdefault("use_org_service_managed", True)
     cfn_ss.setdefault("fallback_admin_role", "AWSCloudFormationStackSetAdministrationRole")
     cfn_ss.setdefault("fallback_execution_role", "AWSCloudFormationStackSetExecutionRole")
+    cfn_ss["use_org_service_managed"] = require_bool(
+        "multi_account.cfn_stacksets.use_org_service_managed",
+        cfn_ss["use_org_service_managed"],
+    )
+    for role_key in ("fallback_admin_role", "fallback_execution_role"):
+        cfn_ss[role_key] = require_string(
+            f"multi_account.cfn_stacksets.{role_key}",
+            cfn_ss[role_key],
+            pattern=IAM_ROLE_NAME_RE,
+            maximum=64,
+        )
+    if cfn_ss["template_url"]:
+        cfn_ss["template_url"] = require_https_template_url(
+            "multi_account.cfn_stacksets.template_url",
+            cfn_ss["template_url"],
+        )
 
     if multi["enabled"]:
         if not multi["control_account_id"]:
             raise RenderError("multi_account.control_account_id is required when multi_account.enabled=true")
         if not multi["member_accounts"]:
             raise RenderError("multi_account.member_accounts must be non-empty when multi_account.enabled=true")
-        for entry in multi["member_accounts"]:
+        if re.fullmatch(r"[0-9]{12}", str(multi["control_account_id"])) is None:
+            raise RenderError("multi_account.control_account_id must be a quoted 12-digit string")
+        member_ids: list[str] = []
+        for index, entry in enumerate(multi["member_accounts"]):
             if not isinstance(entry, dict) or not entry.get("aws_account_id"):
                 raise RenderError("each multi_account.member_accounts entry must include aws_account_id")
+            account_id = entry["aws_account_id"]
+            if not isinstance(account_id, str) or re.fullmatch(r"[0-9]{12}", account_id) is None:
+                raise RenderError("multi_account member aws_account_id must be a quoted 12-digit string")
+            entry["label"] = require_string(
+                f"multi_account.member_accounts[{index}].label",
+                entry.get("label", ""),
+                pattern=ACCOUNT_LABEL_RE,
+                maximum=128,
+                allow_empty=True,
+            )
+            member_ids.append(account_id)
+        if len(member_ids) != len(set(member_ids)):
+            raise RenderError("multi_account.member_accounts must contain unique AWS account IDs")
+        if multi["control_account_id"] in member_ids:
+            raise RenderError("multi_account.control_account_id must not also be a member account")
 
-    handoffs = spec.setdefault("handoffs", {})
+    handoffs = require_mapping("handoffs", spec.setdefault("handoffs", {}))
     for k, default in (
         ("lambda_apm", False),
         ("logs_via_splunk_ta_aws", False),
@@ -583,6 +876,7 @@ def validate_spec(spec: dict[str, Any], realm_override: str | None = None) -> di
         ("otel_collector_for_ec2_eks", False),
     ):
         handoffs.setdefault(k, default)
+        handoffs[k] = require_bool(f"handoffs.{k}", handoffs[k])
 
     if "enableLogsSync" in spec or "enable_logs_sync" in spec:
         raise RenderError(
@@ -978,6 +1272,9 @@ def render_cfn_stub(spec: dict[str, Any]) -> str:
     )
     flavor = "StackSets (multi-region)" if streams["use_stack_sets"] else "regional (per-region)"
     lines: list[str] = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
         f"# CloudFormation deploy stub ({flavor}).",
         f"# Template URL: {template_url}",
         "# This stub is operator-driven; copy the appropriate command per region.",
@@ -989,7 +1286,7 @@ def render_cfn_stub(spec: dict[str, Any]) -> str:
             "# 2. Deploy the multi-region StackSets template across member accounts:",
             "aws cloudformation create-stack-set \\",
             "  --stack-set-name SplunkObservability-MetricStreams \\",
-            f"  --template-url {template_url} \\",
+            f"  --template-url {shlex.quote(template_url)} \\",
             "  --permission-model SERVICE_MANAGED \\",
             "  --auto-deployment Enabled=true,RetainStacksOnAccountRemoval=false \\",
             "  --capabilities CAPABILITY_NAMED_IAM \\",
@@ -999,13 +1296,14 @@ def render_cfn_stub(spec: dict[str, Any]) -> str:
     else:
         lines += [
             "# Per-region deployment loop:",
-            "for region in " + " ".join(spec["regions"]) + "; do",
+            "regions=(" + " ".join(spec["regions"]) + ")",
+            'for region in "${regions[@]}"; do',
             "  aws cloudformation create-stack \\",
-            "    --stack-name SplunkObservability-MetricStreams-${region} \\",
-            f"    --template-url {template_url} \\",
+            '    --stack-name "SplunkObservability-MetricStreams-${region}" \\',
+            f"    --template-url {shlex.quote(template_url)} \\",
             "    --capabilities CAPABILITY_NAMED_IAM \\",
             f"    --parameters ParameterKey=SplunkRealm,ParameterValue={spec['realm']} \\",
-            "    --region ${region}",
+            '    --region "${region}"',
             "done",
             "",
         ]
@@ -1022,8 +1320,8 @@ def render_terraform_main(spec: dict[str, Any]) -> str:
     pieces.append(f"""terraform {{
   required_providers {{
     signalfx = {{
-      source  = "{tf['source']}"
-      version = "{tf['version']}"
+      source  = {hcl_string(tf['source'])}
+      version = {hcl_string(tf['version'])}
     }}
   }}
 }}
@@ -1035,7 +1333,7 @@ provider "signalfx" {{
 }}
 
 resource "signalfx_aws_external_integration" "this" {{
-  name = "{spec['integration_name']}"
+  name = {hcl_string(spec['integration_name'])}
 }}
 """)
 
@@ -1058,7 +1356,7 @@ data "aws_iam_policy_document" "trust" {{
 }}
 
 resource "aws_iam_role" "splunk_observability" {{
-  name               = "{auth.get('iam_role_name', 'SplunkObservabilityRole')}"
+  name               = {hcl_string(auth.get('iam_role_name', 'SplunkObservabilityRole'))}
   assume_role_policy = data.aws_iam_policy_document.trust.json
 }}
 
@@ -1071,39 +1369,39 @@ resource "aws_iam_role_policy" "splunk_observability_policy" {{
 
     services_block = ""
     if spec["services"]["explicit"]:
-        services_block = "  services = " + json.dumps(spec["services"]["explicit"]) + "\n"
+        services_block = "  services = " + hcl_string_list(spec["services"]["explicit"]) + "\n"
 
     namespace_rules = ""
     for rule in spec["services"]["namespace_sync_rules"]:
         namespace_rules += f"""  namespace_sync_rule {{
-    namespace      = "{rule['namespace']}"
-    filter_action  = "{rule['filter_action']}"
-    filter_source  = "{rule['filter_source']}"
-    default_action = "{rule.get('default_action', 'Exclude')}"
+    namespace      = {hcl_string(rule['namespace'])}
+    filter_action  = {hcl_string(rule['filter_action'])}
+    filter_source  = {hcl_string(rule['filter_source'])}
+    default_action = {hcl_string(rule.get('default_action', 'Exclude'))}
   }}
 """
 
     custom_ns_block = ""
     if spec["custom_namespaces"]["simple_list"]:
-        custom_ns_block = "  custom_cloudwatch_namespaces = " + json.dumps(
+        custom_ns_block = "  custom_cloudwatch_namespaces = " + hcl_string_list(
             spec["custom_namespaces"]["simple_list"]
         ) + "\n"
     custom_rules = ""
     for rule in spec["custom_namespaces"]["sync_rules"]:
         custom_rules += f"""  custom_namespace_sync_rule {{
-    namespace      = "{rule['namespace']}"
-    filter_action  = "{rule['filter_action']}"
-    filter_source  = "{rule['filter_source']}"
-    default_action = "{rule.get('default_action', 'Exclude')}"
+    namespace      = {hcl_string(rule['namespace'])}
+    filter_action  = {hcl_string(rule['filter_action'])}
+    filter_source  = {hcl_string(rule['filter_source'])}
+    default_action = {hcl_string(rule.get('default_action', 'Exclude'))}
   }}
 """
 
     metric_stats = ""
     for entry in spec["services"]["metric_stats_to_syncs"]:
         metric_stats += f"""  metric_stats_to_sync {{
-    namespace = "{entry['namespace']}"
-    metric    = "{entry['metric']}"
-    stats     = {json.dumps(entry['stats'])}
+    namespace = {hcl_string(entry['namespace'])}
+    metric    = {hcl_string(entry['metric'])}
+    stats     = {hcl_string_list(entry['stats'])}
   }}
 """
 
@@ -1112,7 +1410,7 @@ resource "aws_iam_role_policy" "splunk_observability_policy" {{
   integration_id  = signalfx_aws_external_integration.this.id
   external_id     = signalfx_aws_external_integration.this.external_id
   role_arn        = aws_iam_role.splunk_observability.arn
-  regions         = {json.dumps(spec['regions'])}
+  regions         = {hcl_string_list(spec['regions'])}
   poll_rate       = {spec['connection']['poll_rate_seconds']}
   inactive_metrics_poll_rate = {spec['connection']['adaptive_polling']['inactive_seconds']}
   import_cloud_watch = true
@@ -1132,10 +1430,73 @@ resource "aws_iam_role_policy" "splunk_observability_policy" {{
 # ---------------------------------------------------------------------------
 
 
+def _safe_directory(path: Path) -> None:
+    if path.is_symlink():
+        raise RenderError(f"refusing symlink output directory: {path}")
+    if path.exists() and not path.is_dir():
+        raise RenderError(f"output path is not a directory: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise RenderError(f"output directory failed validation: {path}")
+
+
 def write_text(path: Path, text: str, label: str | None = None) -> None:
     assert_no_secrets_in_text(text, label or path.name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    _safe_directory(path.parent)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), 0o644)
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def write_private_text(path: Path, text: str, label: str | None = None) -> None:
+    """Atomically write a mode-0600 artifact into a private directory."""
+    assert_no_secrets_in_text(text, label or path.name)
+    _safe_directory(path.parent)
+    os.chmod(path.parent, 0o700)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise RenderError(f"private output failed final validation: {path}")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def render_readme(spec: dict[str, Any]) -> str:
@@ -1482,23 +1843,25 @@ def render_apply_integration_sh(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to process credential files." >&2
+    exit 2
+fi
+
 # Apply the AWSCloudWatch integration via POST/PUT /v2/integration.
 # Reads the admin user API access token from $SPLUNK_O11Y_TOKEN_FILE (chmod 600).
 
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 RENDER_DIR="$(cd "${{SCRIPT_DIR}}/.." && pwd)"
-SKILL_DIR="$(cd "${{RENDER_DIR}}/../skills/{SKILL_NAME}" 2>/dev/null && pwd || \\
-    cd "${{RENDER_DIR}}/../../skills/{SKILL_NAME}" 2>/dev/null && pwd || \\
-    echo "")"
-
-if [[ -z "${{SKILL_DIR}}" ]]; then
-    echo "ERROR: cannot locate the {SKILL_NAME} skill scripts directory." >&2
+SKILL_DIR={shlex.quote(str(PROJECT_ROOT / "skills" / SKILL_NAME))}
+PYTHON_BIN={shlex.quote(str(Path(sys.executable).resolve()))}
+if [[ ! -x "${{PYTHON_BIN}}" || -L "${{PYTHON_BIN}}" ]]; then
+    echo "ERROR: pinned Python interpreter is unavailable or unsafe: ${{PYTHON_BIN}}" >&2
     exit 2
 fi
-
-PYTHON_BIN="python3"
-if [[ -x "${{RENDER_DIR}}/../.venv/bin/python" ]]; then
-    PYTHON_BIN="${{RENDER_DIR}}/../.venv/bin/python"
+if [[ ! -f "${{SKILL_DIR}}/scripts/aws_integration_api.py" || -L "${{SKILL_DIR}}/scripts/aws_integration_api.py" ]]; then
+    echo "ERROR: pinned AWS integration client is unavailable or unsafe." >&2
+    exit 2
 fi
 
 : "${{SPLUNK_O11Y_REALM:?must be set (e.g. {spec['realm']})}}"
@@ -1507,6 +1870,11 @@ fi
 EXTRA_ARGS=()
 [[ -n "${{SPLUNK_AWS_ACCESS_KEY_ID_FILE:-}}" ]] && EXTRA_ARGS+=(--aws-access-key-id-file "${{SPLUNK_AWS_ACCESS_KEY_ID_FILE}}")
 [[ -n "${{SPLUNK_AWS_SECRET_ACCESS_KEY_FILE:-}}" ]] && EXTRA_ARGS+=(--aws-secret-access-key-file "${{SPLUNK_AWS_SECRET_ACCESS_KEY_FILE}}")
+case "${{ALLOW_LOOSE_TOKEN_PERMS:-false}}" in
+    true) EXTRA_ARGS+=(--allow-loose-token-perms) ;;
+    false) ;;
+    *) echo "ERROR: ALLOW_LOOSE_TOKEN_PERMS must be true or false." >&2; exit 2 ;;
+esac
 
 "${{PYTHON_BIN}}" "${{SKILL_DIR}}/scripts/aws_integration_api.py" \\
     --realm "${{SPLUNK_O11Y_REALM}}" \\
@@ -1575,7 +1943,7 @@ set -euo pipefail
 # enableLogsSync is deprecated. Logs land in Splunk Platform, then surface in
 # O11y via Log Observer Connect.
 
-PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}
 
 echo "==> Step 1: Preflight uninstall Splunk_TA_amazon_security_lake (absorbed by"
 echo "    Splunk_TA_AWS v7.0+; running both causes data duplication)."
@@ -1605,7 +1973,7 @@ set -euo pipefail
 
 # Hand-off: AWS dashboards via splunk-observability-dashboard-builder.
 
-PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}
 : "${{AWS_DASHBOARD_SPEC:?Set AWS_DASHBOARD_SPEC to a reviewed dashboard-builder YAML/JSON spec}}"
 MODE="${{1:---render}}"
 case "${{MODE}}" in
@@ -1623,7 +1991,7 @@ set -euo pipefail
 
 # Hand-off: AWS AutoDetect detectors via splunk-observability-native-ops.
 
-PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}
 : "${{AWS_DETECTOR_SPEC:?Set AWS_DETECTOR_SPEC to a reviewed native-ops JSON/YAML spec}}"
 MODE="${{1:---render}}"
 case "${{MODE}}" in
@@ -1636,19 +2004,19 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
 
 
 def render_handoff_otel_sh(spec: dict[str, Any]) -> str:
-    return """#!/usr/bin/env bash
+    return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 # Hand-off: Splunk Distribution of OpenTelemetry Collector for EC2 / EKS host
 # telemetry. CWAgent is built-in but produces fewer host metrics than the OTel
 # collector running natively.
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}
 
 echo "==> EC2/Linux:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm <realm>"
+echo "    bash ${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-linux --realm <realm>"
 echo "==> EKS/Kubernetes:"
-echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm <realm> --distribution eks --cluster-name <cluster>"
+echo "    bash ${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm <realm> --distribution eks --cluster-name <cluster>"
 echo "==> Compared to CWAgent, the OTel collector ships richer host telemetry"
 echo "    (cpu, memory, disk, network, processes) through OTLP and bypasses"
 echo "    CloudWatch metric publishing costs."
@@ -1666,7 +2034,7 @@ echo "==> AWS Lambda APM is handled by splunk-observability-aws-lambda-apm-setup
 echo "    Splunk OTel Lambda layer publisher AWS account: {LAMBDA_LAYER_PUBLISHER_AWS_ACCOUNT}"
 echo ""
 echo "==> Quickstart:"
-echo "    bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --quickstart --accept-beta"
+echo "    bash {PROJECT_ROOT}/skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --quickstart --accept-beta"
 echo ""
 echo "==> Splunk doc:"
 echo "    https://help.splunk.com/en/splunk-observability-cloud/manage-data/instrument-serverless-functions/instrument-serverless-functions/instrument-aws-lambda-functions"
@@ -1677,19 +2045,33 @@ def render_validate_live_sh(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to process credential files." >&2
+    exit 2
+fi
+
 # Live validation: GET /v2/integration?type=AWSCloudWatch and dump the
 # matching integrations to current-state.json (with secrets redacted).
 
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 RENDER_DIR="$(cd "${{SCRIPT_DIR}}/.." && pwd)"
-SKILL_DIR="$(cd "${{RENDER_DIR}}/../skills/{SKILL_NAME}" 2>/dev/null && pwd || \\
-    cd "${{RENDER_DIR}}/../../skills/{SKILL_NAME}" 2>/dev/null && pwd || \\
-    echo "")"
-
-PYTHON_BIN="python3"
-if [[ -x "${{RENDER_DIR}}/../.venv/bin/python" ]]; then
-    PYTHON_BIN="${{RENDER_DIR}}/../.venv/bin/python"
+SKILL_DIR={shlex.quote(str(PROJECT_ROOT / "skills" / SKILL_NAME))}
+PYTHON_BIN={shlex.quote(str(Path(sys.executable).resolve()))}
+if [[ ! -x "${{PYTHON_BIN}}" || -L "${{PYTHON_BIN}}" ]]; then
+    echo "ERROR: pinned Python interpreter is unavailable or unsafe: ${{PYTHON_BIN}}" >&2
+    exit 2
 fi
+if [[ ! -f "${{SKILL_DIR}}/scripts/aws_integration_api.py" || -L "${{SKILL_DIR}}/scripts/aws_integration_api.py" ]]; then
+    echo "ERROR: pinned AWS integration client is unavailable or unsafe." >&2
+    exit 2
+fi
+
+EXTRA_ARGS=()
+case "${{ALLOW_LOOSE_TOKEN_PERMS:-false}}" in
+    true) EXTRA_ARGS+=(--allow-loose-token-perms) ;;
+    false) ;;
+    *) echo "ERROR: ALLOW_LOOSE_TOKEN_PERMS must be true or false." >&2; exit 2 ;;
+esac
 
 : "${{SPLUNK_O11Y_REALM:?must be set}}"
 : "${{SPLUNK_O11Y_TOKEN_FILE:?must point at a chmod-600 admin user API access token}}"
@@ -1698,7 +2080,7 @@ fi
     --realm "${{SPLUNK_O11Y_REALM}}" \\
     --token-file "${{SPLUNK_O11Y_TOKEN_FILE}}" \\
     --state-dir "${{RENDER_DIR}}/state" \\
-    discover --output "${{RENDER_DIR}}/current-state.json"
+    "${{EXTRA_ARGS[@]}}" discover --output "${{RENDER_DIR}}/current-state.json"
 """
 
 
@@ -1715,11 +2097,15 @@ def render(
     list_namespaces: bool = False,
     list_recommended_stats: bool = False,
 ) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _safe_directory(output_dir)
 
     # Clear stale subdirs so re-renders don't carry leftover state.
     for sub in ("payloads", "scripts", "aws", "iam", "support-tickets"):
         target = output_dir / sub
+        if target.is_symlink():
+            raise RenderError(f"refusing symlink output directory: {target}")
+        if target.exists() and not target.is_dir():
+            raise RenderError(f"output path is not a directory: {target}")
         if target.exists():
             shutil.rmtree(target)
 
@@ -1762,6 +2148,12 @@ def render(
                 "step": "metric_streams.cfn",
                 "idempotency_key": f"cfn:{spec['integration_name']}",
                 "coverage": coverage.get("metric_streams.cloudformation", {}).get("status", "not_applicable"),
+                "template_url": spec["metric_streams"]["cloudformation_template_url"]
+                or (
+                    CFN_STACKSETS_URL
+                    if spec["metric_streams"]["use_stack_sets"]
+                    else CFN_REGIONAL_URL
+                ),
             },
             {
                 "step": "validation.discover",
@@ -1860,13 +2252,23 @@ def render(
     # State placeholders (renderer never writes a real apply record; the
     # API client populates these on apply).
     state_dir = output_dir / "state"
-    state_dir.mkdir(parents=True, exist_ok=True)
+    _safe_directory(state_dir)
+    os.chmod(state_dir, 0o700)
     state_path = state_dir / "apply-state.json"
+    if state_path.is_symlink():
+        raise RenderError(f"refusing symlink apply state: {state_path}")
     if not state_path.exists():
-        write_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
-    os.chmod(state_path, 0o600)
-    write_text(
-        state_dir / "idempotency-keys.json",
+        write_private_text(state_path, json.dumps({"steps": []}, indent=2) + "\n")
+    else:
+        metadata = state_path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RenderError(f"apply state must be a single-hardlink regular file: {state_path}")
+        os.chmod(state_path, 0o600)
+    idempotency_path = state_dir / "idempotency-keys.json"
+    if idempotency_path.is_symlink():
+        raise RenderError(f"refusing symlink idempotency state: {idempotency_path}")
+    write_private_text(
+        idempotency_path,
         json.dumps([s["idempotency_key"] for s in apply_plan["ordered_steps"]], indent=2) + "\n",
     )
 

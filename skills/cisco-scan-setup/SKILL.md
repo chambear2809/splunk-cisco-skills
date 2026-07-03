@@ -34,7 +34,7 @@ indexes, configure data inputs, or require vendor-specific credentials.
 ## Package Model
 
 **Splunkbase is the public install source; `splunk-ta/` is the local cache
-for offline installs and product-catalog builds.** SCAN is listed on
+for offline installs and package review.** SCAN is listed on
 Splunkbase as app ID `8566`. Use `splunk-app-install` with the Splunkbase ID
 when a fresh download or public Cloud install is available:
 
@@ -45,10 +45,11 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 
 For offline Enterprise installs or private review copies, place the downloaded
 package in `splunk-ta/` and run this skill's `setup.sh`; it installs the newest
-matching local package. The product repo's `cisco-product-setup` catalog is
-also generated from the newest local SCAN tarball, using the embedded
-`default/app.conf` app version when cached filenames do not include a dotted
-version.
+matching local package. The product repo's `cisco-product-setup` catalog uses
+a checked-in normalized fixture of SCAN's public S3 `products.conf`, with the
+source timestamp, minimum SCAN version, raw source SHA-256, and fixture SHA-256
+recorded in `scan_source.json`. Clean-clone catalog builds therefore do not
+depend on an ignored vendor archive or live network access.
 
 For Splunk Cloud (ACS), prefer the Splunkbase install path. Use private app
 upload only for pre-vetted local packages. After installation, use this skill
@@ -62,7 +63,8 @@ has not been verified here. The shared installer defaults to verified
 `1.0.27`; only `--accept-unverified-release` follows public `1.0.29`. After
 that explicit override, re-check `products.conf`, lookup/sync behavior, saved
 searches, and shipped dashboards before completion. Local catalog generation
-must continue to use the package's actual `default/app.conf` version.
+does not upgrade or approve the app package: fixture refresh and package review
+remain separate controls.
 
 ## Agent Behavior — Credentials
 
@@ -212,7 +214,7 @@ private app upload completes.
    member must run `synclookup` independently (or use the scheduled search).
 7. **Splunkbase listing available**: SCAN is Splunkbase app ID `8566`. Keep a
    local package in `splunk-ta/` when you need offline Enterprise installs or
-   to regenerate the product repo catalog from a reviewed package.
+   package review. It is not required for deterministic catalog generation.
 8. **Restart behavior**: SCAN does not create indexes, so a restart is
    typically only needed if Splunk requires one after app installation.
 9. **Non-atomic sync**: `synccatalog` writes the file before reloading.
@@ -222,6 +224,7 @@ private app upload completes.
    the already-written file. Run `| synccatalog dryrun=true` separately to
    diagnose version state, not to trigger a reload.
 10. **cisco-product-setup dependency**: The `cisco-product-setup` skill
-    reads the SCAN tarball at build-time to generate `catalog.json`. At
+    reads the checksum-pinned normalized SCAN public-catalog fixture at
+    build-time to generate `catalog.json`. At
     runtime, live SCAN features (installed app detection, data flow
     validation, legacy debt auditing) require the app to be installed.

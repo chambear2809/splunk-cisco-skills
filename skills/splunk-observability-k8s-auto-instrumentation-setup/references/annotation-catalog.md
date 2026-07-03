@@ -15,7 +15,6 @@ Every annotation below is placed at `spec.template.metadata.annotations` on a `D
 | `instrumentation.opentelemetry.io/inject-go` | same shape + requires target-exe below | Go (eBPF) |
 | `instrumentation.opentelemetry.io/inject-apache-httpd` | same shape | Apache HTTPD (`mod_otel_apache.so`) |
 | `instrumentation.opentelemetry.io/inject-nginx` | same shape | Nginx (`otel_ngx_module.so`) |
-| `instrumentation.opentelemetry.io/inject-sdk` | same shape | Env-only; language-agnostic |
 
 ## Container selection
 

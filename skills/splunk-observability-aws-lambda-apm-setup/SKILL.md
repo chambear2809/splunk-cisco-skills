@@ -61,8 +61,17 @@ The skill is the live fulfillment of the `handoffs.lambda_apm` stub emitted by
   The apply helper rotates the selected AWS secret, fetches it into a private
   temporary file, and merges it into the Lambda environment without exposing
   it in rendered files, shell history, or process arguments.
-- Token files must be `chmod 600`. Use `write_secret_file.sh` to create one
-  without shell-history exposure.
+- Token files must be regular, single-hardlink files containing one non-empty
+  printable-ASCII value with at most one trailing LF or CRLF, and no larger
+  than the backend limit (4 KiB for default-tier SSM Parameter Store;
+  64 KiB for Secrets Manager) with mode `600`. The generated writer opens the file once
+  with `O_NOFOLLOW`, verifies stable inode, metadata, and content fingerprints,
+  and builds the AWS payload from that descriptor. Use `write_secret_file.sh`
+  to create one without shell-history exposure.
+- `--allow-loose-token-perms` is an explicit development-only escape that
+  relaxes only the source mode check. The setup wrapper propagates it to the
+  generated writer; regular-file, non-symlink, single-hardlink, size, UTF-8,
+  and fingerprint checks remain mandatory.
 - Reject direct-secret flags: `--token`, `--access-token`, `--api-token`,
   `--o11y-token`, `--sf-token`, `--password`.
 - `signalfx/splunk-otel-lambda` is BETA. Gate all operations behind
@@ -76,9 +85,14 @@ The skill is the live fulfillment of the `handoffs.lambda_apm` stub emitted by
 |------|------|---------|
 | render | `--render` (default) | Produces the plan tree. No AWS calls. |
 | apply | `--apply [SECTIONS]` | Runs the rendered aws-cli plan. Sections: `layer,env,iam,validation`. |
-| validate | `--validate [--live]` | Static + optional ingest-endpoint probe. |
+| validate | `--validate [--live]` | Static checks plus an optional unauthenticated ingest-endpoint reachability probe; `--live` does not validate configured state or telemetry arrival. |
 | doctor | `--doctor` | Vendor conflict, ADOT, X-Ray, snapshot-freshness checks. |
 | quickstart | `--quickstart` | Render + print exact `--apply` command. |
+
+`--quickstart-from-live --target FUNCTION` writes only an allowlisted subset of
+the Lambda configuration to a mode-`600` snapshot. It deliberately excludes
+`Environment` (and therefore environment secrets), revision IDs, and other
+unneeded response fields.
 
 ## Primary Workflow
 
@@ -179,6 +193,12 @@ bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh \
 `--gitops-mode` suppresses the `aws-cli/` directory and produces only
 `terraform/` and `cloudformation/` artifacts.
 
+The Terraform variant necessarily reads the token as plaintext and stores it
+in Terraform state as part of the Lambda environment. Use only an encrypted,
+access-controlled remote backend with locking and never commit local state;
+prefer the CloudFormation dynamic-reference or guarded AWS CLI variant when
+state cannot be protected to the same standard as the token.
+
 ## Doctor
 
 ```bash
@@ -246,6 +266,9 @@ bash skills/splunk-observability-aws-lambda-apm-setup/scripts/validate.sh \
 ```
 
 Static checks: required files, IAM JSON shape, secret-leak scan.
-With `--live`: probes the Splunk ingest endpoint.
+With `--live`: runs an unauthenticated reachability-only probe of the Splunk
+ingest endpoint. It does not validate Lambda configuration, token authorization,
+span export, or APM data arrival. Invoke the function and verify its expected
+span attributes in APM for configured-state acceptance.
 
 See [`references/splunk-doc-feature-matrix.md`](references/splunk-doc-feature-matrix.md) for the full feature matrix and limitations.

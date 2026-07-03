@@ -43,7 +43,7 @@ Identity:
   --base-namespace NS             Base collector namespace
 
 Languages + CR config:
-  --languages csv                 java,nodejs,python,dotnet,go,apache-httpd,nginx,sdk
+  --languages csv                 java,nodejs,python,dotnet,go,apache-httpd,nginx
   --java-image URI                Override ghcr.io/signalfx/splunk-otel-java
   --nodejs-image URI              Override ghcr.io/signalfx/splunk-otel-js
   --python-image URI              Override ghcr.io/signalfx/splunk-otel-python

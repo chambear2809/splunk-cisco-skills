@@ -13,8 +13,10 @@ CHECK_LINUX=false
 CHECK_TA=false
 CHECK_PLATFORM_HEC=false
 LIVE=false
+K8S_WORKLOADS_ONLY=false
 CHECK_UPSTREAM=false
 EXECUTION="local"
+KUBE_CONTEXT=""
 
 usage() {
     cat <<'EOF'
@@ -30,6 +32,8 @@ Options:
   --check-ta             Check Splunkbase 7125 TA rendered assets
   --check-platform-hec   Check rendered Splunk Platform HEC helper assets
   --live                 Run live status checks using rendered status scripts
+  --k8s-workloads-only   With live Kubernetes validation, avoid Helm release Secret reads
+  --kube-context CTX     Context for --k8s-workloads-only kubectl reads
   --check-upstream       Download/pull pinned upstream artifacts and template them
   --execution local|ssh  Linux live validation mode (default: local)
   --help                 Show this help
@@ -44,6 +48,8 @@ while [[ $# -gt 0 ]]; do
         --check-ta) CHECK_TA=true; shift ;;
         --check-platform-hec) CHECK_PLATFORM_HEC=true; shift ;;
         --live) LIVE=true; shift ;;
+        --k8s-workloads-only) K8S_WORKLOADS_ONLY=true; CHECK_K8S=true; LIVE=true; shift ;;
+        --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
         --check-upstream) CHECK_UPSTREAM=true; shift ;;
         --execution) require_arg "$1" "$#" || exit 1; EXECUTION="$2"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
@@ -208,7 +214,22 @@ if isinstance(platform, dict):
 PY
     log "Kubernetes rendered assets passed static validation."
     if [[ "${LIVE}" == "true" ]]; then
-        bash "${OUTPUT_DIR}/k8s/status.sh"
+        if [[ "${K8S_WORKLOADS_ONLY}" == "true" ]]; then
+            command -v kubectl >/dev/null 2>&1 || {
+                log "ERROR: kubectl is required for --k8s-workloads-only."
+                exit 1
+            }
+            workload_args=(
+                --metadata "${OUTPUT_DIR}/metadata.json"
+                --image-verifier "${OUTPUT_DIR}/k8s/k8s-image-post-renderer.py"
+            )
+            if [[ -n "${KUBE_CONTEXT}" ]]; then
+                workload_args+=(--kube-context "${KUBE_CONTEXT}")
+            fi
+            python3 "${SCRIPT_DIR}/validate_k8s_workloads.py" "${workload_args[@]}"
+        else
+            bash "${OUTPUT_DIR}/k8s/status.sh"
+        fi
     fi
 fi
 

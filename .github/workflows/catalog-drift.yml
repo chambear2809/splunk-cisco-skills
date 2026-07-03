@@ -1,0 +1,38 @@
+name: Catalog drift audit
+
+on:
+  schedule:
+    - cron: "17 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-drift-audit
+  cancel-in-progress: false
+
+jobs:
+  splunkbase-registry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Compare registry with live Splunkbase listings
+        run: >-
+          python3 skills/shared/scripts/audit_splunkbase_registry.py
+          --live --json --max-workers 12
+
+  scan-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Compare pinned SCAN catalog provenance with the public source
+        run: >-
+          python3 skills/cisco-product-setup/scripts/build_catalog.py
+          --check-live-source

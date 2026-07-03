@@ -1,0 +1,231 @@
+name: AWS EKS O11y staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_aws_account_id:
+        description: Exact 12-digit staging AWS account ID
+        required: true
+        type: string
+      aws_region:
+        description: Region containing the staging EKS cluster
+        required: true
+        default: us-east-1
+        type: string
+      eks_cluster_name:
+        description: Existing staging EKS cluster
+        required: true
+        type: string
+      o11y_realm:
+        description: Splunk Observability Cloud realm
+        required: true
+        type: choice
+        options: [us0, us1, us2, us3, au0, eu0, eu1, eu2, jp0, sg0]
+      collector_namespace:
+        description: Namespace containing the Splunk OTel Collector
+        required: true
+        default: splunk-otel
+        type: string
+      collector_release:
+        description: Existing Splunk OTel Collector Helm release
+        required: true
+        default: splunk-otel-collector
+        type: string
+      staging_namespace:
+        description: Namespace containing the instrumented staging workload
+        required: true
+        default: staging
+        type: string
+      workload:
+        description: Existing workload as Deployment/name, StatefulSet/name, or DaemonSet/name
+        required: true
+        type: string
+      language:
+        description: Auto-instrumentation language expected on the workload
+        required: true
+        type: choice
+        options: [java, nodejs, python, dotnet, go, apache-httpd, nginx]
+      apm_service:
+        description: Exact service.name that must appear in APM topology
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-eks-o11y-staging-${{ inputs.expected_aws_account_id }}-${{ inputs.eks_cluster_name }}
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Read-only staging gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Configure this environment with required reviewers and restrict it to the
+    # protected branch. Its OIDC subject must be the exact environment subject.
+    environment: aws-eks-o11y-staging
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      STAGING_EXPECTED_AWS_ACCOUNT_ID: ${{ inputs.expected_aws_account_id }}
+      STAGING_EKS_CLUSTER_NAME: ${{ inputs.eks_cluster_name }}
+      STAGING_KUBE_CONTEXT: aws-eks-o11y-staging
+      STAGING_NAMESPACE: ${{ inputs.staging_namespace }}
+      STAGING_WORKLOAD: ${{ inputs.workload }}
+      STAGING_APM_SERVICE: ${{ inputs.apm_service }}
+      SPLUNK_O11Y_REALM: ${{ inputs.o11y_realm }}
+      COLLECTOR_NAMESPACE: ${{ inputs.collector_namespace }}
+      COLLECTOR_RELEASE: ${{ inputs.collector_release }}
+      INSTRUMENTATION_NAME: splunk-otel-staging
+      WORKLOAD_LANGUAGE: ${{ inputs.language }}
+      KUBECONFIG: ${{ runner.temp }}/aws-eks-o11y-kubeconfig
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate dispatch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${STAGING_EXPECTED_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]]
+          [[ "${AWS_REGION}" =~ ^[a-z0-9]+(-[a-z0-9]+)+$ ]]
+          [[ "${STAGING_EKS_CLUSTER_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$ ]]
+          [[ "${COLLECTOR_NAMESPACE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
+          [[ "${COLLECTOR_RELEASE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
+          [[ "${STAGING_NAMESPACE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
+          [[ "${STAGING_WORKLOAD}" =~ ^(Deployment|StatefulSet|DaemonSet)/[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]]
+          [[ ! "${STAGING_APM_SERVICE}" =~ [[:cntrl:]] ]]
+          [[ "${STAGING_APM_SERVICE}" =~ ^[^[:space:][:cntrl:]](.*[^[:space:][:cntrl:]])?$ ]]
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install hash-pinned renderer dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          requirements="${RUNNER_TEMP}/staging-requirements.txt"
+          printf '%s\n' \
+            'PyYAML==6.0.3 --hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d' \
+            > "${requirements}"
+          python -m pip install \
+            --disable-pip-version-check \
+            --only-binary=:all: \
+            --require-hashes \
+            --requirement "${requirements}"
+
+      - name: Assume read-only staging role with OIDC
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          role-to-assume: ${{ secrets.AWS_STAGING_ROLE_ARN }}
+          role-session-name: o11y-staging-${{ github.run_id }}
+          role-duration-seconds: 1800
+          aws-region: ${{ inputs.aws_region }}
+          allowed-account-ids: ${{ inputs.expected_aws_account_id }}
+          mask-aws-account-id: true
+          unset-current-credentials: true
+          inline-session-policy: >-
+            {"Version":"2012-10-17","Statement":[{
+            "Effect":"Allow","Action":"eks:DescribeCluster",
+            "Resource":"arn:aws:eks:${{ inputs.aws_region }}:${{ inputs.expected_aws_account_id }}:cluster/${{ inputs.eks_cluster_name }}"}]}
+
+      - name: Install audited kubectl
+        id: setup-kubectl
+        uses: Azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        with:
+          version: v1.35.1
+
+      - name: Verify kubectl artifact digest
+        shell: bash
+        env:
+          KUBECTL_PATH: ${{ steps.setup-kubectl.outputs.kubectl-path }}
+        run: |
+          set -euo pipefail
+          [[ -f "${KUBECTL_PATH}" && ! -L "${KUBECTL_PATH}" ]]
+          printf '%s  %s\n' \
+            '36e2f4ac66259232341dd7866952d64a958846470f6a9a6a813b9117bd965207' \
+            "${KUBECTL_PATH}" | sha256sum -c -
+
+      - name: Configure exact EKS context
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          rm -f -- "${KUBECONFIG}"
+          aws eks update-kubeconfig \
+            --name "${STAGING_EKS_CLUSTER_NAME}" \
+            --region "${AWS_REGION}" \
+            --alias "${STAGING_KUBE_CONTEXT}"
+          chmod 600 "${KUBECONFIG}"
+          [[ "$(kubectl config current-context)" == "${STAGING_KUBE_CONTEXT}" ]]
+
+      - name: Materialize private O11y token file
+        shell: bash
+        env:
+          O11Y_TOKEN: ${{ secrets.SPLUNK_O11Y_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ -n "${O11Y_TOKEN}" ]]
+          token_file="${RUNNER_TEMP}/splunk-o11y-token"
+          install -m 600 /dev/null "${token_file}"
+          printf '%s' "${O11Y_TOKEN}" > "${token_file}"
+          chmod 600 "${token_file}"
+          printf 'SPLUNK_O11Y_TOKEN_FILE=%s\n' "${token_file}" >> "${GITHUB_ENV}"
+
+      - name: Render clean desired-state packets
+        shell: bash
+        run: |
+          set -euo pipefail
+          render_root="${RUNNER_TEMP}/aws-eks-o11y-rendered"
+          python scripts/staging/render-aws-eks-o11y.py \
+            --output-root "${render_root}" \
+            --token-file "${SPLUNK_O11Y_TOKEN_FILE}" \
+            --aws-account-id "${STAGING_EXPECTED_AWS_ACCOUNT_ID}" \
+            --aws-region "${AWS_REGION}" \
+            --eks-cluster-name "${STAGING_EKS_CLUSTER_NAME}" \
+            --kube-context "${STAGING_KUBE_CONTEXT}" \
+            --o11y-realm "${SPLUNK_O11Y_REALM}" \
+            --aws-integration-name "${STAGING_EKS_CLUSTER_NAME}-staging" \
+            --collector-namespace "${COLLECTOR_NAMESPACE}" \
+            --collector-release "${COLLECTOR_RELEASE}" \
+            --instrumentation-name "${INSTRUMENTATION_NAME}" \
+            --namespace "${STAGING_NAMESPACE}" \
+            --workload "${STAGING_WORKLOAD}" \
+            --language "${WORKLOAD_LANGUAGE}"
+          {
+            printf 'STAGING_OTEL_RENDERED_DIR=%s\n' "${render_root}/otel"
+            printf 'STAGING_AUTO_INSTRUMENTATION_RENDERED_DIR=%s\n' "${render_root}/auto-instrumentation"
+            printf 'STAGING_AWS_INTEGRATION_RENDERED_DIR=%s\n' "${render_root}/aws-integration"
+            printf 'STAGING_REPORT_PATH=%s\n' "${RUNNER_TEMP}/aws-eks-o11y-staging-report.json"
+          } >> "${GITHUB_ENV}"
+
+      - name: Run fail-closed staging acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/staging/validate-aws-eks-o11y.sh \
+            --report "${STAGING_REPORT_PATH}"
+
+      - name: Remove local credentials and kubeconfig
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f -- \
+            "${SPLUNK_O11Y_TOKEN_FILE:-${RUNNER_TEMP}/splunk-o11y-token}" \
+            "${KUBECONFIG:-${RUNNER_TEMP}/aws-eks-o11y-kubeconfig}"
+
+      - name: Upload sanitized acceptance report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: aws-eks-o11y-staging-${{ github.run_id }}
+          path: ${{ runner.temp }}/aws-eks-o11y-staging-report.json
+          if-no-files-found: warn
+          retention-days: 14

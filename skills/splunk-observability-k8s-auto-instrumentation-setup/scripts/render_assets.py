@@ -35,7 +35,6 @@ SUPPORTED_LANGUAGES = {
     "go",
     "apache-httpd",
     "nginx",
-    "sdk",
 }
 LANGUAGE_SPEC_KEYS = {
     "java": "java",
@@ -675,6 +674,26 @@ def workload_key(workload: dict[str, Any]) -> str:
     return f"{workload['kind'].lower()}-{workload['namespace']}-{workload['name']}".replace("/", "-")
 
 
+def bounded_k8s_name(value: str, limit: int) -> str:
+    """Mirror the base Collector renderer's collision-resistant name bound."""
+
+    if len(value) <= limit:
+        return value.rstrip("-")
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
+    return f"{value[: limit - len(digest) - 1].rstrip('-')}-{digest}"
+
+
+def operator_resource_names(release: str, namespace: str) -> dict[str, str]:
+    raw = release if "operator" in release else f"{release}-operator"
+    operator_name = bounded_k8s_name(raw, 31)
+    return {
+        "namespace": namespace,
+        "deployment_name": operator_name,
+        "webhook_configuration_name": f"{operator_name}-mutation",
+        "webhook_service_name": f"{operator_name}-webhook",
+    }
+
+
 def annotation_value_for(workload: dict[str, Any]) -> str:
     if boolish(workload.get("disable"), False):
         return "false"
@@ -720,8 +739,6 @@ def language_env(config: dict[str, Any], cr: dict[str, Any], language: str) -> d
     }
     if language == "go":
         env["OTEL_GO_AUTO_GLOBAL"] = "true"
-    if language == "dotnet":
-        env["OTEL_DOTNET_AUTO_HOME"] = "/otel-dotnet-auto"
     if cr.get("profiling_enabled") and language in {"java", "nodejs"}:
         env["SPLUNK_PROFILER_ENABLED"] = "true"
         if cr.get("profiling_memory_enabled"):
@@ -757,8 +774,6 @@ def instrumentation_cr_doc(config: dict[str, Any], cr: dict[str, Any]) -> dict[s
         spec["imagePullSecrets"] = [{"name": config["image_pull_secret"]}]
 
     for language in cr["languages"]:
-        if language == "sdk":
-            continue
         block: dict[str, Any] = {
             "image": cr.get("images", {}).get(language) or LANGUAGE_IMAGE_DEFAULTS[language],
             "env": env_list(language_env(config, cr, language)),
@@ -1033,7 +1048,7 @@ def runbook(config: dict[str, Any], errors: list[str]) -> str:
             "2. Review `k8s-instrumentation/instrumentation-cr.yaml` and `k8s-instrumentation/workload-annotations.yaml`.",
             "3. Apply Instrumentation CRs first: `bash k8s-instrumentation/apply-instrumentation.sh`.",
             "4. Apply workload annotations with an explicit restart gate: `bash k8s-instrumentation/apply-annotations.sh --accept-auto-instrumentation --target-all`.",
-            "5. Verify injection: `bash k8s-instrumentation/verify-injection.sh --target <Kind/ns/name>` or run `scripts/validate.sh --live --check-injection` from the skill.",
+            "5. Verify injection: `bash k8s-instrumentation/verify-injection.sh --target <Kind/ns/name>` or run the skill's narrow `scripts/validate.sh --check-injection` diagnostic. Use `scripts/validate.sh --live --check-apm <service>` for the complete production gate.",
             "",
             "## Uninstall",
             "Use `bash k8s-instrumentation/uninstall.sh --accept-auto-instrumentation --target <Kind/ns/name>` for selective rollback, or add `--target-all --purge-crs` for full teardown.",
@@ -1066,6 +1081,9 @@ def metadata_payload(
         "distribution": config["distribution"],
         "namespace": config["namespace"],
         "base": config["base"],
+        "operator_resources": operator_resource_names(
+            str(config["base"]["release"]), str(config["base"]["namespace"])
+        ),
         "languages": all_languages,
         "instrumentation_crs": [
             {"name": cr["name"], "namespace": cr["namespace"], "languages": cr["languages"], "endpoint": cr["endpoint"]}

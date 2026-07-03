@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to load or process credentials." >&2
+    exit 2
+fi
+
 # Splunk Platform <-> Splunk Observability Cloud integration: primary CLI.
 #
 # Mirrors the `splunk-cloud-acs-admin-setup` and `splunk-observability-otel-collector-setup`
@@ -182,21 +187,8 @@ assert_secret_file_perms() {
         echo "FAIL: ${label} (${path}) must have mode 600 (found ${mode}); chmod 600 ${path}." >&2
         exit 2
     fi
-    if ! "${PYTHON_BIN}" - "${path}" <<'PY'
-from pathlib import Path
-import sys
-
-try:
-    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
-except (OSError, UnicodeError):
-    raise SystemExit(1)
-if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
-    raise SystemExit(1)
-PY
-    then
-        echo "FAIL: ${label} (${path}) must contain exactly one non-empty UTF-8 line." >&2
-        exit 2
-    fi
+    # Content, size, link-count, and stable-fingerprint validation is performed
+    # by the descriptor-bound client/helper immediately before use.
 }
 
 require_secret_file_option() {

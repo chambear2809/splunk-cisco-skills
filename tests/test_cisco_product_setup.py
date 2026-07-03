@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import io
 import json
 import shlex
@@ -12,7 +13,9 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,13 +33,9 @@ class CiscoProductSetupTests(unittest.TestCase):
         spec.loader.exec_module(module)
         cls.module = module
 
-        scan_glob = "splunk-cisco-app-navigator-*.tar.gz"
-        if not list((REPO_ROOT / "splunk-ta").glob(scan_glob)):
-            raise unittest.SkipTest(f"SCAN package ({scan_glob}) not in tree")
-
         cls._tmpdir = tempfile.TemporaryDirectory()
         cls.catalog_path = Path(cls._tmpdir.name) / "catalog.json"
-        catalog = module.build_catalog(module.find_scan_package(""))
+        catalog = module.build_catalog()
         cls.catalog_path.write_text(module.render_catalog(catalog), encoding="utf-8")
 
     @classmethod
@@ -71,6 +70,163 @@ class CiscoProductSetupTests(unittest.TestCase):
     def test_builder_check_matches_committed_catalog(self) -> None:
         result = self.run_command(sys.executable, str(BUILD_SCRIPT), "--check")
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+    def test_pinned_scan_fixture_has_verified_provenance(self) -> None:
+        manifest_path = REPO_ROOT / "skills/cisco-product-setup/scan_source.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        fixture_path = manifest_path.parent / manifest["fixture"]["path"]
+        fixture_payload = fixture_path.read_bytes()
+        fixture = json.loads(fixture_payload)
+        catalog = json.loads(
+            (REPO_ROOT / "skills/cisco-product-setup/catalog.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(manifest["source"]["kind"], "scan_public_catalog")
+        self.assertEqual(manifest["source"]["url"], self.module.SCAN_SOURCE_URL)
+        self.assertEqual(manifest["source"]["catalog_version"], "2026_06_26_1427")
+        self.assertEqual(manifest["source"]["minimum_scan_version"], "1.0.28")
+        self.assertEqual(
+            date.fromisoformat(manifest["source"]["retrieved_date"]).isoformat(),
+            manifest["source"]["retrieved_date"],
+        )
+        self.assertRegex(manifest["source"]["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            hashlib.sha256(fixture_payload).hexdigest(),
+            manifest["fixture"]["sha256"],
+        )
+        self.assertEqual(len(fixture["products"]), manifest["fixture"]["product_count"])
+        self.assertEqual(
+            catalog["scan_source"]["normalized_fixture_sha256"],
+            manifest["fixture"]["sha256"],
+        )
+        self.assertEqual(
+            catalog["scan_source"]["sha256"],
+            manifest["source"]["sha256"],
+        )
+
+    def test_scan_fixture_rejects_untrusted_source_identity_and_date(self) -> None:
+        manifest = json.loads(
+            (REPO_ROOT / "skills/cisco-product-setup/scan_source.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        invalid_values = (
+            ("kind", "vendor_mirror", "kind"),
+            ("url", "https://example.invalid/scan/products.conf", "URL"),
+            ("retrieved_date", "July 3, 2026", "retrieved_date"),
+            ("retrieved_date", "2026-02-30", "retrieved_date"),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "scan_source.json"
+            for field, value, expected_error in invalid_values:
+                with self.subTest(field=field, value=value):
+                    candidate = json.loads(json.dumps(manifest))
+                    candidate["source"][field] = value
+                    manifest_path.write_text(
+                        json.dumps(candidate),
+                        encoding="utf-8",
+                    )
+                    with mock.patch.object(
+                        self.module,
+                        "SCAN_SOURCE_MANIFEST_PATH",
+                        manifest_path,
+                    ):
+                        with self.assertRaisesRegex(ValueError, expected_error):
+                            self.module.load_scan_source_fixture()
+
+    def test_live_scan_source_binds_raw_source_to_normalized_fixture(self) -> None:
+        source_payload = b"""# version = 2026_07_03_0000
+# min_app_version = 1.0.28
+
+[cisco_test_product]
+display_name = Cisco Test Product
+status = active
+category = test
+sourcetypes = cisco:test
+"""
+        live_products = self.module.parse_scan_products(source_payload.decode("utf-8"))
+        matching_fixture_text = self.module.render_scan_fixture(live_products)
+        matching_fixture_sha = hashlib.sha256(
+            matching_fixture_text.encode("utf-8")
+        ).hexdigest()
+        altered_products = json.loads(json.dumps(live_products))
+        altered_products[0]["display_name"] = "Altered Product"
+        altered_fixture_text = self.module.render_scan_fixture(altered_products)
+        altered_fixture_sha = hashlib.sha256(
+            altered_fixture_text.encode("utf-8")
+        ).hexdigest()
+
+        manifest = {
+            "schema_version": 1,
+            "source": {
+                "kind": "scan_public_catalog",
+                "url": self.module.SCAN_SOURCE_URL,
+                "catalog_version": "2026_07_03_0000",
+                "minimum_scan_version": "1.0.28",
+                "sha256": hashlib.sha256(source_payload).hexdigest(),
+                "retrieved_date": "2026-07-03",
+            },
+            "fixture": {
+                "path": "scan_products.fixture.json",
+                "product_count": 1,
+                "sha256": matching_fixture_sha,
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_root = Path(tmpdir)
+            manifest_path = fixture_root / "scan_source.json"
+            fixture_path = fixture_root / manifest["fixture"]["path"]
+            with mock.patch.object(
+                self.module,
+                "SCAN_SOURCE_MANIFEST_PATH",
+                manifest_path,
+            ), mock.patch.object(
+                self.module,
+                "SKILL_ROOT",
+                fixture_root,
+            ), mock.patch.object(
+                self.module,
+                "fetch_scan_source",
+                return_value=source_payload,
+            ):
+                fixture_path.write_text(matching_fixture_text, encoding="utf-8")
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                self.assertTrue(
+                    self.module.check_live_scan_source(self.module.SCAN_SOURCE_URL)
+                )
+
+                manifest["fixture"]["sha256"] = altered_fixture_sha
+                fixture_path.write_text(altered_fixture_text, encoding="utf-8")
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                self.assertFalse(
+                    self.module.check_live_scan_source(self.module.SCAN_SOURCE_URL)
+                )
+
+    def test_default_builder_does_not_discover_a_vendor_package(self) -> None:
+        original = self.module.find_scan_package
+        original_fetch = self.module.fetch_scan_source
+
+        def fail_if_called(_explicit: str) -> Path:
+            raise AssertionError("default fixture build must not discover a vendor package")
+
+        def fail_if_networked(_source_url: str) -> bytes:
+            raise AssertionError("default fixture build must remain offline")
+
+        self.module.find_scan_package = fail_if_called
+        self.module.fetch_scan_source = fail_if_networked
+        try:
+            catalog = self.module.build_catalog()
+        finally:
+            self.module.find_scan_package = original
+            self.module.fetch_scan_source = original_fetch
+
+        self.assertEqual(catalog["product_count"], 84)
+        self.assertEqual(catalog["scan_source"]["kind"], "scan_public_catalog")
 
     def test_resolve_aci(self) -> None:
         result, payload = self.run_resolver_json("ACI")

@@ -233,7 +233,7 @@ A named profile does not imply end-to-end dashboard/data validation. See
 - A read-only catalog lookup can report that the catalog appears stale. An
   apply-only opt-in refresh records its status in JSON/report output; a warning
   does not hide the subsequent catalog lookup result.
-- Current Splunk App for Content Packs 2.5.0 known issues are surfaced as warnings where they affect automation safety: installing packs with a non-empty `prefix` can leave imported services unlinked from service templates and KPIs, Cisco Enterprise Networks service import options are not filtered by the selected Catalyst Center Host, Cisco Data Center service import does not handle case-only duplicate service names, and older Cisco Catalyst Center alert integration connections might still reference the pre-3.0.0 `cisco_dnac_host` field.
+- Repo-reviewed Splunk App for Content Packs 2.5.0 known issues are surfaced as warnings where they affect automation safety. Public 2.5.1 is current but has not replaced the reviewed package baseline. For 2.5.0, installing packs with a non-empty `prefix` can leave imported services unlinked from service templates and KPIs, Cisco Enterprise Networks service import options are not filtered by the selected Catalyst Center Host, Cisco Data Center service import does not handle case-only duplicate service names, and older Cisco Catalyst Center alert integration connections might still reference the pre-3.0.0 `cisco_dnac_host` field.
 
 ### `aws`
 

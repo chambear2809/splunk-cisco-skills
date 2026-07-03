@@ -43,6 +43,35 @@ SAFE_PAIRING_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 UID_REALMS = {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so bearer and O11y tokens stay on admin.splunk.com."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_admin_url(url: str) -> None:
+    """Fail closed unless an authenticated request targets Splunk's ACS host."""
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise RuntimeError("ACS REST URL contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or parsed.hostname != "admin.splunk.com"
+        or port not in {None, 443}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or any(ch.isspace() for ch in url)
+    ):
+        raise RuntimeError(
+            "authenticated ACS REST requests require https://admin.splunk.com "
+            "without embedded credentials, a nonstandard port, fragments, or whitespace"
+        )
+
+
 def _acs_available() -> bool:
     return shutil.which("acs") is not None
 
@@ -62,11 +91,13 @@ def _run_acs(args: list[str], env_extra: dict[str, str] | None = None) -> tuple[
 
 
 def _rest_request(method: str, url: str, headers: dict[str, str], data: str | None = None) -> tuple[int, dict[str, Any]]:
+    _validate_admin_url(url)
     payload = data.encode("utf-8") if data else None
     req = urllib.request.Request(url, data=payload, method=method)
     for k, v in headers.items():
         req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    opener = urllib.request.build_opener(_NoRedirectHandler())
+    with opener.open(req, timeout=30) as resp:
         body = resp.read().decode("utf-8")
         try:
             return resp.status, json.loads(body)

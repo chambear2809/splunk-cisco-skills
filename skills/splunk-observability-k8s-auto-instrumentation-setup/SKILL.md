@@ -8,7 +8,7 @@ description: >-
   Splunk OBI eBPF assets, profiling/runtime metric env vars, sampler settings,
   Fargate gateway paths, vendor-coexistence checks, GitOps YAML, and clean
   uninstall scripts. Use when wiring zero-code Java, Node.js, Python, .NET, Go,
-  Apache, Nginx, or SDK instrumentation into Splunk Observability Cloud APM,
+  Apache, or Nginx instrumentation into Splunk Observability Cloud APM,
   adding AlwaysOn Profiling, discovering workloads, or reverting
   operator-managed instrumentation.
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
@@ -110,7 +110,7 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
 
    ```bash
    bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/validate.sh \
-     --live --check-injection
+     --check-injection
    ```
 
 ## Annotation Model
@@ -169,12 +169,24 @@ Static checks cover:
 - Rendered scripts do not echo secrets.
 - CR name uniqueness.
 
-With `--live`:
+`--live --check-apm <service>` runs the complete production gate. It enables
+webhook, Instrumentation CR, injection, backup, and scoped APM checks. A caller
+may explicitly omit only the APM or backup gate with `--skip-apm-check` or
+`--skip-backup-check`; those named skips are valid only with `--live`. Individual
+`--check-*` flags remain available as narrow diagnostics.
 
-- `--check-webhook` — operator MutatingWebhookConfiguration presence + webhook error log scan.
+- `--check-webhook` — exact pinned pod-admission webhook policy/route, CA bundle,
+  Service and ready 9443/TCP Endpoints, Ready Operator pods, and recent webhook
+  error log scan. This proves Kubernetes routing state but does not synthesize
+  an admission request or perform a separate TLS handshake.
 - `--check-instrumentation` — `kubectl get otelinst -A` shows the rendered CRs with expected fields.
 - `--check-injection` — iterate annotated workloads, assert each has a Pod carrying the `opentelemetry-auto-instrumentation` init container and the expected `OTEL_*` env.
-- `--check-apm <service>` — optional probe of `api.<realm>.signalfx.com/v2/apm/topology` for the workload's `service.name`.
+- `--check-apm <service>` — scoped probe of `api.<realm>.observability.splunkcloud.com/v2/apm/topology` for the workload's `service.name`, deployment environment, and Kubernetes cluster.
 - `--check-backup` — annotation backup ConfigMap exists and is non-empty.
+
+Every requested live check is fail-closed: a missing tool, credential,
+resource, injected pod, backup, API response, or exact APM service is a
+validation failure. The composed AWS/EKS/O11y staging gate is documented in
+[`../../scripts/staging/README.md`](../../scripts/staging/README.md).
 
 See [reference.md](reference.md) for the full CLI flag reference and the thirteen `references/*.md` annexes for deep topical documentation.

@@ -307,7 +307,17 @@ bash skills/splunk-observability-otel-collector-setup/scripts/validate.sh \
 bash skills/splunk-observability-otel-collector-setup/scripts/validate.sh \
   --check-k8s --check-linux --check-upstream \
   --output-dir splunk-observability-otel-rendered
+
+# Live controller, pod-readiness, and audited-image checks without reading
+# Helm release Secrets:
+bash skills/splunk-observability-otel-collector-setup/scripts/validate.sh \
+  --output-dir splunk-observability-otel-rendered \
+  --k8s-workloads-only --kube-context CONTEXT
 ```
+
+The repository-wide AWS/EKS/O11y staging gate composes this secret-free mode
+with AWS identity, EKS endpoint, auto-instrumentation, APM, and AWS integration
+checks. See [`../../scripts/staging/README.md`](../../scripts/staging/README.md).
 
 ## TA Completion Gate
 

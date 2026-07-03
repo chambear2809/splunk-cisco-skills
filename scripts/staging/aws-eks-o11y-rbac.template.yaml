@@ -1,0 +1,97 @@
+# Replace both namespace placeholders, the exact Operator webhook configuration
+# name, and its webhook Service name before an EKS administrator applies this
+# one-time prerequisite. The GitHub OIDC role's EKS access entry must map to
+# Kubernetes group aws-eks-o11y-staging-validator. This grants no Secret access
+# and no mutating Kubernetes verbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aws-eks-o11y-staging-validator-cluster
+rules:
+  - nonResourceURLs: ["/version"]
+    verbs: ["get"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    resourceNames: ["__OPERATOR_WEBHOOK_NAME__"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aws-eks-o11y-staging-validator-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aws-eks-o11y-staging-validator-cluster
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: aws-eks-o11y-staging-validator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aws-eks-o11y-staging-validator-collector
+  namespace: __COLLECTOR_NAMESPACE__
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    resourceNames: ["__OPERATOR_WEBHOOK_SERVICE_NAME__"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["splunk-otel-auto-instrumentation-annotations-backup"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "statefulsets"]
+    verbs: ["get"]
+  - apiGroups: ["opentelemetry.io"]
+    resources: ["instrumentations"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aws-eks-o11y-staging-validator-collector
+  namespace: __COLLECTOR_NAMESPACE__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aws-eks-o11y-staging-validator-collector
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: aws-eks-o11y-staging-validator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aws-eks-o11y-staging-validator-workload
+  namespace: __STAGING_NAMESPACE__
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "statefulsets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aws-eks-o11y-staging-validator-workload
+  namespace: __STAGING_NAMESPACE__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aws-eks-o11y-staging-validator-workload
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: aws-eks-o11y-staging-validator

@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -469,6 +471,65 @@ def test_handoff_stubs_empty_when_not_requested(tmp_path: Path) -> None:
     assert "splunk-observability-aws-integration" not in content
 
 
+def test_handoff_exec_paths_are_pinned_against_hostile_caller_cwd(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    spec = renderer.validate_spec(_spec(handoffs={
+        "cloudwatch_metrics": True,
+        "logs": True,
+    }))
+    renderer.render(spec, rendered)
+
+    hostile_cwd = tmp_path / "hostile-cwd"
+    planted_paths = (
+        hostile_cwd / "skills/splunk-observability-aws-integration/scripts/setup.sh",
+        hostile_cwd / "skills/splunk-connect-for-otlp-setup/scripts/setup.sh",
+    )
+    for planted in planted_paths:
+        planted.parent.mkdir(parents=True, exist_ok=True)
+        planted.write_text(
+            '#!/bin/sh\nprintf "planted\\n" >> "$MARKER_FILE"\n',
+            encoding="utf-8",
+        )
+        os.chmod(planted, 0o755)
+
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    capture = tmp_path / "bash-arguments.txt"
+    marker = tmp_path / "planted-ran.txt"
+    fake_bash = fake_bin / "bash"
+    fake_bash.write_text(
+        """#!/bin/sh
+case "$1" in
+  /*) printf '%s\\n' "$1" >> "$CAPTURE_FILE" ;;
+  *) exec /bin/bash "$@" ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    os.chmod(fake_bash, 0o755)
+
+    result = subprocess.run(
+        ["/bin/bash", str(rendered / "scripts/handoffs.sh")],
+        cwd=hostile_cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}/usr/bin:/bin",
+            "CAPTURE_FILE": str(capture),
+            "MARKER_FILE": str(marker),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert not marker.exists()
+    assert capture.read_text(encoding="utf-8").splitlines() == [
+        str(REPO_ROOT / "skills/splunk-observability-aws-integration/scripts/setup.sh"),
+        str(REPO_ROOT / "skills/splunk-connect-for-otlp-setup/scripts/setup.sh"),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Secret backend variants
 # ---------------------------------------------------------------------------
@@ -488,6 +549,277 @@ def test_secret_backend_ssm(tmp_path: Path) -> None:
     renderer.render(spec, tmp_path)
     env_plan = (tmp_path / "04-env.md").read_text()
     assert "resolve:ssm-secure" in env_plan
+
+
+def test_rendered_token_writer_uses_one_validated_no_follow_descriptor(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    spec = renderer.validate_spec(_spec())
+    renderer.render(spec, tmp_path)
+    writer = (tmp_path / "scripts" / "write-splunk-token.sh").read_text()
+    assert "os.O_NOFOLLOW" in writer
+    assert writer.count("token_fd = os.open(") == 1
+    assert "opened_before.st_nlink != 1" in writer
+    assert "source_mode = stat.S_IMODE(opened_before.st_mode)" in writer
+    assert "if not allow_loose" in writer
+    assert "opened_before.st_ino" in writer
+    assert "fingerprint(opened_before) != fingerprint(opened_after)" in writer
+    assert "hashlib.sha256(token_bytes)" in writer
+    assert 'MAX_SECRET_BYTES = 4096 if payload_kind == "ssm" else 64 * 1024' in writer
+    assert "regular, non-symlink file" in writer
+    assert "exactly one non-empty UTF-8 line" in writer
+    assert "Path(sys.argv[1]).read_text" not in writer
+    assert "open(sys.argv[1]" not in writer
+
+
+def _fake_aws_for_token_writer(tmp_path: Path) -> tuple[Path, Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    capture = tmp_path / "captured-payload.json"
+    fake_aws = bin_dir / "aws"
+    fake_aws.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "secretsmanager" && "${2:-}" == "describe-secret" ]]; then
+  exit 1
+fi
+for arg in "$@"; do
+  case "${arg}" in
+    file://*) cp "${arg#file://}" "${CAPTURE_FILE}" ;;
+  esac
+done
+""",
+        encoding="utf-8",
+    )
+    os.chmod(fake_aws, 0o755)
+    return bin_dir, capture
+
+
+@pytest.mark.parametrize(
+    ("backend", "secret_field"),
+    [("secretsmanager", "SecretString"), ("ssm", "Value")],
+)
+def test_rendered_token_writer_payload_comes_from_validated_descriptor(
+    tmp_path: Path,
+    backend: str,
+    secret_field: str,
+) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    spec = renderer.validate_spec(_spec(secret_backend=backend))
+    renderer.render(spec, rendered)
+    token = tmp_path / "token"
+    token.write_text("validated-token-value\n", encoding="utf-8")
+    os.chmod(token, 0o600)
+    bin_dir, capture = _fake_aws_for_token_writer(tmp_path)
+    env = {
+        **os.environ,
+        "TOKEN_FILE": str(token),
+        "CAPTURE_FILE": str(capture),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+    result = subprocess.run(
+        ["bash", str(rendered / "scripts" / "write-splunk-token.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(capture.read_text(encoding="utf-8"))
+    assert payload[secret_field] == "validated-token-value"
+
+
+def test_rendered_token_writer_rejects_symlink_hardlink_and_oversized_files(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    spec = renderer.validate_spec(_spec(secret_backend="ssm"))
+    renderer.render(spec, rendered)
+    writer = rendered / "scripts" / "write-splunk-token.sh"
+    bin_dir, capture = _fake_aws_for_token_writer(tmp_path)
+
+    token = tmp_path / "token"
+    token.write_text("token", encoding="utf-8")
+    os.chmod(token, 0o600)
+    token_link = tmp_path / "token-symlink"
+    token_link.symlink_to(token)
+    os.link(token, tmp_path / "token-hardlink")
+    env = {
+        **os.environ,
+        "TOKEN_FILE": str(token_link),
+        "CAPTURE_FILE": str(capture),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+    symlink_result = subprocess.run(
+        ["bash", str(writer)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert symlink_result.returncode == 2
+    assert "regular, non-symlink" in symlink_result.stderr
+    assert not capture.exists()
+
+    env["TOKEN_FILE"] = str(token)
+    hardlink_result = subprocess.run(
+        ["bash", str(writer)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert hardlink_result.returncode == 2
+    assert "exactly one hard link" in hardlink_result.stderr
+    assert not capture.exists()
+
+    (tmp_path / "token-hardlink").unlink()
+    token.write_bytes(b"x" * 4097)
+    os.chmod(token, 0o600)
+    oversized_result = subprocess.run(
+        ["bash", str(writer)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert oversized_result.returncode == 2
+    assert "4096-byte limit" in oversized_result.stderr
+    assert not capture.exists()
+
+
+def test_rendered_token_writer_loose_mode_escape_is_explicit_and_still_safe(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    spec = renderer.validate_spec(_spec(secret_backend="ssm"))
+    renderer.render(spec, rendered)
+    writer = rendered / "scripts" / "write-splunk-token.sh"
+    bin_dir, capture = _fake_aws_for_token_writer(tmp_path)
+
+    token = tmp_path / "loose-token"
+    token.write_text("validated-token-value\n", encoding="utf-8")
+    os.chmod(token, 0o640)
+    env = {
+        **os.environ,
+        "TOKEN_FILE": str(token),
+        "CAPTURE_FILE": str(capture),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+
+    strict = subprocess.run(
+        ["bash", str(writer)], capture_output=True, text=True, check=False, env=env
+    )
+    assert strict.returncode == 2
+    assert "must have mode 0600" in strict.stderr
+    assert not capture.exists()
+
+    env["ALLOW_LOOSE_TOKEN_PERMS"] = "true"
+    allowed = subprocess.run(
+        ["bash", str(writer)], capture_output=True, text=True, check=False, env=env
+    )
+    assert allowed.returncode == 0, allowed.stdout + allowed.stderr
+    assert "ALLOW_LOOSE_TOKEN_PERMS=true" in allowed.stderr
+    assert json.loads(capture.read_text(encoding="utf-8"))["Value"] == "validated-token-value"
+
+    capture.unlink()
+    symlink = tmp_path / "loose-token-link"
+    symlink.symlink_to(token)
+    env["TOKEN_FILE"] = str(symlink)
+    linked = subprocess.run(
+        ["bash", str(writer)], capture_output=True, text=True, check=False, env=env
+    )
+    assert linked.returncode == 2
+    assert "regular, non-symlink" in linked.stderr
+    assert not capture.exists()
+
+    hardlink = tmp_path / "loose-token-hardlink"
+    os.link(token, hardlink)
+    env["TOKEN_FILE"] = str(token)
+    hardlinked = subprocess.run(
+        ["bash", str(writer)], capture_output=True, text=True, check=False, env=env
+    )
+    assert hardlinked.returncode == 2
+    assert "exactly one hard link" in hardlinked.stderr
+    assert not capture.exists()
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    ["token\v", "token\f", "token\x1c", "token\u0085", "token\u2028", "token\u2029"],
+)
+def test_rendered_token_writer_rejects_hidden_line_controls(
+    tmp_path: Path,
+    bad_value: str,
+) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    renderer.render(renderer.validate_spec(_spec(secret_backend="ssm")), rendered)
+    token = tmp_path / "controlled-token"
+    token.write_text(bad_value, encoding="utf-8")
+    os.chmod(token, 0o600)
+    bin_dir, capture = _fake_aws_for_token_writer(tmp_path)
+    result = subprocess.run(
+        ["bash", str(rendered / "scripts" / "write-splunk-token.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **os.environ,
+            "TOKEN_FILE": str(token),
+            "CAPTURE_FILE": str(capture),
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        },
+    )
+    assert result.returncode == 2
+    assert "printable-ASCII" in result.stderr
+    assert not capture.exists()
+
+
+def test_rendered_token_writer_accepts_single_crlf_terminator(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    rendered = tmp_path / "rendered"
+    renderer.render(renderer.validate_spec(_spec(secret_backend="ssm")), rendered)
+    token = tmp_path / "crlf-token"
+    token.write_bytes(b"validated-token-value\r\n")
+    os.chmod(token, 0o600)
+    bin_dir, capture = _fake_aws_for_token_writer(tmp_path)
+    result = subprocess.run(
+        ["bash", str(rendered / "scripts" / "write-splunk-token.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **os.environ,
+            "TOKEN_FILE": str(token),
+            "CAPTURE_FILE": str(capture),
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(capture.read_text(encoding="utf-8"))["Value"] == "validated-token-value"
+
+
+def test_setup_propagates_explicit_loose_mode_to_generated_writer() -> None:
+    setup = SETUP.read_text(encoding="utf-8")
+    assert 'ALLOW_LOOSE_TOKEN_PERMS="${ALLOW_LOOSE_TOKEN_PERMS}"' in setup
+
+
+def test_secret_setup_wrappers_delegate_content_read_to_bounded_clients() -> None:
+    setup_paths = (
+        SETUP,
+        REPO_ROOT / "skills/splunk-observability-aws-integration/scripts/setup.sh",
+        REPO_ROOT / "skills/splunk-observability-cloud-integration-setup/scripts/setup.sh",
+    )
+    for setup_path in setup_paths:
+        source = setup_path.read_text(encoding="utf-8")
+        assert "splitlines()" not in source
+        assert ".read_bytes()" not in source
+        assert "descriptor-bound" in source
 
 
 def test_invalid_secret_backend_refused(tmp_path: Path) -> None:
@@ -516,6 +848,137 @@ def test_setup_sh_rejects_direct_secret(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "Refusing direct-secret flag" in result.stderr
+
+
+def test_setup_sh_rejects_symlink_token_file(tmp_path: Path) -> None:
+    token = tmp_path / "token"
+    token.write_text("dummy", encoding="utf-8")
+    os.chmod(token, 0o600)
+    link = tmp_path / "token-link"
+    link.symlink_to(token)
+    result = subprocess.run(
+        [
+            "bash",
+            str(SETUP),
+            "--apply",
+            "env",
+            "--accept-beta",
+            "--realm",
+            "us1",
+            "--token-file",
+            str(link),
+            "--allow-loose-token-perms",
+            "--output-dir",
+            str(tmp_path / "rendered"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "regular, non-symlink" in result.stderr
+
+
+def test_setup_sh_rejects_vertical_tab_token_before_generated_writer(
+    tmp_path: Path,
+) -> None:
+    token = tmp_path / "controlled-token"
+    token.write_bytes(b"token\v")
+    os.chmod(token, 0o600)
+    result = subprocess.run(
+        [
+            "bash",
+            str(SETUP),
+            "--apply",
+            "env",
+            "--accept-beta",
+            "--realm",
+            "us1",
+            "--token-file",
+            str(token),
+            "--output-dir",
+            str(tmp_path / "rendered"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "printable-ASCII" in result.stderr
+
+
+def test_quickstart_from_live_writes_only_private_allowlisted_snapshot(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_aws = bin_dir / "aws"
+    fake_aws.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+[[ "${1:-}" == "lambda" && "${2:-}" == "get-function-configuration" ]]
+cat <<'JSON'
+{"FunctionName":"safe-function","Runtime":"python3.11","Timeout":30,"Environment":{"Variables":{"SPLUNK_ACCESS_TOKEN":"must-not-survive","OTHER_SECRET":"also-private"}},"RevisionId":"private-revision"}
+JSON
+""",
+        encoding="utf-8",
+    )
+    os.chmod(fake_aws, 0o755)
+    rendered = tmp_path / "rendered"
+    result = subprocess.run(
+        [
+            "bash",
+            str(SETUP),
+            "--quickstart-from-live",
+            "--target",
+            "safe-function",
+            "--output-dir",
+            str(rendered),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    snapshot = rendered / "state" / "live-function-config.json"
+    payload = json.loads(snapshot.read_text(encoding="utf-8"))
+    assert payload == {
+        "FunctionName": "safe-function",
+        "Runtime": "python3.11",
+        "Timeout": 30,
+    }
+    assert stat.S_IMODE(snapshot.stat().st_mode) == 0o600
+    combined = result.stdout + result.stderr + snapshot.read_text(encoding="utf-8")
+    assert "must-not-survive" not in combined
+    assert "also-private" not in combined
+    assert "private-revision" not in combined
+
+
+def test_terraform_artifact_warns_that_plaintext_token_enters_state(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    renderer.render(renderer.validate_spec(_spec()), tmp_path)
+    terraform = (tmp_path / "terraform" / "main.tf").read_text(encoding="utf-8")
+    assert "Terraform reads SPLUNK_ACCESS_TOKEN as plaintext and stores it" in terraform
+    assert "encrypted, access-controlled remote backend" in terraform.replace("\n# ", "")
+    assert "never commit local state" in terraform
+
+
+def test_rollback_env_uses_private_unpredictable_temp_files() -> None:
+    result = subprocess.run(
+        ["bash", str(SETUP), "--rollback", "env"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "/tmp/original-env-" not in result.stdout
+    assert "umask 077" in result.stdout
+    assert "mktemp" in result.stdout
+    assert "trap cleanup_rollback_env" in result.stdout
+    assert '--environment "file://${CLEAN_ENV_FILE}"' in result.stdout
 
 
 def test_setup_sh_list_runtimes(tmp_path: Path) -> None:
@@ -554,6 +1017,55 @@ def test_validate_sh_against_rendered_tree(tmp_path: Path) -> None:
         capture_output=True, text=True, check=False,
     )
     assert result2.returncode == 0, result2.stdout + result2.stderr
+
+
+def test_validation_plan_labels_endpoint_probe_as_reachability_only(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    spec = renderer.validate_spec(_spec())
+    renderer.render(spec, tmp_path)
+    plan = (tmp_path / "05-validation.md").read_text(encoding="utf-8")
+    assert "reachability probe" in plan
+    assert "does **not** validate Lambda configuration" in plan
+    assert "Configured-state acceptance" in plan
+
+
+def test_live_validator_reports_reachability_only_scope(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    spec = renderer.validate_spec(_spec())
+    renderer.render(spec, tmp_path / "rendered")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_curl = bin_dir / "curl"
+    # An unauthenticated 401 still proves network/TLS/HTTP reachability and
+    # must not be misreported as configured-state failure.
+    fake_curl.write_text("#!/usr/bin/env bash\nprintf '401'\n", encoding="utf-8")
+    os.chmod(fake_curl, 0o755)
+    env = {
+        **os.environ,
+        "SPLUNK_O11Y_REALM": "us1",
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPTS_DIR / "validate.sh"),
+            "--output-dir",
+            str(tmp_path / "rendered"),
+            "--live",
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["live_scope"] == "ingest_endpoint_reachability_only"
+    assert any("reachability-only" in item for item in payload["infos"])
+    assert all("configured" not in item.lower() for item in payload["infos"])
 
 
 def test_smoke_offline(tmp_path: Path) -> None:

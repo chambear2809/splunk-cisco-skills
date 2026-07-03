@@ -9,8 +9,9 @@ set -euo pipefail
 #   - secret-leak scan across every rendered file
 #
 # Live checks (--live):
-#   - GET /v2/integration?type=AWSCloudWatch round-trip
-#   - HTTP HEAD on the configured CFN template URL
+#   - exact enabled AWSCloudWatch integration match for rendered identity/scope
+#   - Splunk-side credential validation for the matched integration ID
+#   - HTTP HEAD on the configured CFN template URL only when rendered for use
 #
 # Doctor mode (--doctor) writes <output-dir>/doctor-report.md with the
 # troubleshooting catalog. Discover mode (--discover) writes
@@ -29,6 +30,7 @@ DOCTOR=false
 DISCOVER=false
 JSON_OUTPUT=false
 SUMMARY=false
+ALLOW_LOOSE_TOKEN_PERMS=false
 
 usage() {
     cat <<EOF
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
         --discover) DISCOVER=true ;;
         --json) JSON_OUTPUT=true ;;
         --summary) SUMMARY=true ;;
+        --allow-loose-token-perms) ALLOW_LOOSE_TOKEN_PERMS=true ;;
         -h|--help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -123,39 +126,93 @@ PY
     done < <(find "${OUTPUT_DIR}/iam" -type f -name "*.json" -print0)
 fi
 
-# Live checks (best-effort; do not FAIL when external state is unknown).
+# Live checks are an explicit production-readiness request. Missing tools,
+# credentials, or failed endpoints are failures; callers that only want the
+# render audit should omit --live.
 if [[ "${LIVE}" == "true" ]]; then
-    # Verify the CFN template URL responds. Prefer the URL actually rendered into
-    # the plan (honors spec.metric_streams.cloudformation_template_url and the
-    # --cfn-template-url override); fall back to the canonical default.
-    cfn_url="$(grep -hoE 'https://[A-Za-z0-9.-]+/[A-Za-z0-9/_.-]*template_metric_streams[A-Za-z0-9/_.-]*\.yaml' "${OUTPUT_DIR}/05-metric-streams.md" 2>/dev/null | head -n1 || true)"
-    if [[ -z "${cfn_url}" ]]; then
-        cfn_url="https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams_regional.yaml"
-    fi
-    if command -v curl >/dev/null 2>&1; then
-        status_code=$(curl -sS -o /dev/null -w "%{http_code}" -I "${cfn_url}" 2>/dev/null || echo "000")
-        if [[ "${status_code}" =~ ^(200|301|302)$ ]]; then
-            infos+=("CFN template URL reachable (HTTP ${status_code})")
+    if cfn_probe_metadata="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/apply-plan.json" <<'PY'
+import json
+import sys
+import urllib.parse
+
+plan = json.load(open(sys.argv[1], encoding="utf-8"))
+rows = [row for row in (plan.get("ordered_steps") or []) if row.get("step") == "metric_streams.cfn"]
+if len(rows) != 1:
+    raise SystemExit("rendered apply plan must contain exactly one metric_streams.cfn step")
+url = rows[0].get("template_url")
+parsed = urllib.parse.urlsplit(url) if isinstance(url, str) else None
+if (
+    parsed is None
+    or parsed.scheme != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.query
+    or parsed.fragment
+    or not parsed.path.endswith((".yaml", ".yml"))
+    or any(character.isspace() or ord(character) < 0x20 for character in url)
+):
+    raise SystemExit("rendered metric_streams.cfn template_url is missing or invalid")
+required = "true" if rows[0].get("coverage") not in {"not_applicable", "handoff"} else "false"
+print(f"{required}\t{url}")
+PY
+)"; then
+        IFS=$'\t' read -r cfn_probe_required cfn_url <<< "${cfn_probe_metadata}"
+        if [[ "${cfn_probe_required}" == "true" ]]; then
+            if command -v curl >/dev/null 2>&1; then
+                status_code=$(curl -q --proto '=https' --tlsv1.2 -sS \
+                    --connect-timeout 10 --max-time 60 \
+                    -o /dev/null -w "%{http_code}" -I "${cfn_url}" 2>/dev/null || echo "000")
+                if [[ "${status_code}" == "200" ]]; then
+                    infos+=("CFN template URL reachable (HTTP ${status_code})")
+                else
+                    failures+=("CFN template URL HTTP HEAD returned ${status_code}")
+                fi
+            else
+                failures+=("curl not installed; cannot run required CFN URL probe")
+            fi
         else
-            warns+=("CFN template URL HTTP HEAD returned ${status_code}; may be transient")
+            infos+=("CFN template URL probe not applicable to this rendered packet")
         fi
     else
-        warns+=("curl not installed; skipping CFN URL probe")
+        failures+=("could not determine whether the rendered CFN URL probe is required")
     fi
 
-    # Verify Splunk Observability /v2/integration is reachable for our realm.
+    # Require one enabled live integration matching the freshly rendered name,
+    # account, authentication method, regions, and metric-stream state.
     if [[ -n "${SPLUNK_O11Y_REALM:-}" && -n "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
+        expected_account_id="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/apply-plan.json" <<'PY'
+import json
+import re
+import sys
+
+plan = json.load(open(sys.argv[1], encoding="utf-8"))
+values = []
+for row in plan.get("ordered_steps") or []:
+    key = str(row.get("idempotency_key") or "")
+    if key.startswith("iam-trust:") and re.fullmatch(r"[0-9]{12}", key.removeprefix("iam-trust:")):
+        values.append(key.removeprefix("iam-trust:"))
+if len(set(values)) != 1:
+    raise SystemExit("rendered apply plan does not identify exactly one AWS account")
+print(values[0])
+PY
+)" || expected_account_id=""
+        live_secret_args=()
+        [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]] && live_secret_args+=(--allow-loose-token-perms)
         if "${PYTHON_BIN}" "${SCRIPT_DIR}/aws_integration_api.py" \
             --realm "${SPLUNK_O11Y_REALM}" \
             --token-file "${SPLUNK_O11Y_TOKEN_FILE}" \
             --state-dir "${OUTPUT_DIR}/state" \
-            list >/dev/null 2>&1; then
-            infos+=("/v2/integration?type=AWSCloudWatch reachable")
+            --payload-file "${OUTPUT_DIR}/payloads/integration-create.json" \
+            --expected-aws-account-id "${expected_account_id}" \
+            "${live_secret_args[@]}" \
+            validate >/dev/null 2>&1; then
+            infos+=("live AWSCloudWatch integration matches rendered identity and scope")
         else
-            warns+=("/v2/integration?type=AWSCloudWatch unreachable (token / realm may be wrong)")
+            failures+=("live AWSCloudWatch integration is unreachable, absent, disabled, duplicated, or does not match rendered identity/scope")
         fi
     else
-        warns+=("SPLUNK_O11Y_REALM and SPLUNK_O11Y_TOKEN_FILE not set; skipping live integration probe")
+        failures+=("SPLUNK_O11Y_REALM and SPLUNK_O11Y_TOKEN_FILE are required for --live")
     fi
 fi
 

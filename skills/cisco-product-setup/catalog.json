@@ -1,5 +1,5 @@
 {
-  "description": "Generated from the packaged SCAN catalog plus skills/cisco-product-setup/catalog_overrides.json local overrides and synthetic products.",
+  "description": "Generated from the pinned normalized SCAN catalog source plus skills/cisco-product-setup/catalog_overrides.json local overrides and synthetic products.",
   "product_count": 84,
   "products": [
     {
@@ -243,6 +243,7 @@
         "cisco:dc:aci:authentication",
         "cisco:dc:aci:class",
         "cisco:dc:aci:health",
+        "cisco:dc:aci:managed_object",
         "cisco:dc:aci:stats",
         "cisco:dc:aci:syslog"
       ],
@@ -789,7 +790,7 @@
         "shadow access"
       ],
       "learn_more_url": "https://appomni.com",
-      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
+      "manual_gap_reason": "This product is marked under_development in the pinned SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
       "normalized_search_terms": [
         "cisco appomni",
         "appomni",
@@ -1316,15 +1317,30 @@
         "password"
       ],
       "sourcetypes": [
+        "cisco:dnac:application:traffic",
         "cisco:dnac:audit:logs",
         "cisco:dnac:client",
         "cisco:dnac:clienthealth",
         "cisco:dnac:compliance",
         "cisco:dnac:devicehealth",
+        "cisco:dnac:devicehealth:interface",
         "cisco:dnac:issue",
         "cisco:dnac:networkhealth",
         "cisco:dnac:securityadvisory",
-        "cisco:dnac:site:topology"
+        "cisco:dnac:site:topology",
+        "cisco:dnac:swim",
+        "cisco:dnac:custom",
+        "cisco:dnac:custom:*",
+        "cisco:catalyst:center:inventory:report",
+        "cisco:catalyst:center:compliance:report",
+        "cisco:catalyst:center:report",
+        "cisco:catalyst:client",
+        "cisco:catalyst:clienthealth",
+        "cisco:catalyst:compliance",
+        "cisco:catalyst:devicehealth",
+        "cisco:catalyst:issue",
+        "cisco:catalyst:networkhealth",
+        "cisco:catalyst:securityadvisory"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -1467,34 +1483,35 @@
         "password"
       ],
       "sourcetypes": [
-        "cisco:firewall:logs",
-        "cisco:sdwan:*",
-        "cisco:sdwan:acl:logs",
-        "cisco:sdwan:alert:off",
-        "cisco:sdwan:alert:on",
         "cisco:sdwan:audit:logs",
-        "cisco:sdwan:block:host",
-        "cisco:sdwan:dmi:cli:engine:write:fail",
-        "cisco:sdwan:drop:pkt",
-        "cisco:sdwan:host:tcp:alert:on",
+        "cisco:sdwan:energy:stats",
         "cisco:sdwan:linkhealth",
-        "cisco:sdwan:log:summary",
-        "cisco:sdwan:pass:pkt",
-        "cisco:sdwan:session:audit:trail",
-        "cisco:sdwan:session:audit:trail:start",
-        "cisco:sdwan:sessions:maximum",
-        "cisco:sdwan:sgacl:logs",
         "cisco:sdwan:sitehealth",
-        "cisco:sdwan:smart:lic:platform:error",
+        "cisco:sdwan:ssetunnelhealth",
         "cisco:sdwan:ssetunnels",
-        "cisco:sdwan:system:logs",
         "cisco:sdwan:tunnelhealth",
-        "cisco:sdwan:unblock:host",
-        "cisco:sdwan:utd:logs",
         "cisco:sdwan:utdhealth",
-        "cisco:sgacl:logs",
-        "cisco:viptela",
-        "stream:netflow"
+        "cisco:sdwan:custom",
+        "cisco:sdwan:custom:*",
+        "cisco:sdwan:system:logs",
+        "cisco:sdwan:sytem:logs",
+        "cisco:sdwan:session:audit:trail:start",
+        "cisco:sdwan:session:audit:trail",
+        "cisco:sdwan:unblock:host",
+        "cisco:sdwan:block:host",
+        "cisco:sdwan:host:tcp:alert:on",
+        "cisco:sdwan:alert:on",
+        "cisco:sdwan:alert:off",
+        "cisco:sdwan:sessions:maximum",
+        "cisco:sdwan:pass:pkt",
+        "cisco:sdwan:drop:pkt",
+        "cisco:sdwan:log:summary",
+        "cisco:sdwan:smart:lic:platform:error",
+        "cisco:sdwan:dmi:cli:engine:write:fail",
+        "cisco:sdwan:utd:logs",
+        "cisco:sdwan:acl:logs",
+        "cisco:sdwan:sgacl:logs",
+        "cisco:sgacl:logs"
       ],
       "status": "active",
       "subcategory": "routing_wan",
@@ -2440,8 +2457,8 @@
         "cisco:cybervision:devices",
         "cisco:cybervision:events",
         "cisco:cybervision:flows",
-        "cisco:cybervision:syslog",
-        "cisco:cybervision:vulnerabilities"
+        "cisco:cybervision:vulnerabilities",
+        "cisco:cybervision:syslog"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -2669,8 +2686,18 @@
         "skey"
       ],
       "sourcetypes": [
+        "cisco:duo",
+        "cisco:duo:*",
+        "cisco:duo:account",
+        "cisco:duo:activity",
+        "cisco:duo:administrator",
         "cisco:duo:authentication",
-        "cisco:duo:authentication_v2"
+        "cisco:duo:authentication_v2",
+        "cisco:duo:endpoint",
+        "cisco:duo:telephony",
+        "cisco:duo:telephony_v2",
+        "cisco:duo:trust_monitor",
+        "cisco:duo:user"
       ],
       "status": "active",
       "subcategory": "identity_access",
@@ -3604,18 +3631,21 @@
         "password"
       ],
       "sourcetypes": [
+        "cisco:ise",
+        "cisco:ise:syslog",
+        "cisco:ise:radius:policyset",
+        "cisco:ise:radius:authz:policy",
+        "cisco:ise:tacacs:policyset",
+        "cisco:ise:tacacs:authz:policy",
+        "cisco:ise:securitygroups",
+        "cisco:ise:sgtbindings",
         "cisco:ise:analytics",
         "cisco:ise:analytics:applications",
         "cisco:ise:analytics:fullreport",
         "cisco:ise:analytics:hardware",
         "cisco:ise:analytics:registry",
-        "cisco:ise:radius:authz:policy",
-        "cisco:ise:radius:policyset",
-        "cisco:ise:securitygroups",
-        "cisco:ise:sgtbindings",
-        "cisco:ise:syslog",
-        "cisco:ise:tacacs:authz:policy",
-        "cisco:ise:tacacs:policyset"
+        "cisco:ise:custom",
+        "cisco:ise:custom:*"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -4869,6 +4899,7 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
+        "cisco:multicloud:defense",
         "cisco:multicloud:defense:appid",
         "cisco:multicloud:defense:auditlogs",
         "cisco:multicloud:defense:av",
@@ -5400,6 +5431,7 @@
       ],
       "sourcetypes": [
         "cisco:dc:nexus9k",
+        "cisco:dc:nexus9k:dme",
         "cisco:dc:nexus9k:syslog"
       ],
       "status": "active",
@@ -5732,7 +5764,23 @@
         "TA Accedian Skylight powered Security"
       ],
       "secret_keys": [],
-      "sourcetypes": [],
+      "sourcetypes": [
+        "skylight:alexa",
+        "skylight:citrix",
+        "skylight:cleanevent",
+        "skylight:dga_ml",
+        "skylight:dns",
+        "skylight:http",
+        "skylight:ml",
+        "skylight:smb",
+        "skylight:sql",
+        "skylight:tcp",
+        "skylight:ti",
+        "skylight:ti_domain",
+        "skylight:tls",
+        "skylight:udp",
+        "skylight:voip"
+      ],
       "status": "deprecated",
       "subcategory": "infrastructure_monitoring",
       "template_checks": {},
@@ -5856,7 +5904,7 @@
         "api protection"
       ],
       "learn_more_url": "https://www.radware.com",
-      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
+      "manual_gap_reason": "This product is marked under_development in the pinned SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
       "normalized_search_terms": [
         "cisco radware",
         "radware",
@@ -7791,8 +7839,9 @@
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [
-        "network",
-        "alerts"
+        "ta_cisco_thousandeyes/application",
+        "cisco-catalyst-app/network",
+        "cisco-catalyst-app/alerts"
       ],
       "description": "Digital experience monitoring - internet, cloud, and SaaS visibility with synthetic and real-user monitoring.",
       "display_name": "Cisco ThousandEyes (TE)",
@@ -8941,6 +8990,11 @@
       "sourcetypes": [
         "cisco:webex:admin:audit:events",
         "cisco:webex:call:detailed_history",
+        "cisco:webex:contact:center",
+        "cisco:webex:contact:center:aar",
+        "cisco:webex:contact:center:asr",
+        "cisco:webex:contact:center:car",
+        "cisco:webex:contact:center:csr",
         "cisco:webex:meeting:attendee:reports",
         "cisco:webex:meeting:qualities",
         "cisco:webex:meeting:usage:reports",
@@ -9457,5 +9511,14 @@
       "value_proposition": "Stream WLC trap, syslog, and client-session data into Splunk for wireless fleet health and rogue-AP detection."
     }
   ],
-  "scan_package": "splunk-cisco-app-navigator-scan_1025.tar.gz"
+  "scan_source": {
+    "catalog_version": "2026_06_26_1427",
+    "kind": "scan_public_catalog",
+    "minimum_scan_version": "1.0.28",
+    "normalized_fixture": "scan_products.fixture.json",
+    "normalized_fixture_sha256": "47313edcd1c145f582d115b41375e42bff4651a26af09330135b0bb69de1224e",
+    "retrieved_date": "2026-07-03",
+    "sha256": "94e694bb7e922902ffdd44c3306dc818715651532f97930620270e81aeafd721",
+    "url": "https://is4s.s3.amazonaws.com/scan/products.conf"
+  }
 }

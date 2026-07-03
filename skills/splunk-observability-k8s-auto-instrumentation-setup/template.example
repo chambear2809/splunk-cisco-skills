@@ -47,8 +47,6 @@ instrumentation_crs:
 
     # Languages this CR covers. Each language emits its own block in the CR
     # spec (images, env, resource limits) per the OpenTelemetry Operator CRD.
-    # `sdk` is a language-agnostic env-only inject for apps that bundle their
-    # own OTel SDK.
     languages:
       - java
       - nodejs
@@ -57,7 +55,6 @@ instrumentation_crs:
       # - go
       # - apache-httpd
       # - nginx
-      # - sdk
 
     # Endpoint where the CR tells language SDKs to send OTLP. Default points
     # at the base-collector node-local agent DaemonSet via the SPLUNK_OTEL_AGENT
@@ -175,7 +172,7 @@ namespace_annotations: {}
 #   - kind: Deployment            # Deployment | StatefulSet | DaemonSet
 #     namespace: prod
 #     name: payments-api
-#     language: java              # one of: java, nodejs, python, dotnet, go, apache-httpd, nginx, sdk
+#     language: java              # one of: java, nodejs, python, dotnet, go, apache-httpd, nginx
 #     container_names: "app"      # optional; REQUIRED when Istio sidecar injection is on
 #     dotnet_runtime: ""          # optional; linux-x64 | linux-musl-x64
 #     go_target_exe: ""           # REQUIRED for language: go

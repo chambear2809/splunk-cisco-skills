@@ -248,6 +248,21 @@ def test_multi_cr_with_gate_succeeds(tmp_path: Path) -> None:
     assert names == {"dev", "prod"}
 
 
+def test_sdk_language_is_rejected_as_unsupported(tmp_path: Path) -> None:
+    spec = write_spec(
+        tmp_path / "spec.yaml",
+        instrumentation_crs=[
+            {"name": "sdk", "namespace": "splunk-otel", "languages": ["sdk"]}
+        ],
+        workload_annotations=[
+            {"kind": "Deployment", "namespace": "prod", "name": "app", "language": "sdk"}
+        ],
+    )
+    result = run_render("--spec", str(spec), "--output-dir", str(tmp_path / "r"))
+    assert result.returncode != 0
+    assert "Unsupported language 'sdk'" in combined(result)
+
+
 def test_apply_annotations_requires_accept(tmp_path: Path) -> None:
     spec = write_spec(tmp_path / "spec.yaml")
     out = tmp_path / "r"
@@ -464,6 +479,7 @@ def test_multi_language_render(tmp_path: Path) -> None:
         assert key in cr_body, f"CR must include {key} block"
     assert "SPLUNK_PROFILER_ENABLED" in cr_body
     assert "SPLUNK_METRICS_ENABLED" in cr_body
+    assert "OTEL_DOTNET_AUTO_HOME" not in cr_body
 
 
 # ---------------------------------------------------------------------------

@@ -104,22 +104,24 @@ done
 if [[ -d "${OUTPUT_DIR}" ]]; then
     while IFS= read -r -d '' file; do
         if grep -E "(eyJ[A-Za-z0-9._-]{20,}|(?i)bearer\s+[A-Za-z0-9._-]{12,})" "${file}" >/dev/null 2>&1; then
-            failures+=("secret-looking content in ${file#${OUTPUT_DIR}/}")
+            failures+=("secret-looking content in ${file#"${OUTPUT_DIR}"/}")
         fi
     done < <(find "${OUTPUT_DIR}" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.signalflow" -o -name "*.mmd" \) -print0)
 fi
 
-# Live checks (best-effort; do not FAIL when external state is unknown).
+# Live checks are explicit reachability diagnostics. Static-only validation
+# remains available by omitting --live; configured-state acceptance belongs to
+# the section-specific apply/read-back workflows.
 if [[ "${LIVE}" == "true" ]]; then
     if "${PYTHON_BIN}" "${SCRIPT_DIR}/token_auth_api.py" status >/dev/null 2>&1; then
         infos+=("token_auth_api status reachable")
     else
-        warns+=("token_auth_api status unreachable (Splunk REST credentials may be missing)")
+        failures+=("token_auth_api status unreachable (Splunk REST credentials may be missing)")
     fi
     if "${PYTHON_BIN}" "${SCRIPT_DIR}/sim_addon_api.py" list-accounts >/dev/null 2>&1; then
         infos+=("sim_addon_api list-accounts reachable")
     else
-        warns+=("sim_addon_api list-accounts unreachable (Splunk REST or Splunk_TA_sim may be missing)")
+        failures+=("sim_addon_api list-accounts unreachable (Splunk REST or Splunk_TA_sim may be missing)")
     fi
 fi
 

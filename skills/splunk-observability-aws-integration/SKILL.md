@@ -60,6 +60,13 @@ Every rendered section gets an explicit coverage status in
   token. Token files must be `chmod 600`. Override only with
   `--allow-loose-token-perms` (emits a WARN — use only for short-lived scratch
   tokens).
+- Secret files must always be regular, non-symlink, single-hardlink files no
+  larger than 64 KiB containing one non-empty printable-ASCII value with at
+  most one trailing LF or CRLF. Readers use `O_NOFOLLOW`,
+  bounded double reads, and stable metadata/content fingerprints;
+  `--allow-loose-token-perms` relaxes only the mode check.
+- Authenticated API calls are pinned to supported HTTPS realm hosts and refuse
+  every redirect so `X-SF-Token` cannot be forwarded to another URL.
 - For `authentication.mode: security_token` (GovCloud / China), use
   `--aws-access-key-id-file` and `--aws-secret-access-key-file`. Both files
   must be `chmod 600`.
@@ -111,6 +118,9 @@ Plus quality-of-life flags:
 - `--cfn-template-url URL` — override the default
   `https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams_regional.yaml`
   (or the StackSets equivalent when `metric_streams.use_stack_sets: true`).
+  Overrides must be absolute HTTPS URLs on port 443, end in `.yaml` or `.yml`,
+  and contain no credentials, query, fragment, whitespace, or control
+  characters. The rendered AWS CLI command shell-quotes the validated URL.
 - `--accept-drift FIELD[,FIELD...]` — needed for `--apply` when discover shows
   the live integration differs from the rendered spec on a field with side
   effects (e.g. flipping `useMetricStreamsSync`).
@@ -245,11 +255,22 @@ bash skills/splunk-observability-aws-integration/scripts/validate.sh \
   --output-dir splunk-observability-aws-integration-rendered
 ```
 
-Static checks: required-files, IAM JSON shape, secrets-leak scan across every
-rendered file, CFN template URL HTTP HEAD probe (`--live`).
+Static checks: required-files, IAM JSON shape, and a secrets-leak scan across
+every rendered file.
 
-With `--live`: `GET /v2/integration?type=AWSCloudWatch` round-trip, drift
-report against `template.example`.
+With `--live`, the CFN HTTPS probe is mandatory only when the rendered plan
+uses that template. The live API check requires exactly one enabled integration
+matching the rendered name, AWS account, regions, polling/stream mode, services,
+custom namespaces, rates, and guards, then calls
+`GET /v2/integration/validate/{id}`. Missing credentials, tools, or evidence
+fail validation. The validation endpoint requires a short-lived administrator
+User API session token.
+
+For the cross-domain AWS/EKS/O11y production gate, render clean packets with
+`scripts/staging/render-aws-eks-o11y.py` and run
+`scripts/staging/validate-aws-eks-o11y.sh`. See
+[`../../scripts/staging/README.md`](../../scripts/staging/README.md). The gate
+is read-only and records a private, sanitized JSON report.
 
 See `reference.md` and the focused references under `references/` for full
 detail. The plan and corrections that produced this skill are recorded in

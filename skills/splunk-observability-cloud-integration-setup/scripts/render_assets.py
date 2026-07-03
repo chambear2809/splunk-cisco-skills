@@ -25,7 +25,10 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
+import stat
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -282,6 +285,10 @@ class RenderError(Exception):
 SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 SAFE_INDEX_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
 SAFE_STACK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
+SAFE_ROLE_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+SAFE_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$")
+API_VERSION = "splunk-observability-cloud-integration-setup/v1"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def require_safe_name(label: str, value: Any) -> str:
@@ -354,9 +361,8 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
     if not isinstance(spec, dict):
         raise RenderError("spec root must be a mapping")
 
-    spec.setdefault("api_version", "splunk-observability-cloud-integration-setup/v1")
-    if not isinstance(spec["api_version"], str):
-        raise RenderError("api_version must be a string")
+    if spec.get("api_version") != API_VERSION:
+        raise RenderError(f"api_version must be exactly {API_VERSION!r}")
 
     target = target_override or spec.get("target", "cloud")
     if not isinstance(target, str) or target not in {"cloud", "enterprise"}:
@@ -418,8 +424,11 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
             raise RenderError(f"pairing.multi_org contains duplicate realm {entry_realm!r}")
         seen_realms.add(entry_realm)
         label = entry.get("label", "")
-        if not isinstance(label, str) or "\n" in label or "\r" in label:
-            raise RenderError(f"pairing.multi_org[{index}].label must be a single-line string")
+        if not isinstance(label, str) or (label and SAFE_LABEL_RE.fullmatch(label) is None):
+            raise RenderError(
+                f"pairing.multi_org[{index}].label must be empty or contain only "
+                "letters, digits, spaces, dots, underscores, or hyphens (64 characters max)"
+            )
         if not isinstance(entry.get("make_default", False), bool):
             raise RenderError(f"pairing.multi_org[{index}].make_default must be boolean")
 
@@ -477,7 +486,15 @@ def validate_spec(spec: dict[str, Any], target_override: str | None = None) -> d
         raise RenderError(
             "discover_app.access_tokens_realm_token_file_ref must be SPLUNK_O11Y_TOKEN_FILE"
         )
-    require_safe_name_list("discover_app.read_permission_roles", discover["read_permission_roles"])
+    roles = discover["read_permission_roles"]
+    if (
+        not isinstance(roles, list)
+        or not roles
+        or any(not isinstance(role_name, str) or SAFE_ROLE_RE.fullmatch(role_name) is None for role_name in roles)
+    ):
+        raise RenderError(
+            "discover_app.read_permission_roles may contain only letters, digits, dot, underscore, or hyphen"
+        )
 
     loc = require_mapping("log_observer_connect", spec.setdefault("log_observer_connect", {}))
     loc.setdefault("enable", True)
@@ -681,8 +698,12 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         }
     else:
         coverage["pairing.sa"] = {
-            "status": "api_apply" if pairing_mode == "service_account" else "api_validate",
-            "notes": "The pairing section owns the Discover app Access tokens REST write; UID mode only validates it.",
+            "status": "handoff" if pairing_mode == "service_account" else "api_validate",
+            "notes": (
+                "Realm-only readback cannot prove the submitted access token; mutation fails closed to the UI Test workflow."
+                if pairing_mode == "service_account"
+                else "UID mode only validates the Discover app Access tokens endpoint."
+            ),
         }
 
     if multiple_pairing_orgs:
@@ -711,8 +732,8 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         }
     if target == "cloud" and not fed_or_excluded and pairing_mode == "unified_identity":
         coverage["centralized_rbac.o11y_access"] = {
-            "status": "api_apply" if rbac["o11y_access_role"].get("create") else "deeplink",
-            "notes": "Splunk authorize REST creates the o11y_access gate role; assigning it to other roles remains an explicit operator handoff.",
+            "status": "handoff" if rbac["o11y_access_role"].get("create") else "deeplink",
+            "notes": "Role create/update requires named-object convergence and readback not implemented by the raw REST path; generated apply fails before mutation.",
         }
     else:
         coverage["centralized_rbac.o11y_access"] = {
@@ -755,9 +776,9 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     coverage["discover_app.test"] = {"status": "deeplink", "notes": "Test now button is UI only."}
 
     if loc.get("enable"):
-        coverage["log_observer_connect.user"] = {"status": "api_apply", "notes": "Splunk users REST: create LOC service-account user."}
-        coverage["log_observer_connect.role"] = {"status": "api_apply", "notes": "Splunk authorize REST: create LOC role with caps + indexes + limits."}
-        coverage["log_observer_connect.workload"] = {"status": "api_apply", "notes": "Splunk workload-management REST: create runtime>5m abort rule."}
+        coverage["log_observer_connect.user"] = {"status": "handoff", "notes": "Raw create lacks safe named-object convergence/readback; generated apply fails before mutation."}
+        coverage["log_observer_connect.role"] = {"status": "handoff", "notes": "Raw create lacks safe named-object convergence/readback; generated apply fails before mutation."}
+        coverage["log_observer_connect.workload"] = {"status": "handoff", "notes": "Raw create lacks safe named-object convergence/readback; generated apply fails before mutation."}
         if target == "cloud":
             coverage["log_observer_connect.allowlist"] = {"status": "handoff", "notes": "Delegate LOC realm IPs to splunk-cloud-acs-admin-setup --features search-api."}
             coverage["log_observer_connect.tls_cert"] = {"status": "not_applicable", "notes": "TLS-cert paste path is SE-only."}
@@ -937,14 +958,14 @@ def section_token_auth(spec: dict[str, Any]) -> str:
         "source skills/shared/lib/credential_helpers.sh",
         "load_splunk_connection_settings",
         "SK=\"$(get_session_key \"${SPLUNK_SEARCH_API_URI}\")\"",
-        "splunk_curl \"${SK}\" --fail-with-body --show-error \\",
+        "splunk_curl \"${SK}\" --fail --location --max-redirs 0 --output /dev/null --show-error \\",
         "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth?output_mode=json\"",
         "```",
         "",
         "## Enable (no restart required)",
         "",
         "```bash",
-        "splunk_curl \"${SK}\" --fail-with-body --show-error -X POST \\",
+        "splunk_curl \"${SK}\" --fail --location --max-redirs 0 --output /dev/null --show-error -X POST \\",
         "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth\" \\",
         "  -d disabled=false",
         "```",
@@ -1013,26 +1034,25 @@ def section_pairing(spec: dict[str, Any]) -> str:
             f"  --realm {realm}",
             "```",
             "",
-            "Or via the ACS REST API:",
+            "Or call the file-safe ACS REST client directly (HTTPS host pinned; redirects refused):",
             "",
             "```bash",
-            "SPLUNK_CLOUD_PAIRING_CURL_CONFIG=\"$(mktemp)\"",
-            "chmod 600 \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"",
-            "{ printf 'header = \"Authorization: Bearer '; tr -d '\\r\\n' < \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\"; printf '\"\\n';",
-            "  printf 'header = \"o11y-access-token: '; tr -d '\\r\\n' < \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\"; printf '\"\\n'; } > \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"",
-            "trap 'rm -f \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"' EXIT",
-            "",
-            "curl --fail-with-body --silent --show-error -X POST 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing' \\",
-            "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
-            "  -H 'Content-Type: application/json'",
+            "python3 skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py \\",
+            "  --state-dir \"${PAIRING_STATE_DIR:-state}\" \\",
+            "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
+            "  --splunk-cloud-admin-jwt-file \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\" \\",
+            "  --splunk-cloud-stack \"${SPLUNK_CLOUD_STACK}\" \\",
+            f"  pair --realm {realm}",
             "```",
             "",
-            "Returns `{\"id\": \"<pairing-id>\"}`. Poll with:",
+            "The client creates and polls the asynchronous pairing job. To resume a retained job or inspect a known ID:",
             "",
             "```bash",
-            "curl --fail-with-body --silent --show-error -X GET 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing/${PAIRING_ID}' \\",
-            "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
-            "  -H 'Content-Type: application/json'",
+            "python3 skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py \\",
+            "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
+            "  --splunk-cloud-admin-jwt-file \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\" \\",
+            "  --splunk-cloud-stack \"${SPLUNK_CLOUD_STACK}\" \\",
+            "  status --pairing-id \"${PAIRING_ID}\"",
             "```",
             "",
             "Statuses are `SUCCESS`, `FAILED`, or `IN_PROGRESS`.",
@@ -1493,7 +1513,19 @@ def section_handoff(spec: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-SHEBANG = "#!/usr/bin/env bash\nset -euo pipefail\n\n"
+SHEBANG = f"""#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$-" == *x* ]]; then
+  echo "ERROR: shell xtrace is enabled; refusing to process credentials." >&2
+  exit 2
+fi
+
+GENERATED_SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+RENDER_ROOT="$(cd "${{GENERATED_SCRIPT_DIR}}/.." && pwd)"
+PROJECT_ROOT={shlex.quote(str(PROJECT_ROOT))}
+
+"""
 
 
 SPLUNK_CURL_AUTH_HELPER = """\
@@ -1524,7 +1556,8 @@ then
 fi
 
 curl() {
-  command curl --fail-with-body --silent --show-error "$@"
+  command curl -q --fail --silent --show-error --output /dev/null \
+    --proto '=https' --proto-redir '=https' --location --max-redirs 0 "$@"
 }
 
 CURL_TLS_ARGS=()
@@ -1544,58 +1577,31 @@ case "${SPLUNK_VERIFY_SSL:-true}" in
     ;;
 esac
 
-require_secret_file() {
-  local path="${1:?secret-file path is required}"
-  local label="${2:-secret file}"
-  [[ ! -L "${path}" && -f "${path}" && -s "${path}" ]] || {
-    echo "ERROR: ${label} is missing or empty: ${path}" >&2
-    exit 2
-  }
-  local mode
-  mode="$(stat -f '%A' "${path}" 2>/dev/null || stat -c '%a' "${path}")"
-  [[ "${mode}" == "600" ]] || {
-    echo "ERROR: ${label} must have mode 600 (found ${mode}): ${path}" >&2
-    exit 2
-  }
-  "${PYTHON_BIN:-python3}" - "${path}" <<'PY_SECRET'
-from pathlib import Path
-import sys
-
-try:
-    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
-except (OSError, UnicodeError):
-    raise SystemExit(1)
-if len(lines) != 1 or not lines[0] or "\\x00" in lines[0]:
-    raise SystemExit(1)
-PY_SECRET
-}
-
-_curl_config_escape() {
-  local value="${1:-}"
-  value="${value//\\\\/\\\\\\\\}"
-  value="${value//\\"/\\\\\\"}"
-  value="${value//$'\\n'/\\\\n}"
-  value="${value//$'\\r'/\\\\r}"
-  printf '%s' "${value}"
-}
-
 make_splunk_auth_config() {
   local auth_config
   auth_config="$(mktemp)"
   chmod 600 "${auth_config}"
-  printf 'user = "%s:%s"\\n' "$(_curl_config_escape "${SPLUNK_USER}")" "$(_curl_config_escape "${SPLUNK_PASS}")" > "${auth_config}"
+  if ! "${PYTHON_BIN:-python3}" \
+    "${CURL_SECRET_CONFIG_HELPER:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/secret_file_to_curl_config.py}" \
+    --basic-auth-env --output "${auth_config}"; then
+    rm -f -- "${auth_config}"
+    return 2
+  fi
   printf '%s\\n' "${auth_config}"
 }
 
 make_curl_form_secret_config() {
   local field="${1:?form field is required}"
   local path="${2:?secret-file path is required}"
-  local value config
-  value="$(<"${path}")"
+  local config
   config="$(mktemp)"
   chmod 600 "${config}"
-  printf 'data-urlencode = "%s=%s"\\n' "$(_curl_config_escape "${field}")" "$(_curl_config_escape "${value}")" > "${config}"
-  value=""
+  if ! "${PYTHON_BIN:-python3}" \
+    "${CURL_SECRET_CONFIG_HELPER:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/secret_file_to_curl_config.py}" \
+    --field "${field}" --secret-file "${path}" --output "${config}"; then
+    rm -f -- "${config}"
+    return 2
+  fi
   printf '%s\\n' "${config}"
 }
 
@@ -1609,7 +1615,7 @@ def apply_script_token_auth() -> str:
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
         "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-        "TOKEN_AUTH_API=\"${TOKEN_AUTH_API:-skills/splunk-observability-cloud-integration-setup/scripts/token_auth_api.py}\"\n"
+        "TOKEN_AUTH_API=\"${TOKEN_AUTH_API:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/token_auth_api.py}\"\n"
         "\"${PYTHON_BIN}\" \"${TOKEN_AUTH_API}\" --state-dir \"${TOKEN_AUTH_STATE_DIR:-state}\" enable\n"
     )
 
@@ -1631,26 +1637,16 @@ def apply_script_pairing(spec: dict[str, Any]) -> str:
             "exit 2\n"
         )
     if mode == "service_account":
-        body = SHEBANG + (
-            "# Step: Splunk Cloud Platform API-token pairing through the Discover app.\n"
-            ": \"${SPLUNK_O11Y_TOKEN_FILE:?SPLUNK_O11Y_TOKEN_FILE must point to a chmod-600 user-token file}\"\n"
-            "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-            "DISCOVER_API=\"${DISCOVER_API:-skills/splunk-observability-cloud-integration-setup/scripts/discover_app_api.py}\"\n"
-            "PAIRING_STATE_DIR=\"${PAIRING_STATE_DIR:-state}\"\n\n"
+        return SHEBANG + (
+            "echo 'ERROR: API-token pairing is a fail-closed handoff; realm-only REST readback cannot prove the submitted token.' >&2\n"
+            "echo 'HANDOFF: use Discover app > Configurations > Access tokens, run its documented Test action, and retain evidence; no mutation was attempted.' >&2\n"
+            "exit 2\n"
         )
-        for entry in multi:
-            api_realm = observability_api_realm(entry["realm"])
-            body += (
-                f"# Configure realm: {entry.get('realm')}\n"
-                "\"${PYTHON_BIN}\" \"${DISCOVER_API}\" --state-dir \"${PAIRING_STATE_DIR}\" "
-                f"access-tokens --realm {api_realm} --token-file \"${{SPLUNK_O11Y_TOKEN_FILE}}\"\n\n"
-            )
-        return body
     body = SHEBANG + (
         "# Step: Unified Identity pair (single organization).\n"
         ": \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE:?SPLUNK_O11Y_ADMIN_TOKEN_FILE must point to a chmod-600 admin token file}\"\n\n"
         "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-        "PAIRING_API=\"${PAIRING_API:-skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
+        "PAIRING_API=\"${PAIRING_API:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
         f"SPLUNK_CLOUD_STACK=\"{stack}\"\n"
         "PAIRING_ARGS=(--state-dir \"${PAIRING_STATE_DIR:-state}\" --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\n"
         "[[ -n \"${SPLUNK_CLOUD_STACK:-}\" ]] && PAIRING_ARGS+=(--splunk-cloud-stack \"${SPLUNK_CLOUD_STACK}\")\n"
@@ -1680,6 +1676,12 @@ def apply_script_rbac(spec: dict[str, Any]) -> str:
         return SHEBANG + (
             "echo 'ERROR: centralized RBAC cutover has no safe token-file transport in this repo.' >&2\n"
             "echo 'HANDOFF: use an approved Splunk Cloud administrative workflow; no changes were made.' >&2\n"
+            "exit 2\n"
+        )
+    if rbac["o11y_access_role"].get("create"):
+        return SHEBANG + (
+            "echo 'ERROR: o11y_access role mutation lacks safe named-object convergence and readback.' >&2\n"
+            "echo 'HANDOFF: create or update the role through an approved Splunk administrative workflow; no mutation was attempted.' >&2\n"
             "exit 2\n"
         )
     if not rbac.get("enable_capabilities") and not rbac["o11y_access_role"].get("create"):
@@ -1726,7 +1728,7 @@ def apply_script_discover_app(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
         "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-        "DISCOVER_API=\"${DISCOVER_API:-skills/splunk-observability-cloud-integration-setup/scripts/discover_app_api.py}\"\n"
+        "DISCOVER_API=\"${DISCOVER_API:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/discover_app_api.py}\"\n"
         "STATE_ARGS=(--state-dir \"${DISCOVER_STATE_DIR:-state}\")\n\n"
         "\"${PYTHON_BIN}\" \"${DISCOVER_API}\" \"${STATE_ARGS[@]}\" preflight\n"
         f"\"${{PYTHON_BIN}}\" \"${{DISCOVER_API}}\" \"${{STATE_ARGS[@]}}\" related-content-discovery --enabled {'true' if discover['related_content_discovery'] else 'false'}\n"
@@ -1744,50 +1746,11 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
             "echo 'ERROR: log_observer_connect.enable=false; no live action was requested.' >&2\n"
             "exit 2\n"
         )
-    role = loc["role"]
-    sa = loc["service_account"]
-    runtime = loc["workload_rule_runtime_seconds"]
-    role_search_jobs_quota = role["standard_search_limit_per_user"] * role["expected_concurrent_users"]
-    body = SHEBANG + (
-        "# Step: Log Observer Connect service-account user + role + workload rule.\n"
-        ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set}\"\n"
-        ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
-        ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
-        ": \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE:?--service-account-password-file must be set (chmod 600)}\"\n\n"
-        f"{SPLUNK_CURL_AUTH_HELPER}"
-        "require_secret_file \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE}\" 'LOC service-account password file'\n"
-        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
-        "LOC_PASSWORD_CONFIG=\"\"\n"
-        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\" \"${LOC_PASSWORD_CONFIG}\"' EXIT\n"
-        "LOC_PASSWORD_CONFIG=\"$(make_curl_form_secret_config password \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE}\")\"\n"
-        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n\n"
-        "# Read every target collection before the first mutation.\n"
-        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/authorization/roles?output_mode=json&count=0\" >/dev/null\n"
-        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/authentication/users?output_mode=json&count=0\" >/dev/null\n"
-        "curl \"${CURL_TLS_ARGS[@]}\" \"${AUTH[@]}\" \"${SPLUNK_SEARCH_API_URI}/services/workloads/rules?output_mode=json&count=0\" >/dev/null\n\n"
-        "# Role.\n"
-        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authorization/roles\" \\\n"
-        f"  -d name={role['name']} \\\n"
-        f"  -d imported_roles={role['base_role']} \\\n"
-        f"  -d capabilities=edit_tokens_own -d capabilities=search \\\n"
-        f"  -d srchTimeWin={role['time_window_seconds']} \\\n"
-        f"  -d srchTimeEarliest=-{role['earliest_event_seconds']}s \\\n"
-        f"  -d srchDiskQuota={role['disk_space_mb']} \\\n"
-        f"  -d srchJobsQuota={role_search_jobs_quota} \\\n"
-        f"  -d rtSrchJobsQuota=0 \\\n"
-        f"  {' '.join(f'-d srchIndexesAllowed={ix}' for ix in role['indexes'])}\n\n"
-        "# User.\n"
-        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authentication/users\" \\\n"
-        f"  -d name={sa['username']} \\\n"
-        f"  -d roles={role['name']} \\\n"
-        f"  -K \"${{LOC_PASSWORD_CONFIG}}\"\n\n"
-        "# Workload rule.\n"
-        f"curl \"${{CURL_TLS_ARGS[@]}}\" \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/workloads/rules\" \\\n"
-        f"  -d name=loc_runtime_abort \\\n"
-        f"  -d predicate=\"user={sa['username']} AND runtime>{runtime}s\" \\\n"
-        f"  -d action=abort -d schedule=alwayson\n"
+    return SHEBANG + (
+        "echo 'ERROR: Log Observer Connect user/role/workload mutations lack safe named-object convergence and readback.' >&2\n"
+        "echo 'HANDOFF: use an approved Splunk administrative workflow and retain readback evidence; no mutation was attempted.' >&2\n"
+        "exit 2\n"
     )
-    return body
 
 
 def apply_script_sim_addon(spec: dict[str, Any]) -> str:
@@ -1806,8 +1769,8 @@ def apply_script_sim_addon(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         f": \"${{{sim['org_token_file_ref']}:?--org-token-file must be set (chmod 600)}}\"\n\n"
         "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
-        "SIM_API=\"${SIM_API:-skills/splunk-observability-cloud-integration-setup/scripts/sim_addon_api.py}\"\n"
-        "SIM_CATALOG_DIR=\"${SIM_CATALOG_DIR:-sim-addon/signalflow-catalog}\"\n"
+        "SIM_API=\"${SIM_API:-${PROJECT_ROOT}/skills/splunk-observability-cloud-integration-setup/scripts/sim_addon_api.py}\"\n"
+        "SIM_CATALOG_DIR=\"${SIM_CATALOG_DIR:-${RENDER_ROOT}/sim-addon/signalflow-catalog}\"\n"
         "STATE_ARGS=(--state-dir \"${SIM_STATE_DIR:-state}\")\n\n"
         "\"${PYTHON_BIN}\" \"${SIM_API}\" \"${STATE_ARGS[@]}\" preflight\n"
         f"\"${{PYTHON_BIN}}\" \"${{SIM_API}}\" \"${{STATE_ARGS[@]}}\" ensure-metric-index --name {sim['index_name']}\n"
@@ -1831,7 +1794,7 @@ def apply_script_sim_addon(spec: dict[str, Any]) -> str:
 def handoff_script_app_install() -> str:
     return SHEBANG + (
         "# Splunk_TA_sim install handoff to splunk-app-install.\n"
-        "exec bash skills/splunk-app-install/scripts/install_app.sh \\\n"
+        "exec bash \"${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh\" \\\n"
         "  --source splunkbase --app-id 5247 --no-update \"$@\"\n"
     )
 
@@ -1841,7 +1804,7 @@ def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
     ips = LOC_REALM_IPS.get(realm, [])
     return SHEBANG + (
         "# Log Observer Connect realm-IP allowlist handoff to splunk-cloud-acs-admin-setup.\n"
-        "exec bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\\n"
+        "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"
         "  --phase render --features search-api \\\n"
         f"  --search-api-subnets {','.join(ips) or '<no-realm-ips>'} \"$@\"\n"
     )
@@ -1850,7 +1813,7 @@ def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
 def handoff_script_acs_hec() -> str:
     return SHEBANG + (
         "# Splunk Cloud Victoria-stack HEC allowlist handoff to splunk-cloud-acs-admin-setup.\n"
-        "exec bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\\n"
+        "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"
         "  --phase render --features hec \"$@\"\n"
     )
 
@@ -1860,7 +1823,7 @@ def handoff_script_itsi() -> str:
         "# Content Pack for Splunk Observability Cloud handoff to splunk-itsi-config.\n"
         "ITSI_SPEC=\"${1:?Usage: apply-itsi-content-pack.sh /path/to/reviewed-content-pack-spec.yaml [--apply]}\"\n"
         "shift\n"
-        "exec bash skills/splunk-itsi-config/scripts/setup.sh \\\n"
+        "exec bash \"${PROJECT_ROOT}/skills/splunk-itsi-config/scripts/setup.sh\" \\\n"
         "  --workflow content-packs --spec \"${ITSI_SPEC}\" \"$@\"\n"
     )
 
@@ -1950,7 +1913,66 @@ SECRET_PATTERNS = [
     re.compile(r"(?i)password\s*=\s*[^&\s]{4,}"),
     re.compile(r"eyJ[A-Za-z0-9._-]{20,}"),
     re.compile(r"(?i)x-vo-api-key:\s*[A-Za-z0-9-]{8,}"),
+    re.compile(
+        r'(?i)"(?:accessToken|apiKey|externalId|jwt|password|secret|token)"'
+        r'\s*:\s*"(?!\[REDACTED\])[^"\r\n]+"'
+    ),
 ]
+
+UNTRUSTED_VALUE_REDACTORS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._-]{8,}"),
+    re.compile(r"eyJ[A-Za-z0-9._-]{20,}"),
+    re.compile(
+        r"(?i)\b(authorization|password|secret|api[_ -]?key|access[_ -]?token|"
+        r"token|jwt|external[_ -]?id)\b\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;}|]+)"
+    ),
+)
+
+
+def _looks_untrusted_secret_key(key: str) -> bool:
+    canonical = re.sub(r"[^a-z0-9]", "", key.lower())
+    return any(
+        marker in canonical
+        for marker in (
+            "authorization",
+            "password",
+            "secret",
+            "apikey",
+            "accesstoken",
+            "token",
+            "jwt",
+            "externalid",
+        )
+    )
+
+
+def redact_untrusted(value: Any) -> Any:
+    """Recursively redact caller-supplied discover/doctor material."""
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if _looks_untrusted_secret_key(str(key)) else redact_untrusted(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_untrusted(item) for item in value]
+    if isinstance(value, str):
+        for pattern in UNTRUSTED_VALUE_REDACTORS:
+            value = pattern.sub("[REDACTED]", value)
+        return value
+    return value
+
+
+def markdown_cell(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise RenderError(f"{label} must be a string")
+    if any(character in value for character in ("\r", "\n")):
+        raise RenderError(f"{label} must be a single-line string")
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("|", "\\|")
+    )
 
 
 def assert_no_secrets_in_text(label: str, text: str) -> None:
@@ -1960,10 +1982,73 @@ def assert_no_secrets_in_text(label: str, text: str) -> None:
 
 
 def write_text(path: Path, content: str, executable: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    if executable:
-        path.chmod(path.stat().st_mode | 0o755)
+    _safe_directory(path.parent)
+    temporary: Path | None = None
+    final_mode = 0o755 if executable else 0o644
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), final_mode)
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _safe_directory(path: Path) -> None:
+    if path.is_symlink():
+        raise RenderError(f"refusing symlink output directory: {path}")
+    if path.exists() and not path.is_dir():
+        raise RenderError(f"output path is not a directory: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise RenderError(f"output directory failed validation: {path}")
+
+
+def write_private_text(path: Path, content: str) -> None:
+    """Atomically write a sensitive rendered artifact with mode 0600."""
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    parent = path.parent.lstat()
+    if stat.S_ISLNK(parent.st_mode) or not stat.S_ISDIR(parent.st_mode):
+        raise RenderError(f"private output parent must be a non-symlink directory: {path.parent}")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        final = path.lstat()
+        if (
+            not stat.S_ISREG(final.st_mode)
+            or final.st_nlink != 1
+            or stat.S_IMODE(final.st_mode) != 0o600
+        ):
+            raise RenderError(f"private output failed final validation: {path}")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def render(
@@ -1972,12 +2057,19 @@ def render(
     discover_data: dict[str, Any] | None = None,
     doctor_data: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    _safe_directory(output_dir)
     if output_dir.exists():
         # Remove only generated subdirs to avoid clobbering user files.
         for sub in ("payloads", "scripts", "support-tickets", "sim-addon"):
-            shutil.rmtree(output_dir / sub, ignore_errors=True)
+            target = output_dir / sub
+            if target.is_symlink():
+                raise RenderError(f"refusing symlink output directory: {target}")
+            if target.exists() and not target.is_dir():
+                raise RenderError(f"output path is not a directory: {target}")
+            if target.exists():
+                shutil.rmtree(target)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _safe_directory(output_dir)
     coverage = coverage_for(spec)
     mts_md, mts_rows, mts_failures = mts_sizing_report(spec)
     if mts_failures:
@@ -2115,11 +2207,25 @@ def render(
 
     # State scaffolding (apply-state.json + idempotency keys).
     state_dir = output_dir / "state"
-    state_dir.mkdir(parents=True, exist_ok=True)
-    if not (state_dir / "apply-state.json").exists():
-        write_text(state_dir / "apply-state.json", "{\"steps\": []}\n")
-    os.chmod(state_dir / "apply-state.json", 0o600)
-    write_text(state_dir / "idempotency-keys.json", json.dumps([s["idempotency_key"] for s in apply_plan["steps"]], indent=2))
+    _safe_directory(state_dir)
+    os.chmod(state_dir, 0o700)
+    state_path = state_dir / "apply-state.json"
+    if state_path.is_symlink():
+        raise RenderError(f"refusing symlink apply state: {state_path}")
+    if not state_path.exists():
+        write_private_text(state_path, "{\"steps\": []}\n")
+    else:
+        metadata = state_path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RenderError(f"apply state must be a single-hardlink regular file: {state_path}")
+        os.chmod(state_path, 0o600)
+    idempotency_path = state_dir / "idempotency-keys.json"
+    if idempotency_path.is_symlink():
+        raise RenderError(f"refusing symlink idempotency state: {idempotency_path}")
+    write_private_text(
+        idempotency_path,
+        json.dumps([s["idempotency_key"] for s in apply_plan["steps"]], indent=2),
+    )
 
     # Support-ticket templates (rendered when relevant gates fire).
     realm = spec["realm"]
@@ -2149,15 +2255,29 @@ def render(
 
     # Discover snapshot / doctor report when supplied by the bash wrapper.
     if discover_data is not None:
-        write_text(output_dir / "current-state.json", json.dumps(discover_data, indent=2))
+        safe_discover = redact_untrusted(discover_data)
+        discover_text = json.dumps(safe_discover, indent=2) + "\n"
+        assert_no_secrets_in_text("current-state.json", discover_text)
+        write_private_text(output_dir / "current-state.json", discover_text)
     if doctor_data is not None:
+        if not isinstance(doctor_data, list):
+            raise RenderError("doctor input must be a JSON list")
+        safe_doctor = redact_untrusted(doctor_data)
         rows = ["# Doctor Report", "", "| # | Severity | Check | Fix |", "|---|----------|-------|-----|"]
-        for idx, row in enumerate(doctor_data, start=1):
+        for idx, row in enumerate(safe_doctor, start=1):
+            if not isinstance(row, dict):
+                raise RenderError(f"doctor input row {idx} must be an object")
+            severity = markdown_cell(row.get("severity", "INFO"), f"doctor row {idx} severity")
+            if severity not in {"INFO", "WARN", "FAIL"}:
+                raise RenderError(f"doctor row {idx} severity must be INFO, WARN, or FAIL")
+            check = markdown_cell(row.get("check", ""), f"doctor row {idx} check")
+            fix = markdown_cell(row.get("fix", ""), f"doctor row {idx} fix")
             rows.append(
-                f"| {idx} | {row.get('severity', 'INFO')} | {row.get('check', '')} | "
-                f"{row.get('fix', '')} |"
+                f"| {idx} | {severity} | {check} | {fix} |"
             )
-        write_text(output_dir / "doctor-report.md", "\n".join(rows) + "\n")
+        doctor_text = "\n".join(rows) + "\n"
+        assert_no_secrets_in_text("doctor-report.md", doctor_text)
+        write_private_text(output_dir / "doctor-report.md", doctor_text)
 
     return {
         "coverage": coverage,

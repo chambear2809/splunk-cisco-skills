@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.11"
           cache: "pip"
@@ -51,10 +51,10 @@ jobs:
         python-version: ["3.10", "3.14"]
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install Bats
         run: |
@@ -96,7 +96,7 @@ jobs:
       SHELLCHECK_SHA256: "6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install ShellCheck
         run: |
@@ -116,9 +116,10 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          files = sorted(str(path) for path in Path("skills").rglob("*.sh"))
+          roots = (Path("skills"), Path("scripts"))
+          files = sorted(str(path) for root in roots for path in root.rglob("*.sh"))
           if not files:
-              raise SystemExit("No shell scripts found under skills/")
+              raise SystemExit("No first-party shell scripts found")
 
           for file_path in files:
               subprocess.run(["bash", "-n", file_path], check=True)
@@ -130,9 +131,10 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          files = sorted(str(path) for path in Path("skills").rglob("*.sh"))
+          roots = (Path("skills"), Path("scripts"))
+          files = sorted(str(path) for root in roots for path in root.rglob("*.sh"))
           if not files:
-              raise SystemExit("No shell scripts found under skills/")
+              raise SystemExit("No first-party shell scripts found")
 
           subprocess.run(["shellcheck", "--severity=warning", *files], check=True)
           PY
@@ -142,10 +144,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.11"
           cache: "pip"
@@ -186,20 +188,14 @@ jobs:
           yamllint -c .yamllint.yml \
             .github/ \
             skills/splunk-itsi-config/templates \
-            skills/splunk-itsi-config/agents
+            skills/splunk-itsi-config/agents \
+            scripts/staging/aws-eks-o11y-rbac.template.yaml
 
       - name: Lint Python with ruff
-        run: ruff check skills/ tests/ agent/
+        run: ruff check skills/ tests/ agent/ scripts/
 
       - name: Check catalog freshness
-        run: |
-          if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
-            python3 skills/cisco-product-setup/scripts/build_catalog.py --check
-          else
-            echo "WARNING: SCAN package not in tree (gitignored binary); catalog freshness check skipped."
-            echo "  If you modified catalog_overrides.json, rebuild catalog.json locally with:"
-            echo "  python3 skills/cisco-product-setup/scripts/build_catalog.py --write"
-          fi
+        run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
 
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check

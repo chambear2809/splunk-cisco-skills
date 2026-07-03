@@ -26,17 +26,31 @@ import argparse
 import json
 import os
 import random
+import re
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _apply_state import append_step, read_secret_file, redact  # noqa: E402
+from _apply_state import append_step, read_secret_file, redact, write_private_json  # noqa: E402
 
 _RETRYABLE_STATUSES = {429, 502, 503, 504}
+SUPPORTED_REALMS = {
+    "us0",
+    "us1",
+    "us2",
+    "us3",
+    "eu0",
+    "eu1",
+    "eu2",
+    "au0",
+    "jp0",
+    "sg0",
+}
 
 # Read-back fields the renderer strips before PUT.
 READ_BACK_FIELDS: tuple[str, ...] = (
@@ -54,6 +68,39 @@ READ_BACK_FIELDS: tuple[str, ...] = (
 
 class ApiError(Exception):
     """Raised when an API call fails."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Refuse redirects so the X-SF-Token never moves to another URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_api_url(url: str) -> None:
+    """Allow authenticated calls only to a supported realm's HTTPS API host."""
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ApiError("Splunk Observability API URL contains an invalid port") from exc
+    allowed_hosts = {
+        f"api.{realm}.observability.splunkcloud.com" for realm in SUPPORTED_REALMS
+    }
+    if (
+        parsed.scheme.lower() != "https"
+        or parsed.hostname not in allowed_hosts
+        or port not in {None, 443}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or any(ch.isspace() for ch in url)
+    ):
+        raise ApiError(
+            "authenticated Splunk Observability API requests require a supported "
+            "https://api.<realm>.observability.splunkcloud.com URL without embedded "
+            "credentials, a nonstandard port, fragments, or whitespace"
+        )
 
 
 def _max_retries() -> int:
@@ -78,6 +125,7 @@ def _retry_after_seconds(exc: HTTPError, attempt: int) -> float:
 
 
 def _request(method: str, url: str, token: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    _validate_api_url(url)
     headers = {
         "X-SF-Token": token,
         "Accept": "application/json",
@@ -88,12 +136,13 @@ def _request(method: str, url: str, token: str, body: dict[str, Any] | None = No
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
     request = Request(url, data=data, headers=headers, method=method)
+    opener = build_opener(_NoRedirectHandler())
 
     max_attempts = _max_retries()
     last_exc: Exception | None = None
     for attempt in range(max_attempts):
         try:
-            with urlopen(request, timeout=60) as response:  # noqa: S310 - operator-supplied URL
+            with opener.open(request, timeout=60) as response:
                 text = response.read().decode("utf-8")
                 if not text:
                     return {}
@@ -106,11 +155,11 @@ def _request(method: str, url: str, token: str, body: dict[str, Any] | None = No
             if exc.code in _RETRYABLE_STATUSES and attempt < max_attempts - 1:
                 time.sleep(_retry_after_seconds(exc, attempt))
                 continue
-            try:
-                err_body = exc.read().decode("utf-8")
-            except Exception:
-                err_body = ""
-            raise ApiError(f"{method} {url} -> HTTP {exc.code}: {err_body[:500]}") from exc
+            request_id = ""
+            if exc.headers:
+                request_id = exc.headers.get("X-Request-Id") or exc.headers.get("X-Amzn-RequestId") or ""
+            suffix = f" (request-id {request_id})" if request_id else ""
+            raise ApiError(f"{method} {url} -> HTTP {exc.code}{suffix}; response body suppressed") from exc
         except URLError as exc:
             last_exc = exc
             if attempt < max_attempts - 1:
@@ -121,6 +170,11 @@ def _request(method: str, url: str, token: str, body: dict[str, Any] | None = No
 
 
 def _base_url(realm: str) -> str:
+    if realm not in SUPPORTED_REALMS:
+        raise ApiError(
+            f"unsupported Splunk Observability realm {realm!r}; allowed: "
+            f"{', '.join(sorted(SUPPORTED_REALMS))}"
+        )
     return f"https://api.{realm}.observability.splunkcloud.com/v2"
 
 
@@ -134,15 +188,203 @@ def _strip_read_back(integration: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_aws_integrations(realm: str, token: str) -> list[dict[str, Any]]:
-    """List all integrations and filter for type=AWSCloudWatch client-side."""
-    url = f"{_base_url(realm)}/integration"
-    response = _request("GET", url, token)
-    items = response if isinstance(response, list) else response.get("items") or response.get("results") or []
-    return [it for it in items if isinstance(it, dict) and it.get("type") == "AWSCloudWatch"]
+    """List every AWS integration using server filtering and bounded pagination."""
+
+    limit = 1000
+    offset = 0
+    collected: list[dict[str, Any]] = []
+    for _page in range(100):
+        query = urllib.parse.urlencode(
+            {"type": "AWSCloudWatch", "limit": limit, "offset": offset}
+        )
+        response = _request("GET", f"{_base_url(realm)}/integration?{query}", token)
+        if isinstance(response, list):
+            page = response
+            total = len(page)
+        elif isinstance(response, dict):
+            page = response.get("results")
+            if page is None:
+                page = response.get("items") or []
+            total = response.get("count")
+        else:
+            raise ApiError("GET /integration returned an unsupported response shape")
+        if not isinstance(page, list) or not all(isinstance(item, dict) for item in page):
+            raise ApiError("GET /integration returned a malformed integration page")
+        collected.extend(
+            item for item in page if item.get("type") == "AWSCloudWatch"
+        )
+        offset += len(page)
+        if isinstance(total, int):
+            if total < 0:
+                raise ApiError("GET /integration returned a negative count")
+            if offset >= total:
+                break
+        elif len(page) < limit:
+            break
+        if not page:
+            raise ApiError("GET /integration pagination stopped before the advertised count")
+    else:
+        raise ApiError("GET /integration exceeded the 100-page safety bound")
+    return collected
+
+
+def validate_integration_credentials(realm: str, token: str, integration_id: str) -> None:
+    """Ask Splunk Observability to validate the integration's live credentials."""
+
+    if not integration_id or any(character.isspace() for character in integration_id):
+        raise ApiError("live AWSCloudWatch integration has an invalid id")
+    encoded_id = urllib.parse.quote(integration_id, safe="")
+    _request("GET", f"{_base_url(realm)}/integration/validate/{encoded_id}", token)
+
+
+def validate_live_integration(
+    integrations: list[dict[str, Any]],
+    desired: dict[str, Any],
+    expected_aws_account_id: str = "",
+) -> dict[str, Any]:
+    """Require one enabled live object matching the rendered identity and scope."""
+
+    name = str(desired.get("name") or "")
+    if not name:
+        raise ApiError("rendered AWS integration payload has no name")
+    matches = [item for item in integrations if item.get("name") == name]
+    if not matches:
+        raise ApiError(f"no live AWSCloudWatch integration matches rendered name {name!r}")
+    if len(matches) != 1:
+        raise ApiError(f"multiple live AWSCloudWatch integrations match rendered name {name!r}")
+
+    live = matches[0]
+    if not live.get("id"):
+        raise ApiError(f"live AWSCloudWatch integration {name!r} has no server-assigned id")
+    if live.get("enabled") is not True:
+        raise ApiError(f"live AWSCloudWatch integration {name!r} is not enabled")
+
+    expected_auth = str(desired.get("authMethod") or "")
+    if str(live.get("authMethod") or "") != expected_auth:
+        raise ApiError(f"live AWSCloudWatch integration {name!r} has the wrong authMethod")
+
+    expected_regions = desired.get("regions")
+    live_regions = live.get("regions")
+    if (
+        not isinstance(expected_regions, list)
+        or not all(isinstance(region, str) and region for region in expected_regions)
+        or not isinstance(live_regions, list)
+        or not all(isinstance(region, str) and region for region in live_regions)
+        or sorted(set(live_regions)) != sorted(set(expected_regions))
+        or len(expected_regions) != len(set(expected_regions))
+        or len(live_regions) != len(set(live_regions))
+    ):
+        raise ApiError(f"live AWSCloudWatch integration {name!r} regions do not match the rendered scope")
+
+    if expected_auth == "ExternalId":
+        if not re.fullmatch(r"[0-9]{12}", expected_aws_account_id):
+            raise ApiError("a 12-digit expected AWS account ID is required for ExternalId validation")
+        role_arn = str(live.get("roleArn") or live.get("roleARN") or "")
+        role_match = re.fullmatch(
+            r"arn:(?:aws|aws-us-gov|aws-cn):iam::([0-9]{12}):role/(.+)",
+            role_arn,
+        )
+        if not role_match or role_match.group(1) != expected_aws_account_id:
+            raise ApiError(
+                f"live AWSCloudWatch integration {name!r} roleArn does not belong to the expected AWS account"
+            )
+        expected_role_arn = str(desired.get("roleArn") or "")
+        if expected_role_arn and "${" not in expected_role_arn and role_arn != expected_role_arn:
+            raise ApiError(
+                f"live AWSCloudWatch integration {name!r} roleArn does not match the rendered role"
+            )
+
+    def normalized_strings(value: Any) -> list[str] | None:
+        if value is None:
+            return []
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            return None
+        if len(value) != len(set(value)):
+            return None
+        return sorted(value)
+
+    for field, aliases in (
+        ("services", ("services",)),
+        ("customCloudWatchNamespaces", ("customCloudWatchNamespaces", "customCloudwatchNamespaces")),
+    ):
+        expected_value = normalized_strings(desired.get(field))
+        live_raw = next((live[key] for key in aliases if key in live), None)
+        live_value = normalized_strings(live_raw)
+        if expected_value is None or live_value is None or live_value != expected_value:
+            raise ApiError(f"live AWSCloudWatch integration {name!r} field {field} does not match")
+
+    def canonical_list(value: Any, *, sort_stats: bool = False) -> list[str] | None:
+        if value is None:
+            return []
+        if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+            return None
+        normalized = []
+        for item in value:
+            copy = dict(item)
+            if sort_stats and "stats" in copy:
+                stats = copy["stats"]
+                if not isinstance(stats, list) or not all(isinstance(stat, str) for stat in stats):
+                    return None
+                copy["stats"] = sorted(stats)
+            normalized.append(json.dumps(copy, sort_keys=True, separators=(",", ":")))
+        return sorted(normalized)
+
+    for field in ("namespaceSyncRules", "customNamespaceSyncRules", "metricStatsToSyncs"):
+        sort_stats = field == "metricStatsToSyncs"
+        if canonical_list(live.get(field), sort_stats=sort_stats) != canonical_list(
+            desired.get(field), sort_stats=sort_stats
+        ):
+            raise ApiError(f"live AWSCloudWatch integration {name!r} field {field} does not match")
+
+    integer_defaults = {
+        "pollRate": 300_000,
+        "metadataPollRate": 900_000,
+        "inactiveMetricsPollRate": 1_200_000,
+    }
+    for field, default in integer_defaults.items():
+        live_value = live.get(field, default)
+        desired_value = desired.get(field, default)
+        if (
+            isinstance(live_value, bool)
+            or not isinstance(live_value, int)
+            or isinstance(desired_value, bool)
+            or not isinstance(desired_value, int)
+            or live_value != desired_value
+        ):
+            raise ApiError(f"live AWSCloudWatch integration {name!r} field {field} does not match")
+
+    boolean_defaults = {
+        "importCloudWatch": True,
+        "enableAwsUsage": False,
+        "enableCheckLargeVolume": True,
+        "syncCustomNamespacesOnly": False,
+        "syncLoadBalancerTargetGroupTags": False,
+        "ignoreAllStatusMetrics": False,
+        "collectOnlyRecommendedStats": False,
+    }
+    for field, default in boolean_defaults.items():
+        live_value = live.get(field, default)
+        desired_value = desired.get(field, default)
+        if not isinstance(live_value, bool) or not isinstance(desired_value, bool) or live_value != desired_value:
+            raise ApiError(f"live AWSCloudWatch integration {name!r} field {field} does not match")
+
+    desired_streams = desired.get("useMetricStreamsSync") is True
+    live_stream_state = str(live.get("metricStreamsSyncState") or "")
+    if desired_streams and live_stream_state != "ENABLED":
+        raise ApiError(f"live AWSCloudWatch integration {name!r} metric stream sync is not enabled")
+    if not desired_streams and live_stream_state != "DISABLED":
+        raise ApiError(f"live AWSCloudWatch integration {name!r} is not in polling-only mode")
+    desired_external = desired.get("metricStreamsManagedExternally") is True
+    live_external = live.get("metricStreamsManagedExternally", False)
+    if not isinstance(live_external, bool) or live_external != desired_external:
+        raise ApiError(
+            f"live AWSCloudWatch integration {name!r} metric-stream ownership does not match the rendered scope"
+        )
+    return live
 
 
 def get_integration(realm: str, token: str, integration_id: str) -> dict[str, Any]:
-    url = f"{_base_url(realm)}/integration/{integration_id}"
+    url = f"{_base_url(realm)}/integration/{urllib.parse.quote(integration_id, safe='')}"
     return _request("GET", url, token)
 
 
@@ -153,13 +395,13 @@ def create_integration(realm: str, token: str, payload: dict[str, Any]) -> dict[
 
 
 def update_integration(realm: str, token: str, integration_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    url = f"{_base_url(realm)}/integration/{integration_id}"
+    url = f"{_base_url(realm)}/integration/{urllib.parse.quote(integration_id, safe='')}"
     body = _strip_read_back(payload)
     return _request("PUT", url, token, body)
 
 
 def delete_integration(realm: str, token: str, integration_id: str) -> dict[str, Any]:
-    url = f"{_base_url(realm)}/integration/{integration_id}"
+    url = f"{_base_url(realm)}/integration/{urllib.parse.quote(integration_id, safe='')}"
     return _request("DELETE", url, token)
 
 
@@ -198,7 +440,7 @@ def upsert(
                 "key": read_secret_file(aws_secret_access_key_file),
                 "enabled": True,
             }
-        except PermissionError as exc:
+        except (PermissionError, ValueError) as exc:
             raise ApiError(str(exc)) from exc
     elif auth_method == "ExternalId":
         # A new ExternalId integration must first be created disabled so its
@@ -259,7 +501,7 @@ def discover(realm: str, token: str, output_path: Path | None, state_dir: Path) 
         "integrations": [redact(i) for i in integrations],
     }
     if output_path:
-        output_path.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+        write_private_json(output_path, snapshot)
     append_step(state_dir, "validation", "discover", f"discover:{realm}", "success", {"count": len(integrations)})
     return snapshot
 
@@ -332,10 +574,11 @@ def _parse() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true")
     p.add_argument(
         "command",
-        choices=("list", "get", "upsert", "delete", "discover"),
+        choices=("list", "get", "upsert", "delete", "discover", "validate"),
     )
     p.add_argument("--integration-id", default="")
     p.add_argument("--output", default="")
+    p.add_argument("--expected-aws-account-id", default="")
     return p.parse_args()
 
 
@@ -343,7 +586,7 @@ def main() -> int:
     args = _parse()
     try:
         token = read_secret_file(args.token_file, allow_loose=args.allow_loose_token_perms)
-    except PermissionError as exc:
+    except (PermissionError, ValueError) as exc:
         print(f"FAIL: {exc}", flush=True)
         return 2
 
@@ -354,6 +597,33 @@ def main() -> int:
         if args.command == "list":
             items = list_aws_integrations(args.realm, token)
             print(json.dumps([redact(i) for i in items], indent=2))
+        elif args.command == "validate":
+            if not args.payload_file:
+                raise ApiError("--payload-file is required for `validate`")
+            desired = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
+            items = list_aws_integrations(args.realm, token)
+            name = str(desired.get("name") or "")
+            matches = [item for item in items if item.get("name") == name]
+            if len(matches) != 1 or not matches[0].get("id"):
+                # Reuse the detailed validator's precise missing/duplicate/id error.
+                validate_live_integration(matches, desired, args.expected_aws_account_id)
+            integration_id = str(matches[0]["id"])
+            detailed = get_integration(args.realm, token, integration_id)
+            if not detailed or str(detailed.get("id") or "") != integration_id:
+                raise ApiError("GET /integration/{id} did not return the selected AWS integration")
+            live = validate_live_integration([detailed], desired, args.expected_aws_account_id)
+            validate_integration_credentials(args.realm, token, str(live.get("id") or ""))
+            print(
+                json.dumps(
+                    {
+                        "result": "validated",
+                        "name": live.get("name"),
+                        "id": live.get("id"),
+                        "enabled": live.get("enabled"),
+                    },
+                    indent=2,
+                )
+            )
         elif args.command == "get":
             if not args.integration_id:
                 raise ApiError("--integration-id is required for `get`")

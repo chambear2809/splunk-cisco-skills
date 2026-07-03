@@ -26,8 +26,8 @@ The SignalFx Smart Agent (deprecated) used a per-host daemon and language-specif
 
 If your apps already call `opentelemetry-sdk` directly:
 
-- Use `inject-sdk` (not a language-specific `inject-java`). That path only sets env vars (endpoint, resource attrs, propagators) without injecting an agent binary — your existing SDK code keeps working.
-- Or, if you want the operator to own the SDK entirely: remove the manual `OpenTelemetrySdk.builder(...)` calls, then use `inject-java` (or the language's own annotation).
+- Keep the manual SDK and configure its OTLP endpoint, resource attributes, and propagators in the application's normal deployment configuration. This skill does not render an `inject-sdk` annotation because the Operator has no supported language-agnostic SDK injection block.
+- Or, if you want the operator to own auto-instrumentation entirely: remove the manual `OpenTelemetrySdk.builder(...)` calls, then use `inject-java` (or the language's own annotation).
 
 ## From another APM vendor
 
@@ -53,7 +53,7 @@ kubectl -n <ns> get <kind>/<name> -o jsonpath='{.spec.template.spec.containers[*
 If any of those are set, the operator's injection will fight with them. Resolution:
 
 - If the value is another vendor's agent: follow the vendor removal steps in `vendor-coexistence.md`.
-- If the value is a manual OTel SDK: switch to `inject-sdk` instead of `inject-<lang>`.
+- If the value belongs to a manual OTel SDK: retain that SDK and configure it outside this auto-instrumentation overlay, or remove it before using `inject-<lang>`.
 - If the value is an unrelated OTel env set by platform tooling: merge it into `extra_env` in this skill's spec so the final env is a strict superset.
 
 ## Service-name continuity

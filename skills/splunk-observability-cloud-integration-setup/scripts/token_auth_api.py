@@ -29,6 +29,34 @@ from _apply_state import append_step, redact  # noqa: E402
 _INSECURE_WARNING_EMITTED = False
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so Basic credentials never move to another URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_authenticated_url(url: str) -> None:
+    """Require an absolute HTTPS URL before attaching Splunk credentials."""
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise RuntimeError("authenticated Splunk REST URL contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or any(ch.isspace() for ch in url)
+    ):
+        raise RuntimeError(
+            "authenticated Splunk REST requests require an absolute HTTPS URL "
+            "without embedded credentials, fragments, or whitespace"
+        )
+
+
 def _ssl_context() -> ssl.SSLContext | None:
     global _INSECURE_WARNING_EMITTED
     if os.environ.get("SPLUNK_VERIFY_SSL", "true").lower() in {"false", "0", "no"}:
@@ -49,6 +77,7 @@ def _ssl_context() -> ssl.SSLContext | None:
 
 
 def _splunk_request(method: str, url: str, data: dict | None = None) -> tuple[int, dict]:
+    _validate_authenticated_url(url)
     user = os.environ.get("SPLUNK_USER")
     password = os.environ.get("SPLUNK_PASS")
     if not user or not password:
@@ -60,7 +89,11 @@ def _splunk_request(method: str, url: str, data: dict | None = None) -> tuple[in
     req.add_header("Accept", "application/json")
     if data is not None:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    with urllib.request.urlopen(req, context=_ssl_context(), timeout=30) as resp:
+    opener = urllib.request.build_opener(
+        _NoRedirectHandler(),
+        urllib.request.HTTPSHandler(context=_ssl_context()),
+    )
+    with opener.open(req, timeout=30) as resp:
         body = resp.read().decode("utf-8")
         try:
             return resp.status, json.loads(body)

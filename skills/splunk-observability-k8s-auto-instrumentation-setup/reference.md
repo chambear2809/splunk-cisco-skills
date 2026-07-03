@@ -69,7 +69,7 @@ Always required for `--render`:
 
 ### Languages and CR Configuration
 
-- `--languages java,nodejs,python,dotnet,go,apache-httpd,nginx,sdk` (any subset; `sdk` is a language-agnostic env-only injection for apps that bundle their own OTel SDK)
+- `--languages java,nodejs,python,dotnet,go,apache-httpd,nginx` (any subset)
 - `--java-image`, `--nodejs-image`, `--python-image`, `--dotnet-image`, `--go-image`, `--apache-httpd-image`, `--nginx-image` — override the default `ghcr.io/signalfx/splunk-otel-*` image per language
 - `--extra-env <lang>=KEY=VALUE` (repeatable)
 - `--resource-limits <lang>=cpu=500m,memory=128Mi`
@@ -215,12 +215,18 @@ See [references/annotation-surgery.md](references/annotation-surgery.md) for the
 
 ## Validation
 
-`validate.sh` is static by default. The `--live` probes are:
+`validate.sh` is static by default. `--live --check-apm <service>` is the
+complete production gate. It enables all probes below; only
+`--skip-apm-check` and `--skip-backup-check` may explicitly omit their named
+gates. Individual `--check-*` flags run narrow diagnostics.
 
-- `--check-webhook` — MutatingWebhookConfiguration presence and clean operator logs.
+- `--check-webhook` — exact pinned pod webhook policy/client/rule, injected CA
+  bundle, Service-to-ready-9443/TCP-Endpoints route, Ready Operator pods, and
+  clean recent Operator logs. It does not issue a synthetic admission request
+  or perform a separate TLS handshake.
 - `--check-instrumentation` — `kubectl get otelinst -A` matches the rendered CRs.
 - `--check-injection` — sample pods carry the `opentelemetry-auto-instrumentation` init container and expected `OTEL_*` env.
-- `--check-apm <service>` — probe `api.<realm>.signalfx.com/v2/apm/topology` for the workload's `service.name`.
+- `--check-apm <service>` — probe `api.<realm>.observability.splunkcloud.com/v2/apm/topology` for the workload's `service.name`, deployment environment, and Kubernetes cluster.
 - `--check-backup` — backup ConfigMap exists and is non-empty.
 
 See the thirteen topical `references/*.md` annexes for more:

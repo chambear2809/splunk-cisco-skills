@@ -34,7 +34,7 @@ workloads:
     node_selector: {}
     current_annotations:
       prometheus.io/scrape: "true"
-    language: ""         # <-- operator fills this in (java | nodejs | python | dotnet | go | apache-httpd | nginx | sdk | skip)
+    language: ""         # <-- operator fills this in (java | nodejs | python | dotnet | go | apache-httpd | nginx | skip)
 
   - kind: StatefulSet
     namespace: payments

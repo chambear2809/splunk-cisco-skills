@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to load or process credential files." >&2
+    exit 2
+fi
+
 # Splunk Observability Cloud <-> AWS integration: primary CLI.
 #
 # Five-mode UX (matches splunk-observability-cloud-integration-setup):
@@ -181,9 +186,10 @@ PY
 assert_secret_file_perms() {
     local path="$1"
     local label="$2"
+    local permit_loose_mode="${3:-false}"
     [[ -z "${path}" ]] && return 0
-    if [[ ! -f "${path}" ]]; then
-        echo "FAIL: ${label} (${path}) does not exist." >&2
+    if [[ -L "${path}" || ! -f "${path}" ]]; then
+        echo "FAIL: ${label} (${path}) must be a regular, non-symlink file." >&2
         exit 2
     fi
     if [[ ! -s "${path}" ]]; then
@@ -193,13 +199,19 @@ assert_secret_file_perms() {
     local mode
     mode="$(file_mode_octal "${path}")"
     if [[ "${mode}" != "600" ]]; then
-        if [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
+        if [[ "${permit_loose_mode}" == "true" && "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
             echo "WARN: ${label} (${path}) has loose permissions (${mode}); proceeding under --allow-loose-token-perms." >&2
         else
-            echo "FAIL: ${label} (${path}) has loose permissions (${mode}); chmod 600 ${path} (or pass --allow-loose-token-perms)." >&2
+            if [[ "${permit_loose_mode}" == "true" ]]; then
+                echo "FAIL: ${label} (${path}) has loose permissions (${mode}); chmod 600 ${path} (or pass --allow-loose-token-perms for the O11y token only)." >&2
+            else
+                echo "FAIL: ${label} (${path}) must remain mode 600; --allow-loose-token-perms never applies to AWS credential files." >&2
+            fi
             exit 2
         fi
     fi
+    # Content, size, link-count, and stable-fingerprint validation is performed
+    # by the descriptor-bound API client immediately before use.
 }
 
 run_renderer() {
@@ -224,6 +236,7 @@ run_validate() {
     [[ "${SOAI_VALIDATE_LIVE:-}" == "true" ]] && args+=(--live)
     [[ "${MODE}" == "doctor" ]] && args+=(--doctor)
     [[ "${MODE}" == "discover" ]] && args+=(--discover)
+    [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]] && args+=(--allow-loose-token-perms)
     [[ "${JSON_OUTPUT}" == "true" ]] && args+=(--json)
     bash "${SCRIPT_DIR}/validate.sh" "${args[@]}"
 }
@@ -244,7 +257,7 @@ run_section_apply() {
                 echo "ERROR: --apply integration requires --token-file." >&2
                 return 2
             fi
-            assert_secret_file_perms "${TOKEN_FILE}" "--token-file"
+            assert_secret_file_perms "${TOKEN_FILE}" "--token-file" true
             assert_secret_file_perms "${AWS_ACCESS_KEY_ID_FILE}" "--aws-access-key-id-file"
             assert_secret_file_perms "${AWS_SECRET_ACCESS_KEY_FILE}" "--aws-secret-access-key-file"
             export SPLUNK_O11Y_REALM="${REALM}"
@@ -272,11 +285,14 @@ run_section_apply() {
             bash "${OUTPUT_DIR}/scripts/apply-multi-account.sh"
             ;;
         validation|discover)
-            assert_secret_file_perms "${TOKEN_FILE}" "--token-file"
+            assert_secret_file_perms "${TOKEN_FILE}" "--token-file" true
+            local validation_extra=()
+            [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]] && validation_extra+=(--allow-loose-token-perms)
             "${PYTHON_BIN}" "${API_CLIENT}" \
                 --realm "${REALM}" \
                 --token-file "${TOKEN_FILE}" \
                 --state-dir "${OUTPUT_DIR}/state" \
+                "${validation_extra[@]}" \
                 discover --output "${OUTPUT_DIR}/current-state.json"
             ;;
         *)
@@ -334,13 +350,16 @@ case "${MODE}" in
         ;;
     quickstart_from_live)
         # Fetch the live integration and write it to template.observed.yaml.
-        assert_secret_file_perms "${TOKEN_FILE}" "--token-file"
+        assert_secret_file_perms "${TOKEN_FILE}" "--token-file" true
         : "${REALM:?--realm or SPLUNK_O11Y_REALM is required for --quickstart-from-live}"
         mkdir -p "${OUTPUT_DIR}/state"
+        quickstart_extra=()
+        [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]] && quickstart_extra+=(--allow-loose-token-perms)
         "${PYTHON_BIN}" "${API_CLIENT}" \
             --realm "${REALM}" \
             --token-file "${TOKEN_FILE}" \
             --state-dir "${OUTPUT_DIR}/state" \
+            "${quickstart_extra[@]}" \
             discover --output "${OUTPUT_DIR}/current-state.json"
         echo "==> live snapshot written to ${OUTPUT_DIR}/current-state.json"
         echo "==> review and convert by hand into template.observed.yaml; the renderer's"

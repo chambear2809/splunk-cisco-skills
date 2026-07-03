@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to inspect Lambda configuration." >&2
+    exit 2
+fi
+
 # Splunk Observability Cloud AWS Lambda APM — doctor script.
 #
 # Detects: vendor conflicts (Datadog, New Relic, AppDynamics, Dynatrace),
@@ -92,25 +97,32 @@ fi
 # --- Live function-config checks (requires AWS CLI) ---
 if [[ -n "${TARGET}" ]] && command -v aws >/dev/null 2>&1; then
     echo "==> Checking live function config for: ${TARGET}..."
-    FN_CONFIG="$(aws lambda get-function-configuration \
-        --function-name "${TARGET}" \
-        --query '{Layers:Layers[].Arn,Env:Environment.Variables}' \
-        --output json 2>/dev/null || echo "{}")"
+    umask 077
+    FN_CONFIG_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-doctor.XXXXXX")"
+    cleanup_fn_config() { rm -f -- "${FN_CONFIG_FILE:-}"; }
+    trap cleanup_fn_config EXIT
+    # shellcheck disable=SC2016  # JMESPath object literal intentionally uses backticks.
+    if ! aws lambda get-function-configuration \
+        --function-name="${TARGET}" \
+        --query '{Layers:Layers[].Arn,EnvKeys:keys(Environment.Variables || `{}`)}' \
+        --output json > "${FN_CONFIG_FILE}" 2>/dev/null; then
+        printf '{}\n' > "${FN_CONFIG_FILE}"
+    fi
 
     # Vendor conflict detection.
-    VENDOR_FOUND="$("${PYTHON_BIN}" - "${FN_CONFIG}" "${ALLOW_VENDOR_COEXISTENCE}" <<'PY'
+    VENDOR_FOUND="$("${PYTHON_BIN}" - "${FN_CONFIG_FILE}" "${ALLOW_VENDOR_COEXISTENCE}" <<'PY'
 import json, sys
-config = json.loads(sys.argv[1])
+config = json.loads(open(sys.argv[1], encoding="utf-8").read())
 allow = sys.argv[2].lower() == "true"
-env = config.get("Env", {}) or {}
+env_keys = config.get("EnvKeys", []) or []
 layers = config.get("Layers", []) or []
 conflicts = []
 for prefix, name in [("DD_", "Datadog"), ("APPDYNAMICS_", "AppDynamics")]:
-    if any(k.startswith(prefix) for k in env):
+    if any(k.startswith(prefix) for k in env_keys):
         conflicts.append(name)
-if "NEW_RELIC_LAMBDA_HANDLER" in env:
+if "NEW_RELIC_LAMBDA_HANDLER" in env_keys:
     conflicts.append("New Relic")
-if "DT_TENANT" in env:
+if "DT_TENANT" in env_keys:
     conflicts.append("Dynatrace")
 for arn in layers:
     if "datadog" in arn.lower():

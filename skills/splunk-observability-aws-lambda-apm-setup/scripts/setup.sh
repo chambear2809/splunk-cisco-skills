@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to load or process credential files." >&2
+    exit 2
+fi
+
 # Splunk Observability Cloud AWS Lambda APM Setup
 #
 # Render-first CLI that mirrors splunk-observability-aws-integration:
@@ -180,8 +185,8 @@ assert_secret_file_perms() {
     local path="$1"
     local label="$2"
     [[ -z "${path}" ]] && return 0
-    if [[ ! -f "${path}" ]]; then
-        echo "FAIL: ${label} (${path}) does not exist." >&2
+    if [[ -L "${path}" || ! -f "${path}" ]]; then
+        echo "FAIL: ${label} (${path}) must be a regular, non-symlink file." >&2
         exit 2
     fi
     if [[ ! -s "${path}" ]]; then
@@ -197,6 +202,24 @@ assert_secret_file_perms() {
             echo "FAIL: ${label} (${path}) has loose permissions (${mode}); chmod 600 ${path} (or pass --allow-loose-token-perms)." >&2
             exit 2
         fi
+    fi
+    # Content, backend size, link-count, and stable-fingerprint validation is
+    # performed by the generated descriptor-bound writer immediately before use.
+}
+
+validate_aws_region() {
+    local region="$1"
+    [[ -z "${region}" ]] && return 0
+    if ! "${PYTHON_BIN}" - "${SCRIPT_DIR}/../references/layer-versions.snapshot.json" "${region}" <<'PY'
+import json
+import sys
+
+manifest = json.loads(open(sys.argv[1], encoding="utf-8").read())
+raise SystemExit(0 if sys.argv[2] in manifest.get("x86_64", {}) else 1)
+PY
+    then
+        echo "ERROR: unsupported commercial AWS Lambda region: ${region}" >&2
+        exit 2
     fi
 }
 
@@ -271,7 +294,9 @@ case "${MODE}" in
             else
                 if [[ "${mutation_csv}" == *env* && -n "${TOKEN_FILE}" ]]; then
                     assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
-                    TOKEN_FILE="${TOKEN_FILE}" bash "${OUTPUT_DIR}/scripts/write-splunk-token.sh"
+                    TOKEN_FILE="${TOKEN_FILE}" \
+                    ALLOW_LOOSE_TOKEN_PERMS="${ALLOW_LOOSE_TOKEN_PERMS}" \
+                        bash "${OUTPUT_DIR}/scripts/write-splunk-token.sh"
                 fi
                 APPLY_SECTIONS="${mutation_csv}" TARGET_FILTER="${TARGET}" \
                     bash "${OUTPUT_DIR}/aws-cli/apply-plan.sh"
@@ -302,11 +327,12 @@ case "${MODE}" in
         run_doctor
         ;;
     discover_functions)
-        region_flag="${AWS_REGION:+--region ${AWS_REGION}}"
+        validate_aws_region "${AWS_REGION}"
+        region_args=()
+        [[ -n "${AWS_REGION}" ]] && region_args+=(--region "${AWS_REGION}")
         echo "==> Listing Lambda functions..."
-        # shellcheck disable=SC2086
         if command -v aws >/dev/null 2>&1; then
-            aws lambda list-functions ${region_flag:-} \
+            aws lambda list-functions "${region_args[@]}" \
                 --query 'Functions[].{Name:FunctionName,Runtime:Runtime,Arch:Architectures[0]}' \
                 --output table 2>/dev/null || echo "WARN: aws CLI call failed; ensure credentials are configured."
         else
@@ -331,23 +357,79 @@ case "${MODE}" in
         echo "    bash ${0} --apply --spec ${SPEC} --realm ${REALM:-<realm>} --token-file /tmp/splunk_o11y_token"
         ;;
     quickstart_from_live)
-        region_flag="${AWS_REGION:+--region ${AWS_REGION}}"
         echo "==> Snapshotting live Lambda function configuration..."
         if [[ -z "${TARGET}" ]]; then
             echo "ERROR: --target FUNCTION_NAME is required for --quickstart-from-live." >&2
             exit 2
         fi
-        mkdir -p "${OUTPUT_DIR}/state"
+        snapshot_dir="${OUTPUT_DIR}/state"
+        if [[ -L "${snapshot_dir}" ]]; then
+            echo "ERROR: refusing symlink state directory: ${snapshot_dir}" >&2
+            exit 2
+        fi
+        mkdir -p "${snapshot_dir}"
+        chmod 700 "${snapshot_dir}"
         if command -v aws >/dev/null 2>&1; then
-            # shellcheck disable=SC2086
-            aws lambda get-function-configuration \
+            umask 077
+            raw_snapshot="$(mktemp "${snapshot_dir}/.live-function-raw.XXXXXX")"
+            clean_snapshot="$(mktemp "${snapshot_dir}/.live-function-clean.XXXXXX")"
+            cleanup_live_snapshot() {
+                rm -f -- "${raw_snapshot:-}" "${clean_snapshot:-}"
+            }
+            trap cleanup_live_snapshot EXIT
+            region_args=()
+            if [[ -n "${AWS_REGION}" ]]; then
+                validate_aws_region "${AWS_REGION}"
+                region_args+=(--region "${AWS_REGION}")
+            fi
+            if ! aws lambda get-function-configuration \
                 --function-name "${TARGET}" \
-                ${region_flag:-} \
-                > "${OUTPUT_DIR}/state/live-function-config.json" 2>/dev/null \
-            && echo "==> Live config written to ${OUTPUT_DIR}/state/live-function-config.json" \
-            || echo "WARN: aws CLI call failed; ensure credentials are configured."
+                "${region_args[@]}" \
+                --output json > "${raw_snapshot}"; then
+                echo "ERROR: aws CLI snapshot failed; no live-state artifact was retained." >&2
+                exit 1
+            fi
+            "${PYTHON_BIN}" - "${raw_snapshot}" "${clean_snapshot}" <<'PY'
+import json
+import os
+import sys
+
+allowed = {
+    "Architectures",
+    "FunctionName",
+    "Handler",
+    "LastUpdateStatus",
+    "Layers",
+    "MemorySize",
+    "PackageType",
+    "Role",
+    "Runtime",
+    "State",
+    "Timeout",
+    "TracingConfig",
+}
+with open(sys.argv[1], encoding="utf-8") as source:
+    raw = json.load(source)
+if not isinstance(raw, dict):
+    raise SystemExit("AWS Lambda configuration response must be an object")
+sanitized = {key: raw[key] for key in sorted(allowed) if key in raw}
+with open(sys.argv[2], "w", encoding="utf-8") as destination:
+    json.dump(sanitized, destination, indent=2)
+    destination.write("\n")
+    destination.flush()
+    os.fsync(destination.fileno())
+PY
+            snapshot_path="${snapshot_dir}/live-function-config.json"
+            chmod 600 "${clean_snapshot}"
+            mv -f "${clean_snapshot}" "${snapshot_path}"
+            clean_snapshot=""
+            rm -f -- "${raw_snapshot}"
+            raw_snapshot=""
+            trap - EXIT
+            echo "==> Redacted live config written to ${snapshot_path} (mode 600; Environment excluded)"
         else
-            echo "WARN: aws CLI not installed."
+            echo "ERROR: aws CLI not installed; cannot create a live snapshot." >&2
+            exit 2
         fi
         echo "==> Convert to spec by hand:"
         echo "    cp skills/${SKILL_NAME}/template.example template.observed.yaml"
@@ -362,14 +444,14 @@ case "${MODE}" in
 
 # 1. Get current layer ARNs:
 aws lambda get-function-configuration \
-  --function-name ${FUNCTION_NAME} \
-  --region ${REGION} \
+  --function-name "${FUNCTION_NAME}" \
+  --region "${REGION}" \
   --query 'Layers[].Arn'
 
 # 2. Re-apply with non-Splunk layers only (omit the splunk-apm* ARN):
 aws lambda update-function-configuration \
-  --function-name ${FUNCTION_NAME} \
-  --region ${REGION} \
+  --function-name "${FUNCTION_NAME}" \
+  --region "${REGION}" \
   --layers ${OTHER_LAYER_ARNS}
 ROLLBACK_LAYER
                 ;;
@@ -377,18 +459,31 @@ ROLLBACK_LAYER
                 cat <<'ROLLBACK_ENV'
 # Rollback: remove Splunk env vars from Lambda function
 # Replace FUNCTION_NAME and REGION. Review before running.
-# WARNING: This resets ALL env vars. Capture originals first.
+# The temporary files contain the function's full environment and may contain
+# secrets. They are unpredictable, mode 600, and removed automatically.
 
-# 1. Capture originals:
+# 1. Create private temporary files and capture the current environment:
+umask 077
+ROLLBACK_ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-env.XXXXXX")"
+CLEAN_ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-clean-env.XXXXXX")"
+cleanup_rollback_env() {
+  rm -f "${ROLLBACK_ENV_FILE:-}" "${CLEAN_ENV_FILE:-}"
+}
+trap cleanup_rollback_env EXIT HUP INT TERM
+
 aws lambda get-function-configuration \
-  --function-name ${FUNCTION_NAME} \
-  --region ${REGION} \
-  --query 'Environment.Variables' > /tmp/original-env-${FUNCTION_NAME}.json
+  --function-name "${FUNCTION_NAME}" \
+  --region "${REGION}" \
+  --query 'Environment.Variables' \
+  --output json > "${ROLLBACK_ENV_FILE}"
 
-# 2. Build a cleaned env dict (remove Splunk-added vars):
-python3 - /tmp/original-env-${FUNCTION_NAME}.json <<'PY'
-import json, sys
-env = json.load(open(sys.argv[1]))
+# 2. Build a private AWS CLI environment document without Splunk-owned keys:
+python3 - "${ROLLBACK_ENV_FILE}" "${CLEAN_ENV_FILE}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    env = json.load(source) or {}
 splunk_keys = {
     "AWS_LAMBDA_EXEC_WRAPPER", "SPLUNK_REALM", "SPLUNK_ACCESS_TOKEN",
     "OTEL_SERVICE_NAME", "SPLUNK_LAMBDA_LOCAL_COLLECTOR_ENABLED",
@@ -396,14 +491,16 @@ splunk_keys = {
     "SPLUNK_TRACE_RESPONSE_HEADER_ENABLED",
 }
 cleaned = {k: v for k, v in env.items() if k not in splunk_keys}
-print("Variables=" + json.dumps(cleaned))
+with open(sys.argv[2], "w", encoding="utf-8") as destination:
+    json.dump({"Variables": cleaned}, destination)
 PY
 
-# 3. Apply the cleaned env (pipe the output of step 2 as the value):
-# aws lambda update-function-configuration \
-#   --function-name ${FUNCTION_NAME} \
-#   --region ${REGION} \
-#   --environment 'Variables=<output from step 2>'
+# 3. Review the key names if needed, then apply without printing values:
+# python3 -c 'import json,sys; print("\n".join(sorted(json.load(open(sys.argv[1]))["Variables"])))' "${CLEAN_ENV_FILE}"
+aws lambda update-function-configuration \
+  --function-name "${FUNCTION_NAME}" \
+  --region "${REGION}" \
+  --environment "file://${CLEAN_ENV_FILE}"
 ROLLBACK_ENV
                 ;;
             iam)

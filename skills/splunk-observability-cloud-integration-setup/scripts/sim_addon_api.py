@@ -36,6 +36,33 @@ O11Y_API_REALMS = {"us0", "us1", "us2", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"
 _INSECURE_WARNING_EMITTED = False
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so Splunk Basic credentials stay on the target URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_authenticated_url(url: str) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise RuntimeError("authenticated Splunk REST URL contains an invalid port") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or any(ch.isspace() for ch in url)
+    ):
+        raise RuntimeError(
+            "authenticated Splunk REST requests require an absolute HTTPS URL "
+            "without embedded credentials, fragments, or whitespace"
+        )
+
+
 def _ssl_ctx() -> ssl.SSLContext | None:
     global _INSECURE_WARNING_EMITTED
     if os.environ.get("SPLUNK_VERIFY_SSL", "true").lower() in {"false", "0", "no"}:
@@ -56,6 +83,7 @@ def _ssl_ctx() -> ssl.SSLContext | None:
 
 
 def _splunk_request(method: str, url: str, data: dict[str, str] | None = None) -> tuple[int, dict]:
+    _validate_authenticated_url(url)
     user = os.environ.get("SPLUNK_USER")
     password = os.environ.get("SPLUNK_PASS")
     if not user or not password:
@@ -66,7 +94,11 @@ def _splunk_request(method: str, url: str, data: dict[str, str] | None = None) -
     if data is not None:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as resp:
+    opener = urllib.request.build_opener(
+        _NoRedirectHandler(),
+        urllib.request.HTTPSHandler(context=_ssl_ctx()),
+    )
+    with opener.open(req, timeout=30) as resp:
         body = resp.read().decode("utf-8")
         try:
             return resp.status, json.loads(body)
@@ -325,14 +357,9 @@ def check_connection(name: str, state_dir: Path | None = None) -> dict:
         isinstance(value, str) and value.strip().lower() in affirmative_statuses
         for value in _walk_values(body, "status")
     )
-    affirmative = affirmative or any(
-        isinstance(value, str)
-        and any(word in value.strip().lower() for word in ("success", "connected", "valid"))
-        for value in _walk_values(body, "message")
-    )
     if not affirmative:
         raise RuntimeError(
-            f"SIM account {name!r} connection check returned no affirmative success indicator"
+            f"SIM account {name!r} connection check returned no exact structured success indicator"
         )
     result = "success" if 200 <= code < 300 else "failed"
     if state_dir is not None:
@@ -350,7 +377,7 @@ def enable_account(name: str, enabled: bool, state_dir: Path | None = None) -> d
     current = _find_entry(after, name)
     if current is None:
         raise RuntimeError(f"SIM account {name!r} disappeared after data-collection update")
-    matching_readback = any(
+    matching_readback = [
         (
             field == "disabled" and _field_matches(current, field, not enabled)
         )
@@ -359,10 +386,11 @@ def enable_account(name: str, enabled: bool, state_dir: Path | None = None) -> d
         )
         for field in ("enabled", "data_collection_enabled", "data_collection", "disabled")
         if field in current
-    )
-    if not matching_readback:
+    ]
+    if not matching_readback or not all(matching_readback):
         raise RuntimeError(
-            f"SIM account {name!r} data-collection readback did not match enabled={enabled}"
+            f"SIM account {name!r} data-collection aliases were missing, contradictory, "
+            f"or did not all match enabled={enabled}"
         )
     result = "success"
     if state_dir is not None:

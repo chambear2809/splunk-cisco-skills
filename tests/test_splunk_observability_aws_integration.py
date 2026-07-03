@@ -35,8 +35,10 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -311,6 +313,38 @@ def test_cfn_stacksets_url_when_use_stack_sets(tmp_path: Path) -> None:
     assert "create-stack-set" in stub
 
 
+def test_cfn_template_url_rejects_shell_injection_and_quotes_valid_url(
+    tmp_path: Path,
+) -> None:
+    renderer = _load_renderer()
+    with pytest.raises(renderer.RenderError, match="absolute https"):
+        renderer.validate_spec(
+            _spec(
+                metric_streams={
+                    "use_metric_streams_sync": True,
+                    "cloudformation": True,
+                    "cloudformation_template_url": (
+                        "https://example.test/template.yaml; touch /tmp/injected"
+                    ),
+                }
+            )
+        )
+
+    custom_url = "https://example.test/templates/template;reviewed.yaml"
+    spec = renderer.validate_spec(
+        _spec(
+            metric_streams={
+                "use_metric_streams_sync": True,
+                "cloudformation": True,
+                "cloudformation_template_url": custom_url,
+            }
+        )
+    )
+    renderer.render(spec, tmp_path)
+    stub = (tmp_path / "aws/cloudformation-stub.sh").read_text(encoding="utf-8")
+    assert f"--template-url '{custom_url}'" in stub
+
+
 def test_streams_rollback_quotes_output_path_without_command_execution(
     tmp_path: Path,
 ) -> None:
@@ -358,6 +392,19 @@ def test_multi_account_renders_stacksets_stub(tmp_path: Path) -> None:
     renderer.render(spec, tmp_path)
     stub = (tmp_path / "aws/cloudformation-stacksets-stub.sh").read_text()
     assert "template_metric_streams.yaml" in stub
+
+
+def test_multi_account_label_rejects_rendered_text_injection() -> None:
+    renderer = _load_renderer()
+    with pytest.raises(renderer.RenderError, match="label"):
+        renderer.validate_spec(_spec(multi_account={
+            "enabled": True,
+            "control_account_id": "111111111111",
+            "member_accounts": [{
+                "aws_account_id": "222222222222",
+                "label": "prod\n| injected |",
+            }],
+        }))
 
 
 # --- Hand-off scripts -------------------------------------------------------
@@ -470,6 +517,35 @@ def test_setup_sh_chmod_600_passes(tmp_path: Path) -> None:
     assert out.returncode == 0 or "dry-run" in (out.stdout + out.stderr)
 
 
+def test_setup_sh_rejects_symlink_even_with_loose_perms_override(tmp_path: Path) -> None:
+    token = tmp_path / "token"
+    token.write_text("dummy", encoding="utf-8")
+    os.chmod(token, 0o600)
+    link = tmp_path / "token-link"
+    link.symlink_to(token)
+    out = subprocess.run(
+        [
+            "bash",
+            str(SETUP),
+            "--apply",
+            "integration",
+            "--dry-run",
+            "--realm",
+            "us0",
+            "--token-file",
+            str(link),
+            "--allow-loose-token-perms",
+            "--output-dir",
+            str(tmp_path / "rendered"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert out.returncode == 2
+    assert "regular, non-symlink" in out.stderr
+
+
 # --- aws_integration_api.py CLI --------------------------------------------
 
 
@@ -487,6 +563,139 @@ def test_api_client_rejects_direct_secret_flag() -> None:
 def test_api_client_uses_x_sf_token_header() -> None:
     body = (SCRIPTS_DIR / "aws_integration_api.py").read_text()
     assert '"X-SF-Token": token' in body or "'X-SF-Token': token" in body
+
+
+def test_api_client_rejects_http_and_untrusted_https_hosts() -> None:
+    api = _load_api_client()
+    with pytest.raises(api.ApiError, match="https://api"):
+        api._request("GET", "http://api.us0.observability.splunkcloud.com/v2/integration", "secret")
+    with pytest.raises(api.ApiError, match="https://api"):
+        api._request("GET", "https://attacker.example.test/v2/integration", "secret")
+    with pytest.raises(api.ApiError, match="unsupported"):
+        api._base_url("us0@attacker.example.test")
+
+
+def test_api_client_redirect_handler_refuses_redirects() -> None:
+    api = _load_api_client()
+    handler = api._NoRedirectHandler()
+    assert handler.redirect_request(
+        None,
+        None,
+        302,
+        "Found",
+        {},
+        "https://attacker.example.test/steal",
+    ) is None
+
+
+def _live_validation_fixture() -> tuple[dict, dict]:
+    desired = {
+        "type": "AWSCloudWatch",
+        "name": "observability-staging",
+        "authMethod": "ExternalId",
+        "roleArn": "arn:aws:iam::123456789012:role/SplunkObservabilityStagingRole",
+        "regions": ["us-east-1"],
+        "services": ["AWS/EC2", "AWS/Lambda", "AWS/ApplicationELB"],
+        "customCloudWatchNamespaces": ["ContainerInsights"],
+        "metricStatsToSyncs": [],
+        "pollRate": 300_000,
+        "metadataPollRate": 900_000,
+        "inactiveMetricsPollRate": 1_200_000,
+        "importCloudWatch": True,
+        "enableAwsUsage": False,
+        "enableCheckLargeVolume": True,
+        "syncCustomNamespacesOnly": False,
+        "syncLoadBalancerTargetGroupTags": False,
+        "ignoreAllStatusMetrics": False,
+        "collectOnlyRecommendedStats": True,
+        "useMetricStreamsSync": False,
+        "metricStreamsManagedExternally": False,
+    }
+    live = {
+        **desired,
+        "id": "integration-id",
+        "enabled": True,
+        "metricStreamsSyncState": "DISABLED",
+    }
+    live.pop("useMetricStreamsSync")
+    return desired, live
+
+
+def test_api_client_live_validation_requires_exact_enabled_scope() -> None:
+    api = _load_api_client()
+    desired, live = _live_validation_fixture()
+    assert api.validate_live_integration([live], desired, "123456789012")["id"] == "integration-id"
+
+    with pytest.raises(api.ApiError, match="no live"):
+        api.validate_live_integration([], desired, "123456789012")
+    with pytest.raises(api.ApiError, match="multiple live"):
+        api.validate_live_integration([live, dict(live)], desired, "123456789012")
+
+    for field, value, message in (
+        ("enabled", False, "not enabled"),
+        ("authMethod", "SecurityToken", "authMethod"),
+        ("regions", ["us-west-2"], "regions"),
+        ("roleArn", "arn:aws:iam::999999999999:role/Other", "roleArn"),
+        ("services", ["AWS/EC2"], "services"),
+        ("customCloudWatchNamespaces", [], "customCloudWatchNamespaces"),
+        ("pollRate", 60_000, "pollRate"),
+        ("enableCheckLargeVolume", False, "enableCheckLargeVolume"),
+        ("metricStreamsSyncState", "ENABLED", "polling-only"),
+    ):
+        changed = dict(live)
+        changed[field] = value
+        with pytest.raises(api.ApiError, match=message):
+            api.validate_live_integration([changed], desired, "123456789012")
+
+    missing_role = dict(live)
+    missing_role.pop("roleArn")
+    with pytest.raises(api.ApiError, match="roleArn"):
+        api.validate_live_integration([missing_role], desired, "123456789012")
+
+
+def test_api_client_paginates_filtered_integration_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = _load_api_client()
+    calls: list[dict[str, list[str]]] = []
+
+    def fake_request(method: str, url: str, token: str):
+        assert method == "GET"
+        assert token == "token"
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+        calls.append(query)
+        offset = int(query["offset"][0])
+        size = 1000 if offset == 0 else 1
+        return {
+            "count": 1001,
+            "results": [
+                {"type": "AWSCloudWatch", "name": f"integration-{offset + index}"}
+                for index in range(size)
+            ],
+        }
+
+    monkeypatch.setattr(api, "_request", fake_request)
+    result = api.list_aws_integrations("us1", "token")
+    assert len(result) == 1001
+    assert len(calls) == 2
+    assert all(call["type"] == ["AWSCloudWatch"] for call in calls)
+    assert [call["offset"] for call in calls] == [["0"], ["1000"]]
+
+
+def test_api_client_calls_credential_validation_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = _load_api_client()
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        api,
+        "_request",
+        lambda method, url, token: calls.append((method, url, token)) or {},
+    )
+    api.validate_integration_credentials("us1", "token", "integration/id")
+    assert calls == [
+        (
+            "GET",
+            "https://api.us1.observability.splunkcloud.com/v2/integration/validate/integration%2Fid",
+            "token",
+        )
+    ]
 
 
 def test_api_client_strips_read_back_fields_on_put() -> None:
@@ -523,6 +732,170 @@ def test_apply_state_redacts_token_keys() -> None:
     redacted = apply_state.redact(sample)
     for k in sample:
         assert redacted[k] == "[REDACTED]"
+
+
+def test_apply_state_secret_reader_requires_0600_and_rejects_symlink(
+    tmp_path: Path,
+) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "token"
+    token.write_text("one-secret-line\n", encoding="utf-8")
+    os.chmod(token, 0o600)
+    assert apply_state.read_secret_file(token) == "one-secret-line"
+
+    link = tmp_path / "token-link"
+    link.symlink_to(token)
+    with pytest.raises(PermissionError, match="non-symlink"):
+        apply_state.read_secret_file(link, allow_loose=True)
+
+    os.chmod(token, 0o640)
+    with pytest.raises(PermissionError, match="loose permissions"):
+        apply_state.read_secret_file(token)
+
+    os.chmod(token, 0o600)
+    hardlink = tmp_path / "token-hardlink"
+    os.link(token, hardlink)
+    with pytest.raises(PermissionError, match="exactly one hard link"):
+        apply_state.read_secret_file(token, allow_loose=True)
+
+
+def test_apply_state_secret_reader_is_bounded_and_double_checked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_state = _load_apply_state()
+    oversized = tmp_path / "oversized-token"
+    oversized.write_bytes(b"x" * (apply_state.MAX_SECRET_BYTES + 1))
+    os.chmod(oversized, 0o600)
+    with pytest.raises(PermissionError, match="safety limit"):
+        apply_state.read_secret_file(oversized)
+
+    token = tmp_path / "racing-token"
+    token.write_text("first-value\n", encoding="utf-8")
+    os.chmod(token, 0o600)
+    original_read = apply_state.os.read
+    read_count = 0
+
+    def racing_read(descriptor: int, size: int) -> bytes:
+        nonlocal read_count
+        chunk = original_read(descriptor, size)
+        read_count += 1
+        if read_count == 1:
+            token.write_text("other-value\n", encoding="utf-8")
+        return chunk
+
+    monkeypatch.setattr(apply_state.os, "read", racing_read)
+    with pytest.raises(PermissionError, match="changed while it was being read"):
+        apply_state.read_secret_file(token)
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    ["token\v", "token\f", "token\x1c", "token\u0085", "token\u2028", "token\u2029"],
+)
+def test_apply_state_token_parser_rejects_all_line_controls(
+    tmp_path: Path,
+    bad_value: str,
+) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "controlled-token"
+    token.write_text(bad_value, encoding="utf-8")
+    os.chmod(token, 0o600)
+    with pytest.raises(ValueError, match="printable-ASCII"):
+        apply_state.read_secret_file(token)
+
+
+def test_apply_state_token_parser_allows_only_one_optional_file_terminator(
+    tmp_path: Path,
+) -> None:
+    apply_state = _load_apply_state()
+    token = tmp_path / "terminated-token"
+    for payload in (b"token-value", b"token-value\n", b"token-value\r\n"):
+        token.write_bytes(payload)
+        os.chmod(token, 0o600)
+        assert apply_state.read_secret_file(token) == "token-value"
+    token.write_bytes(b"token-value\n\n")
+    os.chmod(token, 0o600)
+    with pytest.raises(ValueError, match="at most one trailing"):
+        apply_state.read_secret_file(token)
+
+
+def test_apply_state_uses_private_unpredictable_atomic_temp_file(tmp_path: Path) -> None:
+    apply_state = _load_apply_state()
+    state_dir = tmp_path / "state"
+    apply_state.append_step(
+        state_dir,
+        section="integration",
+        step="create",
+        idempotency_key="integration:create",
+        result="success",
+    )
+    state_path = state_dir / "apply-state.json"
+    assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
+    assert list(state_dir.glob(".apply-state.*")) == []
+    source = (SCRIPTS_DIR / "_apply_state.py").read_text(encoding="utf-8")
+    assert "NamedTemporaryFile" in source
+    assert "os.getpid()" not in source
+
+
+def test_rendered_state_is_private_and_accepts_first_append(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    apply_state = _load_apply_state()
+    renderer.render(renderer.validate_spec(_spec()), tmp_path)
+    state_dir = tmp_path / "state"
+    state_path = state_dir / "apply-state.json"
+    assert stat.S_IMODE(state_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
+    apply_state.append_step(
+        state_dir,
+        section="integration",
+        step="first-live-append",
+        idempotency_key="integration:first-live-append",
+        result="success",
+    )
+    assert apply_state.has_step(state_dir, "integration:first-live-append")
+
+
+def test_apply_state_read_rejects_path_swap_to_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_state = _load_apply_state()
+    state_dir = tmp_path / "state"
+    apply_state.append_step(
+        state_dir,
+        section="integration",
+        step="trusted",
+        idempotency_key="trusted",
+        result="success",
+    )
+    state_path = state_dir / "apply-state.json"
+    replacement = tmp_path / "replacement.json"
+    replacement.write_text('{"steps": []}\n', encoding="utf-8")
+    os.chmod(replacement, 0o600)
+    original_open = apply_state.os.open
+
+    def swapping_open(path, flags, *args, **kwargs):
+        if Path(path) == state_path:
+            state_path.unlink()
+            state_path.symlink_to(replacement)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(apply_state.os, "open", swapping_open)
+    with pytest.raises(PermissionError, match="safely|changed"):
+        apply_state.has_step(state_dir, "trusted")
+
+
+def test_generated_live_scripts_pin_repo_and_interpreter_paths(tmp_path: Path) -> None:
+    renderer = _load_renderer()
+    output = tmp_path / "rendered"
+    renderer.render(renderer.validate_spec(_spec()), output)
+    for name in ("apply-integration.sh", "validate-live.sh"):
+        body = (output / "scripts" / name).read_text(encoding="utf-8")
+        assert str(SKILL_DIR) in body
+        assert str(Path(sys.executable).resolve()) in body
+        assert ".venv/bin/python" not in body
+        assert "RENDER_DIR}/../skills" not in body
 
 
 # --- smoke_offline.sh + validate.sh ----------------------------------------

@@ -117,17 +117,6 @@ nginx:
 
 Works like the Apache block but injects an `otel_ngx_module.so` directive into `configFile`.
 
-### SDK-only (`spec.sdk`)
-
-```yaml
-sdk:
-  image: ""   # unused; no binary is injected
-  env:
-  - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: http://$(SPLUNK_OTEL_AGENT):4317
-```
-
-Use when your application already bundles an OTel SDK (e.g. a Java app compiled with the agent baked in). The operator injects env vars only; no init container.
 
 ## Cross-namespace CR reference
 

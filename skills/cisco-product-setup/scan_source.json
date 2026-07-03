@@ -1,0 +1,17 @@
+{
+  "fixture": {
+    "normalization": "Parsed SCAN product fields consumed by build_catalog.py; comments, disabled stanzas, and unused vendor package files are excluded.",
+    "path": "scan_products.fixture.json",
+    "product_count": 83,
+    "sha256": "47313edcd1c145f582d115b41375e42bff4651a26af09330135b0bb69de1224e"
+  },
+  "schema_version": 1,
+  "source": {
+    "catalog_version": "2026_06_26_1427",
+    "kind": "scan_public_catalog",
+    "minimum_scan_version": "1.0.28",
+    "retrieved_date": "2026-07-03",
+    "sha256": "94e694bb7e922902ffdd44c3306dc818715651532f97930620270e81aeafd721",
+    "url": "https://is4s.s3.amazonaws.com/scan/products.conf"
+  }
+}

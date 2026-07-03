@@ -153,7 +153,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "Delegates to the routed Cisco app install path for the resolved product",
         "cloud_config_path": "Delegates to the routed Cisco setup skill after resolving the SCAN catalog product name",
-        "notes": "Top-level Cisco product orchestrator. Uses the packaged SCAN catalog plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow."
+        "notes": "Top-level Cisco product orchestrator. Uses the checksum-pinned normalized SCAN public-catalog fixture plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow."
       },
       {
         "kind": "app",
@@ -183,9 +183,9 @@
         "kind": "app",
         "app_name": "DA-ITSI-ContentLibrary",
         "label": "`splunk-itsi-config` content library",
-        "cloud_install_path": "ACS Splunkbase or Splunk Support / Cloud App Request",
+        "cloud_install_path": "Splunkbase assisted install or Splunk Support / Cloud App Request",
         "cloud_config_path": "Content pack catalog refresh, preview, install, and validate through ITSI REST workflows",
-        "notes": "Requires ITSI app 1841. Used by splunk-itsi-config for supported content-pack workflows."
+        "notes": "Requires ITSI app 1841. Public 2.5.1 advertises Splunk 10.5 through 10.2; the repo-reviewed 2.5.0 release retains exact Splunk 10.5 through 9.3 evidence. Splunkbase marks Cloud installation as assisted."
       },
       {
         "kind": "app",
@@ -781,7 +781,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; overlay on splunk-observability-otel-collector-setup that renders Instrumentation CRs, annotation patches, and the optional OBI DaemonSet for customer-managed Kubernetes clusters",
         "cloud_config_path": "Rendered Instrumentation CR manifests (per-language images + env), namespace + workload strategic-merge-patches targeting spec.template.metadata.annotations, annotation backup ConfigMap for clean revert, OpenShift SCC stub when OBI is enabled, and idempotent apply + uninstall helper scripts",
-        "notes": "Zero-code application auto-instrumentation for Java / Node.js / Python / .NET / Go / Apache / Nginx / SDK workloads. Overlay on splunk-observability-otel-collector-setup (which installs the operator + CRDs). Includes AlwaysOn Profiling + runtime metrics wiring, propagator + sampler configuration, multi-CR support behind the operator multi-instrumentation gate, vendor-coexistence detection, --discover-workloads helper, selective --target apply/uninstall, and --gitops-mode YAML-only rendering."
+        "notes": "Zero-code application auto-instrumentation for Java / Node.js / Python / .NET / Go / Apache / Nginx workloads. Overlay on splunk-observability-otel-collector-setup (which installs the operator + CRDs). Includes AlwaysOn Profiling + runtime metrics wiring, propagator + sampler configuration, multi-CR support behind the operator multi-instrumentation gate, vendor-coexistence detection, --discover-workloads helper, selective --target apply/uninstall, and --gitops-mode YAML-only rendering."
       },
       {
         "kind": "workflow",
@@ -4453,12 +4453,12 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
+      "cloud_compatible": true,
+      "install_method_single": "assisted",
+      "install_method_distributed": "assisted",
       "latest_verified_version": "2.5.0",
-      "latest_release_version": "2.5.0",
-      "latest_verified_date": "February 10, 2026",
-      "latest_release_date": "February 10, 2026",
-      "last_verified_date": "July 2, 2026",
-      "platform_versions": [
+      "latest_release_version": "2.5.1",
+      "verified_platform_versions": [
         "10.5",
         "10.4",
         "10.3",
@@ -4468,7 +4468,17 @@
         "9.4",
         "9.3"
       ],
-      "compatibility_status": "supported"
+      "latest_verified_date": "February 10, 2026",
+      "latest_release_date": "July 2, 2026",
+      "last_verified_date": "July 3, 2026",
+      "platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Public 2.5.1 is current and Splunkbase-assisted. Repo-reviewed 2.5.0 remains the package evidence baseline; its exact platform list is preserved in verified_platform_versions."
     },
     {
       "skill": "splunk-enterprise-security-install",

@@ -5,17 +5,25 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import hashlib
 import io
 import json
 import re
 import tarfile
+import urllib.request
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_ROOT = REPO_ROOT / "skills/cisco-product-setup"
 CATALOG_PATH = SKILL_ROOT / "catalog.json"
 OVERRIDES_PATH = SKILL_ROOT / "catalog_overrides.json"
+SCAN_SOURCE_MANIFEST_PATH = SKILL_ROOT / "scan_source.json"
+SCAN_SOURCE_FIXTURE_PATH = SKILL_ROOT / "scan_products.fixture.json"
+SCAN_SOURCE_URL = "https://is4s.s3.amazonaws.com/scan/products.conf"
+SCAN_SOURCE_SCHEMA_VERSION = 1
 SCAN_GLOB = "splunk-cisco-app-navigator-*.tar.gz"
 SCAN_APP_CONF_MEMBER = "splunk-cisco-app-navigator/default/app.conf"
 SCAN_PRODUCTS_MEMBER = "splunk-cisco-app-navigator/default/products.conf"
@@ -78,9 +86,35 @@ CATALYST_DEFAULT_INDEX = {
 }
 
 GENERATED_BANNER = (
-    "Generated from the packaged SCAN catalog plus "
+    "Generated from the pinned normalized SCAN catalog source plus "
     "skills/cisco-product-setup/catalog_overrides.json local overrides and "
     "synthetic products."
+)
+
+SCAN_STRING_FIELDS = (
+    "id",
+    "display_name",
+    "status",
+    "category",
+    "subcategory",
+    "description",
+    "value_proposition",
+    "addon",
+    "addon_uid",
+    "addon_label",
+    "app_viz",
+    "app_viz_uid",
+    "app_viz_label",
+    "app_viz_2",
+    "learn_more_url",
+)
+SCAN_LIST_FIELDS = (
+    "prereq_apps",
+    "prereq_labels",
+    "dashboards",
+    "sourcetypes",
+    "aliases",
+    "keywords",
 )
 
 
@@ -89,10 +123,31 @@ def parse_args() -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="Verify catalog.json is up to date.")
     mode.add_argument("--write", action="store_true", help="Write catalog.json.")
+    mode.add_argument(
+        "--check-live-source",
+        action="store_true",
+        help="Compare the pinned SCAN source provenance with the live public catalog.",
+    )
     parser.add_argument(
         "--scan-package",
         default="",
-        help="Optional explicit path to the SCAN tarball. Defaults to the newest match in splunk-ta/.",
+        help=(
+            "Optional explicit SCAN tarball for one-off comparison output. "
+            "Normal builds use the pinned normalized source fixture."
+        ),
+    )
+    parser.add_argument(
+        "--refresh-source",
+        action="store_true",
+        help=(
+            "Fetch the public SCAN products.conf, refresh the normalized source "
+            "fixture and provenance manifest, then rebuild catalog.json. Requires --write."
+        ),
+    )
+    parser.add_argument(
+        "--source-url",
+        default=SCAN_SOURCE_URL,
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -201,13 +256,39 @@ def extract_display_aliases(display_name: str) -> list[str]:
     return unique_ordered(aliases)
 
 
-def load_scan_products(scan_package: Path) -> list[dict]:
-    with tarfile.open(scan_package, "r:gz") as archive:
-        raw = archive.extractfile(SCAN_PRODUCTS_MEMBER)
-        if raw is None:
-            raise SystemExit(f"{SCAN_PRODUCTS_MEMBER} not found in {scan_package.name}")
-        text = raw.read().decode("utf-8")
+def scan_product(values: dict) -> dict:
+    product = {field: str(values.get(field, "")).strip() for field in SCAN_STRING_FIELDS}
+    for field in SCAN_LIST_FIELDS:
+        raw = values.get(field, [])
+        if not isinstance(raw, list):
+            raise ValueError(f"SCAN product {product['id'] or '<unknown>'}: {field} must be a list")
+        product[field] = [str(item).strip() for item in raw if str(item).strip()]
 
+    display_name = product["display_name"] or product["id"]
+    product["display_name"] = display_name
+    product["search_terms"] = unique_ordered(
+        [
+            product["id"],
+            product["id"].replace("_", " "),
+            *extract_display_aliases(display_name),
+            *product["aliases"],
+            *product["keywords"],
+            product["addon"],
+            product["addon"].replace("_", " ").replace("-", " "),
+            product["addon_label"],
+            product["app_viz"],
+            product["app_viz"].replace("_", " ").replace("-", " "),
+            product["app_viz_label"],
+            product["app_viz_2"],
+            product["app_viz_2"].replace("_", " ").replace("-", " "),
+        ]
+    )
+    if not product["id"]:
+        raise ValueError("SCAN source contains a product without an id")
+    return product
+
+
+def parse_scan_products(text: str) -> list[dict]:
     parser = configparser.ConfigParser(strict=False)
     parser.optionxform = str
     parser.read_file(io.StringIO(text))
@@ -219,60 +300,260 @@ def load_scan_products(scan_package: Path) -> list[dict]:
         if parser.get(section, "disabled", fallback="0").strip() == "1":
             continue
 
-        display_name = parser.get(section, "display_name", fallback=section).strip()
-        aliases = split_csv(parser.get(section, "aliases", fallback=""))
-        keywords = split_csv(parser.get(section, "keywords", fallback=""))
-        addon = parser.get(section, "addon", fallback="").strip()
-        addon_label = parser.get(section, "addon_label", fallback="").strip()
-        app_viz = parser.get(section, "app_viz", fallback="").strip()
-        app_viz_label = parser.get(section, "app_viz_label", fallback="").strip()
-        app_viz_2 = parser.get(section, "app_viz_2", fallback="").strip()
-        search_terms = unique_ordered(
-            [
-                section,
-                section.replace("_", " "),
-                *extract_display_aliases(display_name),
-                *aliases,
-                *keywords,
-                addon,
-                addon.replace("_", " ").replace("-", " "),
-                addon_label,
-                app_viz,
-                app_viz.replace("_", " ").replace("-", " "),
-                app_viz_label,
-                app_viz_2,
-                app_viz_2.replace("_", " ").replace("-", " "),
-            ]
-        )
-
         products.append(
-            {
+            scan_product(
+                {
                 "id": section,
-                "display_name": display_name,
+                "display_name": parser.get(section, "display_name", fallback=section),
                 "status": parser.get(section, "status", fallback="").strip(),
                 "category": parser.get(section, "category", fallback="").strip(),
                 "subcategory": parser.get(section, "subcategory", fallback="").strip(),
                 "description": parser.get(section, "description", fallback="").strip(),
                 "value_proposition": parser.get(section, "value_proposition", fallback="").strip(),
-                "addon": addon,
+                "addon": parser.get(section, "addon", fallback="").strip(),
                 "addon_uid": parser.get(section, "addon_uid", fallback="").strip(),
-                "addon_label": addon_label,
-                "app_viz": app_viz,
+                "addon_label": parser.get(section, "addon_label", fallback="").strip(),
+                "app_viz": parser.get(section, "app_viz", fallback="").strip(),
                 "app_viz_uid": parser.get(section, "app_viz_uid", fallback="").strip(),
-                "app_viz_label": app_viz_label,
-                "app_viz_2": app_viz_2,
+                "app_viz_label": parser.get(section, "app_viz_label", fallback="").strip(),
+                "app_viz_2": parser.get(section, "app_viz_2", fallback="").strip(),
                 "prereq_apps": split_csv(parser.get(section, "prereq_apps", fallback="")),
                 "prereq_labels": split_csv(parser.get(section, "prereq_labels", fallback="")),
                 "dashboards": split_csv(parser.get(section, "dashboards", fallback="")),
                 "sourcetypes": split_csv(parser.get(section, "sourcetypes", fallback="")),
-                "aliases": aliases,
-                "keywords": keywords,
+                "aliases": split_csv(parser.get(section, "aliases", fallback="")),
+                "keywords": split_csv(parser.get(section, "keywords", fallback="")),
                 "learn_more_url": parser.get(section, "learn_more_url", fallback="").strip(),
-                "search_terms": search_terms,
-            }
+                }
+            )
         )
 
     return products
+
+
+def load_scan_products(scan_package: Path) -> list[dict]:
+    with tarfile.open(scan_package, "r:gz") as archive:
+        raw = archive.extractfile(SCAN_PRODUCTS_MEMBER)
+        if raw is None:
+            raise SystemExit(f"{SCAN_PRODUCTS_MEMBER} not found in {scan_package.name}")
+        text = raw.read().decode("utf-8")
+    return parse_scan_products(text)
+
+
+def sanitized_scan_product(product: dict) -> dict:
+    return {
+        field: product[field]
+        for field in (*SCAN_STRING_FIELDS, *SCAN_LIST_FIELDS)
+        if product.get(field) not in ("", [], {})
+    }
+
+
+def render_scan_fixture(products: list[dict]) -> str:
+    payload = {
+        "schema_version": SCAN_SOURCE_SCHEMA_VERSION,
+        "products": [sanitized_scan_product(product) for product in products],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def parse_scan_source_header(text: str) -> tuple[str, str]:
+    catalog_match = re.search(r"(?m)^#\s*version\s*=\s*(\S+)\s*$", text)
+    minimum_match = re.search(r"(?m)^#\s*min_app_version\s*=\s*(\S+)\s*$", text)
+    if not catalog_match or not minimum_match:
+        raise ValueError("SCAN products.conf is missing version or min_app_version provenance")
+    return catalog_match.group(1), minimum_match.group(1)
+
+
+def fetch_scan_source(source_url: str) -> bytes:
+    if source_url != SCAN_SOURCE_URL:
+        raise ValueError(f"SCAN source URL must be the canonical {SCAN_SOURCE_URL}")
+    requested = urlsplit(source_url)
+    if requested.scheme.lower() != "https" or not requested.hostname:
+        raise ValueError("SCAN source URL must use HTTPS")
+    requested_origin = (requested.scheme.lower(), requested.hostname.lower(), requested.port or 443)
+    request = urllib.request.Request(
+        source_url,
+        headers={"User-Agent": "splunk-cisco-skills/catalog-source-refresh"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        final = urlsplit(response.geturl())
+        final_origin = (final.scheme.lower(), (final.hostname or "").lower(), final.port or 443)
+        if final_origin != requested_origin:
+            raise ValueError("SCAN source redirect changed origin")
+        source_payload = response.read(5_000_001)
+    if len(source_payload) > 5_000_000:
+        raise ValueError("SCAN products.conf exceeds the 5 MB source limit")
+    return source_payload
+
+
+def refresh_scan_source(source_url: str) -> None:
+    source_payload = fetch_scan_source(source_url)
+    text = source_payload.decode("utf-8")
+    catalog_version, minimum_scan_version = parse_scan_source_header(text)
+    products = parse_scan_products(text)
+    fixture_text = render_scan_fixture(products)
+    fixture_payload = fixture_text.encode("utf-8")
+    manifest = {
+        "schema_version": SCAN_SOURCE_SCHEMA_VERSION,
+        "source": {
+            "kind": "scan_public_catalog",
+            "url": source_url,
+            "catalog_version": catalog_version,
+            "minimum_scan_version": minimum_scan_version,
+            "sha256": sha256_bytes(source_payload),
+            "retrieved_date": date.today().isoformat(),
+        },
+        "fixture": {
+            "path": SCAN_SOURCE_FIXTURE_PATH.name,
+            "sha256": sha256_bytes(fixture_payload),
+            "product_count": len(products),
+            "normalization": (
+                "Parsed SCAN product fields consumed by build_catalog.py; comments, "
+                "disabled stanzas, and unused vendor package files are excluded."
+            ),
+        },
+    }
+    SCAN_SOURCE_FIXTURE_PATH.write_text(fixture_text, encoding="utf-8")
+    SCAN_SOURCE_MANIFEST_PATH.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def check_live_scan_source(source_url: str) -> bool:
+    manifest = load_json(SCAN_SOURCE_MANIFEST_PATH)
+    expected = manifest.get("source")
+    if not isinstance(expected, dict):
+        raise ValueError("SCAN source manifest must contain a source object")
+    validate_scan_source_metadata(expected)
+    _, pinned_catalog_source = load_scan_source_fixture()
+    expected_fixture_sha = pinned_catalog_source["normalized_fixture_sha256"]
+    source_payload = fetch_scan_source(source_url)
+    text = source_payload.decode("utf-8")
+    catalog_version, minimum_scan_version = parse_scan_source_header(text)
+    live_products = parse_scan_products(text)
+    normalized_fixture_sha = sha256_bytes(
+        render_scan_fixture(live_products).encode("utf-8")
+    )
+    actual = {
+        "catalog_version": catalog_version,
+        "minimum_scan_version": minimum_scan_version,
+        "sha256": sha256_bytes(source_payload),
+    }
+    drift = {
+        field: {"pinned": expected.get(field), "live": value}
+        for field, value in actual.items()
+        if expected.get(field) != value
+    }
+    if expected_fixture_sha != normalized_fixture_sha:
+        drift["normalized_fixture_sha256"] = {
+            "pinned": expected_fixture_sha,
+            "live": normalized_fixture_sha,
+        }
+    if drift:
+        print(json.dumps({"ok": False, "source_url": source_url, "drift": drift}, indent=2))
+        return False
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "source_url": source_url,
+                **actual,
+                "normalized_fixture_sha256": normalized_fixture_sha,
+                "normalized_product_count": len(live_products),
+            },
+            indent=2,
+        )
+    )
+    return True
+
+
+def validate_scan_source_metadata(source_meta: dict) -> None:
+    if source_meta.get("kind") != "scan_public_catalog":
+        raise ValueError("SCAN source provenance kind must be scan_public_catalog")
+    if source_meta.get("url") != SCAN_SOURCE_URL:
+        raise ValueError(f"SCAN source provenance URL must be {SCAN_SOURCE_URL}")
+
+    retrieved_date = source_meta.get("retrieved_date")
+    if not isinstance(retrieved_date, str):
+        raise ValueError("SCAN source provenance retrieved_date must use YYYY-MM-DD")
+    try:
+        parsed_retrieved_date = date.fromisoformat(retrieved_date)
+    except ValueError as exc:
+        raise ValueError(
+            "SCAN source provenance retrieved_date must be a valid YYYY-MM-DD date"
+        ) from exc
+    if parsed_retrieved_date.isoformat() != retrieved_date:
+        raise ValueError("SCAN source provenance retrieved_date must use canonical YYYY-MM-DD")
+
+
+def load_scan_source_fixture() -> tuple[list[dict], dict]:
+    manifest = load_json(SCAN_SOURCE_MANIFEST_PATH)
+    if manifest.get("schema_version") != SCAN_SOURCE_SCHEMA_VERSION:
+        raise ValueError("Unsupported SCAN source manifest schema_version")
+
+    fixture_meta = manifest.get("fixture")
+    source_meta = manifest.get("source")
+    if not isinstance(fixture_meta, dict) or not isinstance(source_meta, dict):
+        raise ValueError("SCAN source manifest must contain source and fixture objects")
+    fixture_name = str(fixture_meta.get("path", "")).strip()
+    fixture_path = (SKILL_ROOT / fixture_name).resolve()
+    if not fixture_name or fixture_path.parent != SKILL_ROOT.resolve():
+        raise ValueError("SCAN source fixture path must be a file in cisco-product-setup")
+    fixture_payload = fixture_path.read_bytes()
+    expected_fixture_sha = str(fixture_meta.get("sha256", "")).strip()
+    actual_fixture_sha = sha256_bytes(fixture_payload)
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_fixture_sha):
+        raise ValueError("SCAN source fixture SHA-256 is missing or invalid")
+    if actual_fixture_sha != expected_fixture_sha:
+        raise ValueError(
+            f"SCAN source fixture checksum mismatch: {actual_fixture_sha} != {expected_fixture_sha}"
+        )
+
+    fixture = json.loads(fixture_payload)
+    if fixture.get("schema_version") != SCAN_SOURCE_SCHEMA_VERSION:
+        raise ValueError("Unsupported SCAN source fixture schema_version")
+    raw_products = fixture.get("products")
+    if not isinstance(raw_products, list) or not all(
+        isinstance(product, dict) for product in raw_products
+    ):
+        raise ValueError("SCAN source fixture products must be a list of objects")
+    products = [scan_product(product) for product in raw_products]
+    if len(products) != fixture_meta.get("product_count"):
+        raise ValueError("SCAN source fixture product_count does not match fixture contents")
+    product_ids = [product["id"] for product in products]
+    if len(product_ids) != len(set(product_ids)):
+        raise ValueError("SCAN source fixture contains duplicate product IDs")
+
+    validate_scan_source_metadata(source_meta)
+    for field in ("catalog_version", "minimum_scan_version", "sha256"):
+        if not str(source_meta.get(field, "")).strip():
+            raise ValueError(f"SCAN source provenance is missing {field}")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(source_meta["sha256"])):
+        raise ValueError("SCAN source SHA-256 is invalid")
+
+    catalog_source = dict(source_meta)
+    catalog_source.update(
+        {
+            "normalized_fixture": fixture_name,
+            "normalized_fixture_sha256": actual_fixture_sha,
+        }
+    )
+    return products, catalog_source
+
+
+def load_scan_package_source(scan_package: Path) -> tuple[list[dict], dict]:
+    package_payload = scan_package.read_bytes()
+    return load_scan_products(scan_package), {
+        "kind": "scan_package",
+        "package": scan_package.name,
+        "app_version": scan_app_version(scan_package),
+        "sha256": sha256_bytes(package_payload),
+    }
 
 
 def synthetic_product_entry(raw: dict) -> dict:
@@ -1065,7 +1346,7 @@ def generic_manual_gap_reason(product: dict) -> str:
     return "No local setup route is defined for this product yet."
 
 
-def build_catalog(scan_package: Path) -> dict:
+def build_catalog(scan_package: Path | None = None) -> dict:
     overrides_doc = load_json(OVERRIDES_PATH)
     overrides = overrides_doc.get("products", {})
     security_products = load_json(SECURITY_CLOUD_PRODUCTS_PATH)
@@ -1074,7 +1355,11 @@ def build_catalog(scan_package: Path) -> dict:
     known_apps = {entry["app_name"] for entry in registry["apps"]}
 
     products = []
-    source_products = load_scan_products(scan_package) + load_synthetic_products(overrides_doc)
+    if scan_package is None:
+        scan_products, scan_source = load_scan_source_fixture()
+    else:
+        scan_products, scan_source = load_scan_package_source(scan_package)
+    source_products = scan_products + load_synthetic_products(overrides_doc)
     for product in source_products:
         override = overrides.get(product["id"], {})
         state_override = override.get("automation_state", "")
@@ -1170,9 +1455,9 @@ def build_catalog(scan_package: Path) -> dict:
 
     catalog = {
         "description": GENERATED_BANNER,
-        "scan_package": scan_package.name,
         "product_count": len(products),
         "products": products,
+        "scan_source": scan_source,
     }
 
     validate_catalog(catalog)
@@ -1236,7 +1521,23 @@ def render_catalog(catalog: dict) -> str:
 
 def main() -> int:
     args = parse_args()
-    scan_package = find_scan_package(args.scan_package)
+    if args.check_live_source:
+        if args.scan_package or args.refresh_source:
+            raise SystemExit("--check-live-source cannot be combined with source mutation options")
+        return 0 if check_live_scan_source(args.source_url) else 1
+    if args.refresh_source and not args.write:
+        raise SystemExit("--refresh-source requires --write")
+    if args.refresh_source and args.scan_package:
+        raise SystemExit("--refresh-source cannot be combined with --scan-package")
+    if args.write and args.scan_package:
+        raise SystemExit(
+            "--write cannot be combined with --scan-package; use the pinned fixture or "
+            "refresh it with --refresh-source --write"
+        )
+    if args.refresh_source:
+        refresh_scan_source(args.source_url)
+
+    scan_package = find_scan_package(args.scan_package) if args.scan_package else None
     catalog = build_catalog(scan_package)
     rendered = render_catalog(catalog)
 
