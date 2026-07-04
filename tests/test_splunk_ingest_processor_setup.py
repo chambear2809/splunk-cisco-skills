@@ -61,6 +61,7 @@ def test_feature_coverage_includes_current_ip_surface() -> None:
         "AI-powered data management readiness",
         "Automated Field Extraction",
         "Automated Field Extraction region allowlist",
+        "Guided Onboarding with Auto-Schematization",
         "SPL to SPL2 conversion review",
         "PCRE2 compatibility lint",
         "Queue DLQ Usage Summary monitoring",
@@ -79,6 +80,7 @@ def test_render_outputs_required_artifacts(tmp_path: Path) -> None:
         "apply-plan.json",
         "control-plane-handoffs/ingest-processor-ui.md",
         "control-plane-handoffs/known-issues.md",
+        "control-plane-handoffs/ai-powered-data-management.md",
         "monitoring/searches.spl",
         "monitoring/usage-summary-handoff.md",
         "spl2-pipeline-kit/templates/ingestProcessor/metrics.spl2",
@@ -120,6 +122,49 @@ def test_known_issue_guardrails_and_afe_regions_are_rendered(tmp_path: Path) -> 
         assert phrase in known_issues
 
 
+def test_ai_powered_data_management_lifecycle_is_explicit_and_ui_only(tmp_path: Path) -> None:
+    out = run_renderer(tmp_path)
+    coverage = json.loads((out / "coverage-report.json").read_text())
+    by_feature = {row["feature"]: row for row in coverage}
+
+    afe = by_feature["Automated Field Extraction"]
+    assert afe["availability"] == "controlled_availability"
+    assert afe["source_date"] == "2026-03-11"
+    assert afe["coverage_status"] == "ui_handoff"
+    assert afe["automation"] == "ui_suggestion_and_human_review_only"
+
+    guided = by_feature["Guided Onboarding with Auto-Schematization"]
+    assert guided["availability"] == "alpha"
+    assert guided["source_date"] == "2026-03-11"
+    assert guided["coverage_status"] == "ui_handoff"
+    assert guided["automation"] == "ui_handoff_and_human_review_only"
+
+    plan = json.loads((out / "apply-plan.json").read_text())
+    ai_plan = plan["ai_powered_data_management"]
+    assert ai_plan["api_crud"] == "not_claimed"
+    assert {item["capability"] for item in ai_plan["capabilities"]} == {
+        "Automated Field Extraction",
+        "Guided Onboarding with Auto-Schematization",
+    }
+    assert {item["availability"] for item in ai_plan["capabilities"]} == {
+        "alpha",
+        "controlled_availability",
+    }
+    assert all(action["type"] != "api" for action in plan["actions"])
+
+    handoff = (out / "control-plane-handoffs/ai-powered-data-management.md").read_text()
+    normalized_handoff = " ".join(handoff.split())
+    for phrase in (
+        "Controlled Availability",
+        "Alpha",
+        "does not generate, download, install, or apply",
+        "explicit human apply decision",
+        "not evidence that the tenant configuration changed",
+        "does not infer a third",
+    ):
+        assert phrase in normalized_handoff
+
+
 def test_rendered_artifacts_do_not_claim_private_crud_or_render_secrets(tmp_path: Path) -> None:
     out = run_renderer(tmp_path)
     combined = "\n".join(
@@ -132,6 +177,8 @@ def test_rendered_artifacts_do_not_claim_private_crud_or_render_secrets(tmp_path
         "POST /services/data-manager/input",
         "PUT /services/data-manager/input",
         "terraform resource splunk_cloud_data_manager_input",
+        "POST /services/data-management/guided-onboarding",
+        "terraform resource splunk_guided_onboarding",
         "global HEC ACK",
         "BEGIN PRIVATE KEY",
     ]

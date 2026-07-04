@@ -23,6 +23,7 @@ required=(
   apply-plan.json
   control-plane-handoffs/ingest-processor-ui.md
   control-plane-handoffs/known-issues.md
+  control-plane-handoffs/ai-powered-data-management.md
   monitoring/searches.spl
   monitoring/usage-summary-handoff.md
   spl2-pipeline-kit/lint-report.json

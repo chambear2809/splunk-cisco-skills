@@ -225,7 +225,7 @@ sourcetypes = cisco:test
             self.module.find_scan_package = original
             self.module.fetch_scan_source = original_fetch
 
-        self.assertEqual(catalog["product_count"], 85)
+        self.assertEqual(catalog["product_count"], 86)
         self.assertEqual(catalog["scan_source"]["kind"], "scan_public_catalog")
 
     def test_resolve_aci(self) -> None:

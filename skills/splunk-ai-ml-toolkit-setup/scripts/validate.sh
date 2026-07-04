@@ -82,6 +82,8 @@ required = [
     "apply-plan.json",
     "doctor-report.md",
     "dsdl-runtime-handoff.md",
+    "agent-builder-handoff.md",
+    "time-series-model-handoff.md",
     "legacy-anomaly-migration.md",
 ]
 missing = [name for name in required if not (rendered / name).is_file()]
@@ -95,14 +97,38 @@ if not coverage:
     print("coverage-report.json has no coverage entries", file=sys.stderr)
     raise SystemExit(1)
 bad = []
+allowed_product_stages = {"alpha", "available", "deprecated", "feature_preview", "ga"}
 for entry in coverage:
     if entry.get("status") == "unknown":
         bad.append(f"{entry.get('key')}: unknown")
+    if entry.get("product_stage") not in allowed_product_stages:
+        bad.append(f"{entry.get('key')}: unsupported product_stage {entry.get('product_stage')!r}")
     if not entry.get("source_url"):
         bad.append(f"{entry.get('key')}: missing source_url")
 if bad:
     print("Invalid coverage: " + "; ".join(bad), file=sys.stderr)
     raise SystemExit(1)
+by_key = {entry.get("key"): entry for entry in coverage}
+expected_stages = {
+    "ai_toolkit.agent_builder": "alpha",
+    "ai_toolkit.agent_builder_knowledge_base_connections": "alpha",
+    "ai_toolkit.agent_builder_mcp_connections": "alpha",
+    "ai_toolkit.aiagent_command": "alpha",
+    "ai_toolkit.agent_run_history": "alpha",
+    "ai_toolkit.open_cisco_time_series_model_1_0": "available",
+    "ai_toolkit.anomaly_cisco_deep_time_series": "feature_preview",
+}
+for key, expected_stage in expected_stages.items():
+    entry = by_key.get(key)
+    if not entry:
+        print(f"coverage-report.json is missing {key}", file=sys.stderr)
+        raise SystemExit(1)
+    if entry.get("product_stage") != expected_stage:
+        print(
+            f"coverage-report.json has {key} stage {entry.get('product_stage')!r}; expected {expected_stage!r}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 plan = json.loads((rendered / "apply-plan.json").read_text(encoding="utf-8"))
 commands = plan.get("steps", [])
 if not any(step.get("section") == "ai-toolkit" for step in commands):

@@ -95,8 +95,9 @@ bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
   configuration route authoritative and use `splunk-ai-assistant-setup` only
   for the generic `Splunk_AI_Assistant_Cloud` app workflow.
 - For Federated Analytics, route the provider/index setup through
-  `splunk-federated-search-setup`, then return to ES configuration for ASL,
-  OCSF, ESCU, and detection-readiness handoffs.
+  the dedicated handoff-only `aws_lake` identity in
+  `splunk-federated-search-setup`; never substitute generic `aws_s3`. Return
+  to ES configuration for ASL, OCSF, ESCU, and detection-readiness handoffs.
 - Treat `manual_gap` and `partial` results as handoff/readiness workflows and
   do not imply full automation.
 

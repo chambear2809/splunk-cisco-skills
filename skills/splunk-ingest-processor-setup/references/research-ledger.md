@@ -17,3 +17,12 @@
   management and auto-schematization language around onboarding and pipeline
   management. This skill treats those as UI handoffs and still refuses private
   Data Management CRUD.
+- 2026-07-03: Splunk's March 11, 2026 AI-powered Data Management announcement
+  labels Automated Field Extraction as Controlled Availability and Guided
+  Onboarding with Auto-Schematization as Alpha. The latter can recommend CIM
+  mappings and candidate TA or SPL2 outputs, but no stable public API or
+  Ingest Processor release-note entry was found. Both remain entitlement-
+  checked, human-reviewed UI handoffs; the renderer does not enroll tenants,
+  invoke either AI workflow, generate or install TAs, or apply suggestions.
+  Although the announcement says three capabilities, it publicly names only
+  these two; the skill does not invent a third capability.

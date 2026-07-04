@@ -6,16 +6,21 @@ Supports the full Splunk Federated Search product surface:
 - Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent
   mode, with multiple providers per render and one or more federated indexes
   per provider.
-- Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform
-  only), rendered as a REST payload because FSS3 cannot be configured through
-  federated.conf and is created by POSTing to /services/data/federated/provider.
+- Legacy Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud
+  Platform only), rendered as payload-shaped inventory/migration evidence with
+  explicit Splunk 10.5 phased-deprecation guidance. No legacy CRUD is emitted.
 - Data Management app federation handoffs for current Amazon S3,
   Microsoft Azure, Azure Databricks, Snowflake, and DDSS connection/dataset
-  workflows. These are rendered as readiness handoffs, not legacy provider
-  payloads.
+  workflows, including Glue, Iceberg REST, Splunk-native catalog, Delta Lake,
+  Iceberg, JSON, and Parquet distinctions. These are readiness handoffs, not
+  legacy provider payloads.
+- Dedicated handoff-only coverage for Amazon Security Lake Federated Analytics
+  (type=aws_lake) and Cisco Security Analytics and Logging federation
+  (type=aws_s3_sal). The renderer never masquerades either as generic aws_s3
+  and does not invent provider, subscriber, dataset, or index CRUD.
 - File-based apply for Splunk Enterprise standalone search heads, a fail-closed
-  SHC deployer bundle handoff, plus a REST apply path that works on both Splunk
-  Enterprise and Splunk Cloud Platform.
+  SHC deployer bundle handoff, plus an FSS2S-only REST apply path that works on
+  both Splunk Enterprise and Splunk Cloud Platform.
 - Global federated-search enable/disable through
   /services/data/federated/settings/general.
 - Live status helper that probes connectivityStatus per provider.
@@ -44,6 +49,8 @@ GENERATED_FILES = {
     "README.md",
     "metadata.json",
     "data-management-federation-handoff.md",
+    "specialized-federation-handoff.md",
+    "legacy-fss3-migration.md",
     "federated.conf.template",
     "indexes.conf",
     "server.conf",
@@ -59,53 +66,143 @@ GENERATED_FILES = {
 S2S_DATASET_TYPES = ("index", "metricindex", "savedsearch", "lastjob", "datamodel")
 FSS3_DATASET_TYPES = ("glue_table",)
 ALL_DATASET_TYPES = S2S_DATASET_TYPES + FSS3_DATASET_TYPES
+FEDERATED_SEARCH_OVERVIEW_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform"
+AMAZON_S3_OVERVIEW_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-amazon-s3-datasets/overview-of-federated-search-for-amazon-s3"
+AMAZON_SECURITY_LAKE_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets/about-federated-analytics"
+FEDERATED_CONF_URL = "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/federated.conf"
+S3_DATA_CATALOG_OPTIONS = [
+    {
+        "key": "aws_glue",
+        "label": "AWS Glue catalog table",
+        "formats": ["apache_iceberg", "delta_lake", "non_table_json_or_parquet"],
+        "ownership": "customer_managed",
+        "notes": "The Glue table must reference the selected S3 location. Iceberg and Delta are table formats; non-table datasets use JSON or Parquet files.",
+        "source_url": AMAZON_S3_OVERVIEW_URL,
+    },
+    {
+        "key": "iceberg_rest",
+        "label": "Apache Iceberg REST catalog",
+        "formats": ["apache_iceberg"],
+        "ownership": "customer_managed",
+        "notes": "The S3 connection records the catalog URL. Current public documentation does not support Iceberg REST catalogs that require authorization.",
+        "source_url": AMAZON_S3_OVERVIEW_URL,
+    },
+    {
+        "key": "splunk_native",
+        "label": "Splunk-native data catalog",
+        "formats": ["inferred_or_operator_defined_schema_and_partitions"],
+        "ownership": "splunk_managed",
+        "notes": "Splunk can crawl the dataset to infer schema and partitions, or the operator can define them manually. Data-routing-plus-search datasets use a Splunk-native catalog.",
+        "source_url": AMAZON_S3_OVERVIEW_URL,
+    },
+]
 DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
     {
         "key": "amazon_s3_data_management",
         "label": "Federated Search for Amazon S3 through the Data Management app",
         "stage": "available by activation",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "configuration_surface": "data_management_connection_and_dataset",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
         "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics customers can have a tenant-specific access path.",
         "dataset_model": "Data Management app connections and datasets; datasets can support federated search and, where documented, data routing.",
-        "notes": "Use the legacy `aws_s3` REST payload path in this renderer only when that provider model is still the reviewed target for the tenant.",
+        "notes": "Use Data Management for new Amazon S3 federation. Legacy `aws_s3` definitions in this renderer are payload-shaped inventory and migration evidence only; no legacy CRUD is emitted.",
+        "source_url": AMAZON_S3_OVERVIEW_URL,
     },
     {
         "key": "microsoft_azure",
         "label": "Federated Search for Microsoft Azure",
         "stage": "available by activation",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "configuration_surface": "data_management_connection_and_dataset",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
         "activation": "Contact Splunk sales for activation and confirm target-tenant commercial terms before building the connection.",
         "dataset_model": "Data Management app connection plus datasets over Azure Data Lake Storage and Azure Blob Storage containers.",
         "notes": "Azure datasets can be federated-search-only or data-routing-plus-federated-search when the tenant supports the documented Data Management workflow.",
+        "source_url": FEDERATED_SEARCH_OVERVIEW_URL,
     },
     {
         "key": "azure_databricks",
         "label": "Federated Search for Azure Databricks",
         "stage": "available by activation",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "configuration_surface": "data_management_connection_and_dataset",
         "availability": "Splunk Cloud Platform deployments in AWS regions",
         "activation": "Contact Splunk sales for activation; existing FSS3/Federated Analytics users apply through the documented access path.",
         "dataset_model": "Data Management app connection using Azure Databricks Delta Sharing to Unity Catalog schemas and tables.",
         "notes": "Searches use SPL2. This renderer does not create Databricks Delta Sharing credentials or Unity Catalog datasets.",
+        "source_url": FEDERATED_SEARCH_OVERVIEW_URL,
     },
     {
         "key": "snowflake",
         "label": "Federated Search for Snowflake",
         "stage": "available by activation in Splunk Cloud 10.5",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "configuration_surface": "data_management_connection_and_dataset",
         "availability": "Splunk Cloud Platform deployments in AWS regions; Snowflake warehouses must run on AWS",
         "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
         "dataset_model": "Data Management app connection for one Snowflake warehouse/database/schema plus datasets backed by tables or views.",
         "notes": "Require USAGE on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token kept outside this repo.",
+        "source_url": FEDERATED_SEARCH_OVERVIEW_URL,
     },
     {
         "key": "ddss",
         "label": "Federated Search for DDSS",
         "stage": "available by activation in Splunk Cloud 10.5",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "configuration_surface": "data_management_dataset",
         "availability": "Splunk Cloud Platform deployments in AWS regions with DDSS data stored in Amazon S3",
         "activation": "Contact Splunk sales for activation; confirm any applicable commercial entitlement without assuming a universal Data Scan Unit model.",
         "dataset_model": "Data Management app DDSS dataset identified by a configured S3 bucket path and its associated DDSS index.",
         "notes": "Require an SQS queue, S3 event notification, and the generated S3 bucket and SQS queue policies. Current federated search does not support DDSS locations in Azure or GCP.",
+        "source_url": FEDERATED_SEARCH_OVERVIEW_URL,
     },
 ]
+SPECIALIZED_FEDERATION_HANDOFFS = [
+    {
+        "key": "amazon_security_lake_federated_analytics",
+        "label": "Federated Analytics for Amazon Security Lake",
+        "provider_type": "aws_lake",
+        "stage": "available by activation",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "availability": "Splunk Cloud Platform deployments in AWS regions; Amazon Security Lake and Splunk Cloud must be in the same AWS region",
+        "activation": "Contact Splunk sales to activate Federated Analytics, then use the documented Amazon Security Lake provider workflow.",
+        "dataset_model": "A dedicated `aws_lake` provider coordinates local data lake indexes for recent threat detection and federated indexes for historical threat hunting over OCSF datasets.",
+        "notes": "Do not represent Federated Analytics as a generic `aws_s3` provider. This renderer emits a readiness handoff only and does not create Amazon Security Lake subscribers, data lake indexes, or federated indexes.",
+        "source_url": AMAZON_SECURITY_LAKE_URL,
+    },
+    {
+        "key": "cisco_security_analytics_and_logging",
+        "label": "Federated Search for Cisco Security Analytics and Logging (FS-SAL)",
+        "provider_type": "aws_s3_sal",
+        "stage": "documented provider type; tenant availability requires confirmation",
+        "lifecycle": "documented_conditional",
+        "automation": "ui_handoff",
+        "availability": "Cisco SAL and Splunk tenant, licensing, region, and supported onboarding dependent",
+        "activation": "Confirm the supported Cisco SAL federation onboarding path with Cisco and Splunk before configuration.",
+        "dataset_model": "A dedicated `aws_s3_sal` provider represents Cisco Security Analytics and Logging federation.",
+        "notes": "Do not substitute a generic `aws_s3` provider. The public configuration reference identifies `aws_s3_sal`, but this repo does not have a stable customer-facing CRUD contract for creating it.",
+        "source_url": FEDERATED_CONF_URL,
+    },
+]
+SPECIALIZED_HANDOFF_BY_TYPE = {
+    item["provider_type"]: item for item in SPECIALIZED_FEDERATION_HANDOFFS
+}
+LEGACY_FSS3_LIFECYCLE = {
+    "key": "legacy_fss3_provider_payload",
+    "provider_type": "aws_s3",
+    "lifecycle": "legacy_phased_deprecation",
+    "automation": "rendered_migration_evidence_only",
+    "preferred_replacement": "Federated Search for Amazon S3 through Data Management app connections and datasets",
+    "guidance": "Inventory existing legacy providers, recreate access through the current Data Management connection/dataset model, validate equivalent SPL2 searches and RBAC, then retire the legacy provider only after cutover evidence is complete.",
+    "source_url": FEDERATED_CONF_URL,
+}
 
 PASSWORD_PLACEHOLDER_PREFIX = "__FEDERATED_PASSWORD_FILE_BASE64__"
 
@@ -154,6 +251,13 @@ class FSS3Provider:
 
 
 @dataclass
+class SpecializedProviderHandoff:
+    name: str
+    provider_type: str
+    disabled: bool = False
+
+
+@dataclass
 class FederatedIndex:
     name: str
     provider: str
@@ -173,6 +277,7 @@ class Spec:
     restart_splunk: bool
     s2s_providers: list[S2SProvider]
     fss3_providers: list[FSS3Provider]
+    specialized_provider_handoffs: list[SpecializedProviderHandoff]
     federated_indexes: list[FederatedIndex]
 
 
@@ -467,10 +572,31 @@ def _normalize_fss3(raw: dict[str, Any], known_provider_names: set[str]) -> FSS3
     )
 
 
+def _normalize_specialized_handoff(
+    raw: dict[str, Any], known_provider_names: set[str]
+) -> SpecializedProviderHandoff:
+    name = str(raw.get("name") or "").strip()
+    validate_provider_name(name, label="specialized federation handoff name")
+    if name in known_provider_names:
+        raise SpecError(f"Duplicate provider name: {name}")
+    provider_type = str(raw.get("type") or "").strip().lower()
+    if provider_type not in SPECIALIZED_HANDOFF_BY_TYPE:
+        raise SpecError(
+            f"Specialized federation handoff {name} type must be one of "
+            f"{tuple(SPECIALIZED_HANDOFF_BY_TYPE)} (got {provider_type!r})."
+        )
+    return SpecializedProviderHandoff(
+        name=name,
+        provider_type=provider_type,
+        disabled=boolish(raw.get("disabled"), default=False),
+    )
+
+
 def _normalize_index(
     raw: dict[str, Any],
     s2s_providers: list[S2SProvider],
     fss3_providers: list[FSS3Provider],
+    specialized_provider_handoffs: list[SpecializedProviderHandoff],
 ) -> FederatedIndex:
     name = str(raw.get("name") or "").strip()
     validate_index_name(name, label="federated index name")
@@ -479,10 +605,19 @@ def _normalize_index(
         raise SpecError(f"federated index {name} requires a provider name.")
     s2s_lookup = {p.name: p for p in s2s_providers}
     fss3_lookup = {p.name: p for p in fss3_providers}
+    specialized_lookup = {p.name: p for p in specialized_provider_handoffs}
+    if provider in specialized_lookup:
+        provider_type = specialized_lookup[provider].provider_type
+        raise SpecError(
+            f"federated index {name} references handoff-only provider '{provider}' "
+            f"(type={provider_type}). This repo has no stable public CRUD contract "
+            "for that provider's dataset or index objects; review "
+            "specialized-federation-handoff.md instead."
+        )
     if provider not in s2s_lookup and provider not in fss3_lookup:
         raise SpecError(
             f"federated index {name} references unknown provider '{provider}'. "
-            f"Known providers: {sorted(set(s2s_lookup) | set(fss3_lookup))}"
+            f"Known providers: {sorted(set(s2s_lookup) | set(fss3_lookup) | set(specialized_lookup))}"
         )
     dataset_type = str(raw.get("dataset_type") or raw.get("datasetType") or "").strip()
     if dataset_type not in ALL_DATASET_TYPES:
@@ -552,6 +687,7 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
         raise SpecError("`providers` must be a list when provided.")
     s2s: list[S2SProvider] = []
     fss3: list[FSS3Provider] = []
+    specialized_handoffs: list[SpecializedProviderHandoff] = []
     seen_names: set[str] = set()
     for entry in raw_providers:
         if not isinstance(entry, dict):
@@ -565,13 +701,18 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
             provider_s3 = _normalize_fss3(entry, seen_names)
             fss3.append(provider_s3)
             seen_names.add(provider_s3.name)
+        elif provider_type in SPECIALIZED_HANDOFF_BY_TYPE:
+            provider_handoff = _normalize_specialized_handoff(entry, seen_names)
+            specialized_handoffs.append(provider_handoff)
+            seen_names.add(provider_handoff.name)
         else:
             raise SpecError(
-                f"Provider {entry.get('name')!r} type must be 'splunk' or 'aws_s3' "
+                f"Provider {entry.get('name')!r} type must be 'splunk', 'aws_s3', "
+                f"or a handoff-only type in {tuple(SPECIALIZED_HANDOFF_BY_TYPE)} "
                 f"(got {provider_type!r})."
             )
 
-    if not s2s and not fss3:
+    if not s2s and not fss3 and not specialized_handoffs:
         raise SpecError("Spec must declare at least one provider.")
 
     # Standard mode: multiple providers per remote host are allowed only when
@@ -612,7 +753,7 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
     for entry in raw_indexes:
         if not isinstance(entry, dict):
             raise SpecError("Each `federated_indexes` entry must be a mapping.")
-        idx = _normalize_index(entry, s2s, fss3)
+        idx = _normalize_index(entry, s2s, fss3, specialized_handoffs)
         if idx.name in seen_index_names:
             raise SpecError(f"Duplicate federated index name: {idx.name}")
         seen_index_names.add(idx.name)
@@ -641,6 +782,7 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
         restart_splunk=restart_splunk,
         s2s_providers=s2s,
         fss3_providers=fss3,
+        specialized_provider_handoffs=specialized_handoffs,
         federated_indexes=indexes,
     )
 
@@ -663,11 +805,24 @@ def password_token_for(provider: S2SProvider) -> str:
 
 def render_federated_template(spec: Spec) -> str:
     if not spec.s2s_providers:
-        return (
-            "# No FSS2S (type=splunk) providers were declared in the spec.\n"
-            "# Federated Search for Amazon S3 (type=aws_s3) is created via REST,\n"
-            "# not federated.conf; see aws-s3-providers/ and apply-rest.sh.\n"
-        )
+        lines = ["# No FSS2S (type=splunk) providers were declared in the spec."]
+        if spec.fss3_providers:
+            lines.extend(
+                [
+                    "# Legacy Federated Search for Amazon S3 (type=aws_s3) is not",
+                    "# applied by this skill. Review the payload-shaped inventory in",
+                    "# aws-s3-providers/ and follow legacy-fss3-migration.md.",
+                ]
+            )
+        if spec.specialized_provider_handoffs:
+            lines.extend(
+                [
+                    "# Amazon Security Lake (type=aws_lake) and Cisco SAL",
+                    "# (type=aws_s3_sal) requests are handoff-only. No provider or index",
+                    "# CRUD is emitted; review specialized-federation-handoff.md.",
+                ]
+            )
+        return "\n".join(lines) + "\n"
     lines = [
         "# Rendered by splunk-federated-search-setup. Review before applying.",
         "# Each provider's `password` field is substituted by the apply scripts",
@@ -705,7 +860,7 @@ def render_indexes(spec: Spec) -> str:
         return (
             "# No FSS2S federated indexes were declared in the spec.\n"
             "# Transparent-mode providers do not use federated indexes.\n"
-            "# FSS3 federated indexes are created via REST; see apply-rest.sh.\n"
+            "# Legacy FSS3 definitions are migration evidence only on 10.5; no CRUD is emitted.\n"
         )
     lines = [
         "# Rendered by splunk-federated-search-setup. Review before applying.",
@@ -764,21 +919,26 @@ def render_aws_s3_readme(spec: Spec) -> str:
     if not spec.fss3_providers:
         return ""
     lines = [
-        "# Federated Search for Amazon S3 — Apply Notes",
+        "# Federated Search for Amazon S3 — Migration Evidence",
         "",
-        "Splunk Cloud Platform creates FSS3 providers through REST or Splunk Web,",
-        "**not** through `federated.conf`. The renderer therefore writes one JSON",
-        "payload per FSS3 provider under `aws-s3-providers/<name>.json`. The",
-        "rendered `apply-rest.sh` will POST each payload to:",
+        "## Lifecycle warning",
         "",
-        "    https://<splunk-cloud-host>:<mport>/services/data/federated/provider",
+        "The rendered `type=aws_s3` payload is the legacy provider path. Splunk",
+        "10.5 documentation describes phased deprecation of legacy FS-S3 provider",
+        "and federated-index operations in preparation for migration to the Data",
+        "Management app. Prefer current Amazon S3 connections and datasets for new",
+        "designs. These payload-shaped files are inventory/migration evidence only",
+        "on 10.5 and are never consumed by the rendered apply scripts.",
         "",
-        "with form-encoded fields. The Splunk admin user must hold the",
-        "`admin_all_objects` capability.",
+        "Legacy Splunk Cloud FSS3 definitions used REST or Splunk Web, not",
+        "`federated.conf`. On 10.5, the renderer writes one payload-shaped JSON",
+        "inventory record per provider under `aws-s3-providers/<name>.json`. The",
+        "rendered `apply-rest.sh` refuses legacy-only plans and excludes legacy",
+        "providers/indexes from mixed FSS2S applies.",
         "",
         "## AWS prerequisites",
         "",
-        "Before applying, the AWS administrator must:",
+        "Before validating or migrating an existing legacy definition, the AWS administrator must:",
         "",
         "1. Create the AWS Glue database and Glue tables that you list in",
         "   `aws_glue_tables_allowlist`. Each Glue table must reference an S3",
@@ -796,12 +956,9 @@ def render_aws_s3_readme(spec: Spec) -> str:
         "",
         "## Splunk Cloud prerequisites",
         "",
-        "1. The IP allow-list use case **Search head API access** must include",
-        "   the source IP/CIDR that runs `apply-rest.sh`.",
-        "2. The Splunk admin user supplied to the apply script needs",
-        "   `admin_all_objects`.",
-        "3. After provider creation, map federated indexes to the Glue tables",
-        "   via federated_indexes entries with `dataset_type: glue_table`.",
+        "1. Inventory the existing provider and read-only federated indexes.",
+        "2. Confirm the migrated Data Management connection and datasets.",
+        "3. Validate equivalent SPL2, RBAC, schema/time/partition, cost, and result behavior before retirement.",
         "",
         "## Per-provider payloads",
         "",
@@ -816,10 +973,10 @@ def render_data_management_handoff() -> str:
         "# Data Management App Federation Handoff",
         "",
         "Current Splunk Cloud federated-search expansion is centered on Data",
-        "Management app connections and datasets. This renderer still automates",
-        "reviewable Splunk-to-Splunk assets and the legacy/reviewed `aws_s3`",
-        "provider payload path, but it does not invent Data Management app CRUD",
-        "for newer federation surfaces.",
+        "Management app connections and datasets. This renderer automates",
+        "reviewable Splunk-to-Splunk assets and retains payload-shaped legacy",
+        "`aws_s3` inventory solely for migration evidence. It does not emit legacy",
+        "FSS3 or Data Management app CRUD.",
         "",
         "| Surface | Stage | Availability | Operator action |",
         "| --- | --- | --- | --- |",
@@ -827,6 +984,24 @@ def render_data_management_handoff() -> str:
     for item in DATA_MANAGEMENT_FEDERATION_HANDOFFS:
         lines.append(
             f"| {item['label']} | {item['stage']} | {item['availability']} | {item['activation']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Amazon S3 Data Catalog Options",
+            "",
+            "Current Amazon S3 connections require each federated-search dataset to",
+            "have a catalog. Choose the catalog explicitly; these are not interchangeable",
+            "with the legacy provider-level `data_catalog` ARN field.",
+            "",
+            "| Catalog | Ownership | Supported formats/model | Notes |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for catalog in S3_DATA_CATALOG_OPTIONS:
+        formats = ", ".join(catalog["formats"])
+        lines.append(
+            f"| {catalog['label']} | `{catalog['ownership']}` | {formats} | {catalog['notes']} |"
         )
     lines.extend(
         [
@@ -840,7 +1015,7 @@ def render_data_management_handoff() -> str:
             "- For Azure Databricks, collect Delta Sharing and Unity Catalog readiness without placing credentials in this repo.",
             "- For Snowflake, require a role with `USAGE` on the warehouse, database, and schema; a Splunk-region IPv4 ingress network rule and Snowflake network policy; a service-user authentication policy; and a programmatic access token (PAT) kept outside this repository. Azure/GCP Snowflake warehouses are unsupported.",
             "- For DDSS, confirm the S3 self-storage location and associated DDSS index already exist, then create an SQS queue and S3 event notification and apply the generated S3 bucket and SQS queue policies. Route DDSS location lifecycle ownership to `splunk-cloud-acs-admin-setup`.",
-            "- For current Amazon S3 workflows, prefer the Data Management app connection/dataset model unless the tenant is intentionally using the older provider payload path.",
+            "- For current Amazon S3 workflows, use the Data Management app connection/dataset model; treat any older provider definition as read-only migration inventory.",
             "- Confirm roles have the current `edit_connections` and `edit_datasets` capabilities before the Data Management handoff.",
             "- Validate SPL2 searches against representative time fields and partitions before production routing.",
             "",
@@ -854,7 +1029,9 @@ def render_data_management_handoff() -> str:
                 f"### {item['label']}",
                 "",
                 f"- Dataset model: {item['dataset_model']}",
+                f"- Lifecycle: `{item['lifecycle']}`; automation: `{item['automation']}`.",
                 f"- Notes: {item['notes']}",
+                f"- Source: {item['source_url']}",
                 "",
             ]
         )
@@ -871,9 +1048,111 @@ def render_data_management_handoff() -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_specialized_federation_handoff(spec: Spec) -> str:
+    lines = [
+        "# Specialized Federation Handoffs",
+        "",
+        "Amazon Security Lake Federated Analytics and Cisco Security Analytics",
+        "and Logging use dedicated provider types. They must not be represented",
+        "as generic `aws_s3` providers. This renderer records reviewed intent and",
+        "prerequisites but emits no provider, subscriber, dataset, or index CRUD.",
+        "",
+        "| Surface | Provider type | Lifecycle | Automation | Availability |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for item in SPECIALIZED_FEDERATION_HANDOFFS:
+        lines.append(
+            f"| {item['label']} | `{item['provider_type']}` | `{item['lifecycle']}` | "
+            f"`{item['automation']}` | {item['availability']} |"
+        )
+    lines.extend(["", "## Requested Handoffs", ""])
+    if spec.specialized_provider_handoffs:
+        for provider in spec.specialized_provider_handoffs:
+            item = SPECIALIZED_HANDOFF_BY_TYPE[provider.provider_type]
+            lines.append(
+                f"- `{provider.name}` -> `{provider.provider_type}` ({item['label']}); "
+                f"disabled intent: `{str(provider.disabled).lower()}`."
+            )
+    else:
+        lines.append(
+            "- None declared in this spec. Add a handoff-only `providers:` entry with "
+            "`type: aws_lake` or `type: aws_s3_sal` to record intent without emitting CRUD."
+        )
+    lines.extend(["", "## Per-Surface Readiness", ""])
+    for item in SPECIALIZED_FEDERATION_HANDOFFS:
+        lines.extend(
+            [
+                f"### {item['label']}",
+                "",
+                f"- Dedicated provider type: `{item['provider_type']}`.",
+                f"- Stage: {item['stage']}.",
+                f"- Activation: {item['activation']}",
+                f"- Dataset model: {item['dataset_model']}",
+                f"- Guardrail: {item['notes']}",
+                f"- Source: {item['source_url']}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Boundary",
+            "",
+            "- `aws_lake` is a dedicated Amazon Security Lake Federated Analytics provider, not ordinary FSS3.",
+            "- `aws_s3_sal` is a dedicated Cisco SAL provider, not ordinary FSS3.",
+            "- The current public contracts do not justify generating customer-facing CRUD payloads for either type here.",
+            "- Create subscribers, data lake indexes, federated indexes, SAL associations, and access policy through the documented product workflow and validate them in the target tenant.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def render_legacy_fss3_migration(spec: Spec) -> str:
+    provider_names = [provider.name for provider in spec.fss3_providers]
+    lines = [
+        "# Legacy Federated Search for Amazon S3 Migration",
+        "",
+        f"- Provider type: `{LEGACY_FSS3_LIFECYCLE['provider_type']}`",
+        f"- Lifecycle: `{LEGACY_FSS3_LIFECYCLE['lifecycle']}`",
+        f"- Preferred replacement: {LEGACY_FSS3_LIFECYCLE['preferred_replacement']}",
+        f"- Source: {LEGACY_FSS3_LIFECYCLE['source_url']}",
+        "",
+        "Splunk 10.5 configuration documentation describes phased deprecation of",
+        "legacy FS-S3 provider and federated-index operations as Splunk moves the",
+        "current Amazon S3 workflow to Data Management app connections and datasets.",
+        "The legacy renderer remains only to inventory and migrate reviewed existing",
+        "tenants; it never applies provider or index CRUD and is not an architecture",
+        "for a new deployment.",
+        "",
+        "## Legacy Providers In This Plan",
+        "",
+    ]
+    if provider_names:
+        lines.extend(f"- `{name}`" for name in provider_names)
+    else:
+        lines.append("- None.")
+    lines.extend(
+        [
+            "",
+            "## Migration Checklist",
+            "",
+            "1. Inventory the legacy provider, mapped federated indexes, roles, saved searches, alerts, dashboards, and Data Scan Unit usage.",
+            "2. Confirm current Federated Search for Amazon S3 activation and the `edit_connections` and `edit_datasets` capabilities for the target Splunk Cloud tenant.",
+            "3. Create a Data Management Amazon S3 connection with reviewed IAM trust and resource policies.",
+            "4. Recreate datasets using the appropriate AWS Glue, Apache Iceberg REST, or Splunk-native catalog model; preserve time fields, partitions, schema, formats, and encryption requirements.",
+            "5. Reapply dataset RBAC and validate representative SPL2 searches, result shape, time filtering, cost, and performance against the legacy path.",
+            "6. Update dependent knowledge objects only after equivalent results are proven, then monitor a controlled cutover window.",
+            "7. Disable and remove the legacy provider and indexes only through a separately reviewed change with rollback evidence.",
+            "",
+            "This skill does not automatically delete or migrate a legacy provider.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_readme(spec: Spec) -> str:
     s2s_count = len(spec.s2s_providers)
     fss3_count = len(spec.fss3_providers)
+    specialized_count = len(spec.specialized_provider_handoffs)
     idx_count = len(spec.federated_indexes)
     standard_count = sum(1 for p in spec.s2s_providers if p.mode == "standard")
     transparent_count = sum(1 for p in spec.s2s_providers if p.mode == "transparent")
@@ -882,6 +1161,7 @@ def render_readme(spec: Spec) -> str:
         "",
         f"FSS2S providers: {s2s_count} ({standard_count} standard, {transparent_count} transparent)  ",
         f"FSS3 providers:  {fss3_count}  ",
+        f"Specialized provider handoffs: {specialized_count}  ",
         f"Federated indexes: {idx_count}  ",
         f"App: `{spec.app_name}`  ",
         "",
@@ -893,11 +1173,13 @@ def render_readme(spec: Spec) -> str:
         "- `preflight.sh` — local btool sanity checks",
         "- `apply-search-head.sh` — file-based apply on a standalone Splunk Enterprise SH",
         "- `apply-shc-deployer.sh` — fail-closed handoff to SHC bundle validation/apply",
-        "- `apply-rest.sh` — REST-based apply for both Splunk Enterprise and Splunk Cloud Platform",
+        "- `apply-rest.sh` — FSS2S-only REST apply for Splunk Enterprise or Splunk Cloud; refuses legacy-only plans",
         "- `status.sh` — REST GET /services/data/federated/provider; reports connectivityStatus per provider",
         "- `global-enable.sh` / `global-disable.sh` — toggle the global federated-search switch",
-        "- `aws-s3-providers/<name>.json` — REST payload for each FSS3 provider (Splunk Cloud only)",
-        "- `data-management-federation-handoff.md` — current Data Management app federation readiness for Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, and DDSS",
+        "- `aws-s3-providers/<name>.json` — payload-shaped inventory/migration evidence for each legacy FSS3 provider; never apply input",
+        "- `data-management-federation-handoff.md` — current Data Management app federation and S3 catalog readiness",
+        "- `specialized-federation-handoff.md` — dedicated `aws_lake` Amazon Security Lake and `aws_s3_sal` Cisco SAL handoffs",
+        "- `legacy-fss3-migration.md` — phased-deprecation and migration guidance for legacy `aws_s3` providers",
         "- `metadata.json` — machine-readable summary of the rendered plan",
         "",
         "Service-account passwords are never embedded. Apply scripts read them from",
@@ -909,6 +1191,8 @@ def render_readme(spec: Spec) -> str:
         "- Splunk Cloud IP allow-lists (use Splunk Web → Settings → Server settings → IP allow list).",
         "- AWS Glue tables, S3 bucket policies, or KMS key policies (operator/AWS admin task).",
         "- Data Management app connections or datasets for current Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, Apache Iceberg, or Delta Lake workflows.",
+        "- Amazon Security Lake `aws_lake` providers, subscribers, data lake indexes, or federated indexes.",
+        "- Cisco SAL `aws_s3_sal` providers or associated datasets/indexes.",
         "- Service accounts on remote Splunk deployments. Standard mode requires the",
         "  service account role on the remote SH to read the mapped datasets;",
         "  transparent mode against an SHC additionally requires the",
@@ -985,6 +1269,11 @@ def _password_substitution_python_block(spec: Spec) -> str:
 
 
 def render_apply_local(spec: Spec, *, shc: bool) -> str:
+    if not spec.s2s_providers and (spec.fss3_providers or spec.specialized_provider_handoffs):
+        return make_script(
+            "echo 'HANDOFF ONLY: legacy aws_s3 migration evidence and specialized aws_lake/aws_s3_sal requests have no supported local apply contract in this skill.' >&2\n"
+            "exit 2\n"
+        )
     if shc:
         return make_script(
             "echo 'HANDOFF: SHC deployer staging is not a completed cluster apply. Use the rendered files with splunk-search-head-cluster-setup bundle validation/apply after secure password injection.' >&2\n"
@@ -1004,7 +1293,7 @@ def render_apply_local(spec: Spec, *, shc: bool) -> str:
         else 'echo "Review rendered changes and restart or push the bundle as appropriate."\n'
     )
     fss3_note = (
-        'echo "INFO: FSS3 providers are not file-managed; run apply-rest.sh against Splunk Cloud."\n'
+        'echo "INFO: Legacy FSS3 definitions are migration evidence only on 10.5; no legacy CRUD was performed."\n'
         if spec.fss3_providers
         else ""
     )
@@ -1031,13 +1320,6 @@ def _rest_provider_payload_block(spec: Spec) -> str:
     Reads SPLUNK_REST_URI / SPLUNK_REST_USER / SPLUNK_REST_PASSWORD_FILE from
     env so passwords stay off argv.
     """
-    fss3_payloads_lines: list[str] = []
-    for provider in spec.fss3_providers:
-        fss3_payloads_lines.append(
-            f"  ({json.dumps(provider.name)}, Path('aws-s3-providers') / {json.dumps(provider.name + '.json')}),"
-        )
-    fss3_block = "\n".join(fss3_payloads_lines) if fss3_payloads_lines else ""
-
     s2s_payloads_lines: list[str] = []
     for provider in spec.s2s_providers:
         s2s_payloads_lines.append(
@@ -1057,7 +1339,10 @@ def _rest_provider_payload_block(spec: Spec) -> str:
     s2s_block = "\n".join(s2s_payloads_lines) if s2s_payloads_lines else ""
 
     indexes_payloads_lines: list[str] = []
+    s2s_provider_names = {provider.name for provider in spec.s2s_providers}
     for idx in spec.federated_indexes:
+        if idx.provider not in s2s_provider_names:
+            continue
         indexes_payloads_lines.append(
             "  {"
             + (
@@ -1171,16 +1456,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "    print(f\"Provider {entry['name']} (FSS2S, {entry['mode']}): POST /services/data/federated/provider\")\n"
         "    post_or_update('/services/data/federated/provider', entry['name'], entry)\n"
         "\n"
-        "# Step 2: FSS3 providers (Splunk Cloud Platform only)\n"
-        "fss3_payload_paths = [\n"
-        f"{fss3_block}\n"
-        "]\n"
-        "for name, payload_path in fss3_payload_paths:\n"
-        "    payload = json.loads(Path(payload_path).read_text(encoding='utf-8'))\n"
-        "    print(f'Provider {name} (FSS3): POST /services/data/federated/provider')\n"
-        "    post_or_update('/services/data/federated/provider', name, payload)\n"
-        "\n"
-        "# Step 3: federated indexes (FSS2S standard mode + FSS3)\n"
+        "# Step 2: FSS2S standard-mode federated indexes\n"
         "index_payloads = [\n"
         f"{indexes_block}\n"
         "]\n"
@@ -1194,11 +1470,22 @@ def _rest_provider_payload_block(spec: Spec) -> str:
 
 
 def render_apply_rest(spec: Spec) -> str:
+    if not spec.s2s_providers and (spec.fss3_providers or spec.specialized_provider_handoffs):
+        return make_script(
+            "echo 'HANDOFF ONLY: legacy aws_s3 migration evidence and specialized aws_lake/aws_s3_sal requests have no supported REST CRUD contract in this skill.' >&2\n"
+            "exit 2\n"
+        )
+    legacy_warning = (
+        "echo 'WARNING: legacy aws_s3 providers and indexes are excluded from this FSS2S REST apply; use legacy-fss3-migration.md.' >&2\n"
+        if spec.fss3_providers
+        else ""
+    )
     return make_script(
         "echo 'Splunk Federated Search REST apply'\n"
         "echo 'Required env: SPLUNK_REST_URI=https://<sh>:8089 SPLUNK_REST_USER=admin SPLUNK_REST_PASSWORD_FILE=/path/to/admin_pw'\n"
         "echo 'Optional lab-only env: SPLUNK_VERIFY_SSL=false for self-signed TLS; SPLUNK_ALLOW_INSECURE_HTTP=true for an isolated plaintext lab endpoint'\n"
         "\n"
+        + legacy_warning
         + _rest_provider_payload_block(spec)
     )
 
@@ -1346,6 +1633,23 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
     standard_s2s_names = {p.name for p in spec.s2s_providers if p.mode == "standard"}
     referenced = {idx.provider for idx in spec.federated_indexes}
     unmapped_standard = sorted(standard_s2s_names - referenced)
+    warnings = [
+        f"Standard-mode FSS2S provider '{name}' has no federated_indexes entries; "
+        "searches against it will return nothing until you map at least one dataset."
+        for name in unmapped_standard
+    ]
+    if spec.fss3_providers:
+        warnings.append(
+            "Legacy type=aws_s3 FSS3 provider inventory is in a phased-deprecation "
+            "migration path on Splunk 10.5. Prefer Data Management app Amazon S3 "
+            "connections and datasets for new designs. No legacy CRUD is emitted; "
+            "review legacy-fss3-migration.md."
+        )
+    if spec.specialized_provider_handoffs:
+        warnings.append(
+            "Specialized aws_lake and aws_s3_sal entries are handoff-only; no provider, "
+            "dataset, subscriber, data lake index, or federated index CRUD is emitted."
+        )
     payload = {
         "app_name": spec.app_name,
         "splunk_home": spec.splunk_home,
@@ -1370,6 +1674,10 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
             "amazon_s3": [
                 {
                     "name": p.name,
+                    "provider_type": "aws_s3",
+                    "lifecycle": LEGACY_FSS3_LIFECYCLE["lifecycle"],
+                    "automation": LEGACY_FSS3_LIFECYCLE["automation"],
+                    "preferred_replacement": LEGACY_FSS3_LIFECYCLE["preferred_replacement"],
                     "aws_account_id": p.aws_account_id,
                     "aws_region": p.aws_region,
                     "database": p.database,
@@ -1380,6 +1688,16 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
                     "disabled": p.disabled,
                 }
                 for p in spec.fss3_providers
+            ],
+            "specialized_handoffs": [
+                {
+                    "name": p.name,
+                    "provider_type": p.provider_type,
+                    "lifecycle": SPECIALIZED_HANDOFF_BY_TYPE[p.provider_type]["lifecycle"],
+                    "automation": "ui_handoff",
+                    "disabled": p.disabled,
+                }
+                for p in spec.specialized_provider_handoffs
             ],
         },
         "federated_indexes": [
@@ -1392,14 +1710,14 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
             }
             for idx in spec.federated_indexes
         ],
-        "warnings": (
-            [
-                f"Standard-mode FSS2S provider '{name}' has no federated_indexes entries; "
-                "searches against it will return nothing until you map at least one dataset."
-                for name in unmapped_standard
-            ]
-        ),
+        "warnings": warnings,
         "data_management_federation_handoffs": DATA_MANAGEMENT_FEDERATION_HANDOFFS,
+        "specialized_federation_handoffs": SPECIALIZED_FEDERATION_HANDOFFS,
+        "federation_handoffs": (
+            DATA_MANAGEMENT_FEDERATION_HANDOFFS + SPECIALIZED_FEDERATION_HANDOFFS
+        ),
+        "amazon_s3_data_catalog_options": S3_DATA_CATALOG_OPTIONS,
+        "legacy_fss3": LEGACY_FSS3_LIFECYCLE,
     }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
@@ -1415,7 +1733,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--spec",
         default="",
-        help="YAML or JSON spec file (multi-provider, multi-index, FSS2S + FSS3).",
+        help="YAML or JSON spec file (FSS2S automation plus legacy FSS3 migration evidence).",
     )
     # Single-provider back-compat flags.
     parser.add_argument("--mode", choices=("standard", "transparent"), default="standard")
@@ -1532,6 +1850,8 @@ def render(spec: Spec, *, output_dir: Path, dry_run: bool) -> dict[str, Any]:
             "README.md": render_readme(spec),
             "metadata.json": render_metadata(spec, render_dir=render_dir),
             "data-management-federation-handoff.md": render_data_management_handoff(),
+            "specialized-federation-handoff.md": render_specialized_federation_handoff(spec),
+            "legacy-fss3-migration.md": render_legacy_fss3_migration(spec),
             "federated.conf.template": render_federated_template(spec),
             "indexes.conf": render_indexes(spec),
             "server.conf": render_server(spec),
@@ -1565,15 +1885,20 @@ def render(spec: Spec, *, output_dir: Path, dry_run: bool) -> dict[str, Any]:
         "providers": {
             "splunk_to_splunk_count": len(spec.s2s_providers),
             "amazon_s3_count": len(spec.fss3_providers),
+            "specialized_handoff_count": len(spec.specialized_provider_handoffs),
         },
         "federated_index_count": len(spec.federated_indexes),
         "commands": {
             "preflight": [["./preflight.sh"]],
-            "apply": [
-                ["./apply-search-head.sh"],
-                ["./apply-shc-deployer.sh"],
-                ["./apply-rest.sh"],
-            ],
+            "apply": (
+                [
+                    ["./apply-search-head.sh"],
+                    ["./apply-shc-deployer.sh"],
+                    ["./apply-rest.sh"],
+                ]
+                if spec.s2s_providers
+                else []
+            ),
             "status": [["./status.sh"]],
             "global_toggle": [["./global-enable.sh"], ["./global-disable.sh"]],
         },

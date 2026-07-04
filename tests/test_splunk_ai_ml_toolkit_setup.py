@@ -48,6 +48,8 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "apply-plan.json",
         "doctor-report.md",
         "dsdl-runtime-handoff.md",
+        "agent-builder-handoff.md",
+        "time-series-model-handoff.md",
         "legacy-anomaly-migration.md",
     ]
     for rel in required:
@@ -55,6 +57,7 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
 
     coverage = json.loads((output_dir / "coverage-report.json").read_text())["coverage"]
     assert all(entry["status"] != "unknown" for entry in coverage)
+    assert all(entry["product_stage"] != "unknown" for entry in coverage)
     assert all(entry["source_url"] for entry in coverage)
     keys = {entry["key"] for entry in coverage}
     expected = {
@@ -64,7 +67,13 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "ai_toolkit.permissions_and_safeguards",
         "ai_toolkit.assistants",
         "ai_toolkit.anomaly_cisco_deep_time_series",
+        "ai_toolkit.open_cisco_time_series_model_1_0",
         "ai_toolkit.hosted_foundation_models",
+        "ai_toolkit.agent_builder",
+        "ai_toolkit.agent_builder_knowledge_base_connections",
+        "ai_toolkit.agent_builder_mcp_connections",
+        "ai_toolkit.aiagent_command",
+        "ai_toolkit.agent_run_history",
         "ai_toolkit.llm_ai_command",
         "ai_toolkit.connections_tab",
         "ai_toolkit.container_management",
@@ -90,6 +99,74 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         if entry["key"].startswith("legacy.")
     }
     assert set(legacy_statuses.values()) == {"eol_migration"}
+
+
+def test_ai_ml_toolkit_tracks_agent_and_time_series_product_lifecycle(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_setup(
+        "--render",
+        "--platform",
+        "cloud",
+        "--output-dir",
+        str(output_dir),
+    )
+
+    payload = json.loads((output_dir / "coverage-report.json").read_text())
+    assert payload["research_verified"] == "2026-07-03"
+    by_key = {entry["key"]: entry for entry in payload["coverage"]}
+
+    alpha_keys = {
+        "ai_toolkit.agent_builder",
+        "ai_toolkit.agent_builder_knowledge_base_connections",
+        "ai_toolkit.agent_builder_mcp_connections",
+        "ai_toolkit.aiagent_command",
+        "ai_toolkit.agent_run_history",
+    }
+    assert {by_key[key]["product_stage"] for key in alpha_keys} == {"alpha"}
+    assert {by_key[key]["status"] for key in alpha_keys} == {"manual_handoff"}
+    assert by_key["ai_toolkit.open_cisco_time_series_model_1_0"]["product_stage"] == "available"
+    assert by_key["ai_toolkit.anomaly_cisco_deep_time_series"]["product_stage"] == "feature_preview"
+    assert "CDTSM is a separate" in by_key["ai_toolkit.hosted_foundation_models"]["summary"]
+
+    agent_handoff = (output_dir / "agent-builder-handoff.md").read_text()
+    assert "Alpha/private preview" in agent_handoff
+    assert "not Cisco Cloud Control Studio Agent Builder" in agent_handoff
+    assert "`edit_agent_connections`" in agent_handoff
+    assert "`run_agents`" in agent_handoff
+    assert "`aiagent`" in agent_handoff
+    assert "`ai_agent_run_history_index`" in agent_handoff
+    assert "100 MB" in agent_handoff
+    assert "30 days" in agent_handoff
+
+    time_series_handoff = (output_dir / "time-series-model-handoff.md").read_text()
+    assert "`available` open-weight release" in time_series_handoff
+    assert "`Apache-2.0`" in time_series_handoff
+    assert "`feature_preview`" in time_series_handoff
+    assert "Open model availability does not make" in time_series_handoff
+
+    plan = json.loads((output_dir / "apply-plan.json").read_text())
+    sections = {step["section"] for step in plan["steps"]}
+    assert "agent-builder" not in sections
+    assert "ctsm" not in sections
+    assert "cdtsm" not in sections
+
+
+def test_ai_ml_toolkit_agent_builder_is_not_applicable_to_enterprise_plan(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_setup(
+        "--render",
+        "--platform",
+        "enterprise",
+        "--output-dir",
+        str(output_dir),
+    )
+
+    coverage = json.loads((output_dir / "coverage-report.json").read_text())["coverage"]
+    agent_entries = [entry for entry in coverage if entry["key"].startswith("ai_toolkit.agent_")]
+    agent_entries.append(next(entry for entry in coverage if entry["key"] == "ai_toolkit.aiagent_command"))
+    assert agent_entries
+    assert {entry["product_stage"] for entry in agent_entries} == {"alpha"}
+    assert {entry["status"] for entry in agent_entries} == {"not_applicable"}
 
 
 def test_ai_ml_toolkit_apply_plan_orders_psc_ai_toolkit_then_dsdl(tmp_path: Path) -> None:

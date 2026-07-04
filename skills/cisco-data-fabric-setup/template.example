@@ -1,0 +1,89 @@
+api_version: cisco-data-fabric-setup/v1
+organization:
+  name: example-enterprise
+  environment: production
+  owner: data-platform
+
+platform:
+  deployment: splunk-cloud
+  version: 10.5.2605.3
+  cloud_provider: aws
+  region: us-east-1
+
+data_management:
+  enabled: true
+  ingest_processor:
+    enabled: true
+  edge_processor:
+    enabled: true
+    tenant_url: ""
+    name: data-fabric-edge
+  spl2_pipeline_kit:
+    enabled: true
+  automated_field_extraction:
+    enabled: true
+  guided_onboarding:
+    enabled: true
+  ingest_monitoring:
+    enabled: true
+
+federation:
+  enabled: true
+  requested_targets:
+    - splunk
+    - amazon-s3
+    - microsoft-azure
+    - azure-databricks
+    - snowflake
+    - ddss
+    - amazon-security-lake
+  child_spec: ""
+
+storage_catalog:
+  enabled: true
+  splunk_index:
+    enabled: true
+  machine_data_lake:
+    enabled: true
+  built_in_data_catalog:
+    enabled: true
+  child_specs:
+    cloud_data_manager: ""
+    ingest_actions: ""
+    ddaa: ""
+    smartstore: ""
+
+ai_activation:
+  enabled: true
+  ai_toolkit:
+    enabled: true
+    child_spec: ""
+  agent_builder:
+    enabled: true
+  mcp_server:
+    enabled: true
+    mcp_url: ""
+  ai_assistant:
+    enabled: true
+  agent_observability:
+    enabled: true
+    child_spec: ""
+
+context_governance:
+  enabled: true
+  child_specs:
+    data_source_readiness: ""
+    cim: ""
+    knowledge_objects: ""
+    itsi: ""
+
+experience:
+  enabled: true
+  cloud_control: true
+  ai_canvas: true
+
+domains:
+  - secops
+  - itops
+  - engineering
+  - netops

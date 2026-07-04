@@ -21,6 +21,13 @@ legacy_anomaly_audit: true      # add legacy anomaly-migration guidance
 #   llm_ai_command: true
 #   connections_tab: true
 #   container_management: true
+#   agent_builder_alpha: false       # private-preview handoff; Splunk Cloud only
+#   agent_builder_knowledge_base: false
+#   agent_builder_mcp: false
+#   aiagent_command: false
+#   agent_run_history: false         # requires approved ai_agent_run_history_index
+#   cisco_time_series_model_open_1_0: true
+#   cisco_deep_time_series_preview: true
 #   onnx: true
 #   alerts: true
 # dsdl:

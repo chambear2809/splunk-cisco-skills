@@ -48,7 +48,14 @@ Spec input (preferred for multi-provider deployments):
 
 Repeated CLI flags (multi-provider without YAML):
   --provider 'type=splunk,name=remote_prod,mode=standard,host_port=h:p,...'
+  --provider 'type=aws_lake,name=security_lake'       # handoff only; no CRUD
+  --provider 'type=aws_s3_sal,name=cisco_sal'         # handoff only; no CRUD
   --federated-index 'name=remote_main,provider=remote_prod,dataset_type=index,dataset_name=main'
+
+Legacy type=aws_s3 definitions are in a phased-deprecation path on Splunk 10.5.
+Prefer current Data Management app connections and datasets for new Amazon S3
+designs. Legacy definitions render as migration evidence only;
+apply phases refuse legacy-only plans and never POST legacy FSS3 objects.
 
 Single-provider back-compat flags:
   --mode standard|transparent

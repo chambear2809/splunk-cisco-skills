@@ -29,6 +29,7 @@ SECTIONS = [
 ]
 ALLOWED_STATUSES = {
     "delegated_apply",
+    "delegated_render",
     "render",
     "ui_handoff",
     "ca_handoff",
@@ -84,8 +85,9 @@ SOURCE_URLS = {
     "splunk_platform_innovations": "https://www.splunk.com/en_us/blog/platform/new-splunk-platform-innovations-cisco-live-2026.html",
     "cisco_data_fabric_press": "https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html",
     "splunk_data_management": "https://www.splunk.com/en_us/blog/platform/the-complete-guide-to-splunk-data-management.html",
-    "federated_options": "https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions",
+    "federated_options": "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform",
     "ai_toolkit": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
+    "splunk_ai_canvas": "https://lantern.splunk.com/Splunk_and_Cisco_Use_Cases/Connecting_the_Splunk_platform_to_Cisco_Cloud_Control_and_AI_Canvas/Integrating_Splunk_Cloud_Platform_with_AI_Canvas",
 }
 DATA_FABRIC_2026_SURFACES = [
     {
@@ -107,40 +109,44 @@ DATA_FABRIC_2026_SURFACES = [
     {
         "key": "ai_powered_data_management",
         "title": "AI-powered data management",
-        "status": "render",
-        "owner": "splunk-ingest-processor-setup,splunk-edge-processor-setup,splunk-spl2-pipeline-kit",
+        "status": "delegated_render",
+        "owner": "cisco-data-fabric-setup",
         "source": "splunk_platform_innovations",
-        "summary": "Route onboarding, auto-schematization, SPL2 pipeline, routing, redaction, and lifecycle planning to Data Management child skills.",
+        "summary": "Delegate lifecycle-aware onboarding, Automated Field Extraction CA, Guided Onboarding/Auto-Schematization alpha, SPL2, routing, redaction, monitoring, and tiering coverage to the dedicated Data Fabric parent.",
     },
     {
         "key": "expanded_federated_search",
         "title": "Expanded federated search",
-        "status": "render",
-        "owner": "splunk-federated-search-setup",
+        "status": "delegated_render",
+        "owner": "cisco-data-fabric-setup",
         "source": "federated_options",
-        "summary": "Render handoffs for current Data Management app federation across Amazon S3, Microsoft Azure, and Azure Databricks; automated apply remains limited to supported provider contracts.",
+        "summary": "Delegate Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, Amazon Security Lake, catalog, RBAC, DSU, and legacy-migration coverage to cisco-data-fabric-setup.",
     },
     {
         "key": "machine_data_ai_activation",
         "title": "Machine-data AI activation",
-        "status": "delegated_apply",
-        "owner": "splunk-ai-ml-toolkit-setup,splunk-mcp-server-setup",
+        "status": "delegated_render",
+        "owner": "cisco-data-fabric-setup",
         "source": "cisco_data_fabric_press",
-        "summary": "Delegate AI Toolkit, Cisco Deep Time Series Model readiness, DSDL/runtime handoffs, and MCP tool access to child skills.",
+        "summary": "Delegate AI Toolkit, open CTSM, hosted CDTSM preview, both Agent Builder products, DSDL, MCP, and agent-governance coverage to cisco-data-fabric-setup.",
     },
 ]
 PRODUCT_INTEGRATION_MATRIX = [
-    ("Meraki", "Available", "Available", "Available"),
-    ("Catalyst Center", "Q3 2026", "Q3 2026", "Q3 2026"),
-    ("Nexus Dashboard", "Available", "Available", "Available"),
-    ("Nexus Hyperfabric", "Available", "Available", "Available"),
-    ("Intersight", "Available", "Available", "Available"),
-    ("Catalyst SD-WAN Manager", "End of May 2026", "End of May 2026", "End of May 2026"),
-    ("Security Cloud Control", "Available", "Firewall: Available; Secure Access: Available", "Available"),
-    ("ThousandEyes", "End of May 2026", "Available via Meraki; native support End of May 2026", "Available"),
-    ("Splunk Cloud", "Q3 2026", "Q3 2026", "Q3 2026"),
-    ("Collaboration Control Hub", "Available", "Available", "Available"),
-    ("Cisco IQ", "End of May 2026", "Future roadmap", "Future roadmap"),
+    ("Catalyst SD-WAN Manager", "Yes", "Yes", "Yes"),
+    ("Collaboration Control Hub", "Yes", "No", "No"),
+    ("Intersight", "Yes", "Yes", "Yes"),
+    ("Meraki", "Yes", "Yes", "Yes"),
+    ("Nexus Dashboard", "Yes", "Yes", "Yes"),
+    ("Nexus Hyperfabric", "Yes", "Yes", "Yes"),
+    ("Secure Access", "Yes", "No", "No"),
+    ("Secure Firewall", "Yes", "Yes", "Yes"),
+    ("ThousandEyes", "Yes", "No", "Yes"),
+]
+PRODUCT_ADJACENT_HANDOFFS = [
+    ("Catalyst Center", "onboarding_handoff", "Appears in onboarding preparation, but not as a direct row in the current inventory/topology/notifications support matrix."),
+    ("Security Cloud Control", "product_family_handoff", "Use the current Secure Firewall and Secure Access rows rather than treating the umbrella name as a supported matrix row."),
+    ("Splunk Cloud", "controlled_availability_integration", "Separate Cloud Control/AI Canvas integration; during CA verify Splunk Cloud 10.5.2605.3, US commercial AWS, tenant approval, identity/domain, terms, AI Assistant, MCP Server, and mcp_tool_execute."),
+    ("Cisco IQ", "not_in_current_matrix", "No direct row in the current inventory/topology/notifications support matrix; keep as a separately verified roadmap or handoff surface."),
 ]
 OFFICIAL_FEATURES = [
     (
@@ -157,7 +163,7 @@ OFFICIAL_FEATURES = [
         "render",
         "cisco-cloud-control-setup",
         "getting_started",
-        "Render official navigation, inventory, and AI Canvas product timeline matrix.",
+        "Render the current inventory, topology, and notifications product matrix plus separately classified onboarding/integration handoffs.",
     ),
     (
         "ai_context_readiness",
@@ -230,6 +236,22 @@ OFFICIAL_FEATURES = [
         "Cisco AI Canvas",
         "ai_canvas_doc",
         "Render board, prompt-library, collaboration, knowledge, and multimodal input handoffs.",
+    ),
+    (
+        "splunk_ai_canvas_prerequisites",
+        "ai-canvas",
+        "ca_handoff",
+        "Cisco AI Canvas and Splunk Cloud",
+        "splunk_ai_canvas",
+        "Require Cloud Control enablement, Splunk Cloud 10.5.2605.3, current AI Assistant and MCP Server, admin onboarding, and mcp_tool_execute for every user.",
+    ),
+    (
+        "splunk_ai_canvas_limits",
+        "ai-canvas",
+        "validate",
+        "Cisco AI Canvas and Splunk Cloud",
+        "splunk_ai_canvas",
+        "Validate the 100-row-per-card results cap, visualization compatibility, and forbidden SPL commands that fail on refresh or run.",
     ),
     (
         "actions_notifications_favorites",
@@ -556,6 +578,7 @@ def merge_config(spec: dict[str, Any]) -> dict[str, Any]:
         "adoption_goal": str(get_nested(spec, "cloud_control.adoption_goal", "governed-agentic-operations") or "governed-agentic-operations"),
         "studio_region": str(get_nested(spec, "cloud_control.studio_region", "us") or "us"),
         "data_fabric_enabled": as_bool(get_nested(spec, "data_fabric.enabled", True), True),
+        "data_fabric_spec": str(get_nested(spec, "data_fabric.spec", "") or ""),
         "data_fabric_child_specs": {str(k): str(v or "") for k, v in child_specs.items()},
         "spl2_pipeline_kit_enabled": as_bool(get_nested(spec, "data_fabric.spl2_pipeline_kit.enabled", True), True),
         "machine_data_lake_enabled": as_bool(get_nested(spec, "data_fabric.machine_data_lake.enabled", True), True),
@@ -593,40 +616,22 @@ def command(argv: list[str]) -> list[str]:
 
 def build_commands(config: dict[str, Any], output_dir: Path) -> dict[str, list[list[str]]]:
     delegated = output_dir / "delegated"
-    specs = config["data_fabric_child_specs"]
     dashboard_spec = config["dashboards_spec"] or str(output_dir / "observability/cloud-control-dashboard.yaml")
     detector_spec = config["detectors_spec"] or str(output_dir / "observability/cloud-control-native-ops.yaml")
 
     data_fabric: list[list[str]] = []
     if config["data_fabric_enabled"]:
-        if specs.get("federated_search"):
-            fed = ["bash", "skills/splunk-federated-search-setup/scripts/setup.sh", "--phase", "render", "--output-dir", str(delegated / "splunk-federated-search")]
-            fed.extend(["--spec", specs["federated_search"]])
-            data_fabric.append(command(fed))
-        if config["edge_processor_tenant_url"]:
-            data_fabric.append(
-                command(
-                    [
-                        "bash",
-                        "skills/splunk-edge-processor-setup/scripts/setup.sh",
-                        "--phase",
-                        "render",
-                        "--ep-tenant-url",
-                        config["edge_processor_tenant_url"],
-                        "--ep-name",
-                        config["edge_processor_name"],
-                        "--output-dir",
-                        str(delegated / "splunk-edge-processor"),
-                    ]
-                )
-            )
-        data_fabric.append(command(["bash", "skills/splunk-ingest-processor-setup/scripts/setup.sh", "--phase", "render", "--output-dir", str(delegated / "splunk-ingest-processor")]))
-        if config["spl2_pipeline_kit_enabled"]:
-            data_fabric.append(command(["bash", "skills/splunk-spl2-pipeline-kit/scripts/setup.sh", "--phase", "all", "--profile", "both", "--output-dir", str(delegated / "splunk-spl2-pipeline-kit")]))
-        ai_ml = ["bash", "skills/splunk-ai-ml-toolkit-setup/scripts/setup.sh", "--render", "--output-dir", str(delegated / "splunk-ai-ml-toolkit")]
-        if specs.get("ai_ml_toolkit"):
-            ai_ml.extend(["--spec", specs["ai_ml_toolkit"]])
-        data_fabric.append(command(ai_ml))
+        data_fabric_command = [
+            "bash",
+            "skills/cisco-data-fabric-setup/scripts/setup.sh",
+            "--render",
+            "--validate",
+            "--output-dir",
+            str(delegated / "cisco-data-fabric"),
+        ]
+        if config["data_fabric_spec"]:
+            data_fabric_command.extend(["--spec", config["data_fabric_spec"]])
+        data_fabric.append(command(data_fabric_command))
 
     mcp: list[list[str]] = []
     if config["mcp_enabled"]:
@@ -731,13 +736,26 @@ def render_platform_assets(output_dir: Path, config: dict[str, Any]) -> None:
     product_lines = [
         "# Product Integration Matrix",
         "",
-        "Cisco marks these timelines as roadmap information that can change.",
+        "Current support matrix from Cisco Cloud Control Getting Started. Verify the live page before production adoption because Controlled Availability coverage can change.",
         "",
-        "| Product | Navigation | Inventory | AI Canvas |",
+        "| Product | Inventory | Topology | Notifications |",
         "| --- | --- | --- | --- |",
     ]
-    for product, navigation, inventory, ai_canvas in PRODUCT_INTEGRATION_MATRIX:
-        product_lines.append(f"| {product} | {navigation} | {inventory} | {ai_canvas} |")
+    for product, inventory, topology, notifications in PRODUCT_INTEGRATION_MATRIX:
+        product_lines.append(f"| {product} | {inventory} | {topology} | {notifications} |")
+    product_lines.extend(
+        [
+            "",
+            "## Adjacent onboarding and integration handoffs",
+            "",
+            "These are not equivalent rows in the current support matrix.",
+            "",
+            "| Surface | Classification | Boundary |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for product, classification, boundary in PRODUCT_ADJACENT_HANDOFFS:
+        product_lines.append(f"| {product} | `{classification}` | {boundary} |")
     write_text(output_dir / "platform/product-integration-matrix.md", "\n".join(product_lines) + "\n")
 
     write_text(
@@ -881,6 +899,8 @@ def render_ai_canvas_assets(output_dir: Path, config: dict[str, Any]) -> None:
 - Objective: {item.get("objective", "Coordinate Cloud Control readiness.")}
 - Lanes: Data Fabric, MCP connectors, domain sources, AI Defense, Observability, Studio build, validation.
 - Exit criteria: child skill validation complete, agent traces visible, action boundaries documented, and owner approvals recorded.
+- Splunk prerequisites: Cloud Control enabled, Splunk Cloud `10.5.2605.3`, current AI Assistant and MCP Server, and `mcp_tool_execute` for every user.
+- Splunk limits: results are capped at 100 rows per card; incompatible visualizations do not render; some SPL commands are forbidden and fail on refresh or run.
 
 AI Canvas action: recreate this board in the Cisco AI Canvas experience.
 """,
@@ -911,34 +931,27 @@ def render_data_fabric_handoffs(output_dir: Path, config: dict[str, Any]) -> Non
     lines = [
         "# Cisco Data Fabric Handoffs",
         "",
-        "The parent executes only child render commands that have enough non-secret input.",
+        "Cisco Data Fabric is owned by the dedicated `cisco-data-fabric-setup` architecture router.",
+        "This Cloud Control parent delegates one render-and-validate command and never invokes constituent child skills with example defaults.",
         "",
     ]
-    if specs.get("federated_search"):
-        lines.append(f"- Federated Search spec: `{specs['federated_search']}`")
+    if config["data_fabric_spec"]:
+        lines.append(f"- Data Fabric intake: `{config['data_fabric_spec']}`")
     else:
         lines.append(
-            "- Federated Search: skipped until `data_fabric.child_specs.federated_search` points to a reviewed child spec."
+            "- Data Fabric intake: no child spec supplied; the dedicated parent renders its complete evidence-backed default coverage packet without executing constituent skills."
         )
-    if config["edge_processor_tenant_url"]:
-        lines.append(f"- Edge Processor tenant URL: `{config['edge_processor_tenant_url']}`")
-    else:
-        lines.append(
-            "- Edge Processor: skipped until `data_fabric.edge_processor.tenant_url` is set."
-        )
-    for key in ("edge_processor", "ingest_processor"):
-        if specs.get(key):
-            lines.append(
-                f"- {key}: spec path `{specs[key]}` recorded for operator review; the current child skill CLI does not accept a parent `--spec` handoff."
-            )
+    for key, value in sorted(specs.items()):
+        if value:
+            lines.append(f"- Legacy `data_fabric.child_specs.{key}` value `{value}` is recorded for migration; move it into the dedicated Data Fabric intake.")
     lines.extend(
         [
-            "- Ingest Processor: render command uses default child render mode.",
-            "- SPL2 Pipeline Kit: render command uses `--profile both` when `data_fabric.spl2_pipeline_kit.enabled` is true.",
-            "- AI/ML Toolkit: render command uses child spec when `data_fabric.child_specs.ai_ml_toolkit` is set.",
-            "- Machine Data Lake: alpha/readiness handoff only; confirm entitlement, landing-zone governance, catalog, promotion, and AI/analytics access in Splunk Cloud before implementation.",
-            "- Built-in Data Catalog: readiness handoff only; collect data owner, schema/context, retention, promotion, and policy metadata before AI agent use.",
-            "- Expanded federation: use `splunk-federated-search-setup` for FSS2S and reviewed FSS3 payloads; current Amazon S3 Data Management, Microsoft Azure, and Azure Databricks paths render as handoffs.",
+            "- Data management coverage includes Data Inputs, Edge Processor, Ingest Processor, SPL2, Automated Field Extraction CA, Guided Onboarding/Auto-Schematization alpha, and Ingest Monitoring.",
+            "- Federation coverage keeps Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake lifecycle and entitlement boundaries separate.",
+            "- Catalog coverage distinguishes the global Splunk Catalog, Splunk-native dataset catalogs, AWS Glue, Iceberg REST, Databricks Unity Catalog, and Machine Data Lake cataloging.",
+            "- Storage coverage distinguishes indexed data, Machine Data Lake alpha, external stores, DDSS, DDAA, SmartStore, and S3 Promote.",
+            "- AI coverage distinguishes AI Toolkit, open Cisco Time Series Model 1.0, hosted Cisco Deep Time Series Model preview, Splunk Agent Builder alpha, Cloud Control Studio Agent Builder, MCP Server, and AI Canvas CA.",
+            "- Machine Data Lake and built-in Data Catalog remain readiness handoffs; no undocumented provisioning API is called.",
         ]
     )
     write_text(output_dir / "data-fabric/handoff.md", "\n".join(lines) + "\n")
@@ -961,12 +974,11 @@ def render_data_fabric_handoffs(output_dir: Path, config: dict[str, Any]) -> Non
             "",
             "## Review Checklist",
             "",
-            "- Classify data by hot indexed, Machine Data Lake, archive, and external federated sources before routing.",
-            "- Confirm Machine Data Lake alpha availability and built-in Data Catalog access with the Splunk/Cisco account team before planning production dependencies.",
-            "- Use Ingest Processor, Edge Processor, and the SPL2 Pipeline Kit for AI-powered onboarding, filtering, shaping, redaction, routing, and data-tiering plans.",
-            "- Use Federated Search for Splunk and reviewed FSS3 where supported; use Data Management app handoffs for current Amazon S3, Microsoft Azure, and Azure Databricks connection/dataset workflows.",
-            "- Use AI Toolkit, Cisco Deep Time Series Model readiness, DSDL runtime handoffs, and Splunk MCP Server for model and agent access to machine data.",
-            "- Keep action execution, data promotion, and agent workflows behind RBAC, audit, and human approval gates until the child skill validation evidence is complete.",
+            "- Review the delegated `cisco-data-fabric-setup` product matrix, availability matrix, source ledger, gap register, and doctor report.",
+            "- Classify data by indexed, alpha Machine Data Lake, archive/lifecycle, and store-specific external federation tiers before routing.",
+            "- Confirm per-surface version, cloud, region, activation, entitlement, credential, catalog, and role requirements.",
+            "- Keep lifecycle stage independent from repository automation status; a GA product can still be render-only or production-blocked in its owning child skill.",
+            "- Keep action execution, data promotion, legacy migration, and agent workflows behind RBAC, audit, cost, and human-approval gates.",
         ]
     )
     write_text(output_dir / "data-fabric/cisco-data-fabric-2026-readiness.md", "\n".join(readiness) + "\n")
@@ -980,8 +992,9 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
         ("cloud_control_studio_app_builder", "studio", "ui_handoff", "Cisco Cloud Control Studio", SOURCE_URLS["studio"], "App Builder actions are operator UI handoffs."),
         ("ai_defense_guardrails", "governance", "render", "cisco-cloud-control-setup", SOURCE_URLS["ai_defense"], "Render guardrail review prompts; AI Defense configuration is a Cisco-side handoff."),
         ("ai_canvas_boards", "ai-canvas", "ca_handoff", "Cisco AI Canvas", SOURCE_URLS["ai_canvas_doc"], "Render board templates only."),
-        ("data_fabric_prerequisites", "data-fabric", "delegated_apply" if config["data_fabric_enabled"] else "not_applicable", "Splunk Data Fabric child skills", SOURCE_URLS["splunk"], "Child skills own render/apply/validate."),
-        ("data_fabric_spl2_pipeline_kit", "data-fabric", "delegated_apply" if config["data_fabric_enabled"] and config["spl2_pipeline_kit_enabled"] else "not_applicable", "splunk-spl2-pipeline-kit", SOURCE_URLS["splunk_data_management"], "Render reusable SPL2 templates and lint reports for Ingest Processor and Edge Processor."),
+        ("data_fabric_prerequisites", "data-fabric", "delegated_render" if config["data_fabric_enabled"] else "not_applicable", "cisco-data-fabric-setup", SOURCE_URLS["splunk"], "Dedicated parent owns lifecycle-aware architecture coverage, child routing, and validation; this parent delegates render only."),
+        ("data_fabric_full_architecture_coverage", "data-fabric", "delegated_render" if config["data_fabric_enabled"] else "not_applicable", "cisco-data-fabric-setup", SOURCE_URLS["cisco_data_fabric_press"], "Render the complete product, feature, federation, storage/catalog, AI, governance, experience, source-ledger, and gap packet."),
+        ("data_fabric_spl2_pipeline_kit", "data-fabric", "delegated_render" if config["data_fabric_enabled"] and config["spl2_pipeline_kit_enabled"] else "not_applicable", "cisco-data-fabric-setup", SOURCE_URLS["splunk_data_management"], "Dedicated parent records and safely delegates reusable SPL2 templates when enabled by its reviewed intake."),
         ("mcp_connectors", "mcp", "delegated_apply" if config["mcp_enabled"] else "not_applicable", "splunk-mcp-server-setup,cisco-thousandeyes-mcp-setup", SOURCE_URLS["agent_builder"], "Child MCP skills own client writes and token-file validation."),
         ("agent_observability", "observability", "delegated_apply" if config["agent_observability_enabled"] else "not_applicable", "splunk-observability-ai-agent-monitoring-setup", SOURCE_URLS["splunk"], "Child skill owns collector/runtime/content apply."),
         ("observability_content", "observability", "delegated_apply" if config["observability_content_enabled"] else "not_applicable", "splunk-observability-dashboard-builder,splunk-observability-native-ops", SOURCE_URLS["splunk"], "Child skills own Observability API writes."),
@@ -1010,7 +1023,7 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
         if key == "workflows_api" and not config["workflows_api_enabled"]:
             status = "not_applicable"
         rows.append((key, area, status, owner, SOURCE_URLS[source_key], apply_boundary))
-    for product, navigation, inventory, ai_canvas in PRODUCT_INTEGRATION_MATRIX:
+    for product, inventory, topology, notifications in PRODUCT_INTEGRATION_MATRIX:
         rows.append(
             (
                 f"product_{slugify(product).replace('-', '_')}",
@@ -1018,7 +1031,18 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
                 "render",
                 "cisco-cloud-control-setup",
                 SOURCE_URLS["getting_started"],
-                f"Official timeline: navigation={navigation}; inventory={inventory}; ai_canvas={ai_canvas}.",
+                f"Current support matrix: inventory={inventory}; topology={topology}; notifications={notifications}.",
+            )
+        )
+    for product, classification, boundary in PRODUCT_ADJACENT_HANDOFFS:
+        rows.append(
+            (
+                f"product_{slugify(product).replace('-', '_')}",
+                "products",
+                "render",
+                "cisco-cloud-control-setup",
+                SOURCE_URLS["getting_started"],
+                f"Adjacent surface classification={classification}. {boundary}",
             )
         )
     output = []
@@ -1040,7 +1064,7 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
 
 def build_apply_plan(config: dict[str, Any], commands: dict[str, list[list[str]]], sections: list[str], output_dir: Path) -> dict[str, Any]:
     owners = {
-        "data-fabric": "Splunk Data Fabric child skills",
+        "data-fabric": "cisco-data-fabric-setup",
         "mcp": "splunk-mcp-server-setup,cisco-thousandeyes-mcp-setup",
         "agent-observability": "splunk-observability-ai-agent-monitoring-setup",
         "observability-content": "splunk-observability-dashboard-builder,splunk-observability-native-ops",
@@ -1197,6 +1221,7 @@ def render_handoff(output_dir: Path, config: dict[str, Any], selected: list[str]
 
 def render_doctor(output_dir: Path, config: dict[str, Any], rows: list[dict[str, str]]) -> None:
     delegated = [row for row in rows if row["status"] == "delegated_apply"]
+    delegated_render = [row for row in rows if row["status"] == "delegated_render"]
     handoffs = [row for row in rows if row["status"] in {"ui_handoff", "ca_handoff"}]
     lines = [
         "# Cisco Cloud Control Doctor Report",
@@ -1204,18 +1229,21 @@ def render_doctor(output_dir: Path, config: dict[str, Any], rows: list[dict[str,
         f"- Organization: `{config['organization']}`",
         f"- Environment: `{config['environment']}`",
         f"- Delegated apply surfaces: {len(delegated)}",
+        f"- Delegated render surfaces: {len(delegated_render)}",
         f"- UI/CA handoff surfaces: {len(handoffs)}",
         "- Direct Cisco Cloud Control API mutation: `false`",
         "- Secret values rendered: `false`",
         "",
         "## Required Reviews",
         "- Confirm Cisco Cloud Control entitlement and Studio access.",
-        "- Confirm Cisco AI Canvas access if board templates will be used.",
-        "- Review the official product integration timeline for Meraki, Catalyst Center, Nexus Dashboard, Nexus Hyperfabric, Intersight, Catalyst SD-WAN Manager, Security Cloud Control, ThousandEyes, Splunk Cloud, Collaboration Control Hub, and Cisco IQ.",
+        "- Confirm Cisco AI Canvas access; for Splunk require Cloud Control enablement, Splunk Cloud 10.5.2605.3, current AI Assistant and MCP Server, and mcp_tool_execute for every user.",
+        "- Validate AI Canvas's 100-row-per-card cap, visualization compatibility, and forbidden SPL commands before relying on generated searches.",
+        "- Review the current Inventory/Topology/Notifications matrix for Catalyst SD-WAN Manager, Collaboration Control Hub, Intersight, Meraki, Nexus Dashboard, Nexus Hyperfabric, Secure Access, Secure Firewall, and ThousandEyes; treat Catalyst Center, Security Cloud Control, Splunk Cloud, and Cisco IQ as separately classified handoffs.",
         "- Review inventory, licensing, RBAC, topology, workflows, audit logs, SSO, users, tenants, Actions, Notifications, Favorites, and support/help coverage.",
         "- If custom automation is needed, review the Cisco Workflows API OAS, target/account-key model, and rate limits before implementation.",
         "- Review Cisco Cloud Control release-note open issues before production agent use.",
         "- Confirm Splunk Platform, ITSI, and Observability Cloud prerequisites through delegated skills.",
+        "- Review the dedicated Cisco Data Fabric source ledger and lifecycle matrix; do not infer product availability from Cloud Control launch messaging.",
         "- Confirm AI Defense and action-approval boundaries before production agent execution.",
     ]
     write_text(output_dir / "doctor-report.md", "\n".join(lines) + "\n")

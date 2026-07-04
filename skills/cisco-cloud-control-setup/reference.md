@@ -43,22 +43,30 @@ Feature coverage includes onboarding, tenant groups, product integrations, AI
 context management, users and roles, SSO, audit logs, AI Assistant, AI Canvas,
 Actions, Notifications, Favorites, Help/support workflows, inventory search,
 licensing visibility, RBAC, topology scopes and health, workflows/atomics, API
-readiness, targets/account keys, and Multicloud Fabric beta handoff.
+readiness, targets/account keys, and Multicloud Fabric beta handoff. The
+Splunk-specific AI Canvas path additionally records the exact `10.5.2605.3`,
+current AI Assistant/MCP, `mcp_tool_execute`, 100-row-per-card, visualization,
+and forbidden-command constraints.
 
-Product coverage follows Cisco's current integration matrix: Meraki, Catalyst
-Center, Nexus Dashboard, Nexus Hyperfabric, Intersight, Catalyst SD-WAN
-Manager, Security Cloud Control, ThousandEyes, Splunk Cloud, Collaboration
-Control Hub, and Cisco IQ.
+The current capability matrix is kept separate from adjacent handoffs. Its
+rows are Catalyst SD-WAN Manager, Collaboration Control Hub, Intersight,
+Meraki, Nexus Dashboard, Nexus Hyperfabric, Secure Access, Secure Firewall,
+and ThousandEyes, with independent Inventory, Topology, and Notifications
+columns. Catalyst Center onboarding context, Security Cloud Control family
+routing, the Splunk Cloud CA integration, and Cisco IQ are rendered as
+separately classified handoffs rather than being promoted to matrix rows.
 
 ## Delegated Owners
 
 | Area | Owner |
 | --- | --- |
 | Cisco Workflows API readiness | Rendered API/OAS handoff; no direct API calls |
-| Cisco Data Fabric | `splunk-federated-search-setup`, `splunk-edge-processor-setup`, `splunk-ingest-processor-setup`, `splunk-spl2-pipeline-kit`, `splunk-ai-ml-toolkit-setup`, `splunk-mcp-server-setup` |
-| Machine Data Lake alpha | Rendered readiness handoff; no provisioning API calls |
-| Built-in Data Catalog | Rendered readiness handoff; no catalog CRUD calls |
-| Expanded Data Management app federation | `splunk-federated-search-setup` for supported FSS2S/reviewed FSS3 assets plus UI/entitlement handoffs for current Amazon S3, Microsoft Azure, and Azure Databricks |
+| Cisco Data Fabric | `cisco-data-fabric-setup`; complete architecture router, lifecycle matrix, source ledger, gap doctor, and validated child-render handoffs |
+| Data management | Dedicated parent distinguishes Data Inputs, Edge Processor, Ingest Processor, SPL2, Automated Field Extraction CA, Guided Onboarding/Auto-Schematization alpha, and Ingest Monitoring |
+| Machine Data Lake alpha | Dedicated parent readiness handoff; no provisioning API calls |
+| Catalogs | Dedicated parent distinguishes global Splunk Catalog, dataset-native catalog, AWS Glue, Iceberg REST, Databricks Unity Catalog, and Machine Data Lake cataloging; no undocumented CRUD |
+| Federation | Dedicated parent covers Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake independently, plus legacy FSS3 migration and Cisco SAL boundaries |
+| AI activation | Dedicated parent distinguishes AI Toolkit, open CTSM, hosted CDTSM preview, Splunk Agent Builder alpha, announced/roadmap Cloud Control Studio Agent Builder, MCP, and AI Canvas CA |
 | MCP | `splunk-mcp-server-setup` when `mcp.splunk_mcp_url` is set; `cisco-thousandeyes-mcp-setup` can render without Splunk credentials |
 | AI agent monitoring | `splunk-observability-ai-agent-monitoring-setup` |
 | Observability dashboards | `splunk-observability-dashboard-builder` |

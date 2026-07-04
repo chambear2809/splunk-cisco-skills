@@ -32,7 +32,7 @@ operators do not have to know the older skill names before routing work.
 | Detection Studio | `bundled_es` | `splunk-enterprise-security-config` | ES detection lifecycle capability. |
 | TIM Cloud | `bundled_es` | `splunk-enterprise-security-config` | ES threat intelligence workflow. |
 | Splunk Cloud Connect | `bundled_es` | `splunk-enterprise-security-config` | ES cloud integration readiness. |
-| Federated Analytics | `existing_skill` | `splunk-federated-search-setup`, `splunk-enterprise-security-config` | Amazon Security Lake / OCSF provider and index setup routes to Federated Search, then ES handles ASL macros, ESCU detections, and detection readiness. |
+| Federated Analytics | `existing_skill` | `splunk-federated-search-setup`, `splunk-enterprise-security-config` | Routes to the dedicated handoff-only `aws_lake` identity, never generic `aws_s3`; Amazon Security Lake provider/subscriber/data-lake-index/federated-index work remains a documented product handoff, then ES handles ASL macros, ESCU detections, and detection readiness. |
 | DLX | `bundled_es` | `splunk-enterprise-security-install` | ES packaged support component. |
 | Splunk ES Content Update | `install_only` | `splunk-enterprise-security-config` content library | Splunkbase `3449`, app `DA-ESS-ContentUpdate`. |
 | Splunk UBA Kafka Ingestion App | `partial` | `splunk-uba-setup` | Splunkbase `4147`, search-head-only, restricted. |

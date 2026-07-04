@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cisco Data Fabric Setup"
+  short_description: "Plan and validate Cisco Data Fabric adoption"
+  default_prompt: "Use $cisco-data-fabric-setup to map, render, validate, and safely delegate a complete Cisco Data Fabric adoption plan."

@@ -280,9 +280,109 @@ def test_fss3_provider_renders_rest_payload_and_aws_readme(tmp_path: Path) -> No
     readme = (out / "federated-search/aws-s3-providers/README.md").read_text()
     assert "FSS3" in readme or "Federated Search for Amazon S3" in readme
     assert "aws-s3-providers/aws_logs.json" in readme
+    assert "phased deprecation" in readme
+    assert "Management app" in readme
+    metadata = json.loads((out / "federated-search/metadata.json").read_text())
+    legacy_provider = metadata["providers"]["amazon_s3"][0]
+    assert legacy_provider["provider_type"] == "aws_s3"
+    assert legacy_provider["lifecycle"] == "legacy_phased_deprecation"
+    assert legacy_provider["automation"] == "rendered_migration_evidence_only"
+    assert metadata["legacy_fss3"]["automation"] == "rendered_migration_evidence_only"
+    assert metadata["legacy_fss3"]["preferred_replacement"].startswith(
+        "Federated Search for Amazon S3 through Data Management"
+    )
+    assert any("phased-deprecation" in warning for warning in metadata["warnings"])
+    migration = (out / "federated-search/legacy-fss3-migration.md").read_text()
+    assert "legacy_phased_deprecation" in migration
+    assert "`aws_logs`" in migration
+    assert "AWS Glue, Apache Iceberg REST, or Splunk-native" in migration
     # FSS2S federated.conf.template should NOT contain the FSS3 provider name
     fed = (out / "federated-search/federated.conf.template").read_text()
     assert "aws_logs" not in fed
+    # Legacy-only plans are inventory/migration evidence, never runnable CRUD.
+    dry_run = run_render(
+        "--output-dir", str(tmp_path / "dry"), "--spec", str(spec_path), "--dry-run", "--json"
+    )
+    assert dry_run.returncode == 0, dry_run.stderr
+    assert json.loads(dry_run.stdout)["commands"]["apply"] == []
+    render_dir = out / "federated-search"
+    for script_name in ("apply-search-head.sh", "apply-rest.sh"):
+        script = (render_dir / script_name).read_text()
+        assert "HANDOFF ONLY" in script
+        assert "exit 2" in script
+        assert "aws-s3-providers/" not in script
+        assert "aws_logs" not in script
+        refused = subprocess.run(
+            ["bash", str(render_dir / script_name)],
+            cwd=render_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert refused.returncode == 2
+    assert "/services/data/federated/provider" not in (
+        render_dir / "apply-rest.sh"
+    ).read_text()
+    assert "/services/data/federated/index" not in (
+        render_dir / "apply-rest.sh"
+    ).read_text()
+    validate = run_validate("--output-dir", str(out))
+    assert validate.returncode == 0, validate.stderr + validate.stdout
+
+
+def test_setup_apply_refuses_legacy_fss3_before_rest_credentials_or_network(
+    tmp_path: Path,
+) -> None:
+    spec_path = write_spec(tmp_path, "fss3.json", _fss3_provider_spec(tmp_path))
+    out = tmp_path / "out"
+    result = run_setup(
+        "--phase", "apply",
+        "--apply-target", "rest",
+        "--output-dir", str(out),
+        "--spec", str(spec_path),
+    )
+    assert result.returncode == 2
+    assert "HANDOFF ONLY" in result.stderr
+    assert "SPLUNK_REST_URI" not in result.stderr
+
+
+def test_mixed_plan_validation_uses_structural_legacy_exclusion(
+    tmp_path: Path,
+) -> None:
+    """A legacy name that occurs in generic prose must not cause a false failure."""
+    spec = _fss3_provider_spec(tmp_path)
+    spec["providers"][0]["name"] = "provider"
+    spec["federated_indexes"][0]["provider"] = "provider"
+    spec["providers"].insert(
+        0,
+        {
+            "name": "remote_prod",
+            "type": "splunk",
+            "mode": "standard",
+            "host_port": "remote.example.test:8089",
+            "service_account": "federated_svc",
+            "password_file": str(tmp_path / "provider-password"),
+        },
+    )
+    spec["federated_indexes"].insert(
+        0,
+        {
+            "name": "remote_main",
+            "provider": "remote_prod",
+            "dataset_type": "index",
+            "dataset_name": "main",
+        },
+    )
+    spec_path = write_spec(tmp_path, "mixed.json", spec)
+    out = tmp_path / "out"
+    result = run_render("--output-dir", str(out), "--spec", str(spec_path))
+    assert result.returncode == 0, result.stderr
+    validate = run_validate("--output-dir", str(out))
+    assert validate.returncode == 0, validate.stderr + validate.stdout
+    apply_rest = (out / "federated-search/apply-rest.sh").read_text()
+    assert "'name': \"remote_prod\"" in apply_rest
+    assert "'name': \"provider\"" not in apply_rest
+    assert "'federated.provider': \"provider\"" not in apply_rest
 
 
 def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
@@ -304,6 +404,18 @@ def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
     }
     assert expected == {
         item["key"] for item in metadata["data_management_federation_handoffs"]
+    }
+    assert {
+        item["key"] for item in metadata["specialized_federation_handoffs"]
+    } == {
+        "amazon_security_lake_federated_analytics",
+        "cisco_security_analytics_and_logging",
+    }
+    assert {
+        item["key"] for item in metadata["federation_handoffs"]
+    } == expected | {
+        "amazon_security_lake_federated_analytics",
+        "cisco_security_analytics_and_logging",
     }
     handoffs = {
         item["key"]: item for item in metadata["data_management_federation_handoffs"]
@@ -331,6 +443,114 @@ def test_cloud_10_5_data_management_handoff_covers_new_federation_surfaces(
     assert "SQS queue and S3 event notification" in handoff
     assert "generated S3 bucket and SQS queue policies" in handoff
     assert "does not support DDSS locations in Azure or GCP" in handoff
+
+    catalogs = {
+        item["key"]: item for item in metadata["amazon_s3_data_catalog_options"]
+    }
+    assert set(catalogs) == {"aws_glue", "iceberg_rest", "splunk_native"}
+    assert "apache_iceberg" in catalogs["aws_glue"]["formats"]
+    assert "delta_lake" in catalogs["aws_glue"]["formats"]
+    assert "Apache Iceberg REST catalog" in handoff
+    assert "Splunk-native data catalog" in handoff
+    assert "non_table_json_or_parquet" in handoff
+
+
+def test_specialized_asl_and_sal_provider_types_render_handoffs_without_crud(
+    tmp_path: Path,
+) -> None:
+    spec = write_spec(
+        tmp_path,
+        "specialized.json",
+        {
+            "providers": [
+                {"name": "security_lake", "type": "aws_lake"},
+                {"name": "cisco_sal", "type": "aws_s3_sal"},
+            ],
+            "federated_indexes": [],
+        },
+    )
+    out = tmp_path / "out"
+    dry_run = run_render(
+        "--output-dir", str(out), "--spec", str(spec), "--dry-run", "--json"
+    )
+    assert dry_run.returncode == 0, dry_run.stderr
+    assert json.loads(dry_run.stdout)["commands"]["apply"] == []
+    result = run_render("--output-dir", str(out), "--spec", str(spec))
+    assert result.returncode == 0, result.stderr
+
+    render_dir = out / "federated-search"
+    metadata = json.loads((render_dir / "metadata.json").read_text())
+    requested = {
+        item["name"]: item for item in metadata["providers"]["specialized_handoffs"]
+    }
+    assert requested["security_lake"] == {
+        "name": "security_lake",
+        "provider_type": "aws_lake",
+        "lifecycle": "available_by_activation",
+        "automation": "ui_handoff",
+        "disabled": False,
+    }
+    assert requested["cisco_sal"] == {
+        "name": "cisco_sal",
+        "provider_type": "aws_s3_sal",
+        "lifecycle": "documented_conditional",
+        "automation": "ui_handoff",
+        "disabled": False,
+    }
+    handoff = (render_dir / "specialized-federation-handoff.md").read_text()
+    assert "Federated Analytics for Amazon Security Lake" in handoff
+    assert "Federated Search for Cisco Security Analytics and Logging" in handoff
+    assert "`security_lake` -> `aws_lake`" in handoff
+    assert "`cisco_sal` -> `aws_s3_sal`" in handoff
+    assert "must not be represented" in handoff
+    assert "generic `aws_s3`" in handoff
+    assert not (render_dir / "aws-s3-providers").exists()
+    apply_rest = (render_dir / "apply-rest.sh").read_text()
+    assert "security_lake" not in apply_rest
+    assert "cisco_sal" not in apply_rest
+    assert "POST /services/data/federated" not in apply_rest
+    assert "HANDOFF ONLY" in apply_rest
+    assert "no supported REST CRUD contract" in apply_rest
+    apply_local = (render_dir / "apply-search-head.sh").read_text()
+    assert "HANDOFF ONLY" in apply_local
+    assert "no supported local apply contract" in apply_local
+    for script in ("apply-search-head.sh", "apply-rest.sh"):
+        refused = subprocess.run(
+            ["bash", str(render_dir / script)],
+            cwd=render_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert refused.returncode == 2
+    validate = run_validate("--output-dir", str(out))
+    assert validate.returncode == 0, validate.stderr + validate.stdout
+
+
+def test_specialized_handoff_provider_refuses_federated_index_crud(
+    tmp_path: Path,
+) -> None:
+    spec = write_spec(
+        tmp_path,
+        "bad-specialized-index.json",
+        {
+            "providers": [{"name": "security_lake", "type": "aws_lake"}],
+            "federated_indexes": [
+                {
+                    "name": "asl_findings",
+                    "provider": "security_lake",
+                    "dataset_type": "glue_table",
+                    "dataset_name": "ocsf_findings",
+                }
+            ],
+        },
+    )
+    result = run_render(
+        "--output-dir", str(tmp_path / "out"), "--spec", str(spec)
+    )
+    assert result.returncode != 0
+    assert "handoff-only provider 'security_lake'" in result.stderr
+    assert "no stable public CRUD contract" in result.stderr
 
 
 def test_fss3_payload_omits_kms_when_not_provided(tmp_path: Path) -> None:
@@ -775,6 +995,9 @@ def test_setup_help_documents_new_flags() -> None:
         "--federated-index",
         "--apply-target search-head|shc-deployer|rest",
         "--global-toggle",
+        "aws_lake",
+        "aws_s3_sal",
+        "phased-deprecation",
         "SPLUNK_REST_URI",
         "SPLUNK_REST_PASSWORD_FILE",
     ):
@@ -856,6 +1079,25 @@ def test_validate_detects_corrupt_fss3_payload(tmp_path: Path) -> None:
     assert validate.returncode != 0
     combined = validate.stderr + validate.stdout
     assert "FSS3 keys" in combined or "schema check" in combined
+
+
+def test_validate_detects_specialized_provider_identity_drift(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    run_render(
+        "--output-dir", str(out),
+        "--remote-host-port", "remote:8089",
+        "--service-account", "u",
+        "--password-file", str(tmp_path / "pw"),
+    )
+    metadata_path = out / "federated-search/metadata.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata["specialized_federation_handoffs"][0]["provider_type"] = "aws_s3"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    validate = run_validate("--output-dir", str(out))
+    assert validate.returncode != 0
+    combined = validate.stderr + validate.stdout
+    assert "lifecycle metadata/handoff contract" in combined
 
 
 # ---------------------------------------------------------------------------

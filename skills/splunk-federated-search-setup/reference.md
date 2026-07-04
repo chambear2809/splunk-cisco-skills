@@ -4,8 +4,8 @@
 
 This skill follows current Splunk Federated Search documentation and
 configuration references for Splunk Enterprise and Splunk Cloud Platform. It
-distinguishes automated legacy/configuration paths from newer Data Management
-app connection/dataset handoffs:
+distinguishes supported FSS2S automation from legacy FSS3 migration evidence
+and newer Data Management app connection/dataset handoffs:
 
 - `federated.conf` provider stanza: `provider://<name>` with `type`,
   `hostPort`, `serviceAccount`, `password`, `mode`, `appContext`,
@@ -16,19 +16,32 @@ app connection/dataset handoffs:
   `federated.dataset` (`<type>:<dataset_name>`), `disabled`.
 - REST endpoints:
   - `/services/data/federated/settings/general` — global enable/disable.
-  - `/services/data/federated/provider` — provider CRUD (FSS2S **and** FSS3).
-  - `/services/data/federated/index` — federated index CRUD.
+  - `/services/data/federated/provider` — FSS2S provider CRUD in this skill;
+    legacy FSS3 definitions are read-only migration evidence here.
+  - `/services/data/federated/index` — FSS2S federated index CRUD in this skill.
   - Each provider entity supports `/_reload`, `/enable`, and `/disable`.
 
 ## Provider Types And Handoffs
 
-The renderer automates the provider types with stable configuration contracts
-that this repo already supports:
+The renderer automates only the provider types with stable customer-facing
+configuration contracts that this repo supports:
 
 | `type` | Product | Available on | Configuration surface |
 |---|---|---|---|
 | `splunk` | Federated Search for Splunk (FSS2S) | Splunk Enterprise + Splunk Cloud | `federated.conf` and REST |
-| `aws_s3` | Federated Search for Amazon S3 legacy/reviewed provider path (FSS3) | Splunk Cloud Platform only | REST + Splunk Web only |
+| `aws_s3` | Federated Search for Amazon S3 legacy provider path (FSS3) | Splunk Cloud Platform only | Inventory and migration evidence only; no provider or federated-index CRUD |
+
+Two additional provider types are represented as explicit handoffs. They are
+not coerced into `aws_s3` and do not produce live CRUD:
+
+| `type` | Product | Lifecycle | Repository behavior |
+|---|---|---|---|
+| `aws_lake` | Federated Analytics for Amazon Security Lake | Available by activation on supported AWS-hosted Splunk Cloud deployments | Record intent and render activation, same-region, OCSF, data-lake-index, and federated-index readiness only |
+| `aws_s3_sal` | Federated Search for Cisco Security Analytics and Logging | Documented provider type; tenant availability and onboarding remain conditional | Record intent and render Cisco/Splunk onboarding handoff only |
+
+The configuration reference names `aws_lake` and `aws_s3_sal` independently.
+Using a generic legacy `aws_s3` payload for either product would describe the
+wrong provider lifecycle and omit product-specific setup.
 
 Current Splunk Cloud federation expansion is centered on the Data Management
 app connection/dataset model. The skill renders
@@ -37,11 +50,25 @@ inventing unsupported API writes:
 
 | Surface | Stage | Notes |
 |---|---|---|
-| Federated Search for Amazon S3 through Data Management | Available by activation | Contact Splunk sales to activate it, then define connections and datasets in the Data Management app. Prefer this model for new tenants unless the older provider-payload path is explicitly reviewed. |
+| Federated Search for Amazon S3 through Data Management | Available by activation | Contact Splunk sales to activate it, then define connections and datasets in the Data Management app. Use this model for new tenants; inventory and migrate any legacy provider definitions. |
 | Federated Search for Microsoft Azure | Available by activation | Contact Splunk sales to activate searches over Azure Data Lake Storage and Azure Blob Storage datasets. |
 | Federated Search for Azure Databricks | Available by activation | Contact Splunk sales to activate searches over Azure Databricks Unity Catalog tables through Delta Sharing; searches use SPL2. |
 | Federated Search for Snowflake | Available by activation in Splunk Cloud 10.5 | Contact Splunk sales to activate searches over AWS-hosted Snowflake tables and views through a programmatic access token. Azure/GCP-hosted Snowflake warehouses are unsupported. |
 | Federated Search for DDSS | Available by activation in Splunk Cloud 10.5 | Contact Splunk sales to activate searches over DDSS datasets stored in Amazon S3. DDSS locations in Azure or GCP are unsupported. |
+
+### Amazon S3 data catalog distinctions
+
+Current Amazon S3 Data Management datasets require one of these catalog paths:
+
+| Catalog | Formats/model | Important boundary |
+|---|---|---|
+| AWS Glue catalog table | Apache Iceberg, Delta Lake, or non-table JSON/Parquet | The table must reference the selected S3 location. The AWS Glue Iceberg REST interface is not the Iceberg REST catalog path. |
+| Apache Iceberg REST catalog | Apache Iceberg table in a customer-maintained REST catalog | Current public documentation does not support Iceberg REST catalogs that require authorization. |
+| Splunk-native data catalog | Crawler-inferred or operator-defined schema and partitions | Data-routing-plus-federated-search datasets use this catalog model. |
+
+Record the dataset time field, time partitions, schema ownership, encryption,
+RBAC, and crawler/update behavior as part of the handoff. These current catalog
+objects are not the same as the legacy provider-level Glue Data Catalog ARN.
 
 Activation and commercial access are tenant-specific. The absence of a
 connection type in the Data Management app is a handoff to Splunk. Confirm any
@@ -90,11 +117,43 @@ Before defining a DDSS dataset:
 - Apply federated-dataset RBAC and validate representative SPL2 searches after
   the crawler has inferred the schema and partitions.
 
-FSS3 cannot be configured through `federated.conf`. For tenants still using the
-reviewed legacy provider model, Splunk Cloud admins POST FSS3 provider
-definitions to `/services/data/federated/provider` (the admin user must hold
-`admin_all_objects`). This skill renders one JSON payload per FSS3 provider
-under `aws-s3-providers/<name>.json` plus an AWS prerequisites README.
+FSS3 cannot be configured through `federated.conf`. Older deployments used the
+Splunk Cloud provider REST surface or Splunk Web for these definitions. Splunk
+10.5 documents phased deprecation: new legacy FSS3 indexes cannot be created,
+existing indexes are read-only, and the replacement is the Data Management app
+connection/dataset model. This skill therefore renders a payload-shaped JSON
+inventory record per legacy provider under `aws-s3-providers/<name>.json`; no
+rendered apply script consumes those records or performs legacy provider/index
+CRUD.
+
+The rendered `legacy-fss3-migration.md` inventories selected legacy providers
+and requires equivalent SPL2, RBAC, time-field, partition, cost, and result-shape
+validation before the old provider is disabled or removed through a separately
+reviewed product workflow. For every new design, use an Amazon S3 connection and
+datasets.
+
+## Specialized Provider Handoffs
+
+### Amazon Security Lake Federated Analytics (`aws_lake`)
+
+- Requires Splunk Cloud Platform in an AWS region and Amazon Security Lake in
+  the same AWS region.
+- Uses a dedicated Amazon Security Lake provider. Recent OCSF data can be
+  ingested into local data lake indexes for high-frequency detection while
+  long-range data remains available through federated indexes for ad hoc threat
+  hunting.
+- Subscriber creation, data lake index retention/filters, federated indexes,
+  OCSF mappings, and Enterprise Security readiness remain product UI/operator
+  handoffs. This skill does not generate those payloads.
+
+### Cisco Security Analytics and Logging (`aws_s3_sal`)
+
+- The current `federated.conf` reference identifies `aws_s3_sal` as the
+  provider type for Federated Search for Cisco Security Analytics and Logging.
+- Confirm Cisco SAL licensing, tenant association, region, data availability,
+  and the supported Cisco/Splunk onboarding path before configuration.
+- This skill does not infer an SAL provider payload from legacy FSS3 fields and
+  does not claim a stable public create/update contract.
 
 ## FSS2S Settings (`type = splunk`)
 
@@ -197,9 +256,9 @@ The service-account role on each remote deployment must:
   every IP/CIDR that runs `apply-rest.sh`, `status.sh`, or the global
   toggle scripts.
 - **No file edits**: Splunk Cloud customers cannot edit `federated.conf`
-  directly. Use `--apply-target rest` for FSS2S, and POST FSS3 providers
-  through `apply-rest.sh` (which reads the rendered
-  `aws-s3-providers/<name>.json` payloads).
+  directly. Use `--apply-target rest` for supported FSS2S changes. Current
+  Amazon S3 federation is configured in Data Management; legacy FSS3 records
+  rendered under `aws-s3-providers/` are inventory/migration evidence only.
 - **Region support**: Federated Search supports Splunk Cloud Platform on
   AWS, Google Cloud, and Microsoft Azure. Cross-region restrictions vary;
   see the Splunk Cloud Service Description.
@@ -232,7 +291,7 @@ files. The renderer writes a stable per-provider placeholder (e.g.
 local-only `password_file` declared per provider in the spec, then write
 `federated.conf` with mode `0600`.
 
-The REST apply path reads each provider's `password_file` at apply time and
+For FSS2S only, the REST apply path reads each provider's `password_file` at apply time and
 includes the password value in the form-encoded POST body to
 `/services/data/federated/provider` (Splunk's own endpoint encrypts the value
 to `splunk.secret` on disk). The Splunk admin password used to authenticate
@@ -246,11 +305,16 @@ Static validation (`validate.sh`) checks:
 - All required rendered files exist.
 - `federated.conf.template` has a per-provider password placeholder for every
   `[provider://X]` stanza.
-- Each `aws-s3-providers/*.json` payload is valid JSON, has `type=aws_s3`,
-  and includes the required FSS3 keys.
+- Each `aws-s3-providers/*.json` inventory record is valid JSON, has
+  `type=aws_s3`, and includes the required legacy FSS3 keys; the validator also
+  verifies that these records remain migration evidence rather than apply input.
 - `data-management-federation-handoff.md` is rendered so Azure/Databricks and
   current Data Management app S3, Snowflake, and DDSS requests have an explicit
   non-automated path with the required provider-side prerequisites.
+- `specialized-federation-handoff.md` and metadata retain the dedicated
+  `aws_lake` and `aws_s3_sal` identities and `ui_handoff` automation boundary.
+- `legacy-fss3-migration.md` and metadata identify legacy `aws_s3` as a phased
+  deprecation/migration path rather than a current default.
 
 Live validation (`validate.sh --live`) additionally runs `status.sh`, which
 GETs `/services/data/federated/provider`, `/services/data/federated/index`,
@@ -267,7 +331,7 @@ authentication:
 | Variable | Purpose |
 |---|---|
 | `SPLUNK_REST_URI` | `https://<search-head>:<management-port>` |
-| `SPLUNK_REST_USER` | Admin user with `admin_all_objects` (FSS3 requires this). |
+| `SPLUNK_REST_USER` | Admin user authorized for the selected supported FSS2S/status/global operation. |
 | `SPLUNK_REST_PASSWORD_FILE` | Local-only file containing the admin password. |
 | `SPLUNK_VERIFY_SSL` | `true` (default) or `false` for self-signed dev clusters. Canonical name shared with the rest of the skill suite. |
 | `SPLUNK_REST_VERIFY_SSL` | Legacy alias for `SPLUNK_VERIFY_SSL`. Honored as a fallback when the canonical variable is unset. Prefer `SPLUNK_VERIFY_SSL` in new automation. |
@@ -281,3 +345,6 @@ authentication:
 - Create an Azure Databricks connection: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-azure-databricks-datasets/create-an-azure-databricks-connection
 - Federated Search for Snowflake: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-snowflake-datasets/about-federated-search-for-snowflake
 - Federated Search for DDSS: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-ddss-datasets/about-federated-search-for-ddss
+- Current Amazon S3 catalog choices: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-amazon-s3-datasets/overview-of-federated-search-for-amazon-s3
+- Federated Analytics for Amazon Security Lake: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets/about-federated-analytics
+- Provider-type and legacy FS-S3 lifecycle reference: https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/federated.conf
