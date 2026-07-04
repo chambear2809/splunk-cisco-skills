@@ -95,10 +95,13 @@ def test_generic_installer_contains_fail_closed_version_and_release_gates() -> N
     ).read_text(encoding="utf-8")
     for phrase in (
         "preflight_current_install_target_compatibility",
+        "require_registry_provenance",
+        "audit_splunkbase_registry.py",
         "apply_registry_verified_version_default",
         "--target-splunk-version",
         "--accept-unsupported-platform",
         "--accept-unverified-release",
+        "--accept-historical-review-only-pin",
         "does not advertise Splunk",
     ):
         assert phrase in text
@@ -110,10 +113,13 @@ def test_cloud_batch_installer_uses_the_same_fail_closed_contract() -> None:
     ).read_text(encoding="utf-8")
     for phrase in (
         "preflight_app_compatibility",
+        "require_registry_provenance",
+        "audit_splunkbase_registry.py",
         "resolve_app_install_version",
         "--target-splunk-version",
         "--accept-unsupported-platform",
         "--accept-unverified-release",
+        "--accept-historical-review-only-pin",
         "before ACS mutation",
     ):
         assert phrase in text

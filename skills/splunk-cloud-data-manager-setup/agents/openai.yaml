@@ -1,4 +1,4 @@
 interface:
   display_name: "Splunk Cloud Data Manager Setup"
-  short_description: "Render and validate Data Manager onboarding for AWS, Azure, GCP, and CrowdStrike"
+  short_description: "Operate Splunk Cloud Data Manager onboarding"
   default_prompt: "Use $splunk-cloud-data-manager-setup to render, doctor, validate, and safely apply supported Splunk Cloud Data Manager onboarding artifacts."

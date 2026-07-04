@@ -22,6 +22,10 @@ setup() {
     export SPLUNK_USER="testuser"
     export SPLUNK_PASS="testpass"
     export SPLUNK_VERIFY_SSL="false"
+    unset SPLUNK_ALLOW_INSECURE_HTTP
+    unset APP_DOWNLOAD_ALLOW_HTTP
+    unset _WARNED_APP_DOWNLOAD_HTTP
+    unset _WARNED_SPLUNK_INSECURE_HTTP
 
     TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
     PROJECT_ROOT="$(cd "${TEST_DIR}/.." && pwd)"
@@ -161,14 +165,14 @@ EOF
     [ "${#_tls_verify_args[@]}" -eq 0 ]
 }
 
-@test "_set_app_download_curl_tls_args opts out when SPLUNK_VERIFY_SSL=false is set" {
+@test "_set_app_download_curl_tls_args does not inherit Splunk REST TLS opt-out" {
     source "${LIB_DIR}/rest_helpers.sh"
     export SPLUNK_VERIFY_SSL="false"
     unset APP_DOWNLOAD_VERIFY_SSL
     unset APP_DOWNLOAD_CA_CERT
     unset _WARNED_APP_DOWNLOAD_INSECURE_TLS
     _set_app_download_curl_tls_args 2>/dev/null
-    [ "${_tls_verify_args[0]}" = "-k" ]
+    [ "${#_tls_verify_args[@]}" -eq 0 ]
 }
 
 @test "_set_app_download_curl_tls_args verifies by default when nothing is overridden" {
@@ -179,6 +183,270 @@ EOF
     unset APP_DOWNLOAD_CA_CERT
     _set_app_download_curl_tls_args
     [ "${#_tls_verify_args[@]}" -eq 0 ]
+}
+
+@test "credential-bearing Splunk helpers reject plaintext HTTP before curl" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    marker="${mock_dir}/curl-ran"
+    cat > "${mock_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+touch "${CURL_MARKER}"
+exit 0
+EOF
+    chmod +x "${mock_dir}/curl"
+    export CURL_MARKER="${marker}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    run get_session_key "http://splunk.example:8089"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"SPLUNK_ALLOW_INSECURE_HTTP=true"* ]]
+    [ ! -e "${marker}" ]
+
+    password_file="${mock_dir}/password"
+    printf '%s\n' "testpass" > "${password_file}"
+    chmod 600 "${password_file}"
+    run get_session_key_from_password_file \
+        "http://splunk.example:8089" "${password_file}" "testuser"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    run splunk_curl "session-key" "http://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    run splunk_curl_post \
+        "session-key" "name=value" "http://splunk.example:8089/services/example"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    run verify_search_api_connectivity "http://splunk.example:8089"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    run get_session_key "http://embedded-user:embedded-secret@splunk.example:8089"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"embedded userinfo is refused"* ]]
+    [[ "${output}" != *"embedded-secret"* ]]
+    [ ! -e "${marker}" ]
+    PATH="${old_path}"
+}
+
+@test "SPLUNK_VERIFY_SSL=false does not authorize plaintext HTTP" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    export SPLUNK_VERIFY_SSL="false"
+    unset SPLUNK_ALLOW_INSECURE_HTTP
+    run get_session_key "http://splunk.example:8089"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"refuses plaintext HTTP"* ]]
+}
+
+@test "lab-only HTTP opt-in warns and permits captured password authentication" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    args_log="${mock_dir}/curl-args"
+    stdin_log="${mock_dir}/curl-stdin"
+    warning_log="${mock_dir}/warning"
+    cat > "${mock_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${CURL_ARGS_LOG}"
+cat > "${CURL_STDIN_LOG}"
+printf '%s\n' '<response><sessionKey>captured-session</sessionKey></response>'
+EOF
+    chmod +x "${mock_dir}/curl"
+    export CURL_ARGS_LOG="${args_log}"
+    export CURL_STDIN_LOG="${stdin_log}"
+    export SPLUNK_ALLOW_INSECURE_HTTP="true"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    session_key="$(get_session_key "http://splunk.example:8089" 2>"${warning_log}")"
+    PATH="${old_path}"
+
+    [ "${session_key}" = "captured-session" ]
+    [ "$(cat "${stdin_log}")" = "username=testuser&password=testpass" ]
+    grep -q "WARNING: LAB ONLY" "${warning_log}"
+    grep -q -- "--proto" "${args_log}"
+    grep -q -- "=http,https" "${args_log}"
+    [ "$(tail -n 3 "${args_log}")" = $'--max-redirs\n0\n--globoff' ]
+}
+
+@test "authenticated HTTPS keeps TLS verification controls and HTTPS-only protocols" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    unset SPLUNK_ALLOW_INSECURE_HTTP
+    export SPLUNK_VERIFY_SSL="false"
+    _prepare_splunk_transport_for_curl_args "https://splunk.example:8089/services/server/info"
+    _set_splunk_curl_tls_args 2>/dev/null
+    [ "${_splunk_transport_curl_args[0]}" = "--proto" ]
+    [ "${_splunk_transport_curl_args[1]}" = "=https" ]
+    [ "${_splunk_transport_curl_args[4]}" = "--max-redirs" ]
+    [ "${_splunk_transport_curl_args[5]}" = "0" ]
+    [ "${_splunk_transport_curl_args[6]}" = "--globoff" ]
+    [ "${_tls_verify_args[0]}" = "-k" ]
+}
+
+@test "authenticated curl wrappers reject caller transport and redirect overrides" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    marker="${mock_dir}/curl-ran"
+    cat > "${mock_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+touch "${CURL_MARKER}"
+exit 0
+EOF
+    chmod +x "${mock_dir}/curl"
+    export CURL_MARKER="${marker}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    run splunk_curl "session-key" --location \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"rejects caller redirect controls"* ]]
+
+    run splunk_curl "session-key" --max-redirs 0 \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"rejects caller redirect controls"* ]]
+
+    run splunk_curl "session-key" --proto '=http,https' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"owns curl protocol"* ]]
+
+    run splunk_curl "session-key" -K "${mock_dir}/override.curlrc" \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"config/transfer-boundary"* ]]
+
+    run splunk_curl "session-key" \
+        "https://splunk.example:8089/services/server/info" \
+        "-sK${mock_dir}/override.curlrc"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"config/transfer-boundary"* ]]
+
+    run splunk_curl "session-key" -sk \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"owns curl TLS verification policy"* ]]
+
+    run splunk_curl "session-key" --insecure \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"owns curl TLS verification policy"* ]]
+
+    run splunk_curl "session-key" -H 'Authorization: Bearer override' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"owns authentication"* ]]
+
+    run splunk_curl "session-key" -H 'Authorization : Bearer override' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"malformed caller header names"* ]]
+
+    run splunk_curl "session-key" --header @/tmp/hostile-headers \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"file-backed"* ]]
+
+    run splunk_curl "session-key" -H $'Accept: application/json\r\nHost: capture.invalid' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"malformed caller headers"* ]]
+
+    run splunk_curl "session-key" \
+        "https://splunk.example:8089/services/server/info" \
+        --variable 'hidden=https://other.example:8089/credential-capture' \
+        --expand-url '{{hidden}}'
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"rejects curl URL expansion options"* ]]
+
+    run splunk_curl "session-key" --data \
+        "https://validator-decoy.example/payload" \
+        "other.example:8089/credential-capture"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"ambiguous URL token"* ]]
+
+    run splunk_curl "session-key" --data-binary @/etc/passwd \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"file-backed body"* ]]
+
+    run splunk_curl "session-key" --data-urlencode secret@/etc/passwd \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"file-backed URL-encoded"* ]]
+
+    run splunk_curl "session-key" -F 'field=value;headers=@/etc/passwd' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"form arguments"* ]]
+
+    run splunk_curl $'unsafe\nheader-injection' \
+        "https://splunk.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"unsafe for curl config"* ]]
+
+    run splunk_curl "session-key" \
+        "https://splunk-a.example:8089/services/server/info" \
+        "https://splunk-b.example:8089/services/server/info"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"requires exactly one"* ]]
+    [[ "${output}" == *"found 2"* ]]
+    [ ! -e "${marker}" ]
+    PATH="${old_path}"
+}
+
+@test "password-file session authentication descriptor-binds secrets before curl" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    args_log="${mock_dir}/curl-args"
+    stdin_log="${mock_dir}/curl-stdin"
+    marker="${mock_dir}/curl-ran"
+    cat > "${mock_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+touch "${CURL_MARKER}"
+printf '%s\n' "$@" > "${CURL_ARGS_LOG}"
+cat > "${CURL_STDIN_LOG}"
+printf '%s\n' '<response><sessionKey>file-session</sessionKey></response>'
+EOF
+    chmod +x "${mock_dir}/curl"
+    password_file="${mock_dir}/password"
+    printf '%s\n' 'p&a=s value' > "${password_file}"
+    chmod 600 "${password_file}"
+    export CURL_ARGS_LOG="${args_log}" CURL_STDIN_LOG="${stdin_log}" CURL_MARKER="${marker}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    session_key="$(get_session_key_from_password_file \
+        "https://splunk.example:8089" "${password_file}" "admin-user")"
+    [ "${session_key}" = "file-session" ]
+    [ "$(<"${stdin_log}")" = "username=admin-user&password=p%26a%3Ds+value" ]
+    ! grep -q -- 'p&a=s value' "${args_log}"
+    [ "$(head -n 1 "${args_log}")" = "-q" ]
+
+    rm -f "${marker}" "${args_log}" "${stdin_log}"
+    password_link="${mock_dir}/password-link"
+    ln -s "${password_file}" "${password_link}"
+    run get_session_key_from_password_file \
+        "https://splunk.example:8089" "${password_link}" "admin-user"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    password_hardlink="${mock_dir}/password-hardlink"
+    ln "${password_file}" "${password_hardlink}"
+    run get_session_key_from_password_file \
+        "https://splunk.example:8089" "${password_file}" "admin-user"
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+
+    PATH="${old_path}"
 }
 
 @test "hbs_make_curl_auth_config writes 0600 curl config without argv secrets" {
@@ -199,32 +467,239 @@ EOF
     [ "$config_text" = 'user = "admin\"user:pa\"ss\\word"' ]
 }
 
-@test "hbs_make_sshpass_file returns a 0600 file containing the configured password" {
+@test "host bootstrap downloads disable curlrc and constrain redirects and protocols" {
+    source "${LIB_DIR}/rest_helpers.sh"
     source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    args_log="${mock_dir}/curl-args"
+    marker="${mock_dir}/curl-ran"
+    cat > "${mock_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+touch "${CURL_MARKER}"
+printf '%s\n' "$@" > "${CURL_ARGS_LOG}"
+printf '%s' 'download-body'
+EOF
+    chmod +x "${mock_dir}/curl"
+    export CURL_MARKER="${marker}" CURL_ARGS_LOG="${args_log}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    result="$(hbs_fetch_url_text \
+        "https://download.example.invalid/file" "download-user" "download-secret")"
+    [ "${result}" = "download-body" ]
+    [ "$(head -n 1 "${args_log}")" = "-q" ]
+    grep -q -- "--proto" "${args_log}"
+    grep -q -- "=https" "${args_log}"
+    grep -q -- "--proto-redir" "${args_log}"
+    grep -q -- "--max-redirs" "${args_log}"
+    grep -q -- "--globoff" "${args_log}"
+    ! grep -q -- "--location-trusted" "${args_log}"
+    ! grep -q -- "download-secret" "${args_log}"
+
+    rm -f "${marker}" "${args_log}"
+    run hbs_fetch_url_text "http://download.example.invalid/file" \
+        "download-user" "download-secret"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"APP_DOWNLOAD_ALLOW_HTTP=true"* ]]
+    [ ! -e "${marker}" ]
+
+    export APP_DOWNLOAD_ALLOW_HTTP=true
+    result="$(hbs_fetch_url_text "http://download.example.invalid/file" 2>"${mock_dir}/warning")"
+    [ "${result}" = "download-body" ]
+    grep -q "LAB ONLY" "${mock_dir}/warning"
+    grep -q -- "=http,https" "${args_log}"
+
+    PATH="${old_path}"
+}
+
+@test "host bootstrap uses strict pinned host keys and passes password only on fd 3" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    known_hosts="${mock_dir}/known_hosts"
+    printf '%s\n' 'host.example ssh-ed25519 AAAATESTKEY' > "${known_hosts}"
+    chmod 600 "${known_hosts}"
+    cat > "${mock_dir}/sshpass" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${SSHPASS_ARGS_LOG}"
+for argument in "$@"; do
+    case "${argument}" in
+        UserKnownHostsFile=*)
+            trust_copy="${argument#*=}"
+            printf '%s' "${trust_copy}" > "${SSHPASS_TRUST_PATH_LOG}"
+            cat "${trust_copy}" > "${SSHPASS_TRUST_CONTENT_LOG}"
+            ;;
+    esac
+done
+IFS= read -r supplied_password <&3
+printf '%s' "${supplied_password}" > "${SSHPASS_PASSWORD_LOG}"
+if [[ -n "${SPLUNK_SSH_PASS+x}" || -n "${SSHPASS+x}" ]]; then
+    printf '%s' inherited > "${SSHPASS_ENV_LOG}"
+fi
+EOF
+    chmod +x "${mock_dir}/sshpass"
+    export SSHPASS_ARGS_LOG="${mock_dir}/args.log"
+    export SSHPASS_PASSWORD_LOG="${mock_dir}/password.log"
+    export SSHPASS_ENV_LOG="${mock_dir}/env.log"
+    export SSHPASS_TRUST_PATH_LOG="${mock_dir}/trust-path.log"
+    export SSHPASS_TRUST_CONTENT_LOG="${mock_dir}/trust-content.log"
+    export SPLUNK_SSH_HOST="host.example"
+    export SPLUNK_SSH_PORT="22"
+    export SPLUNK_SSH_USER="splunk"
     export SPLUNK_SSH_PASS="ssh-secret"
+    export SPLUNK_SSH_KNOWN_HOSTS_FILE="${known_hosts}"
+    unset SPLUNK_SSH_HOST_KEY_FINGERPRINT SPLUNK_SSH_ALLOW_TOFU SSHPASS
+    load_splunk_ssh_credentials() { :; }
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
 
-    pass_file="$(hbs_make_sshpass_file)"
-    TEST_TEMP_FILES+=("${pass_file}")
+    hbs_run_target_cmd ssh "printf ok"
 
-    # The file must persist after the function returns so the caller's
-    # subsequent `sshpass -f "${pass_file}"` can read it. Earlier versions
-    # registered an EXIT trap inside the function which fired on the
-    # $(...) subshell exit and deleted the file before the caller could
-    # use it — this test guards against that regression.
-    [ -f "${pass_file}" ]
+    [ "$(sed -n '1p' "${SSHPASS_ARGS_LOG}")" = "-d" ]
+    [ "$(sed -n '2p' "${SSHPASS_ARGS_LOG}")" = "3" ]
+    grep -q 'StrictHostKeyChecking=yes' "${SSHPASS_ARGS_LOG}"
+    trust_copy="$(cat "${SSHPASS_TRUST_PATH_LOG}")"
+    [ "${trust_copy}" != "${known_hosts}" ]
+    [ "$(cat "${SSHPASS_TRUST_CONTENT_LOG}")" = 'host.example ssh-ed25519 AAAATESTKEY' ]
+    [ ! -e "${trust_copy}" ]
+    grep -q 'GlobalKnownHostsFile=/dev/null' "${SSHPASS_ARGS_LOG}"
+    ! grep -q 'accept-new' "${SSHPASS_ARGS_LOG}"
+    ! grep -q 'ssh-secret' "${SSHPASS_ARGS_LOG}"
+    [ "$(cat "${SSHPASS_PASSWORD_LOG}")" = "ssh-secret" ]
+    [ ! -e "${SSHPASS_ENV_LOG}" ]
 
-    [ "$(cat "${pass_file}")" = "ssh-secret" ]
+    PATH="${old_path}"
+}
 
-    mode=$(stat -c "%a" "${pass_file}" 2>/dev/null || stat -f "%Lp" "${pass_file}")
-    [ "${mode}" = "600" ]
+@test "host bootstrap rejects unsafe known_hosts files before copying them" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    source_file="${mock_dir}/known_hosts"
+    printf '%s\n' 'host.example ssh-ed25519 AAAATESTKEY' > "${source_file}"
+    chmod 600 "${source_file}"
 
-    rm -f "${pass_file}"
+    ln -s "${source_file}" "${mock_dir}/symlink"
+    run hbs_prepare_known_hosts_copy "${mock_dir}/symlink"
+    [ "${status}" -ne 0 ]
+
+    ln "${source_file}" "${mock_dir}/hardlink"
+    run hbs_prepare_known_hosts_copy "${source_file}"
+    [ "${status}" -ne 0 ]
+    rm -f "${mock_dir}/hardlink"
+
+    chmod 666 "${source_file}"
+    run hbs_prepare_known_hosts_copy "${source_file}"
+    [ "${status}" -ne 0 ]
+}
+
+@test "host bootstrap fails closed without a host-key pin" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    cat > "${mock_dir}/sshpass" <<'EOF'
+#!/usr/bin/env bash
+touch "${SSHPASS_RAN_MARKER}"
+EOF
+    chmod +x "${mock_dir}/sshpass"
+    export SSHPASS_RAN_MARKER="${mock_dir}/ran"
+    export SPLUNK_SSH_HOST="host.example" SPLUNK_SSH_PORT="22"
+    export SPLUNK_SSH_USER="splunk" SPLUNK_SSH_PASS="ssh-secret"
+    unset SPLUNK_SSH_KNOWN_HOSTS_FILE SPLUNK_SSH_HOST_KEY_FINGERPRINT SPLUNK_SSH_ALLOW_TOFU
+    load_splunk_ssh_credentials() { :; }
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    run hbs_run_target_cmd ssh "true"
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"production SSH requires"* ]]
+    [ ! -e "${SSHPASS_RAN_MARKER}" ]
+    PATH="${old_path}"
+}
+
+@test "host bootstrap permits accept-new only through the warned lab TOFU gate" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    cat > "${mock_dir}/sshpass" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${SSHPASS_ARGS_LOG}"
+IFS= read -r _password <&3
+EOF
+    chmod +x "${mock_dir}/sshpass"
+    export SSHPASS_ARGS_LOG="${mock_dir}/args.log"
+    export SPLUNK_SSH_HOST="host.example" SPLUNK_SSH_PORT="22"
+    export SPLUNK_SSH_USER="splunk" SPLUNK_SSH_PASS="ssh-secret"
+    export SPLUNK_SSH_ALLOW_TOFU="true"
+    unset SPLUNK_SSH_KNOWN_HOSTS_FILE SPLUNK_SSH_HOST_KEY_FINGERPRINT
+    load_splunk_ssh_credentials() { :; }
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    run hbs_run_target_cmd ssh "true"
+
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"LAB-ONLY SSH TOFU IS ENABLED"* ]]
+    grep -q 'StrictHostKeyChecking=accept-new' "${SSHPASS_ARGS_LOG}"
+    ! grep -q 'StrictHostKeyChecking=yes' "${SSHPASS_ARGS_LOG}"
+    PATH="${old_path}"
+}
+
+@test "host bootstrap validates remote tmpdir and staging basename before SCP" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+
+    hbs_validate_remote_stage_path "/var/tmp/splunk" "package.tgz"
+    run hbs_validate_remote_stage_path "var/tmp" "package.tgz"
+    [ "${status}" -ne 0 ]
+    run hbs_validate_remote_stage_path "/var/tmp/../root" "package.tgz"
+    [ "${status}" -ne 0 ]
+    run hbs_validate_remote_stage_path "/var/tmp" "../../package.tgz"
+    [ "${status}" -ne 0 ]
+    run hbs_validate_remote_stage_path "/var/tmp" "package name.tgz"
+    [ "${status}" -ne 0 ]
+}
+
+@test "host bootstrap accepts only the scanned key matching a pinned fingerprint" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    expected='SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+    cat > "${mock_dir}/ssh-keyscan" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'host.example ssh-ed25519 AAAAMATCH' 'host.example ssh-rsa AAAAOTHER'
+EOF
+    cat > "${mock_dir}/ssh-keygen" <<'EOF'
+#!/usr/bin/env bash
+IFS= read -r key_line
+case "${key_line}" in
+    *AAAAMATCH) printf '%s\n' '256 SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA host (ED25519)' ;;
+    *) printf '%s\n' '3072 SHA256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB host (RSA)' ;;
+esac
+EOF
+    chmod +x "${mock_dir}/ssh-keyscan" "${mock_dir}/ssh-keygen"
+    export SPLUNK_SSH_HOST="host.example" SPLUNK_SSH_PORT="22"
+    export SPLUNK_SSH_USER="splunk" SPLUNK_SSH_PASS="ssh-secret"
+    export SPLUNK_SSH_HOST_KEY_FINGERPRINT="${expected}"
+    unset SPLUNK_SSH_KNOWN_HOSTS_FILE SPLUNK_SSH_ALLOW_TOFU
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+
+    hbs_prepare_ssh_trust
+
+    [ -f "${HBS_SSH_TRUST_TEMP_FILE}" ]
+    grep -q 'AAAAMATCH' "${HBS_SSH_TRUST_TEMP_FILE}"
+    ! grep -q 'AAAAOTHER' "${HBS_SSH_TRUST_TEMP_FILE}"
+    [[ " ${HBS_SSH_TRUST_ARGS[*]} " == *" StrictHostKeyChecking=yes "* ]]
+    hbs_cleanup_ssh_trust
+    PATH="${old_path}"
 }
 
 @test "hbs_append_cleanup_trap composes with an existing cleanup trap" {
     # This helper still has a valid use case in get_splunkbase_session and
     # other functions that are invoked WITHOUT command substitution. Verify
-    # the append-not-replace semantics independently of hbs_make_sshpass_file.
+    # the append-not-replace semantics independently.
     captured="$(
         set -e
         source "${LIB_DIR}/host_bootstrap_helpers.sh"
@@ -299,6 +774,28 @@ EOF
     run _is_splunk_package "$tmpfile"
     rm -f "$tmpfile"
     [ "$status" -ne 0 ]
+}
+
+@test "read_secret_file rejects symlinks hardlinks and broad modes" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    tmpdir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${tmpdir}")
+    secret="${tmpdir}/secret"
+    printf '%s\n' 'private-value' > "${secret}"
+    chmod 600 "${secret}"
+
+    ln -s "${secret}" "${tmpdir}/link"
+    run read_secret_file "${tmpdir}/link"
+    [ "${status}" -ne 0 ]
+
+    ln "${secret}" "${tmpdir}/hard"
+    run read_secret_file "${secret}"
+    [ "${status}" -ne 0 ]
+    rm -f "${tmpdir}/hard"
+
+    chmod 644 "${secret}"
+    run read_secret_file "${secret}"
+    [ "${status}" -ne 0 ]
 }
 
 # --- rest_set_verify_ssl ---
@@ -410,6 +907,28 @@ EOF
     [[ "$output" == *"apply cluster-bundle"* ]]
     [[ "$output" == *"-answer-yes"* ]]
     [[ "$output" != *"cluster-pass"* ]]
+}
+
+@test "search-head bundle apply rejects plaintext target before staging credentials" {
+    credentials_file=$(mktemp)
+    TEST_TEMP_FILES+=("${credentials_file}")
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export BUNDLE_STAGE_MARKER="${BATS_TMPDIR}/bundle-stage-${BASHPID}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+
+    hbs_stage_file_for_execution() {
+        touch "${BUNDLE_STAGE_MARKER}"
+        printf '%s' "$2"
+    }
+    export -f hbs_stage_file_for_execution
+
+    run deployment_bundle_apply_current_profile \
+        "shc" "http://deployer.example.com:8089" "cluster-user" "cluster-pass"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"refuses plaintext HTTP"* ]]
+    [ ! -e "${BUNDLE_STAGE_MARKER}" ]
 }
 
 @test "deployment_hec_token_record_from_conf parses bundle-managed inputs stanzas" {

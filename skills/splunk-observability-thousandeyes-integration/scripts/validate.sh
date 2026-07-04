@@ -129,7 +129,7 @@ log "Splunk Observability ThousandEyes Integration rendered assets passed static
 if [[ "${LIVE}" == "true" ]]; then
     log "  --live: probing https://api.thousandeyes.com/v7/account-groups (expect 401 without auth)..."
     if command -v curl >/dev/null 2>&1; then
-        local_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 'https://api.thousandeyes.com/v7/account-groups' || echo 000)"
+        local_status="$(curl -q -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff 'https://api.thousandeyes.com/v7/account-groups' || echo 000)"
         log "  status: ${local_status}"
     fi
 fi

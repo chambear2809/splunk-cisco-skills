@@ -124,6 +124,15 @@ EOF
     exit "${exit_code}"
 }
 
+read_hec_token_value() {
+    local token_path="$1" token_value
+    if ! token_value="$(read_secret_file "${token_path}")"; then
+        log "ERROR: Could not securely read HEC token file '${token_path}'. Use a nonempty, single-link regular file with mode 0400 or 0600." >&2
+        return 1
+    fi
+    printf '%s' "${token_value}"
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --splunk-prep) DO_SPLUNK_PREP=true; shift ;;
@@ -389,7 +398,9 @@ ensure_apply_token_ready() {
             log "HANDOFF: Provide --hec-token-file PATH, or combine --splunk-prep with --write-hec-token-file PATH."
             exit 1
         fi
-        token_value="$(read_secret_file "${HEC_TOKEN_FILE}")" || exit 1
+        if ! token_value="$(read_hec_token_value "${HEC_TOKEN_FILE}")"; then
+            exit 1
+        fi
         if [[ -z "${token_value}" ]]; then
             log "ERROR: Live apply is blocked because the HEC token file contains only whitespace."
             exit 1
@@ -1412,7 +1423,9 @@ render_host_assets() {
     hec_base_url="$(detect_hec_base_url)"
     if [[ -n "${HEC_TOKEN_FILE}" ]]; then
         assert_secret_output_dir_is_safe "${host_dir}"
-        hec_token_value="$(read_secret_file "${HEC_TOKEN_FILE}")"
+        if ! hec_token_value="$(read_hec_token_value "${HEC_TOKEN_FILE}")"; then
+            return 1
+        fi
     else
         hec_token_value="<replace-with-hec-token>"
         log "WARN: No --hec-token-file provided. Rendering a placeholder token value."
@@ -1612,7 +1625,9 @@ render_k8s_assets() {
     if [[ -n "${HEC_TOKEN_FILE}" ]]; then
         assert_secret_output_dir_is_safe "${k8s_dir}"
         local _raw_token _escaped_token
-        _raw_token="$(read_secret_file "${HEC_TOKEN_FILE}")"
+        if ! _raw_token="$(read_hec_token_value "${HEC_TOKEN_FILE}")"; then
+            return 1
+        fi
         _escaped_token="$(printf '%s' "${_raw_token}" | python3 -c '
 import sys
 v = sys.stdin.read()

@@ -29,7 +29,8 @@ doctor.
 
 Render-first umbrella workflow for CyberArk EPM and legacy EPV/PTA parsing.
 The skill keeps the support boundary explicit: `Splunk_TA_cyberark_epm`
-(Splunkbase `5160`, verified `4.0.0`) is the supported API path, while
+(Splunkbase `5160`, repo-reviewed pin `4.0.0`; public `5.0.0` requires review)
+is the supported API path, while
 `Splunk_TA_cyberark` (Splunkbase `2891`, verified `1.2.0`) is archived and
 parser-only.
 

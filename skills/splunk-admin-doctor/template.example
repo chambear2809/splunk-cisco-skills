@@ -3,14 +3,21 @@
 # Copy this file locally and fill in non-secret values only.
 
 phase: doctor
-platform: auto
+# Required for normal operation: cloud or enterprise.
+# Use auto only when evidence_file JSON declares its platform or splunk_uri is
+# a strict HTTPS management host ending in .splunkcloud.com.
+platform: enterprise
 
 target_search_head:
+# Optional context only. When set, use an HTTPS management origin such as
+# https://splunk.example.com:8089 with no credentials, non-root path, query, or
+# fragment.
 splunk_uri:
 splunk_home: /opt/splunk
 output_dir: splunk-admin-doctor-rendered
 
 # Optional evidence file for offline or fixture-driven diagnosis.
+# Generated evidence is written as evidence/normalized-evidence.redacted.json.
 evidence_file:
 
 # Apply renders local packets only and requires explicit rule IDs.

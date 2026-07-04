@@ -919,7 +919,9 @@ if [[ "${{ALLOWLISTS_ENABLED}}" == "true" && ( -n "${{acs_planned_v4}}" || -n "$
   discovered_v4=""
   if [[ -z "${{operator_v4}}" ]]; then
     for url in https://checkip.amazonaws.com https://ifconfig.me https://api.ipify.org; do
-      candidate=$(curl -sS --connect-timeout 5 --max-time 10 "${{url}}" 2>/dev/null | tr -d '[:space:]' || true)
+      candidate=$(curl -q -sS --connect-timeout 5 --max-time 10 "${{url}}" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+        2>/dev/null | tr -d '[:space:]' || true)
       if [[ -n "${{candidate}}" ]]; then
         discovered_v4="${{candidate}}"
         break
@@ -1410,7 +1412,7 @@ JSON
     private-connectivity)
       if [[ -n "${{STACK_TOKEN:-}}" && -n "${{SPLUNK_CLOUD_STACK:-}}" ]]; then
         endpoint="${{ACS_SERVER:-https://admin.splunk.com}}/${{SPLUNK_CLOUD_STACK}}/adminconfig/v2/private-connectivity/eligibility"
-        curl -fsS -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") "${{endpoint}}" > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json" \\
+        acs_rest_curl "${{endpoint}}" > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json" \\
           || printf '{{"status":"unavailable","name":"private-connectivity-eligibility"}}\\n' > "${{SNAPSHOT_DIR}}/private-connectivity-eligibility.json"
       else
         printf '{{"status":"skipped","reason":"STACK_TOKEN and SPLUNK_CLOUD_STACK required for API-only private connectivity endpoint"}}\\n' \\
@@ -1626,7 +1628,7 @@ fi
 
 case "${{ACTION}}" in
   eligibility)
-    curl -fsS -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") "${{BASE}}/eligibility"
+    acs_rest_curl "${{BASE}}/eligibility"
     ;;
   apply)
     tmp_dir="$(mktemp -d)"
@@ -1647,11 +1649,9 @@ for index, item in enumerate(payloads):
 PY
     for body in "${{tmp_dir}}"/private-connectivity-*.json; do
       [[ -f "${{body}}" ]] || continue
-      curl -fsS --request POST \\
-        -K <(printf 'header = "Authorization: Bearer %s"\\n' "${{STACK_TOKEN}}") \\
+      credential_curl_stream_file "${{body}}" | acs_rest_curl "${{BASE}}/endpoints" --request POST \\
         --header "Content-Type: application/json" \\
-        --data @"${{body}}" \\
-        "${{BASE}}/endpoints"
+        --data @-
     done
     ;;
   *)

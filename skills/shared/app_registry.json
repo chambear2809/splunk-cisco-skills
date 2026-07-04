@@ -1,5 +1,14 @@
 {
   "description": "Central registry of Splunkbase app metadata and deployment-role placement for this repo. Used by the cloud installer, batch scripts, tests, and generated deployment docs as the single source of truth for package identity and role support.",
+  "splunkbase_metadata_evidence": {
+    "schema_version": 1,
+    "path": "skills/shared/references/splunkbase_registry_evidence.json",
+    "sha256": "92193695424aba7953a8d1e0d1a3ba4c8b714f115b7c98d80fa6015b0b6585c7",
+    "generated_date": "2026-07-03",
+    "max_evidence_age_days": 90,
+    "registry_package_facts_sha256": "0ad4cea49dc547e06742a91ab24e27a4f2dd29cb6c9a5427fcf9df4f83967df7",
+    "scope": "Public Splunkbase listing and release API metadata/release provenance only; does not verify downloadable package binaries or package checksums."
+  },
   "compatibility_target": "10.5",
   "compatibility_verified_date": "July 2, 2026",
   "deployment_roles": [
@@ -4101,6 +4110,7 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.7.0",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
       "latest_release_version": "1.7.1",
       "verified_platform_versions": [],
       "latest_verified_date": "July 30, 2024",
@@ -4188,6 +4198,7 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.1",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
       "latest_release_version": "1.0.3",
       "verified_platform_versions": [],
       "latest_verified_date": "September 16, 2025",
@@ -6569,6 +6580,7 @@
       },
       "notes": "Salesforce object and event-log modular inputs; run each org input set on one search tier or heavy forwarder.",
       "latest_verified_version": "6.0.2",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
       "latest_release_version": "6.0.3",
       "verified_platform_versions": [],
       "latest_verified_date": "April 8, 2026",
@@ -6654,12 +6666,25 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "notes": "Supported CyberArk EPM API collection path.",
+      "notes": "Supported CyberArk EPM API collection path. Public 5.0.0 is current as of July 3, 2026; repo-reviewed 4.0.0 remains the default pin until the new major release is reviewed.",
       "latest_verified_version": "4.0.0",
-      "latest_release_version": "4.0.0",
+      "latest_release_version": "5.0.0",
       "latest_verified_date": "May 22, 2026",
-      "latest_release_date": "May 22, 2026",
-      "last_verified_date": "July 2, 2026",
+      "latest_release_date": "July 3, 2026",
+      "last_verified_date": "July 3, 2026",
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
       "platform_versions": [
         "10.5",
         "10.4",
@@ -6970,6 +6995,7 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product. Splunkbase app 2911 release 4.0.1 does not currently advertise Splunk 10.5 support.",
       "latest_verified_version": "4.0.0",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
       "latest_release_version": "4.0.1",
       "verified_platform_versions": [],
       "latest_verified_date": "May 27, 2026",
@@ -7960,6 +7986,7 @@
         "uf_safe": false
       },
       "latest_verified_version": "10.0.1",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
       "latest_release_version": "11.0.0",
       "verified_platform_versions": [],
       "latest_verified_date": "June 5, 2026",

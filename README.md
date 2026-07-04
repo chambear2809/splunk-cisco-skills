@@ -27,6 +27,11 @@ against `10.5`: repo-verified pins and current public releases keep separate
 platform-version evidence. A selected release with no 10.5 evidence fails
 closed and must not inherit compatibility merely because Splunk Cloud Platform
 supports that train or a different package release advertises it.
+The numeric app registry is also bound to a tracked public-listing/release-API
+[metadata provenance snapshot](skills/shared/references/splunkbase_registry_evidence.md).
+That evidence covers release metadata, not downloadable package binaries or
+package checksums; older pins absent from the current API require an additional
+explicit installer acknowledgement.
 
 Every skill now declares a machine-readable 10.5 status in its `SKILL.md`
 frontmatter. See the generated
@@ -191,6 +196,12 @@ SPLUNK_CLOUD_STACK="your-stack-name"
 ACS_SERVER="https://admin.splunk.com"
 ```
 
+Splunk management credentials and session keys require an `https://` URI.
+`SPLUNK_VERIFY_SSL=false` only disables certificate verification for HTTPS; it
+does not permit plaintext HTTP. For an isolated, short-lived lab only, set
+`SPLUNK_ALLOW_INSECURE_HTTP=true`; each process emits a prominent warning when
+it authorizes plaintext HTTP.
+
 For Splunk Observability Cloud, keep the token value in a separate file:
 
 ```bash
@@ -210,7 +221,10 @@ The automation separates platform target from deployment role:
 
 - Splunk Enterprise uses direct management REST on port `8089`; remote local
   package installs stage local packages over SSH before installing the
-  server-local path.
+  server-local path. Password SSH fails closed until the target host key is
+  pinned with `SPLUNK_SSH_KNOWN_HOSTS_FILE` or
+  `SPLUNK_SSH_HOST_KEY_FINGERPRINT`; first-use trust is restricted to the
+  warned, lab-only `SPLUNK_SSH_ALLOW_TOFU=true` gate.
 - Splunk Cloud uses ACS for app installs, app uninstalls, index creation, and
   restarts.
 - Splunk Cloud search-tier REST is used for TA-specific account setup, input
@@ -233,6 +247,10 @@ install and configuration behavior.
   the compatible Splunkbase release when the app is published there.
 - For Enterprise, install from Splunkbase, a URL, or a local `.tgz`, `.tar.gz`,
   `.spl`, `.rpm`, or `.deb` package.
+- Splunkbase registry evidence covers release metadata, not package bytes. The
+  generic installer redownloads exact Enterprise releases unless a supplied
+  SHA-256 proves a cache entry, and validates archive app identity/version before
+  upload. Remote URLs require HTTPS plus an operator/publisher SHA-256.
 - Use private package uploads only for private or pre-vetted apps that do not
   have a public Splunkbase path.
 - Unpacked copies under `splunk-ta/_unpacked/` are review-only artifacts.
@@ -397,8 +415,9 @@ the published guidance for
 [evaluating skills](https://agentskills.io/skill-creation/evaluating-skills).
 
 Compliance is enforced through `tests/check_skill_frontmatter.py` for the
-`SKILL.md` contract and `tests/check_repo_readiness.py` for catalog links,
-agent command links, local artifact guardrails, and this specification callout.
+`SKILL.md` contract and canonical `agents/openai.yaml` interface metadata, and
+through `tests/check_repo_readiness.py` for catalog links, agent command links,
+local artifact guardrails, and this specification callout.
 
 Before opening a pull request, read [`CONTRIBUTING.md`](CONTRIBUTING.md), run
 the documented checks, and report security issues through the process in

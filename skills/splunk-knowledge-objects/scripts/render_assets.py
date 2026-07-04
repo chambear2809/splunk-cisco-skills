@@ -8,7 +8,13 @@ import json
 import re
 import shlex
 import stat
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+
+BUNDLE_OWNER = "splunk-knowledge-objects"
 
 OBJECT_TYPES = {
     "savedsearches",
@@ -339,6 +345,7 @@ On a search head cluster, stage through the deployer.
 def render(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "knowledge-objects"
+    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)

@@ -76,7 +76,6 @@ BOOLEAN_FIELDS = {
     "allow_episode_export_delete",
     "allow_episode_field_change",
     "allow_high_risk_deletes",
-    "allow_insecure_http",
     "allow_insecure_tls",
     "allow_large_template_import",
     "allow_lookup_file_replace",

@@ -55,13 +55,13 @@ if [[ -f "${RENDERED_DIR}/cdn-snippet.html" ]]; then
 fi
 
 if [[ -n "${CHECK_URL}" ]]; then
-    page="$(curl -fsSL "${CHECK_URL}" || true)"
+    page="$(curl -q -fsSL --proto '=https' --proto-redir '=https' --max-redirs 5 --globoff --connect-timeout 10 --max-time 30 "${CHECK_URL}" || true)"
     if grep -Eq 'SplunkRum|splunk-otel-web|rum-ingest' <<<"${page}"; then
         pass "Detected Browser RUM marker at ${CHECK_URL}"
     else
         warn "No Browser RUM marker detected at ${CHECK_URL}"
     fi
-    headers="$(curl -fsSI "${CHECK_URL}" || true)"
+    headers="$(curl -q -fsSI --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff --connect-timeout 10 --max-time 30 "${CHECK_URL}" || true)"
     if grep -qi 'server-timing:.*traceparent' <<<"${headers}"; then
         pass "Server-Timing traceparent header detected"
     else

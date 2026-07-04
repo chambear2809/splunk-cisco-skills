@@ -62,6 +62,32 @@ def rendered_text(root: Path) -> str:
     )
 
 
+def test_claude_render_rejects_symlinked_output_parent_before_cleanup(
+    tmp_path: Path,
+) -> None:
+    victim = tmp_path / "victim"
+    owned_child = victim / "settings"
+    owned_child.mkdir(parents=True)
+    sentinel = owned_child / "keep.json"
+    sentinel.write_text('{"keep": true}\n', encoding="utf-8")
+    output = tmp_path / "rendered"
+    output.symlink_to(victim, target_is_directory=True)
+
+    result = run_claude(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--output-dir",
+        str(output),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert sentinel.read_text(encoding="utf-8") == '{"keep": true}\n'
+    assert output.is_symlink()
+    assert "symlinks" in result.stdout + result.stderr
+
+
 # ---------------------------------------------------------------------------
 # Parent router tests — claude-code agent
 # ---------------------------------------------------------------------------
@@ -1889,6 +1915,74 @@ def test_apply_env_helper_managed_splunk_direct_skips_same_file_helper(
     helper = out / "bin" / "claude-code-otel-headers.sh"
     assert helper.is_file()
     assert helper.stat().st_mode & stat.S_IXUSR
+
+
+@pytest.mark.parametrize(
+    ("destination", "command_name"),
+    [("local-collector", "install"), ("splunk-direct", "install-executable")],
+)
+@pytest.mark.parametrize("link_kind", ["symlink", "hardlink"])
+def test_claude_apply_rejects_linked_install_targets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    destination: str,
+    command_name: str,
+    link_kind: str,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    out = tmp_path / f"rendered-{destination}-{link_kind}"
+    render_args = [
+        "--render",
+        "--destination",
+        destination,
+        "--output-dir",
+        str(out),
+    ]
+    if destination == "splunk-direct":
+        render_args.append("--disable-galileo")
+    run_claude(*render_args)
+
+    plan = json.loads((out / "apply-plan.json").read_text(encoding="utf-8"))
+    command = next(
+        command
+        for step in plan["steps"]
+        if step["section"] == "env-helper"
+        for command in step["commands"]
+        if command[0] == command_name
+    )
+    target = Path(command[-1])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    victim = tmp_path / f"{destination}-{command_name}-{link_kind}-victim"
+    victim.write_text("KEEP_ME\n", encoding="utf-8")
+    victim.chmod(0o640)
+    if link_kind == "symlink":
+        target.symlink_to(victim)
+    else:
+        os.link(victim, target)
+
+    apply_args = [
+        "--apply",
+        "env-helper",
+        "--destination",
+        destination,
+        "--output-dir",
+        str(out),
+        "--json",
+    ]
+    if destination == "splunk-direct":
+        apply_args.append("--disable-galileo")
+    result = run_claude(*apply_args, check=False)
+
+    assert result.returncode != 0
+    assert victim.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640
+    if link_kind == "symlink":
+        assert target.is_symlink()
+    else:
+        assert target.samefile(victim)
+    assert "single-hardlink regular file" in result.stdout + result.stderr
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,8 @@
 
 By default, assets are written under `splunk-observability-thousandeyes-rendered/`:
 
+- `.splunk-observability-thousandeyes-bundle.json` — mode-600 ownership marker
+  binding the renderer to this canonical dedicated root.
 - `te-payloads/stream.json` — `POST /v7/streams` body.
 - `te-payloads/connector.json` — Integrations 2.0 generic connector.
 - `te-payloads/apm-operation.json` — `splunk-observability-apm` operation assignment.
@@ -41,6 +43,14 @@ By default, assets are written under `splunk-observability-thousandeyes-rendered
 - `--validate` — run static validation against an already-rendered output directory.
 - `--dry-run` — show the plan without writing files.
 - `--json` — emit JSON dry-run output.
+
+The output directory must be new/empty or already contain this skill's valid
+exclusive bundle marker. The renderer refuses `/`, the user's home, the
+repository root, non-empty unmarked directories, unexpected top-level files,
+symlinks, hardlinked files, special files, and filesystem crossings. It
+validates every managed tree before deleting any of them and preserves the
+private `state/` directory on rerender. Legacy unmarked output must be archived
+or moved by the operator; the renderer never auto-adopts it.
 - `--explain` — print plan in plain English (no API calls or writes).
 
 ## Required values
@@ -77,13 +87,31 @@ Three modes (use exactly one):
 
 Every request uses the fixed `https://api.thousandeyes.com/v7` origin, verified TLS, bounded timeouts/response size, HTTP 2xx enforcement, and `?aid=<account_group_id>` scoping.
 
-- `stream` — collection preflight; create plus ID collection readback, or GET/PUT/GET when `TE_STREAM_ID` is supplied.
-- `apm` — connector collection preflight, connector create plus ID readback, then operation GET/PUT/GET verification.
-- `tests`, `alert_rules`, and `templates` — collection preflight, create, retain the server-returned ID, and verify that ID in collection readback.
-- `templates --deploy-templates` — locally state-gated deploy POST followed by template-resource readback. This confirms the template remains readable, not that every asynchronous deployed child asset completed.
+- `stream` — stable identity includes endpoint/model fields plus the exact
+  presence and value of `testMatch`/`filters`; create plus exact ID collection
+  readback, or GET/PUT/GET when `TE_STREAM_ID` is supplied.
+- `apm` — connector identity is `type,name,target`; connector create plus ID
+  readback, then operation GET/PUT/GET verification.
+- `tests` — identity uses the API-documented globally unique `testName` plus
+  the read-only `type` implied by the create endpoint.
+- `alert_rules` and `templates` — use their documented name/type identity
+  fields, retain the server-returned ID, and verify that ID and identity in
+  collection readback.
+- `--deploy-templates` — reserved and fail-closed before mutation. Deploy
+  through the TE UI until an authoritative deployment postcondition is
+  available.
 - `labels`, `tags`, and `te_dashboards` — render-only; automated apply exits before mutation because authoritative response-ID and readback schemas are not yet encoded.
 
-Create state is stored atomically under the rendered output's mode-700 `state/` directory. Preserve it: the helper deliberately does not assume names are unique, so it cannot safely adopt an existing object by name after state loss. If a POST reaches TE but its response is lost, the outcome is ambiguous and must be reconciled before retrying. The generic connector collection path and alert-rule response ID are conservatively inferred from the checked-in API evidence; unsupported tenant behavior fails closed rather than reporting success.
+Create state is stored atomically under the rendered output's mode-700
+`state/` directory. The client holds a per-key file lock from the state check
+through readback and fsyncs a mode-600 `in_progress` journal before POST. After
+a trustworthy ID it records `created_pending_readback`, then `verified` only
+after exact ID and stable-identity readback. Missing IDs, transport uncertainty,
+or failed/mismatched readback become `ambiguous` and permanently block
+automatic POST retry pending manual reconciliation. State and lock files reject
+symlinks and multiple hard links. Payload fingerprints are calculated from the
+non-secret rendered placeholder payload, so token rotation neither creates a
+secret-derived state oracle nor looks like unrelated configuration drift.
 
 ## SignalFlow handoff
 

@@ -137,6 +137,13 @@ teardown() {
     [[ "$output" =~ "Uninstall a Splunk App" ]]
 }
 
+@test "cloud_batch_uninstall --help documents destructive gates" {
+    run bash "${PROJECT_ROOT}/skills/shared/scripts/cloud_batch_uninstall.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "--yes" ]]
+    [[ "$output" =~ "--accept-rest-fallback" ]]
+}
+
 @test "configure_streams --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-stream-setup/scripts/configure_streams.sh" --help
     [ "$status" -eq 0 ]
@@ -663,6 +670,7 @@ teardown() {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" =~ "--stop-on-error" ]]
+    [[ "$output" =~ "--continue-on-error" ]]
     [[ "$output" =~ "--strict" ]]
 }
 
@@ -902,4 +910,60 @@ printf "user=%s\npass=%s\n" "${auth_user}" "${auth_pass}"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "requires a value" ]]
     [[ ! "$output" =~ "unbound variable" ]]
+}
+
+# --- splunk-admin-doctor strict target flags ---
+
+@test "admin doctor setup help documents strict platform and URI inputs" {
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Auto requires" ]]
+    [[ "$output" =~ "HTTPS_ORIGIN" ]]
+    [[ "$output" =~ "no credentials, non-root path, query" ]]
+    [[ "$output" =~ "report_valid" ]]
+    [[ "$output" =~ "integrity_verified" ]]
+}
+
+@test "admin doctor rejects ambiguous auto platform before rendering" {
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" \
+        --phase doctor --platform auto --dry-run --json
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--platform auto requires" ]]
+}
+
+@test "admin doctor auto accepts only a strict splunkcloud subdomain" {
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" \
+        --phase doctor --platform auto \
+        --splunk-uri "https://stack.example.splunkcloud.com:8089/" \
+        --dry-run --json
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ '"platform": "cloud"' ]]
+
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" \
+        --phase doctor --platform auto \
+        --splunk-uri "https://stack.splunkcloud.com.invalid:8089/" \
+        --dry-run --json
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--platform auto requires" ]]
+}
+
+@test "admin doctor rejects unsafe URI without echoing credentials" {
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" \
+        --phase doctor --platform cloud \
+        --splunk-uri "https://doctor-user:DO_NOT_ECHO@example.invalid:8089/" \
+        --dry-run --json
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "embedded credentials are forbidden" ]]
+    [[ ! "$output" =~ "doctor-user" ]]
+    [[ ! "$output" =~ "DO_NOT_ECHO" ]]
+}
+
+@test "admin doctor rejects malformed ports with a generic error" {
+    run bash "${PROJECT_ROOT}/skills/splunk-admin-doctor/scripts/setup.sh" \
+        --phase doctor --platform cloud \
+        --splunk-uri "https://example.invalid:DO_NOT_ECHO/" \
+        --dry-run --json
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "invalid --splunk-uri syntax or port" ]]
+    [[ ! "$output" =~ "DO_NOT_ECHO" ]]
 }

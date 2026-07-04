@@ -4,7 +4,8 @@ description: >-
   Resolve a Cisco product name from the SCAN catalog and route installation,
   configuration, and validation through the correct existing setup skill. Use
   when the user asks to set up Splunk for a Cisco product such as ACI, Nexus
-  9000, Duo, Meraki, or ThousandEyes.
+  9000, Duo, Meraki, ThousandEyes, ASA, or FTD, including choosing the dedicated
+  ASA syslog TA versus Cisco Security Cloud API or eStreamer collection.
 compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
 metadata:
   splunk_cloud_10_5: "delegated"
@@ -32,6 +33,10 @@ Provides one product-aware entrypoint for Cisco setup requests.
   this repo.
 - For partial products, returns a concrete collector or app-install handoff
   path without claiming full product automation.
+- For ASA and FTD, treats the collection path as part of product identity:
+  syslog or `Splunk_TA_cisco-asa` intent routes to `cisco-asa-ta-setup`, while
+  API and eStreamer intent routes to `cisco-security-cloud-setup`. Bare ASA/FTD
+  requests return both choices instead of selecting an owner silently.
 - Uses the relevant family `template.example` file to show which non-secret
   values are required before configuration.
 

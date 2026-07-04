@@ -28,6 +28,30 @@ def load_mcp_tools_loader_module():
     return module
 
 
+def minimal_mcp_tools_document() -> dict[str, object]:
+    return {
+        "name": "Demo MCP Tools",
+        "description": "Demo",
+        "version": "1.0.0",
+        "author": "tests",
+        "tools": [
+            {
+                "_key": "demo:demo_example",
+                "name": "demo_example",
+                "title": "Demo Example",
+                "description": "Example",
+                "category": "demo",
+                "tags": ["demo"],
+                "time_range": False,
+                "row_limiter": True,
+                "spl": "| rest /services/server/info | table serverName",
+                "arguments": [],
+                "examples": [],
+            }
+        ],
+    }
+
+
 def write_mcp_validation_curl(path: Path) -> None:
     """Write a deterministic curl double for the MCP completion validator."""
     write_executable(
@@ -79,7 +103,16 @@ def write_mcp_validation_curl(path: Path) -> None:
         log_path = Path(os.environ["MCP_VALIDATION_CURL_LOG"])
         with log_path.open("a", encoding="utf-8") as handle:
             auth_scheme = "bearer" if any("Authorization: Bearer " in value for value in curl_configs) else "splunk"
-            handle.write(json.dumps({"url": url, "data": data, "auth_scheme": auth_scheme, "headers": headers}) + "\\n")
+            handle.write(json.dumps({
+                "url": url,
+                "data": data,
+                "auth_scheme": auth_scheme,
+                "headers": headers,
+                "quiet_config": "-q" in args,
+                "https_protocol_only": "=https" in args,
+                "no_redirects": "--max-redirs" in args and args[args.index("--max-redirs") + 1] == "0",
+                "globbing_disabled": "--globoff" in args,
+            }) + "\\n")
 
         status = 200
         body = "{}"
@@ -306,6 +339,194 @@ class MCPRegressionTests(ShellScriptRegressionBase):
 
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.check_hostname)
+
+    def test_mcp_python_loader_rejects_plaintext_http_before_rest_calls(self):
+        loader = load_mcp_tools_loader_module()
+        calls = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tools_path = Path(tmpdir) / "mcp_tools.json"
+            tools_path.write_text(
+                json.dumps(minimal_mcp_tools_document()),
+                encoding="utf-8",
+            )
+            original_rest = loader.load_via_rest_batch
+            saved = {
+                key: os.environ.pop(key, None)
+                for key in (
+                    "__SPLUNK_ALLOW_INSECURE_HTTP",
+                    "SPLUNK_ALLOW_INSECURE_HTTP",
+                    "__SPLUNK_SK",
+                )
+            }
+            loader.load_via_rest_batch = lambda **kwargs: calls.append(kwargs)
+            try:
+                os.environ["__SPLUNK_SK"] = "session"
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    result = loader.main(
+                        [
+                            "--tools-json",
+                            str(tools_path),
+                            "--splunk-uri",
+                            "http://splunk.example:8089",
+                        ]
+                    )
+            finally:
+                loader.load_via_rest_batch = original_rest
+                for key in saved:
+                    os.environ.pop(key, None)
+                for key, value in saved.items():
+                    if value is not None:
+                        os.environ[key] = value
+
+        self.assertEqual(result, 1)
+        self.assertEqual(calls, [])
+        self.assertIn("plaintext HTTP is refused", stderr.getvalue())
+        self.assertIn("SPLUNK_ALLOW_INSECURE_HTTP=true", stderr.getvalue())
+
+    def test_mcp_python_loader_allows_explicit_lab_http_with_warning(self):
+        loader = load_mcp_tools_loader_module()
+        calls = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tools_path = Path(tmpdir) / "mcp_tools.json"
+            tools_path.write_text(
+                json.dumps(minimal_mcp_tools_document()),
+                encoding="utf-8",
+            )
+            original_rest = loader.load_via_rest_batch
+            saved = {
+                key: os.environ.pop(key, None)
+                for key in (
+                    "__SPLUNK_ALLOW_INSECURE_HTTP",
+                    "SPLUNK_ALLOW_INSECURE_HTTP",
+                    "__SPLUNK_SK",
+                    "__SPLUNK_TLS_MODE",
+                )
+            }
+            loader.load_via_rest_batch = lambda **kwargs: calls.append(kwargs)
+            loader._WARNED_INSECURE_HTTP = False
+            try:
+                os.environ["__SPLUNK_ALLOW_INSECURE_HTTP"] = "true"
+                os.environ["__SPLUNK_SK"] = "session"
+                os.environ["__SPLUNK_TLS_MODE"] = "verify"
+                stderr = io.StringIO()
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+                    result = loader.main(
+                        [
+                            "--tools-json",
+                            str(tools_path),
+                            "--splunk-uri",
+                            "http://splunk.example:8089",
+                        ]
+                    )
+            finally:
+                loader.load_via_rest_batch = original_rest
+                for key in saved:
+                    os.environ.pop(key, None)
+                for key, value in saved.items():
+                    if value is not None:
+                        os.environ[key] = value
+
+        self.assertEqual(result, 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["splunk_uri"], "http://splunk.example:8089")
+        self.assertIn("WARNING: LAB ONLY", stderr.getvalue())
+
+    def test_mcp_python_loader_follows_same_origin_but_rejects_cross_origin_redirects(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        loader = load_mcp_tools_loader_module()
+        same_origin_auth = []
+        cross_origin_called = threading.Event()
+
+        class SameOriginHandler(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                same_origin_auth.append(self.headers.get("Authorization", ""))
+                if self.path == "/redirect":
+                    self.send_response(302)
+                    self.send_header("Location", "/final")
+                    self.end_headers()
+                    return
+                payload = b'{"ok": true}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *_args):
+                return
+
+        class TargetHandler(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                cross_origin_called.set()
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *_args):
+                return
+
+        target = HTTPServer(("127.0.0.1", 0), TargetHandler)
+
+        class RedirectHandler(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                self.send_response(302)
+                self.send_header(
+                    "Location",
+                    f"http://127.0.0.1:{target.server_port}/credential-capture",
+                )
+                self.end_headers()
+
+            def log_message(self, *_args):
+                return
+
+        same_origin = HTTPServer(("127.0.0.1", 0), SameOriginHandler)
+        redirect = HTTPServer(("127.0.0.1", 0), RedirectHandler)
+        servers = (same_origin, redirect, target)
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True)
+            for server in servers
+        ]
+        saved = {
+            key: os.environ.pop(key, None)
+            for key in ("__SPLUNK_ALLOW_INSECURE_HTTP", "SPLUNK_ALLOW_INSECURE_HTTP")
+        }
+        for thread in threads:
+            thread.start()
+        try:
+            os.environ["__SPLUNK_ALLOW_INSECURE_HTTP"] = "true"
+            loader._WARNED_INSECURE_HTTP = False
+            with contextlib.redirect_stderr(io.StringIO()):
+                status, body, _ = loader.request_json(
+                    f"http://127.0.0.1:{same_origin.server_port}/redirect",
+                    method="GET",
+                    session_key="session",
+                    ctx=ssl.create_default_context(),
+                )
+                with self.assertRaises(loader.urllib.error.URLError) as raised:
+                    loader.request_json(
+                        f"http://127.0.0.1:{redirect.server_port}/redirect",
+                        method="GET",
+                        session_key="session",
+                        ctx=ssl.create_default_context(),
+                    )
+        finally:
+            for server in servers:
+                server.shutdown()
+                server.server_close()
+            for thread in threads:
+                thread.join(timeout=2)
+            for key in saved:
+                os.environ.pop(key, None)
+            for key, value in saved.items():
+                if value is not None:
+                    os.environ[key] = value
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body, {"ok": True})
+        self.assertEqual(same_origin_auth, ["Splunk session", "Splunk session"])
+        self.assertIn("cross-origin redirect refused", str(raised.exception))
+        self.assertFalse(cross_origin_called.is_set())
 
     def test_mcp_shared_loader_rest_batch_sequence_is_behavioral(self):
         loader = load_mcp_tools_loader_module()
@@ -1131,6 +1352,10 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             ]
             self.assertTrue(mcp_records)
             self.assertTrue(all(record["auth_scheme"] == "bearer" for record in mcp_records))
+            self.assertTrue(all(record["quiet_config"] for record in mcp_records))
+            self.assertTrue(all(record["https_protocol_only"] for record in mcp_records))
+            self.assertTrue(all(record["no_redirects"] for record in mcp_records))
+            self.assertTrue(all(record["globbing_disabled"] for record in mcp_records))
             self.assertTrue(
                 all(
                     "MCP-Protocol-Version: 2025-06-18" in record["headers"]

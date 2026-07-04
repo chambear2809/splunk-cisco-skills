@@ -25,14 +25,40 @@ Based on current Splunk Platform knowledge object and REST documentation:
 
 ## Apply Transport
 
-Apply writes the object via REST `configs/conf-<file>/<stanza>` (the shared
-`rest_set_conf` helper is search head cluster deployer-bundle aware) and then
-POSTs sharing/ownership to `.../configs/conf-<file>/<stanza>/acl`. For lookups
-with `--auto-lookup-sourcetype`, apply also writes the `LOOKUP-<name>` binding to
-`props.conf` on that source type (app-scoped), matching the rendered
-`props.conf`. Knowledge object changes generally take effect after a
+Before mutation, apply reads the target app, authenticated context, conf
+collection, object, ACL, and optional `props.conf` stanza. Existing state is
+held only in a private temporary transaction directory. Apply then writes the
+object via REST `configs/conf-<file>/<stanza>`, POSTs sharing/ownership to
+`.../configs/conf-<file>/<stanza>/acl`, writes any requested
+`LOOKUP-<name>` binding, and reads all requested state back.
+
+Failures after the first write invoke read-only reconciliation. Immediately after creating
+an object, apply captures and validates its complete mutable content and initial
+ACL before attempting governance. It does not later DELETE that object: Splunk
+does not provide a supported conditional DELETE/If-Match contract, so state can
+change between any read-back and an unconditional DELETE. A failed create path
+therefore retains the object and writes its before, post-write, current, and ACL
+responses under a mode-700 `knowledge-objects/state/manual-cleanup-*`
+directory; each snapshot is mode 600. Newly created automatic-lookup stanzas
+follow the same retain-and-handoff rule.
+
+Pre-existing objects, ACLs, and automatic-lookup stanzas are also never restored
+with a compensating POST. Splunk exposes no verified conditional update
+contract, so a guard GET followed by an unconditional restore can overwrite an
+edit made in between. The runner reads current state and records `unchanged`
+only when touched values or ACL governance still match their prestate;
+otherwise it preserves mode-600 before/current snapshots, retains the failed
+state, and sets `rollback=partial`, `partial_failure=true`, and
+`manual_cleanup_required=true` in `apply-evidence.json`. Recovery guidance
+requires a fresh exact live read and ownership review before manual UI/REST
+reconciliation.
+
+The SHC deployer bundle path is refused before mutation because file-based
+content delivery and a live member `/acl` POST cannot form one transaction.
+Use `splunk-knowledge-objects` to stage the conf and `local.meta` together on
+the deployer. Knowledge object changes generally take effect after a
 configuration reload; the skill prints platform-appropriate restart/reload
-guidance.
+guidance after verified success.
 
 ## CSV Lookup Content
 
@@ -49,9 +75,19 @@ On a search head cluster, distribute lookup files through the deployer.
   apply step sends no `perms.read`, so Splunk's defaults apply: app- and
   global-scoped objects are readable by all roles (`*`), while `--sharing user`
   objects stay private to the owner.
+- App/global sharing requires owner `nobody`. User sharing requires a named
+  user owner and uses that owner's `/servicesNS/<owner>/<app>` namespace.
+  Owners must match `[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}`; every namespace and
+  app path segment is URL-encoded. Invalid or traversal-like owners fail before
+  render and authentication.
+- App names must begin with an alphanumeric character. Exact `.`/`..` values
+  are refused for object names and automatic-lookup source types because URL
+  encoding does not escape unreserved dot path segments.
 
 ## Validation
 
-Static validation confirms the rendered conf and ACL-plan assets exist. Confirm
-the live object and its permissions in Settings or via the object's REST
-endpoint after applying.
+Static validation confirms the rendered conf and ACL-plan assets exist. The
+setup wrapper's `--phase status` is the live validation path: it queries the
+object and `/acl` endpoints (plus `props.conf` for automatic lookups), compares
+them with the requested state, writes a private `live-status.json`, and exits
+nonzero for missing content or governance drift.

@@ -528,6 +528,7 @@ def test_rendered_cloud_curl_and_uid_examples_are_fail_closed(tmp_path: Path) ->
     assert "command curl -q" in curl_helper
     assert "--proto '=https'" in curl_helper
     assert "--location --max-redirs 0" in curl_helper
+    assert "--globoff" in curl_helper
     assert "--fail" in curl_helper
     assert "--fail-with-body" not in curl_helper
 

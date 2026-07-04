@@ -4,12 +4,18 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import os
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
+from contextlib import redirect_stderr
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 from agent.splunk_cisco_skills_mcp import core
 from tests.regression_helpers import REPO_ROOT
@@ -82,6 +88,87 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
             check=False,
             timeout=60,
         )
+
+    def test_live_collector_refuses_http_without_explicit_lab_opt_in(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SPLUNK_ALLOW_INSECURE_HTTP", None)
+            with self.assertRaises(SystemExit):
+                doctor.normalize_splunk_uri("http://127.0.0.1:8089")
+
+    def test_live_collector_allows_explicit_lab_http_with_warning(self) -> None:
+        doctor._INSECURE_HTTP_WARNING_EMITTED = False
+        stderr = io.StringIO()
+        with mock.patch.dict(os.environ, {"SPLUNK_ALLOW_INSECURE_HTTP": "true"}, clear=False):
+            with redirect_stderr(stderr):
+                uri = doctor.normalize_splunk_uri("http://127.0.0.1:8089/")
+        self.assertEqual(uri, "http://127.0.0.1:8089")
+        self.assertIn("LAB ONLY", stderr.getvalue())
+
+    def test_live_collector_rejects_uri_userinfo_without_echoing_secret(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), self.assertRaises(SystemExit):
+            doctor.normalize_splunk_uri("https://embedded:uri-secret@example.test:8089")
+        self.assertIn("userinfo", stderr.getvalue())
+        self.assertNotIn("uri-secret", stderr.getvalue())
+
+    def test_live_collector_refuses_redirect_without_forwarding_session_key(self) -> None:
+        target_authorization: list[str] = []
+
+        class TargetHandler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                target_authorization.append(self.headers.get("Authorization", ""))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+            def do_POST(self) -> None:  # noqa: N802
+                self.do_GET()
+
+            def log_message(self, _format: str, *_args: object) -> None:
+                return
+
+        target = ThreadingHTTPServer(("127.0.0.1", 0), TargetHandler)
+
+        class RedirectHandler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                self.send_response(302)
+                self.send_header(
+                    "Location",
+                    f"http://127.0.0.1:{target.server_port}/credential-target",
+                )
+                self.end_headers()
+
+            def log_message(self, _format: str, *_args: object) -> None:
+                return
+
+        redirect = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True)
+            for server in (target, redirect)
+        ]
+        for thread in threads:
+            thread.start()
+        try:
+            args = doctor.parse_args(
+                [
+                    "--phase",
+                    "collect",
+                    "--splunk-uri",
+                    f"http://127.0.0.1:{redirect.server_port}",
+                    "--collect-timeout-seconds",
+                    "5",
+                ]
+            )
+            search = {"id": "redirect-test", "title": "redirect test", "spl": "| makeresults"}
+            with mock.patch.dict(os.environ, {"SPLUNK_ALLOW_INSECURE_HTTP": "true"}, clear=False):
+                result = doctor.execute_export_search(args, "do-not-forward", search)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["http_status"], 302)
+            self.assertEqual(target_authorization, [])
+        finally:
+            for server in (redirect, target):
+                server.shutdown()
+                server.server_close()
 
     def test_rule_catalog_has_full_domain_coverage_and_required_fields(self) -> None:
         validation = doctor.validate_catalog()

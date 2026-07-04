@@ -10,6 +10,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -20,7 +21,9 @@ from urllib.parse import SplitResult, quote, urlsplit
 from skills.shared.coding_agent_o11y.common import (
     REPO_ROOT,
     UsageError,
+    absolute_path_no_follow,
     command_failed,
+    copy_file_safe,
     deep_merge,
     ensure_safe_external_header,
     ensure_safe_external_value,
@@ -28,6 +31,7 @@ from skills.shared.coding_agent_o11y.common import (
     parse_header,
     print_payload,
     reject_secret_argv,
+    reset_output_subdirectories,
     scan_rendered_for_secret_leaks,
     shell_join,
     split_csv,
@@ -435,22 +439,26 @@ def destination_uses_headers_helper(config: dict[str, Any], destination: str) ->
 def resolve_settings_scope_path(config: dict[str, Any], output_dir: Path) -> Path:
     scope = str(config["claude_code"].get("settings_scope", "user"))
     if scope == "user":
-        return (Path.home() / ".claude" / "settings.json").resolve()
+        return absolute_path_no_follow(Path.home() / ".claude" / "settings.json")
     if scope == "project":
-        return (Path.cwd() / ".claude" / "settings.json").resolve()
+        return absolute_path_no_follow(Path.cwd() / ".claude" / "settings.json")
     if scope == "managed":
-        return (output_dir / "settings" / "managed-settings.json").resolve()
+        return absolute_path_no_follow(output_dir / "settings" / "managed-settings.json")
     raise UsageError(f"unknown settings_scope: {scope}")
 
 
 def headers_helper_target_path(config: dict[str, Any], output_dir: Path) -> Path:
     scope = str(config["claude_code"].get("settings_scope", "user"))
     if scope == "user":
-        return (Path.home() / ".claude" / "bin" / "claude-code-otel-headers.sh").resolve()
+        return absolute_path_no_follow(
+            Path.home() / ".claude" / "bin" / "claude-code-otel-headers.sh"
+        )
     if scope == "project":
-        return (Path.cwd() / ".claude" / "bin" / "claude-code-otel-headers.sh").resolve()
+        return absolute_path_no_follow(
+            Path.cwd() / ".claude" / "bin" / "claude-code-otel-headers.sh"
+        )
     if scope == "managed":
-        return (output_dir / "bin" / "claude-code-otel-headers.sh").resolve()
+        return absolute_path_no_follow(output_dir / "bin" / "claude-code-otel-headers.sh")
     raise UsageError(f"unknown settings_scope: {scope}")
 
 
@@ -2093,7 +2101,6 @@ def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
 
 def render(config: dict[str, Any], output_dir: Path, json_output: bool = False) -> dict[str, Any]:
     errors, warnings = validate_config(config)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Validate BEFORE wiping prior output so a failed render does not destroy a
     # previously-good rendered tree (and leave a stale apply-plan.json behind).
@@ -2105,10 +2112,10 @@ def render(config: dict[str, Any], output_dir: Path, json_output: bool = False) 
             print(json.dumps(metadata, indent=2, sort_keys=True))
         raise UsageError("; ".join(errors))
 
-    for child in ("settings", "env", "collector", "bin", "runtime"):
-        target = output_dir / child
-        if target.exists():
-            shutil.rmtree(target)
+    reset_output_subdirectories(
+        output_dir,
+        ("settings", "env", "collector", "bin", "runtime"),
+    )
 
     cc = config["claude_code"]
     scope = str(cc.get("settings_scope", "user"))
@@ -3208,23 +3215,14 @@ def merge_settings_file(source: Path, target: Path) -> None:
             target_doc.pop(key, None)
     target_doc["_managedBy"] = MANAGED_SETTINGS_MARKER
 
-    target.parent.mkdir(parents=True, exist_ok=True)
     prior_mode: int | None = None
     if target.exists():
         prior_mode = target.stat().st_mode
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
         backup = target.with_name(f"{target.name}.bak.{timestamp}")
-        shutil.copy2(target, backup)
+        copy_file_safe(target, backup, mode=stat.S_IMODE(prior_mode))
 
-    temp_target = target.with_name(f".{target.name}.tmp.{os.getpid()}")
-    try:
-        write_json(temp_target, target_doc)
-        if prior_mode is not None:
-            temp_target.chmod(prior_mode)
-        os.replace(temp_target, target)
-    finally:
-        if temp_target.exists():
-            temp_target.unlink()
+    write_json(target, target_doc)
 
 
 def apply_sections(
@@ -3271,18 +3269,11 @@ def apply_sections(
             if command[0] == "install":
                 source = Path(command[-2])
                 target = Path(os.path.expandvars(os.path.expanduser(command[-1])))
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if source.resolve() != target.resolve():
-                    shutil.copy2(source, target)
-                if len(command) >= 3 and command[2] == "0755":
-                    target.chmod(target.stat().st_mode | 0o111)
+                copy_file_safe(source, target, mode=int(command[2], 8))
             elif command[0] == "install-executable":
                 source = Path(command[-2])
                 target = Path(os.path.expandvars(os.path.expanduser(command[-1])))
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if source.resolve() != target.resolve():
-                    shutil.copy2(source, target)
-                target.chmod(target.stat().st_mode | 0o111)
+                copy_file_safe(source, target, mode=int(command[2], 8))
             elif command[0] == "merge-settings":
                 merge_settings_file(
                     Path(command[1]),
@@ -3383,7 +3374,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         reject_secret_argv(argv)
         args = parse_args(argv)
-        output_dir = Path(args.output_dir).expanduser().resolve()
+        output_dir = absolute_path_no_follow(Path(args.output_dir))
         if args.discover:
             discover(args.json)
             return 0

@@ -4,13 +4,14 @@ import base64
 import json
 import os
 import ssl
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 from .common import ValidationError, bool_from_any
 
@@ -23,6 +24,22 @@ class ClientConfig:
     password: str | None
     session_key: str | None
     ca_cert_file: str | None = None
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Refuse redirects so authenticated requests never leave their URL."""
+
+    def redirect_request(  # type: ignore[override]
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        del req, fp, code, msg, headers, newurl
+        return None
 
 
 class SplunkRestClient:
@@ -41,6 +58,10 @@ class SplunkRestClient:
             self._ssl_context = ssl._create_unverified_context()
         elif config.ca_cert_file:
             self._ssl_context = ssl.create_default_context(cafile=config.ca_cert_file)
+        self._opener = build_opener(
+            _NoRedirectHandler(),
+            HTTPSHandler(context=self._ssl_context),
+        )
 
     @classmethod
     def from_spec(cls, spec: dict[str, Any]) -> "SplunkRestClient":
@@ -56,12 +77,26 @@ class SplunkRestClient:
             raise ValidationError(f"Splunk base URL is invalid: {exc}") from exc
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
             raise ValidationError("Splunk base URL must be an http(s) origin URL.")
-        if parsed_url.scheme != "https" and not bool_from_any(
-            connection.get("allow_insecure_http"), default=False
-        ):
+        if "allow_insecure_http" in connection:
             raise ValidationError(
-                "Splunk base URL must use https. Set connection.allow_insecure_http=true "
-                "only for an explicitly accepted short-lived lab endpoint."
+                "connection.allow_insecure_http is not accepted. For an isolated short-lived "
+                "lab only, explicitly set SPLUNK_ALLOW_INSECURE_HTTP=true in the process environment."
+            )
+        if parsed_url.scheme != "https":
+            allow_insecure_http = bool_from_any(
+                os.environ.get("SPLUNK_ALLOW_INSECURE_HTTP"),
+                default=False,
+                field="SPLUNK_ALLOW_INSECURE_HTTP",
+            )
+            if not allow_insecure_http:
+                raise ValidationError(
+                    "Splunk base URL must use https. For an isolated short-lived lab only, "
+                    "explicitly set SPLUNK_ALLOW_INSECURE_HTTP=true."
+                )
+            print(
+                "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true permits Splunk credentials "
+                "and session keys over plaintext HTTP. Network observers can recover them.",
+                file=sys.stderr,
             )
         if parsed_url.username or parsed_url.password:
             raise ValidationError("Splunk base URL must not contain inline credentials.")
@@ -161,7 +196,7 @@ class SplunkRestClient:
             headers["Content-Type"] = "application/json"
         request = Request(url, method=method.upper(), headers=headers, data=body)
         try:
-            with urlopen(request, context=self._ssl_context, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
+            with self._opener.open(request, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
                 raw = response.read()
                 content_type = response.headers.get("Content-Type", "")
         except HTTPError as exc:
@@ -202,7 +237,7 @@ class SplunkRestClient:
         headers["Content-Type"] = "application/x-www-form-urlencoded"
         request = Request(url, method=method.upper(), headers=headers, data=body)
         try:
-            with urlopen(request, context=self._ssl_context, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
+            with self._opener.open(request, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
                 raw = response.read()
                 content_type = response.headers.get("Content-Type", "")
         except HTTPError as exc:

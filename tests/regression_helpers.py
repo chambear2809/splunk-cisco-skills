@@ -266,7 +266,9 @@ class ShellScriptRegressionBase(unittest.TestCase):
             "cloudlock_token": "cloudlock-token",
         }
         for name, value in secret_values.items():
-            (secrets_dir / name).write_text(value, encoding="utf-8")
+            secret_path = secrets_dir / name
+            secret_path.write_text(value, encoding="utf-8")
+            secret_path.chmod(0o600)
 
         write_executable(
             bin_dir / "nc",

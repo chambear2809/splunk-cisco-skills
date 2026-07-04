@@ -14,9 +14,12 @@ import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from tests.regression_helpers import REPO_ROOT
 
 from skills.shared.coding_agent_o11y import codex as codex_o11y
+from skills.shared.coding_agent_o11y import common as common_o11y
 
 
 PARENT = REPO_ROOT / "skills/splunk-observability-coding-agent-instrumentation-setup/scripts/setup.sh"
@@ -56,6 +59,117 @@ def run_codex(*args: str, check: bool = True) -> subprocess.CompletedProcess[str
 
 def rendered_text(root: Path) -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*")) if path.is_file())
+
+
+def test_shared_writer_rejects_symlink_target_without_content_or_mode_change(
+    tmp_path: Path,
+) -> None:
+    victim = tmp_path / "victim.conf"
+    victim.write_text("KEEP_ME\n", encoding="utf-8")
+    victim.chmod(0o640)
+    output = tmp_path / "rendered/runtime/codex-o11y.env"
+    output.parent.mkdir(parents=True)
+    output.symlink_to(victim)
+
+    with pytest.raises(common_o11y.UsageError, match="regular file"):
+        common_o11y.write_text(output, "CLOBBERED\n", executable=True)
+
+    assert output.is_symlink()
+    assert victim.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
+def test_shared_writer_rejects_symlink_parent_and_hardlinked_target(
+    tmp_path: Path,
+) -> None:
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir()
+    linked_parent = tmp_path / "linked-parent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(common_o11y.UsageError, match="symlinks|non-directories"):
+        common_o11y.write_text(linked_parent / "output.txt", "BLOCKED\n")
+    assert list(real_parent.iterdir()) == []
+
+    victim = tmp_path / "victim.conf"
+    victim.write_text("KEEP_ME\n", encoding="utf-8")
+    victim.chmod(0o640)
+    output = tmp_path / "hardlinked-output.conf"
+    os.link(victim, output)
+    with pytest.raises(common_o11y.UsageError, match="single-hardlink"):
+        common_o11y.write_text(output, "CLOBBERED\n", executable=True)
+    assert victim.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
+def test_shared_writer_rejects_target_swap_before_atomic_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "rendered/bin/codex-o11y-exec"
+    output.parent.mkdir(parents=True)
+    output.write_text("OLD\n", encoding="utf-8")
+    victim = tmp_path / "victim.conf"
+    victim.write_text("KEEP_ME\n", encoding="utf-8")
+    victim.chmod(0o640)
+
+    original_stat = common_o11y.os.stat
+    target_stats = 0
+
+    def swapping_stat(path, *args, **kwargs):
+        nonlocal target_stats
+        if (
+            path == output.name
+            and kwargs.get("dir_fd") is not None
+            and kwargs.get("follow_symlinks") is False
+        ):
+            target_stats += 1
+            if target_stats == 2:
+                output.unlink()
+                output.symlink_to(victim)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(common_o11y.os, "stat", swapping_stat)
+    with pytest.raises(common_o11y.UsageError, match="regular file|changed"):
+        common_o11y.write_text(output, "NEW\n", executable=True)
+
+    assert output.is_symlink()
+    assert victim.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640
+    assert list(output.parent.glob(f".{output.name}.*.tmp")) == []
+
+
+def test_shared_writer_sets_executable_mode_before_atomic_publish(tmp_path: Path) -> None:
+    output = tmp_path / "rendered/bin/codex-o11y-exec"
+    common_o11y.write_text(output, "#!/bin/sh\nexit 0\n", executable=True)
+    assert output.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n"
+    assert stat.S_IMODE(output.stat().st_mode) == 0o755
+    assert list(output.parent.glob(f".{output.name}.*.tmp")) == []
+
+
+def test_codex_render_rejects_symlinked_output_parent_before_cleanup(
+    tmp_path: Path,
+) -> None:
+    victim = tmp_path / "victim"
+    owned_child = victim / "profiles"
+    owned_child.mkdir(parents=True)
+    sentinel = owned_child / "keep.txt"
+    sentinel.write_text("KEEP_ME\n", encoding="utf-8")
+    output = tmp_path / "rendered"
+    output.symlink_to(victim, target_is_directory=True)
+
+    result = run_codex(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--output-dir",
+        str(output),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert sentinel.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert output.is_symlink()
+    assert "symlinks" in result.stdout + result.stderr
 
 
 def test_parent_execute_dry_run_json_returns_exact_child_command() -> None:
@@ -666,6 +780,52 @@ def test_codex_apply_consumes_reviewed_artifacts_without_rerendering_defaults(tm
     assert "http://127.0.0.1:14318/v1/traces" in (
         codex_home / "codex-o11y-local.config.toml"
     ).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("link_kind", ["symlink", "hardlink"])
+def test_codex_apply_rejects_linked_profile_target(
+    tmp_path: Path,
+    link_kind: str,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    out = tmp_path / "rendered"
+    run_codex(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--codex-home",
+        str(codex_home),
+        "--output-dir",
+        str(out),
+    )
+
+    victim = tmp_path / f"{link_kind}-victim.conf"
+    victim.write_text("KEEP_ME\n", encoding="utf-8")
+    victim.chmod(0o640)
+    target = codex_home / "codex-o11y-local.config.toml"
+    if link_kind == "symlink":
+        target.symlink_to(victim)
+    else:
+        os.link(victim, target)
+
+    result = run_codex(
+        "--apply",
+        "profiles",
+        "--output-dir",
+        str(out),
+        "--json",
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert victim.read_text(encoding="utf-8") == "KEEP_ME\n"
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640
+    if link_kind == "symlink":
+        assert target.is_symlink()
+    else:
+        assert target.samefile(victim)
+    assert "single-hardlink regular file" in result.stdout + result.stderr
 
 
 def test_codex_rejects_secret_flags_and_scans_rendered_token_leaks(tmp_path: Path) -> None:

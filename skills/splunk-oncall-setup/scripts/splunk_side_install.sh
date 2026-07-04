@@ -557,10 +557,10 @@ PY
                 exit 1
             fi
             seed_url="${SPLUNK_URI:-https://localhost:8089}/servicesNS/nobody/${app}/storage/collections/data/mycollection?output_mode=json"
-            if ! seed_http_code="$(splunk_curl "${SESSION_KEY}" \
+            if ! seed_http_code="$(credential_curl_stream_file "${tmp_payload}" | splunk_curl "${SESSION_KEY}" \
                 -X POST \
                 -H "Content-Type: application/json" \
-                --data-binary "@${tmp_payload}" \
+                --data-binary @- \
                 -o "${tmp_response}" -w '%{http_code}' \
                 "${seed_url}" 2>/dev/null)"; then
                 seed_http_code="000"

@@ -27,6 +27,24 @@ Never ask for the Splunk admin password; apply reads the project `credentials`
 file via the shared helper. Updating an existing dashboard requires
 `--accept-overwrite`.
 
+`preflight`, `status`, `apply`, and `all` are live phases. Preflight fails
+closed unless the target app, authenticated context, views collection, exact
+view, and (when present) exact ACL are readable. Status compares the rendered
+`eai:data` byte-for-byte with the exact live view and also validates owner,
+sharing, and exact normalized `perms.read` / `perms.write` role sets; it exits
+nonzero on drift. Defaults are `--read-roles '*' --write-roles ''`.
+
+Apply snapshots an existing view and ACL into a private temporary directory,
+writes content and ACL, then reads both back. An ACL, readback, signal, or local
+failure starts read-only reconciliation. If the exact pre-transaction state is
+not already present, both existing and newly created views are retained: the
+endpoint has no verified conditional `If-Match` restore or delete contract, so
+a guard GET followed by an unconditional POST/DELETE could overwrite a
+concurrent edit. Apply writes mode-600 before/current snapshots under a
+mode-700 `dashboard-studio/state/manual-cleanup-*` directory and marks the
+rollback partial/manual-recovery-required. Redacted status/apply evidence
+contains hashes, HTTP outcomes, role sets, and reviewed recovery guidance.
+
 This is Splunk Platform Dashboard Studio. For Splunk Observability Cloud
 dashboards, use `splunk-observability-dashboard-builder`.
 
@@ -54,6 +72,14 @@ bash skills/splunk-dashboard-studio-setup/scripts/setup.sh --phase apply \
   --dashboard-name complex_dash --definition-file ./my_dashboard.json --accept-overwrite
 ```
 
+Check exact live content and governance drift without mutation:
+
+```bash
+bash skills/splunk-dashboard-studio-setup/scripts/setup.sh --phase status \
+  --dashboard-name complex_dash --definition-file ./my_dashboard.json \
+  --owner nobody --sharing app --read-roles '*' --write-roles admin
+```
+
 ## What It Renders
 
 - `dashboard.json` - the Dashboard Studio version 2 JSON definition
@@ -61,5 +87,9 @@ bash skills/splunk-dashboard-studio-setup/scripts/setup.sh --phase apply \
 
 Apply posts `name` + `eai:data` to `/servicesNS/<owner>/<app>/data/ui/views`
 (create) or `.../data/ui/views/<name>` (update), then sets sharing/ownership on
-the view's `/acl` endpoint. The REST endpoint can also read, update, and delete
-dashboards and is the supported way to replicate dashboards across environments.
+the view's `/acl` endpoint, including exact read/write role sets, and reads both
+exact endpoints back. Preflight snapshots existing content and ACL before
+overwrite. Failure handling performs GET-only reconciliation and never issues
+an automatic restore POST or DELETE. The REST endpoint can also read, update,
+and delete dashboards and is the supported way to replicate dashboards across
+environments.

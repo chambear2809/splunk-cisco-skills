@@ -8,6 +8,10 @@ SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 APP_NAME=""
 RESTART_SPLUNK=true
 ASSUME_YES=false
+ACCEPT_REST_FALLBACK=false
+CLOUD_VERIFY_ATTEMPTS=""
+CLOUD_VERIFY_INTERVAL=""
+CLOUD_EVIDENCE_FILE=""
 
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
@@ -15,6 +19,10 @@ while [[ $# -gt 0 ]]; do
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
         --yes|--force|--non-interactive) ASSUME_YES=true; shift ;;
+        --accept-rest-fallback) ACCEPT_REST_FALLBACK=true; shift ;;
+        --verify-attempts) require_arg "$1" $# || exit 1; CLOUD_VERIFY_ATTEMPTS="$2"; shift 2 ;;
+        --verify-interval) require_arg "$1" $# || exit 1; CLOUD_VERIFY_INTERVAL="$2"; shift 2 ;;
+        --evidence-file) require_arg "$1" $# || exit 1; CLOUD_EVIDENCE_FILE="$2"; shift 2 ;;
         --help)
             cat <<EOF
 Uninstall a Splunk App (interactive)
@@ -26,6 +34,13 @@ Optional flags (skip the corresponding prompt):
   --no-restart       Skip the automatic restart after uninstall
   --yes              Skip the destructive-action confirmation prompt
                      (aliases: --force, --non-interactive). Requires --app-name.
+  --accept-rest-fallback
+                     Cloud only: separately authorize a direct search-tier
+                     REST DELETE after ACS leaves the exact app present.
+  --verify-attempts N Cloud only: bounded ACS/REST probes per phase.
+  --verify-interval N Cloud only: seconds between bounded probes.
+  --evidence-file PATH
+                     Cloud only: private JSON result/recovery evidence path.
 
 Credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
@@ -46,27 +61,12 @@ restart_splunk_or_exit() {
         "Restart manually before relying on the uninstall state." || exit 1
 }
 
-cloud_restart_or_exit() {
-    : "${RESTART_SPLUNK}"  # Consumed by cloud_app_restart_or_exit.
-    cloud_app_restart_or_exit "$1" \
-        "Run 'acs status current-stack' and restart if required before relying on the uninstall state." || exit 1
-}
-
-refresh_cloud_verify_session() {
-    SK_VERIFY=""
-
-    load_splunk_credentials 2>/dev/null || return 1
-    if [[ -z "${SPLUNK_URI:-}" ]] || [[ "${SPLUNK_URI}" != *".splunkcloud.com"* ]]; then
-        return 1
-    fi
-    SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
-    [[ -n "${SK_VERIFY}" ]]
-}
-
 app_lookup_http_code() {
     local sk="$1" uri="$2" app="$3"
+    local encoded_app
+    encoded_app=$(_urlencode "${app}") || { printf '%s' "000"; return 0; }
     splunk_curl "${sk}" --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" \
-        "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null || echo "000"
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null || echo "000"
 }
 
 DELETE_HTTP_CODE=""
@@ -75,17 +75,19 @@ DELETE_INCOMPLETE_BUT_ABSENT=false
 
 delete_app_via_rest() {
     local sk="$1" uri="$2" app="$3"
-    local delete_response delete_rc http_code body post_delete_check
+    local delete_response delete_rc encoded_app http_code body post_delete_check
 
     DELETE_HTTP_CODE=""
     DELETE_BODY=""
     DELETE_INCOMPLETE_BUT_ABSENT=false
 
+    encoded_app=$(_urlencode "${app}") || return 1
+
     delete_response=""
     delete_rc=0
     set +e
     delete_response=$(splunk_curl "${sk}" --connect-timeout 10 --max-time 60 -w "\n%{http_code}" \
-        -X DELETE "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null)
+        -X DELETE "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null)
     delete_rc=$?
     set -e
 
@@ -108,8 +110,8 @@ delete_app_via_rest() {
 }
 
 validate_app_name() {
-    if [[ ! "${APP_NAME}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-        log "ERROR: App name '${APP_NAME}' contains unsupported characters."
+    if [[ -z "${APP_NAME}" || "${APP_NAME}" == "." || "${APP_NAME}" == ".." || ! "${APP_NAME}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+        log "ERROR: App name '${APP_NAME}' is not a safe concrete app identifier."
         exit 1
     fi
 }
@@ -166,98 +168,16 @@ except Exception:
 
     validate_app_name
 
-    if [[ "${ASSUME_YES}" == "true" ]]; then
-        log "Non-interactive mode (--yes): removing app '${APP_NAME}' without prompting."
-    else
-        echo ""
-        read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
-        case "${confirm}" in
-            [yY]|[yY][eE][sS]) ;;
-            *) log "Cancelled."; exit 0 ;;
-        esac
-    fi
-
-    log "Checking if app '${APP_NAME}' exists in Splunk Cloud..."
-    if ! acs_command apps describe "${APP_NAME}" >/dev/null 2>&1; then
-        log "ERROR: App '${APP_NAME}' not found in Splunk Cloud."
-        exit 1
-    fi
-
-    log "Removing app '${APP_NAME}' from Splunk Cloud via ACS..."
-    acs_uninstall_output=""
-    acs_uninstall_rc=0
-    if cloud_requires_local_scope; then
-        set +e
-        acs_uninstall_output=$(acs_command apps uninstall "${APP_NAME}" --scope local 2>&1)
-        acs_uninstall_rc=$?
-        set -e
-    else
-        set +e
-        acs_uninstall_output=$(acs_command apps uninstall "${APP_NAME}" 2>&1)
-        acs_uninstall_rc=$?
-        set -e
-    fi
-
-    if (( acs_uninstall_rc == 0 )); then
-        log "ACS uninstall accepted for '${APP_NAME}'."
-    else
-        log "WARNING: ACS uninstall returned rc=${acs_uninstall_rc} for '${APP_NAME}'."
-        if [[ -n "${acs_uninstall_output}" ]]; then
-            printf '%s\n' "${acs_uninstall_output}" >&2
-        fi
-    fi
-
-    cloud_restart_or_exit "app removal"
-
-    cloud_uninstall_rest_fallback_needed=false
-    if refresh_cloud_verify_session; then
-        if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"; then
-            log "WARNING: ACS reported success but the app is still present on the search tier."
-            cloud_uninstall_rest_fallback_needed=true
-        fi
-    else
-        log "WARNING: Could not verify search-tier app state after ACS uninstall."
-    fi
-
-    if ${cloud_uninstall_rest_fallback_needed}; then
-        log "Attempting direct search-tier REST DELETE as fallback..."
-        delete_app_via_rest "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"
-        delete_code="${DELETE_HTTP_CODE:-000}"
-        if ${DELETE_INCOMPLETE_BUT_ABSENT}; then
-            log "WARNING: Search-tier REST DELETE did not finish cleanly, but the app is no longer present."
-        fi
-        case "${delete_code}" in
-            200)
-                log "Search-tier REST DELETE succeeded (HTTP ${delete_code})."
-                cloud_restart_or_exit "search-tier app removal"
-                ;;
-            404)
-                log "App already absent from search tier (HTTP 404)."
-                ;;
-            *)
-                log "WARNING: Search-tier REST DELETE returned HTTP ${delete_code}. Manual cleanup may be required."
-                ;;
-        esac
-    fi
-
-    if refresh_cloud_verify_session; then
-        if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null; then
-            log "ERROR: App '${APP_NAME}' is still present on the search tier after uninstall attempts."
-            log "On Victoria stacks with SHC, a direct REST DELETE on each member followed by an ACS restart may be required."
-            exit 1
-        fi
-        log "SUCCESS: App '${APP_NAME}' has been removed from Splunk Cloud."
-        exit 0
-    fi
-
-    if (( acs_uninstall_rc == 0 )); then
-        log "ERROR: ACS accepted the uninstall, but completion could not be verified on the search tier."
-        log "HANDOFF: Run 'acs apps describe ${APP_NAME}' and verify the app is absent in Splunk Web/search-tier REST before treating removal as complete."
-        exit 1
-    else
-        log "ERROR: ACS uninstall failed and search-tier verification is unavailable."
-        exit 1
-    fi
+    batch_args=()
+    [[ "${ASSUME_YES}" == "true" ]] && batch_args+=(--yes)
+    [[ "${RESTART_SPLUNK}" == "false" ]] && batch_args+=(--no-restart)
+    [[ "${ACCEPT_REST_FALLBACK}" == "true" ]] && batch_args+=(--accept-rest-fallback)
+    [[ -n "${CLOUD_VERIFY_ATTEMPTS}" ]] && batch_args+=(--verify-attempts "${CLOUD_VERIFY_ATTEMPTS}")
+    [[ -n "${CLOUD_VERIFY_INTERVAL}" ]] && batch_args+=(--verify-interval "${CLOUD_VERIFY_INTERVAL}")
+    [[ -n "${CLOUD_EVIDENCE_FILE}" ]] && batch_args+=(--evidence-file "${CLOUD_EVIDENCE_FILE}")
+    log "Delegating Cloud removal to the ACS-authoritative batch uninstall state machine."
+    exec bash "${SCRIPT_DIR}/../../shared/scripts/cloud_batch_uninstall.sh" \
+        "${batch_args[@]}" "${APP_NAME}"
 fi
 
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }

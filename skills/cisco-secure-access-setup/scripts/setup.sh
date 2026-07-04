@@ -82,8 +82,10 @@ resolve_latest_version() {
         return 1
     fi
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
-        "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
+    curl -q -s --connect-timeout 15 --max-time 60 \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff 2>/dev/null \
         | python3 -c "
 import json
 import sys

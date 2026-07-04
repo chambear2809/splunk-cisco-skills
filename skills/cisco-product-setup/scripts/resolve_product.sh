@@ -102,6 +102,10 @@ def state_rank(product: dict) -> int:
     state = product.get("automation_state", "")
     return {
         "automated": 0,
+        # Partial routes are still active choices. Do not silently prefer a
+        # mutating automated route when an equally exact partial route owns a
+        # different collection path (for example ASA/FTD API versus syslog).
+        "partial": 0,
         "manual_gap": 1,
         "unsupported_roadmap": 2,
         "unsupported_legacy": 3,
@@ -196,7 +200,9 @@ else:
     elif status == "ambiguous":
         print(f"Ambiguous product query: {query}")
         for product in matches:
-            print(f"- {product['display_name']} [{product['id']}]")
+            owner = product.get("primary_skill", "")
+            suffix = f" -> {owner}" if owner else ""
+            print(f"- {product['display_name']} [{product['id']}]{suffix}")
     else:
         print(f"Product not found: {query}")
 

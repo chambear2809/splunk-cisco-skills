@@ -1086,7 +1086,7 @@ if (
     or stat.S_IMODE(header_before.st_mode) != 0o600
 ):
     raise SystemExit("ERROR: private token-header file failed validation")
-header_fd = os.open(header_path, os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW)
+header_fd = os.open(header_path, os.O_WRONLY | os.O_NOFOLLOW)
 try:
     header_opened = os.fstat(header_fd)
     if (header_before.st_dev, header_before.st_ino) != (
@@ -1094,6 +1094,7 @@ try:
         header_opened.st_ino,
     ):
         raise SystemExit("ERROR: private token-header file changed while opening")
+    os.ftruncate(header_fd, 0)
     header_payload = b"X-SF-Token: " + data + b"\n"
     if os.write(header_fd, header_payload) != len(header_payload):
         raise SystemExit("ERROR: private token-header file write was incomplete")

@@ -119,7 +119,7 @@ if [[ "${LIVE}" == "true" ]]; then
     if command -v curl >/dev/null 2>&1; then
         # Without auth this should return 401; the goal is to confirm the
         # endpoint is reachable, not that auth succeeds.
-        local_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 'https://api.thousandeyes.com/mcp' || echo 000)"
+        local_status="$(curl -q -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff 'https://api.thousandeyes.com/mcp' || echo 000)"
         log "  status: ${local_status} (401 expected without Authorization)"
     else
         log "  WARN: curl not on PATH; cannot probe."

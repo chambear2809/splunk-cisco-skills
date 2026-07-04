@@ -15,10 +15,161 @@ acs_cli_available() {
 
 acs_command() {
     load_splunk_platform_settings
+    local server="${ACS_SERVER:-https://admin.splunk.com}"
     local -a cmd=(acs --format structured)
-    [[ -n "${ACS_SERVER:-}" ]] && cmd+=(--server "${ACS_SERVER}")
+    if ! _acs_validate_server "${server}"; then
+        echo "ERROR: ACS_SERVER must be exactly https://admin.splunk.com or https://staging.admin.splunk.com." >&2
+        return 1
+    fi
+    cmd+=(--server "${server}")
     cmd+=("$@")
     "${cmd[@]}"
+}
+
+_acs_validate_server() {
+    case "${1:-}" in
+        https://admin.splunk.com|https://staging.admin.splunk.com) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_acs_validate_rest_url() {
+    local url="${1:-}" server="${2:-}"
+
+    python3 - "${url}" "${server}" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+raw, server_raw = sys.argv[1:]
+try:
+    parsed = urlsplit(raw)
+    server = urlsplit(server_raw)
+    parsed.port
+    server.port
+except ValueError:
+    raise SystemExit(1)
+
+valid = (
+    parsed.scheme.lower() == "https"
+    and bool(parsed.hostname)
+    and (parsed.scheme.lower(), parsed.hostname.lower(), parsed.port)
+    == (server.scheme.lower(), server.hostname.lower(), server.port)
+    and parsed.username is None
+    and parsed.password is None
+    and parsed.path.startswith("/")
+    and not parsed.fragment
+    and not any(character.isspace() for character in raw)
+)
+raise SystemExit(0 if valid else 1)
+PY
+}
+
+_acs_validate_rest_curl_args() {
+    local argument="" expect_value=false option=""
+
+    for argument in "$@"; do
+        if [[ "${expect_value}" == "true" ]]; then
+            if [[ "${option}" == "-H" || "${option}" == "--header" ]]; then
+                if [[ "${argument}" == *$'\n'* || "${argument}" == *$'\r'* || "${argument}" == @* ]]; then
+                    echo "ERROR: ACS REST helper rejected an unsafe header value." >&2
+                    return 1
+                fi
+                case "${argument%%:*}" in
+                    [Cc]ontent-[Tt]ype|[Aa]ccept) ;;
+                    *)
+                        echo "ERROR: ACS REST helper permits only Content-Type or Accept caller headers; authentication is helper-owned." >&2
+                        return 1
+                        ;;
+                    esac
+            fi
+            if [[ "${option}" == "-d" || "${option}" == "--data" || "${option}" == "--data-binary" ]]; then
+                if [[ "${argument}" == @* && "${argument}" != "@-" ]]; then
+                    echo "ERROR: ACS REST helper rejects file-backed request bodies; stream a descriptor-validated file on stdin with @-." >&2
+                    return 1
+                fi
+            fi
+            expect_value=false
+            option=""
+            continue
+        fi
+        case "${argument}" in
+            -X|--request|-H|--header|-d|--data|--data-binary|-o|--output|-w|--write-out|--connect-timeout|--max-time)
+                expect_value=true
+                option="${argument}"
+                ;;
+            --header=*)
+                echo "ERROR: ACS REST helper requires caller headers as a separate, validated argument." >&2
+                return 1
+                ;;
+            --data=@*|--data-binary=@*)
+                if [[ "${argument#*=}" != "@-" ]]; then
+                    echo "ERROR: ACS REST helper rejects file-backed request bodies; stream a descriptor-validated file on stdin with @-." >&2
+                    return 1
+                fi
+                ;;
+            --request=*|--data=*|--data-binary=*|--output=*|--write-out=*|--connect-timeout=*|--max-time=*)
+                ;;
+            -f|--fail|--fail-with-body|-s|--silent|-S|--show-error)
+                ;;
+            --|--next|--config|--config=*|-K*|-[^-]*K*|-:*|-[^-]*:*|\
+            -L*|-[^-]*L*|--location|--location-trusted|--max-redirs|--max-redirs=*|\
+            --proto|--proto=*|--proto-redir|--proto-redir=*|--proto-default|--proto-default=*|\
+            --globoff|--no-globoff|-g|--url|--url=*|--variable|--variable=*|--expand-*|\
+            -k*|-[^-]*k*|--insecure|--no-insecure|--cacert|--cacert=*|--capath|--capath=*)
+                echo "ERROR: ACS REST helper rejected caller-owned curl transport/configuration option: ${argument}" >&2
+                return 1
+                ;;
+            -*|*)
+                echo "ERROR: ACS REST helper rejected unsupported curl argument." >&2
+                return 1
+                ;;
+        esac
+    done
+    if [[ "${expect_value}" == "true" ]]; then
+        echo "ERROR: ACS REST helper received ${option} without a value." >&2
+        return 1
+    fi
+}
+
+# acs_rest_curl <absolute-https-url> [supported curl args]
+#
+# API-only ACS endpoints are not all exposed by the ACS CLI. Keep their bearer
+# token off argv while enforcing the same transport boundary as Splunk REST:
+# HTTPS only, no redirects, no URL globbing, no user/system curl config, and
+# exactly the URL supplied as the first argument.
+acs_rest_curl() {
+    local url="${1:-}" token_escaped="" server=""
+    shift || true
+
+    if declare -F load_splunk_platform_settings >/dev/null 2>&1; then
+        load_splunk_platform_settings
+    fi
+    server="${ACS_SERVER:-https://admin.splunk.com}"
+    if ! _acs_validate_server "${server}"; then
+        echo "ERROR: ACS_SERVER must be exactly https://admin.splunk.com or https://staging.admin.splunk.com." >&2
+        return 1
+    fi
+    if ! _acs_validate_rest_url "${url}" "${server}"; then
+        echo "ERROR: ACS REST URL must be a credential-free HTTPS URL on the configured, allowlisted ACS_SERVER origin." >&2
+        return 1
+    fi
+    _acs_validate_rest_curl_args "$@" || return 1
+    if [[ -z "${STACK_TOKEN:-}" || "${STACK_TOKEN}" == *$'\n'* || "${STACK_TOKEN}" == *$'\r'* ]]; then
+        echo "ERROR: STACK_TOKEN must contain one non-empty line for ACS REST calls." >&2
+        return 1
+    fi
+
+    if declare -F _curl_config_escape >/dev/null 2>&1; then
+        token_escaped="$(_curl_config_escape "${STACK_TOKEN}")"
+    else
+        token_escaped="${STACK_TOKEN//\\/\\\\}"
+        token_escaped="${token_escaped//\"/\\\"}"
+    fi
+
+    command curl -q -fsS "$@" \
+        -K <(printf 'header = "Authorization: Bearer %s"\n' "${token_escaped}") \
+        "${url}" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
 }
 
 acs_extract_http_response_json() {
@@ -409,15 +560,19 @@ _SEARCH_API_ALLOWLIST_CHECKED=false
 
 _detect_public_ip() {
     local ip
-    ip=$(curl -sS --connect-timeout 5 --max-time 10 \
-        "https://checkip.amazonaws.com" 2>/dev/null || true)
+    ip=$(curl -q -sS --connect-timeout 5 --max-time 10 \
+        "https://checkip.amazonaws.com" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+        2>/dev/null || true)
     ip="${ip%%[[:space:]]*}"
     if [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         printf '%s' "${ip}"
         return 0
     fi
-    ip=$(curl -sS --connect-timeout 5 --max-time 10 \
-        "https://api.ipify.org" 2>/dev/null || true)
+    ip=$(curl -q -sS --connect-timeout 5 --max-time 10 \
+        "https://api.ipify.org" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+        2>/dev/null || true)
     ip="${ip%%[[:space:]]*}"
     if [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         printf '%s' "${ip}"

@@ -46,7 +46,7 @@ Optional:
   --o11y-api-token-file PATH
                           Splunk Observability User API access token
   --i-accept-te-mutations Allow mutating TE-side asset apply (tests/alerts/labels/...)
-  --deploy-templates      For --apply templates, also POST /v7/templates/{id}/deploy
+  --deploy-templates      Reserved; currently fails closed before any mutation
   --help                  Show this help
 
 Direct token flags such as --te-token, --access-token, --token, --bearer-token,
@@ -61,9 +61,10 @@ bool_text() {
 resolve_abs_path() {
     "${PYTHON_BIN}" - "$1" <<'PY'
 from pathlib import Path
+import os
 import sys
 
-print(Path(sys.argv[1]).expanduser().resolve(), end="")
+print(Path(os.path.abspath(os.path.expanduser(sys.argv[1]))), end="")
 PY
 }
 
@@ -238,8 +239,8 @@ PY
     case ",${APPLY_SECTIONS}," in
         *,apm,*) [[ -n "${O11Y_API_TOKEN_FILE}" ]] || { log "ERROR: --apply apm requires --o11y-api-token-file."; exit 1; } ;;
     esac
-    if [[ "${DEPLOY_TEMPLATES}" == "true" && ",${APPLY_SECTIONS}," != *,templates,* ]]; then
-        log "ERROR: --deploy-templates is valid only when templates is selected."
+    if [[ "${DEPLOY_TEMPLATES}" == "true" ]]; then
+        log "ERROR: --deploy-templates is disabled because template-resource readback does not prove deploy completion; no changes were made."
         exit 1
     fi
 fi

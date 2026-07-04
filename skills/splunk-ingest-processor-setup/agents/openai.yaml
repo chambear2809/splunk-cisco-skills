@@ -1,3 +1,4 @@
-display_name: Ingest Processor Setup
-short_description: Render and validate Splunk Ingest Processor setup plans.
-default_prompt: Render a Splunk Ingest Processor readiness, SPL2 pipeline, destination, monitoring, and handoff packet.
+interface:
+  display_name: "Splunk Ingest Processor Setup"
+  short_description: "Render and validate Splunk Ingest Processor setup plans"
+  default_prompt: "Use $splunk-ingest-processor-setup to render and validate Splunk Ingest Processor setup plans."

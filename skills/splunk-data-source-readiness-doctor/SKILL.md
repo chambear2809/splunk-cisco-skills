@@ -51,6 +51,11 @@ Never ask for passwords, session keys, API keys, HEC tokens, or bearer tokens in
 chat. Keep all credentials in local files and pass only file paths to the
 underlying collection workflows.
 
+Live REST collection requires a credential-free HTTPS origin and never follows
+redirects. Plaintext HTTP is refused unless an operator explicitly sets
+`SPLUNK_ALLOW_INSECURE_HTTP=true` for an isolated, short-lived lab;
+`--no-verify-tls` does not authorize HTTP.
+
 Use this doctor after an input/app setup skill says ingestion is configured, or
 when dashboards, ES detections, ITSI services, ARI inventories, or CIM/OCSF
 content are not producing useful results.

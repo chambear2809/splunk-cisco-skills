@@ -49,7 +49,10 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_shc_secret
 ```
 
 - Reuse the project `credentials` file or `~/.splunk/credentials` for SSH and
-  REST defaults when possible.
+  REST defaults when possible. SSH execution additionally requires either an
+  operator-reviewed `SPLUNK_SSH_KNOWN_HOSTS_FILE` or a verified
+  `SPLUNK_SSH_HOST_KEY_FINGERPRINT`. The warned
+  `SPLUNK_SSH_ALLOW_TOFU=true` escape hatch is for disposable labs only.
 
 ## Package Model
 

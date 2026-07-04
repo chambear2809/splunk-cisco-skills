@@ -7,7 +7,8 @@ This skill is a router over the existing Cisco setup skills in this repo.
 | Route Type | Backing skill(s) | Typical products |
 |---|---|---|
 | `security_cloud_product` | `cisco-security-cloud-setup` | Duo, XDR, ETD, Secure Endpoint |
-| `security_cloud_variant` | `cisco-security-cloud-setup` | Secure Firewall, Identity Intelligence |
+| `security_cloud_variant` | `cisco-security-cloud-setup` | Secure Firewall API/eStreamer, Identity Intelligence |
+| `asa_ta` | `cisco-asa-ta-setup` | Cisco ASA / FTD syslog and `Splunk_TA_cisco-asa` |
 | `secure_access` | `cisco-secure-access-setup` | Secure Access, Umbrella, Cloudlock |
 | `dc_networking` | `cisco-dc-networking-setup` | ACI, Nexus Dashboard, Nexus 9K |
 | `catalyst_stack` | `cisco-catalyst-ta-setup` + `cisco-enterprise-networking-setup` | Catalyst Center, ISE, SD-WAN, Cyber Vision |
@@ -46,6 +47,10 @@ This skill is a router over the existing Cisco setup skills in this repo.
   a product-specific collector that does not exist.
 - Meraki is a local override: SCAN maps it to the Catalyst visualization stack,
   while this repo also has a dedicated Meraki TA setup flow.
+- Secure Firewall is collection-aware. API and eStreamer requests use
+  `CiscoSecurityCloud`; ASA/FTD syslog and `Splunk_TA_cisco-asa` requests use
+  the dedicated ASA TA workflow. Bare ASA or FTD names deliberately resolve as
+  an explicit two-choice ambiguity.
 - Optional companions not routed here:
   - `cisco-catalyst-enhanced-netflow-setup` adds the optional NetFlow / IPFIX
     stream mapping app for richer Catalyst NetFlow dashboards. It is a

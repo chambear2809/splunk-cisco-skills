@@ -2295,6 +2295,36 @@ if [[ -z "$EP_ID" ]] || [[ -z "$ADMIN_PASSWORD_FILE" ]]; then
     echo "ERROR: EP_ID and ADMIN_PASSWORD_FILE must be set" >&2
     exit 1
 fi
+if [[ ! "$EP_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: EP_ID contains unsupported URL-path characters" >&2
+    exit 1
+fi
+if ! python3 - "$EP_CONTROL_PLANE" <<'PY_URI'
+import sys
+from urllib.parse import urlsplit
+
+raw = sys.argv[1]
+try:
+    parsed = urlsplit(raw)
+    parsed.port
+except ValueError:
+    raise SystemExit(1)
+valid = (
+    parsed.scheme.lower() == "https"
+    and bool(parsed.hostname)
+    and parsed.username is None
+    and parsed.password is None
+    and parsed.path in ("", "/")
+    and not parsed.query
+    and not parsed.fragment
+    and not any(character.isspace() for character in raw)
+)
+raise SystemExit(0 if valid else 1)
+PY_URI
+then
+    echo "ERROR: EP_CONTROL_PLANE must be a credential-free HTTPS origin" >&2
+    exit 1
+fi
 
 password_mode="$(stat -c '%a' "$ADMIN_PASSWORD_FILE" 2>/dev/null || true)"
 if [[ "$password_mode" != "600" && "$password_mode" != "400" ]]; then
@@ -2315,7 +2345,7 @@ printf 'user = "admin:%s"\\n' "$curl_password" >"$curl_config"
 admin_password=""
 curl_password=""
 
-curl --silent --show-error --fail \\
+command curl -q --silent --show-error --fail \\
      --cacert ./ca_cert.pem \\
      --config "$curl_config" \\
      -X POST \\
@@ -2324,7 +2354,8 @@ curl --silent --show-error --fail \\
      -F server_cert=@./edge_server_cert.pem \\
      -F server_key=@./edge_server_key.pem \\
      -F client_cert=@./data_source_client_cert.pem \\
-     -F client_key=@./data_source_client_key.pem
+     -F client_key=@./data_source_client_key.pem \\
+     --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
 echo
 echo "OK: EP $EP_ID certificates uploaded"
 """
@@ -3131,9 +3162,10 @@ if [[ -n "$ADMIN_PASSWORD_FILE" ]] && [[ -r "$ADMIN_PASSWORD_FILE" ]]; then
             curl_password="${{admin_password//\\\\/\\\\\\\\}}"
             curl_password="${{curl_password//\\\"/\\\\\\\"}}"
             health="$(printf 'user = \"%s:%s\"\\n' "${{SPLUNK_ADMIN_USER:-admin}}" "$curl_password" \\
-                | curl --fail --silent --show-error --proto '=https' \\
+                | curl -q --fail --silent --show-error \\
                     --cacert "$HEALTH_CA_BUNDLE" --config - \\
-                    "https://${{HEALTH_HOST}}:8089/services/server/health/splunkd" 2>/dev/null \\
+                    "https://${{HEALTH_HOST}}:8089/services/server/health/splunkd" \\
+                    --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff 2>/dev/null \\
                 | grep -oE '"health":"[a-z]+"' | head -1 | cut -d'"' -f4)"
             admin_password=""
             curl_password=""

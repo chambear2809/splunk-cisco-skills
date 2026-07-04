@@ -44,6 +44,7 @@ TEMPLATE_PATHS = {
     "ucs_ta": "skills/cisco-ucs-ta-setup/template.example",
     "secure_email_web_gateway": "skills/cisco-secure-email-web-gateway-setup/template.example",
     "talos_intelligence": "skills/cisco-talos-intelligence-setup/template.example",
+    "asa_ta": "skills/cisco-asa-ta-setup/template.example",
 }
 
 DC_ACCOUNT_TEMPLATE_SECTION = {
@@ -256,6 +257,30 @@ def extract_display_aliases(display_name: str) -> list[str]:
     return unique_ordered(aliases)
 
 
+def product_search_terms(product: dict) -> list[str]:
+    display_name = str(product.get("display_name") or product.get("id", ""))
+    addon = str(product.get("addon", ""))
+    app_viz = str(product.get("app_viz", ""))
+    app_viz_2 = str(product.get("app_viz_2", ""))
+    return unique_ordered(
+        [
+            str(product.get("id", "")),
+            str(product.get("id", "")).replace("_", " "),
+            *extract_display_aliases(display_name),
+            *list(product.get("aliases", [])),
+            *list(product.get("keywords", [])),
+            addon,
+            addon.replace("_", " ").replace("-", " "),
+            str(product.get("addon_label", "")),
+            app_viz,
+            app_viz.replace("_", " ").replace("-", " "),
+            str(product.get("app_viz_label", "")),
+            app_viz_2,
+            app_viz_2.replace("_", " ").replace("-", " "),
+        ]
+    )
+
+
 def scan_product(values: dict) -> dict:
     product = {field: str(values.get(field, "")).strip() for field in SCAN_STRING_FIELDS}
     for field in SCAN_LIST_FIELDS:
@@ -266,23 +291,7 @@ def scan_product(values: dict) -> dict:
 
     display_name = product["display_name"] or product["id"]
     product["display_name"] = display_name
-    product["search_terms"] = unique_ordered(
-        [
-            product["id"],
-            product["id"].replace("_", " "),
-            *extract_display_aliases(display_name),
-            *product["aliases"],
-            *product["keywords"],
-            product["addon"],
-            product["addon"].replace("_", " ").replace("-", " "),
-            product["addon_label"],
-            product["app_viz"],
-            product["app_viz"].replace("_", " ").replace("-", " "),
-            product["app_viz_label"],
-            product["app_viz_2"],
-            product["app_viz_2"].replace("_", " ").replace("-", " "),
-        ]
-    )
+    product["search_terms"] = product_search_terms(product)
     if not product["id"]:
         raise ValueError("SCAN source contains a product without an id")
     return product
@@ -566,24 +575,7 @@ def synthetic_product_entry(raw: dict) -> dict:
     app_viz = str(raw.get("app_viz", "")).strip()
     app_viz_label = str(raw.get("app_viz_label", "")).strip()
     app_viz_2 = str(raw.get("app_viz_2", "")).strip()
-    search_terms = unique_ordered(
-        [
-            product_id,
-            product_id.replace("_", " "),
-            *extract_display_aliases(display_name),
-            *aliases,
-            *keywords,
-            addon,
-            addon.replace("_", " ").replace("-", " "),
-            addon_label,
-            app_viz,
-            app_viz.replace("_", " ").replace("-", " "),
-            app_viz_label,
-            app_viz_2,
-            app_viz_2.replace("_", " ").replace("-", " "),
-        ]
-    )
-    return {
+    product = {
         "id": product_id,
         "display_name": display_name,
         "status": str(raw.get("status", "active")).strip(),
@@ -605,8 +597,34 @@ def synthetic_product_entry(raw: dict) -> dict:
         "aliases": aliases,
         "keywords": keywords,
         "learn_more_url": str(raw.get("learn_more_url", "")).strip(),
-        "search_terms": search_terms,
     }
+    product["search_terms"] = product_search_terms(product)
+    return product
+
+
+def apply_product_metadata_override(product: dict, override: dict) -> dict:
+    """Overlay local routing labels without mutating the pinned SCAN fixture."""
+    effective = dict(product)
+    display_name = str(override.get("display_name", "")).strip()
+    if display_name:
+        effective["display_name"] = display_name
+
+    for field in ("aliases", "keywords"):
+        additions = override.get(f"{field}_add", []) or []
+        if not isinstance(additions, list):
+            raise ValueError(f"{product['id']}: {field}_add must be a list")
+        effective[field] = unique_ordered(
+            [*list(product.get(field, [])), *[str(item) for item in additions]]
+        )
+
+    if "sourcetypes_override" in override:
+        sourcetypes = override.get("sourcetypes_override") or []
+        if not isinstance(sourcetypes, list):
+            raise ValueError(f"{product['id']}: sourcetypes_override must be a list")
+        effective["sourcetypes"] = unique_ordered([str(item) for item in sourcetypes])
+
+    effective["search_terms"] = product_search_terms(effective)
+    return effective
 
 
 def load_synthetic_products(overrides_doc: dict) -> list[dict]:
@@ -749,6 +767,59 @@ def build_security_cloud_variant_route(
             "variant_key": variant_key,
             "default_variant": override.get("default_variant", ""),
             "variants": variants,
+        },
+    }
+
+
+def build_asa_ta_route(override: dict) -> dict:
+    defaults = {
+        "index": "cisco_asa",
+        "sourcetype": "cisco:asa",
+        "syslog_owner": "sc4s",
+        "sc4s_vendor_product": "cisco_asa",
+        "include_ftd": "true",
+    }
+    defaults.update(
+        {
+            str(key): str(value)
+            for key, value in (override.get("defaults", {}) or {}).items()
+        }
+    )
+    optional = sorted(defaults)
+    return {
+        "route_type": "asa_ta",
+        "primary_skill": "cisco-asa-ta-setup",
+        "companion_skills": [],
+        "install_apps": ["Splunk_TA_cisco-asa"],
+        "template_paths": [TEMPLATE_PATHS["asa_ta"]],
+        "template_checks": merge_template_checks(
+            {
+                "contains": [
+                    "index: cisco_asa",
+                    "sourcetype: cisco:asa",
+                    "syslog_owner: sc4s",
+                ]
+            },
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": [],
+        "optional_non_secret_keys": optional,
+        "accepted_non_secret_keys": optional,
+        "secret_keys": [],
+        "required_secret_keys": [],
+        "conditional_required_secret_rules": [],
+        "route": {
+            "default_index": defaults["index"],
+            "default_sourcetype": defaults["sourcetype"],
+            "default_syslog_owner": defaults["syslog_owner"],
+            "default_sc4s_vendor_product": defaults["sc4s_vendor_product"],
+            "default_include_ftd": defaults["include_ftd"],
+            "defaults": defaults,
+            "sourcetypes": [defaults["sourcetype"]],
+            "handoff": (
+                "Install the ASA TA and render the selected external syslog receiver "
+                "handoff; completion requires live cisco:asa event evidence."
+            ),
         },
     }
 
@@ -1300,6 +1371,8 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_security_cloud_product_route(override["product_key"], security_products, override)
     if route_type == "security_cloud_variant":
         return build_security_cloud_variant_route(override, security_products)
+    if route_type == "asa_ta":
+        return build_asa_ta_route(override)
     if route_type == "secure_access":
         return build_secure_access_route(override)
     if route_type == "app_install_only":
@@ -1362,6 +1435,7 @@ def build_catalog(scan_package: Path | None = None) -> dict:
     source_products = scan_products + load_synthetic_products(overrides_doc)
     for product in source_products:
         override = overrides.get(product["id"], {})
+        product = apply_product_metadata_override(product, override)
         state_override = override.get("automation_state", "")
 
         if state_override:

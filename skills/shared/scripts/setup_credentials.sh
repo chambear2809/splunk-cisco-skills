@@ -94,35 +94,54 @@ fi
 # the operator does not hit a TLS-verification failure on the first script run.
 splunk_verify_ssl=""
 splunk_ca_cert=""
+splunk_allow_insecure_http=""
 if [[ -n "${splunk_uri}" ]]; then
-    echo ""
-    echo "TLS verification for Splunk management calls (default: verify):"
-    echo "  1) Verify with system root CAs (recommended; works for Splunk Cloud and any host with a trusted certificate)"
-    echo "  2) Verify with a private CA bundle (recommended for self-signed Splunk hosts)"
-    echo "  3) Skip TLS verification (curl -k; only for lab/self-signed targets)"
-    read -rp "Choose [1/2/3, default 1]: " tls_choice
-    case "${tls_choice}" in
-        ""|1)
-            ;;
-        2)
-            read -rp "Path to private CA bundle (PEM): " splunk_ca_cert
-            if [[ -z "${splunk_ca_cert}" || ! -f "${splunk_ca_cert}" ]]; then
-                echo "WARN: CA bundle path '${splunk_ca_cert}' is not a readable file; you can edit ${CRED_FILE} later."
+    case "${splunk_uri}" in
+        [Hh][Tt][Tt][Pp]://*)
+            echo ""
+            echo "WARNING: Plain HTTP exposes Splunk credentials and session keys to network observers."
+            read -rp "Type LAB-ONLY to permit this isolated short-lived lab URI: " insecure_http_confirmation
+            if [[ "${insecure_http_confirmation}" != "LAB-ONLY" ]]; then
+                echo "ERROR: Refusing plaintext HTTP. Re-run with an https:// search-tier URI." >&2
+                exit 1
             fi
-            ;;
-        3)
-            splunk_verify_ssl="false"
-            ;;
-        *)
-            echo "Unknown TLS choice '${tls_choice}'; defaulting to verify."
+            splunk_allow_insecure_http="true"
+            echo "TLS certificate verification does not apply to this plaintext HTTP lab URI."
             ;;
     esac
+    if [[ "${splunk_allow_insecure_http}" != "true" ]]; then
+        echo ""
+        echo "TLS verification for Splunk management calls (default: verify):"
+        echo "  1) Verify with system root CAs (recommended; works for Splunk Cloud and any host with a trusted certificate)"
+        echo "  2) Verify with a private CA bundle (recommended for self-signed Splunk hosts)"
+        echo "  3) Skip TLS verification (curl -k; only for lab/self-signed targets)"
+        read -rp "Choose [1/2/3, default 1]: " tls_choice
+        case "${tls_choice}" in
+            ""|1)
+                ;;
+            2)
+                read -rp "Path to private CA bundle (PEM): " splunk_ca_cert
+                if [[ -z "${splunk_ca_cert}" || ! -f "${splunk_ca_cert}" ]]; then
+                    echo "WARN: CA bundle path '${splunk_ca_cert}' is not a readable file; you can edit ${CRED_FILE} later."
+                fi
+                ;;
+            3)
+                splunk_verify_ssl="false"
+                ;;
+            *)
+                echo "Unknown TLS choice '${tls_choice}'; defaulting to verify."
+                ;;
+        esac
+    fi
 fi
 
 splunk_ssh_host=""
 splunk_ssh_port="22"
 splunk_ssh_user="splunk"
 splunk_ssh_pass=""
+splunk_ssh_known_hosts_file=""
+splunk_ssh_host_key_fingerprint=""
+splunk_ssh_allow_tofu="false"
 echo ""
 read -rp "Add SSH staging settings for Enterprise installs? [y/N]: " add_ssh
 if [[ "${add_ssh}" =~ ^[yY] ]]; then
@@ -133,6 +152,32 @@ if [[ "${add_ssh}" =~ ^[yY] ]]; then
     splunk_ssh_user="${splunk_ssh_user_input:-splunk}"
     read -rsp "SSH password: " splunk_ssh_pass
     echo ""
+    echo "SSH host-key verification (required before password authentication):"
+    echo "  1) Pinned known_hosts file (recommended)"
+    echo "  2) Pinned OpenSSH SHA256 host-key fingerprint"
+    echo "  3) LAB ONLY: trust the first key seen (TOFU; interception risk)"
+    read -rp "Choose [1/2/3, default 1]: " ssh_trust_choice
+    case "${ssh_trust_choice}" in
+        ""|1)
+            read -rp "Absolute path to pinned known_hosts file: " splunk_ssh_known_hosts_file
+            ;;
+        2)
+            read -rp "Pinned host-key fingerprint (SHA256:...): " splunk_ssh_host_key_fingerprint
+            ;;
+        3)
+            echo "WARNING: TOFU does not authenticate the first SSH connection."
+            read -rp "Type LAB-ONLY to enable first-use trust: " ssh_tofu_confirmation
+            if [[ "${ssh_tofu_confirmation}" != "LAB-ONLY" ]]; then
+                echo "ERROR: SSH TOFU was not confirmed; refusing unsafe SSH configuration." >&2
+                exit 1
+            fi
+            splunk_ssh_allow_tofu="true"
+            ;;
+        *)
+            echo "ERROR: unknown SSH trust choice '${ssh_trust_choice}'." >&2
+            exit 1
+            ;;
+    esac
 fi
 
 splunk_cloud_stack=""
@@ -217,10 +262,14 @@ sp_user_q=$(quote_credential_value "${sp_user}")
 sp_pass_q=$(quote_credential_value "${sp_pass}")
 splunk_verify_ssl_q=$(quote_credential_value "${splunk_verify_ssl}")
 splunk_ca_cert_q=$(quote_credential_value "${splunk_ca_cert}")
+splunk_allow_insecure_http_q=$(quote_credential_value "${splunk_allow_insecure_http}")
 splunk_ssh_host_q=$(quote_credential_value "${splunk_ssh_host}")
 splunk_ssh_port_q=$(quote_credential_value "${splunk_ssh_port}")
 splunk_ssh_user_q=$(quote_credential_value "${splunk_ssh_user}")
 splunk_ssh_pass_q=$(quote_credential_value "${splunk_ssh_pass}")
+splunk_ssh_known_hosts_file_q=$(quote_credential_value "${splunk_ssh_known_hosts_file}")
+splunk_ssh_host_key_fingerprint_q=$(quote_credential_value "${splunk_ssh_host_key_fingerprint}")
+splunk_ssh_allow_tofu_q=$(quote_credential_value "${splunk_ssh_allow_tofu}")
 splunk_cloud_stack_q=$(quote_credential_value "${splunk_cloud_stack}")
 splunk_cloud_search_head_q=$(quote_credential_value "${splunk_cloud_search_head}")
 splunk_cloud_index_searchable_days_q=$(quote_credential_value "${splunk_cloud_index_searchable_days}")
@@ -273,10 +322,19 @@ SPLUNK_PASS=${sp_pass_q}
 # to "false" to disable verification entirely (curl -k).
 SPLUNK_VERIFY_SSL=${splunk_verify_ssl_q}
 SPLUNK_CA_CERT=${splunk_ca_cert_q}
+# Plain HTTP is rejected even when SPLUNK_VERIFY_SSL=false. This lab-only
+# override must be explicitly true before credentials/session keys can be sent
+# to an http:// management URI. Never enable it on a routed or shared network.
+SPLUNK_ALLOW_INSECURE_HTTP=${splunk_allow_insecure_http_q}
 SPLUNK_SSH_HOST=${splunk_ssh_host_q}
 SPLUNK_SSH_PORT=${splunk_ssh_port_q}
 SPLUNK_SSH_USER=${splunk_ssh_user_q}
 SPLUNK_SSH_PASS=${splunk_ssh_pass_q}
+# Password SSH fails closed unless one production pin is configured. Set only
+# one of the known_hosts file or fingerprint fields. TOFU is lab-only.
+SPLUNK_SSH_KNOWN_HOSTS_FILE=${splunk_ssh_known_hosts_file_q}
+SPLUNK_SSH_HOST_KEY_FINGERPRINT=${splunk_ssh_host_key_fingerprint_q}
+SPLUNK_SSH_ALLOW_TOFU=${splunk_ssh_allow_tofu_q}
 SPLUNK_CLOUD_STACK=${splunk_cloud_stack_q}
 SPLUNK_CLOUD_SEARCH_HEAD=${splunk_cloud_search_head_q}
 SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS=${splunk_cloud_index_searchable_days_q}

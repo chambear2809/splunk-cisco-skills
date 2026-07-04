@@ -24,13 +24,47 @@ PRE_VETTED=false
 TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
 ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
 ACCEPT_UNVERIFIED_RELEASE="${SPLUNK_ACCEPT_UNVERIFIED_RELEASE:-false}"
+ACCEPT_HISTORICAL_REVIEW_ONLY_PIN="${SPLUNK_ACCEPT_HISTORICAL_REVIEW_ONLY_PIN:-false}"
 CLOUD_APP_NAME=""
 CLOUD_APP_VERSION=""
 CLOUD_APP_STATUS=""
 
 REGISTRY_FILE="${REGISTRY_FILE:-${SCRIPT_DIR}/../../../skills/shared/app_registry.json}"
+REGISTRY_AUDIT="${SCRIPT_DIR}/../../shared/scripts/audit_splunkbase_registry.py"
 
 is_interactive() { [[ -t 0 ]]; }
+
+require_registry_provenance() {
+    local audit_output
+    if [[ ! -f "${REGISTRY_FILE}" ]]; then
+        log "ERROR: Refusing installation before mutation: app registry is missing at ${REGISTRY_FILE}."
+        return 1
+    fi
+    if [[ ! -x "${REGISTRY_AUDIT}" ]]; then
+        log "ERROR: Refusing installation before mutation: registry provenance verifier is unavailable."
+        return 1
+    fi
+    if ! audit_output="$(python3 "${REGISTRY_AUDIT}" --registry "${REGISTRY_FILE}" 2>&1)"; then
+        log "ERROR: Refusing installation before mutation: Splunkbase registry provenance validation failed."
+        [[ -n "${audit_output}" ]] && printf '%s\n' "${audit_output}" >&2
+        return 1
+    fi
+}
+
+validate_splunkbase_id() {
+    local app_id="${1:-}"
+    [[ "${app_id}" =~ ^[1-9][0-9]*$ ]]
+}
+
+validate_app_version() {
+    local version="${1:-}"
+    (( ${#version} <= 128 )) || return 1
+    [[ "${version}" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]
+}
+
+validate_expected_sha256() {
+    [[ "${1:-}" =~ ^[A-Fa-f0-9]{64}$ ]]
+}
 
 list_package_files() {
     python3 - "$@" <<'PY'
@@ -221,6 +255,7 @@ resolve_target_splunk_version() {
     export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
     export SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM="${ACCEPT_UNSUPPORTED_PLATFORM}"
     export SPLUNK_ACCEPT_UNVERIFIED_RELEASE="${ACCEPT_UNVERIFIED_RELEASE}"
+    export SPLUNK_ACCEPT_HISTORICAL_REVIEW_ONLY_PIN="${ACCEPT_HISTORICAL_REVIEW_ONLY_PIN}"
 }
 
 registry_app_compatibility_by_app_id() {
@@ -248,7 +283,12 @@ for app in registry.get("apps", []):
             platforms = [str(item) for item in app.get("platform_versions", [])]
         else:
             platforms = []
-        evidence = "repo-verified"
+        evidence = (
+            "historical-review-only"
+            if app.get("verified_release_evidence_status")
+            == "historical-review-only-not-currently-reproducible"
+            else "repo-verified"
+        )
     elif selected == release:
         platforms = [str(item) for item in app.get("platform_versions", [])]
         evidence = "public-latest"
@@ -267,6 +307,7 @@ for app in registry.get("apps", []):
         str(app.get("cloud_compatible", "")).lower(),
         str(app.get("install_method_single", "")),
         str(app.get("install_method_distributed", "")),
+        str(app.get("verified_release_evidence_status", "source-verified-current-release-api")),
     )
     print("|".join(fields), end="")
     break
@@ -274,18 +315,26 @@ PY
 }
 
 apply_registry_verified_version_default() {
-    local verified release
+    local verified release evidence_status
     [[ "${SOURCE}" == "splunkbase" ]] || return 0
     [[ -n "${APP_ID}" && -z "${APP_VERSION}" ]] || return 0
-    [[ "${ACCEPT_UNVERIFIED_RELEASE}" == "true" ]] && {
-        log "WARNING: Latest public release requested without repository package verification."
-        return 0
-    }
     verified="$(registry_app_field_by_app_id "${APP_ID}" "latest_verified_version")"
     release="$(registry_app_field_by_app_id "${APP_ID}" "latest_release_version")"
+    evidence_status="$(registry_app_field_by_app_id "${APP_ID}" "verified_release_evidence_status")"
+    if [[ "${ACCEPT_UNVERIFIED_RELEASE}" == "true" && -n "${release}" ]]; then
+        APP_VERSION="${release}"
+        log "WARNING: Pinned registry-recorded public latest ${release} for app ID ${APP_ID}; repository evidence covers release metadata, not package-binary contents."
+        return 0
+    fi
+    if [[ "${ACCEPT_UNVERIFIED_RELEASE}" == "true" ]]; then
+        log "WARNING: Unknown app ID ${APP_ID} has no registry public-latest pin; an explicit --app-version is required."
+        return 0
+    fi
     if [[ -n "${verified}" ]]; then
         APP_VERSION="${verified}"
-        if [[ -n "${release}" && "${release}" != "${verified}" ]]; then
+        if [[ "${evidence_status}" == "historical-review-only-not-currently-reproducible" ]]; then
+            log "Selected historical-review-only version ${verified} for app ID ${APP_ID}; current public release API metadata cannot reproduce this pin."
+        elif [[ -n "${release}" && "${release}" != "${verified}" ]]; then
             log "Using repo-verified version ${verified} for app ID ${APP_ID}; public latest ${release} remains unverified by this repo."
         else
             log "Using repo-verified version ${verified} for app ID ${APP_ID}."
@@ -297,6 +346,7 @@ preflight_current_install_target_compatibility() {
     local target_app_id metadata status app_name platforms verified release
     local selected_version evidence
     local cloud_compatible install_method_single install_method_distributed
+    local verified_evidence_status
 
     resolve_target_splunk_version || exit 1
     target_app_id="$(registry_target_app_id)"
@@ -311,11 +361,40 @@ preflight_current_install_target_compatibility() {
     fi
     metadata="$(registry_app_compatibility_by_app_id "${target_app_id}" "${TARGET_SPLUNK_VERSION}" "${selected_version}")"
     if [[ -z "${metadata}" ]]; then
-        log "INFO: App ID ${target_app_id} is not in the registry; compatibility with Splunk ${TARGET_SPLUNK_VERSION} must be verified separately."
+        if [[ "${target_app_id}" =~ ^[0-9]+$ ]]; then
+            if [[ "${ACCEPT_UNVERIFIED_RELEASE}" != "true" ]]; then
+                log "ERROR: Numeric app ID ${target_app_id} is outside the provenance-bound registry."
+                log "Refusing installation before mutation. Pass --accept-unverified-release only after independently reviewing the app identity and release."
+                exit 1
+            fi
+            if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" != "true" ]]; then
+                log "ERROR: Numeric app ID ${target_app_id} has no registry platform evidence for Splunk ${TARGET_SPLUNK_VERSION}."
+                log "Refusing installation before mutation. After manual compatibility review, pass --accept-unsupported-platform as a separate approval."
+                exit 1
+            fi
+            if [[ -z "${selected_version}" ]]; then
+                log "ERROR: Unknown Splunkbase app ID ${target_app_id} requires an explicit --app-version."
+                log "Refusing installation before mutation because a moving latest release cannot be verified exactly."
+                exit 1
+            fi
+            log "WARNING: Explicit unverified-ID and manual platform approvals accepted for unknown Splunkbase app ID ${target_app_id}."
+            return 0
+        fi
+        log "INFO: App ID ${target_app_id} is not a numeric Splunkbase ID; compatibility must be verified separately."
         return 0
     fi
     IFS='|' read -r status app_name platforms verified release selected_version evidence cloud_compatible \
-        install_method_single install_method_distributed <<< "${metadata}"
+        install_method_single install_method_distributed verified_evidence_status <<< "${metadata}"
+    if [[ "${selected_version}" == "${verified}" && "${verified_evidence_status}" == "historical-review-only-not-currently-reproducible" ]]; then
+        if [[ "${ACCEPT_HISTORICAL_REVIEW_ONLY_PIN}" == "true" ]]; then
+            log "WARNING: Explicit historical-review-only pin override accepted for ${app_name:-app ID ${target_app_id}} version ${selected_version}."
+            log "WARNING: The current public Splunkbase release API cannot reproduce this reviewed pin's metadata; this is not current source provenance or package-binary checksum verification."
+        else
+            log "ERROR: ${app_name:-App ID ${target_app_id}} version ${selected_version} is historical-review-only and cannot be reproduced from the current public Splunkbase release API."
+            log "Refusing installation before mutation. Prefer --accept-unverified-release to review public latest, or pass --accept-historical-review-only-pin only after independent package/version approval."
+            exit 1
+        fi
+    fi
     if is_splunk_cloud && [[ "${cloud_compatible}" == "false" ]]; then
         if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
             log "WARNING: Explicit Cloud-placement override accepted for ${app_name:-app ID ${target_app_id}} even though Splunkbase marks cloud_compatible=false (single=${install_method_single:-unknown}, distributed=${install_method_distributed:-unknown})."
@@ -341,8 +420,8 @@ preflight_current_install_target_compatibility() {
 
     log "ERROR: ${app_name:-App ID ${target_app_id}} version ${selected_version:-unknown} (${evidence}) does not advertise Splunk ${TARGET_SPLUNK_VERSION} compatibility."
     log "Selected-release platform versions: ${platforms:-none}."
-    if [[ "${evidence}" == "repo-verified" && -z "${platforms}" && "${release}" != "${verified}" ]]; then
-        log "The repo-verified pin has no current public compatibility evidence for this target; review the newer public release with --accept-unverified-release."
+    if [[ "${evidence}" == "historical-review-only" ]]; then
+        log "The historical reviewed pin has no reproducible current public release metadata; review public latest with --accept-unverified-release."
     elif [[ "${evidence}" == "unregistered-version" ]]; then
         log "Supply a registry-known --app-version or document an explicit compatibility exception."
     fi
@@ -388,6 +467,149 @@ try:
 except Exception:
     pass
 PY
+}
+
+PACKAGE_INSPECTED_NAME=""
+PACKAGE_INSPECTED_VERSION=""
+
+inspect_package_contract() {
+    local package_path="$1" expected_name="${2:-}" expected_version="${3:-}" result
+    if ! result="$(python3 - "${package_path}" "${expected_name}" "${expected_version}" <<'PY'
+import configparser
+import io
+import re
+import sys
+import tarfile
+from pathlib import PurePosixPath
+
+archive_path, expected_name, expected_version = sys.argv[1:]
+safe_name = re.compile(r"^[A-Za-z0-9_.-]+$")
+safe_version = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
+
+try:
+    archive = tarfile.open(archive_path, "r:*")
+except Exception as exc:
+    print(f"ERROR: Package is not a readable tar archive: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+with archive:
+    top_levels = set()
+    app_conf_members = {}
+    for member in archive.getmembers():
+        raw_name = member.name or ""
+        if not raw_name or "\x00" in raw_name or raw_name.startswith("/"):
+            print("ERROR: Package contains an empty, absolute, or NUL-bearing path.", file=sys.stderr)
+            raise SystemExit(1)
+        normalized_name = raw_name
+        while normalized_name.startswith("./"):
+            normalized_name = normalized_name[2:]
+        normalized_name = normalized_name.rstrip("/")
+        raw_parts = normalized_name.split("/") if normalized_name else []
+        path = PurePosixPath(normalized_name)
+        if not raw_parts or any(part in ("", ".", "..") for part in raw_parts):
+            print(f"ERROR: Package contains an unsafe path: {raw_name!r}", file=sys.stderr)
+            raise SystemExit(1)
+        top = path.parts[0]
+        if top in {"__MACOSX", "pax_global_header"} or path.name == "@PaxHeader":
+            continue
+        top_levels.add(top)
+        if member.issym() or member.islnk():
+            link = PurePosixPath(member.linkname or "")
+            if not member.linkname or member.linkname.startswith("/") or ".." in link.parts:
+                print(f"ERROR: Package contains an unsafe link target: {member.linkname!r}", file=sys.stderr)
+                raise SystemExit(1)
+        if len(path.parts) == 3 and path.parts[1] in ("default", "local") and path.parts[2] == "app.conf":
+            if not member.isfile() or member.size > 1024 * 1024:
+                print("ERROR: Package app.conf must be a regular file no larger than 1 MiB.", file=sys.stderr)
+                raise SystemExit(1)
+            extracted = archive.extractfile(member)
+            if extracted is None:
+                print("ERROR: Package app.conf could not be read.", file=sys.stderr)
+                raise SystemExit(1)
+            app_conf_members[path.parts[1]] = extracted.read().decode("utf-8", errors="strict")
+
+if len(top_levels) != 1:
+    print(f"ERROR: Package must contain exactly one top-level Splunk app directory; found {sorted(top_levels)!r}.", file=sys.stderr)
+    raise SystemExit(1)
+
+top_level = next(iter(top_levels))
+if not safe_name.fullmatch(top_level):
+    print(f"ERROR: Package top-level app directory is unsafe: {top_level!r}.", file=sys.stderr)
+    raise SystemExit(1)
+if expected_name and top_level != expected_name:
+    print(f"ERROR: Package app identity {top_level!r} does not match expected {expected_name!r}.", file=sys.stderr)
+    raise SystemExit(1)
+if "default" not in app_conf_members:
+    print("ERROR: Package is missing default/app.conf.", file=sys.stderr)
+    raise SystemExit(1)
+
+parsed = {}
+for layer in ("default", "local"):
+    text = app_conf_members.get(layer)
+    if text is None:
+        continue
+    parser = configparser.RawConfigParser(strict=False, interpolation=None)
+    parser.optionxform = str.lower
+    try:
+        parser.read_file(io.StringIO(text))
+    except Exception as exc:
+        print(f"ERROR: Package {layer}/app.conf is invalid: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    package_id = parser.get("package", "id", fallback="").strip()
+    version = parser.get("launcher", "version", fallback="").strip()
+    if package_id:
+        parsed["package_id"] = package_id
+    if version:
+        parsed["version"] = version
+
+package_id = parsed.get("package_id", "")
+version = parsed.get("version", "")
+if package_id and (not safe_name.fullmatch(package_id) or package_id != top_level):
+    print(f"ERROR: Package [package] id {package_id!r} does not match top-level app directory {top_level!r}.", file=sys.stderr)
+    raise SystemExit(1)
+if not version or not safe_version.fullmatch(version):
+    print("ERROR: Package must declare a safe [launcher] version in app.conf.", file=sys.stderr)
+    raise SystemExit(1)
+if expected_version and version != expected_version:
+    print(f"ERROR: Package version {version!r} does not match expected {expected_version!r}.", file=sys.stderr)
+    raise SystemExit(1)
+
+print("\x1f".join((top_level, version)), end="")
+PY
+)"; then
+        log "ERROR: Package identity/version inspection failed for ${package_path}."
+        return 1
+    fi
+    IFS=$'\x1f' read -r PACKAGE_INSPECTED_NAME PACKAGE_INSPECTED_VERSION <<< "${result}"
+    if [[ -z "${PACKAGE_INSPECTED_NAME}" || -z "${PACKAGE_INSPECTED_VERSION}" ]]; then
+        log "ERROR: Package inspection did not return an exact app identity and version."
+        return 1
+    fi
+    log "Verified package contract: ${PACKAGE_INSPECTED_NAME} version ${PACKAGE_INSPECTED_VERSION}."
+}
+
+prepare_exact_package_contract() {
+    local target_app_id expected_name
+    [[ -n "${APP_FILE}" && -f "${APP_FILE}" ]] || {
+        log "ERROR: Package file is unavailable for pre-install identity/version inspection."
+        return 1
+    }
+    target_app_id="$(registry_target_app_id)"
+    expected_name=""
+    if [[ -n "${target_app_id}" ]]; then
+        expected_name="$(registry_app_name_by_app_id "${target_app_id}")"
+    fi
+    inspect_package_contract "${APP_FILE}" "${expected_name}" "${APP_VERSION}" || return 1
+    APP_VERSION="${PACKAGE_INSPECTED_VERSION}"
+    if [[ -z "${APP_ID}" && -n "${target_app_id}" ]]; then
+        APP_ID="${target_app_id}"
+    fi
+}
+
+preflight_unknown_explicit_app_id() {
+    [[ -n "${APP_ID}" ]] || return 0
+    [[ -z "$(registry_app_name_by_app_id "${APP_ID}")" ]] || return 0
+    preflight_current_install_target_compatibility
 }
 
 registry_local_package_for_app_id() {
@@ -604,6 +826,7 @@ while [[ $# -gt 0 ]]; do
         --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
         --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
         --accept-unverified-release) ACCEPT_UNVERIFIED_RELEASE=true; shift ;;
+        --accept-historical-review-only-pin) ACCEPT_HISTORICAL_REVIEW_ONLY_PIN=true; shift ;;
         --help)
             cat <<EOF
 Splunk App Installer (interactive)
@@ -617,8 +840,8 @@ Optional flags (skip the corresponding prompt):
   --source local|remote|splunkbase
   --file PATH           Local app file path
   --url URL             Remote download URL
-  --expected-sha256 HEX 64-char hex SHA-256 of the package; required for non-Splunkbase URL
-                        downloads to be installed (defense against compromised mirrors).
+  --expected-sha256 HEX 64-char package SHA-256; required for URL downloads and
+                        required before a cached Splunkbase archive may be reused.
   --app-id ID           Splunkbase app ID
   --app-version VER     Pin a specific Splunkbase version (default: repo-verified
                         version for known apps)
@@ -634,8 +857,13 @@ Optional flags (skip the corresponding prompt):
                         Override a known registry incompatibility only with documented
                         vendor/operator approval.
   --accept-unverified-release
-                        For a known app, request public latest instead of the repo-verified
-                        version. This does not certify that release.
+                        For a known app, pin the registry-recorded public latest instead of
+                        the repo-verified version. For an unknown numeric ID, acknowledge
+                        independent identity/release review; --app-version is also required.
+  --accept-historical-review-only-pin
+                        Permit a reviewed older pin that the current public release API no
+                        longer returns. Requires independent package/version approval and
+                        does not verify package-binary contents or checksums.
 
 Credentials and remote host settings are read from the project-root credentials file automatically.
 For Splunk Cloud installs, configure ACS access. If one credentials file contains
@@ -652,6 +880,24 @@ EOF
         *) log "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+if [[ -n "${APP_VERSION}" ]] && ! validate_app_version "${APP_VERSION}"; then
+    log "ERROR: --app-version must be 1-128 characters using only letters, digits, '.', '_', '+', or '-'."
+    exit 1
+fi
+if [[ -n "${APP_ID}" ]]; then
+    if [[ "${APP_ID}" =~ splunkbase\.splunk\.com/app/([0-9]+) ]]; then
+        APP_ID="${BASH_REMATCH[1]}"
+    fi
+    if ! validate_splunkbase_id "${APP_ID}"; then
+        log "ERROR: --app-id must be a positive numeric Splunkbase ID or a Splunkbase app URL."
+        exit 1
+    fi
+fi
+if [[ -n "${EXPECTED_SHA256}" ]] && ! validate_expected_sha256 "${EXPECTED_SHA256}"; then
+    log "ERROR: --expected-sha256 must be a 64-character hexadecimal SHA-256 digest."
+    exit 1
+fi
 
 # ── Prompt helpers ──────────────────────────────────────────────────
 
@@ -749,6 +995,11 @@ prompt_splunkbase() {
     if [[ "${APP_ID}" =~ splunkbase\.splunk\.com/app/([0-9]+) ]]; then
         APP_ID="${BASH_REMATCH[1]}"
         log "Using app ID: ${APP_ID}"
+    fi
+
+    if ! validate_splunkbase_id "${APP_ID}"; then
+        log "ERROR: Splunkbase app ID '${APP_ID}' must be a positive numeric ID."
+        exit 1
     fi
 
     cloud_apply_known_splunkbase_defaults
@@ -867,7 +1118,11 @@ except Exception:
     CLOUD_APP_NAME="${app_name}"
     CLOUD_APP_VERSION="${version}"
     CLOUD_APP_STATUS="${status}"
-    log "ACS accepted the private app install request${app_name:+ for '${app_name}'}."
+    if [[ -n "${app_name}" ]]; then
+        log "ACS accepted the private app install request for '${app_name}'."
+    else
+        log "ACS accepted the private app install request."
+    fi
 }
 
 cloud_install_splunkbase_app() {
@@ -931,11 +1186,86 @@ except Exception:
     CLOUD_APP_NAME="${app_name}"
     CLOUD_APP_VERSION="${version}"
     CLOUD_APP_STATUS="${status}"
-    log "ACS accepted the Splunkbase app operation${app_name:+ for '${app_name}'}."
+    if [[ -n "${app_name}" ]]; then
+        log "ACS accepted the Splunkbase app operation for '${app_name}'."
+    else
+        log "ACS accepted the Splunkbase app operation."
+    fi
+}
+
+cloud_verify_exact_app_state() {
+    local app_name="$1" expected_version="$2"
+    local attempts="${SPLUNK_ACS_APP_VERIFY_ATTEMPTS:-30}"
+    local interval="${SPLUNK_ACS_APP_VERIFY_INTERVAL:-5}"
+    local attempt=1 raw describe_json metadata name version status normalized
+
+    [[ "${attempts}" =~ ^[1-9][0-9]*$ ]] || {
+        log "ERROR: SPLUNK_ACS_APP_VERIFY_ATTEMPTS must be a positive integer."
+        return 1
+    }
+    [[ "${interval}" =~ ^[0-9]+$ ]] || {
+        log "ERROR: SPLUNK_ACS_APP_VERIFY_INTERVAL must be a non-negative integer."
+        return 1
+    }
+    [[ -n "${expected_version}" ]] || {
+        log "ERROR: Exact expected version is required for Cloud post-install verification."
+        return 1
+    }
+
+    while (( attempt <= attempts )); do
+        raw="$(acs_command apps describe "${app_name}" 2>/dev/null || true)"
+        describe_json="$(printf '%s' "${raw}" | acs_extract_http_response_json)"
+        metadata="$(printf '%s' "${describe_json}" | python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+if isinstance(data, dict) and isinstance(data.get("app"), dict):
+    data = data["app"]
+if not isinstance(data, dict):
+    raise SystemExit(1)
+spec = data.get("spec") if isinstance(data.get("spec"), dict) else {}
+name = data.get("name") or data.get("appID") or spec.get("name") or ""
+version = data.get("version") or spec.get("version") or ""
+status = data.get("status") or spec.get("status") or ""
+values = [str(name), str(version), str(status)]
+if not all(values) or any("\x1f" in value for value in values):
+    raise SystemExit(1)
+print("\x1f".join(values), end="")
+' 2>/dev/null || true)"
+        if [[ -n "${metadata}" ]]; then
+            IFS=$'\x1f' read -r name version status <<< "${metadata}"
+            normalized="$(printf '%s' "${status}" | tr '[:upper:]' '[:lower:]')"
+            case "${normalized}" in
+                installed|updated|active|completed|complete|ready|enabled|success|succeeded)
+                    if [[ "${version}" != "${expected_version}" ]]; then
+                        log "ERROR: ACS reports app '${name}' at version '${version}', expected exact version '${expected_version}'."
+                        return 1
+                    fi
+                    printf '%s' "${metadata}"
+                    return 0
+                    ;;
+                pending|installing|updating|processing|queued|in_progress|in-progress) ;;
+                *)
+                    log "ERROR: ACS reports ambiguous status '${status}' for '${name}'."
+                    return 1
+                    ;;
+            esac
+        fi
+        if (( attempt < attempts )); then
+            (( interval > 0 )) && sleep "${interval}"
+        fi
+        attempt=$((attempt + 1))
+    done
+    log "ERROR: ACS did not prove '${app_name}' at exact version '${expected_version}' in a terminal state."
+    return 1
 }
 
 cloud_install_app() {
-    local describe_json metadata verified_name verified_version verified_status normalized_status
+    local metadata verified_name verified_version verified_status
     case "${SOURCE}" in
         local|remote|url)
             if [[ ! -f "${APP_FILE}" ]]; then
@@ -959,49 +1289,12 @@ cloud_install_app() {
         log "HANDOFF: Run 'acs apps list' and verify the expected package/version before treating the install as complete."
         return 1
     fi
-    if ! describe_json="$(acs_command apps describe "${CLOUD_APP_NAME}" 2>/dev/null | acs_extract_http_response_json)"; then
-        log "ERROR: ACS accepted the app operation, but '${CLOUD_APP_NAME}' could not be verified afterward."
-        log "HANDOFF: Run 'acs apps describe ${CLOUD_APP_NAME}' and check stack restart status before using the app."
+    if ! metadata="$(cloud_verify_exact_app_state "${CLOUD_APP_NAME}" "${APP_VERSION}")"; then
+        log "ERROR: ACS accepted the app operation, but exact terminal state could not be verified afterward."
+        log "HANDOFF: Run 'acs apps describe ${CLOUD_APP_NAME}' and verify exact version ${APP_VERSION:-<missing>}."
         return 1
     fi
-    if ! metadata="$(printf '%s' "${describe_json}" | python3 -c '
-import json
-import sys
-
-data = json.load(sys.stdin)
-if isinstance(data, dict) and isinstance(data.get("app"), dict):
-    data = data["app"]
-if not isinstance(data, dict):
-    raise SystemExit(1)
-spec = data.get("spec") if isinstance(data.get("spec"), dict) else {}
-name = data.get("name") or data.get("appID") or spec.get("name") or ""
-version = data.get("version") or spec.get("version") or ""
-status = data.get("status") or spec.get("status") or ""
-if not name:
-    raise SystemExit(1)
-print(f"{name}|{version}|{status}", end="")
-')"; then
-        log "ERROR: ACS app describe returned an unrecognized record for '${CLOUD_APP_NAME}'."
-        log "HANDOFF: Verify the app ID, version, and status with 'acs apps describe ${CLOUD_APP_NAME}'."
-        return 1
-    fi
-    IFS='|' read -r verified_name verified_version verified_status <<< "${metadata}"
-    if [[ -n "${APP_VERSION}" && "${verified_version}" != "${APP_VERSION}" ]]; then
-        log "ERROR: App '${verified_name}' is version '${verified_version:-unknown}', expected pinned version '${APP_VERSION}'."
-        return 1
-    fi
-    normalized_status="$(printf '%s' "${verified_status}" | tr '[:upper:]' '[:lower:]')"
-    case "${normalized_status}" in
-        failed|failure|error|rejected|invalid)
-            log "ERROR: ACS app record for '${verified_name}' reports status '${verified_status}'."
-            return 1
-            ;;
-        pending|installing|updating|processing|queued|in_progress|in-progress)
-            log "ERROR: ACS app record for '${verified_name}' is still incomplete with status '${verified_status}'."
-            log "HANDOFF: Wait for the Cloud stack operation to settle, then rerun 'acs apps describe ${CLOUD_APP_NAME}' and verify the installed version."
-            return 1
-            ;;
-    esac
+    IFS=$'\x1f' read -r verified_name verified_version verified_status <<< "${metadata}"
     CLOUD_APP_NAME="${verified_name}"
     CLOUD_APP_VERSION="${verified_version:-${CLOUD_APP_VERSION}}"
     CLOUD_APP_STATUS="${verified_status:-${CLOUD_APP_STATUS}}"
@@ -1023,7 +1316,10 @@ resolve_splunkbase_release_metadata() {
     fi
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    metadata=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
+    metadata=$(curl -q -sS --connect-timeout 30 --max-time 120 \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -1078,7 +1374,7 @@ print(f'{version}\\t{filename}')
 download_from_splunkbase() {
     resolve_splunkbase_release_metadata
 
-    local requested_version cached_path
+    local requested_version cached_path cached_sha expected_lower actual_sha actual_lower
     requested_version="${APP_VERSION}"
 
     if [[ -n "${APP_PACKAGE_NAME}" ]]; then
@@ -1088,14 +1384,20 @@ download_from_splunkbase() {
         fi
 
         for cached_path in "${cached_candidates[@]}"; do
-            if [[ -f "${cached_path}" ]] && _is_splunk_package "${cached_path}"; then
-                log "Existing package found: ${cached_path}"
+            [[ -f "${cached_path}" ]] || continue
+            if [[ -z "${EXPECTED_SHA256}" ]]; then
+                log "Ignoring unverified cached package and redownloading exact Splunkbase release: ${cached_path}"
+                continue
+            fi
+            cached_sha="$(hbs_sha256_file "${cached_path}")"
+            expected_lower="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
+            actual_lower="$(printf '%s' "${cached_sha}" | tr '[:upper:]' '[:lower:]')"
+            if [[ -n "${cached_sha}" && "${actual_lower}" == "${expected_lower}" ]] && _is_splunk_package "${cached_path}"; then
+                log "Using SHA-256-verified cached package: ${cached_path}"
                 APP_FILE="${cached_path}"
                 return
             fi
-            if [[ -f "${cached_path}" ]]; then
-                log "Ignoring invalid package at: ${cached_path}"
-            fi
+            log "Ignoring cached package whose bytes do not match the operator-provided SHA-256: ${cached_path}"
         done
     fi
 
@@ -1122,6 +1424,23 @@ download_from_splunkbase() {
         exit 1
     fi
 
+    if [[ -n "${EXPECTED_SHA256}" ]]; then
+        actual_sha="$(hbs_sha256_file "${temp_path}")"
+        actual_lower="$(printf '%s' "${actual_sha}" | tr '[:upper:]' '[:lower:]')"
+        expected_lower="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
+        if [[ -z "${actual_sha}" || "${actual_lower}" != "${expected_lower}" ]]; then
+            rm -f "${temp_path}"
+            log "ERROR: SHA-256 mismatch for the exact Splunkbase package."
+            log "       expected: ${expected_lower}"
+            log "       actual:   ${actual_sha:-<could not compute>}"
+            exit 1
+        fi
+        log "Verified operator-provided SHA-256 ${actual_sha} for the Splunkbase package."
+    else
+        log "NOTICE: Splunkbase supplied the package over authenticated HTTPS, but no publisher/operator package checksum was provided."
+        log "NOTICE: Registry provenance verifies release metadata only; these package bytes are not repository checksum evidence."
+    fi
+
     local resolved_version output_filename output_path
     resolved_version="${SB_DOWNLOAD_VERSION:-${requested_version:-latest}}"
     output_filename="${APP_PACKAGE_NAME:-${SB_DOWNLOAD_FILENAME:-splunkbase_${APP_ID}_v${resolved_version}.tgz}}"
@@ -1140,7 +1459,7 @@ download_from_splunkbase() {
 }
 
 download_from_url() {
-    local filename
+    local filename safe_source_url
     filename=$(basename "${APP_URL}" | sed 's/[?#].*//')
 
     if [[ -z "${filename}" ]] || [[ "${filename}" == "/" ]]; then
@@ -1153,7 +1472,7 @@ download_from_url() {
         log "ERROR: --expected-sha256 is required for --url downloads (supply the publisher's"
         log "       SHA-256 of the package). Without an integrity check a compromised or swapped"
         log "       mirror could ship a malicious app package. Pass --expected-sha256 <hex> or"
-        log "       use --source splunkbase for signed releases."
+        log "       use --source splunkbase for an authenticated exact-release download."
         exit 1
     fi
     if ! [[ "${EXPECTED_SHA256}" =~ ^[A-Fa-f0-9]{64}$ ]]; then
@@ -1161,26 +1480,51 @@ download_from_url() {
         exit 1
     fi
 
-    log "Downloading from: ${APP_URL}"
-    local http_code
-    _set_app_download_curl_tls_args || exit 1
-    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_app_download_curl_tls_args.
-    http_code=$(curl -sL ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -w "%{http_code}" \
-        -o "${output_path}" \
-        "${APP_URL}" 2>/dev/null || echo "000")
+    if ! credential_curl_validate_url "${APP_URL}" false; then
+        log "ERROR: --url must be an absolute credential-free HTTPS URL without whitespace or a fragment."
+        exit 1
+    fi
+    safe_source_url="$(python3 - "${APP_URL}" <<'PY'
+import sys
+from urllib.parse import urlsplit, urlunsplit
 
-    if [[ "${http_code}" -lt 200 ]] || [[ "${http_code}" -ge 400 ]] || [[ ! -s "${output_path}" ]]; then
-        rm -f "${output_path}"
-        log "ERROR: Download failed (HTTP ${http_code}) from: ${APP_URL}"
+parsed = urlsplit(sys.argv[1])
+print(urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "[REDACTED]" if parsed.query else "", "")), end="")
+PY
+)"
+    log "Downloading from: ${safe_source_url}"
+    local http_code effective_url download_meta temp_path
+    _set_app_download_curl_tls_args || exit 1
+    temp_path="$(mktemp "${TA_CACHE}/remote-app-download.XXXXXX")"
+    hbs_append_cleanup_trap "rm -f $(printf '%q' "${temp_path}") 2>/dev/null || true" EXIT INT TERM
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_app_download_curl_tls_args.
+    download_meta=$(curl -q -sS --location --max-redirs 3 \
+        --proto '=https' --proto-redir '=https' --globoff \
+        --connect-timeout 30 --max-time 300 \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        -w $'%{http_code}\t%{url_effective}' \
+        -o "${temp_path}" \
+        "${APP_URL}" 2>/dev/null || printf '000\t')
+    http_code="${download_meta%%$'\t'*}"
+    effective_url="${download_meta#*$'\t'}"
+
+    if [[ ! "${http_code}" =~ ^[0-9]{3}$ ]] || (( 10#${http_code} < 200 || 10#${http_code} >= 400 )) || [[ ! -s "${temp_path}" ]]; then
+        rm -f "${temp_path}"
+        log "ERROR: Download failed (HTTP ${http_code:-unknown}) from: ${safe_source_url}"
+        exit 1
+    fi
+    if ! credential_curl_validate_url "${effective_url}" false; then
+        rm -f "${temp_path}"
+        log "ERROR: Download resolved to an invalid or non-HTTPS effective URL."
         exit 1
     fi
 
     local actual_sha actual_lower expected_lower
-    actual_sha="$(hbs_sha256_file "${output_path}")"
+    actual_sha="$(hbs_sha256_file "${temp_path}")"
     actual_lower="$(printf '%s' "${actual_sha}" | tr '[:upper:]' '[:lower:]')"
     expected_lower="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
     if [[ -z "${actual_sha}" || "${actual_lower}" != "${expected_lower}" ]]; then
-        rm -f "${output_path}"
+        rm -f "${temp_path}"
         log "ERROR: SHA-256 mismatch for downloaded package."
         log "       expected: ${expected_lower}"
         log "       actual:   ${actual_sha:-<could not compute>}"
@@ -1188,6 +1532,8 @@ download_from_url() {
         exit 1
     fi
     log "Verified SHA-256 ${actual_sha} for ${filename}."
+
+    mv -f "${temp_path}" "${output_path}"
 
     log "Downloaded to: ${output_path} (HTTP ${http_code})"
     APP_FILE="${output_path}"
@@ -1259,7 +1605,7 @@ stage_file_via_ssh() {
     local local_path="$1"
     local remote_path="$2"
     local ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
-    local pass_file
+    local remote_dir remote_name scp_target rc
 
     if ! command -v sshpass >/dev/null 2>&1; then
         log "ERROR: sshpass is required for SSH password-based staging."
@@ -1267,25 +1613,38 @@ stage_file_via_ssh() {
         return 1
     fi
 
-    pass_file="$(hbs_make_sshpass_file)"
+    remote_dir="$(dirname "${remote_path}")"
+    remote_name="$(basename "${remote_path}")"
+    if [[ "${remote_path}" != "${remote_dir%/}/${remote_name}" ]]; then
+        log "ERROR: SSH staging path is not a normalized absolute remote path: ${remote_path}"
+        return 1
+    fi
+    hbs_validate_remote_stage_path "${remote_dir}" "${remote_name}" || return 1
+    hbs_prepare_ssh_trust || return 1
+    scp_target="${ssh_target}:${remote_path}"
+    if [[ "${SPLUNK_SSH_HOST}" == *:* ]]; then
+        scp_target="${SPLUNK_SSH_USER}@[${SPLUNK_SSH_HOST}]:${remote_path}"
+    fi
 
-    sshpass -f "${pass_file}" scp \
+    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 scp \
         -P "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
+        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${local_path}" "${ssh_target}:${remote_path}"
-    local rc=$?
-    rm -f "${pass_file}"
+        "${local_path}" "${scp_target}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
     return "${rc}"
 }
 
 cleanup_remote_stage_file() {
     local remote_path="$1"
-    local ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
-    local pass_file remote_quoted
 
     [[ -z "${remote_path}" ]] && return 0
 
@@ -1293,22 +1652,7 @@ cleanup_remote_stage_file() {
         return 0
     fi
 
-    pass_file="$(hbs_make_sshpass_file)"
-
-    # Use printf '%q' so any shell metacharacters (including single quotes)
-    # in the staged filename are safely escaped before remote shell expansion.
-    remote_quoted="$(printf '%q' "${remote_path}")"
-
-    sshpass -f "${pass_file}" ssh \
-        -p "${SPLUNK_SSH_PORT}" \
-        -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -q \
-        "${ssh_target}" "rm -f ${remote_quoted}" >/dev/null 2>&1 || true
-
-    rm -f "${pass_file}"
+    hbs_run_target_cmd ssh "$(hbs_shell_join rm -f "${remote_path}")" >/dev/null 2>&1 || true
 }
 
 install_app() {
@@ -1517,6 +1861,8 @@ main() {
     echo "=== Splunk App Installer ==="
     echo ""
 
+    require_registry_provenance || exit 1
+
     mkdir -p "${PROJECT_TA_DIR}"
     mkdir -p "${TA_CACHE}"
 
@@ -1542,10 +1888,15 @@ main() {
                 ;;
         esac
 
+        if [[ "${SOURCE}" != "splunkbase" ]]; then
+            preflight_unknown_explicit_app_id
+            prepare_exact_package_contract
+        fi
         prompt_update
         apply_registry_verified_version_default
         preflight_current_install_target_compatibility
         warn_for_current_install_target_role
+        require_registry_provenance || exit 1
         install_required_dependencies
         cloud_install_app
         exit 0
@@ -1571,11 +1922,14 @@ main() {
             ;;
     esac
 
+    preflight_unknown_explicit_app_id
+    prepare_exact_package_contract
     prompt_update
-    if [[ "${SOURCE}" != "splunkbase" ]]; then
-        preflight_current_install_target_compatibility
-    fi
+    # Bind compatibility to the exact version read from the downloaded archive
+    # immediately before any dependency or target mutation.
+    preflight_current_install_target_compatibility
     warn_for_current_install_target_role
+    require_registry_provenance || exit 1
     prompt_splunk_creds
     splunk_auth
     install_required_dependencies

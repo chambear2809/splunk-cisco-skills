@@ -205,16 +205,20 @@ trap cleanup EXIT
 chmod 600 "${AUTH_CONFIG}"
 
 if [[ -n "${TOKEN_FILE}" ]]; then
-    ACCESS_TOKEN="$(tr -d '\r\n' < "${TOKEN_FILE}")"
+    credential_curl_write_header_config \
+        "${TOKEN_FILE}" "Authorization" "${AUTH_CONFIG}" "Bearer " || {
+        echo "FAIL: AppDynamics OAuth token file failed descriptor-bound validation." >&2
+        exit 1
+    }
 else
     TOKEN_JSON="$(appd_controller_oauth_token "${CONTROLLER_URL}" "${ACCOUNT_NAME}" "${CLIENT_NAME}" "${CLIENT_SECRET_FILE}")"
     ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("access_token", ""))' <<<"${TOKEN_JSON}")"
+    if [[ -z "${ACCESS_TOKEN}" || "${ACCESS_TOKEN}" == *$'\r'* || "${ACCESS_TOKEN}" == *$'\n'* || "${ACCESS_TOKEN}" == *'"'* || "${ACCESS_TOKEN}" == *'\'* ]]; then
+        echo "FAIL: AppDynamics OAuth token is empty or unsafe." >&2
+        exit 1
+    fi
+    printf 'header = "Authorization: Bearer %s"\n' "${ACCESS_TOKEN}" > "${AUTH_CONFIG}"
 fi
-if [[ -z "${ACCESS_TOKEN}" ]]; then
-    echo "FAIL: AppDynamics OAuth token is empty." >&2
-    exit 1
-fi
-printf 'header = "Authorization: Bearer %s"\n' "${ACCESS_TOKEN}" > "${AUTH_CONFIG}"
 unset ACCESS_TOKEN TOKEN_JSON
 
 url_path_segment() {

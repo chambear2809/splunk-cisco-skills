@@ -34,6 +34,15 @@ Environment-specific notes:
 - Kubernetes apply/validate paths require the right `kubectl` or `oc` context.
 - Cloud and Observability tokens must be referenced by file path, never pasted
   into shell arguments or chat.
+- Render directories shared by a legacy/current skill pair are single-owner
+  bundles. Preserve `.splunk-skill-bundle.json`; if another skill owns the
+  directory, choose a different `--output-dir` or remove the entire stale
+  bundle only after review. Do not copy generated files between paired roots.
+- Splunk management REST credentials and session keys require `https://`.
+  `SPLUNK_VERIFY_SSL=false` is an HTTPS certificate-verification override, not
+  permission for plaintext transport. `SPLUNK_ALLOW_INSECURE_HTTP=true` is
+  reserved for an isolated, short-lived lab and emits a prominent warning when
+  used.
 - Splunk TA, add-on, and dashboard companion setup skills must satisfy the
   shared `skills/shared/ta_completion_gate.md`: data ingest must be configured
   and validated, and any pre-built dashboards must be visible, macro-aligned,

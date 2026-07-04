@@ -25,6 +25,44 @@
         "splunk ai agent monitoring"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/solutions/artificial-intelligence/agentic-ops/cisco-cloud-control/index.html"
+    },
+    {
+      "id": "cisco_asa_ftd_syslog",
+      "display_name": "Cisco ASA / FTD Syslog (Splunk_TA_cisco-asa)",
+      "status": "active",
+      "category": "security",
+      "subcategory": "network_security",
+      "description": "Cisco ASA and Secure Firewall Threat Defense syslog onboarding through the Splunk Add-on for Cisco ASA, with explicit external syslog receiver ownership and cisco:asa source typing.",
+      "value_proposition": "Route ASA and FTD syslog through the dedicated parser, collection handoff, CIM-readiness, and validation workflow instead of treating syslog as a Cisco Security Cloud API input.",
+      "addon": "Splunk_TA_cisco-asa",
+      "addon_uid": "1620",
+      "addon_label": "Splunk Add-on for Cisco ASA",
+      "aliases": [
+        "ASA",
+        "FTD",
+        "Cisco ASA",
+        "Cisco FTD",
+        "Cisco Firepower Threat Defense",
+        "Cisco ASA syslog",
+        "ASA syslog",
+        "Cisco FTD syslog",
+        "FTD syslog",
+        "Cisco Secure Firewall syslog",
+        "Secure Firewall syslog",
+        "Cisco ASA TA",
+        "ASA TA",
+        "Splunk_TA_cisco-asa"
+      ],
+      "keywords": [
+        "syslog",
+        "cisco:asa",
+        "SC4S",
+        "Splunk Add-on for Cisco ASA"
+      ],
+      "sourcetypes": [
+        "cisco:asa"
+      ],
+      "learn_more_url": "https://splunkbase.splunk.com/app/1620"
     }
   ],
   "products": {
@@ -88,15 +126,44 @@
       "product_key": "secure_endpoint"
     },
     "cisco_secure_firewall": {
+      "display_name": "Cisco Secure Firewall API / eStreamer (CiscoSecurityCloud)",
+      "aliases_add": [
+        "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+        "ASA",
+        "FTD",
+        "Cisco FTD",
+        "Cisco Secure Firewall",
+        "Secure Firewall",
+        "Cisco Secure Firewall API",
+        "Secure Firewall API",
+        "FMC API",
+        "FTD API",
+        "Cisco FTD API",
+        "Cisco Secure Firewall eStreamer",
+        "Secure Firewall eStreamer",
+        "FTD eStreamer",
+        "Cisco FTD eStreamer"
+      ],
+      "keywords_add": [
+        "api collection",
+        "estreamer collection"
+      ],
+      "sourcetypes_override": [
+        "cisco:sfw:estreamer",
+        "cisco:sfw:policy"
+      ],
       "route_type": "security_cloud_variant",
       "variant_key": "variant",
       "variants": {
         "api": "secure_firewall_api",
-        "estreamer": "secure_firewall_estreamer",
-        "syslog": "secure_firewall_syslog",
-        "asa_syslog": "secure_firewall_asa_syslog"
+        "estreamer": "secure_firewall_estreamer"
       },
-      "notes": "Choose the Secure Firewall collection mode with --set variant api, estreamer, syslog, or asa_syslog."
+      "notes": "Cisco Security Cloud owns Secure Firewall API and eStreamer collection. ASA/FTD syslog and Splunk_TA_cisco-asa requests route separately through cisco_asa_ftd_syslog and cisco-asa-ta-setup."
+    },
+    "cisco_asa_ftd_syslog": {
+      "automation_state": "partial",
+      "route_type": "asa_ta",
+      "notes": "Dedicated ASA/FTD syslog route. Install Splunk_TA_cisco-asa, render the selected SC4S/syslog receiver handoff, and require cisco:asa event evidence before completion."
     },
     "cisco_secure_malware_analytics": {
       "route_type": "security_cloud_product",

@@ -343,7 +343,44 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
         self.assertNotIn('python3 - "$@"', script_text)
         self.assertIn('printf \'%s\\0\' "${arg}"', script_text)
-        self.assertIn('chmod 600 "${args_file}"', script_text)
+        self.assertIn("sys.stdin.buffer.read()", script_text)
+        self.assertNotIn('args_file="$(mktemp)"', script_text)
+        self.assertIn("-d @-", script_text)
+        self.assertNotIn('-d "${payload}"', script_text)
+
+    def test_secure_access_rejects_unsafe_secret_before_discovery_or_index_creation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, secrets_dir, state_file, _, _ = self.build_mock_cisco_skill_env(tmp_path)
+            (secrets_dir / "sa_api_key").chmod(0o644)
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["installed_apps"]["cisco-cloud-security"] = {"version": "1.0.53"}
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            result = self.run_script(
+                "skills/cisco-secure-access-setup/scripts/configure_account.sh",
+                "--discover-org-id",
+                "--base-url",
+                "https://api.us.security.cisco.com",
+                "--timezone",
+                "UTC",
+                "--storage-region",
+                "us",
+                "--api-key-file",
+                str(secrets_dir / "sa_api_key"),
+                "--api-secret-file",
+                str(secrets_dir / "sa_api_secret"),
+                "--investigate-index",
+                "cisco_secure_access_investigate",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Could not securely read Secure Access API key", output)
+            self.assertNotIn("secure-access-api-key", output)
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertEqual(state["indexes"], [])
 
 
     def test_thousandeyes_hec_management_uses_ingest_profile_on_enterprise(self):
@@ -652,8 +689,56 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
         self.assertNotIn('-H "Authorization: Bearer ${bearer_token}"', script_text)
         self.assertIn('chmod 600 "${auth_config}"', script_text)
-        self.assertIn('-K "${auth_config}"', script_text)
+        self.assertEqual(script_text.count('-K "${auth_config}"'), 1)
         self.assertIn('rm -f "${auth_config}"', script_text)
+
+    def test_thousandeyes_oauth_curl_transport_is_fail_closed(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/configure_account.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(script_text.count("curl -q -sS"), 2)
+        self.assertEqual(script_text.count("credential_curl_validate_request_args false"), 2)
+        self.assertIn('credential_curl_validate_auth_config "${auth_config}"', script_text)
+        self.assertEqual(script_text.count("--connect-timeout 10"), 2)
+        self.assertEqual(script_text.count("--max-time 120"), 2)
+        self.assertEqual(script_text.count('"${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}"'), 2)
+        self.assertNotIn("curl -sS", script_text)
+        self.assertNotIn("--location", script_text)
+
+    def test_thousandeyes_oauth_poll_values_are_validated_before_arithmetic(self):
+        script = REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/configure_account.sh"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker = Path(tmpdir) / "injected"
+            env = {**os.environ, "MARKER": str(marker)}
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(script),
+                    "--poll-timeout",
+                    'x[$(touch "$MARKER")]',
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be a decimal integer", result.stderr)
+        self.assertFalse(marker.exists())
+
+    def test_thousandeyes_account_output_is_atomic_and_nofollow(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/configure_account.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("write_account_output_file", script_text)
+        self.assertIn("os.O_NOFOLLOW", script_text)
+        self.assertIn("os.O_EXCL", script_text)
+        self.assertIn("os.replace", script_text)
+        self.assertNotIn('printf \'%s\\n\' "${account_email}" > "${ACCOUNT_OUTPUT_FILE}"', script_text)
 
     def test_configure_scripts_reject_direct_secret_cli_values(self):
         cases = [
@@ -869,6 +954,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             encoding="utf-8",
         )
         password_file.write_text("device-secret", encoding="utf-8")
+        password_file.chmod(0o600)
 
         write_executable(
             bin_dir / "nc",
@@ -1133,6 +1219,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             credentials_file.write_text('SPLUNK_HOST="wrong.example.com"\n', encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "curl",
@@ -1209,6 +1296,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             credentials_file.write_text("", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "curl",
@@ -1316,6 +1404,9 @@ EOF
             password_file.write_text("changeme\n", encoding="utf-8")
             shc_secret_file.write_text("shc-secret\n", encoding="utf-8")
             idxc_secret_file.write_text("idxc-secret\n", encoding="utf-8")
+            password_file.chmod(0o600)
+            shc_secret_file.chmod(0o600)
+            idxc_secret_file.chmod(0o600)
 
             write_executable(
                 splunk_home / "bin" / "splunk",
@@ -1409,6 +1500,7 @@ EOF
             credentials_file.write_text("", encoding="utf-8")
             package_file.write_text("deb-package-placeholder", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
 
             env = os.environ.copy()
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
@@ -1440,6 +1532,7 @@ EOF
             credentials_file.write_text("", encoding="utf-8")
             package_file.write_text("tgz-package-placeholder", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
             target_home.mkdir()
 
             env = os.environ.copy()
@@ -1492,6 +1585,7 @@ EOF
                 export SPLUNK_SSH_HOST="hf.example.com"
                 export SPLUNK_SSH_PORT="22"
                 export SPLUNK_SSH_PASS="secret"
+                export SPLUNK_SSH_ALLOW_TOFU="true"
                 export SPLUNK_REMOTE_TMPDIR="/var/tmp/splunk"
                 result="$(hbs_stage_file_for_execution ssh "{local_file}" "pkg.tgz")"
                 printf '%s\\n' "$result"
@@ -1562,6 +1656,7 @@ EOF
                 export SPLUNK_SSH_HOST="hf.example.com"
                 export SPLUNK_SSH_PORT="22"
                 export SPLUNK_SSH_PASS="secret"
+                export SPLUNK_SSH_ALLOW_TOFU="true"
                 export REMOTE_ROOT="{remote_root}"
                 hbs_stage_file_for_execution ssh "{local_file}" "pkg.tgz"
                 """
@@ -1603,6 +1698,7 @@ EOF
 
             credentials_file.write_text("", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "sudo",
@@ -1693,6 +1789,7 @@ EOF
 
             credentials_file.write_text("", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
             with tarfile.open(package_file, "w:gz") as archive:
                 data = b"escape"
                 info = tarfile.TarInfo("../escaped.txt")
@@ -1970,6 +2067,7 @@ EOF
                     "SPLUNK_SSH_PORT": "22",
                     "SPLUNK_SSH_USER": current_user,
                     "SPLUNK_SSH_PASS": "ssh-password",
+                    "SPLUNK_SSH_ALLOW_TOFU": "true",
                 }
             )
 
@@ -2077,6 +2175,7 @@ EOF
                     "SPLUNK_SSH_PORT": "22",
                     "SPLUNK_SSH_USER": current_user,
                     "SPLUNK_SSH_PASS": "ssh-password",
+                    "SPLUNK_SSH_ALLOW_TOFU": "true",
                 }
             )
 
@@ -2143,6 +2242,7 @@ EOF
                     "SPLUNK_SSH_PORT": "22",
                     "SPLUNK_SSH_USER": current_user,
                     "SPLUNK_SSH_PASS": "ssh-password",
+                    "SPLUNK_SSH_ALLOW_TOFU": "true",
                 }
             )
 
@@ -2239,6 +2339,7 @@ EOF
 
             credentials_file.write_text("", encoding="utf-8")
             idxc_secret_file.write_text("idxc-secret\n", encoding="utf-8")
+            idxc_secret_file.chmod(0o600)
 
             write_executable(
                 bin_dir / "sudo",
@@ -2509,6 +2610,7 @@ EOF
                     "SPLUNK_SSH_HOST": "cm01.example.com",
                     "SPLUNK_SSH_USER": "splunk",
                     "SPLUNK_SSH_PASS": "ssh-password",
+                    "SPLUNK_SSH_ALLOW_TOFU": "true",
                 }
             )
 

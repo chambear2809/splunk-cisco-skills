@@ -10,6 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACS_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-admin-setup/scripts/render_assets.py"
 IDXC_SETUP = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/setup.sh"
+IDXC_RENDERER = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/render_assets.py"
 SOAR_SETUP = REPO_ROOT / "skills/splunk-soar-setup/scripts/setup.sh"
 
 
@@ -89,6 +90,8 @@ def test_acs_admin_renderer_covers_broader_control_plane(tmp_path: Path) -> None
     assert "--disabled=false" in commands
     assert "--use-ack=true" in commands
     assert "private-connectivity" in private_rest
+    assert "acs_rest_curl" in private_rest
+    assert "curl -fsS" not in private_rest
     assert '"feature": item["features"]' in private_rest
     assert '"features": [\n          "ingest"\n        ]' in plan
     assert '"restartIfRequired": false' in plan
@@ -233,6 +236,38 @@ def test_indexer_cluster_setup_exports_phase_inputs() -> None:
     assert "export SITE" in text
     assert "export PEER_HOST PEER_SSH_USER NEW_SITE" in text
     assert "export INDEXER_HOST" in text
+
+
+def test_indexer_cluster_bootstrap_uses_shared_pinned_ssh_policy(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3",
+            str(IDXC_RENDERER),
+            "--output-dir",
+            str(tmp_path),
+            "--cluster-manager-uri",
+            "https://cm.example.com:8089",
+            "--manager-hosts",
+            "cm.example.com",
+            "--peer-hosts",
+            "idx01.example.com",
+            "--replication-factor",
+            "1",
+            "--search-factor",
+            "1",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    bootstrap = (tmp_path / "cluster/bootstrap/sequenced-bootstrap.sh").read_text(encoding="utf-8")
+    assert "hbs_prepare_ssh_trust false" in bootstrap
+    assert 'scp "${HBS_SSH_TRUST_ARGS[@]}"' in bootstrap
+    assert 'ssh "${HBS_SSH_TRUST_ARGS[@]}"' in bootstrap
+    assert "hbs_cleanup_ssh_trust" in bootstrap
+    assert "StrictHostKeyChecking=accept-new" not in bootstrap
 
 
 def test_soar_automation_broker_requires_file_based_token(tmp_path: Path) -> None:

@@ -835,7 +835,7 @@ def validated_http_base(value: Any, label: str) -> str:
     parsed = urlsplit(text)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError(f"{label} must be an http(s) URL")
-    if parsed.username or parsed.password:
+    if parsed.username is not None or parsed.password is not None:
         raise ValueError(f"{label} must not contain inline credentials")
     if parsed.query or parsed.fragment:
         raise ValueError(f"{label} must not contain a query string or fragment")
@@ -846,13 +846,349 @@ def validated_http_base(value: Any, label: str) -> str:
 
 def render_appd_curl_helper() -> str:
     return r"""APPD_CURL_TLS_ARGS=()
+APPD_CURL_TRANSPORT_ARGS=(--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)
 APPD_INSECURE_TLS_WARNED=0
+
+appd_validate_curl_url() {
+  python3 - "${1:-}" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+value = sys.argv[1]
+if not value or any(character.isspace() for character in value):
+    raise SystemExit(1)
+try:
+    parsed = urlsplit(value)
+    port = parsed.port
+except ValueError:
+    raise SystemExit(1)
+if parsed.scheme != "https" or not parsed.hostname:
+    raise SystemExit(1)
+if parsed.username is not None or parsed.password is not None or parsed.fragment:
+    raise SystemExit(1)
+if port is not None and not 1 <= port <= 65535:
+    raise SystemExit(1)
+PY
+}
+
+appd_validate_curl_request_args() {
+  local argument="" option_name="" header_name="" header_name_lc="" form_value=""
+  local expect_value=false url_count=0
+
+  for argument in "$@"; do
+    if [[ "${expect_value}" == "true" ]]; then
+      if [[ "${option_name}" == "-H" || "${option_name}" == "--header" ]]; then
+        if [[ "${argument}" == @* || "${argument}" == *$'\r'* || "${argument}" == *$'\n'* || "${argument}" != *:* ]]; then
+          echo "FAIL: AppDynamics curl rejects file-backed or malformed caller headers." >&2
+          return 2
+        fi
+        header_name="${argument%%:*}"
+        if [[ ! "${header_name}" =~ ^[A-Za-z0-9-]+$ ]]; then
+          echo "FAIL: AppDynamics curl rejects malformed caller header names." >&2
+          return 2
+        fi
+        header_name_lc="$(printf '%s' "${header_name}" | tr '[:upper:]' '[:lower:]')"
+        case "${header_name_lc}" in
+          authorization|proxy-authorization|host|cookie)
+            echo "FAIL: AppDynamics curl owns authentication and host headers." >&2
+            return 2
+            ;;
+        esac
+      fi
+      case "${option_name}" in
+        -d|--data|--data-ascii|--data-binary|--data-raw)
+          if [[ "${argument}" == @* && "${argument}" != "@-" ]]; then
+            echo "FAIL: AppDynamics curl rejects file-backed body arguments; stream validated bytes on stdin with @-." >&2
+            return 2
+          fi
+          ;;
+        --data-urlencode)
+          if [[ "${argument}" == @* && "${argument}" != "@-" ]] || \
+             [[ "${argument}" != *=* && "${argument}" == *@* && "${argument}" != *@- ]]; then
+            echo "FAIL: AppDynamics curl rejects file-backed URL-encoded body arguments." >&2
+            return 2
+          fi
+          ;;
+        -F|--form)
+          form_value="${argument#*=}"
+          if [[ "${argument}" != *=* || "${argument}" == *$'\r'* || "${argument}" == *$'\n'* || \
+                "${argument}" == *';'[Hh][Ee][Aa][Dd][Ee][Rr][Ss]=* ]] || \
+             { [[ "${form_value}" == @* || "${form_value}" == \<* ]] && [[ "${form_value}" != "@-" ]]; }; then
+            echo "FAIL: AppDynamics curl rejects file-backed or malformed form arguments." >&2
+            return 2
+          fi
+          ;;
+      esac
+      expect_value=false
+      option_name=""
+      continue
+    fi
+
+    if [[ "${argument}" =~ ^-[fGsS]+$ ]]; then
+      continue
+    fi
+    case "${argument}" in
+      --|--next|--config|--config=*|-K*|-[^-]*K*|-:*|-[^-]*:*)
+        echo "FAIL: AppDynamics curl rejects caller config and transfer-boundary options." >&2
+        return 2
+        ;;
+      --url|--url=*|--variable|--variable=*|--expand-*)
+        echo "FAIL: AppDynamics curl rejects caller URL and expansion options." >&2
+        return 2
+        ;;
+      --location|--location-trusted|--max-redirs|--max-redirs=*|-L*|-[^-]*L*)
+        echo "FAIL: AppDynamics curl rejects caller redirect controls." >&2
+        return 2
+        ;;
+      --proto|--proto=*|--proto-default|--proto-default=*|--proto-redir|--proto-redir=*|\
+      --globoff|--no-globoff|-g)
+        echo "FAIL: AppDynamics curl owns protocol and URL-globbing policy." >&2
+        return 2
+        ;;
+      --insecure|--no-insecure|--cacert|--cacert=*|--capath|--capath=*|\
+      --ca-native|--no-ca-native|--proxy-insecure|--no-proxy-insecure|\
+      --proxy-cacert|--proxy-cacert=*|--proxy-capath|--proxy-capath=*|\
+      --doh-insecure|--no-doh-insecure|--ssl-no-revoke|\
+      --ssl-revoke-best-effort|-k*|-[^-]*k*)
+        echo "FAIL: AppDynamics curl owns TLS verification policy." >&2
+        return 2
+        ;;
+      -X|--request|-o|--output|-w|--write-out|-H|--header|-d|--data|\
+      --data-ascii|--data-binary|--data-raw|--data-urlencode|-F|--form|\
+      --connect-timeout|--max-time)
+        expect_value=true
+        option_name="${argument}"
+        ;;
+      --fail|--fail-with-body|--show-error|--silent)
+        ;;
+      [Hh][Tt][Tt][Pp][Ss]://*)
+        if ! appd_validate_curl_url "${argument}"; then
+          echo "FAIL: AppDynamics curl requires a credential-free HTTPS URL." >&2
+          return 2
+        fi
+        url_count=$((url_count + 1))
+        ;;
+      [Hh][Tt][Tt][Pp]://*)
+        echo "FAIL: AppDynamics curl requires HTTPS." >&2
+        return 2
+        ;;
+      -*)
+        echo "FAIL: AppDynamics curl rejects unsupported curl option: ${argument}" >&2
+        return 2
+        ;;
+      *)
+        echo "FAIL: AppDynamics curl rejects an ambiguous or non-HTTPS URL token." >&2
+        return 2
+        ;;
+    esac
+  done
+
+  if [[ "${expect_value}" == "true" ]]; then
+    echo "FAIL: AppDynamics curl received ${option_name} without a value." >&2
+    return 2
+  fi
+  if ((url_count != 1)); then
+    echo "FAIL: AppDynamics curl requires exactly one explicit URL; found ${url_count}." >&2
+    return 2
+  fi
+}
+
+# shellcheck disable=SC2329  # Used only by rendered scripts with authenticated probes.
+appd_validate_curl_auth_config() {
+  if ! python3 - "${1:-}" <<'PY'
+import os
+import re
+import stat
+import sys
+
+allowed = re.compile(r'^(header|user) = "((?:[^"\\]|\\.)*)"$')
+allowed_auth_headers = {
+    "authorization",
+    "content-type",
+    "cookie",
+    "ph-auth-token",
+    "x-auth-token",
+    "x-events-api-accountname",
+    "x-events-api-key",
+    "x-sf-token",
+}
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(1)
+try:
+    descriptor = os.open(
+        sys.argv[1],
+        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
+    )
+except OSError:
+    raise SystemExit(1)
+try:
+    metadata = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or stat.S_IMODE(metadata.st_mode) not in {0o400, 0o600}
+        or metadata.st_size < 1
+        or metadata.st_size > 65536
+    ):
+        raise SystemExit(1)
+    chunks = []
+    remaining = 65537
+    while True:
+        chunk = os.read(descriptor, min(65536, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+        if remaining == 0:
+            raise SystemExit(1)
+    after = os.fstat(descriptor)
+    if (
+        (metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(descriptor)
+try:
+    text = b"".join(chunks).decode("utf-8")
+except UnicodeDecodeError:
+    raise SystemExit(1)
+if not text or "\r" in text or re.search(r"\\[rn]", text):
+    raise SystemExit(1)
+for line in text.splitlines():
+    match = allowed.fullmatch(line)
+    if not line or match is None:
+        raise SystemExit(1)
+    if match.group(1) == "header":
+        value = match.group(2)
+        if value.startswith("@") or ":" not in value:
+            raise SystemExit(1)
+        header_name = value.split(":", 1)[0].strip().lower()
+        if header_name not in allowed_auth_headers:
+            raise SystemExit(1)
+PY
+  then
+    echo "FAIL: AppDynamics curl auth config must be a private single-link file containing only safe auth directives." >&2
+    return 2
+  fi
+}
+
+appd_stream_file() {
+  python3 - "${1:-}" "${2:-67108864}" <<'PY'
+import os
+import stat
+import sys
+
+path = sys.argv[1]
+try:
+    limit = int(sys.argv[2])
+except ValueError:
+    raise SystemExit(1)
+if not path or limit < 1 or limit > 1024 * 1024 * 1024 or not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(1)
+descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+try:
+    before = os.fstat(descriptor)
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or not 0 < before.st_size <= limit:
+        raise SystemExit(1)
+    chunks = []
+    remaining = limit + 1
+    while remaining > 0:
+        chunk = os.read(descriptor, min(1024 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    if remaining == 0:
+        raise SystemExit(1)
+    after = os.fstat(descriptor)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(descriptor)
+view = memoryview(b"".join(chunks))
+while view:
+    written = os.write(sys.stdout.fileno(), view)
+    if written <= 0:
+        raise SystemExit(1)
+    view = view[written:]
+PY
+}
+
+appd_write_header_config() {
+  python3 - "${1:-}" "${2:-}" "${3:-}" "${4:-}" <<'PY'
+import os
+import re
+import stat
+import sys
+
+secret_path, header_name, output_path, prefix = sys.argv[1:]
+if header_name.lower() not in {"authorization", "x-sf-token", "x-events-api-key"}:
+    raise SystemExit(1)
+if not re.fullmatch(r"[A-Za-z0-9-]+", header_name) or prefix not in {"", "Bearer "}:
+    raise SystemExit(1)
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(1)
+flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+secret_fd = os.open(secret_path, flags)
+try:
+    before = os.fstat(secret_fd)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) not in {0o400, 0o600}
+        or not 0 < before.st_size <= 65536
+    ):
+        raise SystemExit(1)
+    raw = os.read(secret_fd, 65537)
+    after = os.fstat(secret_fd)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(secret_fd)
+try:
+    value = raw.decode("utf-8").rstrip("\n")
+except UnicodeDecodeError:
+    raise SystemExit(1)
+if not value or "\r" in value or "\n" in value or "\x00" in value or '"' in value or "\\" in value:
+    raise SystemExit(1)
+output_fd = os.open(output_path, os.O_WRONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+try:
+    output_info = os.fstat(output_fd)
+    if (
+        not stat.S_ISREG(output_info.st_mode)
+        or output_info.st_nlink != 1
+        or stat.S_IMODE(output_info.st_mode) != 0o600
+    ):
+        raise SystemExit(1)
+    payload = f'header = "{header_name}: {prefix}{value}"\n'.encode("utf-8")
+    os.ftruncate(output_fd, 0)
+    view = memoryview(payload)
+    while view:
+        written = os.write(output_fd, view)
+        if written <= 0:
+            raise SystemExit(1)
+        view = view[written:]
+    os.fsync(output_fd)
+finally:
+    os.close(output_fd)
+PY
+}
 
 appd_prepare_curl_tls_args() {
   APPD_CURL_TLS_ARGS=()
 
   if [[ -n "${APPD_CA_CERT:-}" ]]; then
-    if [[ ! -f "${APPD_CA_CERT}" ]]; then
+    if [[ "${APPD_CA_CERT}" == *$'\r'* || "${APPD_CA_CERT}" == *$'\n'* || ! -f "${APPD_CA_CERT}" ]]; then
       echo "FAIL: APPD_CA_CERT does not exist: ${APPD_CA_CERT}" >&2
       return 2
     fi
@@ -878,8 +1214,23 @@ appd_prepare_curl_tls_args() {
 }
 
 appd_curl() {
+  appd_validate_curl_request_args "$@" || return $?
   appd_prepare_curl_tls_args || return $?
-  curl "${APPD_CURL_TLS_ARGS[@]}" "$@"
+  curl -q "${APPD_CURL_TLS_ARGS[@]}" "$@" "${APPD_CURL_TRANSPORT_ARGS[@]}"
+}
+
+# shellcheck disable=SC2329  # Used only by rendered scripts with authenticated probes.
+appd_authenticated_curl() {
+  local auth_config="${1:-}"
+  if (($# == 0)); then
+    echo "FAIL: appd_authenticated_curl requires an auth config." >&2
+    return 2
+  fi
+  shift
+  appd_validate_curl_auth_config "${auth_config}" || return $?
+  appd_validate_curl_request_args "$@" || return $?
+  appd_prepare_curl_tls_args || return $?
+  curl -q "${APPD_CURL_TLS_ARGS[@]}" "$@" -K "${auth_config}" "${APPD_CURL_TRANSPORT_ARGS[@]}"
 }
 """
 
@@ -2299,19 +2650,16 @@ TOKEN_MODE="$(stat -c '%a' "${{APPD_OAUTH_TOKEN_FILE}}" 2>/dev/null || stat -f '
   echo "FAIL: APPD_OAUTH_TOKEN_FILE must be chmod 600 (found ${{TOKEN_MODE:-unknown}})" >&2
   exit 2
 }}
-OAUTH_TOKEN="$(<"${{APPD_OAUTH_TOKEN_FILE}}")"
-if [[ -z "${{OAUTH_TOKEN}}" || "${{OAUTH_TOKEN}}" == *$'\n'* || "${{OAUTH_TOKEN}}" == *$'\r'* || "${{OAUTH_TOKEN}}" == *'"'* || "${{OAUTH_TOKEN}}" == *'\\'* ]]; then
-  echo "FAIL: APPD_OAUTH_TOKEN_FILE must contain one curl-config-safe token line" >&2
-  exit 2
-fi
 CURL_CONFIG="$(mktemp "${{TMPDIR:-/tmp}}/appd-controller-curl.XXXXXX")"
 chmod 600 "${{CURL_CONFIG}}"
 trap 'rm -f "${{CURL_CONFIG}}"' EXIT
-printf 'header = "Authorization: Bearer %s"\n' "${{OAUTH_TOKEN}}" > "${{CURL_CONFIG}}"
-unset OAUTH_TOKEN
-appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
-appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
-appd_curl --fail --silent --show-error --config "${{CURL_CONFIG}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
+if ! appd_write_header_config "${{APPD_OAUTH_TOKEN_FILE}}" Authorization "${{CURL_CONFIG}}" "Bearer "; then
+  echo "FAIL: APPD_OAUTH_TOKEN_FILE must be a private single-link, one-line token file." >&2
+  exit 2
+fi
+appd_authenticated_curl "${{CURL_CONFIG}}" --fail --silent --show-error "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
+appd_authenticated_curl "${{CURL_CONFIG}}" --fail --silent --show-error "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
+appd_authenticated_curl "${{CURL_CONFIG}}" --fail --silent --show-error "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
 """,
     )
     chmod_exec(plan)
@@ -3826,6 +4174,10 @@ def render_o11y_export_validation(collector: dict[str, Any], targets: list[dict[
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+PROJECT_ROOT="${{PROJECT_ROOT:-{bash_default(REPO_ROOT)}}}"
+# shellcheck disable=SC1091
+source "${{PROJECT_ROOT}}/skills/shared/lib/credential_curl_helpers.sh"
+
 : "${{SPLUNK_REALM:={collector['realm']}}}"
 : "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE:={collector['token_file']}}}"
 : "${{SPLUNK_O11Y_API_URL:={collector['api_url']}}}"
@@ -3841,17 +4193,39 @@ TOKEN_MODE="$(stat -c '%a' "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" 2>/dev/null || s
   echo "FAIL: SPLUNK_O11Y_ACCESS_TOKEN_FILE must be chmod 600 (found ${{TOKEN_MODE:-unknown}})" >&2
   exit 2
 }}
-O11Y_TOKEN="$(<"${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}")"
-if [[ "${{O11Y_TOKEN}}" == *$'\\n'* || "${{O11Y_TOKEN}}" == *$'\\r'* || "${{O11Y_TOKEN}}" == *'"'* ]]; then
-  echo "FAIL: SPLUNK_O11Y_ACCESS_TOKEN_FILE must contain one curl-config-safe token line." >&2
-  exit 2
-fi
+python3 - "${{SPLUNK_O11Y_API_URL}}" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+value = sys.argv[1]
+try:
+    parsed = urlsplit(value)
+    port = parsed.port
+except ValueError:
+    raise SystemExit("FAIL: SPLUNK_O11Y_API_URL must be a credential-free HTTPS origin URL")
+if (
+    parsed.scheme != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.path not in {{"", "/"}}
+    or parsed.query
+    or parsed.fragment
+    or any(character.isspace() for character in value)
+    or (port is not None and not 1 <= port <= 65535)
+):
+    raise SystemExit("FAIL: SPLUNK_O11Y_API_URL must be a credential-free HTTPS origin URL")
+PY
 CURL_CONFIG="$(mktemp "${{TMPDIR:-/tmp}}/appd-o11y-curl.XXXXXX")"
 chmod 600 "${{CURL_CONFIG}}"
 trap 'rm -f "${{CURL_CONFIG}}"' EXIT
-printf 'header = "X-SF-Token: %s"\\n' "${{O11Y_TOKEN}}" > "${{CURL_CONFIG}}"
-curl --fail --silent --show-error --config "${{CURL_CONFIG}}" \\
-  "${{SPLUNK_O11Y_API_URL}}/v2/organization" >/dev/null
+if ! credential_curl_write_header_config "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" X-SF-Token "${{CURL_CONFIG}}"; then
+  echo "FAIL: SPLUNK_O11Y_ACCESS_TOKEN_FILE must be a private single-link, one-line token file." >&2
+  exit 2
+fi
+curl -q --fail --silent --show-error --config "${{CURL_CONFIG}}" \\
+  "${{SPLUNK_O11Y_API_URL%/}}/v2/organization" \\
+  --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff >/dev/null
 
 PODS="$(kubectl -n "${{APPD_NAMESPACE}}" get pods \\
   -l "app.kubernetes.io/instance=${{APPD_CLUSTER_AGENT_RELEASE}}" -o name)"
@@ -4638,6 +5012,9 @@ def render_analytics_artifacts(out: Path, spec: dict[str, Any]) -> None:
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+PROJECT_ROOT="${{PROJECT_ROOT:-{bash_default(REPO_ROOT)}}}"
+# shellcheck disable=SC1091
+source "${{PROJECT_ROOT}}/skills/shared/lib/appdynamics_helpers.sh"
 APPD_ANALYTICS_APPLY="${{APPD_ANALYTICS_APPLY:-0}}"
 APPD_ANALYTICS_ENDPOINT="${{APPD_ANALYTICS_ENDPOINT:-{bash_default(analytics_endpoint)}}}"
 APPD_GLOBAL_ACCOUNT_NAME="${{APPD_GLOBAL_ACCOUNT_NAME:-{bash_default(spec.get('global_account_name', 'customer1_abcdef'))}}}"
@@ -4659,9 +5036,23 @@ python3 - "${{APPD_ANALYTICS_ENDPOINT}}" "${{APPD_ACCEPT_CUSTOM_ANALYTICS_ENDPOI
 import sys
 from urllib.parse import urlsplit
 url, accept_custom = sys.argv[1:]
-parsed = urlsplit(url)
+try:
+    parsed = urlsplit(url)
+    port = parsed.port
+except ValueError:
+    raise SystemExit("FAIL: APPD_ANALYTICS_ENDPOINT must be a credential-free HTTPS origin URL")
 host = (parsed.hostname or "").lower()
-if parsed.scheme != "https" or not host or parsed.username or parsed.password or parsed.query or parsed.fragment:
+if (
+    parsed.scheme != "https"
+    or not host
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.path not in {{"", "/"}}
+    or parsed.query
+    or parsed.fragment
+    or any(character.isspace() for character in url)
+    or (port is not None and not 1 <= port <= 65535)
+):
     raise SystemExit("FAIL: APPD_ANALYTICS_ENDPOINT must be a credential-free HTTPS origin URL")
 if not (host == "appdynamics.com" or host.endswith(".appdynamics.com")) and accept_custom != "1":
     raise SystemExit("FAIL: custom APPD_ANALYTICS_ENDPOINT requires APPD_ACCEPT_CUSTOM_ANALYTICS_ENDPOINT=1")
@@ -4674,21 +5065,18 @@ if not isinstance(payload, list) or not payload:
 PY
 
 ENCODED_SCHEMA="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${{APPD_EVENTS_SCHEMA}}")"
-AUTH_CONFIG="$(mktemp)"
+AUTH_CONFIG="$(mktemp "${{TMPDIR:-/tmp}}/appd-analytics-curl.XXXXXX")"
 chmod 600 "${{AUTH_CONFIG}}"
 trap 'rm -f "${{AUTH_CONFIG}}"' EXIT
-{{
-  printf 'header = "X-Events-API-AccountName: %s"\n' "${{APPD_GLOBAL_ACCOUNT_NAME}}"
-  printf 'header = "X-Events-API-Key: '
-  tr -d '\r\n' < "${{APPD_EVENTS_API_KEY_FILE}}"
-  printf '"\n'
-  printf 'header = "Content-Type: application/vnd.appd.events+json;v=2"\n'
-}} > "${{AUTH_CONFIG}}"
+if ! appd_events_api_headers_file "${{APPD_GLOBAL_ACCOUNT_NAME}}" "${{APPD_EVENTS_API_KEY_FILE}}" "${{AUTH_CONFIG}}"; then
+  echo "FAIL: Events API credentials or auth-config destination failed descriptor validation." >&2
+  exit 2
+fi
 
-curl --fail-with-body --silent --show-error -X POST \
-  "${{APPD_ANALYTICS_ENDPOINT%/}}/events/publish/${{ENCODED_SCHEMA}}" \
+credential_curl_stream_file "${{APPD_EVENTS_PAYLOAD_FILE}}" | appd_curl --fail-with-body --silent --show-error -X POST \
   -K "${{AUTH_CONFIG}}" \
-  --data-binary @"${{APPD_EVENTS_PAYLOAD_FILE}}"
+  "${{APPD_ANALYTICS_ENDPOINT%/}}/events/publish/${{ENCODED_SCHEMA}}" \
+  --data-binary @-
 """,
     )
     chmod_exec(publish)
@@ -4934,6 +5322,10 @@ def render_appd_te_apply_plan(account_group_id: str, connector_path: str, operat
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+PROJECT_ROOT="${{PROJECT_ROOT:-{bash_default(REPO_ROOT)}}}"
+# shellcheck disable=SC1091
+source "${{PROJECT_ROOT}}/skills/shared/lib/credential_curl_helpers.sh"
+
 # Creates the API-backed ThousandEyes custom webhook path for AppDynamics custom events.
 # Native ThousandEyes AppDynamics integration creation remains a UI runbook unless Cisco documents an API for that native integration.
 #
@@ -4978,24 +5370,99 @@ for secret_file in "${{TE_TOKEN_FILE}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}"; do
   [[ "${{mode}}" == "600" ]] || {{ echo "FAIL: secret file must be chmod 600: ${{secret_file}} (found ${{mode:-unknown}})" >&2; exit 2; }}
 done
 
-{{ printf 'header = "Authorization: Bearer '; tr -d '\\r\\n' < "${{TE_TOKEN_FILE}}"; printf '"\\n'; }} > "${{TE_CURL_CONFIG}}"
+if ! credential_curl_write_header_config "${{TE_TOKEN_FILE}}" Authorization "${{TE_CURL_CONFIG}}" "Bearer "; then
+  echo "FAIL: TE_TOKEN_FILE must be a private single-link, one-line token file." >&2
+  exit 2
+fi
 python3 - "${{CONNECTOR_FILE}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" "${{CONNECTOR_PAYLOAD}}" <<'PY'
 import json
+import os
+import stat
 import sys
 from urllib.parse import urlsplit
 
+
+def read_private_secret(path):
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise SystemExit("FAIL: O_NOFOLLOW is required for client-secret handling")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or not 0 < before.st_size <= 65536
+        ):
+            raise SystemExit("FAIL: AppDynamics client secret file is not private")
+        raw = os.read(descriptor, 65537)
+        after = os.fstat(descriptor)
+        if (
+            (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            or after.st_nlink != 1
+        ):
+            raise SystemExit("FAIL: AppDynamics client secret changed while reading")
+    finally:
+        os.close(descriptor)
+    try:
+        value = raw.decode("utf-8").rstrip("\n")
+    except UnicodeDecodeError:
+        raise SystemExit("FAIL: AppDynamics client secret is not UTF-8")
+    if not value or "\r" in value or "\n" in value or "\x00" in value:
+        raise SystemExit("FAIL: AppDynamics client secret must contain one line")
+    return value
+
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
-host = (urlsplit(str(payload.get("target", ""))).hostname or "").lower()
-if not host or host == "example.com" or host.endswith(".example.com"):
-    raise SystemExit("FAIL: connector target is missing or still uses an example host")
-payload.setdefault("authentication", {{}})["oauthClientSecret"] = open(sys.argv[2], encoding="utf-8").read().strip()
-json.dump(payload, open(sys.argv[3], "w", encoding="utf-8"))
+target = str(payload.get("target", ""))
+try:
+    parsed = urlsplit(target)
+    port = parsed.port
+except ValueError:
+    raise SystemExit("FAIL: connector target must be a credential-free HTTPS origin URL")
+host = (parsed.hostname or "").lower()
+if (
+    parsed.scheme != "https"
+    or not host
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.path not in {{"", "/"}}
+    or parsed.query
+    or parsed.fragment
+    or any(character.isspace() for character in target)
+    or (port is not None and not 1 <= port <= 65535)
+    or host == "example.com"
+    or host.endswith(".example.com")
+):
+    raise SystemExit("FAIL: connector target must be a non-example credential-free HTTPS origin URL")
+authentication = payload.setdefault("authentication", {{}})
+expected_token_url = target.rstrip("/") + "/controller/api/oauth/access_token"
+if authentication.get("oauthTokenUrl") != expected_token_url:
+    raise SystemExit("FAIL: connector OAuth token URL must remain on the reviewed Controller origin")
+authentication["oauthClientSecret"] = read_private_secret(sys.argv[2])
+output_fd = os.open(sys.argv[3], os.O_WRONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+try:
+    output_info = os.fstat(output_fd)
+    if not stat.S_ISREG(output_info.st_mode) or output_info.st_nlink != 1 or stat.S_IMODE(output_info.st_mode) != 0o600:
+        raise SystemExit("FAIL: connector payload destination is not private")
+    body = json.dumps(payload).encode("utf-8")
+    os.ftruncate(output_fd, 0)
+    view = memoryview(body)
+    while view:
+        written = os.write(output_fd, view)
+        if written <= 0:
+            raise SystemExit("FAIL: connector payload write failed")
+        view = view[written:]
+    os.fsync(output_fd)
+finally:
+    os.close(output_fd)
 PY
 
-CONNECTOR_HTTP_CODE="$(curl -sS -o "${{CONNECTOR_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/connectors/generic{aid_arg}" \\
+CONNECTOR_HTTP_CODE="$(credential_curl_stream_file "${{CONNECTOR_PAYLOAD}}" | curl -q -sS -o "${{CONNECTOR_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/connectors/generic{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
-  --data-binary @"${{CONNECTOR_PAYLOAD}}")"
+  --data-binary @- \\
+  --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)"
 [[ "${{CONNECTOR_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: connector creation returned HTTP ${{CONNECTOR_HTTP_CODE}}" >&2; sed -n '1,120p' "${{CONNECTOR_RESPONSE_FILE}}" >&2; exit 1; }}
 CONNECTOR_ID="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])) or {{}}).get("id", ""))' "${{CONNECTOR_RESPONSE_FILE}}")"
 if [[ -z "${{CONNECTOR_ID}}" ]]; then
@@ -5003,10 +5470,11 @@ if [[ -z "${{CONNECTOR_ID}}" ]]; then
   exit 1
 fi
 
-OPERATION_HTTP_CODE="$(curl -sS -o "${{OPERATION_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/operations/webhooks{aid_arg}" \\
+OPERATION_HTTP_CODE="$(credential_curl_stream_file "${{OPERATION_FILE}}" | curl -q -sS -o "${{OPERATION_RESPONSE_FILE}}" -w '%{{http_code}}' -X POST "https://api.thousandeyes.com/v7/operations/webhooks{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
-  --data-binary @"${{OPERATION_FILE}}")"
+  --data-binary @- \\
+  --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)"
 [[ "${{OPERATION_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: webhook operation creation returned HTTP ${{OPERATION_HTTP_CODE}}; connector ${{CONNECTOR_ID}} may require cleanup." >&2; sed -n '1,120p' "${{OPERATION_RESPONSE_FILE}}" >&2; exit 1; }}
 OPERATION_ID="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])) or {{}}).get("id", ""))' "${{OPERATION_RESPONSE_FILE}}")"
 if [[ -z "${{OPERATION_ID}}" ]]; then
@@ -5014,10 +5482,11 @@ if [[ -z "${{OPERATION_ID}}" ]]; then
   exit 1
 fi
 
-ASSIGN_HTTP_CODE="$(printf '["%s"]\\n' "${{CONNECTOR_ID}}" | curl -sS -o "${{ASSIGN_RESPONSE_FILE}}" -w '%{{http_code}}' -X PUT "https://api.thousandeyes.com/v7/operations/webhooks/${{OPERATION_ID}}/connectors{aid_arg}" \\
+ASSIGN_HTTP_CODE="$(printf '["%s"]\\n' "${{CONNECTOR_ID}}" | curl -q -sS -o "${{ASSIGN_RESPONSE_FILE}}" -w '%{{http_code}}' -X PUT "https://api.thousandeyes.com/v7/operations/webhooks/${{OPERATION_ID}}/connectors{aid_arg}" \\
   -K "${{TE_CURL_CONFIG}}" \\
   -H "Content-Type: application/json" \\
-  --data-binary @-)"
+  --data-binary @- \\
+  --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)"
 [[ "${{ASSIGN_HTTP_CODE}}" =~ ^2[0-9][0-9]$ ]] || {{ echo "FAIL: connector assignment returned HTTP ${{ASSIGN_HTTP_CODE}}; connector ${{CONNECTOR_ID}} and operation ${{OPERATION_ID}} require review." >&2; sed -n '1,120p' "${{ASSIGN_RESPONSE_FILE}}" >&2; exit 1; }}
 
 python3 - "${{CONNECTOR_ID}}" "${{OPERATION_ID}}" "${{RESULT_FILE}}" <<'PY'

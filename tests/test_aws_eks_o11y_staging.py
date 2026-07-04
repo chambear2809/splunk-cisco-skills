@@ -1090,7 +1090,9 @@ def test_auto_apm_check_fails_when_auth_prerequisites_are_absent(tmp_path: Path)
 def test_auto_apm_header_comes_from_the_validated_no_follow_descriptor() -> None:
     body = AUTO_VALIDATE.read_text(encoding="utf-8")
     assert 'path, header_path = sys.argv[1:]' in body
-    assert 'os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW' in body
+    assert 'os.O_WRONLY | os.O_NOFOLLOW' in body
+    assert 'os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW' not in body
+    assert 'os.ftruncate(header_fd, 0)' in body
     assert 'b"X-SF-Token: " + data' in body
     assert '$(<"${SPLUNK_O11Y_TOKEN_FILE}")' not in body
 

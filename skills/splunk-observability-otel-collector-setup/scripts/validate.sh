@@ -425,7 +425,7 @@ PY
 )
         installer="$(mktemp)"
         trap 'rm -f "${installer}"' EXIT
-        curl --proto '=https' --tlsv1.2 -fsSL "${installer_url}" -o "${installer}"
+        curl -q --proto '=https' --proto-redir '=https' --max-redirs 5 --globoff --tlsv1.2 --connect-timeout 10 --max-time 120 -fsSL "${installer_url}" -o "${installer}"
         if command -v sha256sum >/dev/null 2>&1; then
             actual="$(sha256sum "${installer}" | awk '{print $1}')"
         elif command -v shasum >/dev/null 2>&1; then

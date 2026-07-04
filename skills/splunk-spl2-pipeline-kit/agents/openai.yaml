@@ -1,3 +1,4 @@
-display_name: SPL2 Pipeline Kit
-short_description: Render and lint shared SPL2 pipeline templates.
-default_prompt: Render reusable SPL2 pipeline templates and run compatibility linting for Ingest Processor and Edge Processor.
+interface:
+  display_name: "Splunk SPL2 Pipeline Kit"
+  short_description: "Render and lint shared SPL2 pipeline templates"
+  default_prompt: "Use $splunk-spl2-pipeline-kit to render and lint shared SPL2 pipeline templates."

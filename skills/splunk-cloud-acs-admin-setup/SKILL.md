@@ -111,7 +111,9 @@ Under `splunk-cloud-acs-admin-rendered/acs-admin/`:
   file-backed handoff instead.
 - Private connectivity uses ACS REST endpoints (`private-connectivity/eligibility`
   and `private-connectivity/endpoints`) because the local ACS CLI might not
-  expose a matching command group.
+  expose a matching command group. These Bearer-authenticated calls use the
+  shared HTTPS-only, no-redirect, no-globbing ACS REST helper and ignore user
+  curl configuration.
 
 ## References
 

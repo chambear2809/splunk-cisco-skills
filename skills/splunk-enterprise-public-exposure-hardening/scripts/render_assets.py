@@ -54,6 +54,7 @@ GENERATED_FILES: set[str] = {
     "splunk/apps/000_public_exposure_hardening/metadata/default.meta",
     "splunk/apps/000_public_exposure_hardening/metadata/local.meta",
     # Apply / rotate helpers
+    "splunk/transaction-helpers.sh",
     "splunk/apply-search-head.sh",
     "splunk/apply-hec-tier.sh",
     "splunk/apply-s2s-receiver.sh",
@@ -288,7 +289,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--allow-anonymous-ldap-bind", action="store_true",
                         help="Required ack to leave --ldap-bind-dn empty.")
     parser.add_argument("--allow-scripted-auth", action="store_true",
-                        help="Required ack when authType=Scripted is detected at preflight.")
+                        help=(
+                            "Deprecated compatibility flag; public-facing preflight "
+                            "always refuses authType=Scripted"
+                        ))
     parser.add_argument("--federation-service-account-password-file", default="",
                         help="Used by rotate-federation-service-account.sh.")
     parser.add_argument("--min-password-length", type=int, default=14)
@@ -311,6 +315,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--saml-signing-key-file", default="")
     parser.add_argument("--hec-mtls-ca-bundle-file", default="")
     parser.add_argument("--external-probe-cmd", default="")
+    parser.add_argument(
+        "--public-ca-file",
+        default="",
+        help=(
+            "Optional CA bundle used to verify the public proxy certificate; "
+            "system trust is used when omitted"
+        ),
+    )
     parser.add_argument("--svd-floor-file", default="")
     parser.add_argument("--enable-fips", choices=("true", "false"), default="false")
     parser.add_argument("--fips-version", choices=("140-2", "140-3"), default="140-3")
@@ -1083,6 +1095,354 @@ def render_local_meta(args: argparse.Namespace) -> str:
 # Apply scripts
 # ---------------------------------------------------------------------------
 
+def render_transaction_helpers() -> str:
+    return make_script(
+        r"""# Shared fail-closed transaction primitives for direct local applies.
+# This file is sourced by apply-search-head.sh, apply-hec-tier.sh, and
+# apply-heavy-forwarder.sh. It is not an operator-facing entry point.
+
+SPX_COMMITTED=false
+SPX_MUTATED=false
+SPX_HAD_APP=false
+SPX_HAD_LAUNCH=false
+SPX_LAUNCH_PREPARED=false
+SPX_LAUNCH_MUTATED=false
+SPX_TXN_ROOT=""
+SPX_STAGE_APP=""
+SPX_ORIGINAL_APP=""
+SPX_STAGE_LAUNCH=""
+SPX_ORIGINAL_LAUNCH=""
+SPX_DST_APP=""
+SPX_LAUNCH_CONF=""
+SPX_SPLUNK=""
+SPX_SPLUNK_OWNER=""
+
+spx_secure_read_secret() {
+  local path="$1" label="$2"
+  python3 - "$path" "$label" <<'PY'
+import os
+import stat
+import sys
+
+path, label = sys.argv[1:]
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(f"ERROR: {label}: O_NOFOLLOW is unavailable")
+try:
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW)
+except OSError as exc:
+    raise SystemExit(f"ERROR: {label}: cannot securely open secret file: {exc}")
+try:
+    before = os.fstat(fd)
+    if not stat.S_ISREG(before.st_mode):
+        raise SystemExit(f"ERROR: {label}: secret must be a regular file")
+    if before.st_nlink != 1:
+        raise SystemExit(f"ERROR: {label}: secret must have exactly one hard link")
+    if stat.S_IMODE(before.st_mode) & 0o077:
+        raise SystemExit(f"ERROR: {label}: secret must have mode 0600 or stricter")
+    chunks = []
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    after = os.fstat(fd)
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+    ):
+        raise SystemExit(f"ERROR: {label}: secret changed while it was read")
+finally:
+    os.close(fd)
+value = b"".join(chunks)
+if value.endswith(b"\n"):
+    value = value[:-1]
+if not value or b"\n" in value or b"\r" in value or b"\x00" in value:
+    raise SystemExit(f"ERROR: {label}: secret must contain exactly one non-empty line")
+os.write(1, value)
+PY
+}
+
+spx_btool_output() {
+  local conf="$1" stanza="$2" label="$3" output
+  if ! output="$("$SPX_SPLUNK" btool "$conf" list "$stanza" 2>&1)"; then
+    echo "ERROR: btool failed for $label: $output" >&2
+    return 1
+  fi
+  if [[ -z "${output//[[:space:]]/}" ]]; then
+    echo "ERROR: btool returned empty output for $label" >&2
+    return 1
+  fi
+  printf '%s\n' "$output"
+}
+
+spx_btool_value() {
+  local conf="$1" stanza="$2" key="$3" output value
+  output="$(spx_btool_output "$conf" "$stanza" "$conf [$stanza]")" || return 1
+  value="$(awk -v wanted="$key" '
+    {
+      pos = index($0, "=")
+      if (!pos) next
+      name = substr($0, 1, pos - 1)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+      if (name == wanted) {
+        result = substr($0, pos + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", result)
+        print result
+        exit
+      }
+    }
+  ' <<<"$output")"
+  if [[ -z "$value" ]]; then
+    echo "ERROR: btool did not return $conf [$stanza] $key" >&2
+    return 1
+  fi
+  printf '%s' "$value"
+}
+
+spx_require_btool_value() {
+  local conf="$1" stanza="$2" key="$3" expected="$4" actual
+  actual="$(spx_btool_value "$conf" "$stanza" "$key")" || return 1
+  if [[ "$actual" != "$expected" ]]; then
+    echo "ERROR: expected $conf [$stanza] $key=$expected; btool returned $actual" >&2
+    return 1
+  fi
+}
+
+spx_require_encrypted_btool_value() {
+  local conf="$1" stanza="$2" key="$3" actual
+  actual="$(spx_btool_value "$conf" "$stanza" "$key")" || return 1
+  if [[ ! "$actual" =~ ^\$[0-9]+\$ ]]; then
+    echo "ERROR: $conf [$stanza] $key is not encrypted in btool output" >&2
+    return 1
+  fi
+}
+
+spx_require_encrypted_file_value() {
+  local path="$1" key="$2"
+  if [[ ! -f "$path" ]] || ! grep -Eq "^${key}[[:space:]]*=[[:space:]]*\\\$[0-9]+\\\$" "$path"; then
+    echo "ERROR: $key was not encrypted in $path" >&2
+    return 1
+  fi
+}
+
+spx_validate_common_live_config() {
+  local expected_auth_type="$1" output
+  if ! output="$("$SPX_SPLUNK" btool check --debug 2>&1)"; then
+    echo "ERROR: btool check failed before restart: $output" >&2
+    return 1
+  fi
+  spx_require_btool_value authorize role_admin never_lockout disabled
+  spx_require_btool_value authentication authentication authType "$expected_auth_type"
+  spx_require_btool_value web settings enableSplunkWebClientNetloc false
+  spx_require_btool_value web settings request.show_tracebacks false
+  spx_require_btool_value server httpServer verboseLoginFailMsg false
+  spx_require_btool_value server httpServer sendStrictTransportSecurityHeader true
+}
+
+spx_restore_transaction() {
+  local rollback_failed=0
+  [[ "$SPX_MUTATED" == "true" ]] || return 0
+  echo "WARN: restoring exact pre-apply app and splunk-launch.conf state." >&2
+
+  if [[ "$SPX_HAD_APP" == "true" ]]; then
+    if [[ -d "$SPX_ORIGINAL_APP" ]]; then
+      rm -rf -- "$SPX_DST_APP"
+      mv -- "$SPX_ORIGINAL_APP" "$SPX_DST_APP" || rollback_failed=1
+    elif [[ ! -d "$SPX_DST_APP" ]]; then
+      echo "ERROR: prior app is missing from both live and transaction paths" >&2
+      rollback_failed=1
+    fi
+  else
+    rm -rf -- "$SPX_DST_APP"
+  fi
+
+  if [[ "$SPX_LAUNCH_MUTATED" == "true" ]]; then
+    if [[ "$SPX_HAD_LAUNCH" == "true" ]]; then
+      if [[ -f "$SPX_ORIGINAL_LAUNCH" ]]; then
+        rm -f -- "$SPX_LAUNCH_CONF"
+        mv -- "$SPX_ORIGINAL_LAUNCH" "$SPX_LAUNCH_CONF" || rollback_failed=1
+      elif [[ ! -f "$SPX_LAUNCH_CONF" ]]; then
+        echo "ERROR: prior splunk-launch.conf is missing from both paths" >&2
+        rollback_failed=1
+      fi
+    else
+      rm -f -- "$SPX_LAUNCH_CONF"
+    fi
+  fi
+
+  if ! "$SPX_SPLUNK" restart; then
+    echo "ERROR: rollback restart failed" >&2
+    rollback_failed=1
+  elif ! "$SPX_SPLUNK" status >/dev/null; then
+    echo "ERROR: rollback restart did not return a healthy Splunk status" >&2
+    rollback_failed=1
+  else
+    echo "Rollback restart verified." >&2
+  fi
+  ((rollback_failed == 0))
+}
+
+spx_scrub_transaction() {
+  # These names are dynamically scoped globals in the sourcing apply script.
+  # shellcheck disable=SC2034
+  pass4=""
+  # shellcheck disable=SC2034
+  ssl_pw=""
+  # shellcheck disable=SC2034
+  ldap_pw=""
+  # shellcheck disable=SC2034
+  secret_value=""
+  unset pass4 ssl_pw ldap_pw secret_value || true
+  if [[ -n "$SPX_TXN_ROOT" && -d "$SPX_TXN_ROOT" ]]; then
+    rm -rf -- "$SPX_TXN_ROOT"
+  fi
+}
+
+spx_on_exit() {
+  local rc=$?
+  trap - ERR INT TERM EXIT
+  set +e
+  if [[ "$SPX_COMMITTED" != "true" ]] && ! spx_restore_transaction; then
+    rc=1
+  fi
+  spx_scrub_transaction
+  exit "$rc"
+}
+
+spx_begin_transaction() {
+  local splunk_home="$1" src_app="$2" app_parent splunk_uid
+  SPX_SPLUNK="${splunk_home}/bin/splunk"
+  SPX_DST_APP="${splunk_home}/etc/apps/000_public_exposure_hardening"
+  SPX_LAUNCH_CONF="${splunk_home}/etc/splunk-launch.conf"
+  app_parent="${splunk_home}/etc/apps"
+
+  [[ -x "$SPX_SPLUNK" ]] || { echo "ERROR: Splunk CLI missing: $SPX_SPLUNK" >&2; return 1; }
+  [[ -d "$src_app" && ! -L "$src_app" ]] || { echo "ERROR: rendered app missing or unsafe: $src_app" >&2; return 1; }
+  mkdir -p "$app_parent"
+  [[ ! -L "$app_parent" ]] || { echo "ERROR: apps directory must not be a symlink" >&2; return 1; }
+
+  read -r splunk_uid SPX_SPLUNK_OWNER < <(python3 - "$splunk_home" <<'PY'
+import os
+import sys
+st = os.stat(sys.argv[1], follow_symlinks=False)
+print(st.st_uid, f"{st.st_uid}:{st.st_gid}")
+PY
+  )
+  if [[ "$EUID" -ne 0 && "$EUID" -ne "$splunk_uid" ]]; then
+    echo "ERROR: run as the Splunk service owner (uid $splunk_uid) or root." >&2
+    return 1
+  fi
+
+  SPX_TXN_ROOT="$(mktemp -d "${splunk_home}/etc/.public-exposure-txn.XXXXXX")"
+  trap 'exit $?' ERR
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap spx_on_exit EXIT
+  chmod 0700 "$SPX_TXN_ROOT"
+  SPX_STAGE_APP="$SPX_TXN_ROOT/000_public_exposure_hardening.stage"
+  SPX_ORIGINAL_APP="$SPX_TXN_ROOT/000_public_exposure_hardening.original"
+  SPX_STAGE_LAUNCH="$SPX_TXN_ROOT/splunk-launch.conf.stage"
+  SPX_ORIGINAL_LAUNCH="$SPX_TXN_ROOT/splunk-launch.conf.original"
+  mkdir -m 0700 "$SPX_STAGE_APP"
+  cp -a "$src_app/." "$SPX_STAGE_APP/"
+  if find "$SPX_STAGE_APP" -type l -print -quit | grep -q .; then
+    echo "ERROR: rendered app contains a symlink; refusing apply" >&2
+    return 1
+  fi
+
+  if [[ -e "$SPX_DST_APP" && ( ! -d "$SPX_DST_APP" || -L "$SPX_DST_APP" ) ]]; then
+    echo "ERROR: existing app path is not a real directory: $SPX_DST_APP" >&2
+    return 1
+  fi
+  if [[ -e "$SPX_LAUNCH_CONF" ]]; then
+    [[ -f "$SPX_LAUNCH_CONF" && ! -L "$SPX_LAUNCH_CONF" ]] || {
+      echo "ERROR: splunk-launch.conf must be a regular non-symlink file" >&2
+      return 1
+    }
+    cp -p "$SPX_LAUNCH_CONF" "$SPX_TXN_ROOT/splunk-launch.conf.snapshot"
+    SPX_HAD_LAUNCH=true
+  else
+    : >"$SPX_TXN_ROOT/splunk-launch.conf.absent"
+  fi
+
+}
+
+spx_prepare_fips_launch() {
+  local version="$1"
+  if [[ "$SPX_HAD_LAUNCH" == "true" ]]; then
+    cp -p "$SPX_LAUNCH_CONF" "$SPX_STAGE_LAUNCH"
+  else
+    : >"$SPX_STAGE_LAUNCH"
+    chmod 0600 "$SPX_STAGE_LAUNCH"
+  fi
+  python3 - "$SPX_STAGE_LAUNCH" "$version" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+version = sys.argv[2]
+values = {"SPLUNK_FIPS": "1", "SPLUNK_FIPS_VERSION": version}
+lines = path.read_text(encoding="utf-8").splitlines()
+seen = set()
+output = []
+for line in lines:
+    key = line.split("=", 1)[0].strip() if "=" in line else ""
+    if key in values:
+        if key not in seen:
+            output.append(f"{key}={values[key]}")
+        seen.add(key)
+    else:
+        output.append(line)
+for key, value in values.items():
+    if key not in seen:
+        output.append(f"{key}={value}")
+path.write_text("\n".join(output) + "\n", encoding="utf-8")
+PY
+  SPX_LAUNCH_PREPARED=true
+}
+
+spx_finish_stage() {
+  chmod -R go-w "$SPX_STAGE_APP"
+  if [[ "$EUID" -eq 0 ]]; then
+    chown -R "$SPX_SPLUNK_OWNER" "$SPX_STAGE_APP"
+    [[ "$SPX_LAUNCH_PREPARED" == "true" ]] && chown "$SPX_SPLUNK_OWNER" "$SPX_STAGE_LAUNCH"
+  fi
+}
+
+spx_atomic_swap() {
+  if [[ -d "$SPX_DST_APP" ]]; then
+    SPX_HAD_APP=true
+    SPX_MUTATED=true
+    mv -- "$SPX_DST_APP" "$SPX_ORIGINAL_APP"
+  else
+    SPX_HAD_APP=false
+    SPX_MUTATED=true
+  fi
+  mv -- "$SPX_STAGE_APP" "$SPX_DST_APP"
+
+  if [[ "$SPX_LAUNCH_PREPARED" == "true" ]]; then
+    SPX_LAUNCH_MUTATED=true
+    if [[ "$SPX_HAD_LAUNCH" == "true" ]]; then
+      mv -- "$SPX_LAUNCH_CONF" "$SPX_ORIGINAL_LAUNCH"
+    fi
+    mv -- "$SPX_STAGE_LAUNCH" "$SPX_LAUNCH_CONF"
+  fi
+}
+
+spx_restart_and_verify() {
+  "$SPX_SPLUNK" restart
+  "$SPX_SPLUNK" status >/dev/null
+}
+
+spx_commit() {
+  SPX_COMMITTED=true
+  echo "Transactional hardening apply committed successfully."
+}
+"""
+    )
+
 def render_apply_search_head(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     pass4_path = shell_quote(args.pass4symmkey_file or "")
@@ -1092,183 +1452,130 @@ def render_apply_search_head(args: argparse.Namespace) -> str:
     auth_mode = shell_quote(args.auth_mode)
     ldap_bind_required = "true" if args.auth_mode == "ldap" and args.ldap_bind_dn else "false"
     enable_fips = "true" if args.enable_fips == "true" else "false"
+    expected_auth_type = shell_quote(_auth_type_for(args))
+    enable_hec = "true" if args.enable_hec == "true" else "false"
     return make_script(
-        f"""splunk_home={splunk_home}
+        f"""script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+# shellcheck disable=SC1091
+source "$script_dir/transaction-helpers.sh"
+
+splunk_home={splunk_home}
 pass4_file={pass4_path}
 ssl_pass_file={ssl_pass_path}
 ldap_bind_pwd_file={ldap_bind_pwd_path}
 ldap_strategy={ldap_strategy}
 auth_mode={auth_mode}
+expected_auth_type={expected_auth_type}
 ldap_bind_required={ldap_bind_required}
 enable_fips={enable_fips}
+enable_hec={enable_hec}
 umask 077
 
-if [[ ! -x "${{splunk_home}}/bin/splunk" ]]; then
-  echo "ERROR: $splunk_home/bin/splunk not found." >&2
-  exit 1
-fi
-
-splunk_uid="$(stat -c '%u' "$splunk_home")"
-splunk_owner="$(stat -c '%u:%g' "$splunk_home")"
-if [[ "$EUID" -ne 0 && "$EUID" -ne "$splunk_uid" ]]; then
-  echo "ERROR: run as the Splunk service owner (uid $splunk_uid) or root." >&2
-  exit 1
-fi
-
-validate_secret_file() {{
-  local path="$1" label="$2" mode value
-  [[ -n "$path" ]] || return 0
-  if [[ ! -r "$path" || ! -s "$path" ]]; then
-    echo "ERROR: $label must be a readable, non-empty file: $path" >&2
-    return 1
-  fi
-  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
-  if [[ -z "$mode" ]] || (( (8#$mode & 077) != 0 )); then
-    echo "ERROR: $label must have mode 0600 or stricter: $path" >&2
-    return 1
-  fi
-  value="$(< "$path")"
-  if [[ -z "$value" || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
-    echo "ERROR: $label must contain exactly one non-empty line." >&2
-    return 1
-  fi
-}}
-
-validate_secret_file "$pass4_file" "pass4SymmKey file"
-validate_secret_file "$ssl_pass_file" "TLS private-key password file"
-validate_secret_file "$ldap_bind_pwd_file" "LDAP bind password file"
 if [[ "$ldap_bind_required" == "true" && -z "$ldap_bind_pwd_file" ]]; then
   echo "ERROR: LDAP bind DN apply requires --ldap-bind-password-file." >&2
   exit 1
 fi
 
-src_app="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/apps/000_public_exposure_hardening"
-dst_app="${{splunk_home}}/etc/apps/000_public_exposure_hardening"
+src_app="$script_dir/apps/000_public_exposure_hardening"
+spx_begin_transaction "$splunk_home" "$src_app"
+mkdir -p "$SPX_STAGE_APP/local"
 
-if [[ ! -d "$src_app" ]]; then
-  echo "ERROR: rendered app not found at $src_app" >&2
-  exit 1
-fi
+pass4_present=false
+ssl_pass_present=false
+ldap_bind_present=false
 
-# Backup any existing app.
-if [[ -d "$dst_app" ]]; then
-  ts="$(date +%Y%m%d%H%M%S)"
-  mv "$dst_app" "${{dst_app}}.bak.$ts"
-fi
-
-mkdir -p "$(dirname "$dst_app")"
-cp -R "$src_app" "$dst_app"
-chmod -R go-w "$dst_app"
-mkdir -p "$dst_app/local"
-
-# splunk-launch.conf MUST live at $SPLUNK_HOME/etc/splunk-launch.conf,
-# NOT inside an app's default/. Merge only the two FIPS keys; replacing the
-# whole file would discard deployment-specific launch settings.
-if [[ "$enable_fips" == "true" ]]; then
-  launch_conf="${{splunk_home}}/etc/splunk-launch.conf"
-  if [[ -f "$launch_conf" ]]; then
-    ts="$(date +%Y%m%d%H%M%S)"
-    cp -p "$launch_conf" "$launch_conf.bak.$ts"
-  else
-    : >"$launch_conf"
-  fi
-  set_launch_key() {{
-    local key="$1" value="$2"
-    if grep -qE "^${{key}}[[:space:]]*=" "$launch_conf"; then
-      sed -i -E "s|^${{key}}[[:space:]]*=.*|${{key}}=${{value}}|" "$launch_conf"
-    else
-      printf '%s=%s\n' "$key" "$value" >>"$launch_conf"
-    fi
-  }}
-  set_launch_key SPLUNK_FIPS 1
-  set_launch_key SPLUNK_FIPS_VERSION {args.fips_version}
-  chmod 0600 "$launch_conf"
-  echo "FIPS keys merged into $launch_conf."
-  echo "Verify the host kernel is in FIPS mode before restart, then cold-start Splunk."
-fi
-
-# Inject pass4SymmKey from local file (never argv).
-if [[ -n "$pass4_file" && -s "$pass4_file" ]]; then
-  pass4="$(cat "$pass4_file")"
-  printf '[general]\\npass4SymmKey = %s\\n' "$pass4" \\
-    > "$dst_app/local/server.conf.pass4symmkey.fragment"
+if [[ -n "$pass4_file" ]]; then
+  pass4="$(spx_secure_read_secret "$pass4_file" "pass4SymmKey file")"
+  printf '[general]\npass4SymmKey = %s\n' "$pass4" >"$SPX_STAGE_APP/local/server.conf"
+  chmod 0600 "$SPX_STAGE_APP/local/server.conf"
+  pass4_present=true
+  pass4=""
   unset pass4
 fi
-
-# Inject sslPassword from local file (never argv).
-if [[ -n "$ssl_pass_file" && -s "$ssl_pass_file" ]]; then
-  ssl_pw="$(cat "$ssl_pass_file")"
-  mkdir -p "$dst_app/local"
-  printf '[sslConfig]\\nsslPassword = %s\\n' "$ssl_pw" \\
-    > "$dst_app/local/server.conf.sslpw.fragment"
+if [[ -n "$ssl_pass_file" ]]; then
+  ssl_pw="$(spx_secure_read_secret "$ssl_pass_file" "TLS private-key password file")"
+  printf '[sslConfig]\nsslPassword = %s\n' "$ssl_pw" >>"$SPX_STAGE_APP/local/server.conf"
+  chmod 0600 "$SPX_STAGE_APP/local/server.conf"
+  ssl_pass_present=true
+  ssl_pw=""
   unset ssl_pw
 fi
-
-# Merge any fragments into local/server.conf.
-mkdir -p "$dst_app/local"
-: > "$dst_app/local/server.conf"
-for frag in "$dst_app/local/server.conf.pass4symmkey.fragment" \\
-            "$dst_app/local/server.conf.sslpw.fragment"; do
-  [[ -f "$frag" ]] || continue
-  cat "$frag" >> "$dst_app/local/server.conf"
-  rm -f "$frag"
-done
-chmod 0600 "$dst_app/local/server.conf"
-
-# Inject LDAP bindDNpassword from local file (never argv) when --auth-mode=ldap.
-# Splunk's secure-password pipeline detects and rewrites clear-text LDAP
-# passwords with splunk.secret when it loads the configuration.
-if [[ "$auth_mode" == "ldap" && -n "$ldap_bind_pwd_file" && -s "$ldap_bind_pwd_file" ]]; then
-  ldap_pw="$(cat "$ldap_bind_pwd_file")"
-  : > "$dst_app/local/authentication.conf"
-  printf '[%s]\\nbindDNpassword = %s\\n' "$ldap_strategy" "$ldap_pw" \\
-    >> "$dst_app/local/authentication.conf"
-  chmod 0600 "$dst_app/local/authentication.conf"
+if [[ "$auth_mode" == "ldap" && -n "$ldap_bind_pwd_file" ]]; then
+  ldap_pw="$(spx_secure_read_secret "$ldap_bind_pwd_file" "LDAP bind password file")"
+  printf '[%s]\nbindDNpassword = %s\n' "$ldap_strategy" "$ldap_pw" \
+    >"$SPX_STAGE_APP/local/authentication.conf"
+  chmod 0600 "$SPX_STAGE_APP/local/authentication.conf"
+  ldap_bind_present=true
+  ldap_pw=""
   unset ldap_pw
 fi
-
-if [[ "$EUID" -eq 0 ]]; then
-  chown -R "$splunk_owner" "$dst_app"
-  [[ -n "${{launch_conf:-}}" ]] && chown "$splunk_owner" "$launch_conf"
+if [[ "$enable_fips" == "true" ]]; then
+  spx_prepare_fips_launch {shell_quote(args.fips_version)}
 fi
 
-"${{splunk_home}}/bin/splunk" restart
-
-# A successful restart must have encrypted every clear-text credential that
-# this script staged. Refuse completion if plaintext remains on disk.
-encryption_failed=0
-if [[ -n "$pass4_file" ]] && ! grep -Eq '^pass4SymmKey[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/server.conf"; then
-  echo "ERROR: pass4SymmKey was not encrypted after restart." >&2
-  encryption_failed=1
+spx_finish_stage
+spx_atomic_swap
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$enable_hec" == "true" ]]; then
+  spx_require_btool_value inputs http disabled 0
+  spx_require_btool_value inputs http enableSSL 1
 fi
-if [[ -n "$ssl_pass_file" ]] && ! grep -Eq '^sslPassword[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/server.conf"; then
-  echo "ERROR: sslPassword was not encrypted after restart." >&2
-  encryption_failed=1
+spx_restart_and_verify
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$enable_hec" == "true" ]]; then
+  spx_require_btool_value inputs http disabled 0
+  spx_require_btool_value inputs http enableSSL 1
 fi
-if [[ -n "$ldap_bind_pwd_file" ]] && ! grep -Eq '^bindDNpassword[[:space:]]*=[[:space:]]*\\$[0-9]+\\$' "$dst_app/local/authentication.conf"; then
-  echo "ERROR: bindDNpassword was not encrypted after restart." >&2
-  encryption_failed=1
+if [[ "$pass4_present" == "true" ]]; then
+  spx_require_encrypted_btool_value server general pass4SymmKey
+  spx_require_encrypted_file_value "$SPX_DST_APP/local/server.conf" pass4SymmKey
 fi
-(( encryption_failed == 0 )) || exit 1
+if [[ "$ssl_pass_present" == "true" ]]; then
+  spx_require_encrypted_btool_value server sslConfig sslPassword
+  spx_require_encrypted_file_value "$SPX_DST_APP/local/server.conf" sslPassword
+fi
+if [[ "$ldap_bind_present" == "true" ]]; then
+  spx_require_encrypted_btool_value authentication "$ldap_strategy" bindDNpassword
+  spx_require_encrypted_file_value "$SPX_DST_APP/local/authentication.conf" bindDNpassword
+fi
+if [[ "$enable_fips" == "true" ]]; then
+  [[ "$(grep -c '^SPLUNK_FIPS=1$' "$SPX_LAUNCH_CONF")" == "1" ]]
+  [[ "$(grep -c '^SPLUNK_FIPS_VERSION={args.fips_version}$' "$SPX_LAUNCH_CONF")" == "1" ]]
+fi
+spx_commit
 """
     )
-
 
 def render_apply_hec_tier(args: argparse.Namespace) -> str:
+    splunk_home = shell_quote(args.splunk_home)
+    expected_auth_type = shell_quote(_auth_type_for(args))
+    enable_hec = "true" if args.enable_hec == "true" else "false"
     return make_script(
-        """splunk_home="${SPLUNK_HOME:-/opt/splunk}"
-src_app="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/apps/000_public_exposure_hardening"
-dst_app="${splunk_home}/etc/apps/000_public_exposure_hardening"
-[[ -x "${splunk_home}/bin/splunk" ]] || { echo "ERROR: Splunk CLI missing on HEC tier." >&2; exit 1; }
-[[ -d "${src_app}" ]] || { echo "ERROR: rendered app missing: ${src_app}" >&2; exit 1; }
-if [[ -d "${dst_app}" ]]; then mv "${dst_app}" "${dst_app}.bak.$(date +%Y%m%d%H%M%S)"; fi
-mkdir -p "$(dirname "${dst_app}")"
-cp -R "${src_app}" "${dst_app}"
-chmod -R go-w "${dst_app}"
-"${splunk_home}/bin/splunk" restart
+        f"""script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+# shellcheck disable=SC1091
+source "$script_dir/transaction-helpers.sh"
+splunk_home={splunk_home}
+expected_auth_type={expected_auth_type}
+enable_hec={enable_hec}
+src_app="$script_dir/apps/000_public_exposure_hardening"
+
+spx_begin_transaction "$splunk_home" "$src_app"
+spx_finish_stage
+spx_atomic_swap
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$enable_hec" == "true" ]]; then
+  spx_require_btool_value inputs http disabled 0
+  spx_require_btool_value inputs http enableSSL 1
+fi
+spx_restart_and_verify
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$enable_hec" == "true" ]]; then
+  spx_require_btool_value inputs http disabled 0
+  spx_require_btool_value inputs http enableSSL 1
+fi
+spx_commit
 """
     )
-
 
 def render_apply_s2s_receiver(args: argparse.Namespace) -> str:
     return make_script(
@@ -1281,31 +1588,35 @@ exit 2
 
 
 def render_apply_heavy_forwarder(args: argparse.Namespace) -> str:
+    splunk_home = shell_quote(args.splunk_home)
+    expected_auth_type = shell_quote(_auth_type_for(args))
+    expect_outputs = "true" if (
+        args.topology == "shc-with-hec-and-hf" and args.forwarder_mtls == "true"
+    ) else "false"
     return make_script(
-        """splunk_home="${SPLUNK_HOME:-/opt/splunk}"
-src_app="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/apps/000_public_exposure_hardening"
+        f"""script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+# shellcheck disable=SC1091
+source "$script_dir/transaction-helpers.sh"
+splunk_home={splunk_home}
+expected_auth_type={expected_auth_type}
+expect_outputs={expect_outputs}
+src_app="$script_dir/apps/000_public_exposure_hardening"
 
-if [[ ! -d "$src_app" ]]; then
-  echo "ERROR: rendered app missing at $src_app" >&2
-  exit 1
+spx_begin_transaction "$splunk_home" "$src_app"
+spx_finish_stage
+spx_atomic_swap
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$expect_outputs" == "true" ]]; then
+  spx_require_btool_value outputs tcpout defaultGroup primary_indexers
 fi
-if [[ ! -x "${splunk_home}/bin/splunk" ]]; then
-  echo "ERROR: $splunk_home/bin/splunk not found on heavy forwarder." >&2
-  exit 1
+spx_restart_and_verify
+spx_validate_common_live_config "$expected_auth_type"
+if [[ "$expect_outputs" == "true" ]]; then
+  spx_require_btool_value outputs tcpout defaultGroup primary_indexers
 fi
-
-dst_app="${splunk_home}/etc/apps/000_public_exposure_hardening"
-if [[ -d "$dst_app" ]]; then
-  ts="$(date +%Y%m%d%H%M%S)"
-  mv "$dst_app" "${dst_app}.bak.$ts"
-fi
-mkdir -p "$(dirname "$dst_app")"
-cp -R "$src_app" "$dst_app"
-chmod -R go-w "$dst_app"
-"${splunk_home}/bin/splunk" restart
+spx_commit
 """
     )
-
 
 def render_apply_deployer(args: argparse.Namespace) -> str:
     return make_script(
@@ -2621,23 +2932,23 @@ SOC 2 auditor needs your org's broader operational controls.
 def render_preflight(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     fqdn = shell_quote(args.public_fqdn)
-    proxy_cidr = shell_quote(args.proxy_cidr)
     probe = shell_quote(args.external_probe_cmd or "")
-    helper = shell_quote(helper_path())
     platform_helper = shell_quote(helper_path().with_name("platform_version_helpers.sh"))
     target_version = shell_quote(args.splunk_version)
     cert_path = shell_quote(args.server_cert_path)
+    public_ca = shell_quote(args.public_ca_file or "")
+    expected_auth_type = shell_quote(_auth_type_for(args))
     allow_scripted = "true" if args.allow_scripted_auth else "false"
     return make_script(
         f"""splunk_home={splunk_home}
 fqdn={fqdn}
-proxy_cidr={proxy_cidr}
 external_probe={probe}
 cert_path={cert_path}
-helper={helper}
+public_ca_file={public_ca}
 platform_helper={platform_helper}
 target_version={target_version}
 allow_scripted_auth={allow_scripted}
+expected_auth_type={expected_auth_type}
 
 failures=0
 
@@ -2648,6 +2959,69 @@ fail() {{
 
 ok() {{
   echo "OK:   $1"
+}}
+
+BTOOL_OUTPUT=""
+BTOOL_VALUE=""
+BTOOL_FOUND=false
+
+btool_read() {{
+  local conf="$1" stanza="$2" label="$3" output
+  BTOOL_OUTPUT=""
+  if [[ -n "$stanza" ]]; then
+    output="$("${{splunk_home}}/bin/splunk" btool "$conf" list "$stanza" 2>&1)" || {{
+      fail "btool failed for $label: $output"
+      return 1
+    }}
+  elif ! output="$("${{splunk_home}}/bin/splunk" btool "$conf" list 2>&1)"; then
+    fail "btool failed for $label: $output"
+    return 1
+  fi
+  if [[ -z "${{output//[[:space:]]/}}" ]]; then
+    fail "btool returned empty output for $label"
+    return 1
+  fi
+  BTOOL_OUTPUT="$output"
+}}
+
+btool_value() {{
+  local output="$1" key="$2"
+  BTOOL_VALUE=""
+  BTOOL_FOUND=false
+  if BTOOL_VALUE="$(awk -v wanted="$key" '
+    {{
+      pos = index($0, "=")
+      if (!pos) next
+      name = substr($0, 1, pos - 1)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+      if (name == wanted) {{
+        value = substr($0, pos + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        print value
+        found = 1
+        exit
+      }}
+    }}
+    END {{ if (!found) exit 1 }}
+  ' <<<"$output")"; then
+    BTOOL_FOUND=true
+  else
+    fail "btool output is missing required key: $key"
+  fi
+}}
+
+public_curl_tls_args=()
+if [[ -n "$public_ca_file" ]]; then
+  if [[ ! -f "$public_ca_file" || ! -r "$public_ca_file" || ! -s "$public_ca_file" ]]; then
+    fail "--public-ca-file must be a readable non-empty regular file: $public_ca_file"
+  else
+    public_curl_tls_args=(--cacert "$public_ca_file")
+  fi
+fi
+
+public_curl() {{
+  curl -q --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+    --connect-timeout 10 --max-time 30 "${{public_curl_tls_args[@]}}" "$@"
 }}
 
 # Fail closed if the live runtime is outside the public self-managed support
@@ -2691,12 +3065,17 @@ fi
 # 3. Splunk version vs SVD floor is enforced at render time and the live
 # runtime/target equality check above prevents applying that result elsewhere.
 
-# 4. pass4SymmKey not default
-if "${{splunk_home}}/bin/splunk" btool server list general 2>/dev/null \\
-   | grep -q '^pass4SymmKey *= *changeme'; then
-  fail "pass4SymmKey is the default 'changeme'"
-else
-  ok "pass4SymmKey is not the default literal"
+# 4. pass4SymmKey must be present, non-default, and encrypted.
+server_general=""
+if btool_read server general 'server [general]'; then
+  server_general="$BTOOL_OUTPUT"
+  btool_value "$server_general" pass4SymmKey
+  pass4_value="$BTOOL_VALUE"
+  if [[ "$pass4_value" =~ ^\\$[0-9]+\\$ ]]; then
+    ok "pass4SymmKey is present and encrypted"
+  else
+    fail "pass4SymmKey is missing, plaintext, or default"
+  fi
 fi
 
 # 5. splunk.secret posture
@@ -2712,25 +3091,38 @@ else
   fi
 fi
 
-# 6. sslPassword not default
-if "${{splunk_home}}/bin/splunk" btool server list sslConfig 2>/dev/null \\
-   | grep -q '^sslPassword *= *password *$'; then
-  fail "sslConfig sslPassword is the literal 'password'"
-else
-  ok "sslConfig sslPassword is not the default literal"
+# 6. sslPassword must be present and encrypted.
+server_ssl=""
+if btool_read server sslConfig 'server [sslConfig]'; then
+  server_ssl="$BTOOL_OUTPUT"
+  btool_value "$server_ssl" sslPassword
+  ssl_password="$BTOOL_VALUE"
+  if [[ "$ssl_password" =~ ^\\$[0-9]+\\$ ]]; then
+    ok "sslConfig sslPassword is present and encrypted"
+  else
+    fail "sslConfig sslPassword is missing or plaintext"
+  fi
 fi
 
-# 7. admin role lockout posture
-if "${{splunk_home}}/bin/splunk" btool authorize list role_admin 2>/dev/null \\
-   | grep -q '^never_lockout *= *enabled'; then
-  fail "[role_admin] never_lockout = enabled (Splunk default; must be disabled)"
-else
-  ok "[role_admin] never_lockout != enabled"
+# 7. admin role lockout posture must be explicit, never inferred from absence.
+role_admin=""
+if btool_read authorize role_admin 'authorize [role_admin]'; then
+  role_admin="$BTOOL_OUTPUT"
+  btool_value "$role_admin" never_lockout
+  never_lockout="$BTOOL_VALUE"
+  if [[ "$never_lockout" == "disabled" ]]; then
+    ok "[role_admin] never_lockout = disabled"
+  else
+    fail "[role_admin] never_lockout must equal disabled (got: ${{never_lockout:-missing}})"
+  fi
 fi
 
 # 8. High-risk capabilities on non-admin roles
 forbidden_caps="edit_cmd edit_scripted rest_apps_management delete_by_keyword change_authentication run_sendalert run_dump run_custom_command"
-btool="$("${{splunk_home}}/bin/splunk" btool authorize list 2>/dev/null || true)"
+btool=""
+if btool_read authorize '' 'complete authorize configuration'; then
+  btool="$BTOOL_OUTPUT"
+fi
 current_role=""
 while IFS= read -r line; do
   case "$line" in
@@ -2746,38 +3138,54 @@ while IFS= read -r line; do
       ;;
   esac
 done <<<"$btool"
-ok "scanned non-admin roles for high-risk capabilities"
+[[ -n "$btool" ]] && ok "scanned non-admin roles for high-risk capabilities"
 
-# 9. enableSplunkWebClientNetloc must be false (CVE-2025-20371)
-if "${{splunk_home}}/bin/splunk" btool web list settings 2>/dev/null \\
-   | grep -q '^enableSplunkWebClientNetloc *= *true'; then
-  fail "enableSplunkWebClientNetloc = true (CVE-2025-20371 SSRF)"
-else
-  ok "enableSplunkWebClientNetloc != true"
+# 9-11. Web settings must be present with explicit safe values.
+web_settings=""
+if btool_read web settings 'web [settings]'; then
+  web_settings="$BTOOL_OUTPUT"
+  btool_value "$web_settings" enableSplunkWebClientNetloc
+  web_netloc="$BTOOL_VALUE"
+  btool_value "$web_settings" request.show_tracebacks
+  web_tracebacks="$BTOOL_VALUE"
+  btool_value "$web_settings" crossOriginSharingPolicy
+  web_cors="$BTOOL_VALUE"
+  web_cors_found="$BTOOL_FOUND"
+  if [[ "$web_netloc" == "false" ]]; then
+    ok "enableSplunkWebClientNetloc = false"
+  else
+    fail "enableSplunkWebClientNetloc must equal false"
+  fi
+  if [[ "$web_tracebacks" == "false" ]]; then
+    ok "request.show_tracebacks = false"
+  else
+    fail "request.show_tracebacks must equal false"
+  fi
+  if [[ "$web_cors_found" == "true" && -z "$web_cors" ]]; then
+    ok "crossOriginSharingPolicy is explicitly empty"
+  else
+    fail "crossOriginSharingPolicy must be explicitly empty"
+  fi
 fi
 
-# 10. request.show_tracebacks must be false
-if "${{splunk_home}}/bin/splunk" btool web list settings 2>/dev/null \\
-   | grep -q '^request.show_tracebacks *= *true'; then
-  fail "request.show_tracebacks = true (leaks stack traces)"
-else
-  ok "request.show_tracebacks != true"
-fi
-
-# 11. crossOriginSharingPolicy not '*'
-if "${{splunk_home}}/bin/splunk" btool web list settings 2>/dev/null \\
-   | grep -q '^crossOriginSharingPolicy *= *\\*'; then
-  fail "crossOriginSharingPolicy = * (wildcard CORS not allowed)"
-else
-  ok "crossOriginSharingPolicy is not wildcard"
-fi
-
-# 12. verboseLoginFailMsg must be false
-if "${{splunk_home}}/bin/splunk" btool server list httpServer 2>/dev/null \\
-   | grep -q '^verboseLoginFailMsg *= *true'; then
-  fail "[httpServer] verboseLoginFailMsg = true (username enumeration oracle)"
-else
-  ok "[httpServer] verboseLoginFailMsg != true"
+# 12. splunkd login failure posture must be explicit.
+http_server=""
+if btool_read server httpServer 'server [httpServer]'; then
+  http_server="$BTOOL_OUTPUT"
+  btool_value "$http_server" verboseLoginFailMsg
+  verbose_login="$BTOOL_VALUE"
+  btool_value "$http_server" sendStrictTransportSecurityHeader
+  splunkd_hsts="$BTOOL_VALUE"
+  if [[ "$verbose_login" == "false" ]]; then
+    ok "[httpServer] verboseLoginFailMsg = false"
+  else
+    fail "[httpServer] verboseLoginFailMsg must equal false"
+  fi
+  if [[ "$splunkd_hsts" == "true" ]]; then
+    ok "[httpServer] sendStrictTransportSecurityHeader = true"
+  else
+    fail "[httpServer] sendStrictTransportSecurityHeader must equal true"
+  fi
 fi
 
 # 13. DNS resolution
@@ -2800,7 +3208,23 @@ else
   echo "WARN: no --external-probe-cmd; skipping external port probe."
 fi
 
-# 15. TLS scan (basic)
+# 15. Require a valid public certificate chain and hostname, then reject
+# legacy protocol negotiation. System trust is used unless --public-ca-file
+# was explicitly supplied.
+openssl_verify_args=(
+  -connect "$fqdn:443"
+  -servername "$fqdn"
+  -verify_hostname "$fqdn"
+  -verify_return_error
+)
+if [[ -n "$public_ca_file" && -s "$public_ca_file" ]]; then
+  openssl_verify_args+=(-CAfile "$public_ca_file")
+fi
+if openssl s_client "${{openssl_verify_args[@]}}" </dev/null >/dev/null 2>&1; then
+  ok "public TLS certificate chain and hostname verified for $fqdn"
+else
+  fail "public TLS certificate chain or hostname verification failed for $fqdn"
+fi
 if openssl s_client -connect "$fqdn:443" -tls1 </dev/null >/dev/null 2>&1; then
   fail "TLS 1.0 still negotiates on $fqdn:443"
 else
@@ -2813,7 +3237,7 @@ else
 fi
 
 # 16. HSTS header present at proxy
-hsts="$(curl -sk -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="strict-transport-security"{{print $2}}')"
+hsts="$(public_curl -sS -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="strict-transport-security"{{print $2}}')"
 if [[ -n "$hsts" ]]; then
   ok "HSTS header present: $hsts"
 else
@@ -2822,10 +3246,10 @@ fi
 
 # 17. Log-injection probe — SVD-2025-1203 / CVE-2025-20384 (ANSI escape +
 # CR/LF at /en-US/static/). Proxy must reject ESC \\x1b, BEL \\x07, CR/LF.
-status_ansi="$(curl -sk -o /dev/null -w '%{{http_code}}' \\
+status_ansi="$(public_curl -sS -o /dev/null -w '%{{http_code}}' \\
   -H $'User-Agent: probe\\x1b[31mred' \\
   "https://$fqdn/en-US/static/" 2>/dev/null || true)"
-status_crlf="$(curl -sk -o /dev/null -w '%{{http_code}}' \\
+status_crlf="$(public_curl -sS -o /dev/null -w '%{{http_code}}' \\
   -H $'X-Forwarded-For: 1.2.3.4\\r\\nX-Injected: yes' \\
   "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
 case "$status_ansi" in
@@ -2846,7 +3270,7 @@ case "$status_crlf" in
 esac
 
 # 18. return_to redirect probe (proxy must reject absolute URLs)
-status="$(curl -sk -o /dev/null -w '%{{http_code}}' \\
+status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' \\
   "https://$fqdn/en-US/account/login?return_to=https://attacker.example.com/" 2>/dev/null || true)"
 case "$status" in
   400|403|404)
@@ -2858,7 +3282,7 @@ case "$status" in
 esac
 
 # 19. WAF/proxy reachable
-status="$(curl -sk -o /dev/null -w '%{{http_code}}' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
+status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
 if [[ "$status" == "200" ]]; then
   ok "Splunk Web login page reachable (200)"
 else
@@ -2866,7 +3290,7 @@ else
 fi
 
 # 20. CSRF cookie unmodified
-ck="$(curl -sk -I "https://$fqdn/en-US/account/login" 2>/dev/null | tr -d '\\r' | awk 'tolower($1)=="set-cookie:"' | grep -E 'splunkweb_csrf_token_' || true)"
+ck="$(public_curl -sS -I "https://$fqdn/en-US/account/login" 2>/dev/null | tr -d '\\r' | awk 'tolower($1)=="set-cookie:"' | grep -E 'splunkweb_csrf_token_' || true)"
 if [[ -n "$ck" ]]; then
   ok "splunkweb_csrf_token cookie returned through proxy"
 else
@@ -2878,7 +3302,7 @@ fi
 for path in /services/apps/local /services/apps/appinstall \\
             /services/configs/conf-passwords /services/data/inputs/oneshot \\
             /account/insecurelogin /en-US/account/insecurelogin /debug/refresh; do
-  status="$(curl -sk -o /dev/null -w '%{{http_code}}' "https://$fqdn$path" 2>/dev/null || true)"
+  status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' "https://$fqdn$path" 2>/dev/null || true)"
   case "$status" in
     403|404)
       ok "proxy denies $path (status $status)"
@@ -2889,19 +3313,31 @@ for path in /services/apps/local /services/apps/appinstall \\
   esac
 done
 
-# 22. Scripted-auth refusal. authType=Scripted invokes an external Python /
-# shell script for every login — RCE class on a public-facing search head.
-auth_type="$("${{splunk_home}}/bin/splunk" btool authentication list authentication 2>/dev/null \\
-  | awk -F'= *' '/^authType *=/ {{print $2; exit}}' || true)"
-if [[ "$auth_type" == "Scripted" ]]; then
-  if [[ "$allow_scripted_auth" == "true" ]]; then
-    echo "WARN: authType = Scripted is in use AND --allow-scripted-auth was acked."
-    echo "      Audit $splunk_home/etc/auth/scripts/ before exposing publicly."
-  else
-    fail "authType = Scripted requires --allow-scripted-auth ack (RCE class on public surface)"
-  fi
-else
-  ok "authType is not Scripted (current: ${{auth_type:-unknown}})"
+# 22. Authentication type must be explicit, recognized, non-Scripted, and
+# equal to the rendered target. --allow-scripted-auth is retained only as a
+# migration warning and can never produce production-pass evidence.
+authentication=""
+if btool_read authentication authentication 'authentication [authentication]'; then
+  authentication="$BTOOL_OUTPUT"
+  btool_value "$authentication" authType
+  auth_type="$BTOOL_VALUE"
+  case "$auth_type" in
+    Splunk|LDAP|SAML|ProxySSO)
+      if [[ "$auth_type" == "$expected_auth_type" ]]; then
+        ok "authType is recognized and matches rendered target: $auth_type"
+      else
+        fail "authType $auth_type does not match rendered target $expected_auth_type"
+      fi
+      ;;
+    Scripted)
+      [[ "$allow_scripted_auth" == "true" ]] \
+        && echo "WARN: --allow-scripted-auth cannot override production refusal."
+      fail "authType = Scripted is forbidden on a public-facing search head"
+      ;;
+    *)
+      fail "authType is missing or unknown: ${{auth_type:-missing}}"
+      ;;
+  esac
 fi
 
 # 23. Premium-apps capability scan. Documented apps get embedded-list audit;
@@ -2977,9 +3413,17 @@ echo "PREFLIGHT PASSED."
 def render_validate(args: argparse.Namespace) -> str:
     fqdn = shell_quote(args.public_fqdn)
     probe = shell_quote(args.external_probe_cmd or "")
+    splunk_home = shell_quote(args.splunk_home)
+    public_ca = shell_quote(args.public_ca_file or "")
+    expected_auth_type = shell_quote(_auth_type_for(args))
+    enable_hec = "true" if args.enable_hec == "true" else "false"
     return make_script(
         f"""fqdn={fqdn}
 external_probe={probe}
+splunk_home={splunk_home}
+public_ca_file={public_ca}
+expected_auth_type={expected_auth_type}
+enable_hec={enable_hec}
 
 report="${{1:-./validate-report.json}}"
 checks=()
@@ -2993,8 +3437,62 @@ record() {{
   fi
 }}
 
+BTOOL_VALUE=""
+
+btool_value() {{
+  local conf="$1" stanza="$2" key="$3" output value
+  BTOOL_VALUE=""
+  if ! output="$("${{splunk_home}}/bin/splunk" btool "$conf" list "$stanza" 2>&1)"; then
+    record "btool_${{conf}}_${{stanza}}" fail "command failed"
+    return 1
+  fi
+  if [[ -z "${{output//[[:space:]]/}}" ]]; then
+    record "btool_${{conf}}_${{stanza}}" fail "empty output"
+    return 1
+  fi
+  if ! value="$(awk -v wanted="$key" '
+    {{
+      pos = index($0, "=")
+      if (!pos) next
+      name = substr($0, 1, pos - 1)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+      if (name == wanted) {{
+        result = substr($0, pos + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", result)
+        print result
+        found = 1
+        exit
+      }}
+    }}
+    END {{ if (!found) exit 1 }}
+  ' <<<"$output")"; then
+    record "btool_${{conf}}_${{stanza}}_${{key}}" fail "missing value"
+    return 1
+  fi
+  BTOOL_VALUE="$value"
+}}
+
+public_curl_tls_args=()
+if [[ -n "$public_ca_file" ]]; then
+  if [[ ! -f "$public_ca_file" || ! -r "$public_ca_file" || ! -s "$public_ca_file" ]]; then
+    record public_ca_file fail "unreadable or empty"
+  else
+    public_curl_tls_args=(--cacert "$public_ca_file")
+  fi
+fi
+
+public_curl() {{
+  curl -q --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+    --connect-timeout 10 --max-time 30 "${{public_curl_tls_args[@]}}" "$@"
+}}
+
+public_http_redirect_probe() {{
+  curl -q --proto '=http,https' --proto-redir '=https' --max-redirs 0 --globoff \
+    --connect-timeout 10 --max-time 30 "$@"
+}}
+
 # HTTPS-only redirect
-loc="$(curl -ski -o /dev/null -w '%{{redirect_url}} %{{http_code}}' "http://$fqdn/" 2>/dev/null || true)"
+loc="$(public_http_redirect_probe -sS -i -o /dev/null -w '%{{redirect_url}} %{{http_code}}' "http://$fqdn/" 2>/dev/null || true)"
 case "$loc" in
   https://*\\ 301)
     record https_redirect ok "$loc"
@@ -3005,7 +3503,7 @@ case "$loc" in
 esac
 
 # HSTS
-hsts="$(curl -sk -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="strict-transport-security"{{print $2}}')"
+hsts="$(public_curl -sS -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="strict-transport-security"{{print $2}}')"
 if [[ -n "$hsts" ]]; then
   record hsts_header ok "$hsts"
 else
@@ -3013,7 +3511,7 @@ else
 fi
 
 # CSP
-csp="$(curl -sk -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="content-security-policy"{{print $2}}')"
+csp="$(public_curl -sS -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="content-security-policy"{{print $2}}')"
 if [[ -n "$csp" ]]; then
   record csp_header ok "$csp"
 else
@@ -3021,11 +3519,27 @@ else
 fi
 
 # X-Content-Type-Options
-xcto="$(curl -sk -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="x-content-type-options"{{print $2}}')"
+xcto="$(public_curl -sS -I "https://$fqdn/" 2>/dev/null | tr -d '\\r' | awk -F': ' 'tolower($1)=="x-content-type-options"{{print $2}}')"
 if [[ "$xcto" == "nosniff" ]]; then
   record xcto_header ok "nosniff"
 else
   record xcto_header fail "$xcto"
+fi
+
+# Public certificate hostname/chain validation, followed by TLS 1.0 / 1.1 refusal.
+openssl_verify_args=(
+  -connect "$fqdn:443"
+  -servername "$fqdn"
+  -verify_hostname "$fqdn"
+  -verify_return_error
+)
+if [[ -n "$public_ca_file" && -s "$public_ca_file" ]]; then
+  openssl_verify_args+=(-CAfile "$public_ca_file")
+fi
+if openssl s_client "${{openssl_verify_args[@]}}" </dev/null >/dev/null 2>&1; then
+  record tls_hostname_chain ok "verified"
+else
+  record tls_hostname_chain fail "verification failed"
 fi
 
 # TLS 1.0 / 1.1 absent
@@ -3054,7 +3568,7 @@ else
 fi
 
 # Header-injection probe
-status="$(curl -sk -o /dev/null -w '%{{http_code}}' -H $'X-Forwarded-For: 1.2.3.4\\r\\nX-Injected: yes' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
+status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' -H $'X-Forwarded-For: 1.2.3.4\\r\\nX-Injected: yes' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
 if [[ "$status" =~ ^(400|401|403)$ ]]; then
   record header_injection ok "$status"
 else
@@ -3062,7 +3576,7 @@ else
 fi
 
 # return_to redirect probe
-status="$(curl -sk -o /dev/null -w '%{{http_code}}' "https://$fqdn/en-US/account/login?return_to=https://attacker.example.com/" 2>/dev/null || true)"
+status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' "https://$fqdn/en-US/account/login?return_to=https://attacker.example.com/" 2>/dev/null || true)"
 if [[ "$status" =~ ^(400|403|404)$ ]]; then
   record return_to_redirect ok "$status"
 else
@@ -3070,7 +3584,7 @@ else
 fi
 
 # CSRF cookie pass-through
-ck="$(curl -sk -I "https://$fqdn/en-US/account/login" 2>/dev/null | tr -d '\\r' | grep -ic 'splunkweb_csrf_token_')"
+ck="$(public_curl -sS -I "https://$fqdn/en-US/account/login" 2>/dev/null | tr -d '\\r' | grep -ic 'splunkweb_csrf_token_')"
 if [[ "$ck" -gt 0 ]]; then
   record csrf_cookie ok "present"
 else
@@ -3079,8 +3593,8 @@ fi
 
 # Per-IP rate limit on login (best-effort: 12 rapid POSTs should trigger 429/503)
 hit429=0
-for i in $(seq 1 12); do
-  status="$(curl -sk -o /dev/null -w '%{{http_code}}' -X POST -d 'username=alice&password=fake' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
+for _ in {{1..12}}; do
+  status="$(public_curl -sS -o /dev/null -w '%{{http_code}}' -X POST -d 'username=alice&password=fake' "https://$fqdn/en-US/account/login" 2>/dev/null || true)"
   if [[ "$status" =~ ^(429|503)$ ]]; then
     hit429=1
     break
@@ -3090,6 +3604,117 @@ if [[ "$hit429" == "1" ]]; then
   record login_rate_limit ok "blocked at proxy"
 else
   record login_rate_limit fail "not enforced — operator must add rate-limit at proxy / WAF"
+fi
+
+# Exact live Splunk configuration readback. Empty or failed btool output is a
+# validation failure; absence can never be interpreted as a safe default.
+never_lockout=""
+if btool_value authorize role_admin never_lockout; then
+  never_lockout="$BTOOL_VALUE"
+fi
+if [[ "$never_lockout" == "disabled" ]]; then
+  record role_admin_never_lockout ok "disabled"
+else
+  record role_admin_never_lockout fail "${{never_lockout:-missing}}"
+fi
+
+auth_type=""
+if btool_value authentication authentication authType; then
+  auth_type="$BTOOL_VALUE"
+fi
+case "$auth_type" in
+  Splunk|LDAP|SAML|ProxySSO)
+    if [[ "$auth_type" == "$expected_auth_type" ]]; then
+      record authentication_type ok "$auth_type"
+    else
+      record authentication_type fail "$auth_type (expected $expected_auth_type)"
+    fi
+    ;;
+  *) record authentication_type fail "${{auth_type:-missing-or-unknown}}" ;;
+esac
+
+web_netloc=""
+if btool_value web settings enableSplunkWebClientNetloc; then
+  web_netloc="$BTOOL_VALUE"
+fi
+if [[ "$web_netloc" == "false" ]]; then
+  record web_client_netloc ok "false"
+else
+  record web_client_netloc fail "${{web_netloc:-missing}}"
+fi
+
+web_tracebacks=""
+if btool_value web settings request.show_tracebacks; then
+  web_tracebacks="$BTOOL_VALUE"
+fi
+if [[ "$web_tracebacks" == "false" ]]; then
+  record web_tracebacks ok "false"
+else
+  record web_tracebacks fail "${{web_tracebacks:-missing}}"
+fi
+
+web_cors=""
+web_cors_found=false
+if btool_value web settings crossOriginSharingPolicy; then
+  web_cors="$BTOOL_VALUE"
+  web_cors_found=true
+fi
+if [[ "$web_cors_found" == "true" && -z "$web_cors" ]]; then
+  record web_cors_policy ok "explicitly empty"
+else
+  record web_cors_policy fail "must be explicitly empty"
+fi
+
+verbose_login=""
+if btool_value server httpServer verboseLoginFailMsg; then
+  verbose_login="$BTOOL_VALUE"
+fi
+if [[ "$verbose_login" == "false" ]]; then
+  record verbose_login_fail_msg ok "false"
+else
+  record verbose_login_fail_msg fail "${{verbose_login:-missing}}"
+fi
+
+hsts_enabled=""
+if btool_value server httpServer sendStrictTransportSecurityHeader; then
+  hsts_enabled="$BTOOL_VALUE"
+fi
+if [[ "$hsts_enabled" == "true" ]]; then
+  record splunkd_hsts_setting ok "true"
+else
+  record splunkd_hsts_setting fail "${{hsts_enabled:-missing}}"
+fi
+
+pass4_value=""
+if btool_value server general pass4SymmKey; then
+  pass4_value="$BTOOL_VALUE"
+fi
+if [[ "$pass4_value" =~ ^\\$[0-9]+\\$ ]]; then
+  record pass4symmkey_encrypted ok "encrypted"
+else
+  record pass4symmkey_encrypted fail "missing or plaintext"
+fi
+
+ssl_password=""
+if btool_value server sslConfig sslPassword; then
+  ssl_password="$BTOOL_VALUE"
+fi
+if [[ "$ssl_password" =~ ^\\$[0-9]+\\$ ]]; then
+  record ssl_password_encrypted ok "encrypted"
+else
+  record ssl_password_encrypted fail "missing or plaintext"
+fi
+
+if [[ "$enable_hec" == "true" ]]; then
+  hec_disabled=""
+  hec_ssl=""
+  if btool_value inputs http disabled; then hec_disabled="$BTOOL_VALUE"; fi
+  if btool_value inputs http enableSSL; then hec_ssl="$BTOOL_VALUE"; fi
+  if [[ "$hec_disabled" == "0" && "$hec_ssl" == "1" ]]; then
+    record hec_live_config ok "disabled=0 enableSSL=1"
+  else
+    record hec_live_config fail "disabled=${{hec_disabled:-missing}} enableSSL=${{hec_ssl:-missing}}"
+  fi
 fi
 
 # Emit JSON report
@@ -3128,9 +3753,11 @@ Splunk version target: `{args.splunk_version}` (SVD floor enforced)
   `shcluster/apps/`). Contains `web.conf`, `server.conf`, `inputs.conf`,
   `outputs.conf`, `authentication.conf`, `authorize.conf`, `limits.conf`,
   `commands.conf`, plus `metadata/{{default,local}}.meta`.
-- `splunk/apply-*.sh` — role-aware apply scripts. The search-head one
-  injects `pass4SymmKey` and `sslPassword` from operator-supplied local
-  files at apply time (never argv).
+- `splunk/apply-*.sh` — role-aware apply scripts. Direct search-head, HEC,
+  and heavy-forwarder applies use `transaction-helpers.sh` for private
+  same-filesystem staging, exact rollback, btool gates, restart verification,
+  and plaintext cleanup. The search-head script reads `pass4SymmKey` and
+  `sslPassword` through no-follow descriptors (never argv).
 - `splunk/rotate-*.sh` — `pass4SymmKey` and `splunk.secret` rotation
   helpers.
 - `splunk/certificates/` — `verify-certs.sh` (refuses default Splunk
@@ -3150,10 +3777,12 @@ Splunk version target: `{args.splunk_version}` (SVD floor enforced)
 
 ## How to apply
 
-1. Run `bash preflight.sh` — must exit 0.
-2. On the search head, run
-   `bash splunk/apply-search-head.sh` (the parent setup.sh wraps this
-   when `--phase apply --accept-public-exposure` is passed).
+1. Run `bash preflight.sh` — must exit 0. The parent setup wrapper also
+   runs this automatically immediately before every `--phase apply`.
+2. On the search head, run `bash splunk/apply-search-head.sh` (the parent
+   setup.sh wraps this when `--phase apply --accept-public-exposure` is
+   passed). Any btool, restart, encryption, or post-restart failure restores
+   and restart-verifies the exact prior app and `splunk-launch.conf`.
 3. On the SHC deployer, run `bash splunk/apply-deployer.sh` then
    `splunk apply shcluster-bundle`.
 4. Run `bash validate.sh` — must exit 0.
@@ -3161,8 +3790,11 @@ Splunk version target: `{args.splunk_version}` (SVD floor enforced)
 ## Safety
 
 - The renderer never embeds secret values in any rendered file.
-- The apply scripts read pass4SymmKey, sslPassword, and SAML signing
-  certs from local file paths only.
+- The apply scripts read pass4SymmKey and sslPassword from private,
+  single-link local files through no-follow descriptors. Transaction traps
+  remove every staged plaintext file and clear shell values.
+- Public TLS probes verify the FQDN and chain with system trust, or with the
+  explicit `--public-ca-file`; insecure verification cannot pass.
 - `metadata.json` records non-secret configuration parameters used to
   produce this directory.
 """
@@ -3184,6 +3816,7 @@ def render_metadata(args: argparse.Namespace, floor: dict[str, str]) -> dict:
         "splunk_home": args.splunk_home,
         "splunk_version": args.splunk_version,
         "tls_policy": args.tls_policy,
+        "public_ca_file": args.public_ca_file or None,
         "auth_mode": args.auth_mode,
         "min_password_length": args.min_password_length,
         "lockout_attempts": args.lockout_attempts,
@@ -3251,6 +3884,7 @@ def emit_all(args: argparse.Namespace, render_dir: Path, floor: dict[str, str]) 
     executable_files: dict[str, str] = {
         "preflight.sh": render_preflight(args),
         "validate.sh": render_validate(args),
+        "splunk/transaction-helpers.sh": render_transaction_helpers(),
         "splunk/apply-search-head.sh": render_apply_search_head(args),
         "splunk/apply-hec-tier.sh": render_apply_hec_tier(args),
         "splunk/apply-s2s-receiver.sh": render_apply_s2s_receiver(args),

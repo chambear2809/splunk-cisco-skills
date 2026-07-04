@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/credential_curl_helpers.sh"
 
 APP_NAME="ta_cisco_thousandeyes"
 POLL_INTERVAL=5
@@ -53,25 +55,159 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ ! "${POLL_INTERVAL}" =~ ^[0-9]+$ ]]; then
+    log "ERROR: --poll-interval must be a decimal integer." >&2
+    exit 2
+fi
+if [[ ! "${POLL_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+    log "ERROR: --poll-timeout must be a decimal integer." >&2
+    exit 2
+fi
+POLL_INTERVAL=$((10#${POLL_INTERVAL}))
+POLL_TIMEOUT=$((10#${POLL_TIMEOUT}))
+if (( POLL_INTERVAL < 1 || POLL_INTERVAL > 300 )); then
+    log "ERROR: --poll-interval must be between 1 and 300 seconds." >&2
+    exit 2
+fi
+if (( POLL_TIMEOUT < POLL_INTERVAL || POLL_TIMEOUT > 3600 )); then
+    log "ERROR: --poll-timeout must be at least the poll interval and no more than 3600 seconds." >&2
+    exit 2
+fi
+
+write_account_output_file() {
+    local destination="$1" value="$2"
+    printf '%s\n' "${value}" | python3 /dev/fd/3 "${destination}" 3<<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+
+destination = Path(os.path.abspath(sys.argv[1]))
+payload = sys.stdin.buffer.read(4097)
+if (
+    len(payload) > 4096
+    or not payload
+    or b"\x00" in payload
+    or b"\r" in payload
+    or payload.count(b"\n") != 1
+    or not payload.endswith(b"\n")
+):
+    raise SystemExit("ERROR: resolved account email is not a safe single-line value")
+if not destination.name or destination.name in {".", ".."} or not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: --account-output-file is invalid")
+
+parent = destination.parent
+flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+if sys.platform == "darwin" and len(parent.parts) > 1 and parent.parts[1] in {"tmp", "var"}:
+    alias = Path("/") / parent.parts[1]
+    try:
+        alias_info = alias.lstat()
+        target = alias.resolve(strict=True)
+    except OSError:
+        pass
+    else:
+        if (
+            stat.S_ISLNK(alias_info.st_mode)
+            and alias_info.st_uid == 0
+            and target.parts[:2] == ("/", "private")
+        ):
+            parent = target.joinpath(*parent.parts[2:])
+
+parent_fd = os.open("/", flags)
+try:
+    for component in parent.parts[1:]:
+        child_fd = os.open(component, flags, dir_fd=parent_fd)
+        os.close(parent_fd)
+        parent_fd = child_fd
+    read_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        existing_fd = os.open(destination.name, read_flags, dir_fd=parent_fd)
+    except FileNotFoundError:
+        existing_fd = None
+    if existing_fd is not None:
+        try:
+            existing = os.fstat(existing_fd)
+            if (
+                not stat.S_ISREG(existing.st_mode)
+                or existing.st_nlink != 1
+                or stat.S_IMODE(existing.st_mode) != 0o600
+            ):
+                raise SystemExit("ERROR: --account-output-file destination is unsafe")
+        finally:
+            os.close(existing_fd)
+    temporary = f".{destination.name}.{os.getpid()}.{os.urandom(16).hex()}.tmp"
+    descriptor = os.open(
+        temporary,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+        0o600,
+        dir_fd=parent_fd,
+    )
+    created = True
+    try:
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise SystemExit("ERROR: short account output write")
+            view = view[written:]
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(temporary, destination.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        created = False
+        os.fsync(parent_fd)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if created:
+            try:
+                os.unlink(temporary, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+finally:
+    os.close(parent_fd)
+PY
+}
+
 post_external_form() {
     local url="$1" body="$2"
-    printf '%s' "${body}" | curl -sS \
+    if ! credential_curl_validate_request_args false "${url}"; then
+        log "ERROR: ThousandEyes OAuth request rejected by credential transport policy."
+        return 1
+    fi
+    printf '%s' "${body}" | curl -q -sS \
         "${url}" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         --connect-timeout 10 \
         --max-time 120 \
         -d @- \
-        -w '\n%{http_code}'
+        -w '\n%{http_code}' \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}"
 }
 
 get_external_json() {
     local url="$1" bearer_token="$2"
     local auth_config response curl_rc restore_errexit=false
 
+    if ! credential_curl_validate_request_args false "${url}"; then
+        log "ERROR: ThousandEyes API request rejected by credential transport policy."
+        return 1
+    fi
+    # shellcheck disable=SC1003  # single-quoted backslash pattern is intentional.
+    if [[ -z "${bearer_token}" || "${bearer_token}" == *$'\n'* || "${bearer_token}" == *$'\r'* || "${bearer_token}" == *'"'* || "${bearer_token}" == *'\'* ]]; then
+        log "ERROR: ThousandEyes bearer token was not a curl-config-safe single line."
+        return 1
+    fi
+
     auth_config="$(mktemp)"
     chmod 600 "${auth_config}"
     hbs_append_cleanup_trap "rm -f $(printf '%q' "${auth_config}") 2>/dev/null || true" EXIT INT TERM
-    printf 'header = "Authorization: Bearer %s"\n' "$(_curl_config_escape "${bearer_token}")" > "${auth_config}"
+    printf 'header = "Authorization: Bearer %s"\n' "${bearer_token}" > "${auth_config}"
+    if ! credential_curl_validate_auth_config "${auth_config}"; then
+        rm -f "${auth_config}"
+        log "ERROR: ThousandEyes bearer auth config failed validation."
+        return 1
+    fi
 
     case $- in
         *e*)
@@ -79,12 +215,13 @@ get_external_json() {
             set +e
             ;;
     esac
-    response=$(curl -sS \
+    response=$(curl -q -sS \
         "${url}" \
         -K "${auth_config}" \
         --connect-timeout 10 \
         --max-time 120 \
-        -w '\n%{http_code}')
+        -w '\n%{http_code}' \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}")
     curl_rc=$?
     if [[ "${restore_errexit}" == "true" ]]; then
         set -e
@@ -360,7 +497,7 @@ if ! store_oauth_account; then
 fi
 
 if [[ -n "${ACCOUNT_OUTPUT_FILE}" && -n "${account_email}" ]]; then
-    printf '%s\n' "${account_email}" > "${ACCOUNT_OUTPUT_FILE}"
+    write_account_output_file "${ACCOUNT_OUTPUT_FILE}" "${account_email}"
 fi
 
 if [[ -n "${account_email}" ]]; then

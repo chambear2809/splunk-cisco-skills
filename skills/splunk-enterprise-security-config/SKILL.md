@@ -31,6 +31,11 @@ guide the user to run:
 bash skills/shared/scripts/setup_credentials.sh
 ```
 
+Credential-bearing REST requests require a credential-free HTTPS origin and
+never follow redirects. Plaintext HTTP is refused unless an operator explicitly
+sets `SPLUNK_ALLOW_INSECURE_HTTP=true` for an isolated, short-lived lab;
+`SPLUNK_VERIFY_SSL=false` does not authorize HTTP.
+
 Before applying changes, identify the deployment shape:
 
 - Standalone search head
@@ -262,7 +267,8 @@ Applies repeatable ES configuration primitives and runs the declarative engine.
 | `--mode preview\|apply\|validate\|inventory\|export` | Select declarative workflow mode |
 | `--apply` | Required guard for declarative writes |
 | `--output PATH` | Write declarative JSON output to a file |
-| `--stop-on-error` | Halt the apply loop on the first failed action. Remaining actions are reported as `skipped`; there is **no rollback** of earlier successful actions. |
+| `--stop-on-error` | Explicitly select the default fail-stop policy. The first failed action halts mutation; remaining actions are `skipped`, and there is **no rollback** of earlier successes. |
+| `--continue-on-error` | Explicit high-risk override that keeps mutating after failures. Use only when actions are known to be independent; there is **no rollback**. |
 | `--strict` | Fail fast when the spec contains unknown top-level sections (typo guard for `valdation:`, `detentions:`, etc.) |
 | `--baseline` | Convenience shortcut for lookup order, managed roles, all ES indexes, and validation |
 | `--all-indexes` | Convenience shortcut for core, UEBA, PCI, exposure, Mission Control, and DLX indexes |

@@ -70,6 +70,9 @@ paste raw HAR content into chat. Use the summarizer output instead.
   account, deleting agents, deleting tests, or claiming free tests.
 - Prefer the Meraki AAM UI for agent deployment. Use ThousandEyes public APIs
   only after agents exist and only with a token read from a chmod-600 file.
+- Read-only Meraki and ThousandEyes API validation rejects symlinked or
+  hard-linked secret files, opens secrets with no-follow descriptor checks,
+  and pins curl to HTTPS with redirects and user curl configuration disabled.
 - Use the Meraki public Dashboard API only for read-only preflight validation
   such as organizations, networks, and assigned MX devices.
 - Do not describe private Meraki Dashboard endpoints as stable or supported.

@@ -70,6 +70,7 @@ Options:
 
 Examples:
   $(basename "$0") --product "Cisco ACI" --dry-run
+  $(basename "$0") --product "Cisco ASA syslog" --dry-run
   $(basename "$0") --product "Nexus 9000" \\
     --set hostname apic1.example.local \\
     --set username splunk \\
@@ -79,6 +80,9 @@ Examples:
     --set fmc_host https://fmc.example.local \\
     --set username api-user \\
     --secret-file password /tmp/sfw_password
+
+Bare "Cisco ASA" or "FTD" requests return the syslog TA and API/eStreamer
+collection choices. Select a collection-specific query before applying.
 EOF
     exit "${1:-0}"
 }
@@ -684,6 +688,9 @@ prepare_effective_route() {
                 EFFECTIVE_PRODUCT_KEY="$(product_field "${variant_path}.product_key")"
                 if [[ -z "${EFFECTIVE_PRODUCT_KEY}" ]]; then
                     echo "ERROR: Invalid value '${variant_value}' for ${variant_key}." >&2
+                    if [[ "$(product_field id)" == "cisco_secure_firewall" && "${variant_value}" =~ ^(syslog|asa_syslog)$ ]]; then
+                        echo "Use --product 'Cisco ASA syslog' to route ASA/FTD syslog through cisco-asa-ta-setup." >&2
+                    fi
                     echo "Available values:" >&2
                     while IFS= read -r variant_value || [[ -n "${variant_value}" ]]; do
                         [[ -n "${variant_value}" ]] && echo "  - ${variant_value}" >&2
@@ -695,6 +702,10 @@ prepare_effective_route() {
                 load_default_pairs "${variant_path}.defaults"
                 load_conditional_required_secrets "${variant_path}.conditional_required_secret_rules"
             fi
+            ;;
+        asa_ta)
+            EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
+            load_default_pairs "route.defaults"
             ;;
         secure_access)
             append_unique_required_secret "api_key"
@@ -793,6 +804,55 @@ effective_meraki_index() {
     else
         printf '%s' "${EFFECTIVE_DEFAULT_INDEX:-meraki}"
     fi
+}
+
+effective_asa_index() {
+    local value
+    value="$(lookup_user_value "index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "${EFFECTIVE_DEFAULT_INDEX:-cisco_asa}"
+    fi
+}
+
+effective_asa_sourcetype() {
+    local value
+    value="$(lookup_user_value "sourcetype" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_sourcetype)"
+    fi
+}
+
+effective_asa_syslog_owner() {
+    local value
+    value="$(lookup_user_value "syslog_owner" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_syslog_owner)"
+    fi
+}
+
+effective_asa_sc4s_vendor_product() {
+    local value
+    value="$(lookup_user_value "sc4s_vendor_product" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_sc4s_vendor_product)"
+    fi
+}
+
+effective_asa_include_ftd() {
+    local value
+    value="$(lookup_user_value "include_ftd" || true)"
+    if [[ -z "${value}" ]]; then
+        value="$(product_field route.default_include_ftd)"
+    fi
+    is_truthy "${value}"
 }
 
 effective_thousandeyes_index() {
@@ -1078,6 +1138,11 @@ print_command_plan() {
             echo "  - skills/cisco-security-cloud-setup/scripts/configure_product.sh"
             echo "  - skills/cisco-security-cloud-setup/scripts/validate.sh"
             ;;
+        asa_ta)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-asa-ta-setup/scripts/setup.sh"
+            echo "  - skills/cisco-asa-ta-setup/scripts/validate.sh"
+            ;;
         secure_access)
             echo "Workflow scripts:"
             echo "  - skills/cisco-secure-access-setup/scripts/configure_account.sh"
@@ -1334,6 +1399,10 @@ workflow_scripts_by_route = {
         "skills/cisco-security-cloud-setup/scripts/configure_product.sh",
         "skills/cisco-security-cloud-setup/scripts/validate.sh",
     ],
+    "asa_ta": [
+        "skills/cisco-asa-ta-setup/scripts/setup.sh",
+        "skills/cisco-asa-ta-setup/scripts/validate.sh",
+    ],
     "secure_access": [
         "skills/cisco-secure-access-setup/scripts/configure_account.sh",
         "skills/cisco-secure-access-setup/scripts/configure_settings.sh",
@@ -1539,6 +1608,20 @@ run_security_cloud_configure() {
         cmd+=(--secret-file "${SECRET_KEYS[$i]}" "${SECRET_PATHS[$i]}")
     done
 
+    "${cmd[@]}"
+}
+
+run_asa_ta_configure() {
+    local cmd
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-asa-ta-setup/scripts/setup.sh"
+        --render
+        --index "$(effective_asa_index)"
+        --sourcetype "$(effective_asa_sourcetype)"
+        --syslog-owner "$(effective_asa_syslog_owner)"
+        --sc4s-vendor-product "$(effective_asa_sc4s_vendor_product)")
+    if effective_asa_include_ftd; then
+        cmd+=(--include-ftd)
+    fi
     "${cmd[@]}"
 }
 
@@ -2000,6 +2083,7 @@ run_app_install_only_configure() {
 run_configure_phase() {
     case "${ROUTE_TYPE}" in
         security_cloud_product|security_cloud_variant) run_security_cloud_configure ;;
+        asa_ta) run_asa_ta_configure ;;
         secure_access) run_secure_access_configure ;;
         app_install_only) run_app_install_only_configure ;;
         dc_networking) run_dc_networking_configure ;;
@@ -2045,6 +2129,13 @@ run_validation_phase() {
                 exit 1
             fi
             bash "${SCRIPT_DIR}/../../cisco-security-cloud-setup/scripts/validate.sh" --completion --product "${EFFECTIVE_PRODUCT_KEY}"
+            ;;
+        asa_ta)
+            bash "${SCRIPT_DIR}/../../cisco-asa-ta-setup/scripts/validate.sh" \
+                --live \
+                --completion \
+                --index "$(effective_asa_index)" \
+                --sourcetype "$(effective_asa_sourcetype)"
             ;;
         secure_access)
             org_id="$(lookup_user_value "org_id" || true)"

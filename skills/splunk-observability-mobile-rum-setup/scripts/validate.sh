@@ -200,7 +200,7 @@ if [[ -n "${CHECK_SERVER_TIMING_URL}" ]]; then
         log "ERROR: curl is required for live Server-Timing validation."
         exit 1
     fi
-    headers="$(curl -fsSIL "${CHECK_SERVER_TIMING_URL}" || true)"
+    headers="$(curl -q -fsSIL --proto '=https' --proto-redir '=https' --max-redirs 5 --globoff --connect-timeout 10 --max-time 30 "${CHECK_SERVER_TIMING_URL}" || true)"
     validate_header "${headers}" "${CHECK_SERVER_TIMING_URL}"
 fi
 

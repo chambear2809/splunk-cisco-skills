@@ -68,10 +68,29 @@ The Splunk SOAR REST API supports two user types:
 The skill renders `cloud/automation-user.sh` (and the equivalent for
 on-prem) that:
 
-1. Creates an `automation` user via `POST /rest/ph_user` with
-   `type=automation`.
-2. Mints a long-lived token via `POST /rest/ph_user/<id>/token`.
-3. Writes the returned token to a chmod 600 file via `write_secret_file.sh`.
+1. Reuses an existing private, single-link mode-600 token file without any
+   REST mutation.
+2. Requires `SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION=true` before user creation or
+   token mint; rotation additionally requires
+   `SOAR_ROTATE_AUTOMATION_TOKEN=true`.
+3. Creates/adopts the exact `automation` user via `POST /rest/ph_user` and
+   exact username/type lookup.
+4. Acquires a per-destination lock and fsyncs a mode-600 `in_progress`
+   journal before `POST /rest/ph_user/<id>/token`.
+5. Parses the secret response only from a private signal-cleaned work
+   directory and atomically installs the token with no-follow, single-link,
+   same-directory replacement and directory fsync.
+6. Marks the journal `complete` only after installation. Interruption,
+   transport uncertainty, missing/invalid token response, or uncertain write
+   marks it `ambiguous`; all later automatic retries stop with manual
+   inspect/revoke guidance.
+
+The journal defaults to `<token-file>.mint-state.json`. Never delete or edit
+an `in_progress`/`ambiguous` journal merely to retry: inspect the SOAR
+automation user, revoke any orphan or unknown token, then archive the journal
+as an explicit reconciliation action. Auth calls continue to use
+descriptor-bound curl configs; neither the admin password nor minted token is
+placed on argv.
 
 ## Cluster External Services
 

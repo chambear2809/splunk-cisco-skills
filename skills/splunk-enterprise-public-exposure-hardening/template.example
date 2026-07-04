@@ -126,7 +126,8 @@ allow_cleartext_ldap: false       # required to set ldap_ssl_enabled false
 allow_anonymous_ldap_bind: false  # required to leave ldap_bind_dn empty
 
 # Scripted-auth refusal — Splunk authType=Scripted invokes an external
-# script for every login. Refused at preflight unless explicitly acked.
+# script for every login. Public-facing preflight always refuses it; this
+# compatibility setting cannot override that production gate.
 allow_scripted_auth: false
 
 # Local password policy for the break-glass admin (still required).
@@ -203,6 +204,10 @@ federation_service_account_password_file: /tmp/splunk_federation_service_account
 # ---------------------------------------------------------------------------
 
 external_probe_cmd: "ssh probe@bastion.example.com nc -zv"
+
+# Optional public CA bundle for proxy probes. Leave empty to use the host's
+# system trust store. This never disables certificate or hostname validation.
+public_ca_file: ""
 
 # ---------------------------------------------------------------------------
 # Operator acknowledgements

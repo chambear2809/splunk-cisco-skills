@@ -102,12 +102,16 @@ SK="$(get_session_key "${SPLUNK_URI}")" || {
 }
 
 REMOTE_HOST="${SPLUNK_SSH_HOST}"
-REMOTE_PORT="${SPLUNK_SSH_PORT}"
 REMOTE_USER="${SPLUNK_SSH_USER}"
+if [[ -n "${SMOKE_KNOWN_HOSTS_FILE:-}" && -z "${SPLUNK_SSH_KNOWN_HOSTS_FILE:-}" ]]; then
+    # Backward-compatible alias, but unlike the old behavior the file must
+    # already contain an operator-reviewed pin and pass the shared validation.
+    SPLUNK_SSH_KNOWN_HOSTS_FILE="${SMOKE_KNOWN_HOSTS_FILE}"
+fi
 
 run_remote_root() {
     local remote_cmd="$1"
-    local remote_payload remote_shell pass_file rc
+    local remote_payload remote_shell
     remote_payload="$(printf '%q' "${remote_cmd}")"
 
     if [[ "${REMOTE_USER}" == "root" ]]; then
@@ -116,26 +120,7 @@ run_remote_root() {
         remote_shell="sudo -n sh -lc ${remote_payload}"
     fi
 
-    if ! command_exists sshpass; then
-        log "ERROR: sshpass is required for SSH-based live smoke checks."
-        return 1
-    fi
-
-    pass_file="$(hbs_make_sshpass_file)"
-    # Use accept-new + a per-smoke-run known_hosts file so the host key is
-    # pinned for the duration of the run. SMOKE_KNOWN_HOSTS_FILE may be
-    # pre-populated by the operator to lock the run to a specific key.
-    local known_hosts_file="${SMOKE_KNOWN_HOSTS_FILE:-${HOME}/.ssh/sc4x-smoke-known-hosts}"
-    mkdir -p "$(dirname "${known_hosts_file}")"
-    sshpass -f "${pass_file}" ssh \
-        -p "${REMOTE_PORT}" \
-        -o StrictHostKeyChecking=accept-new \
-        -o UserKnownHostsFile="${known_hosts_file}" \
-        "${REMOTE_USER}@${REMOTE_HOST}" \
-        "${remote_shell}"
-    rc=$?
-    rm -f "${pass_file}"
-    return "${rc}"
+    hbs_capture_target_cmd ssh "${remote_shell}"
 }
 
 search_marker_count() {

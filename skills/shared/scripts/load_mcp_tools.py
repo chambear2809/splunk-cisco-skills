@@ -29,6 +29,7 @@ from mcp_tooling import (  # noqa: E402
 
 
 LEGACY_FALLBACK_STATUSES = {404, 405, 501}
+_WARNED_INSECURE_HTTP = False
 
 
 class HTTPFailure(RuntimeError):
@@ -37,6 +38,67 @@ class HTTPFailure(RuntimeError):
         self.status = status
         self.body = body
         self.raw = raw
+
+
+def _allow_insecure_http() -> bool:
+    raw = os.environ.get(
+        "__SPLUNK_ALLOW_INSECURE_HTTP",
+        os.environ.get("SPLUNK_ALLOW_INSECURE_HTTP", ""),
+    )
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _credential_origin(url: str) -> tuple[str, str, int]:
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+    except ValueError as exc:
+        raise ManifestError(f"Splunk URI is invalid: {exc}") from exc
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise ManifestError("Splunk URI must be a credential-free http(s) URL")
+    if parsed.scheme.lower() == "http":
+        if not _allow_insecure_http():
+            raise ManifestError(
+                "plaintext HTTP is refused; use HTTPS or set "
+                "SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab"
+            )
+        global _WARNED_INSECURE_HTTP
+        if not _WARNED_INSECURE_HTTP:
+            print(
+                "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true permits the "
+                "Splunk session key over plaintext HTTP.",
+                file=sys.stderr,
+            )
+            _WARNED_INSECURE_HTTP = True
+    return parsed.scheme.lower(), parsed.hostname.lower(), port
+
+
+def validate_splunk_base_uri(url: str) -> None:
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError as exc:
+        raise ManifestError(f"Splunk URI is invalid: {exc}") from exc
+    _credential_origin(url)
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ManifestError("Splunk base URI must contain only scheme, host, and optional port")
+
+
+class _SameOriginCredentialRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, expected_origin: tuple[str, str, int]) -> None:
+        super().__init__()
+        self.expected_origin = expected_origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        if _credential_origin(newurl) != self.expected_origin:
+            raise urllib.error.URLError(
+                "cross-origin redirect refused for credential-bearing request"
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def ssl_context_from_env() -> ssl.SSLContext:
@@ -57,6 +119,7 @@ def request_json(
     ctx: ssl.SSLContext,
     payload: dict[str, Any] | None = None,
 ) -> tuple[int, Any, str]:
+    request_origin = _credential_origin(url)
     data = None
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
@@ -69,8 +132,12 @@ def request_json(
             "Content-Type": "application/json",
         },
     )
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=ctx),
+        _SameOriginCredentialRedirectHandler(request_origin),
+    )
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=60) as response:
+        with opener.open(req, timeout=60) as response:
             raw = response.read().decode("utf-8", errors="replace")
             return response.status, parse_json_body(raw), raw
     except urllib.error.HTTPError as exc:
@@ -308,6 +375,12 @@ def main(argv: list[str] | None = None) -> int:
     session_key = os.environ.pop("__SPLUNK_SK", "")
     if not session_key:
         print("ERROR: __SPLUNK_SK is required.", file=sys.stderr)
+        return 1
+
+    try:
+        validate_splunk_base_uri(args.splunk_uri)
+    except ManifestError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     tools_path = Path(args.tools_json)
