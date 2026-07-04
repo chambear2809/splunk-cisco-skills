@@ -113,6 +113,7 @@ def test_coverage_rows_use_allowed_statuses_and_required_fields(tmp_path: Path) 
     coverage = json.loads((output_dir / "coverage-report.json").read_text(encoding="utf-8"))
     allowed = {
         "delegated_apply",
+        "delegated_render",
         "render",
         "ui_handoff",
         "ca_handoff",
@@ -138,6 +139,8 @@ def test_coverage_rows_use_allowed_statuses_and_required_fields(tmp_path: Path) 
         "product_splunk_cloud",
         "product_collaboration_control_hub",
         "product_cisco_iq",
+        "product_secure_access",
+        "product_secure_firewall",
         "inventory_global_assets",
         "licensing_visibility",
         "rbac",
@@ -146,14 +149,28 @@ def test_coverage_rows_use_allowed_statuses_and_required_fields(tmp_path: Path) 
         "workflows_api",
         "workflow_targets_account_keys",
         "release_notes_open_issues",
+        "splunk_ai_canvas_prerequisites",
+        "splunk_ai_canvas_limits",
         "data_fabric_machine_data_lake_alpha",
         "data_fabric_built_in_data_catalog",
         "data_fabric_ai_powered_data_management",
         "data_fabric_expanded_federated_search",
         "data_fabric_machine_data_ai_activation",
         "data_fabric_spl2_pipeline_kit",
+        "data_fabric_full_architecture_coverage",
     }:
         assert key in keys
+
+    matrix = (output_dir / "platform/product-integration-matrix.md").read_text(encoding="utf-8")
+    assert "| Product | Inventory | Topology | Notifications |" in matrix
+    assert "| Secure Access | Yes | No | No |" in matrix
+    assert "| Secure Firewall | Yes | Yes | Yes |" in matrix
+    assert "controlled_availability_integration" in matrix
+    assert "Catalyst Center" in matrix and "not as a direct row" in matrix
+    canvas = (output_dir / "ai-canvas/board-templates/agentic-operations-readiness.md").read_text(encoding="utf-8")
+    assert "mcp_tool_execute" in canvas
+    assert "100 rows per card" in canvas
+    assert "forbidden" in canvas
 
 
 def test_execute_dry_run_json_emits_secret_free_command_arrays(tmp_path: Path) -> None:
@@ -196,9 +213,12 @@ def test_execute_dry_run_json_emits_secret_free_command_arrays(tmp_path: Path) -
     assert "splunk-mcp-server-setup" not in mcp_commands_text
     data_fabric = next(section for section in payload["sections"] if section["name"] == "data-fabric")
     data_fabric_text = json.dumps(data_fabric["commands"])
+    assert "cisco-data-fabric-setup" in data_fabric_text
     assert "splunk-federated-search-setup" not in data_fabric_text
     assert "splunk-edge-processor-setup" not in data_fabric_text
-    assert "splunk-spl2-pipeline-kit" in data_fabric_text
+    assert "splunk-ingest-processor-setup" not in data_fabric_text
+    assert "splunk-spl2-pipeline-kit" not in data_fabric_text
+    assert "--validate" in data_fabric_text
 
 
 def test_splunk_mcp_render_command_requires_explicit_mcp_url(tmp_path: Path) -> None:

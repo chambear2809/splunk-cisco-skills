@@ -2,9 +2,10 @@
 
 | Source | Use in this skill |
 | --- | --- |
-| https://cloud.cisco.com/docs/en/cisco-cloud-control-getting-started/cisco-cloud-control-getting-started.html | Official Getting Started workflow, product integration timeline, onboarding, AI context, integrations, users, tenants, SSO, audit logs, AI tools, Actions, Notifications, Favorites, Help, and related-resource index. |
+| https://cloud.cisco.com/docs/en/cisco-cloud-control-getting-started/cisco-cloud-control-getting-started.html | Official Getting Started workflow, current Inventory/Topology/Notifications product matrix, onboarding, AI context, integrations, users, tenants, SSO, audit logs, AI tools, Actions, Notifications, Favorites, Help, and related-resource index. |
 | https://cloud.cisco.com/docs/en/cisco-cloud-control-rn-open-bugs/cisco-cloud-control-release-notes.html | Open issue review before production agent use. |
 | https://cloud.cisco.com/docs/en/cisco-cloud-control-canvas/cisco-cloud-control-canvas.html | Official AI Canvas and AI Assistant use cases, prompt library, collaboration, knowledge, multimodal input, supported integration prompts, and limitations. |
+| https://lantern.splunk.com/Splunk_and_Cisco_Use_Cases/Connecting_the_Splunk_platform_to_Cisco_Cloud_Control_and_AI_Canvas/Integrating_Splunk_Cloud_Platform_with_AI_Canvas | Splunk-specific AI Canvas prerequisites and limits: Cloud Control enabled, 10.5.2605.3, current AI Assistant/MCP, `mcp_tool_execute`, 100 rows per card, visualization compatibility, and forbidden commands. |
 | https://cloud.cisco.com/docs/en/cisco-cloud-control-inventory/cisco-cloud-control-inventory.html | Global inventory, AI-powered search, product-specific inventory support, and export/readiness limitations. |
 | https://cloud.cisco.com/docs/en/cisco-cloud-control-licensing/cisco-cloud-control-licensing.html | Licensing visibility, supported licensing products/models, data availability, and report readiness. |
 | https://cloud.cisco.com/docs/en/cisco-cloud-control-rbac/cisco-cloud-control-rbac.html | Role-based access control, supported roles, product-specific access, and user/role management. |
@@ -22,7 +23,7 @@
 | https://www.splunk.com/en_us/blog/leadership/splunk-cisco-live-agentic-operations.html | Splunk Platform, ITSI, Observability Cloud, and Cisco Data Fabric routing basis. |
 | https://www.splunk.com/en_us/blog/platform/new-splunk-platform-innovations-cisco-live-2026.html | Cisco Data Fabric 2026 feature refresh: AI-powered data management, expanded Federated Search, Machine Data Lake alpha, and built-in Data Catalog. |
 | https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html | Cisco Data Fabric architecture, Machine Data Lake, AI Toolkit, MCP Server, Time Series Foundation Model, AI Canvas integration timeline, and availability framing. |
-| https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions | Current federated-search option routing for Amazon S3, Microsoft Azure, and Azure Databricks through the Data Management app. |
+| https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform | Version-pinned federation inventory for Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake; store-specific activation and topology still require verification. |
 | https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit | AI Toolkit 5.7.4 / PSC 4.3.2 and CDTSM readiness basis for Data Fabric AI activation. |
 
 ## API Basis

@@ -106,6 +106,7 @@ from pathlib import Path
 
 allowed_statuses = {
     "delegated_apply",
+    "delegated_render",
     "render",
     "ui_handoff",
     "ca_handoff",

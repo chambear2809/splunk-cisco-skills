@@ -153,10 +153,9 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             indexes_conf = (Path(tmpdir) / "federated-search" / "indexes.conf").read_text(encoding="utf-8")
             federated_conf = (Path(tmpdir) / "federated-search" / "federated.conf.template").read_text(encoding="utf-8")
 
-            # Renderer's wording was tightened in the multi-provider rewrite:
-            # transparent providers explicitly do not use federated indexes, and
-            # FSS3 federated indexes are created via REST. Both notes appear in
-            # the rendered indexes.conf placeholder file.
+            # Transparent providers explicitly do not use federated indexes.
+            # Legacy FSS3 definitions are migration evidence only and therefore
+            # do not appear in this file-based FSS2S configuration.
             self.assertIn("Transparent-mode providers do not use federated indexes.", indexes_conf)
             self.assertNotIn("[federated:", indexes_conf)
             self.assertIn("useFSHKnowledgeObjects = 1", federated_conf)

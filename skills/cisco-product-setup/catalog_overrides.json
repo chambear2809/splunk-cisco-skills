@@ -27,6 +27,44 @@
       "learn_more_url": "https://www.cisco.com/site/us/en/solutions/artificial-intelligence/agentic-ops/cisco-cloud-control/index.html"
     },
     {
+      "id": "cisco_data_fabric",
+      "display_name": "Cisco Data Fabric",
+      "status": "active",
+      "category": "observability",
+      "subcategory": "data_platform",
+      "description": "Cisco Data Fabric architecture readiness and orchestration across Splunk data management, federation, storage/catalog, context, AI activation, governance, and cross-domain experience layers.",
+      "value_proposition": "Produce a lifecycle-aware, source-backed coverage and gap report, then delegate only supported work to the owning Splunk and Cisco skills without inventing a standalone Data Fabric product or API.",
+      "aliases": [
+        "Cisco Data Fabric",
+        "Data Fabric",
+        "CDF",
+        "Splunk Machine Data Lake",
+        "Machine Data Lake",
+        "Splunk Data Catalog",
+        "Splunk Catalog",
+        "Data Catalog",
+        "Federated Analytics",
+        "AI-powered Data Management"
+      ],
+      "keywords": [
+        "machine data",
+        "machine data lake",
+        "data catalog",
+        "data management",
+        "edge processor",
+        "ingest processor",
+        "SPL2",
+        "federated search",
+        "Amazon Security Lake",
+        "AI Toolkit",
+        "Agent Builder",
+        "MCP Server",
+        "Cisco Time Series Model",
+        "AI-ready data"
+      ],
+      "learn_more_url": "https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html"
+    },
+    {
       "id": "cisco_asa_ftd_syslog",
       "display_name": "Cisco ASA / FTD Syslog (Splunk_TA_cisco-asa)",
       "status": "active",
@@ -66,6 +104,20 @@
     }
   ],
   "products": {
+    "cisco_data_fabric": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "cisco-data-fabric-setup",
+      "workflow_scripts": [
+        "skills/cisco-data-fabric-setup/scripts/setup.sh",
+        "skills/cisco-data-fabric-setup/scripts/validate.sh"
+      ],
+      "template_paths": [
+        "skills/cisco-data-fabric-setup/template.example"
+      ],
+      "handoff": "Render lifecycle-aware Cisco Data Fabric feature, product, federation, catalog, storage, AI, governance, and cross-domain coverage with cisco-data-fabric-setup; delegate supported child plans only after reviewing stage and entitlement evidence.",
+      "notes": "Synthetic architecture route. Cisco Data Fabric is powered by Splunk and is not a standalone package, API, entitlement, Machine Data Lake, Cloud Control, or AI Canvas product."
+    },
     "cisco_cloud_control": {
       "automation_state": "partial",
       "route_type": "workflow_handoff",
@@ -77,7 +129,7 @@
       "template_paths": [
         "skills/cisco-cloud-control-setup/template.example"
       ],
-      "handoff": "Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, Cisco Data Fabric, MCP, agent observability, Observability content, and domain-readiness handoffs with cisco-cloud-control-setup. Cloud Control Studio and AI Canvas remain UI/CA handoffs until stable public APIs are available.",
+      "handoff": "Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, MCP, agent observability, Observability content, and domain-readiness handoffs with cisco-cloud-control-setup; delegate the underlying Cisco Data Fabric architecture to cisco-data-fabric-setup. Cloud Control Studio and AI Canvas remain UI/CA handoffs until stable public APIs are available.",
       "notes": "Synthetic local workflow product. Distinct from Cisco Security Cloud Control / CDO, which remains cisco_security_cloud_control."
     },
     "cisco_ai_defense": {

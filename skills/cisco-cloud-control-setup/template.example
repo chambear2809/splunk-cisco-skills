@@ -11,6 +11,8 @@ api:
   workflows_api_enabled: true
 data_fabric:
   enabled: true
+  # Preferred: point to a reviewed cisco-data-fabric-setup intake.
+  spec: skills/cisco-data-fabric-setup/template.example
   machine_data_lake:
     enabled: true
   data_catalog:
@@ -18,6 +20,7 @@ data_fabric:
   spl2_pipeline_kit:
     enabled: true
   child_specs:
+    # Legacy compatibility only; migrate these paths into data_fabric.spec.
     federated_search: ""
     edge_processor: ""
     ingest_processor: ""

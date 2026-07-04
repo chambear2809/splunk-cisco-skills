@@ -4,7 +4,7 @@ description: >-
   Render, validate, doctor, and optionally execute delegated setup plans for
   Cisco Cloud Control adoption, AI Canvas readiness, Cloud Control Studio
   handoffs, official Cloud Control feature coverage, Cisco Workflows API
-  readiness, Cisco Data Fabric prerequisites, MCP connectors, Splunk AI Agent
+  readiness, delegated Cisco Data Fabric architecture coverage, MCP connectors, Splunk AI Agent
   Monitoring, Observability content, and Cisco domain readiness. Use when the
   user asks to prepare Cisco Cloud Control, AgenticOps, AI Canvas, Cloud
   Control Studio, Cloud Control Workflows, or governed Cisco/Splunk agent
@@ -25,12 +25,11 @@ executable child-skill handoffs where supported.
 
 ## Supported Paths
 
-1. **Cisco Data Fabric prerequisites**: delegate render/apply planning to
-   Splunk Federated Search, Edge Processor, Ingest Processor, SPL2 Pipeline
-   Kit, AI/ML Toolkit, and MCP Server skills. Render readiness for Machine
-   Data Lake alpha, built-in Data Catalog, AI-powered data management, and
-   expanded Data Management app federation without claiming unsupported
-   product API writes.
+1. **Cisco Data Fabric architecture**: delegate the complete lifecycle-aware
+   product, feature, federation, storage/catalog, context, AI, governance, and
+   source-evidence packet to `cisco-data-fabric-setup`. That dedicated parent
+   routes constituent Splunk skills only when it has reviewed non-secret
+   inputs and never claims a standalone Cisco Data Fabric package or API.
 2. **MCP connectors**: delegate Splunk MCP Server and ThousandEyes MCP client
    setup plans. Splunk MCP client rendering is emitted only when
    `mcp.splunk_mcp_url` is set, because the child skill otherwise needs
@@ -113,6 +112,10 @@ Delegated executable sections:
 - `domain-readiness` (handoff-only; an execute request exits nonzero)
 - `cloud-control-studio` (handoff-only; an execute request exits nonzero)
 - `ai-canvas` (handoff-only; an execute request exits nonzero)
+
+The `data-fabric` section runs only the dedicated parent's render and static
+validation workflow. Any constituent apply remains behind the owning child
+skill's explicit approval gates.
 
 `domain-readiness`, `cloud-control-studio`, and `ai-canvas` never mutate Cisco
 Cloud Control. They render operator handoff artifacts, and an explicit execute

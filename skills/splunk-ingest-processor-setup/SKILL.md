@@ -5,7 +5,8 @@ description: >-
   Platform Ingest Processor setup plans with SPL2 pipelines, source types,
   destinations, lifecycle handoffs, queue and monitoring searches, metrics,
   OCSF, decrypt, S3 archive, custom pipeline templates, AI-powered data
-  management readiness, and downstream readiness checks. Use
+  management readiness, Automated Field Extraction, Guided Onboarding with
+  Auto-Schematization, and downstream readiness checks. Use
   when the user asks to configure Ingest Processor, author Ingest Processor
   pipelines, route or transform data at ingest time, validate Ingest Processor
   readiness, or compare Ingest Processor with Edge Processor and Data Manager,
@@ -42,6 +43,12 @@ source-type, destination, or SPL2 pipeline assets.
 - Hand off post-ingest ES/ITSI/ARI/CIM/OCSF/dashboard validation to
   `splunk-data-source-readiness-doctor` when that skill is present.
 - Read `reference.md` before changing coverage, limits, or lifecycle behavior.
+- Treat AI-powered Data Management release stages as capability-specific:
+  Automated Field Extraction was announced in Controlled Availability, while
+  Guided Onboarding with Auto-Schematization was announced in Alpha. Verify
+  current tenant access before presenting either workflow. The announcement
+  says three capabilities but publicly names only these two; do not infer a
+  third capability.
 
 ## Quick Start
 
@@ -85,6 +92,8 @@ The default output directory is `splunk-ingest-processor-rendered/`:
 - `source-types/*.json`, `destinations/*.json`, and `pipelines/*.spl2`.
 - `spl2-pipeline-kit/` rendered by `splunk-spl2-pipeline-kit`.
 - `monitoring/searches.spl` and `monitoring/usage-summary-handoff.md`.
+- `control-plane-handoffs/ai-powered-data-management.md` with current
+  availability, access, review, and no-automation guardrails.
 - `lifecycle/*.md` for apply, edit, remove, refresh, delete, and rollback
   review.
 - `handoffs/*.md` for HEC, Edge Processor, S3 Federated Search, and data-source
@@ -98,10 +107,16 @@ The default output directory is `splunk-ingest-processor-rendered/`:
 - Confirm default destination behavior in the UI before applying a pipeline.
 - Validate source-type event breaking, sample data, and preview results before
   apply.
-- Treat Automated Field Extraction as region-gated UI assistance, not an API
-  automation path.
-- Treat AI-powered data management as UI assistance for onboarding, schema, and
-  pipeline recommendations until Splunk publishes a stable public API.
+- Treat Automated Field Extraction as a Controlled Availability,
+  region-gated UI suggestion workflow, not an API automation path. Verify
+  tenant entitlement and current feature visibility before use.
+- Treat Guided Onboarding with Auto-Schematization as an Alpha, enrollment-
+  gated UI workflow. It can recommend CIM mappings and candidate TA or SPL2
+  outputs, but this skill does not invoke the service, enroll a tenant,
+  generate a TA, install a TA, or apply a generated pipeline.
+- Require human review, SPL2 lint/preview, representative sample validation,
+  CIM validation, and an explicit apply decision for every AI-generated
+  recommendation or artifact.
 - Treat decrypt as a private-key lookup workflow and warn about throughput.
 - Treat S3 Object Lock as unsupported for rendered IP destination plans.
 - Render and review known issue guardrails: tenant-admin-only editing, no data

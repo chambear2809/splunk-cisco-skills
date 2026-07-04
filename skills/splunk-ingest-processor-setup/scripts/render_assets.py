@@ -48,6 +48,20 @@ AFE_SUPPORTED_REGIONS = [
     "us-west-2",
     "eu-west-3",
 ]
+AI_POWERED_DATA_MANAGEMENT_LIFECYCLE = {
+    "Automated Field Extraction": {
+        "availability": "controlled_availability",
+        "source_date": "2026-03-11",
+        "access": "tenant_entitlement_and_region_gated",
+        "automation": "ui_suggestion_and_human_review_only",
+    },
+    "Guided Onboarding with Auto-Schematization": {
+        "availability": "alpha",
+        "source_date": "2026-03-11",
+        "access": "splunk_expert_enrollment_and_tenant_feature_visibility_required",
+        "automation": "ui_handoff_and_human_review_only",
+    },
+}
 KNOWN_ISSUE_GUARDRAILS = [
     {
         "code": "IP-NO-DELIVERY-GUARANTEE",
@@ -108,6 +122,7 @@ FEATURE_COVERAGE = [
     ("AI-powered data management readiness", "ui_handoff"),
     ("Automated Field Extraction", "ui_handoff"),
     ("Automated Field Extraction region allowlist", "rendered"),
+    ("Guided Onboarding with Auto-Schematization", "ui_handoff"),
     ("SPL to SPL2 conversion review", "lint"),
     ("PCRE2 compatibility lint", "lint"),
     ("Lifecycle apply edit remove refresh delete", "ui_handoff"),
@@ -441,10 +456,11 @@ def render_readiness(args: argparse.Namespace, findings: list[dict[str, str]]) -
         "- Roles: verify `sc_admin`, `admin_all_objects`, and service account/index access.",
         "- Connection refresh: refresh after index, lookup, or role changes.",
         "- Limits: verify pipeline count, lookup size, ingest volume, and persistent queue retention against service details.",
-        "- Automated Field Extraction: UI handoff only; supported regions are "
+        "- Automated Field Extraction: Controlled Availability as announced 2026-03-11; UI suggestion and human-review handoff only. Verify tenant entitlement and feature visibility. Documented supported regions are "
         + ", ".join(f"`{region}`" for region in AFE_SUPPORTED_REGIONS)
         + ".",
-        "- AI-powered data management: review assistant-generated onboarding, schema, and pipeline recommendations in the UI; this renderer keeps them as handoffs until Splunk publishes a stable public API.",
+        "- Guided Onboarding with Auto-Schematization: Alpha as announced 2026-03-11; verify Splunk expert enrollment and tenant feature visibility. Review any recommended CIM mappings and candidate TA or SPL2 outputs in the UI.",
+        "- AI-powered data management: this renderer does not invoke either AI workflow, enroll a tenant, generate or install a TA, or apply a suggestion. Exported candidates require human review, SPL2 lint/preview, CIM validation, and an explicit apply decision.",
         "",
         "## Known Issue Guardrails",
         "",
@@ -469,6 +485,14 @@ def render_apply_plan(args: argparse.Namespace, source_types: list[str], destina
         "workflow": "splunk-ingest-processor-setup",
         "tenant": args.tenant_name,
         "api_crud": "not_claimed",
+        "ai_powered_data_management": {
+            "api_crud": "not_claimed",
+            "capabilities": [
+                {"capability": capability, **details}
+                for capability, details in AI_POWERED_DATA_MANAGEMENT_LIFECYCLE.items()
+            ],
+            "operator_gate": "verify_access_export_review_lint_preview_validate_explicit_apply",
+        },
         "actions": [
             {"order": 1, "type": "ui_handoff", "object": "provisioning", "description": "Confirm Ingest Processor is provisioned for the tenant."},
             {"order": 2, "type": "ui_handoff", "object": "source_types", "items": source_types},
@@ -483,10 +507,12 @@ def render_apply_plan(args: argparse.Namespace, source_types: list[str], destina
 
 
 def render_coverage() -> str:
-    rows = [
-        {"feature": feature, "coverage_status": status}
-        for feature, status in FEATURE_COVERAGE
-    ]
+    rows = []
+    for feature, status in FEATURE_COVERAGE:
+        row = {"feature": feature, "coverage_status": status}
+        if feature in AI_POWERED_DATA_MANAGEMENT_LIFECYCLE:
+            row.update(AI_POWERED_DATA_MANAGEMENT_LIFECYCLE[feature])
+        rows.append(row)
     return json.dumps(rows, indent=2) + "\n"
 
 
@@ -501,9 +527,11 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
         "5. Create pipelines from `pipelines/*.spl2` or the custom template app.",
         "6. Preview every pipeline with representative sample data.",
         "7. Confirm index routing and default destination behavior.",
-        "8. Review any AI-powered data management or Automated Field Extraction recommendations before accepting generated schema or pipeline changes.",
-        "9. Confirm only one browser session is editing each pipeline.",
-        "10. Apply pipelines and immediately run the rendered monitoring searches.",
+        "8. If the tenant has Automated Field Extraction Controlled Availability access in a documented region, review suggested fields and regex in the UI; this renderer cannot invoke or accept AFE suggestions.",
+        "9. If the tenant is enrolled in the Guided Onboarding with Auto-Schematization Alpha, review sample clustering, CIM recommendations, and any exported candidate TA or SPL2 output. Do not treat a recommendation as applied configuration.",
+        "10. Lint and preview every exported SPL2 candidate, validate CIM and event counts, and require an explicit human apply decision. TA candidates require separate package review and installation handling.",
+        "11. Confirm only one browser session is editing each pipeline.",
+        "12. Apply approved pipelines and immediately run the rendered monitoring searches.",
         "",
         "## Source Types",
         "",
@@ -584,6 +612,46 @@ def render_known_issues() -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_ai_powered_data_management_handoff() -> str:
+    return """# AI-Powered Data Management Availability And Review Handoff
+
+Release stages are source snapshots from Splunk's March 11, 2026 announcement.
+Verify current documentation, tenant entitlement, region, enrollment, and UI
+feature visibility before use.
+
+The announcement says three capabilities but publicly names only the two below.
+This packet tracks those named capabilities and does not infer a third.
+
+## Automated Field Extraction — Controlled Availability
+
+- AFE is a Data Management UI suggestion workflow, not a renderer or API action.
+- Confirm that the tenant is entitled and in one of the documented regions in
+  `known-issues.md`.
+- Review proposed fields and regex against representative sample events.
+- Preview and validate extracted values before an explicit human accept/apply
+  decision.
+
+## Guided Onboarding With Auto-Schematization — Alpha
+
+- Request or verify Alpha enrollment with Splunk experts; this packet does not
+  enroll the tenant or invoke the workflow.
+- Review sample-event clustering and proposed CIM data-model mappings.
+- Treat TA packages and SPL2 pipelines produced by the experience as candidate
+  artifacts. This renderer does not generate, download, install, or apply them.
+- Review any TA package separately. Lint candidate SPL2, preview it with
+  representative data, validate CIM mappings and destination/event counts, and
+  require an explicit human apply decision.
+
+## Evidence Boundary
+
+Feature visibility, a recommendation, or a generated candidate is not evidence
+that the tenant configuration changed. Record entitlement, source date, human
+approval, preview results, apply evidence, and post-apply validation separately.
+
+Source: https://www.splunk.com/en_us/blog/artificial-intelligence/accelerating-data-intelligence-with-ai-powered-data-management.html
+"""
+
+
 def render_handoffs() -> dict[str, str]:
     return {
         "splunk-hec-service-setup.md": "# HEC Handoff\n\nUse `splunk-hec-service-setup` for HEC token/index readiness. Keep `useACK=false` for Ingest Processor source paths that do not support indexer acknowledgement.\n",
@@ -613,6 +681,7 @@ def render_assets(args: argparse.Namespace) -> Path:
     write_file(output_dir / "apply-plan.json", render_apply_plan(args, source_types, destinations, pipelines, findings))
     write_file(output_dir / "control-plane-handoffs/ingest-processor-ui.md", render_ui_handoff(source_types, destinations, pipelines))
     write_file(output_dir / "control-plane-handoffs/known-issues.md", render_known_issues())
+    write_file(output_dir / "control-plane-handoffs/ai-powered-data-management.md", render_ai_powered_data_management_handoff())
     for source_type in source_types:
         write_file(output_dir / f"source-types/{safe_name(source_type)}.json", render_source_type(source_type))
     for dest in destinations:
@@ -636,6 +705,7 @@ def validate_output(output_dir: Path) -> list[str]:
         "apply-plan.json",
         "control-plane-handoffs/ingest-processor-ui.md",
         "control-plane-handoffs/known-issues.md",
+        "control-plane-handoffs/ai-powered-data-management.md",
         "monitoring/searches.spl",
         "monitoring/usage-summary-handoff.md",
         "spl2-pipeline-kit/lint-report.json",
@@ -650,6 +720,8 @@ def validate_output(output_dir: Path) -> list[str]:
         "POST /services/data-manager/input",
         "PUT /services/data-manager/input",
         "terraform resource splunk_cloud_data_manager_input",
+        "POST /services/data-management/guided-onboarding",
+        "terraform resource splunk_guided_onboarding",
         "global HEC ACK",
         "BEGIN PRIVATE KEY",
     ]

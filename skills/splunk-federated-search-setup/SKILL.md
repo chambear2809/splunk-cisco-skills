@@ -2,19 +2,14 @@
 name: splunk-federated-search-setup
 description: >-
   Use when configuring Cisco Data Fabric federated search or standalone Splunk
-  Federated Search. Render, preflight, apply, and validate the full product
-  surface: Federated Search for Splunk (FSS2S, type=splunk) in standard or
-  transparent mode with multiple providers and federated indexes per render,
-  Federated Search for Amazon S3 legacy/reviewed provider payloads
-  (FSS3, type=aws_s3, Splunk Cloud Platform only), plus Data Management app
-  readiness handoffs for current Amazon S3, Microsoft Azure, Azure Databricks,
-  Snowflake, and DDSS federation, file-based apply for Splunk
-  Enterprise standalone search heads or SHC deployers, REST-based apply that
-  works on Splunk Enterprise and Splunk Cloud, the global federated-search
-  enable/disable switch, and a status helper that reports per-provider
-  connectivityStatus. Use as the first route for Cisco Data Fabric requests
-  involving cross-domain search, federated analytics, S3 data-lake search, or
-  querying data where it resides.
+  Federated Search, cross-domain search, federated analytics, S3 data-lake
+  search, or querying data where it resides. Render, preflight, apply, and
+  validate FSS2S standard/transparent providers and reviewed legacy FSS3
+  payloads; render 10.5 migration guidance and current Data Management
+  handoffs for S3, Azure, Databricks, Snowflake, and DDSS; distinguish Glue,
+  Iceberg REST, and Splunk-native catalogs; preserve handoff-only Amazon
+  Security Lake (`aws_lake`) and Cisco SAL (`aws_s3_sal`) identities; and
+  manage supported global-switch, status, file, SHC, and REST workflows.
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -40,20 +35,31 @@ Covered:
   or more federated indexes per provider. Supports all four documented
   deployment combinations (SE↔SE, SC↔SC, SE↔SC, SC↔SE).
 - **Federated Search for Amazon S3 (FSS3)** — `type = aws_s3` providers
-  rendered as REST payloads for tenants still using the reviewed legacy
+  rendered as payload-shaped inventory/migration evidence for reviewed legacy
   provider model (Splunk Cloud Platform only; FSS3 cannot be configured via
-  `federated.conf`).
+  `federated.conf`). Splunk 10.5 documents phased deprecation of legacy FS-S3
+  provider/index operations and makes existing indexes read-only after
+  migration to Data Management. This skill emits no legacy FSS3 CRUD; new
+  designs use current connections and datasets.
 - **Data Management app federation handoff** — readiness notes for the current
   connection/dataset model for Amazon S3, Microsoft Azure, Azure Databricks,
   Snowflake, and DDSS. These are UI/activation handoffs until a stable public
   API contract is available. The current overview requires Splunk sales
   activation for each surface; confirm commercial terms per tenant and do not
   infer one universal Data Scan Unit requirement.
+- **Amazon S3 catalog choices** — distinguish AWS Glue catalog tables (Iceberg,
+  Delta Lake, or non-table JSON/Parquet), Apache Iceberg REST catalogs, and
+  Splunk-native catalogs with inferred or operator-defined schema/partitions.
+- **Specialized federation handoffs** — accept `type = aws_lake` to record an
+  Amazon Security Lake Federated Analytics handoff and `type = aws_s3_sal` to
+  record a Cisco Security Analytics and Logging handoff. These entries never
+  produce generic `aws_s3` payloads or live CRUD.
 - **Global federated-search switch** — enable or disable Federated Search
   for the entire deployment via
   `/services/data/federated/settings/general`.
 - **REST apply path** — works on both Splunk Enterprise and Splunk Cloud
-  Platform without shell access on the target.
+  Platform for supported FSS2S providers/indexes. It excludes legacy FSS3 and
+  specialized handoffs and refuses legacy-only plans.
 - **Live status helper** — REST GET of providers and indexes with
   per-provider `connectivityStatus`, output sanitized so no password
   material is printed.
@@ -136,9 +142,26 @@ bash skills/splunk-federated-search-setup/scripts/setup.sh \
   --apply-target rest
 ```
 
-The REST apply POSTs each FSS2S provider, each FSS3 provider, and each
-federated index. On HTTP 409 (already exists) it re-POSTs to the keyed
-endpoint to update the existing entity in place.
+The REST apply POSTs supported FSS2S providers and their standard-mode
+federated indexes. On HTTP 409 (already exists) it re-POSTs to the keyed
+endpoint to update the existing entity in place. It never POSTs legacy FSS3,
+`aws_lake`, or `aws_s3_sal` objects.
+
+Legacy `aws_s3` is inventory/migration-only on the 10.5 baseline. Review
+`legacy-fss3-migration.md`; no apply path is generated for those providers or
+indexes.
+
+### Render specialized federation handoffs
+
+```bash
+bash skills/splunk-federated-search-setup/scripts/setup.sh \
+  --provider 'type=aws_lake,name=amazon_security_lake' \
+  --provider 'type=aws_s3_sal,name=cisco_sal' \
+  --output-dir splunk-federated-search-rendered
+```
+
+This renders intent and readiness only. It does not create either provider or
+allow a `federated_indexes` entry to target a handoff-only provider.
 
 ### Global federated-search toggle
 
@@ -165,11 +188,13 @@ bash skills/splunk-federated-search-setup/scripts/validate.sh --live
 | `federated.conf.template` | One `[provider://X]` stanza per FSS2S provider, with per-provider password placeholder |
 | `indexes.conf` | One `[federated:X]` stanza per FSS2S federated index |
 | `server.conf` | `[shclustering] conf_replication_include.indexes = true` for SHC deployer use |
-| `aws-s3-providers/<name>.json` | REST payload per reviewed legacy FSS3 provider, plus an AWS prerequisites README |
-| `data-management-federation-handoff.md` | Current Data Management app federation handoff for Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, and DDSS, including provider-side prerequisites |
+| `aws-s3-providers/<name>.json` | Payload-shaped inventory/migration evidence per reviewed legacy FSS3 provider; never consumed by apply scripts |
+| `data-management-federation-handoff.md` | Current Data Management app federation handoff for Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, and DDSS, including S3 catalog and format distinctions |
+| `specialized-federation-handoff.md` | Dedicated `aws_lake` Amazon Security Lake and `aws_s3_sal` Cisco SAL readiness without CRUD |
+| `legacy-fss3-migration.md` | Splunk 10.5 phased-deprecation inventory and migration checklist for legacy `aws_s3` providers |
 | `apply-search-head.sh` | File-based apply on a standalone Enterprise SH |
 | `apply-shc-deployer.sh` | Fail-closed handoff to `splunk-search-head-cluster-setup`; staging files alone is not reported as a completed SHC bundle apply |
-| `apply-rest.sh` | REST apply for Splunk Enterprise OR Splunk Cloud |
+| `apply-rest.sh` | REST apply for supported FSS2S on Splunk Enterprise or Splunk Cloud; refuses legacy-only plans |
 | `global-enable.sh` / `global-disable.sh` | Toggle the global federated-search switch |
 | `status.sh` | REST GET per provider, prints `connectivityStatus` |
 | `preflight.sh` | Local btool sanity checks |
