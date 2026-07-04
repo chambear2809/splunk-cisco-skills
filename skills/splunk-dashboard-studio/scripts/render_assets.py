@@ -318,7 +318,7 @@ if [[ -n "${{SPLUNK_CURL_CONFIG:-}}" ]]; then
     echo "SPLUNK_CURL_CONFIG must be a regular, non-symlink file." >&2
     exit 2
   fi
-  config_mode="$(stat -f '%A' "${{SPLUNK_CURL_CONFIG}}" 2>/dev/null || stat -c '%a' "${{SPLUNK_CURL_CONFIG}}")"
+  config_mode="$(stat -c '%a' -- "${{SPLUNK_CURL_CONFIG}}" 2>/dev/null || stat -f '%A' -- "${{SPLUNK_CURL_CONFIG}}")"
   if [[ "${{config_mode}}" != "600" ]]; then
     echo "SPLUNK_CURL_CONFIG must have mode 600 (found ${{config_mode}})." >&2
     exit 2

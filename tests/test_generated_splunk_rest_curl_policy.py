@@ -51,6 +51,8 @@ def test_dashboard_apply_rejects_plaintext_and_curl_config_injection(tmp_path: P
     assert_curl_transport_policy(text)
     assert "command curl -q" in text
     assert "auth-only user directive" in text
+    assert "stat -c '%a' --" in text
+    assert "|| stat -f '%A' --" in text
 
     config = tmp_path / "curl.cfg"
     config.write_text('user = "admin:test-password"\n', encoding="utf-8")
