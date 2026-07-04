@@ -1567,6 +1567,8 @@ hbs_prepare_fingerprint_known_hosts() {
     )
 }
 
+# The generated indexer-cluster bootstrap calls this public helper with false.
+# shellcheck disable=SC2120
 hbs_prepare_ssh_trust() {
     local require_password="${1:-true}"
     local known_hosts_file="${SPLUNK_SSH_KNOWN_HOSTS_FILE:-}"
