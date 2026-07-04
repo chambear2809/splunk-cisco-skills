@@ -7,7 +7,13 @@ import argparse
 import json
 import re
 import stat
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+
+BUNDLE_OWNER = "splunk-dashboard-studio-setup"
 
 GENERATED_FILES = {
     "README.md",
@@ -46,6 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--definition-file", default="")
     parser.add_argument("--owner", default="nobody")
     parser.add_argument("--sharing", choices=("user", "app", "global"), default="app")
+    parser.add_argument("--read-roles", default="*")
+    parser.add_argument("--write-roles", default="")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -89,6 +97,13 @@ def validate(args: argparse.Namespace) -> dict:
         die("--dashboard-name must be a safe view id (letters, numbers, underscore, hyphen).")
     for value, option in ((args.title, "--title"), (args.description, "--description")):
         no_newline(value, option)
+    for value in (args.read_roles, args.write_roles):
+        for role in value.split(","):
+            role = role.strip()
+            if role and role != "*" and not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}", role
+            ):
+                die("ACL roles must be comma-separated Splunk role names (or *).")
     if args.definition_file:
         path = Path(args.definition_file).expanduser()
         if not path.is_file():
@@ -192,6 +207,8 @@ App: `{args.app_name}`
 Theme: `{args.theme}`
 Layout: `{args.layout}`
 Sharing: `{args.sharing}` (owner `{args.owner}`)
+Read roles: `{args.read_roles or '(none)'}`
+Write roles: `{args.write_roles or '(none)'}`
 
 Files:
 
@@ -200,14 +217,20 @@ Files:
 
 Apply posts `name=<dashboard>` and `eai:data=<view.xml>` to
 `/servicesNS/<owner>/<app>/data/ui/views`. Updating an existing dashboard
-requires `--accept-overwrite`. This is Splunk Platform Dashboard Studio and is
-distinct from the Splunk Observability Cloud dashboard builder.
+requires `--accept-overwrite`. Live preflight privately snapshots an existing
+view and ACL; apply verifies exact content plus normalized owner, sharing, read,
+and write role sets. Any failed mutation is retained for reviewed manual
+recovery because REST has no verified conditional restore or delete contract.
+Private before/current snapshots and redacted evidence are written under
+`state/`. This is Splunk Platform Dashboard Studio and is distinct from the
+Splunk Observability Cloud dashboard builder.
 """
 
 
 def render(args: argparse.Namespace, definition: dict) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "dashboard-studio"
+    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)
@@ -221,6 +244,12 @@ def render(args: argparse.Namespace, definition: dict) -> dict:
                     "layout": args.layout,
                     "owner": args.owner,
                     "sharing": args.sharing,
+                    "read_roles": sorted(
+                        {item.strip() for item in args.read_roles.split(",") if item.strip()}
+                    ),
+                    "write_roles": sorted(
+                        {item.strip() for item in args.write_roles.split(",") if item.strip()}
+                    ),
                 },
                 indent=2,
                 sort_keys=True,

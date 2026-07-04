@@ -10,7 +10,7 @@ PROJECT_PKG_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-universal-forwarder-rendered"
 
-PHASE="all"
+PHASE="render"
 TARGET_OS="auto"
 TARGET_ARCH="auto"
 EXECUTION_MODE="local"
@@ -36,6 +36,7 @@ PHONE_HOME_INTERVAL="60"
 TCPOUT_GROUP="default-autolb-group"
 USE_ACK="true"
 BOOT_START=true
+ACCEPT_FORWARDER_MUTATION=false
 SPLUNK_REMOTE_SUDO="${SPLUNK_REMOTE_SUDO:-true}"
 
 PACKAGE_PATH=""
@@ -75,6 +76,8 @@ Install options:
   --service-user USER
   --no-boot-start
   --checksum sha256:<value>
+  --accept-forwarder-mutation
+                         Required for live install, upgrade, or enrollment
 
 Enrollment:
   --enroll none|deployment-server|enterprise-indexers|splunk-cloud
@@ -92,6 +95,7 @@ Security:
 Examples:
   $(basename "$0") --phase all --target-os linux --source remote --url latest \\
     --enroll deployment-server --deployment-server ds01.example.com:8089 \\
+    --accept-forwarder-mutation \\
     --admin-password-file /tmp/uf_admin_password
 
   $(basename "$0") --phase render --target-os windows --source local \\
@@ -99,6 +103,8 @@ Examples:
     --enroll enterprise-indexers --server-list idx01.example.com:9997,idx02.example.com:9997
 
 Notes:
+  The default phase is render and does not install, upgrade, or enroll a host.
+  Live install, enroll, and all phases require --accept-forwarder-mutation.
   Linux and macOS support local/SSH apply in v1. Windows renders an
   administrator-run PowerShell/MSI bootstrap script. FreeBSD, Solaris, and AIX
   are recognized by latest resolution and metadata, but install/apply is not
@@ -269,6 +275,20 @@ phase_includes_enroll() {
 
 phase_includes_status() {
     [[ "${PHASE}" == "status" || "${PHASE}" == "all" ]]
+}
+
+require_forwarder_mutation_acceptance() {
+    if [[ "${DRY_RUN}" == "true" || "${EXECUTION_MODE}" == "render" ]]; then
+        return 0
+    fi
+    if [[ ! "${PHASE}" =~ ^(install|enroll|all)$ ]]; then
+        return 0
+    fi
+    if [[ "${ACCEPT_FORWARDER_MUTATION}" != "true" ]]; then
+        log "ERROR: Live Universal Forwarder ${PHASE} can install, upgrade, or enroll a host and requires --accept-forwarder-mutation."
+        log "Render and review the default --phase render output first, or use --dry-run to inspect the plan."
+        exit 1
+    fi
 }
 
 normalize_target_os() {
@@ -481,6 +501,7 @@ build_apply_source_command() {
     apply_cmd=(
         bash "${SCRIPT_DIR}/setup.sh"
         --phase all
+        --accept-forwarder-mutation
         --target-os "${TARGET_OS}"
         --target-arch "${TARGET_ARCH}"
         --execution "${EXECUTION_MODE}"
@@ -622,6 +643,9 @@ validate_inputs() {
         log "ERROR: macOS .dmg packages are download/verify only in this automation. Use --package-type tgz for automated apply."
         exit 1
     fi
+
+    require_forwarder_mutation_acceptance
+
     if [[ "${ENROLL_MODE}" == "deployment-server" ]]; then
         ensure_prompted_value DEPLOYMENT_SERVER "Deployment server HOST:PORT"
         validate_host_port "${DEPLOYMENT_SERVER}" "deployment server"
@@ -1284,6 +1308,7 @@ while [[ $# -gt 0 ]]; do
         --phone-home-interval) require_arg "$1" $# || exit 1; PHONE_HOME_INTERVAL="$2"; shift 2 ;;
         --tcpout-group) require_arg "$1" $# || exit 1; TCPOUT_GROUP="$2"; shift 2 ;;
         --use-ack) require_arg "$1" $# || exit 1; USE_ACK="$2"; shift 2 ;;
+        --accept-forwarder-mutation) ACCEPT_FORWARDER_MUTATION=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --help) usage 0 ;;

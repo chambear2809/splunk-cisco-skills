@@ -1,6 +1,6 @@
 {
   "description": "Generated from the pinned normalized SCAN catalog source plus skills/cisco-product-setup/catalog_overrides.json local overrides and synthetic products.",
-  "product_count": 84,
+  "product_count": 85,
   "products": [
     {
       "accepted_non_secret_keys": [
@@ -827,6 +827,152 @@
       "template_checks": {},
       "template_paths": [],
       "value_proposition": "Continuously monitor SaaS app configurations and data access to eliminate shadow access and misconfigurations."
+    },
+    {
+      "accepted_non_secret_keys": [
+        "include_ftd",
+        "index",
+        "sc4s_vendor_product",
+        "sourcetype",
+        "syslog_owner"
+      ],
+      "addon": "Splunk_TA_cisco-asa",
+      "addon_label": "Splunk Add-on for Cisco ASA",
+      "addon_uid": "1620",
+      "aliases": [
+        "ASA",
+        "FTD",
+        "Cisco ASA",
+        "Cisco FTD",
+        "Cisco Firepower Threat Defense",
+        "Cisco ASA syslog",
+        "ASA syslog",
+        "Cisco FTD syslog",
+        "FTD syslog",
+        "Cisco Secure Firewall syslog",
+        "Secure Firewall syslog",
+        "Cisco ASA TA",
+        "ASA TA",
+        "Splunk_TA_cisco-asa"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "partial",
+      "category": "security",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco ASA and Secure Firewall Threat Defense syslog onboarding through the Splunk Add-on for Cisco ASA, with explicit external syslog receiver ownership and cisco:asa source typing.",
+      "display_name": "Cisco ASA / FTD Syslog (Splunk_TA_cisco-asa)",
+      "id": "cisco_asa_ftd_syslog",
+      "install_apps": [
+        "Splunk_TA_cisco-asa"
+      ],
+      "keywords": [
+        "syslog",
+        "cisco:asa",
+        "SC4S",
+        "Splunk Add-on for Cisco ASA"
+      ],
+      "learn_more_url": "https://splunkbase.splunk.com/app/1620",
+      "manual_gap_reason": "",
+      "normalized_search_terms": [
+        "cisco asa ftd syslog",
+        "cisco asa ftd syslog splunk ta cisco asa",
+        "splunk ta cisco asa",
+        "asa",
+        "ftd",
+        "cisco asa",
+        "cisco ftd",
+        "cisco firepower threat defense",
+        "cisco asa syslog",
+        "asa syslog",
+        "cisco ftd syslog",
+        "ftd syslog",
+        "cisco secure firewall syslog",
+        "secure firewall syslog",
+        "cisco asa ta",
+        "asa ta",
+        "syslog",
+        "sc4s",
+        "splunk add on for cisco asa"
+      ],
+      "notes": "Dedicated ASA/FTD syslog route. Install Splunk_TA_cisco-asa, render the selected SC4S/syslog receiver handoff, and require cisco:asa event evidence before completion.",
+      "optional_non_secret_keys": [
+        "include_ftd",
+        "index",
+        "sc4s_vendor_product",
+        "sourcetype",
+        "syslog_owner"
+      ],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "cisco-asa-ta-setup",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {
+        "default_include_ftd": "true",
+        "default_index": "cisco_asa",
+        "default_sc4s_vendor_product": "cisco_asa",
+        "default_sourcetype": "cisco:asa",
+        "default_syslog_owner": "sc4s",
+        "defaults": {
+          "include_ftd": "true",
+          "index": "cisco_asa",
+          "sc4s_vendor_product": "cisco_asa",
+          "sourcetype": "cisco:asa",
+          "syslog_owner": "sc4s"
+        },
+        "handoff": "Install the ASA TA and render the selected external syslog receiver handoff; completion requires live cisco:asa event evidence.",
+        "sourcetypes": [
+          "cisco:asa"
+        ]
+      },
+      "route_type": "asa_ta",
+      "search_terms": [
+        "cisco_asa_ftd_syslog",
+        "cisco asa ftd syslog",
+        "Cisco ASA / FTD Syslog (Splunk_TA_cisco-asa)",
+        "Cisco ASA / FTD Syslog",
+        "Splunk_TA_cisco-asa",
+        "ASA",
+        "FTD",
+        "Cisco ASA",
+        "Cisco FTD",
+        "Cisco Firepower Threat Defense",
+        "Cisco ASA syslog",
+        "ASA syslog",
+        "Cisco FTD syslog",
+        "FTD syslog",
+        "Cisco Secure Firewall syslog",
+        "Secure Firewall syslog",
+        "Cisco ASA TA",
+        "ASA TA",
+        "syslog",
+        "cisco:asa",
+        "SC4S",
+        "Splunk Add-on for Cisco ASA",
+        "Splunk TA cisco asa"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cisco:asa"
+      ],
+      "status": "active",
+      "subcategory": "network_security",
+      "template_checks": {
+        "contains": [
+          "index: cisco_asa",
+          "sourcetype: cisco:asa",
+          "syslog_owner: sc4s"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-asa-ta-setup/template.example"
+      ],
+      "value_proposition": "Route ASA and FTD syslog through the dedicated parser, collection handoff, CIM-readiness, and validation workflow instead of treating syslog as a Cisco Security Cloud API input."
     },
     {
       "accepted_non_secret_keys": [],
@@ -6566,9 +6712,7 @@
         "index",
         "interval",
         "name",
-        "port",
         "sourcetype",
-        "type",
         "username",
         "variant"
       ],
@@ -6579,7 +6723,22 @@
         "Cisco Firepower Next-Generation Firewall",
         "Cisco Firepower Threat Defense",
         "Cisco ASA",
-        "Cisco Sourcefire"
+        "Cisco Sourcefire",
+        "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+        "ASA",
+        "FTD",
+        "Cisco FTD",
+        "Cisco Secure Firewall",
+        "Secure Firewall",
+        "Cisco Secure Firewall API",
+        "Secure Firewall API",
+        "FMC API",
+        "FTD API",
+        "Cisco FTD API",
+        "Cisco Secure Firewall eStreamer",
+        "Secure Firewall eStreamer",
+        "FTD eStreamer",
+        "Cisco FTD eStreamer"
       ],
       "app_viz": "",
       "app_viz_2": "",
@@ -6594,7 +6753,7 @@
         "asa_dashboard"
       ],
       "description": "The integration of Secure Firewall Threat Defense (formerly Firepower Threat Defense) provides the capability to investigate, identify, and enrich intrusion events with context from integrations across products. It offers automated triage and prioritization of intrusion events through incidents.",
-      "display_name": "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+      "display_name": "Cisco Secure Firewall API / eStreamer (CiscoSecurityCloud)",
       "id": "cisco_secure_firewall",
       "install_apps": [
         "CiscoSecurityCloud"
@@ -6622,23 +6781,38 @@
         "eve",
         "snort",
         "secure firewall cloud native",
-        "sfcn"
+        "sfcn",
+        "api collection",
+        "estreamer collection"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/firewalls/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco secure firewall",
-        "cisco secure firewall ftd estreamer asa",
-        "ftd estreamer asa",
-        "ftd",
-        "estreamer",
-        "asa",
+        "cisco secure firewall api estreamer ciscosecuritycloud",
+        "cisco secure firewall api estreamer",
+        "ciscosecuritycloud",
         "cisco firepower next generation firewall",
         "cisco firepower threat defense",
         "cisco asa",
         "cisco sourcefire",
+        "cisco secure firewall ftd estreamer asa",
+        "asa",
+        "ftd",
+        "cisco ftd",
+        "secure firewall",
+        "cisco secure firewall api",
+        "secure firewall api",
+        "fmc api",
+        "ftd api",
+        "cisco ftd api",
+        "cisco secure firewall estreamer",
+        "secure firewall estreamer",
+        "ftd estreamer",
+        "cisco ftd estreamer",
         "firepower",
         "ngfw",
+        "estreamer",
         "firesight",
         "intrusion prevention",
         "firewall",
@@ -6657,10 +6831,11 @@
         "snort",
         "secure firewall cloud native",
         "sfcn",
-        "ciscosecuritycloud",
+        "api collection",
+        "estreamer collection",
         "cisco security cloud"
       ],
-      "notes": "Choose the Secure Firewall collection mode with --set variant api, estreamer, syslog, or asa_syslog.",
+      "notes": "Cisco Security Cloud owns Secure Firewall API and eStreamer collection. ASA/FTD syslog and Splunk_TA_cisco-asa requests route separately through cisco_asa_ftd_syslog and cisco-asa-ta-setup.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
@@ -6698,27 +6873,6 @@
               "password"
             ]
           },
-          "asa_syslog": {
-            "conditional_required_secret_rules": [],
-            "default_name": "SecureFirewall_ASA_Syslog_Default",
-            "defaults": {
-              "index": "cisco_sfw_ftd_syslog",
-              "interval": "600"
-            },
-            "optional_non_secret_keys": [
-              "index",
-              "interval"
-            ],
-            "product_key": "secure_firewall_asa_syslog",
-            "required_non_secret_keys": [
-              "event_types",
-              "port",
-              "sourcetype",
-              "type"
-            ],
-            "required_secret_keys": [],
-            "secret_keys": []
-          },
           "estreamer": {
             "conditional_required_secret_rules": [],
             "default_name": "SecureFirewall_eStreamer_Default",
@@ -6747,27 +6901,6 @@
               "password",
               "pkcs_certificate"
             ]
-          },
-          "syslog": {
-            "conditional_required_secret_rules": [],
-            "default_name": "SecureFirewall_Syslog_Default",
-            "defaults": {
-              "index": "cisco_sfw_ftd_syslog",
-              "interval": "600"
-            },
-            "optional_non_secret_keys": [
-              "index",
-              "interval"
-            ],
-            "product_key": "secure_firewall_syslog",
-            "required_non_secret_keys": [
-              "event_types",
-              "port",
-              "sourcetype",
-              "type"
-            ],
-            "required_secret_keys": [],
-            "secret_keys": []
           }
         }
       },
@@ -6775,16 +6908,28 @@
       "search_terms": [
         "cisco_secure_firewall",
         "cisco secure firewall",
-        "Cisco Secure Firewall (FTD/eStreamer/ASA)",
-        "Cisco Secure Firewall",
-        "FTD/eStreamer/ASA",
-        "FTD",
-        "eStreamer",
-        "ASA",
+        "Cisco Secure Firewall API / eStreamer (CiscoSecurityCloud)",
+        "Cisco Secure Firewall API / eStreamer",
+        "CiscoSecurityCloud",
         "Cisco Firepower Next-Generation Firewall",
         "Cisco Firepower Threat Defense",
         "Cisco ASA",
         "Cisco Sourcefire",
+        "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+        "ASA",
+        "FTD",
+        "Cisco FTD",
+        "Cisco Secure Firewall",
+        "Secure Firewall",
+        "Cisco Secure Firewall API",
+        "Secure Firewall API",
+        "FMC API",
+        "FTD API",
+        "Cisco FTD API",
+        "Cisco Secure Firewall eStreamer",
+        "Secure Firewall eStreamer",
+        "FTD eStreamer",
+        "Cisco FTD eStreamer",
         "ftd",
         "firepower",
         "asa",
@@ -6808,7 +6953,8 @@
         "snort",
         "secure firewall cloud native",
         "sfcn",
-        "CiscoSecurityCloud",
+        "api collection",
+        "estreamer collection",
         "Cisco Security Cloud"
       ],
       "secret_keys": [
@@ -6816,8 +6962,6 @@
         "pkcs_certificate"
       ],
       "sourcetypes": [
-        "cisco:asa",
-        "cisco:ftd:syslog",
         "cisco:sfw:estreamer",
         "cisco:sfw:policy"
       ],
@@ -6826,9 +6970,7 @@
       "template_checks": {
         "contains": [
           "# PRODUCT=secure_firewall_api",
-          "# PRODUCT=secure_firewall_asa_syslog",
-          "# PRODUCT=secure_firewall_estreamer",
-          "# PRODUCT=secure_firewall_syslog"
+          "# PRODUCT=secure_firewall_estreamer"
         ]
       },
       "template_paths": [

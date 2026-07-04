@@ -1,5 +1,4 @@
-name: splunk-appdynamics-controller-admin-setup
-short_description: "Render AppDynamics admin, RBAC, license usage, and privacy-control plans"
-entrypoint: "skills/splunk-appdynamics-controller-admin-setup/SKILL.md"
-safe_first_command: "bash skills/splunk-appdynamics-controller-admin-setup/scripts/setup.sh --help"
-validation_command: "bash skills/splunk-appdynamics-controller-admin-setup/scripts/validate.sh --help"
+interface:
+  display_name: "Splunk AppDynamics Controller Admin Setup"
+  short_description: "Render AppDynamics admin, RBAC, and license plans"
+  default_prompt: "Use $splunk-appdynamics-controller-admin-setup to render AppDynamics admin, RBAC, license usage, and privacy-control plans."

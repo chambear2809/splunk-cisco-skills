@@ -121,6 +121,22 @@ def test_validate_passes_after_render(tmp_path: Path) -> None:
     assert "errors=0" in result.stdout + result.stderr
 
 
+def test_validate_does_not_execute_output_dir_as_shell_code(tmp_path: Path) -> None:
+    hostile_output = tmp_path / "x' ]]; touch PWNED; [[ -f 'y"
+    hostile_output.mkdir()
+    marker = tmp_path / "PWNED"
+    result = subprocess.run(
+        ["bash", str(VALIDATE), "--output-dir", str(hostile_output), "--summary"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "errors=0" not in result.stdout
+    assert not marker.exists()
+    assert 'eval "${condition}"' not in VALIDATE.read_text(encoding="utf-8")
+
+
 def test_smoke_offline() -> None:
     run_cmd("bash", str(SMOKE))
 

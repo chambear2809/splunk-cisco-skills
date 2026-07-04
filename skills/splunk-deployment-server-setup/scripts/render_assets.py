@@ -18,7 +18,9 @@ Reads CLI args (from setup.sh) and emits the DS rendered tree under
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SKILL_NAME = "splunk-deployment-server-setup"
 _HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9_./~+-]+$")
+_WARNED_INSECURE_HTTP = False
+
+
+def _allow_insecure_http() -> bool:
+    return os.environ.get("SPLUNK_ALLOW_INSECURE_HTTP", "").strip().lower() in {
+        "1", "true", "yes", "y", "on",
+    }
+
+
+def _warn_insecure_http() -> None:
+    global _WARNED_INSECURE_HTTP
+    if _WARNED_INSECURE_HTTP:
+        return
+    print(
+        "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true permits Splunk "
+        "credentials/session keys over plaintext HTTP.",
+        file=sys.stderr,
+    )
+    _WARNED_INSECURE_HTTP = True
 
 
 def _validate_host(value: str, option: str) -> str:
@@ -40,8 +61,21 @@ def _validate_uri(value: str, option: str) -> str:
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise SystemExit(f"ERROR: {option} must be an http(s) management URI.")
+    if parsed.scheme == "http":
+        if not _allow_insecure_http():
+            raise SystemExit(
+                f"ERROR: {option} refuses plaintext HTTP. Use HTTPS, or set "
+                "SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab."
+            )
+        _warn_insecure_http()
     _validate_host(parsed.hostname, option)
-    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username:
+    if (
+        parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
         raise SystemExit(f"ERROR: {option} must contain only scheme, host, and optional port.")
     try:
         _ = parsed.port
@@ -273,10 +307,29 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     (ds / "inspect" / "client-drift-report.py").write_text(
         "#!/usr/bin/env python3\n"
         '"""Report clients with stale check-in (lag > threshold)."""\n\n'
-        "import json\nimport sys\nimport urllib.request\nimport urllib.error\n"
+        "import json\nimport sys\nimport urllib.request\nimport urllib.error\nimport urllib.parse\n"
         "from datetime import datetime, timezone\n\n"
         "import os\n"
         "DS_URI = sys.argv[1] if len(sys.argv) > 1 else '" + ds_uri + "'\n"
+        "ALLOW_INSECURE_HTTP = os.environ.get('SPLUNK_ALLOW_INSECURE_HTTP', '').strip().lower() in "
+        "{'1', 'true', 'yes', 'y', 'on'}\n"
+        "try:\n"
+        "    _parsed_ds_uri = urllib.parse.urlsplit(DS_URI)\n"
+        "    _parsed_ds_uri.port\n"
+        "except ValueError:\n"
+        "    print('ERROR: DS_URI is invalid.', file=sys.stderr)\n"
+        "    sys.exit(2)\n"
+        "if (_parsed_ds_uri.scheme.lower() not in {'http', 'https'} or not _parsed_ds_uri.hostname\n"
+        "        or _parsed_ds_uri.username is not None or _parsed_ds_uri.password is not None\n"
+        "        or _parsed_ds_uri.path not in {'', '/'} or _parsed_ds_uri.query\n"
+        "        or _parsed_ds_uri.fragment or any(ch.isspace() for ch in DS_URI)):\n"
+        "    print('ERROR: DS_URI must be a credential-free http(s) base URI.', file=sys.stderr)\n"
+        "    sys.exit(2)\n"
+        "if _parsed_ds_uri.scheme.lower() == 'http':\n"
+        "    if not ALLOW_INSECURE_HTTP:\n"
+        "        print('ERROR: plaintext HTTP is refused; use HTTPS or set SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab.', file=sys.stderr)\n"
+        "        sys.exit(2)\n"
+        "    print('WARNING: LAB ONLY: credentials are being sent over plaintext HTTP because SPLUNK_ALLOW_INSECURE_HTTP=true.', file=sys.stderr)\n"
         "LAG_WARN = int(sys.argv[2]) if len(sys.argv) > 2 else 300  # seconds\n"
         "# Read the admin password from a file (never argv) so it does not show\n"
         "# up in `ps`. Override via ADMIN_PASS_FILE / SPLUNK_AUTH_USER.\n"
@@ -306,7 +359,30 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "    f'{DS_URI}/services/deployment/server/clients?count=0&output_mode=json',\n"
         "    headers={'Authorization': 'Basic ' + base64.b64encode(CREDS.encode()).decode()}\n"
         ")\n"
-        "resp = urllib.request.urlopen(req, context=ctx, timeout=30)\n"
+        "def _origin(url):\n"
+        "    parsed = urllib.parse.urlsplit(url)\n"
+        "    try:\n"
+        "        port = parsed.port or (443 if parsed.scheme.lower() == 'https' else 80)\n"
+        "    except ValueError as exc:\n"
+        "        raise urllib.error.URLError('invalid redirect URI') from exc\n"
+        "    if (parsed.scheme.lower() not in {'http', 'https'} or not parsed.hostname\n"
+        "            or parsed.username is not None or parsed.password is not None):\n"
+        "        raise urllib.error.URLError('credential-bearing or invalid redirect URI refused')\n"
+        "    return (parsed.scheme.lower(), (parsed.hostname or '').lower(), port)\n"
+        "INITIAL_ORIGIN = _origin(DS_URI)\n"
+        "class _TransportRedirectHandler(urllib.request.HTTPRedirectHandler):\n"
+        "    def redirect_request(self, req, fp, code, msg, headers, newurl):\n"
+        "        if _origin(newurl) != INITIAL_ORIGIN:\n"
+        "            raise urllib.error.URLError('cross-origin redirect refused for credential-bearing request')\n"
+        "        if newurl.lower().startswith('http://'):\n"
+        "            if not ALLOW_INSECURE_HTTP:\n"
+        "                raise urllib.error.URLError('redirect to plaintext HTTP refused')\n"
+        "            print('WARNING: LAB ONLY: following a redirect that sends credentials over plaintext HTTP.', file=sys.stderr)\n"
+        "        return super().redirect_request(req, fp, code, msg, headers, newurl)\n"
+        "opener = urllib.request.build_opener(\n"
+        "    urllib.request.HTTPSHandler(context=ctx), _TransportRedirectHandler()\n"
+        ")\n"
+        "resp = opener.open(req, timeout=30)\n"
         "data = json.loads(resp.read())\n"
         "now = datetime.now(timezone.utc).timestamp()\n"
         "stale = []\n"
@@ -524,7 +600,13 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=f"{SKILL_NAME} renderer")
+    parser = argparse.ArgumentParser(
+        description=f"{SKILL_NAME} renderer",
+        epilog=(
+            "Management URIs require HTTPS. SPLUNK_ALLOW_INSECURE_HTTP=true is a "
+            "lab-only environment opt-in for plaintext HTTP."
+        ),
+    )
     parser.add_argument("--phase", default="render")
     parser.add_argument("--output-dir",
                         default=str(PROJECT_ROOT / "splunk-deployment-server-rendered"))

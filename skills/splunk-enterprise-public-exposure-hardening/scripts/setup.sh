@@ -62,6 +62,7 @@ SAML_SIGNING_CERT_FILE=""
 SAML_SIGNING_KEY_FILE=""
 HEC_MTLS_CA_BUNDLE_FILE=""
 EXTERNAL_PROBE_CMD=""
+PUBLIC_CA_FILE=""
 SVD_FLOOR_FILE=""
 ENABLE_FIPS="false"
 FIPS_VERSION="140-3"
@@ -174,6 +175,8 @@ Secrets (file paths only — never values on argv):
 
 Validation:
   --external-probe-cmd "ssh probe@bastion nc -zv"
+  --public-ca-file PATH                         CA bundle for public TLS probes
+                                                (default: system trust)
 
 FIPS / unarchive (defense in depth):
   --enable-fips true|false                        (default: false)
@@ -210,7 +213,7 @@ LDAP (only used when --auth-mode=ldap):
   --allow-anonymous-ldap-bind                     (ack; required for empty bind-dn)
 
 Auth refusal:
-  --allow-scripted-auth                           (ack required if authType=Scripted)
+  --allow-scripted-auth                           (deprecated; Scripted remains refused)
 
 Federation:
   --federation-service-account-password-file PATH (file path; rotate helper)
@@ -287,6 +290,7 @@ while [[ $# -gt 0 ]]; do
         --saml-signing-key-file) require_arg "$1" $# || exit 1; SAML_SIGNING_KEY_FILE="$2"; shift 2 ;;
         --hec-mtls-ca-bundle-file) require_arg "$1" $# || exit 1; HEC_MTLS_CA_BUNDLE_FILE="$2"; shift 2 ;;
         --external-probe-cmd) require_arg "$1" $# || exit 1; EXTERNAL_PROBE_CMD="$2"; shift 2 ;;
+        --public-ca-file) require_arg "$1" $# || exit 1; PUBLIC_CA_FILE="$2"; shift 2 ;;
         --svd-floor-file) require_arg "$1" $# || exit 1; SVD_FLOOR_FILE="$2"; shift 2 ;;
         --enable-fips) require_arg "$1" $# || exit 1; ENABLE_FIPS="$2"; shift 2 ;;
         --fips-version) require_arg "$1" $# || exit 1; FIPS_VERSION="$2"; shift 2 ;;
@@ -442,6 +446,7 @@ build_renderer_args() {
         --saml-signing-key-file "${SAML_SIGNING_KEY_FILE}"
         --hec-mtls-ca-bundle-file "${HEC_MTLS_CA_BUNDLE_FILE}"
         --external-probe-cmd "${EXTERNAL_PROBE_CMD}"
+        --public-ca-file "${PUBLIC_CA_FILE}"
         --enable-fips "${ENABLE_FIPS}"
         --fips-version "${FIPS_VERSION}"
         --allowed-unarchive-commands "${ALLOWED_UNARCHIVE_COMMANDS}"
@@ -545,6 +550,10 @@ main() {
             ;;
         apply)
             render_assets
+            # Apply is never allowed to bypass the live fail-closed preflight.
+            # The preflight is rendered from the exact same invocation and is
+            # executed immediately before the selected mutation script.
+            run_rendered_script preflight.sh
             run_rendered_script "$(apply_script_for_target)"
             ;;
         validate)

@@ -1090,6 +1090,25 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "verify_ssl = _verify_raw.lower() not in {'false', '0', 'no'}\n"
         "if not splunk_uri or not splunk_user or not splunk_pw_file:\n"
         "    raise SystemExit('ERROR: set SPLUNK_REST_URI, SPLUNK_REST_USER, SPLUNK_REST_PASSWORD_FILE before apply-rest.sh.')\n"
+        "if any(character.isspace() for character in splunk_uri):\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_URI must not contain whitespace.')\n"
+        "try:\n"
+        "    parsed_uri = urllib.parse.urlsplit(splunk_uri)\n"
+        "    parsed_uri.port\n"
+        "except ValueError:\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_URI is invalid or contains an invalid port.')\n"
+        "scheme = parsed_uri.scheme.lower()\n"
+        "if scheme not in {'http', 'https'} or not parsed_uri.hostname:\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_URI must be an absolute https://host[:port] origin.')\n"
+        "if parsed_uri.username is not None or parsed_uri.password is not None:\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_URI must not contain embedded userinfo credentials.')\n"
+        "if parsed_uri.path not in {'', '/'} or parsed_uri.query or parsed_uri.fragment:\n"
+        "    raise SystemExit('ERROR: SPLUNK_REST_URI must not contain a path, query, or fragment.')\n"
+        "allow_insecure_http = os.environ.get('SPLUNK_ALLOW_INSECURE_HTTP', '').strip().lower() in {'1', 'true', 'yes', 'on'}\n"
+        "if scheme == 'http' and not allow_insecure_http:\n"
+        "    raise SystemExit('ERROR: REST apply refuses plaintext HTTP. Use HTTPS, or set SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab.')\n"
+        "if scheme == 'http':\n"
+        "    print('WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true sends Splunk credentials and provider passwords over plaintext HTTP.', file=sys.stderr)\n"
         "splunk_pw_path = Path(splunk_pw_file)\n"
         "if not splunk_pw_path.is_file():\n"
         "    raise SystemExit(f'ERROR: SPLUNK_REST_PASSWORD_FILE does not exist: {splunk_pw_path}')\n"
@@ -1099,6 +1118,11 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "if not splunk_pw:\n"
         "    raise SystemExit('ERROR: SPLUNK_REST_PASSWORD_FILE is empty.')\n"
         "ctx = None if verify_ssl else ssl._create_unverified_context()\n"
+        "class NoRedirectHandler(urllib.request.HTTPRedirectHandler):\n"
+        "    def redirect_request(self, req, fp, code, msg, headers, newurl):\n"
+        "        return None\n"
+        "transport_handler = urllib.request.HTTPSHandler(context=ctx) if scheme == 'https' else urllib.request.HTTPHandler()\n"
+        "opener = urllib.request.build_opener(NoRedirectHandler(), transport_handler)\n"
         "import base64\n"
         "auth = 'Basic ' + base64.b64encode(f'{splunk_user}:{splunk_pw}'.encode()).decode()\n"
         "\n"
@@ -1111,7 +1135,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "        headers={'Authorization': auth, 'Content-Type': 'application/x-www-form-urlencoded'},\n"
         "    )\n"
         "    try:\n"
-        "        with urllib.request.urlopen(req, context=ctx, timeout=60) as resp:\n"
+        "        with opener.open(req, timeout=60) as resp:\n"
         "            return resp.status\n"
         "    except urllib.error.HTTPError as exc:\n"
         "        # 409 means the entity already exists; fall through to update via name-keyed POST.\n"
@@ -1173,38 +1197,104 @@ def render_apply_rest(spec: Spec) -> str:
     return make_script(
         "echo 'Splunk Federated Search REST apply'\n"
         "echo 'Required env: SPLUNK_REST_URI=https://<sh>:8089 SPLUNK_REST_USER=admin SPLUNK_REST_PASSWORD_FILE=/path/to/admin_pw'\n"
-        "echo 'Optional env: SPLUNK_VERIFY_SSL=false (legacy alias: SPLUNK_REST_VERIFY_SSL=false; only for self-signed dev clusters)'\n"
+        "echo 'Optional lab-only env: SPLUNK_VERIFY_SSL=false for self-signed TLS; SPLUNK_ALLOW_INSECURE_HTTP=true for an isolated plaintext lab endpoint'\n"
         "\n"
         + _rest_provider_payload_block(spec)
     )
 
 
+def _rest_shell_curl_prelude() -> str:
+    return r"""splunk_uri="${SPLUNK_REST_URI:-}"
+splunk_user="${SPLUNK_REST_USER:-}"
+splunk_pw_file="${SPLUNK_REST_PASSWORD_FILE:-}"
+if [[ -z "${splunk_uri}" || -z "${splunk_user}" || -z "${splunk_pw_file}" ]]; then
+  echo 'ERROR: set SPLUNK_REST_URI, SPLUNK_REST_USER, SPLUNK_REST_PASSWORD_FILE.' >&2
+  exit 1
+fi
+if [[ -L "${splunk_pw_file}" || ! -f "${splunk_pw_file}" || ! -s "${splunk_pw_file}" ]]; then
+  echo "ERROR: password file must be a non-symlink regular file and must not be empty." >&2
+  exit 1
+fi
+if ! python3 - "${splunk_uri}" <<'PY_URI'
+import os
+import sys
+from urllib.parse import urlsplit
+
+raw = sys.argv[1]
+try:
+    parsed = urlsplit(raw)
+    parsed.port
+except ValueError:
+    raise SystemExit(1)
+allow_http = os.environ.get("SPLUNK_ALLOW_INSECURE_HTTP", "").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+valid = (
+    parsed.scheme.lower() in ({"https", "http"} if allow_http else {"https"})
+    and bool(parsed.hostname)
+    and parsed.username is None
+    and parsed.password is None
+    and parsed.path in ("", "/")
+    and not parsed.query
+    and not parsed.fragment
+    and not any(character.isspace() for character in raw)
+)
+raise SystemExit(0 if valid else 1)
+PY_URI
+then
+  echo "ERROR: SPLUNK_REST_URI must be a credential-free HTTPS origin. Plaintext HTTP requires SPLUNK_ALLOW_INSECURE_HTTP=true for an isolated lab." >&2
+  exit 1
+fi
+
+transport_args=(--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)
+case "${splunk_uri}" in
+  [Hh][Tt][Tt][Pp]://*)
+    echo "WARNING: LAB ONLY: sending Splunk credentials over plaintext HTTP." >&2
+    transport_args=(--proto '=http,https' --proto-redir '=http,https' --max-redirs 0 --globoff)
+    ;;
+esac
+
+verify_args=()
+_verify_raw="${SPLUNK_VERIFY_SSL:-${SPLUNK_REST_VERIFY_SSL:-true}}"
+if [[ "${_verify_raw,,}" == "false" || "${_verify_raw}" == "0" || "${_verify_raw,,}" == "no" ]]; then
+  verify_args+=(--insecure)
+elif [[ -n "${SPLUNK_CA_CERT:-}" ]]; then
+  [[ -r "${SPLUNK_CA_CERT}" ]] || { echo "ERROR: SPLUNK_CA_CERT is not readable." >&2; exit 1; }
+  verify_args+=(--cacert "${SPLUNK_CA_CERT}")
+fi
+
+splunk_pw="$(cat "${splunk_pw_file}")"
+if [[ -z "${splunk_pw}" || "${splunk_pw}" == *$'\n'* || "${splunk_pw}" == *$'\r'*
+      || "${splunk_user}" == *:* || "${splunk_user}" == *$'\n'* || "${splunk_user}" == *$'\r'* ]]; then
+  echo "ERROR: Splunk username and password file must each contain one non-empty line." >&2
+  exit 1
+fi
+escaped_user="${splunk_user//\\/\\\\}"
+escaped_user="${escaped_user//\"/\\\"}"
+escaped_pw="${splunk_pw//\\/\\\\}"
+escaped_pw="${escaped_pw//\"/\\\"}"
+user_pass_file="$(mktemp)"
+chmod 600 "${user_pass_file}"
+trap 'rm -f "${user_pass_file}"' EXIT INT TERM
+printf 'user = "%s:%s"\n' "${escaped_user}" "${escaped_pw}" > "${user_pass_file}"
+splunk_pw=""
+escaped_pw=""
+
+splunk_rest_curl() {
+  local url="$1"
+  shift
+  command curl -q -fsS "${verify_args[@]}" -K "${user_pass_file}" "$@" "${url}" \
+    "${transport_args[@]}"
+}
+
+"""
+
+
 def render_status(spec: Spec) -> str:
     return make_script(
-        "splunk_uri=\"${SPLUNK_REST_URI:-}\"\n"
-        "splunk_user=\"${SPLUNK_REST_USER:-}\"\n"
-        "splunk_pw_file=\"${SPLUNK_REST_PASSWORD_FILE:-}\"\n"
-        "if [[ -z \"${splunk_uri}\" || -z \"${splunk_user}\" || -z \"${splunk_pw_file}\" ]]; then\n"
-        "  echo 'ERROR: set SPLUNK_REST_URI, SPLUNK_REST_USER, SPLUNK_REST_PASSWORD_FILE.' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        "if [[ ! -s \"${splunk_pw_file}\" ]]; then\n"
-        "  echo \"ERROR: password file missing or empty: ${splunk_pw_file}\" >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        "verify_arg=\"--cacert /etc/ssl/certs/ca-certificates.crt\"\n"
-        "# Prefer the canonical SPLUNK_VERIFY_SSL; fall back to the legacy\n"
-        "# SPLUNK_REST_VERIFY_SSL alias for operators who already set it.\n"
-        "_verify_raw=\"${SPLUNK_VERIFY_SSL:-${SPLUNK_REST_VERIFY_SSL:-true}}\"\n"
-        "if [[ \"${_verify_raw,,}\" == \"false\" || \"${_verify_raw}\" == \"0\" || \"${_verify_raw,,}\" == \"no\" ]]; then\n"
-        "  verify_arg=\"--insecure\"\n"
-        "fi\n"
-        "user_pass_file=\"$(mktemp)\"\n"
-        "trap 'rm -f \"${user_pass_file}\"' EXIT INT TERM\n"
-        "{ printf 'user = %s\\n' \"${splunk_user}\"; printf 'password = '; cat \"${splunk_pw_file}\"; printf '\\n'; } > \"${user_pass_file}\"\n"
-        "chmod 600 \"${user_pass_file}\"\n"
-        "echo '== Federated providers =='\n"
-        "curl -fsS ${verify_arg} -K \"${user_pass_file}\" \"${splunk_uri%/}/services/data/federated/provider?output_mode=json&count=0\" \\\n"
+        _rest_shell_curl_prelude()
+        + "echo '== Federated providers =='\n"
+        "splunk_rest_curl \"${splunk_uri%/}/services/data/federated/provider?output_mode=json&count=0\" \\\n"
         "  | python3 -c '\n"
         "import json, sys\n"
         "data = json.load(sys.stdin)\n"
@@ -1217,7 +1307,7 @@ def render_status(spec: Spec) -> str:
         "'\n"
         "echo ''\n"
         "echo '== Federated indexes =='\n"
-        "curl -fsS ${verify_arg} -K \"${user_pass_file}\" \"${splunk_uri%/}/services/data/federated/index?output_mode=json&count=0\" \\\n"
+        "splunk_rest_curl \"${splunk_uri%/}/services/data/federated/index?output_mode=json&count=0\" \\\n"
         "  | python3 -c '\n"
         "import json, sys\n"
         "data = json.load(sys.stdin)\n"
@@ -1230,7 +1320,7 @@ def render_status(spec: Spec) -> str:
         "'\n"
         "echo ''\n"
         "echo '== Global federated-search switch =='\n"
-        "curl -fsS ${verify_arg} -K \"${user_pass_file}\" \"${splunk_uri%/}/services/data/federated/settings/general?output_mode=json\" \\\n"
+        "splunk_rest_curl \"${splunk_uri%/}/services/data/federated/settings/general?output_mode=json\" \\\n"
         "  | python3 -c '\n"
         "import json, sys\n"
         "data = json.load(sys.stdin)\n"
@@ -1246,27 +1336,9 @@ def render_global_toggle(spec: Spec, *, enable: bool) -> str:
     label = "ENABLE" if enable else "DISABLE"
     return make_script(
         f"# Global federated-search {label} (POST /services/data/federated/settings/general).\n"
-        "splunk_uri=\"${SPLUNK_REST_URI:-}\"\n"
-        "splunk_user=\"${SPLUNK_REST_USER:-}\"\n"
-        "splunk_pw_file=\"${SPLUNK_REST_PASSWORD_FILE:-}\"\n"
-        "if [[ -z \"${splunk_uri}\" || -z \"${splunk_user}\" || -z \"${splunk_pw_file}\" ]]; then\n"
-        "  echo 'ERROR: set SPLUNK_REST_URI, SPLUNK_REST_USER, SPLUNK_REST_PASSWORD_FILE.' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        "verify_arg=\"--cacert /etc/ssl/certs/ca-certificates.crt\"\n"
-        "# Prefer the canonical SPLUNK_VERIFY_SSL; fall back to the legacy\n"
-        "# SPLUNK_REST_VERIFY_SSL alias for operators who already set it.\n"
-        "_verify_raw=\"${SPLUNK_VERIFY_SSL:-${SPLUNK_REST_VERIFY_SSL:-true}}\"\n"
-        "if [[ \"${_verify_raw,,}\" == \"false\" || \"${_verify_raw}\" == \"0\" || \"${_verify_raw,,}\" == \"no\" ]]; then\n"
-        "  verify_arg=\"--insecure\"\n"
-        "fi\n"
-        "user_pass_file=\"$(mktemp)\"\n"
-        "trap 'rm -f \"${user_pass_file}\"' EXIT INT TERM\n"
-        "{ printf 'user = %s\\n' \"${splunk_user}\"; printf 'password = '; cat \"${splunk_pw_file}\"; printf '\\n'; } > \"${user_pass_file}\"\n"
-        "chmod 600 \"${user_pass_file}\"\n"
-        f"curl -fsS ${{verify_arg}} -K \"${{user_pass_file}}\" -X POST -d 'disabled={flag}' \\\n"
-        "  \"${splunk_uri%/}/services/data/federated/settings/general\"\n"
-        f"echo 'Global federated-search switch updated: disabled={flag}'\n"
+        + _rest_shell_curl_prelude()
+        + f"splunk_rest_curl \"${{splunk_uri%/}}/services/data/federated/settings/general\" -X POST -d 'disabled={flag}'\n"
+        + f"echo 'Global federated-search switch updated: disabled={flag}'\n"
     )
 
 

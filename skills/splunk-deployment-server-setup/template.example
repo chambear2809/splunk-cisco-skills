@@ -11,7 +11,10 @@
 # Deployment Server identity
 # --------------------------------------------------------------------------
 
-# DS FQDN and REST URI
+# DS FQDN and REST URI. Management REST is HTTPS-only by default.
+# SPLUNK_VERIFY_SSL=false keeps HTTPS but disables certificate validation; it
+# does not authorize HTTP. SPLUNK_ALLOW_INSECURE_HTTP=true is an environment-
+# only, warning-emitting escape hatch for an isolated short-lived lab.
 ds_host: ds01.corp.example.com
 ds_uri: https://ds01.corp.example.com:8089
 

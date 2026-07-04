@@ -393,6 +393,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             env, state_file = self.build_mock_sc4s_env(harness_path)
             token_file = tmp_path / "sc4s.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             output_dir = tmp_path / "dangerous-render"
             result = self.run_script(
@@ -1009,6 +1010,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             env, _state_file = self.build_mock_sc4snmp_env(harness_path)
             token_file = tmp_path / "sc4snmp.token"
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
 
             output_dir = tmp_path / "dangerous-render"
             result = self.run_script(
@@ -1131,6 +1133,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             snmpv3_secrets_file = tmp_path / "secrets.json"
 
             token_file.write_text("existing-token\n", encoding="utf-8")
+            token_file.chmod(0o600)
             snmpv3_secrets_file.write_text(
                 textwrap.dedent(
                     """\
@@ -1172,6 +1175,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             output_dir = tmp_path / "rendered"
             token_file = tmp_path / "tricky.token"
             token_file.write_text('ab"cd\\ef', encoding="utf-8")
+            token_file.chmod(0o600)
 
             result = self.run_script(
                 "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
@@ -1185,6 +1189,45 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             secret_yaml = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
             self.assertIn('token: "ab\\"cd\\\\ef"', secret_yaml)
+
+    def test_sc4x_render_rejects_broad_mode_hec_token_with_clear_error(self):
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--render-host",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-compose",
+            ),
+        )
+        for name, build_env, script, render_flag in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, _state_file = build_env(tmp_path)
+                token_file = tmp_path / f"{name}.token"
+                token_file.write_text("do-not-expose\n", encoding="utf-8")
+                token_file.chmod(0o644)
+
+                result = self.run_script(
+                    script,
+                    render_flag,
+                    "--output-dir",
+                    str(tmp_path / "rendered"),
+                    "--hec-token-file",
+                    str(token_file),
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Could not securely read HEC token file", output)
+                self.assertIn("mode 0400 or 0600", output)
+                self.assertNotIn("do-not-expose", output)
 
 
     def test_sc4snmp_validate_unexpected_useack_value(self):
@@ -1275,10 +1318,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertIn("SC4S / SC4SNMP Live Smoke Test", result.stdout)
 
-    def test_sc4x_live_smoke_uses_sshpass_file_instead_of_password_flag(self):
+    def test_sc4x_live_smoke_uses_shared_pinned_ssh_transport(self):
         script_text = (
             REPO_ROOT / "skills/shared/scripts/smoke_sc4x_live.sh"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("sshpass -f", script_text)
-        self.assertNotIn("sshpass -p", script_text)
+        self.assertIn("hbs_capture_target_cmd ssh", script_text)
+        self.assertNotIn("sshpass -f", script_text)
+        self.assertNotIn("StrictHostKeyChecking=accept-new", script_text)

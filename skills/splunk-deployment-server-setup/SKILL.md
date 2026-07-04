@@ -37,6 +37,10 @@ Never ask for secrets in chat.
   bash skills/shared/scripts/setup_credentials.sh
   ```
 - Never pass `SPLUNK_PASS` as an env-var prefix or command-line argument.
+- Management REST requires `https://`. `SPLUNK_VERIFY_SSL=false` still uses
+  encrypted HTTPS and does not permit plaintext. Only an isolated, short-lived
+  lab may explicitly set `SPLUNK_ALLOW_INSECURE_HTTP=true`; the renderer and
+  every live call warn when that override is active.
 
 ## Quick Start
 

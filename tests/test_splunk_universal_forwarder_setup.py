@@ -213,6 +213,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             tmp_path = Path(tmpdir)
             secret_file = tmp_path / "password.txt"
             secret_file.write_text("SuperSecretPassword123!", encoding="utf-8")
+            secret_file.chmod(0o600)
             result = self.run_script(
                 "python3",
                 str(RENDERER),
@@ -266,6 +267,84 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertIn("install-universal-forwarder.ps1", payload["files"])
             self.assertEqual(payload["metadata"]["v1_apply"], "render-only")
+
+    def test_setup_defaults_to_non_mutating_render(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            render_root = Path(tmpdir) / "rendered"
+            result = self.run_script(
+                "bash",
+                str(SETUP),
+                "--target-os",
+                "linux",
+                "--output-dir",
+                str(render_root),
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            apply_script = render_root / "universal-forwarder/apply-universal-forwarder.sh"
+            self.assertTrue(apply_script.is_file())
+            self.assertIn("--accept-forwarder-mutation", apply_script.read_text(encoding="utf-8"))
+            blocked = self.run_script("bash", str(apply_script))
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn(
+                "requires --accept-forwarder-mutation",
+                blocked.stdout + blocked.stderr,
+            )
+
+    def test_live_mutation_phases_require_explicit_acknowledgement(self) -> None:
+        for phase in ("install", "enroll", "all"):
+            with self.subTest(phase=phase):
+                result = self.run_script(
+                    "bash",
+                    str(SETUP),
+                    "--phase",
+                    phase,
+                    "--target-os",
+                    "linux",
+                    "--execution",
+                    "local",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "requires --accept-forwarder-mutation",
+                    result.stdout + result.stderr,
+                )
+
+    def test_mutation_dry_run_does_not_require_acknowledgement(self) -> None:
+        result = self.run_script(
+            "bash",
+            str(SETUP),
+            "--phase",
+            "all",
+            "--target-os",
+            "linux",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["phase"], "all")
+
+    def test_mutation_acknowledgement_advances_past_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing_package = Path(tmpdir) / "splunkforwarder-missing-linux-amd64.tgz"
+            result = self.run_script(
+                "bash",
+                str(SETUP),
+                "--phase",
+                "install",
+                "--accept-forwarder-mutation",
+                "--target-os",
+                "linux",
+                "--execution",
+                "local",
+                "--source",
+                "local",
+                "--file",
+                str(missing_package),
+            )
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("requires --accept-forwarder-mutation", combined)
+            self.assertIn("not found", combined.lower())
 
     def test_non_core_and_dmg_apply_dry_runs_are_plannable(self) -> None:
         cases = [
@@ -355,6 +434,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             password_file = tmp_path / "password"
             package.write_text("not-a-real-package", encoding="utf-8")
             password_file.write_text("SuperSecretPassword123!", encoding="utf-8")
+            password_file.chmod(0o600)
             result = self.run_script(
                 "bash",
                 str(SETUP),
@@ -381,6 +461,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             script = (tmp_path / "rendered/universal-forwarder/apply-universal-forwarder.sh").read_text(encoding="utf-8")
             self.assertIn(str(SETUP), script)
             self.assertIn("--phase all", script)
+            self.assertIn("--accept-forwarder-mutation", script)
             self.assertIn("--source local", script)
             self.assertIn("--package-type tgz", script)
             self.assertIn("--deployment-server ds01.example.com:8089", script)
@@ -406,6 +487,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             script = (Path(tmpdir) / "rendered/universal-forwarder/apply-universal-forwarder.sh").read_text(encoding="utf-8")
             self.assertIn("No automated apply command was rendered", script)
+            self.assertIn("--accept-forwarder-mutation", script)
             self.assertNotIn("exec bash skills/splunk-universal-forwarder-setup/scripts/setup.sh --phase all", script)
 
     def test_renderer_rejects_empty_server_list_entries(self) -> None:
@@ -604,6 +686,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 str(SETUP),
                 "--phase",
                 "install",
+                "--accept-forwarder-mutation",
                 "--target-os",
                 "linux",
                 "--source",
@@ -647,6 +730,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 str(SETUP),
                 "--phase",
                 "install",
+                "--accept-forwarder-mutation",
                 "--target-os",
                 "linux",
                 "--source",
@@ -677,6 +761,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 archive.addfile(info, io.BytesIO(payload))
             password_file = tmp_path / "password"
             password_file.write_text("abcdefgh", encoding="utf-8")
+            password_file.chmod(0o600)
             env = os.environ.copy()
             env["SPLUNK_LOCAL_SUDO"] = "false"
             result = self.run_script(
@@ -684,6 +769,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 str(SETUP),
                 "--phase",
                 "install",
+                "--accept-forwarder-mutation",
                 "--target-os",
                 "linux",
                 "--source",
@@ -710,6 +796,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             package.write_text("not-an-archive", encoding="utf-8")
             password_file = tmp_path / "password"
             password_file.write_text("abcdefgh", encoding="utf-8")
+            password_file.chmod(0o600)
             env = os.environ.copy()
             env["SPLUNK_LOCAL_SUDO"] = "false"
             result = self.run_script(
@@ -717,6 +804,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 str(SETUP),
                 "--phase",
                 "install",
+                "--accept-forwarder-mutation",
                 "--target-os",
                 "linux",
                 "--source",

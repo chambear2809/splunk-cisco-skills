@@ -86,5 +86,9 @@ File: `--panels-file panels.json` with a JSON list of objects
   rendered `defaults` block as needed.
 - On Splunk Cloud, publishing uses the search-tier REST API; ensure the
   `search-api` allow list permits your IP.
+- Authenticated publishing requires a credential-free HTTPS management origin,
+  never follows redirects, ignores user curl configuration, and disables URL
+  globbing. Plaintext HTTP requires the explicit lab-only
+  `SPLUNK_ALLOW_INSECURE_HTTP=true` opt-in.
 
 Read `reference.md` for the schema sections and conversion guidance.

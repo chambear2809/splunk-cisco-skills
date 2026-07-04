@@ -60,6 +60,11 @@ Defense-in-depth toggles:
   splunkweb}/*.pem`). Preflight refuses default certs.
 - Replace default `[sslConfig] sslPassword = password` literal. Preflight
   refuses the default.
+- Public preflight and validation probes use the system trust store by
+  default. For a reviewed private/public proxy CA, pass `--public-ca-file`.
+  The probes still verify both the chain and the requested FQDN. `curl -k`
+  and hostname-disabled OpenSSL output are never accepted as production-pass
+  evidence.
 
 See [references/tls-hardening.md](references/tls-hardening.md) for the
 full per-stanza matrix.
@@ -145,9 +150,39 @@ Splunk version. The skill closes the SPL-upload surface by:
 - `[sslConfig] sslPassword` rotated from the literal `password` default.
 - HEC tokens never appear on argv, in chat, or in `metadata.json`.
 - IdP signing certs and TLS private keys passed in via file paths only.
+- Direct search-head apply opens each secret with `O_NOFOLLOW`, validates a
+  single-link private regular file through the open descriptor, and reads the
+  value from that descriptor. Plaintext is prepared only in the private
+  same-filesystem transaction stage; after atomic activation its live files
+  remain mode `0600`, and the transaction cannot commit until Splunk encrypts
+  them. Every EXIT, ERR, INT, or TERM path removes plaintext and scrubs shell
+  values.
 - `splunk-secret-rotation.md` documents the 10-step incident-response
   rotation procedure (used after SVD-2026-0207 / SVD-2026-0203 -class
   leaks).
+
+### Transactional direct apply
+
+Search-head, HEC-tier, and heavy-forwarder apply scripts never copy over the
+live app in place. They create a mode-0700 sibling transaction directory under
+`$SPLUNK_HOME/etc`, build the complete app there, snapshot the exact prior app
+and `splunk-launch.conf`, and rename the staged state into place. Before the
+first restart they require a successful btool configuration check plus exact
+critical-key readback. After restart they repeat exact readback; search-head
+secret values must be encrypted in both btool output and the live local files.
+
+Any failure or signal restores the exact prior app and launch state, performs
+a rollback restart, verifies `splunk status`, and removes the transaction
+directory. `--phase apply` always runs the full live preflight immediately
+before selecting an apply target; it cannot skip directly to mutation.
+
+Preflight and validation never interpret missing configuration as a secure
+default. Failed or empty btool output fails the gate, critical settings are
+compared to their exact rendered safe values, `[role_admin] never_lockout`
+must equal `disabled`, and `authType` must be a known non-`Scripted` value
+matching the selected authentication mode. The legacy
+`--allow-scripted-auth` parser flag is compatibility-only and cannot override
+that refusal.
 
 ## 8. Reverse proxy duties
 

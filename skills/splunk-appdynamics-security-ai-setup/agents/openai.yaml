@@ -1,5 +1,4 @@
-name: splunk-appdynamics-security-ai-setup
-short_description: "Render AppDynamics Application Security and Observability for AI plans"
-entrypoint: "skills/splunk-appdynamics-security-ai-setup/SKILL.md"
-safe_first_command: "bash skills/splunk-appdynamics-security-ai-setup/scripts/setup.sh --help"
-validation_command: "bash skills/splunk-appdynamics-security-ai-setup/scripts/validate.sh --help"
+interface:
+  display_name: "Splunk AppDynamics Security AI Setup"
+  short_description: "Render AppDynamics security and AI monitoring plans"
+  default_prompt: "Use $splunk-appdynamics-security-ai-setup to render AppDynamics Application Security and Observability for AI plans."

@@ -27,19 +27,25 @@ if ! get_splunkbase_session; then
     # Debug: show what the session API returned (redacted)
     if [[ -n "${DEBUG_SPLUNKBASE:-}" ]]; then
         _set_splunkbase_curl_tls_args || exit 1
+        credential_curl_prepare_transport false
         response_file="$(mktemp)"
+        chmod 600 "${response_file}"
+        hbs_append_cleanup_trap "rm -f $(printf '%q' "${response_file}") 2>/dev/null || true" EXIT INT TERM
         # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-        http_code=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        http_code=$(curl -q -s --connect-timeout 30 --max-time 120 \
+            ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
             -X POST "https://splunkbase.splunk.com/api/account:login" \
             -K <(
                 printf 'form-string = "username=%s"\n' "$(_curl_config_escape "${SB_USER}")"
                 printf 'form-string = "password=%s"\n' "$(_curl_config_escape "${SB_PASS}")"
             ) \
             -o "${response_file}" \
-            -w '%{http_code}' 2>/dev/null || echo "000")
-        echo "DEBUG: Session API response (HTTP ${http_code}, first 800 chars):" >&2
-        tr '\n' ' ' < "${response_file}" | sed 's/[[:space:]]\+/ /g' | head -c 800 >&2
-        echo "" >&2
+            -w '%{http_code}' \
+            "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}" 2>/dev/null || echo "000")
+        echo "DEBUG: Sanitized Session API response (HTTP ${http_code}, first 8192 input bytes):" >&2
+        debug_response="$(head -c 8192 "${response_file}")"
+        sanitize_response "${debug_response}" 5 >&2 || true
+        debug_response=""
         rm -f "${response_file}"
     fi
     exit 1

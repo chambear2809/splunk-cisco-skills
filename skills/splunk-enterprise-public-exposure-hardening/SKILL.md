@@ -131,8 +131,13 @@ Run preflight against a live host (read-only checks; refuses to apply):
 bash skills/splunk-enterprise-public-exposure-hardening/scripts/setup.sh \
   --phase preflight \
   --public-fqdn splunk.example.com \
+  --public-ca-file /etc/pki/ca-trust/source/anchors/public-proxy-ca.pem \
   --external-probe-cmd "ssh probe@bastion.example.com nc -zv"
 ```
+
+Omit `--public-ca-file` for a publicly trusted certificate. Public probes use
+system trust by default and always verify the certificate chain and FQDN;
+there is no insecure `curl -k` production-pass path.
 
 Apply the hardening app on a search head (mutates Splunk; requires the
 explicit accept flag):
@@ -174,6 +179,11 @@ Under the project root in `splunk-public-exposure-rendered/`:
   license-manager also delegates and exits nonzero.
   SHC topologies reject direct `search-head`/`hec-tier` mutation and require
   the deployer path.
+- `splunk/transaction-helpers.sh` — shared direct-apply transaction engine.
+  It securely reads secret files through no-follow descriptors, stages in a
+  private directory on the target filesystem, snapshots the prior app and
+  `splunk-launch.conf`, validates btool before restart, and restores plus
+  restart-verifies the exact prior state on any error or signal.
 - `splunk/rotate-pass4symmkey.sh`, `rotate-splunk-secret.sh` — secret
   rotation helpers that read keys from local files only.
 - `splunk/certificates/verify-certs.sh`,
@@ -204,9 +214,15 @@ Under the project root in `splunk-public-exposure-rendered/`:
   TLS scan, header-injection probe, `return_to` redirect probe, cookie
   scrubbing, etc.). Refuses to mark the deployment ready when any check
   fails.
-- `apply` — render then run the apply script for the role you specified.
-  Requires `--accept-public-exposure` (a single-flag acknowledgement
-  that you are about to bind Splunk to a public-facing FQDN).
+- `apply` — render, run the fail-closed live preflight, then run the apply
+  script for the role you specified. Requires `--accept-public-exposure` (a
+  single-flag acknowledgement that you are about to bind Splunk to a
+  public-facing FQDN). Search-head, HEC-tier, and heavy-forwarder applies are
+  transactional and roll back both disk state and the Splunk restart if any
+  btool, restart, encryption, or post-restart readback check fails.
+  Preflight and validation treat failed, empty, missing, or unexpected btool
+  output as a failure; `role_admin.never_lockout` must be `disabled`, and
+  `authType` must be a recognized non-Scripted value matching the render.
 - `validate` — render then run the live validation probes.
 - `all` — render + preflight + apply + validate for direct local targets,
   gated by `--accept-public-exposure`. Delegated cluster/license targets stop

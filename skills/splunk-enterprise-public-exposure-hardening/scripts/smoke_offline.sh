@@ -43,10 +43,10 @@ fi
 
 # --- 3. file count and structure
 count="$(find "$tmp/single/public-exposure" -type f 2>/dev/null | wc -l | tr -d ' ')"
-if [[ "$count" == "53" ]]; then
-    ok "default render produced 53 files"
+if [[ "$count" == "54" ]]; then
+    ok "default render produced 54 files"
 else
-    fail "default render produced $count files (expected 53)"
+    fail "default render produced $count files (expected 54)"
 fi
 
 # --- 4. shc-with-hec-and-hf

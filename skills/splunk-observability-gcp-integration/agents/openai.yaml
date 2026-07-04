@@ -1,30 +1,4 @@
 interface:
   display_name: "Splunk Observability Cloud <-> GCP Integration"
-  short_description: "Render, apply, validate, discover, and diagnose the Splunk Observability Cloud GCP integration end-to-end."
-  default_prompt: |
-    Use $splunk-observability-gcp-integration to render, validate, apply,
-    discover, or diagnose the Splunk Observability Cloud GCP integration:
-    polling via Cloud Monitoring API; two authMethod values —
-    SERVICE_ACCOUNT_KEY (projectServiceKeys with projectKey write-only,
-    redacted on GET, file-based delivery via --key-file) or
-    WORKLOAD_IDENTITY_FEDERATION (official Splunk-generated, mode-600
-    gcp_wif_config.json delivered as compact/stringified JSON in
-    workloadIdentityFederationConfig; never fabricate realm principals,
-    pool IDs, or provider IDs); projects.syncMode; pollRate 60–600 s (wire in
-    milliseconds); useMetricSourceProjectForQuota (WARN: requires extra IAM
-    role); importGCPMetrics; services 32-entry enum (appengine, bigquery,
-    bigtable, cloudfunctions, cloudiot, cloudsql, cloudtasks, composer,
-    compute, container, containeranalysis, dataflow, dataproc, dialogflow,
-    file, firebasedatabase, firebasehosting, firebasestorage, firestore,
-    iam, interconnect, knative, loadbalancing, logging, ml, pubsub, redis,
-    router, run, spanner, storage, vpn); customMetricTypeDomains;
-    excludeGceInstancesWithLabels; namedToken ForceNew warning; Terraform
-    signalfx_gcp_integration handoff for Service Account key mode only;
-    GCloud CLI SA creation + role binding scripts for SA mode; multi-project support;
-    drift detection with credential-hash sidecar (projectKey redacted on
-    GET); conflict matrix (SA key vs WIF block, services mode, poll-rate
-    bounds; WIF missing/corrupt/insecure-file preflight); and cross-skill handoffs to splunk-app-install
-    (Splunk_TA_google_cloud Splunkbase 3088 logs), splunk-observability-
-    otel-collector-setup (GKE host telemetry), splunk-observability-
-    dashboard-builder (GCP dashboards), and splunk-observability-native-ops
-    (GCP detectors).
+  short_description: "Operate Splunk Observability GCP integrations"
+  default_prompt: "Use $splunk-observability-gcp-integration to render, validate, apply,\ndiscover, or diagnose the Splunk Observability Cloud GCP integration:\npolling via Cloud Monitoring API; two authMethod values —\nSERVICE_ACCOUNT_KEY (projectServiceKeys with projectKey write-only,\nredacted on GET, file-based delivery via --key-file) or\nWORKLOAD_IDENTITY_FEDERATION (official Splunk-generated, mode-600\ngcp_wif_config.json delivered as compact/stringified JSON in\nworkloadIdentityFederationConfig; never fabricate realm principals,\npool IDs, or provider IDs); projects.syncMode; pollRate 60–600 s (wire in\nmilliseconds); useMetricSourceProjectForQuota (WARN: requires extra IAM\nrole); importGCPMetrics; services 32-entry enum (appengine, bigquery,\nbigtable, cloudfunctions, cloudiot, cloudsql, cloudtasks, composer,\ncompute, container, containeranalysis, dataflow, dataproc, dialogflow,\nfile, firebasedatabase, firebasehosting, firebasestorage, firestore,\niam, interconnect, knative, loadbalancing, logging, ml, pubsub, redis,\nrouter, run, spanner, storage, vpn); customMetricTypeDomains;\nexcludeGceInstancesWithLabels; namedToken ForceNew warning; Terraform\nsignalfx_gcp_integration handoff for Service Account key mode only;\nGCloud CLI SA creation + role binding scripts for SA mode; multi-project support;\ndrift detection with credential-hash sidecar (projectKey redacted on\nGET); conflict matrix (SA key vs WIF block, services mode, poll-rate\nbounds; WIF missing/corrupt/insecure-file preflight); and cross-skill handoffs to splunk-app-install\n(Splunk_TA_google_cloud Splunkbase 3088 logs), splunk-observability-\notel-collector-setup (GKE host telemetry), splunk-observability-\ndashboard-builder (GCP dashboards), and splunk-observability-native-ops\n(GCP detectors)."

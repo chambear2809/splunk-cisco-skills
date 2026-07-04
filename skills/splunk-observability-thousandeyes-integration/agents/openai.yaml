@@ -1,11 +1,4 @@
 interface:
   display_name: "Splunk Observability ThousandEyes Integration"
-  short_description: "Wire ThousandEyes to Splunk Observability Cloud with verified TE applies and O11y handoffs"
-  default_prompt: >-
-    Use $splunk-observability-thousandeyes-integration to render and
-    optionally apply the TE -> Splunk Observability Cloud integration:
-    Integration 1.0 OpenTelemetry stream, Integrations 2.0 APM connector,
-    verified test, alert-rule, and Template applies; rendered labels, tags,
-    and TE-side dashboard handoffs; and per-test-type O11y dashboards/detectors
-    handed off to splunk-observability-dashboard-builder and
-    splunk-observability-native-ops.
+  short_description: "Connect ThousandEyes to Splunk Observability"
+  default_prompt: "Use $splunk-observability-thousandeyes-integration to render and optionally apply the TE -> Splunk Observability Cloud integration: Integration 1.0 OpenTelemetry stream, Integrations 2.0 APM connector, verified test, alert-rule, and Template applies; rendered labels, tags, and TE-side dashboard handoffs; and per-test-type O11y dashboards/detectors handed off to splunk-observability-dashboard-builder and splunk-observability-native-ops."

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Validate SKILL.md files against the Agent Skills frontmatter contract."""
+"""Validate SKILL.md and agents/openai.yaml metadata contracts."""
 
+import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 try:
     import yaml
@@ -39,9 +41,172 @@ COMPATIBILITY_STATUSES = {
     "delegated",
 }
 COMPATIBILITY_VERIFIED_DATE = "2026-07-02"
+OPENAI_TOP_LEVEL_KEYS = {"interface", "dependencies", "policy"}
+OPENAI_INTERFACE_KEYS = {
+    "display_name",
+    "short_description",
+    "icon_small",
+    "icon_large",
+    "brand_color",
+    "default_prompt",
+}
+OPENAI_DEPENDENCY_KEYS = {"tools"}
+OPENAI_TOOL_KEYS = {"type", "value", "description", "transport", "url"}
 
 
-def parse_frontmatter(block: str) -> dict[str, str]:
+def _fallback_scalar(value: str) -> Any:
+    value = value.strip()
+    if value.startswith('"') and value.endswith('"'):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value[1:-1]
+    if value.startswith("'") and value.endswith("'"):
+        return value[1:-1].replace("''", "'")
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    if value in {"null", "~"}:
+        return None
+    return value
+
+
+def _fallback_mapping(block: str) -> dict[str, Any]:
+    """Parse the small mapping subset used by repository metadata.
+
+    The fallback intentionally supports only top-level scalars, folded/literal
+    strings, nested mappings, and lists of scalars or mappings. That covers
+    SKILL.md frontmatter plus canonical ``agents/openai.yaml`` tool
+    dependencies without pretending to be a general YAML parser.
+    """
+    result: dict[str, Any] = {}
+    lines = block.splitlines()
+    index = 0
+
+    def next_content_indent() -> tuple[int | None, str]:
+        probe = index
+        while probe < len(lines):
+            candidate = lines[probe]
+            if candidate.strip() and not candidate.lstrip().startswith("#"):
+                return (
+                    len(candidate) - len(candidate.lstrip(" ")),
+                    candidate.strip(),
+                )
+            probe += 1
+        return None, ""
+
+    def consume_sequence(expected_indent: int) -> list[Any]:
+        nonlocal index
+        sequence: list[Any] = []
+        while index < len(lines):
+            raw = lines[index]
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                index += 1
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            if indent < expected_indent:
+                break
+            if indent != expected_indent or not raw.strip().startswith("-"):
+                raise ValueError(
+                    f"unsupported YAML sequence at line {index + 1}"
+                )
+
+            value = raw.strip()[1:].strip()
+            index += 1
+            if not value:
+                child_indent, child_text = next_content_indent()
+                if child_indent is None or child_indent <= expected_indent:
+                    sequence.append(None)
+                elif child_text.startswith("-"):
+                    sequence.append(consume_sequence(child_indent))
+                else:
+                    sequence.append(consume_mapping(child_indent))
+                continue
+
+            if ":" not in value:
+                sequence.append(_fallback_scalar(value))
+                continue
+
+            key, raw_value = value.split(":", 1)
+            key = key.strip()
+            if not key:
+                raise ValueError(f"empty YAML key at line {index}")
+            item: dict[str, Any] = {key: _fallback_scalar(raw_value)}
+            child_indent, _ = next_content_indent()
+            if child_indent is not None and child_indent > expected_indent:
+                continuation = consume_mapping(child_indent)
+                duplicate = set(item) & set(continuation)
+                if duplicate:
+                    raise ValueError(
+                        f"duplicate YAML key {sorted(duplicate)[0]!r}"
+                    )
+                item.update(continuation)
+            sequence.append(item)
+        return sequence
+
+    def consume_mapping(expected_indent: int) -> dict[str, Any]:
+        nonlocal index
+        mapping: dict[str, Any] = {}
+        while index < len(lines):
+            raw = lines[index]
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                index += 1
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            if indent < expected_indent:
+                break
+            if indent > expected_indent:
+                raise ValueError(
+                    f"unsupported YAML indentation at line {index + 1}"
+                )
+            line = raw.strip()
+            if line.startswith("-") or ":" not in line:
+                raise ValueError(
+                    f"unsupported YAML construct at line {index + 1}"
+                )
+            key, raw_value = line.split(":", 1)
+            key = key.strip()
+            value = raw_value.strip()
+            index += 1
+
+            if value in {">", ">-", "|", "|-"}:
+                parts: list[str] = []
+                while index < len(lines):
+                    continuation = lines[index]
+                    if not continuation.strip():
+                        parts.append("")
+                        index += 1
+                        continue
+                    continuation_indent = len(continuation) - len(
+                        continuation.lstrip(" ")
+                    )
+                    if continuation_indent <= expected_indent:
+                        break
+                    parts.append(continuation.strip())
+                    index += 1
+                separator = "\n" if value.startswith("|") else " "
+                mapping[key] = separator.join(parts).strip()
+                continue
+
+            if not value:
+                next_indent, next_text = next_content_indent()
+                if next_indent is None or next_indent <= expected_indent:
+                    mapping[key] = {}
+                elif next_text.startswith("-"):
+                    mapping[key] = consume_sequence(next_indent)
+                else:
+                    mapping[key] = consume_mapping(next_indent)
+                continue
+
+            mapping[key] = _fallback_scalar(value)
+        return mapping
+
+    result.update(consume_mapping(0))
+    return result
+
+
+def parse_frontmatter(block: str) -> dict[str, Any]:
     if yaml is not None:
         loaded = yaml.safe_load(block) or {}
         if not isinstance(loaded, dict):
@@ -49,33 +214,135 @@ def parse_frontmatter(block: str) -> dict[str, str]:
         return loaded
 
     # Minimal fallback for local environments that have not installed
-    # requirements-dev.txt yet. It supports the scalar and folded-block fields
-    # used by SKILL.md files; CI installs PyYAML and uses the full parser.
-    metadata: dict[str, str] = {}
-    lines = block.splitlines()
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        if not line.strip() or line.lstrip().startswith("#"):
-            index += 1
-            continue
-        if ":" not in line:
-            index += 1
-            continue
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
-        if value in {">", ">-", "|", "|-"}:
-            parts: list[str] = []
-            index += 1
-            while index < len(lines) and (lines[index].startswith(" ") or not lines[index].strip()):
-                parts.append(lines[index].strip())
-                index += 1
-            metadata[key] = " ".join(part for part in parts if part)
-            continue
-        metadata[key] = value.strip("\"'")
-        index += 1
-    return metadata
+    # requirements-dev.txt yet. CI installs PyYAML and uses the full parser.
+    return _fallback_mapping(block)
+
+
+def check_openai_metadata(skill_dir: Path) -> list[str]:
+    errors: list[str] = []
+    skill_name = skill_dir.name
+    metadata_path = skill_dir / "agents" / "openai.yaml"
+    if not metadata_path.is_file():
+        return [f"{skill_name}: missing agents/openai.yaml"]
+
+    try:
+        document = parse_frontmatter(metadata_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"{skill_name}: invalid agents/openai.yaml: {exc}"]
+    if not isinstance(document, dict):
+        return [f"{skill_name}: agents/openai.yaml root must be a mapping"]
+
+    unexpected_top_level = sorted(set(document) - OPENAI_TOP_LEVEL_KEYS)
+    if unexpected_top_level:
+        errors.append(
+            f"{skill_name}: agents/openai.yaml contains unsupported top-level "
+            f"field(s): {', '.join(unexpected_top_level)}"
+        )
+
+    interface = document.get("interface")
+    if not isinstance(interface, dict):
+        errors.append(
+            f"{skill_name}: agents/openai.yaml must contain an interface mapping"
+        )
+        return errors
+    unexpected_interface = sorted(set(interface) - OPENAI_INTERFACE_KEYS)
+    if unexpected_interface:
+        errors.append(
+            f"{skill_name}: agents/openai.yaml interface contains unsupported "
+            f"field(s): {', '.join(unexpected_interface)}"
+        )
+
+    for key in ("display_name", "short_description", "default_prompt"):
+        value = interface.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                f"{skill_name}: agents/openai.yaml interface.{key} must be "
+                "a non-empty string"
+            )
+
+    short_description = interface.get("short_description")
+    if isinstance(short_description, str) and not 25 <= len(short_description) <= 64:
+        errors.append(
+            f"{skill_name}: agents/openai.yaml interface.short_description is "
+            f"{len(short_description)} characters; expected 25-64"
+        )
+    default_prompt = interface.get("default_prompt")
+    if isinstance(default_prompt, str) and f"${skill_name}" not in default_prompt:
+        errors.append(
+            f"{skill_name}: agents/openai.yaml interface.default_prompt must "
+            f"explicitly mention ${skill_name}"
+        )
+
+    for key in ("icon_small", "icon_large", "brand_color"):
+        value = interface.get(key)
+        if value is not None and not isinstance(value, str):
+            errors.append(
+                f"{skill_name}: agents/openai.yaml interface.{key} must be a string"
+            )
+
+    policy = document.get("policy")
+    if policy is not None:
+        if not isinstance(policy, dict):
+            errors.append(
+                f"{skill_name}: agents/openai.yaml policy must be a mapping"
+            )
+        elif set(policy) - {"allow_implicit_invocation"}:
+            errors.append(
+                f"{skill_name}: agents/openai.yaml policy contains unsupported "
+                "fields"
+            )
+        elif not isinstance(policy.get("allow_implicit_invocation"), bool):
+            errors.append(
+                f"{skill_name}: agents/openai.yaml "
+                "policy.allow_implicit_invocation must be a boolean"
+            )
+
+    dependencies = document.get("dependencies")
+    if dependencies is not None:
+        if not isinstance(dependencies, dict):
+            errors.append(
+                f"{skill_name}: agents/openai.yaml dependencies must be a mapping"
+            )
+        else:
+            unexpected_dependencies = sorted(
+                set(dependencies) - OPENAI_DEPENDENCY_KEYS
+            )
+            if unexpected_dependencies:
+                errors.append(
+                    f"{skill_name}: agents/openai.yaml dependencies contains "
+                    "unsupported field(s): " + ", ".join(unexpected_dependencies)
+                )
+            tools = dependencies.get("tools")
+            if tools is not None and not isinstance(tools, list):
+                errors.append(
+                    f"{skill_name}: agents/openai.yaml dependencies.tools must "
+                    "be a list"
+                )
+            elif isinstance(tools, list):
+                for position, tool in enumerate(tools):
+                    prefix = (
+                        f"{skill_name}: agents/openai.yaml "
+                        f"dependencies.tools[{position}]"
+                    )
+                    if not isinstance(tool, dict):
+                        errors.append(f"{prefix} must be a mapping")
+                        continue
+                    unexpected_tool = sorted(set(tool) - OPENAI_TOOL_KEYS)
+                    if unexpected_tool:
+                        errors.append(
+                            f"{prefix} contains unsupported field(s): "
+                            + ", ".join(unexpected_tool)
+                        )
+                    if tool.get("type") != "mcp":
+                        errors.append(f"{prefix}.type must be 'mcp'")
+                    for field in ("value", "description", "transport", "url"):
+                        field_value = tool.get(field)
+                        if field == "value" or field_value is not None:
+                            if not isinstance(field_value, str) or not field_value.strip():
+                                errors.append(
+                                    f"{prefix}.{field} must be a non-empty string"
+                                )
+    return errors
 
 
 def check_skill(skill_dir: Path) -> list[str]:
@@ -229,15 +496,19 @@ def main() -> int:
         ):
             continue
         all_errors.extend(check_skill(skill_dir))
+        all_errors.extend(check_openai_metadata(skill_dir))
         checked_count += 1
 
     if all_errors:
-        print("SKILL.md frontmatter errors:", file=sys.stderr)
+        print("Skill metadata errors:", file=sys.stderr)
         for err in all_errors:
             print(f"  - {err}", file=sys.stderr)
         return 1
 
-    print(f"All {checked_count} SKILL.md files pass frontmatter checks.")
+    print(
+        f"All {checked_count} skills pass SKILL.md frontmatter and "
+        "agents/openai.yaml checks."
+    )
     return 0
 
 

@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -19,7 +18,9 @@ from skills.shared.coding_agent_o11y.common import (
     ENV_PLACEHOLDER_RE,
     REPO_ROOT,
     UsageError,
+    absolute_path_no_follow,
     command_failed,
+    copy_file_safe,
     deep_merge,
     ensure_safe_external_header,
     ensure_safe_external_value,
@@ -27,6 +28,7 @@ from skills.shared.coding_agent_o11y.common import (
     parse_header,
     print_payload,
     reject_secret_argv,
+    reset_output_subdirectories,
     scan_rendered_for_secret_leaks,
     shell_join,
     split_csv,
@@ -160,11 +162,11 @@ def normalize_local_collector_receiver_endpoint(value: object) -> str:
 def resolve_codex_home(config: dict[str, Any]) -> Path:
     configured = str(config.get("codex", {}).get("codex_home") or "").strip()
     if configured:
-        return Path(configured).expanduser().resolve()
+        return absolute_path_no_follow(Path(configured))
     env_home = os.environ.get("CODEX_HOME", "").strip()
     if env_home:
-        return Path(env_home).expanduser().resolve()
-    return (Path.home() / ".codex").resolve()
+        return absolute_path_no_follow(Path(env_home))
+    return absolute_path_no_follow(Path.home() / ".codex")
 
 
 def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -1096,13 +1098,10 @@ def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
 
 def render(config: dict[str, Any], output_dir: Path, json_output: bool = False) -> dict[str, Any]:
     errors, warnings = validate_config(config)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Remove only files owned by this renderer when re-rendering.
-    for child in ("profiles", "collector", "runtime", "bin", "hooks"):
-        target = output_dir / child
-        if target.exists():
-            shutil.rmtree(target)
+    reset_output_subdirectories(
+        output_dir,
+        ("profiles", "collector", "runtime", "bin", "hooks"),
+    )
 
     if errors:
         metadata = {"ok": False, "errors": errors, "warnings": warnings, "generated_at": now_iso()}
@@ -1339,7 +1338,6 @@ def merge_hooks_file(source: Path, target: Path) -> None:
 
     hooks["Stop"] = [entry for entry in stop_hooks if not is_managed_stop(entry)]
     hooks["Stop"].extend(managed_stop)
-    target.parent.mkdir(parents=True, exist_ok=True)
     write_json(target, target_doc)
 
 
@@ -1368,10 +1366,7 @@ def apply_sections(config: dict[str, Any], output_dir: Path, sections: list[str]
                 continue
             if command[0] == "install":
                 target = Path(os.path.expandvars(os.path.expanduser(command[-1])))
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(command[-2], target)
-                if command[2] == "0755":
-                    target.chmod(target.stat().st_mode | 0o111)
+                copy_file_safe(Path(command[-2]), target, mode=int(command[2], 8))
             elif command[0] == "merge-hooks":
                 merge_hooks_file(Path(command[1]), Path(os.path.expandvars(os.path.expanduser(command[2]))))
             else:
@@ -1448,7 +1443,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         reject_secret_argv(argv)
         args = parse_args(argv)
-        output_dir = Path(args.output_dir).expanduser().resolve()
+        output_dir = absolute_path_no_follow(Path(args.output_dir))
         if args.discover:
             discover(args.json)
             return 0

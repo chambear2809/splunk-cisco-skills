@@ -7,6 +7,8 @@ import io
 import json
 import sys
 import tarfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -32,6 +34,151 @@ engine = load_engine()
 
 def actions_by_operation(plan: dict[str, object], operation: str) -> list[dict[str, object]]:
     return [action for action in plan["actions"] if action["operation"] == operation]  # type: ignore[index]
+
+
+def test_apply_is_fail_stop_by_default_and_continue_requires_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+    actions = [
+        engine.Action("indexes", "create_index", "first").as_dict(),
+        engine.Action("indexes", "create_index", "second").as_dict(),
+    ]
+    monkeypatch.setattr(engine, "SplunkClient", FakeClient)
+
+    calls: list[str] = []
+
+    def fake_apply(_self, _client, action):
+        calls.append(action.target)
+        if action.target == "first":
+            raise RuntimeError("synthetic first-action failure")
+        return "updated"
+
+    monkeypatch.setattr(engine.Runner, "_apply_action", fake_apply)
+
+    default_runner = engine.Runner(REPO_ROOT, {})
+    default_runner.plan = {"actions": actions}
+    default_result = default_runner.apply()
+    assert [item["status"] for item in default_result["results"]] == [
+        "failed",
+        "skipped",
+    ]
+    assert default_result["stopped_on_error"] is True
+    assert calls == ["first"]
+
+    calls.clear()
+    override_runner = engine.Runner(REPO_ROOT, {}, stop_on_error=False)
+    override_runner.plan = {"actions": actions}
+    override_result = override_runner.apply()
+    assert [item["status"] for item in override_result["results"]] == [
+        "failed",
+        "updated",
+    ]
+    assert "stopped_on_error" not in override_result
+    assert calls == ["first", "second"]
+
+
+def _mock_es_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str,
+    *,
+    allow_insecure_http: bool = False,
+) -> None:
+    values = {
+        "SPLUNK_SEARCH_API_URI": base_url,
+        "SPLUNK_USER": "admin",
+        "SPLUNK_PASS": "test-password",
+    }
+    if allow_insecure_http:
+        values["SPLUNK_ALLOW_INSECURE_HTTP"] = "true"
+    monkeypatch.setattr(engine.CredentialLoader, "load", lambda _self: values)
+
+
+def test_es_client_refuses_http_without_explicit_lab_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_es_credentials(monkeypatch, "http://127.0.0.1:8089")
+    with pytest.raises(engine.EsConfigError, match="refuses plaintext HTTP"):
+        engine.SplunkClient(REPO_ROOT, {})
+
+
+def test_es_client_allows_explicit_lab_http_with_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _mock_es_credentials(
+        monkeypatch,
+        "http://127.0.0.1:8089",
+        allow_insecure_http=True,
+    )
+    client = engine.SplunkClient(REPO_ROOT, {})
+    assert client.base_url == "http://127.0.0.1:8089"
+    assert "LAB ONLY" in capsys.readouterr().err
+
+
+def test_es_client_rejects_uri_userinfo_without_echoing_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_es_credentials(monkeypatch, "https://embedded:uri-secret@example.test:8089")
+    with pytest.raises(engine.EsConfigError, match="userinfo") as exc_info:
+        engine.SplunkClient(REPO_ROOT, {})
+    assert "uri-secret" not in str(exc_info.value)
+
+
+def test_es_client_refuses_redirect_and_does_not_forward_session_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_authorization: list[str] = []
+
+    class TargetHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            target_authorization.append(self.headers.get("Authorization", ""))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    target = ThreadingHTTPServer(("127.0.0.1", 0), TargetHandler)
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:{target.server_port}/credential-target",
+            )
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    redirect = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+    threads = [
+        threading.Thread(target=server.serve_forever, daemon=True)
+        for server in (target, redirect)
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        _mock_es_credentials(
+            monkeypatch,
+            f"http://127.0.0.1:{redirect.server_port}",
+            allow_insecure_http=True,
+        )
+        client = engine.SplunkClient(REPO_ROOT, {})
+        client.session_key = "do-not-forward"
+        with pytest.raises(engine.EsConfigError, match="HTTP 302"):
+            client.request("GET", "/services/server/info")
+        assert target_authorization == []
+    finally:
+        for server in (redirect, target):
+            server.shutdown()
+            server.server_close()
 
 
 def test_yaml_spec_parses_and_normalizes_example() -> None:

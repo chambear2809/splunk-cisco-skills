@@ -4,20 +4,28 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
+import ipaddress
 import json
 import os
 import re
+import selectors
 import shlex
+import signal
 import stat
 import subprocess
 import sys
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 SKILL_NAME = "splunk-admin-doctor"
+SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-admin-doctor-rendered"
 
@@ -49,28 +57,86 @@ REQUIRED_RULE_FIELDS = {
     "handoff_skill",
     "rollback_or_validation",
 }
+RULE_ID_RE = re.compile(r"^SAD-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
+OFFICIAL_SOURCE_HOSTS = {"help.splunk.com", "splunk.com", "www.splunk.com"}
+MAX_EVIDENCE_BYTES = 64 * 1024 * 1024
+MAX_LOCAL_OUTPUT_BYTES = 256 * 1024
+NORMALIZED_EVIDENCE_RELATIVE_PATH = "evidence/normalized-evidence.redacted.json"
+LEGACY_EVIDENCE_RELATIVE_PATH = "evidence/input-evidence.redacted.json"
+COLLECTION_NOTES_RELATIVE_PATH = "evidence/collection-notes.md"
+INTEGRITY_MANIFEST_NAME = "artifact-manifest.json"
+OUTPUT_LOCK_NAME = ".doctor-output.lock"
+BASE_ARTIFACT_RELATIVE_PATHS = {
+    "doctor-report.json",
+    "doctor-report.md",
+    "fix-plan.json",
+    "fix-plan.md",
+    "coverage-report.json",
+    NORMALIZED_EVIDENCE_RELATIVE_PATH,
+    COLLECTION_NOTES_RELATIVE_PATH,
+}
+NON_HEALTH_FINDING_IDS = {"SAD-EVIDENCE-INCOMPLETE"}
+
+# Environment exclusions are for genuinely optional or unlicensed features,
+# never for baseline platform health. Rule-level exclusions remain the more
+# precise mechanism when an optional feature shares a broader domain.
+OPTIONAL_ENVIRONMENT_DOMAINS = {
+    "Archive and data lifecycle",
+    "Distributed search and SHC",
+    "Federated search",
+    "Indexer clustering",
+    "Product and solution handoffs",
+    "Workload management",
+}
+OPTIONAL_ENVIRONMENT_RULE_IDS = {
+    "SAD-CLOUD-IDXCLUSTER-DEGRADED",
+    "SAD-CLOUD-SHC-DEGRADED",
+    "SAD-DASHBOARD-STUDIO-GAP",
+    "SAD-DDAA-ARCHIVE-GAP",
+    "SAD-DEPLOYMENT-SERVER-DEGRADED",
+    "SAD-DISTSEARCH-PEER-DOWN",
+    "SAD-FEDERATED-SEARCH-DEGRADED",
+    "SAD-FWD-STALE",
+    "SAD-IDXCLUSTER-DEGRADED",
+    "SAD-INDEX-ARCHIVE-LIFECYCLE-GAP",
+    "SAD-INGEST-ACTIONS-GAP",
+    "SAD-INGEST-CLOUD-DATA-MANAGER-GAP",
+    "SAD-INGEST-COLLECTOR-GAP",
+    "SAD-INGEST-DBCONNECT-GAP",
+    "SAD-INGEST-EDGE-PROCESSOR-GAP",
+    "SAD-INGEST-HEC-DISABLED",
+    "SAD-INGEST-OTLP-GAP",
+    "SAD-INGEST-PROCESSOR-GAP",
+    "SAD-MC-ALERTS-DISABLED",
+    "SAD-MC-NOT-CONFIGURED",
+    "SAD-PREMIUM-HANDOFFS",
+    "SAD-SECURE-GATEWAY-GAP",
+    "SAD-SHC-DEGRADED",
+    "SAD-WLM-CLOUD-CMC-ISSUE",
+    "SAD-WLM-GUARDRAILS-MISSING",
+}
 
 
 SOURCE_DOCS = {
     "acs": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual",
     "agent_management": "https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.0/agent-management/about-agent-management",
-    "audit": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/audit-splunk-activity/about-audit-trail-events",
+    "audit": "https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/audit-activity-in-splunk-enterprise/auditing-activities-in-a-splunk-platform-instance",
     "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.4/first-steps/use-btool-to-troubleshoot-configurations",
     "cloud_config_validation": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/configure-your-splunk-cloud-platform-deployment/validating-configurations-using-the-btool-rest-api",
     "cloud_cmc": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/monitor-your-splunk-cloud-platform-deployment/introduction-to-the-cloud-monitoring-console",
     "cloud_rest": "https://help.splunk.com/en/splunk-cloud-platform/leverage-rest-apis",
-    "config_validation": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/administer-splunk-enterprise-with-configuration-files/validate-configuration-changes",
+    "config_validation": "https://help.splunk.com/en/splunk-enterprise/leverage-rest-apis/rest-api-reference/10.4/configuration-endpoints/configuration-endpoint-descriptions",
     "data_management": "https://help.splunk.com/en/data-management/transform-and-route-data/explore-data-management-solutions/data-management-solutions",
     "dashboard_studio": "https://help.splunk.com/en/splunk-enterprise/create-dashboards-and-reports/dashboard-studio/10.4/whats-new-in-dashboard-studio/whats-new-in-dashboard-studio",
     "ddaa": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.5.2605/manage-your-indexes-and-data-in-splunk-cloud-platform/store-expired-splunk-cloud-platform-data-in-a-splunk-managed-archive",
     "kvstore": "https://help.splunk.com/en?resourceId=Splunk_Admin_TroubleshootKVstore",
     "cim": "https://help.splunk.com/en/splunk-enterprise/common-information-model/6.1/introduction/overview-of-the-splunk-common-information-model",
-    "diag": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/9.1/contact-splunk-support/generate-a-diagnostic-file",
-    "backup": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/administer-splunk-enterprise-with-configuration-files/back-up-configuration-information",
+    "diag": "https://help.splunk.com/en/data-management/monitor-and-troubleshoot/troubleshoot-splunk-enterprise/9.4/contact-splunk-support/generate-a-diagnostic-file",
+    "backup": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/administer-splunk-enterprise-with-configuration-files/back-up-configuration-information",
     "federated_search": "https://help.splunk.com/en/splunk-cloud-platform/splunk-validated-architectures/splunk-platform-indexing-and-search/federated-search-for-splunk-platform",
-    "monitoring": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.0/introduction/monitoring-splunk-enterprise-overview",
+    "monitoring": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/introduction",
     "products": "https://www.splunk.com/en_us/products.html",
-    "splunkd_health": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.0/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring",
+    "splunkd_health": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring",
     "smartstore": "https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.4/deploy-smartstore",
     "support_policy": "https://www.splunk.com/en_us/legal/splunk-software-support-policy.html",
     "workload_cloud": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/9.2.2406/manage-search-workloads-in-splunk-cloud-platform/workload-management-overview",
@@ -297,7 +363,7 @@ PRODUCT_ROUTE_CATALOG = [
     {
         "id": "splunk-soar",
         "name": "Splunk SOAR",
-        "aliases": ["splunk soar", "splunk_app_soar", "phantom"],
+        "aliases": ["soar", "splunk soar", "splunk_app_soar", "phantom"],
         "handoff_skills": ["splunk-soar-setup"],
         "covered_skill_names": ["splunk-soar-setup"],
         "covered_skill_prefixes": [],
@@ -387,12 +453,30 @@ PRODUCT_ROUTE_CATALOG = [
         "source_doc": SOURCE_DOCS["products"],
     },
     {
+        "id": "galileo-agent-control",
+        "name": "Galileo Agent Control",
+        "aliases": ["galileo agent control"],
+        "handoff_skills": ["galileo-agent-control-setup"],
+        "covered_skill_names": ["galileo-agent-control-setup"],
+        "covered_skill_prefixes": [],
+        "source_doc": SOURCE_DOCS["products"],
+    },
+    {
+        "id": "galileo-mcp",
+        "name": "Galileo MCP Server",
+        "aliases": ["galileo mcp", "galileo mcp server"],
+        "handoff_skills": ["galileo-mcp-server-setup"],
+        "covered_skill_names": ["galileo-mcp-server-setup"],
+        "covered_skill_prefixes": [],
+        "source_doc": SOURCE_DOCS["products"],
+    },
+    {
         "id": "galileo",
-        "name": "Galileo",
-        "aliases": ["galileo", "galileo observe", "galileo agent control"],
+        "name": "Galileo Observe platform",
+        "aliases": ["galileo", "galileo observe"],
         "handoff_skills": ["galileo-platform-setup"],
-        "covered_skill_names": [],
-        "covered_skill_prefixes": ["galileo-"],
+        "covered_skill_names": ["galileo-platform-setup"],
+        "covered_skill_prefixes": [],
         "source_doc": SOURCE_DOCS["products"],
     },
     {
@@ -437,8 +521,9 @@ def rule(
     handoff_skill: str,
     rollback_or_validation: str,
     trigger: dict[str, Any],
+    applies_when: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    item = {
         "id": rule_id,
         "domain": domain,
         "platform": platform,
@@ -452,6 +537,9 @@ def rule(
         "rollback_or_validation": rollback_or_validation,
         "trigger": trigger,
     }
+    if applies_when is not None:
+        item["applies_when"] = applies_when
+    return item
 
 
 RULE_CATALOG = [
@@ -833,7 +921,7 @@ RULE_CATALOG = [
         domain="Config validation",
         platform="cloud",
         severity="info",
-        evidence="Cloud 10.3.2512+ supports btool REST validation, or config_validation errors/unvalidated changes are present.",
+        evidence="On Cloud 10.3.2512+, config_validation is unavailable, false, or contains validation errors.",
         source_doc=SOURCE_DOCS["cloud_config_validation"],
         fix_kind="direct_fix",
         preview_command="Validate candidate .conf content with POST /services/properties/<config>?validate=true before deployment.",
@@ -842,11 +930,12 @@ RULE_CATALOG = [
         rollback_or_validation="Repeat validation until it returns success, then use the supported Cloud configuration path.",
         trigger={
             "any": [
-                {"path": "server.version", "version_gte": "10.3.2512"},
+                {"path": "config_validation.available", "equals": False},
                 {"path": "config_validation.validated", "equals": False},
                 {"path": "config_validation.errors", "truthy": True},
             ]
         },
+        applies_when={"all": [{"path": "server.version", "version_gte": "10.3.2512"}]},
     ),
     rule(
         rule_id="SAD-CLOUD-IDXCLUSTER-DEGRADED",
@@ -915,6 +1004,7 @@ RULE_CATALOG = [
         trigger={
             "any": [
                 {"path": "lifecycle.version_unsupported", "equals": True},
+                {"path": "lifecycle.version_unrecognized", "equals": True},
                 {"path": "lifecycle.upgrade_issues", "truthy": True},
                 {"path": "lifecycle.maintenance_issues", "truthy": True},
                 {"path": "lifecycle.experience_issues", "truthy": True},
@@ -1146,7 +1236,7 @@ RULE_CATALOG = [
         evidence="support.diag_ready is false or support.diag_blockers is populated.",
         source_doc=SOURCE_DOCS["diag"],
         fix_kind="manual_support",
-        preview_command="Review support-tickets/diag-readiness.md.",
+        preview_command="Review support-tickets/SAD-DIAG-NOT-READY.md after selecting this fix packet.",
         apply_command="Render diag readiness packet only; no diag bundle is generated or uploaded.",
         handoff_skill="",
         rollback_or_validation="Generate diag through approved Splunk workflow and attach it to the support case.",
@@ -1195,14 +1285,21 @@ RULE_CATALOG = [
         domain="Config validation",
         platform="enterprise",
         severity="info",
-        evidence="server.version is 10.4 or newer; run Splunk Config Validation before applying rendered .conf assets.",
+        evidence="On Enterprise 10.4+, config_validation is unavailable, false, or contains validation errors.",
         source_doc=SOURCE_DOCS["config_validation"],
         fix_kind="diagnose_only",
         preview_command="Review rendered .conf assets with Splunk Config Validation before apply.",
         apply_command="No doctor-side apply; use Splunk Config Validation in Splunk Web or CLI per Splunk documentation.",
         handoff_skill="",
         rollback_or_validation="Re-run Config Validation after changes and before restart.",
-        trigger={"any": [{"path": "server.version", "version_gte": "10.4"}]},
+        trigger={
+            "any": [
+                {"path": "config_validation.available", "equals": False},
+                {"path": "config_validation.validated", "equals": False},
+                {"path": "config_validation.errors", "truthy": True},
+            ]
+        },
+        applies_when={"all": [{"path": "server.version", "version_gte": "10.4"}]},
     ),
     rule(
         rule_id="SAD-ENT-HEALTH-RED",
@@ -1238,6 +1335,7 @@ RULE_CATALOG = [
         trigger={
             "any": [
                 {"path": "lifecycle.version_unsupported", "equals": True},
+                {"path": "lifecycle.version_unrecognized", "equals": True},
                 {"path": "lifecycle.eos", "equals": True},
                 {"path": "lifecycle.near_eos", "equals": True},
                 {"path": "lifecycle.upgrade_path_issues", "truthy": True},
@@ -1997,21 +2095,58 @@ RULE_CATALOG = [
 
 
 SECRET_KEY_RE = re.compile(
-    r"^(password|passwd|pass|pwd|credential|credentials|secret|apikey|apitoken|tokenvalue|"
-    r"accesstoken|refreshtoken|authtoken|bearer|authorization|sessionkey|stacktoken|"
-    r"hectoken|clientsecret|sslpassword|privatekeypassword|pass4symmkey)$",
+    r"^(password|passwd|pass|pwd|credential|credentials|secret|secretkey|apikey|apisecret|"
+    r"apitoken|token|tokenvalue|accesstoken|refreshtoken|authtoken|sessiontoken|bearer|"
+    r"authorization|authorizationheader|sessionkey|stacktoken|hectoken|clientsecret|"
+    r"sslpassword|privatekey|privatekeypassword|pass4symmkey|awsaccesskeyid|"
+    r"awssecretaccesskey|awssessiontoken|ghtoken|githubtoken|cookie|setcookie)$",
     re.IGNORECASE,
 )
 SECRET_VALUE_RE = re.compile(
-    r"(Bearer\s+[A-Za-z0-9._~+/-]+|splunkd_[A-Za-z0-9._-]+|SUPER_SECRET|"
-    r"VERY_SECRET|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]+)",
+    r"((?:Bearer|Basic|Token)\s+[A-Za-z0-9._~+/=-]{6,}|"
+    r"Splunk\s+[A-Za-z0-9._~+/=-]{16,}|"
+    r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b|"
+    r"splunkd_[A-Za-z0-9._-]+|SUPER_SECRET|VERY_SECRET|AKIA[0-9A-Z]{12,}|"
+    r"xox[baprs]-[A-Za-z0-9-]+|gh[pousr]_[A-Za-z0-9_]{20,})",
     re.IGNORECASE,
 )
+PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    re.DOTALL,
+)
 URI_USERINFO_RE = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/@\s]+)@")
+SECRET_NAME_PATTERN = (
+    r"(?:password|passwd|pwd|credential|credentials|secret|secret[_-]?key|token|"
+    r"api[_-]?(?:key|secret|token)|auth[_-]?token|access[_-]?token|refresh[_-]?token|"
+    r"session[_-]?(?:token|key)|client[_-]?secret|authorization(?:[_-]?header)?|"
+    r"aws[_-]?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token)|"
+    r"sslpassword|private[_-]?key(?:[_-]?password)?|pass4symmkey|cookie|"
+    r"[a-z][a-z0-9_-]*(?:password|passwd|secret|secret[_-]?key|token|api[_-]?key|"
+    r"api[_-]?secret|authorization[_-]?header|private[_-]?key(?:[_-]?password)?))"
+)
+AUTHORIZATION_VALUE_RE = re.compile(
+    r"(?i)\b(authorization(?:[_-]?header)?\s*[:=]\s*)"
+    r"(?:(?:Bearer|Basic|Splunk|Token|Digest|MAC)\s+)?[^\s,;]+"
+)
+QUOTED_SECRET_ASSIGNMENT_RE = re.compile(
+    rf"(['\"]?)({SECRET_NAME_PATTERN})(\1)(\s*[:=]\s*)(['\"])(.*?)(\5)",
+    re.IGNORECASE | re.DOTALL,
+)
 SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|api[_-]?token|auth[_-]?token|"
-    r"access[_-]?token|refresh[_-]?token|client[_-]?secret|sslpassword|"
-    r"privatekeypassword|pass4symmkey)(\s*[:=]\s*)([^\s,;&]+)"
+    r"(?i)\b(password|passwd|pwd|credential|secret(?:[_-]?key)?|api[_-]?key|api[_-]?secret|"
+    r"api[_-]?token|token|auth[_-]?token|access[_-]?token|refresh[_-]?token|"
+    r"session[_-]?token|session[_-]?key|client[_-]?secret|authorization(?:[_-]?header)?|"
+    r"aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret[_-]?access[_-]?key|"
+    r"aws[_-]?session[_-]?token|sslpassword|private[_-]?key(?:[_-]?password)?|"
+    r"pass4symmkey|cookie)(\s*[:=]\s*)([^\s,;&]+)"
+)
+GENERIC_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b([a-z][a-z0-9_-]*(?:password|passwd|secret|secret[_-]?key|token|api[_-]?key|"
+    r"api[_-]?secret|api[_-]?token|auth[_-]?token|access[_-]?token|refresh[_-]?token|"
+    r"session[_-]?token|session[_-]?key|client[_-]?secret|authorization[_-]?header|"
+    r"auth[_-]?header|access[_-]?key(?:[_-]?id)?|private[_-]?key(?:[_-]?password)?|"
+    r"hec[_-]?token))"
+    r"(\s*[:=]\s*['\"]?)([^\s'\",;&]+)"
 )
 DIRECT_DANGEROUS_RE = re.compile(
     r"\b(restart|delete|remove|rm\s+-|cluster|maintenance|offline|rotate|cert|license\s+install)\b",
@@ -2020,19 +2155,48 @@ DIRECT_DANGEROUS_RE = re.compile(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Splunk Admin Doctor + Fixes renderer.")
-    parser.add_argument("--phase", choices=("doctor", "fix-plan", "apply", "validate", "status"), default="doctor")
-    parser.add_argument("--platform", choices=("auto", "cloud", "enterprise"), default="auto")
-    parser.add_argument("--target-search-head", default="")
-    parser.add_argument("--splunk-uri", default="")
-    parser.add_argument("--splunk-home", default="/opt/splunk")
-    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
-    parser.add_argument("--evidence-file", default="")
+    parser = argparse.ArgumentParser(
+        description="Splunk Admin Doctor + Fixes renderer.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Platform auto-detection fails closed unless evidence.platform is set or an HTTPS "
+            "management host ends in .splunkcloud.com.\n"
+            "Status: report_valid (and deprecated ok) describe bundle validity; use healthy, "
+            "evidence_complete, health_status, severity_counts, and strict_ready for health gates.\n"
+            "Exit codes: 0 success; 1 invalid input/bundle or secure I/O failure; "
+            "2 --strict high/critical findings; 3 incomplete evidence when required."
+        ),
+    )
+    parser.add_argument(
+        "--phase",
+        choices=("doctor", "fix-plan", "apply", "validate", "status"),
+        default="doctor",
+        help="Operation to run (default: doctor).",
+    )
+    parser.add_argument(
+        "--platform",
+        choices=("auto", "cloud", "enterprise"),
+        default="auto",
+        help="Target platform; auto never silently defaults to Enterprise.",
+    )
+    parser.add_argument("--target-search-head", default="", help="Optional redacted target label.")
+    parser.add_argument(
+        "--splunk-uri",
+        default="",
+        help="Credential-free HTTPS management origin; paths, queries, and fragments are rejected.",
+    )
+    parser.add_argument("--splunk-home", default="/opt/splunk", help="Local Enterprise home for read-only probes.")
+    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Private rendered bundle directory.")
+    parser.add_argument("--evidence-file", default="", help="Secure JSON evidence snapshot.")
     parser.add_argument("--fixes", default="", help="Comma-separated rule IDs to packetize during --phase apply.")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--strict", action="store_true")
-    parser.add_argument("--require-complete-evidence", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--json", action="store_true", help="Emit the phase result as JSON.")
+    parser.add_argument("--strict", action="store_true", help="Exit 2 when high or critical findings exist.")
+    parser.add_argument(
+        "--require-complete-evidence",
+        action="store_true",
+        help="Exit 3 when applicable evidence remains incomplete.",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Evaluate without writing bundle artifacts.")
     return parser.parse_args(argv)
 
 
@@ -2058,9 +2222,45 @@ def normalize_secret_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.lower())
 
 
+def is_secret_key(value: str) -> bool:
+    normalized = normalize_secret_key(value)
+    return bool(
+        SECRET_KEY_RE.fullmatch(normalized)
+        or normalized.endswith(
+            (
+                "password",
+                "passwd",
+                "secret",
+                "secretkey",
+                "token",
+                "apikey",
+                "apisecret",
+                "authtoken",
+                "accesstoken",
+                "refreshtoken",
+                "sessiontoken",
+                "sessionkey",
+                "authorization",
+                "authorizationheader",
+                "privatekey",
+            )
+        )
+    )
+
+
 def redact_string(value: str) -> str:
-    redacted = URI_USERINFO_RE.sub(r"\1[REDACTED]@", value)
+    redacted = PRIVATE_KEY_RE.sub("-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----", value)
+    redacted = URI_USERINFO_RE.sub(r"\1[REDACTED]@", redacted)
+    redacted = AUTHORIZATION_VALUE_RE.sub(r"\1[REDACTED]", redacted)
+    redacted = QUOTED_SECRET_ASSIGNMENT_RE.sub(
+        lambda match: (
+            f"{match.group(1)}{match.group(2)}{match.group(3)}"
+            f"{match.group(4)}{match.group(5)}[REDACTED]{match.group(7)}"
+        ),
+        redacted,
+    )
     redacted = SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", redacted)
+    redacted = GENERIC_SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", redacted)
     redacted = SECRET_VALUE_RE.sub("[REDACTED]", redacted)
     return redacted
 
@@ -2084,7 +2284,72 @@ def sanitize_uri(value: str) -> str:
         port = None
     if port:
         netloc = f"{netloc}:{port}"
-    return redact_string(urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment)))
+    safe_query: list[tuple[str, str]] = []
+    for key, query_value in parse_qsl(parts.query, keep_blank_values=True):
+        if is_secret_key(key):
+            safe_query.append((key, "[REDACTED]"))
+        else:
+            safe_query.append((key, redact_string(query_value)))
+    query = urlencode(safe_query, doseq=True, safe="[]")
+    return redact_string(urlunsplit((parts.scheme, netloc, parts.path, query, "")))
+
+
+def _valid_management_hostname(hostname: str) -> bool:
+    candidate = hostname.rstrip(".")
+    if not candidate or len(candidate) > 253 or any(character.isspace() for character in candidate):
+        return False
+    try:
+        ipaddress.ip_address(candidate)
+        return True
+    except ValueError:
+        pass
+    return all(
+        re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) is not None
+        for label in candidate.split(".")
+    )
+
+
+def normalize_management_uri(value: str) -> str:
+    """Validate and normalize a credential-free HTTPS Splunk management URI."""
+
+    if not value:
+        return ""
+    if any(character.isspace() or ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise ValueError("management URI must not contain whitespace or control characters")
+    try:
+        parts = urlsplit(value)
+        hostname = parts.hostname or ""
+        port = parts.port
+    except ValueError as exc:
+        raise ValueError("management URI is malformed") from exc
+    if parts.scheme.lower() != "https":
+        raise ValueError("management URI must use HTTPS")
+    if not parts.netloc or not hostname or not _valid_management_hostname(hostname):
+        raise ValueError("management URI must contain a valid hostname or IP address")
+    if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+        raise ValueError("management URI must not contain userinfo or credentials")
+    if "?" in value or "#" in value:
+        raise ValueError("management URI must not contain a query or fragment")
+    if parts.path not in {"", "/"}:
+        raise ValueError("management URI must not contain a path")
+    if parts.netloc.endswith(":") or port == 0:
+        raise ValueError("management URI contains an invalid port")
+    normalized_hostname = hostname.rstrip(".").lower()
+    rendered_hostname = normalized_hostname
+    try:
+        if isinstance(ipaddress.ip_address(normalized_hostname), ipaddress.IPv6Address):
+            rendered_hostname = f"[{normalized_hostname}]"
+    except ValueError:
+        pass
+    netloc = rendered_hostname if port is None else f"{rendered_hostname}:{port}"
+    return urlunsplit(("https", netloc, "", "", ""))
+
+
+def uri_is_splunkcloud(value: str) -> bool:
+    if not value:
+        return False
+    hostname = (urlsplit(value).hostname or "").rstrip(".").lower()
+    return hostname.endswith(".splunkcloud.com")
 
 
 def shell_join(argv: list[str]) -> str:
@@ -2146,7 +2411,9 @@ def normalize_bool(value: Any) -> Any:
 
 
 def predicate_matches(predicate: dict[str, Any], evidence: dict[str, Any]) -> bool:
-    actual = get_path(evidence, str(predicate["path"]))
+    exists, actual = lookup_path(evidence, str(predicate["path"]))
+    if not exists or not evidence_value_assessed(actual):
+        return False
     if "equals" in predicate:
         expected = predicate["equals"]
         if isinstance(expected, bool):
@@ -2158,12 +2425,10 @@ def predicate_matches(predicate: dict[str, Any], evidence: dict[str, Any]) -> bo
         return compare_gt(actual, predicate["gt"])
     if "in" in predicate:
         normalized = normalize_status(actual)
-        expected = {normalize_status(item) for item in predicate["in"]}
-        return normalized in expected
+        return any(normalized == normalize_status(item) for item in predicate["in"])
     if "not_in" in predicate:
         normalized = normalize_status(actual)
-        expected = {normalize_status(item) for item in predicate["not_in"]}
-        return normalized not in expected
+        return all(normalized != normalize_status(item) for item in predicate["not_in"])
     if "prefix" in predicate:
         return str(actual or "").startswith(str(predicate["prefix"]))
     if "version_gte" in predicate:
@@ -2181,6 +2446,29 @@ def trigger_matches(trigger: dict[str, Any], evidence: dict[str, Any]) -> bool:
     return False
 
 
+def trigger_is_resolved(trigger: dict[str, Any], evidence: dict[str, Any]) -> bool:
+    """Return whether supplied evidence proves a Boolean trigger true or false.
+
+    For OR, one matching assessed predicate proves true; otherwise every
+    predicate must be assessed to prove false. For AND, one assessed
+    non-match proves false; otherwise every predicate must be assessed to
+    prove true. Missing evidence therefore never becomes implicit health.
+    """
+    predicates = trigger_predicates(trigger)
+    if not predicates:
+        return False
+    assessed = []
+    matched = []
+    for predicate in predicates:
+        exists, value = lookup_path(evidence, str(predicate.get("path", "")))
+        is_assessed = exists and evidence_value_assessed(value)
+        assessed.append(is_assessed)
+        matched.append(is_assessed and predicate_matches(predicate, evidence))
+    if trigger.get("all"):
+        return any(is_assessed and not is_match for is_assessed, is_match in zip(assessed, matched)) or all(assessed)
+    return any(matched) or all(assessed)
+
+
 def platform_applies(rule_platform: str, target_platform: str) -> bool:
     return rule_platform == "both" or rule_platform == target_platform
 
@@ -2195,7 +2483,15 @@ def trigger_predicates(trigger: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def rule_evidence_paths(item: dict[str, Any]) -> list[str]:
-    return sorted({str(predicate.get("path", "")) for predicate in trigger_predicates(item.get("trigger", {})) if predicate.get("path")})
+    expressions = [item.get("trigger", {}), item.get("applies_when", {})]
+    return sorted(
+        {
+            str(predicate.get("path", ""))
+            for expression in expressions
+            for predicate in trigger_predicates(expression)
+            if predicate.get("path")
+        }
+    )
 
 
 def evidence_value_assessed(value: Any) -> bool:
@@ -2207,34 +2503,45 @@ def evidence_value_assessed(value: Any) -> bool:
 
 
 def rule_is_assessed(item: dict[str, Any], evidence: dict[str, Any]) -> bool:
+    condition = item.get("applies_when")
+    if isinstance(condition, dict):
+        if not trigger_is_resolved(condition, evidence) or not trigger_matches(condition, evidence):
+            return False
     if item.get("id") == "SAD-PREMIUM-HANDOFFS":
         for inventory_path in ("premium_products.detected", "products.detected", "apps.installed"):
             exists, value = lookup_path(evidence, inventory_path)
             if exists and evidence_value_assessed(value):
                 return True
-    predicates = trigger_predicates(item.get("trigger", {}))
-    if not predicates:
+    return trigger_is_resolved(item.get("trigger", {}), evidence)
+
+
+def rule_explicitly_not_applicable(item: dict[str, Any], evidence: dict[str, Any]) -> bool:
+    applicability = evidence.get("applicability", {})
+    if not isinstance(applicability, dict):
         return False
-    observed = []
-    for predicate in predicates:
-        exists, value = lookup_path(evidence, str(predicate.get("path", "")))
-        observed.append(exists and evidence_value_assessed(value))
-    if item.get("trigger", {}).get("all"):
-        return all(observed)
-    return any(observed)
+    domain_overrides = applicability.get("domains", {})
+    if isinstance(domain_overrides, dict) and domain_overrides.get(item["domain"]) is False:
+        return True
+    rule_overrides = applicability.get("rules", {})
+    return isinstance(rule_overrides, dict) and rule_overrides.get(item["id"]) is False
 
 
 def rule_environment_applicable(item: dict[str, Any], evidence: dict[str, Any]) -> bool:
-    applicability = evidence.get("applicability", {})
-    if not isinstance(applicability, dict):
-        return True
-    domain_overrides = applicability.get("domains", {})
-    if isinstance(domain_overrides, dict) and domain_overrides.get(item["domain"]) is False:
+    if rule_explicitly_not_applicable(item, evidence):
         return False
-    rule_overrides = applicability.get("rules", {})
-    if isinstance(rule_overrides, dict) and rule_overrides.get(item["id"]) is False:
-        return False
+    condition = item.get("applies_when")
+    if isinstance(condition, dict) and trigger_is_resolved(condition, evidence):
+        return trigger_matches(condition, evidence)
+    # Missing applicability evidence fails closed: keep the rule applicable
+    # and expose it as unassessed rather than silently excluding it.
     return True
+
+
+def rule_eligibility_confirmed(item: dict[str, Any], evidence: dict[str, Any]) -> bool:
+    condition = item.get("applies_when")
+    if not isinstance(condition, dict):
+        return True
+    return trigger_is_resolved(condition, evidence) and trigger_matches(condition, evidence)
 
 
 def validate_evidence_applicability(evidence: dict[str, Any]) -> None:
@@ -2255,6 +2562,28 @@ def validate_evidence_applicability(evidence: dict[str, Any]) -> None:
         invalid_values = sorted(name for name, value in overrides.items() if not isinstance(value, bool))
         if invalid_values:
             die(f"Evidence applicability.{key} values must be booleans: {', '.join(invalid_values)}")
+    disabled_domains = {
+        name
+        for name, value in applicability.get("domains", {}).items()
+        if value is False
+    }
+    forbidden_domains = sorted(disabled_domains - OPTIONAL_ENVIRONMENT_DOMAINS)
+    if forbidden_domains:
+        die(
+            "Evidence cannot mark mandatory domains not applicable: "
+            + ", ".join(forbidden_domains)
+        )
+    disabled_rules = {
+        name
+        for name, value in applicability.get("rules", {}).items()
+        if value is False
+    }
+    forbidden_rules = sorted(disabled_rules - OPTIONAL_ENVIRONMENT_RULE_IDS)
+    if forbidden_rules:
+        die(
+            "Evidence cannot mark mandatory rules not applicable: "
+            + ", ".join(forbidden_rules)
+        )
 
 
 def matched_observations(item: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
@@ -2271,14 +2600,29 @@ def normalize_product_label(value: Any) -> str:
 
 
 def product_route_matches(route: dict[str, Any], value: Any) -> bool:
+    return product_route_match_score(route, value) > 0
+
+
+def product_route_match_score(route: dict[str, Any], value: Any) -> int:
     normalized_value = normalize_product_label(value)
     if not normalized_value:
-        return False
+        return 0
+    best = 0
     for alias in route.get("aliases", []):
         normalized_alias = normalize_product_label(alias)
-        if normalized_alias and (normalized_value == normalized_alias or normalized_alias in normalized_value):
-            return True
-    return False
+        if not normalized_alias:
+            continue
+        if normalized_value == normalized_alias:
+            best = max(best, 10_000 + len(normalized_alias))
+        elif normalized_alias in normalized_value:
+            best = max(best, len(normalized_alias))
+    return best
+
+
+def best_product_route_ids(value: Any) -> set[str]:
+    scored = [(product_route_match_score(route, value), str(route["id"])) for route in PRODUCT_ROUTE_CATALOG]
+    best = max((score for score, _route_id in scored), default=0)
+    return {route_id for score, route_id in scored if best > 0 and score == best}
 
 
 def detected_product_values(evidence: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -2299,7 +2643,7 @@ def detected_product_values(evidence: dict[str, Any]) -> tuple[list[str], list[s
     if isinstance(installed, list):
         for item in installed:
             name = item.get("name", "") if isinstance(item, dict) else item
-            if any(product_route_matches(route, name) for route in PRODUCT_ROUTE_CATALOG):
+            if best_product_route_ids(name):
                 inferred.append(str(name))
     return sorted(set(explicit)), sorted(set(inferred))
 
@@ -2307,22 +2651,24 @@ def detected_product_values(evidence: dict[str, Any]) -> tuple[list[str], list[s
 def build_product_coverage(evidence: dict[str, Any], platform: str) -> dict[str, Any]:
     explicit, inferred = detected_product_values(evidence)
     detected = sorted(set(explicit + inferred))
+    route_ids_by_value = {value: best_product_route_ids(value) for value in detected}
     routes: list[dict[str, Any]] = []
     matched_values: set[str] = set()
     for route in PRODUCT_ROUTE_CATALOG:
-        matches = [value for value in detected if product_route_matches(route, value)]
+        matches = [value for value in detected if route["id"] in route_ids_by_value[value]]
         matched_values.update(matches)
         routes.append(
             {
                 "id": route["id"],
                 "name": route["name"],
                 "detected": bool(matches),
-                "detected_values": matches,
+                "platform_context": route["id"] == "splunk-platform",
+                "detected_values": redact(matches),
                 "handoff_skills": route["handoff_skills"],
                 "source_doc": route["source_doc"],
             }
         )
-    unresolved = sorted(set(explicit) - matched_values)
+    unresolved = redact(sorted(set(explicit) - matched_values))
     return {
         "platform": platform,
         "supported_route_count": len(routes),
@@ -2400,6 +2746,50 @@ def validate_catalog() -> dict[str, Any]:
     seen_ids: set[str] = set()
     domains = manifest_domains()
     valid_predicate_operators = {"equals", "truthy", "gt", "in", "not_in", "prefix", "version_gte"}
+    manifest_by_domain = {entry["domain"]: entry for entry in COVERAGE_MANIFEST}
+
+    if len(manifest_by_domain) != len(COVERAGE_MANIFEST):
+        errors.append("COVERAGE_MANIFEST contains duplicate domain names.")
+    unknown_optional_domains = sorted(OPTIONAL_ENVIRONMENT_DOMAINS - domains)
+    if unknown_optional_domains:
+        errors.append("optional environment domains do not exist: " + ", ".join(unknown_optional_domains))
+    unknown_optional_rules = sorted(OPTIONAL_ENVIRONMENT_RULE_IDS - {item["id"] for item in RULE_CATALOG})
+    if unknown_optional_rules:
+        errors.append("optional environment rules do not exist: " + ", ".join(unknown_optional_rules))
+
+    def validate_expression(rule_id: str, field: str, expression: Any) -> None:
+        if not isinstance(expression, dict):
+            errors.append(f"{rule_id}: {field} must be an object")
+            return
+        groups = [name for name in ("any", "all") if name in expression]
+        if len(groups) != 1 or set(expression) != set(groups):
+            errors.append(f"{rule_id}: {field} must contain exactly one of any or all")
+            return
+        predicates = expression[groups[0]]
+        if not isinstance(predicates, list) or not predicates:
+            errors.append(f"{rule_id}: {field}.{groups[0]} must be a non-empty list")
+            return
+        for predicate in predicates:
+            if not isinstance(predicate, dict):
+                errors.append(f"{rule_id}: {field} predicates must be objects")
+                continue
+            path = str(predicate.get("path", "")).strip()
+            if not path:
+                errors.append(f"{rule_id}: {field} predicate is missing path")
+            operators = valid_predicate_operators & set(predicate)
+            unknown_keys = set(predicate) - {"path"} - valid_predicate_operators
+            if len(operators) != 1:
+                errors.append(f"{rule_id}: predicate {path or '<unknown>'} must have exactly one supported operator")
+            if unknown_keys:
+                errors.append(
+                    f"{rule_id}: predicate {path or '<unknown>'} has unknown keys: "
+                    + ", ".join(sorted(unknown_keys))
+                )
+            if "truthy" in predicate and not isinstance(predicate["truthy"], bool):
+                errors.append(f"{rule_id}: predicate {path or '<unknown>'} truthy must be boolean")
+            for operator in ("in", "not_in"):
+                if operator in predicate and not isinstance(predicate[operator], list):
+                    errors.append(f"{rule_id}: predicate {path or '<unknown>'} {operator} must be a list")
 
     if [rule["id"] for rule in RULE_CATALOG] != sorted(rule["id"] for rule in RULE_CATALOG):
         errors.append("RULE_CATALOG must stay sorted by stable rule id.")
@@ -2409,6 +2799,8 @@ def validate_catalog() -> dict[str, Any]:
         if missing:
             errors.append(f"{item.get('id', '<unknown>')}: missing fields: {', '.join(missing)}")
         rule_id = str(item.get("id", ""))
+        if not RULE_ID_RE.fullmatch(rule_id):
+            errors.append(f"invalid rule id: {rule_id!r}")
         if rule_id in seen_ids:
             errors.append(f"duplicate rule id: {rule_id}")
         seen_ids.add(rule_id)
@@ -2416,31 +2808,30 @@ def validate_catalog() -> dict[str, Any]:
             errors.append(f"{rule_id}: unknown domain {item.get('domain')!r}")
         if item.get("platform") not in {"cloud", "enterprise", "both"}:
             errors.append(f"{rule_id}: invalid platform {item.get('platform')!r}")
+        else:
+            manifest = manifest_by_domain.get(str(item.get("domain", "")), {})
+            allowed_platforms = set(manifest.get("platforms", []))
+            rule_platforms = {"cloud", "enterprise"} if item.get("platform") == "both" else {item.get("platform")}
+            if not rule_platforms.issubset(allowed_platforms):
+                errors.append(f"{rule_id}: platform exceeds its domain applicability")
         if item.get("severity") not in SEVERITY_RANK:
             errors.append(f"{rule_id}: invalid severity {item.get('severity')!r}")
         if item.get("fix_kind") not in FIX_KINDS - {"not_applicable"}:
             errors.append(f"{rule_id}: invalid fix_kind {item.get('fix_kind')!r}")
         if item.get("fix_kind") == "delegated_fix" and not str(item.get("handoff_skill", "")).strip():
             errors.append(f"{rule_id}: delegated_fix rules must declare handoff_skill")
-        if not str(item.get("source_doc", "")).startswith("https://"):
+        source_doc = str(item.get("source_doc", ""))
+        source_parts = urlsplit(source_doc)
+        if source_parts.scheme != "https" or source_parts.hostname not in OFFICIAL_SOURCE_HOSTS:
             errors.append(f"{rule_id}: source_doc must be an absolute HTTPS official reference")
         for field in ("evidence", "preview_command", "apply_command", "rollback_or_validation"):
             if not str(item.get(field, "")).strip():
                 errors.append(f"{rule_id}: {field} must not be empty")
         if item.get("fix_kind") == "direct_fix" and DIRECT_DANGEROUS_RE.search(str(item.get("apply_command", ""))):
             errors.append(f"{rule_id}: direct_fix apply_command contains a blocked disruptive action")
-        if not item.get("trigger"):
-            errors.append(f"{rule_id}: missing trigger")
-        predicates = trigger_predicates(item.get("trigger", {}))
-        if not predicates:
-            errors.append(f"{rule_id}: trigger must contain non-empty any or all predicates")
-        for predicate in predicates:
-            path = str(predicate.get("path", "")).strip()
-            if not path:
-                errors.append(f"{rule_id}: trigger predicate is missing path")
-            operators = valid_predicate_operators & set(predicate)
-            if len(operators) != 1:
-                errors.append(f"{rule_id}: predicate {path or '<unknown>'} must have exactly one supported operator")
+        validate_expression(rule_id, "trigger", item.get("trigger"))
+        if "applies_when" in item:
+            validate_expression(rule_id, "applies_when", item.get("applies_when"))
         for handoff in [part.strip() for part in str(item.get("handoff_skill", "")).split(",") if part.strip()]:
             if not (REPO_ROOT / "skills" / handoff / "SKILL.md").is_file():
                 errors.append(f"{rule_id}: handoff skill does not exist: {handoff}")
@@ -2488,6 +2879,7 @@ def validate_catalog() -> dict[str, Any]:
                 errors.append(f"{domain}: {platform} declares {declared} but applicable rules provide {actual}")
 
     seen_product_ids: set[str] = set()
+    product_alias_owners: dict[str, str] = {}
     directory_skills, _registry_skills = repository_skill_names()
     for route in PRODUCT_ROUTE_CATALOG:
         route_id = str(route.get("id", ""))
@@ -2496,8 +2888,20 @@ def validate_catalog() -> dict[str, Any]:
         seen_product_ids.add(route_id)
         if not route.get("aliases"):
             errors.append(f"{route_id}: product route has no aliases")
+        for alias in route.get("aliases", []):
+            normalized_alias = normalize_product_label(alias)
+            previous = product_alias_owners.get(normalized_alias)
+            if not normalized_alias:
+                errors.append(f"{route_id}: product route has an empty alias")
+            elif previous and previous != route_id:
+                errors.append(f"{route_id}: product alias {alias!r} is already owned by {previous}")
+            else:
+                product_alias_owners[normalized_alias] = route_id
         if not route.get("handoff_skills"):
             errors.append(f"{route_id}: product route has no handoff skills")
+        route_source = urlsplit(str(route.get("source_doc", "")))
+        if route_source.scheme != "https" or route_source.hostname not in OFFICIAL_SOURCE_HOSTS:
+            errors.append(f"{route_id}: product source_doc must be an official HTTPS reference")
         for handoff in route.get("handoff_skills", []):
             if not (REPO_ROOT / "skills" / str(handoff) / "SKILL.md").is_file():
                 errors.append(f"{route_id}: product handoff skill does not exist: {handoff}")
@@ -2542,7 +2946,7 @@ def redact(value: Any, parent_key: str = "") -> Any:
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, child in value.items():
-            if SECRET_KEY_RE.fullmatch(normalize_secret_key(str(key))):
+            if is_secret_key(str(key)):
                 redacted[str(key)] = "[REDACTED]"
             else:
                 redacted[str(key)] = redact(child, str(key))
@@ -2558,16 +2962,67 @@ def redact(value: Any, parent_key: str = "") -> Any:
     return value
 
 
+def _read_json_object_file(path: Path) -> dict[str, Any]:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | os.O_NONBLOCK
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0),
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ValueError(f"JSON input is not a regular file: {path}")
+        if metadata.st_nlink != 1:
+            raise ValueError(f"JSON input must have exactly one hard link: {path}")
+        if metadata.st_size > MAX_EVIDENCE_BYTES:
+            raise ValueError(f"JSON input exceeds the {MAX_EVIDENCE_BYTES}-byte safety limit: {path}")
+        remaining = MAX_EVIDENCE_BYTES + 1
+        chunks: list[bytes] = []
+        while remaining > 0:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if remaining == 0:
+            raise ValueError(f"JSON input exceeds the {MAX_EVIDENCE_BYTES}-byte safety limit: {path}")
+        after = os.fstat(descriptor)
+        if (
+            after.st_dev != metadata.st_dev
+            or after.st_ino != metadata.st_ino
+            or after.st_nlink != 1
+            or after.st_size != metadata.st_size
+            or after.st_mtime_ns != metadata.st_mtime_ns
+        ):
+            raise ValueError(f"JSON input changed while it was being read: {path}")
+        text = b"".join(chunks).decode("utf-8")
+        payload = json.loads(
+            text,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"non-finite JSON number {value!r} is not allowed")
+            ),
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if not isinstance(payload, dict):
+        raise ValueError("JSON file root must be a JSON object")
+    return payload
+
+
 def load_json_file(path: Path) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        return _read_json_object_file(path)
     except FileNotFoundError:
         die(f"Evidence file does not exist: {path}")
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeError, ValueError) as exc:
         die(f"Evidence file is not valid JSON: {exc}")
-    if not isinstance(payload, dict):
-        die("Evidence file root must be a JSON object.")
-    return payload
+    except OSError as exc:
+        die(f"Evidence file cannot be read: {path}: {exc}")
+    raise AssertionError("unreachable")
 
 
 def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
@@ -2578,15 +3033,18 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
     try:
         contract = json.loads(contract_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        diagnostics = evidence.setdefault("diagnostics", {})
+        if isinstance(diagnostics, dict):
+            diagnostics["platform_version_contract_error"] = True
         return
     lifecycle = evidence.setdefault("lifecycle", {})
     if not isinstance(lifecycle, dict):
-        return
+        die("Evidence field 'lifecycle' must be a JSON object when present.")
     parts = version_tuple(version)
     if len(parts) < 2:
         return
     minor = f"{parts[0]}.{parts[1]}"
-    lifecycle.setdefault("assessed_version", version)
+    lifecycle["assessed_version"] = version
     if platform == "enterprise":
         supported = [str(item) for item in contract.get("enterprise_platform_versions", [])]
         cloud_only = {str(item) for item in contract.get("enterprise_cloud_only_trains", [])}
@@ -2594,70 +3052,246 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
             str(item)
             for item in contract.get("enterprise_not_publicly_released_trains", [])
         }
-        lifecycle.setdefault("supported_minor_trains", supported)
+        lifecycle["supported_minor_trains"] = supported
+        unsupported = False
+        eos = False
+        unrecognized = False
+        derived_issues: list[str] = []
         if minor in supported:
-            lifecycle.setdefault("version_unsupported", False)
+            unsupported = False
         elif minor in cloud_only:
-            lifecycle.setdefault("version_unsupported", True)
-            upgrade_issues = lifecycle.setdefault("upgrade_path_issues", [])
-            if isinstance(upgrade_issues, list):
-                upgrade_issues.append(
-                    f"Splunk platform {minor} is Cloud-only and is not a Splunk Enterprise release train."
-                )
+            unsupported = True
+            derived_issues.append(
+                f"Splunk platform {minor} is Cloud-only and is not a Splunk Enterprise release train."
+            )
         elif minor in not_public:
-            lifecycle.setdefault("version_unsupported", True)
-            upgrade_issues = lifecycle.setdefault("upgrade_path_issues", [])
-            if isinstance(upgrade_issues, list):
-                upgrade_issues.append(
-                    f"Splunk Enterprise {minor} is not in the current public "
-                    "Enterprise release contract; keep the verified 10.4 baseline "
-                    "until public Enterprise packages and documentation are available."
-                )
+            unsupported = True
+            derived_issues.append(
+                f"Splunk Enterprise {minor} is not in the current public "
+                "Enterprise release contract; keep the verified 10.4 baseline "
+                "until public Enterprise packages and documentation are available."
+            )
         else:
             supported_parts = [version_tuple(item) for item in supported]
             if supported_parts and parts[:2] < min(supported_parts):
-                lifecycle.setdefault("version_unsupported", True)
-                lifecycle.setdefault("eos", True)
+                unsupported = True
+                eos = True
             else:
-                lifecycle.setdefault("version_unrecognized", True)
+                unrecognized = True
         support_end = contract.get("enterprise_support_end_dates", {}).get(minor)
         if support_end:
             try:
                 end = datetime.fromisoformat(str(support_end)).replace(tzinfo=timezone.utc)
                 days = (end - datetime.now(timezone.utc)).days
-                lifecycle.setdefault("support_end_date", support_end)
-                lifecycle.setdefault("support_days_remaining", days)
-                lifecycle.setdefault("near_eos", 0 <= days <= 90)
+                lifecycle["support_end_date"] = support_end
+                lifecycle["support_days_remaining"] = days
+                lifecycle["near_eos"] = 0 <= days <= 90
                 if days < 0:
-                    lifecycle.setdefault("version_unsupported", True)
-                    lifecycle.setdefault("eos", True)
+                    unsupported = True
+                    eos = True
             except ValueError:
                 pass
+        lifecycle["version_unsupported"] = unsupported
+        lifecycle["eos"] = eos
+        lifecycle["version_unrecognized"] = unrecognized
+        existing_issues = lifecycle.get("upgrade_path_issues", [])
+        if existing_issues is None:
+            existing_issues = []
+        if not isinstance(existing_issues, list):
+            die("Evidence field 'lifecycle.upgrade_path_issues' must be a JSON array when present.")
+        lifecycle["upgrade_path_issues"] = list(dict.fromkeys([*existing_issues, *derived_issues]))
     else:
         cloud_trains = [str(item) for item in contract.get("cloud_doc_trains", [])]
-        lifecycle.setdefault("documented_cloud_trains", cloud_trains)
-        if any(version.startswith(train) for train in cloud_trains):
-            lifecycle.setdefault("version_unsupported", False)
+        lifecycle["documented_cloud_trains"] = cloud_trains
+        known = any(version.startswith(train) for train in cloud_trains)
+        lifecycle["version_unsupported"] = False if known else lifecycle.get("version_unsupported", False)
+        lifecycle["version_unrecognized"] = not known
+
+
+def _append_bounded_output(sink: bytearray, chunk: bytes, dropped: list[int]) -> None:
+    sink.extend(chunk)
+    if len(sink) > MAX_LOCAL_OUTPUT_BYTES:
+        overflow = len(sink) - MAX_LOCAL_OUTPUT_BYTES
+        del sink[:overflow]
+        dropped[0] += overflow
+
+
+def _terminate_local_process(process: subprocess.Popen[bytes], *, force: bool) -> None:
+    if os.name == "posix" and hasattr(os, "killpg"):
+        try:
+            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+            return
+        except OSError:
+            pass
+    if process.poll() is None:
+        try:
+            process.kill() if force else process.terminate()
+        except OSError:
+            pass
+
+
+def local_probe_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in list(env):
+        normalized = re.sub(r"[^A-Z0-9]", "_", key.upper())
+        secret_shaped = re.search(
+            r"(^|_)(PASSWORD|PASSWD|PWD|SECRET|TOKEN|API_KEY|API_SECRET|PRIVATE_KEY|"
+            r"SESSION_KEY|AUTHORIZATION|AUTH_HEADER|ACCESS_KEY)($|_)",
+            normalized,
+        )
+        file_reference = normalized.endswith(("_FILE", "_PATH", "_NAME", "_SOCK"))
+        credential_id = normalized in {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"}
+        if (secret_shaped and not file_reference) or credential_id:
+            env.pop(key, None)
+    return env
 
 
 def run_local_command(argv: list[str], timeout: int = 20) -> dict[str, Any]:
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             argv,
             cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout,
+            env=local_probe_env(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+            start_new_session=True,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except OSError as exc:
         return {"argv": argv, "error": str(exc), "returncode": None}
+    assert process.stdout is not None and process.stderr is not None
+    stdout = bytearray()
+    stderr = bytearray()
+    stdout_dropped = [0]
+    stderr_dropped = [0]
+    stream_state = {
+        process.stdout.fileno(): (process.stdout, stdout, stdout_dropped),
+        process.stderr.fileno(): (process.stderr, stderr, stderr_dropped),
+    }
+    selector = selectors.DefaultSelector()
+    for descriptor in stream_state:
+        os.set_blocking(descriptor, False)
+        selector.register(descriptor, selectors.EVENT_READ)
+
+    started_at = time.monotonic()
+    timeout_deadline = started_at + max(0.001, float(timeout))
+    timed_out = False
+    terminate_deadline: float | None = None
+    hard_deadline: float | None = None
+    exit_drain_deadline: float | None = None
+    try:
+        while True:
+            now = time.monotonic()
+            returncode = process.poll()
+            if returncode is not None and exit_drain_deadline is None:
+                exit_drain_deadline = now + 0.25
+
+            if not timed_out and returncode is None and now >= timeout_deadline:
+                timed_out = True
+                _terminate_local_process(process, force=False)
+                terminate_deadline = now + 0.5
+                hard_deadline = now + 1.5
+
+            if (
+                timed_out
+                and returncode is None
+                and terminate_deadline is not None
+                and now >= terminate_deadline
+            ):
+                _terminate_local_process(process, force=True)
+                terminate_deadline = None
+
+            if timed_out and hard_deadline is not None and now >= hard_deadline:
+                _terminate_local_process(process, force=True)
+                break
+            if returncode is not None and (
+                not selector.get_map()
+                or (exit_drain_deadline is not None and now >= exit_drain_deadline)
+            ):
+                break
+
+            deadlines: list[float] = []
+            if not timed_out and returncode is None:
+                deadlines.append(timeout_deadline)
+            if terminate_deadline is not None:
+                deadlines.append(terminate_deadline)
+            if hard_deadline is not None:
+                deadlines.append(hard_deadline)
+            if exit_drain_deadline is not None:
+                deadlines.append(exit_drain_deadline)
+            wait_seconds = 0.1 if not deadlines else max(0.0, min(0.1, min(deadlines) - now))
+            for key, _mask in selector.select(wait_seconds):
+                descriptor = int(key.fd)
+                try:
+                    chunk = os.read(descriptor, 65536)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    try:
+                        selector.unregister(descriptor)
+                    except KeyError:
+                        pass
+                    continue
+                _stream, sink, dropped = stream_state[descriptor]
+                _append_bounded_output(sink, chunk, dropped)
+    finally:
+        if process.poll() is None:
+            _terminate_local_process(process, force=True)
+            try:
+                process.wait(timeout=0.25)
+            except subprocess.TimeoutExpired:
+                pass
+        selector.close()
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
+    returncode = process.poll()
+    stdout_text = bytes(stdout).decode("utf-8", errors="replace")
+    stderr_text = bytes(stderr).decode("utf-8", errors="replace")
+    if stdout_dropped[0]:
+        stdout_text = f"...[dropped {stdout_dropped[0]} earlier bytes]\n" + stdout_text
+    if stderr_dropped[0]:
+        stderr_text = f"...[dropped {stderr_dropped[0]} earlier bytes]\n" + stderr_text
+    if timed_out:
+        return {
+            "argv": argv,
+            "error": f"timed out after {timeout}s",
+            "returncode": None,
+            "stdout_tail": stdout_text[-4000:],
+            "stderr_tail": stderr_text[-4000:],
+        }
     return {
         "argv": argv,
-        "returncode": result.returncode,
-        "stdout_tail": result.stdout[-4000:],
-        "stderr_tail": result.stderr[-4000:],
+        "returncode": returncode,
+        "stdout_tail": stdout_text[-4000:],
+        "stderr_tail": stderr_text[-4000:],
     }
+
+
+def read_text_tail(path: Path, limit: int) -> str:
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise OSError(f"unsafe local evidence file: {path}")
+        offset = max(0, before.st_size - limit)
+        os.lseek(descriptor, offset, os.SEEK_SET)
+        data = os.read(descriptor, limit)
+        after = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+        ):
+            raise OSError(f"local evidence file changed while reading: {path}")
+    finally:
+        os.close(descriptor)
+    return data.decode("utf-8", errors="replace")
 
 
 def collect_local_enterprise_evidence(args: argparse.Namespace) -> dict[str, Any]:
@@ -2675,15 +3309,23 @@ def collect_local_enterprise_evidence(args: argparse.Namespace) -> dict[str, Any
 
     evidence["collection"]["notes"].append(f"Found Splunk binary at {splunk_bin}.")
     btool_result = run_local_command([str(splunk_bin), "btool", "check", "--debug"])
-    if btool_result["returncode"] not in (0, None):
+    if btool_result["returncode"] is None:
+        evidence["collection"]["notes"].append(
+            "btool check was not assessed: " + str(btool_result.get("error", "collection failed"))
+        )
+    elif btool_result["returncode"] != 0:
         evidence["btool"] = {"errors": [btool_result.get("stderr_tail") or btool_result.get("stdout_tail")]}
     else:
         evidence["btool"] = {"errors": []}
 
     health_log = splunk_home / "var" / "log" / "splunk" / "health.log"
     if health_log.exists():
-        text = health_log.read_text(encoding="utf-8", errors="replace")
-        evidence.setdefault("splunkd", {}).setdefault("health_log_tail", text[-8000:])
+        try:
+            text = read_text_tail(health_log, 8000)
+        except OSError as exc:
+            evidence["collection"]["notes"].append(f"health.log was not read safely: {exc}")
+        else:
+            evidence.setdefault("splunkd", {}).setdefault("health_log_tail", text)
     return evidence
 
 
@@ -2697,15 +3339,19 @@ def merge_evidence(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[s
     return merged
 
 
-def detect_platform(requested: str, evidence: dict[str, Any]) -> str:
+def detect_platform(requested: str, evidence: dict[str, Any], splunk_uri: str = "") -> str:
     if requested in {"cloud", "enterprise"}:
         return requested
-    declared = str(evidence.get("platform", "")).lower()
+    declared = str(evidence.get("platform", "")).strip().lower()
     if declared in {"cloud", "enterprise"}:
         return declared
-    if "acs" in evidence or "cmc" in evidence or "subscription" in evidence:
+    if uri_is_splunkcloud(splunk_uri):
         return "cloud"
-    return "enterprise"
+    die(
+        "Platform auto-detection is ambiguous. Supply --platform cloud|enterprise, "
+        "declare evidence.platform, or use a *.splunkcloud.com management URI."
+    )
+    raise AssertionError("unreachable")
 
 
 def load_evidence(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
@@ -2713,22 +3359,50 @@ def load_evidence(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
     if args.evidence_file:
         evidence = load_json_file(Path(args.evidence_file).expanduser())
 
-    platform = detect_platform(args.platform, evidence)
-    declared_platform = str(evidence.get("platform", "")).lower()
+    try:
+        normalized_splunk_uri = normalize_management_uri(args.splunk_uri)
+    except ValueError as exc:
+        die(str(exc))
+    args.splunk_uri = normalized_splunk_uri
+
+    declared_platform = str(evidence.get("platform", "")).strip().lower()
+    if "platform" in evidence and declared_platform not in {"cloud", "enterprise"}:
+        die("Evidence field 'platform' must be 'cloud' or 'enterprise' when present.")
+    platform = detect_platform(args.platform, evidence, normalized_splunk_uri)
     if args.platform in {"cloud", "enterprise"} and declared_platform in {"cloud", "enterprise"} and declared_platform != args.platform:
         die(f"Requested platform {args.platform!r} conflicts with evidence platform {declared_platform!r}.")
+    if platform == "enterprise" and uri_is_splunkcloud(normalized_splunk_uri):
+        die("Enterprise platform conflicts with the supplied *.splunkcloud.com management URI.")
     if not args.evidence_file and platform == "enterprise":
         evidence = merge_evidence(evidence, collect_local_enterprise_evidence(args))
 
-    evidence.setdefault("platform", platform)
+    evidence["platform"] = platform
     inputs = evidence.setdefault("inputs", {})
     if not isinstance(inputs, dict):
         die("Evidence field 'inputs' must be a JSON object when present.")
     if args.target_search_head:
         inputs["target_search_head"] = redact_string(args.target_search_head)
-    if args.splunk_uri:
-        inputs["splunk_uri"] = sanitize_uri(args.splunk_uri)
+    if normalized_splunk_uri:
+        inputs["splunk_uri"] = normalized_splunk_uri
     inputs["splunk_home"] = args.splunk_home
+    if args.platform in {"cloud", "enterprise"}:
+        platform_resolution = "explicit_argument"
+    elif declared_platform in {"cloud", "enterprise"}:
+        platform_resolution = "evidence"
+    else:
+        platform_resolution = "splunkcloud_management_uri"
+    evidence["doctor_normalization"] = {
+        "performed_by": SKILL_NAME,
+        "source": (
+            "supplied_evidence_snapshot"
+            if args.evidence_file
+            else "local_enterprise_probe"
+            if platform == "enterprise"
+            else "operator_context_only"
+        ),
+        "platform_resolution": platform_resolution,
+        "local_collection_performed_by_doctor": bool(not args.evidence_file and platform == "enterprise"),
+    }
     validate_evidence_applicability(evidence)
     return evidence, platform
 
@@ -2737,20 +3411,23 @@ def evaluate_rules(
     evidence: dict[str, Any],
     platform: str,
     product_coverage: dict[str, Any] | None = None,
+    observed_at: str | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    redacted_evidence = redact(evidence)
+    observed_at = observed_at or now_iso()
     for item in RULE_CATALOG:
         if not platform_applies(item["platform"], platform):
             continue
-        if not rule_environment_applicable(item, redacted_evidence):
+        if not rule_environment_applicable(item, evidence):
             continue
-        if not trigger_matches(item["trigger"], redacted_evidence):
+        if not rule_eligibility_confirmed(item, evidence):
+            continue
+        if not trigger_matches(item["trigger"], evidence):
             continue
         finding = {key: item[key] for key in REQUIRED_RULE_FIELDS}
-        finding["observed_at"] = now_iso()
+        finding["observed_at"] = observed_at
         finding["platform"] = platform
-        finding["observed"] = matched_observations(item, redacted_evidence)
+        finding["observed"] = redact(matched_observations(item, evidence))
         if item["id"] == "SAD-PREMIUM-HANDOFFS" and product_coverage is not None:
             active_routes = [route for route in product_coverage["routes"] if route["detected"]]
             handoffs = sorted({skill for route in active_routes for skill in route["handoff_skills"]})
@@ -2797,7 +3474,14 @@ def build_coverage(
             if item["domain"] == domain and platform_applies(item["platform"], platform)
         ]
         rules = [item for item in platform_rules if rule_environment_applicable(item, evidence)]
-        explicitly_not_applicable = [item["id"] for item in platform_rules if item not in rules]
+        explicitly_not_applicable = [
+            item["id"] for item in platform_rules if rule_explicitly_not_applicable(item, evidence)
+        ]
+        derived_not_applicable = [
+            item["id"]
+            for item in platform_rules
+            if item not in rules and item["id"] not in explicitly_not_applicable
+        ]
         coverage_class = domain_coverage_class(domain, platform, platform_rules)
         assessed_rule_ids = [item["id"] for item in rules if rule_is_assessed(item, evidence)]
         unassessed_rule_ids = [item["id"] for item in rules if item["id"] not in assessed_rule_ids]
@@ -2828,6 +3512,7 @@ def build_coverage(
             "rule_ids": [item["id"] for item in platform_rules],
             "applicable_rule_ids": [item["id"] for item in rules],
             "explicitly_not_applicable_rule_ids": explicitly_not_applicable,
+            "derived_not_applicable_rule_ids": derived_not_applicable,
             "finding_ids": finding_ids,
             "assessed_rule_ids": assessed_rule_ids,
             "unassessed_rule_ids": unassessed_rule_ids,
@@ -2841,6 +3526,7 @@ def build_coverage(
         evidence_status_counts[item["evidence_status"]] = evidence_status_counts.get(item["evidence_status"], 0) + 1
     repository_coverage = repository_skill_dispositions()
     return {
+        "schema_version": SCHEMA_VERSION,
         "platform": platform,
         "assessment_summary": assessment_counts,
         "evidence_status_summary": evidence_status_counts,
@@ -2851,7 +3537,52 @@ def build_coverage(
     }
 
 
-def build_fix_plan(findings: list[dict[str, Any]]) -> dict[str, Any]:
+def report_health_summary(
+    findings: list[dict[str, Any]],
+    coverage: dict[str, Any],
+) -> dict[str, Any]:
+    severity_counts = {severity: 0 for severity in SEVERITY_RANK}
+    for finding in findings:
+        severity = str(finding.get("severity", ""))
+        if severity in severity_counts:
+            severity_counts[severity] += 1
+    severity_counts["total"] = len(findings)
+    highest_severity = max(
+        (str(finding["severity"]) for finding in findings if finding.get("severity") in SEVERITY_RANK),
+        key=lambda severity: SEVERITY_RANK[severity],
+        default="none",
+    )
+    health_findings = [
+        finding for finding in findings if str(finding.get("id", "")) not in NON_HEALTH_FINDING_IDS
+    ]
+    evidence_complete = coverage.get("complete") is True
+    if health_findings and not evidence_complete:
+        health_status = "findings_and_incomplete"
+    elif health_findings:
+        health_status = "findings"
+    elif evidence_complete:
+        health_status = "healthy"
+    else:
+        health_status = "incomplete"
+    return {
+        "report_valid": True,
+        "healthy": health_status == "healthy",
+        "evidence_complete": evidence_complete,
+        "health_status": health_status,
+        "severity_counts": severity_counts,
+        "highest_severity": highest_severity,
+        "health_relevant_finding_count": len(health_findings),
+        "strict_ready": bool(
+            coverage.get("complete") is True
+            and not any(
+                SEVERITY_RANK.get(str(finding.get("severity", "")), -1) >= SEVERITY_RANK["high"]
+                for finding in findings
+            )
+        ),
+    }
+
+
+def build_fix_plan(findings: list[dict[str, Any]], generated_at: str | None = None) -> dict[str, Any]:
     fixes: list[dict[str, Any]] = []
     for finding in findings:
         selectable = finding["fix_kind"] in {"direct_fix", "delegated_fix", "manual_support"}
@@ -2869,7 +3600,8 @@ def build_fix_plan(findings: list[dict[str, Any]]) -> dict[str, Any]:
             }
         )
     return {
-        "generated_at": now_iso(),
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": generated_at or now_iso(),
         "safety": {
             "requires_explicit_fixes": True,
             "dry_run_supported": True,
@@ -2887,13 +3619,477 @@ def build_fix_plan(findings: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _open_secure_parent(path: Path, *, create: bool = True) -> tuple[int, str]:
+    if not path.name or path.name in {".", ".."}:
+        raise ValueError(f"invalid doctor output file name: {path}")
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if not nofollow:
+        raise RuntimeError("secure doctor writes require O_NOFOLLOW support")
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    parent = path.parent
+    if sys.platform == "darwin" and parent.is_absolute() and len(parent.parts) > 1:
+        first_component = parent.parts[1]
+        if first_component in {"tmp", "var"}:
+            alias = Path(os.path.sep) / first_component
+            try:
+                alias_metadata = alias.lstat()
+                alias_target = alias.resolve(strict=True)
+            except OSError:
+                pass
+            else:
+                if (
+                    stat.S_ISLNK(alias_metadata.st_mode)
+                    and alias_metadata.st_uid == 0
+                    and alias_target.is_dir()
+                    and alias_target.parts[:2] == (os.path.sep, "private")
+                ):
+                    parent = alias_target.joinpath(*parent.parts[2:])
+    if parent.is_absolute():
+        descriptor = os.open(os.path.sep, directory_flags | nofollow)
+        components = parent.parts[1:]
+    else:
+        descriptor = os.open(".", directory_flags | nofollow)
+        components = parent.parts
+    try:
+        for component in components:
+            if component in {"", "."}:
+                continue
+            if component == "..":
+                raise ValueError(f"parent traversal is not allowed in doctor output paths: {path}")
+            try:
+                child = os.open(component, directory_flags | nofollow, dir_fd=descriptor)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                try:
+                    os.mkdir(component, 0o700, dir_fd=descriptor)
+                except FileExistsError:
+                    # Another writer may have created the component after our
+                    # failed open. Re-open it through the same O_NOFOLLOW and
+                    # O_DIRECTORY checks; unsafe replacements still fail.
+                    pass
+                child = os.open(component, directory_flags | nofollow, dir_fd=descriptor)
+            metadata = os.fstat(child)
+            if not stat.S_ISDIR(metadata.st_mode):
+                os.close(child)
+                raise OSError(f"doctor output parent is not a directory: {component}")
+            os.close(descriptor)
+            descriptor = child
+        return descriptor, path.name
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _validate_existing_output(parent_fd: int, name: str) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise OSError(f"unsafe doctor output destination: {name}")
+    finally:
+        os.close(descriptor)
+
+
+def ensure_safe_output_layout(output_dir: Path) -> None:
+    directories = (output_dir, output_dir / "evidence", output_dir / "handoffs", output_dir / "support-tickets")
+    for index, directory in enumerate(directories):
+        descriptor, _name = _open_secure_parent(directory / ".doctor-layout-check", create=True)
+        try:
+            metadata = os.fstat(descriptor)
+            if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) & 0o022:
+                raise PermissionError(
+                    "doctor output directory must be owned by the current user and not group/world writable: "
+                    f"{directory if index else output_dir}"
+                )
+        finally:
+            os.close(descriptor)
+
+
+@contextmanager
+def output_bundle_lock(output_dir: Path):
+    """Hold the bundle's advisory writer lock without waiting for another writer."""
+
+    ensure_safe_output_layout(output_dir)
+    parent_fd, name = _open_secure_parent(output_dir / OUTPUT_LOCK_NAME, create=True)
+    descriptor = -1
+    locked = False
+    try:
+        _validate_existing_output(parent_fd, name)
+        lock_flags = os.O_RDWR | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        try:
+            descriptor = os.open(
+                name,
+                lock_flags | os.O_CREAT | os.O_EXCL,
+                stat.S_IRUSR | stat.S_IWUSR,
+                dir_fd=parent_fd,
+            )
+        except FileExistsError:
+            # A concurrent first writer may have created the persistent lock
+            # after validation. Open only that existing non-symlink entry.
+            descriptor = os.open(name, lock_flags, dir_fd=parent_fd)
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+        ):
+            raise PermissionError("doctor output lock must be a private, single-link regular file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("doctor output bundle is locked by another process") from exc
+        locked = True
+        os.ftruncate(descriptor, 0)
+        os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+        os.fsync(descriptor)
+        yield
+    finally:
+        if locked:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+@contextmanager
+def output_bundle_read_lock(output_dir: Path):
+    """Hold a shared lock while status verifies a committed bundle."""
+
+    parent_fd, name = _open_secure_parent(output_dir / OUTPUT_LOCK_NAME, create=False)
+    descriptor = -1
+    locked = False
+    try:
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+        ):
+            raise PermissionError("doctor output lock must be a private, single-link regular file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("doctor output bundle is currently being updated") from exc
+        locked = True
+        yield
+    finally:
+        if locked:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def cleanup_generated_files(directory: Path, name_pattern: re.Pattern[str]) -> None:
+    try:
+        descriptor, _name = _open_secure_parent(directory / ".doctor-cleanup", create=False)
+    except FileNotFoundError:
+        return
+    try:
+        for name in os.listdir(descriptor):
+            if not name_pattern.fullmatch(name):
+                continue
+            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+            entry_fd = os.open(name, flags, dir_fd=descriptor)
+            try:
+                metadata = os.fstat(entry_fd)
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise OSError(f"unsafe generated doctor artifact: {directory / name}")
+            finally:
+                os.close(entry_fd)
+            os.unlink(name, dir_fd=descriptor)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def remove_generated_file(path: Path) -> None:
+    try:
+        parent_fd, name = _open_secure_parent(path, create=False)
+    except FileNotFoundError:
+        return
+    try:
+        try:
+            descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+        except FileNotFoundError:
+            return
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                raise OSError(f"unsafe generated doctor artifact: {path}")
+        finally:
+            os.close(descriptor)
+        os.unlink(name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     mode = stat.S_IRUSR | stat.S_IWUSR | (stat.S_IXUSR if executable else 0)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(content)
-    path.chmod(mode)
+    parent_fd, name = _open_secure_parent(path, create=True)
+    temporary = f".{path.name}.{os.getpid()}.{os.urandom(16).hex()}.tmp"
+    created = False
+    descriptor = -1
+    try:
+        _validate_existing_output(parent_fd, name)
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0),
+            mode,
+            dir_fd=parent_fd,
+        )
+        created = True
+        payload = content.encode("utf-8")
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError(f"short write for doctor output: {path}")
+            view = view[written:]
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(temporary, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        created = False
+        os.fsync(parent_fd)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if created:
+            try:
+                os.unlink(temporary, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        os.close(parent_fd)
+
+
+def artifact_metadata(path: Path) -> dict[str, Any]:
+    parent_fd, name = _open_secure_parent(path, create=False)
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_uid != os.geteuid()
+            or stat.S_IMODE(before.st_mode) & 0o077
+        ):
+            raise PermissionError(f"doctor artifact is not a private, single-link regular file: {path}")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        if (
+            after.st_dev != before.st_dev
+            or after.st_ino != before.st_ino
+            or after.st_nlink != 1
+            or after.st_size != before.st_size
+            or after.st_mtime_ns != before.st_mtime_ns
+        ):
+            raise OSError(f"doctor artifact changed while hashing: {path}")
+        return {"sha256": digest.hexdigest(), "size_bytes": before.st_size}
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _secure_directory_names(directory: Path) -> set[str]:
+    try:
+        descriptor, _name = _open_secure_parent(directory / ".doctor-list", create=False)
+    except FileNotFoundError:
+        return set()
+    try:
+        metadata = os.fstat(descriptor)
+        if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) & 0o022:
+            raise PermissionError(f"doctor artifact directory is not safely owned: {directory}")
+        return set(os.listdir(descriptor))
+    finally:
+        os.close(descriptor)
+
+
+def discover_generated_artifacts(output_dir: Path) -> set[str]:
+    discovered: set[str] = set()
+    top_level = _secure_directory_names(output_dir)
+    for relative in BASE_ARTIFACT_RELATIVE_PATHS | {"applied-fixes.json"}:
+        if "/" not in relative and relative in top_level:
+            discovered.add(relative)
+
+    evidence_names = _secure_directory_names(output_dir / "evidence")
+    for relative in {
+        NORMALIZED_EVIDENCE_RELATIVE_PATH,
+        LEGACY_EVIDENCE_RELATIVE_PATH,
+        COLLECTION_NOTES_RELATIVE_PATH,
+    }:
+        if Path(relative).name in evidence_names:
+            discovered.add(relative)
+
+    packet_pattern = re.compile(r"SAD-[A-Z0-9-]+\.md")
+    for directory_name in ("handoffs", "support-tickets"):
+        for name in _secure_directory_names(output_dir / directory_name):
+            if packet_pattern.fullmatch(name):
+                discovered.add(f"{directory_name}/{name}")
+    return discovered
+
+
+def _canonical_artifact_index(artifacts: dict[str, Any]) -> bytes:
+    return json.dumps(artifacts, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def write_integrity_manifest(
+    output_dir: Path,
+    report: dict[str, Any],
+    phase: str,
+) -> dict[str, Any]:
+    relative_paths = discover_generated_artifacts(output_dir)
+    if LEGACY_EVIDENCE_RELATIVE_PATH in relative_paths:
+        raise OSError(f"legacy evidence artifact must not remain in doctor bundle: {LEGACY_EVIDENCE_RELATIVE_PATH}")
+    missing_base = sorted(BASE_ARTIFACT_RELATIVE_PATHS - relative_paths)
+    if missing_base:
+        raise OSError("doctor bundle is missing generated base artifacts: " + ", ".join(missing_base))
+    if phase == "apply":
+        if "applied-fixes.json" not in relative_paths:
+            raise OSError("doctor apply bundle is missing applied-fixes.json")
+        if not any(path.startswith(("handoffs/", "support-tickets/")) for path in relative_paths):
+            raise OSError("doctor apply bundle is missing selected fix packets")
+    elif relative_paths != BASE_ARTIFACT_RELATIVE_PATHS:
+        extras = sorted(relative_paths - BASE_ARTIFACT_RELATIVE_PATHS)
+        raise OSError("non-apply doctor bundle contains unexpected generated artifacts: " + ", ".join(extras))
+
+    artifacts = {
+        relative: artifact_metadata(output_dir / relative)
+        for relative in sorted(relative_paths)
+    }
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "skill": SKILL_NAME,
+        "generated_at": report["generated_at"],
+        "platform": report["platform"],
+        "phase": phase,
+        "artifact_count": len(artifacts),
+        "artifacts": artifacts,
+        "bundle_sha256": hashlib.sha256(_canonical_artifact_index(artifacts)).hexdigest(),
+        "excluded_control_files": [INTEGRITY_MANIFEST_NAME, OUTPUT_LOCK_NAME],
+    }
+    write_file(output_dir / INTEGRITY_MANIFEST_NAME, json_dumps(manifest))
+    return manifest
+
+
+def _valid_manifest_relative_path(value: Any) -> bool:
+    if not isinstance(value, str) or not value or "\\" in value:
+        return False
+    path = Path(value)
+    return not path.is_absolute() and path.as_posix() == value and all(part not in {"", ".", ".."} for part in path.parts)
+
+
+def verify_integrity_manifest(output_dir: Path) -> tuple[dict[str, Any] | None, list[str]]:
+    manifest_path = output_dir / INTEGRITY_MANIFEST_NAME
+    try:
+        manifest = _read_json_object_file(manifest_path)
+    except FileNotFoundError:
+        return None, ["integrity manifest is missing"]
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        return None, [f"integrity manifest cannot be read safely: {redact_string(str(exc))}"]
+
+    errors: list[str] = []
+    try:
+        artifact_metadata(manifest_path)
+    except (OSError, ValueError) as exc:
+        errors.append(f"integrity manifest is not a secure artifact: {redact_string(str(exc))}")
+    if manifest.get("schema_version") != SCHEMA_VERSION:
+        errors.append("integrity manifest schema_version is incompatible")
+    if manifest.get("skill") != SKILL_NAME:
+        errors.append("integrity manifest skill is invalid")
+    if manifest.get("platform") not in {"cloud", "enterprise"}:
+        errors.append("integrity manifest platform is invalid")
+    phase = manifest.get("phase")
+    if phase not in {"doctor", "fix-plan", "apply"}:
+        errors.append("integrity manifest phase is invalid")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        errors.append("integrity manifest artifacts must be an object")
+        return manifest, errors
+    invalid_paths = sorted(str(path) for path in artifacts if not _valid_manifest_relative_path(path))
+    if invalid_paths:
+        errors.append("integrity manifest contains invalid artifact paths: " + ", ".join(invalid_paths))
+    if INTEGRITY_MANIFEST_NAME in artifacts or OUTPUT_LOCK_NAME in artifacts:
+        errors.append("integrity manifest must not hash its control files")
+    if manifest.get("artifact_count") != len(artifacts):
+        errors.append("integrity manifest artifact_count is inconsistent")
+    if manifest.get("excluded_control_files") != [INTEGRITY_MANIFEST_NAME, OUTPUT_LOCK_NAME]:
+        errors.append("integrity manifest control-file exclusions are invalid")
+    if manifest.get("bundle_sha256") != hashlib.sha256(_canonical_artifact_index(artifacts)).hexdigest():
+        errors.append("integrity manifest bundle hash is inconsistent")
+    if not BASE_ARTIFACT_RELATIVE_PATHS.issubset(artifacts):
+        errors.append("integrity manifest does not include every base artifact")
+    if LEGACY_EVIDENCE_RELATIVE_PATH in artifacts:
+        errors.append("integrity manifest contains the retired legacy evidence artifact")
+    if phase == "apply":
+        if "applied-fixes.json" not in artifacts:
+            errors.append("apply integrity manifest is missing applied-fixes.json")
+        if not any(path.startswith(("handoffs/", "support-tickets/")) for path in artifacts):
+            errors.append("apply integrity manifest is missing selected fix packets")
+    elif phase in {"doctor", "fix-plan"} and set(artifacts) != BASE_ARTIFACT_RELATIVE_PATHS:
+        errors.append("non-apply integrity manifest contains unexpected generated artifacts")
+
+    try:
+        discovered = discover_generated_artifacts(output_dir)
+    except OSError as exc:
+        errors.append(f"generated artifact inventory cannot be read safely: {redact_string(str(exc))}")
+        discovered = set()
+    if discovered != set(artifacts):
+        missing = sorted(set(artifacts) - discovered)
+        extra = sorted(discovered - set(artifacts))
+        if missing:
+            errors.append("manifest artifacts are missing from disk: " + ", ".join(missing))
+        if extra:
+            errors.append("generated artifacts are absent from the manifest: " + ", ".join(extra))
+
+    for relative, expected in artifacts.items():
+        if not _valid_manifest_relative_path(relative):
+            continue
+        if not isinstance(expected, dict) or set(expected) != {"sha256", "size_bytes"}:
+            errors.append(f"integrity metadata is invalid for {relative}")
+            continue
+        if not isinstance(expected.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", expected["sha256"]):
+            errors.append(f"integrity sha256 is invalid for {relative}")
+            continue
+        if not isinstance(expected.get("size_bytes"), int) or isinstance(expected.get("size_bytes"), bool) or expected["size_bytes"] < 0:
+            errors.append(f"integrity size is invalid for {relative}")
+            continue
+        try:
+            actual = artifact_metadata(output_dir / relative)
+        except (OSError, ValueError) as exc:
+            errors.append(f"artifact verification failed for {relative}: {redact_string(str(exc))}")
+            continue
+        if actual != expected:
+            errors.append(f"artifact hash or size mismatch: {relative}")
+    return manifest, errors
 
 
 def markdown_list(items: list[Any]) -> str:
@@ -2911,6 +4107,8 @@ def render_doctor_markdown(report: dict[str, Any]) -> str:
         f"Generated: `{report['generated_at']}`",
         f"Platform: `{report['platform']}`",
         f"Findings: `{len(findings)}`",
+        f"Health status: `{report['health_status']}`",
+        f"Healthy: `{report['healthy']}`",
         f"Evidence complete: `{report['coverage']['complete']}`",
         f"Detected product routes: `{report['product_coverage']['detected_route_count']}`",
         "",
@@ -2950,6 +4148,7 @@ def render_doctor_markdown(report: dict[str, Any]) -> str:
                 f"- Environment applicable: `{item['environment_applicable']}`",
                 f"- Rules: {', '.join(f'`{rule_id}`' for rule_id in item['rule_ids']) or '`none`'}",
                 f"- Explicitly not applicable: {', '.join(f'`{rule_id}`' for rule_id in item['explicitly_not_applicable_rule_ids']) or '`none`'}",
+                f"- Derived not applicable: {', '.join(f'`{rule_id}`' for rule_id in item['derived_not_applicable_rule_ids']) or '`none`'}",
                 f"- Findings: {', '.join(f'`{rule_id}`' for rule_id in item['finding_ids']) or '`none`'}",
                 f"- Unassessed rules: {', '.join(f'`{rule_id}`' for rule_id in item['unassessed_rule_ids']) or '`none`'}",
                 f"- Policy: {item['policy']}",
@@ -2959,7 +4158,10 @@ def render_doctor_markdown(report: dict[str, Any]) -> str:
 
     lines.extend(["## Product Routing", ""])
     for route in report["product_coverage"]["routes"]:
-        status = "detected" if route["detected"] else "not detected"
+        if route.get("platform_context"):
+            status = f"platform context: {report['platform']}"
+        else:
+            status = "detected" if route["detected"] else "not detected"
         lines.append(
             f"- `{route['name']}`: {status}; handoff(s): "
             + ", ".join(f"`{skill}`" for skill in route["handoff_skills"])
@@ -3003,23 +4205,277 @@ def render_fix_plan_markdown(plan: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def report_schema_errors(report: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if report.get("schema_version") != SCHEMA_VERSION:
+        errors.append("schema_version is incompatible")
+    if report.get("skill") != SKILL_NAME:
+        errors.append("skill is invalid")
+    platform = report.get("platform")
+    if platform not in {"cloud", "enterprise"}:
+        errors.append("platform is invalid")
+    generated_at = report.get("generated_at")
+    if not isinstance(generated_at, str) or not generated_at:
+        errors.append("generated_at is missing")
+    else:
+        try:
+            parsed_generated_at = datetime.fromisoformat(generated_at)
+        except ValueError:
+            errors.append("generated_at is not ISO-8601")
+        else:
+            if parsed_generated_at.tzinfo is None:
+                errors.append("generated_at must include a timezone")
+
+    findings = report.get("findings")
+    valid_rule_ids = {item["id"] for item in RULE_CATALOG}
+    if not isinstance(findings, list):
+        errors.append("findings must be an array")
+    else:
+        seen_finding_ids: set[str] = set()
+        finding_fields = REQUIRED_RULE_FIELDS | {"observed_at", "platform", "observed"}
+        for index, finding in enumerate(findings):
+            if not isinstance(finding, dict):
+                errors.append(f"findings[{index}] must be an object")
+                continue
+            missing = sorted(finding_fields - set(finding))
+            if missing:
+                errors.append(f"findings[{index}] is missing: {', '.join(missing)}")
+            finding_id = str(finding.get("id", ""))
+            if finding_id not in valid_rule_ids:
+                errors.append(f"findings[{index}] has an unknown rule id")
+            if finding_id in seen_finding_ids:
+                errors.append(f"findings[{index}] duplicates rule {finding_id}")
+            seen_finding_ids.add(finding_id)
+            if finding.get("severity") not in SEVERITY_RANK:
+                errors.append(f"findings[{index}] severity is invalid")
+            if finding.get("platform") != platform:
+                errors.append(f"findings[{index}] platform does not match report")
+
+    coverage = report.get("coverage")
+    if not isinstance(coverage, dict):
+        errors.append("coverage must be an object")
+    else:
+        if coverage.get("schema_version") != SCHEMA_VERSION:
+            errors.append("coverage schema_version is incompatible")
+        if coverage.get("platform") != platform:
+            errors.append("coverage platform does not match report")
+        if not isinstance(coverage.get("complete"), bool):
+            errors.append("coverage.complete must be boolean")
+        domains = coverage.get("domains")
+        if not isinstance(domains, dict) or set(domains) != manifest_domains():
+            errors.append("coverage.domains does not match the domain manifest")
+        if not isinstance(coverage.get("assessment_summary"), dict):
+            errors.append("coverage.assessment_summary must be an object")
+        if not isinstance(coverage.get("evidence_status_summary"), dict):
+            errors.append("coverage.evidence_status_summary must be an object")
+        if not isinstance(coverage.get("repository_skills"), dict):
+            errors.append("coverage.repository_skills must be an object")
+
+    if report.get("report_valid") is not True:
+        errors.append("report_valid must be true")
+    if not isinstance(report.get("healthy"), bool):
+        errors.append("healthy must be boolean")
+    if not isinstance(report.get("evidence_complete"), bool):
+        errors.append("evidence_complete must be boolean")
+    if report.get("health_status") not in {
+        "healthy",
+        "findings",
+        "incomplete",
+        "findings_and_incomplete",
+    }:
+        errors.append("health_status is invalid")
+    severity_counts = report.get("severity_counts")
+    expected_severity_keys = set(SEVERITY_RANK) | {"total"}
+    if not isinstance(severity_counts, dict) or set(severity_counts) != expected_severity_keys:
+        errors.append("severity_counts is invalid")
+    elif any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in severity_counts.values()):
+        errors.append("severity_counts must contain non-negative integers")
+    if report.get("highest_severity") not in set(SEVERITY_RANK) | {"none"}:
+        errors.append("highest_severity is invalid")
+    if not isinstance(report.get("health_relevant_finding_count"), int) or isinstance(
+        report.get("health_relevant_finding_count"), bool
+    ):
+        errors.append("health_relevant_finding_count must be an integer")
+    if not isinstance(report.get("strict_ready"), bool):
+        errors.append("strict_ready must be boolean")
+    if (
+        isinstance(findings, list)
+        and all(isinstance(finding, dict) for finding in findings)
+        and isinstance(coverage, dict)
+    ):
+        expected_health = report_health_summary(findings, coverage)
+        for field, expected_value in expected_health.items():
+            if report.get(field) != expected_value:
+                errors.append(f"{field} is inconsistent with findings and coverage")
+
+    product_coverage = report.get("product_coverage")
+    if not isinstance(product_coverage, dict) or not isinstance(product_coverage.get("routes"), list):
+        errors.append("product_coverage.routes must be an array")
+    catalog = report.get("catalog")
+    if not isinstance(catalog, dict) or catalog.get("rule_count") != len(RULE_CATALOG):
+        errors.append("catalog.rule_count is invalid")
+    return errors
+
+
+def unavailable_status(
+    status: str,
+    message: str,
+    errors: list[str] | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "report_valid": False,
+        "ok": False,
+        "status": status,
+        "healthy": False,
+        "evidence_complete": False,
+        "health_status": "incomplete",
+        "severity_counts": {**{severity: 0 for severity in SEVERITY_RANK}, "total": 0},
+        "highest_severity": "none",
+        "health_relevant_finding_count": 0,
+        "strict_ready": False,
+        "finding_count": 0,
+        "integrity_verified": False,
+        "message": message,
+    }
+    if errors:
+        payload["errors"] = errors
+    return payload
+
+
 def render_status(output_dir: Path) -> dict[str, Any]:
     report_path = output_dir / "doctor-report.json"
-    if not report_path.exists():
-        return {
-            "ok": False,
-            "status": "missing",
-            "message": f"No doctor report found at {report_path}.",
-        }
-    report = load_json_file(report_path)
+    manifest_path = output_dir / INTEGRITY_MANIFEST_NAME
+    try:
+        with output_bundle_read_lock(output_dir):
+            manifest, integrity_errors = verify_integrity_manifest(output_dir)
+            if integrity_errors:
+                return unavailable_status(
+                    "invalid",
+                    f"Doctor bundle at {output_dir} failed integrity verification.",
+                    integrity_errors,
+                )
+            assert manifest is not None
+            try:
+                report = _read_json_object_file(report_path)
+            except FileNotFoundError:
+                return unavailable_status(
+                    "invalid",
+                    f"Doctor report is missing from committed bundle at {output_dir}.",
+                    ["doctor-report.json is missing"],
+                )
+            except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+                return unavailable_status(
+                    "invalid",
+                    f"Doctor report at {report_path} cannot be read safely.",
+                    [redact_string(str(exc))],
+                )
+            schema_errors = report_schema_errors(report)
+            if manifest.get("generated_at") != report.get("generated_at"):
+                schema_errors.append("integrity manifest generated_at does not match report")
+            if manifest.get("platform") != report.get("platform"):
+                schema_errors.append("integrity manifest platform does not match report")
+            if schema_errors:
+                return unavailable_status(
+                    "invalid",
+                    f"Doctor report at {report_path} does not match the expected report schema.",
+                    schema_errors,
+                )
+    except FileNotFoundError:
+        try:
+            _read_json_object_file(report_path)
+        except FileNotFoundError:
+            return unavailable_status(
+                "missing",
+                f"No committed doctor bundle found at {output_dir}.",
+                ["output bundle lock or integrity manifest is missing"],
+            )
+        except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+            return unavailable_status(
+                "invalid",
+                f"Uncommitted doctor output at {output_dir} cannot be read safely.",
+                [redact_string(str(exc))],
+            )
+        return unavailable_status(
+            "invalid",
+            f"Doctor output at {output_dir} is not a committed bundle.",
+            ["output bundle lock or integrity manifest is missing"],
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        return unavailable_status(
+            "invalid",
+            f"Doctor bundle at {output_dir} cannot be verified safely.",
+            [redact_string(str(exc))],
+        )
+
+    findings = report["findings"]
     return {
+        "report_valid": True,
         "ok": True,
         "status": "available",
-        "generated_at": report.get("generated_at"),
-        "platform": report.get("platform"),
-        "finding_count": len(report.get("findings", [])),
+        "healthy": report["healthy"],
+        "evidence_complete": report["evidence_complete"],
+        "health_status": report["health_status"],
+        "severity_counts": report["severity_counts"],
+        "highest_severity": report["highest_severity"],
+        "health_relevant_finding_count": report["health_relevant_finding_count"],
+        "strict_ready": report["strict_ready"],
+        "generated_at": report["generated_at"],
+        "platform": report["platform"],
+        "finding_count": len(findings),
+        "integrity_verified": True,
+        "manifest_path": str(manifest_path),
         "report_path": str(report_path),
+        "message": f"Verified doctor report at {report_path}.",
     }
+
+
+def render_collection_notes(evidence: dict[str, Any]) -> str:
+    normalization = evidence.get("doctor_normalization", {})
+    source = str(normalization.get("source", "unknown")) if isinstance(normalization, dict) else "unknown"
+    platform_resolution = (
+        str(normalization.get("platform_resolution", "unknown"))
+        if isinstance(normalization, dict)
+        else "unknown"
+    )
+    local_collection = bool(
+        normalization.get("local_collection_performed_by_doctor", False)
+        if isinstance(normalization, dict)
+        else False
+    )
+    collection = evidence.get("collection", {})
+    source_notes = collection.get("notes", []) if isinstance(collection, dict) else []
+    if not isinstance(source_notes, list):
+        source_notes = ["collection.notes was not an array in normalized evidence"]
+    rendered_notes = "\n".join(
+        f"    {line}" for line in json.dumps(redact(source_notes), indent=2, sort_keys=True).splitlines()
+    )
+    source_descriptions = {
+        "supplied_evidence_snapshot": (
+            "The operator supplied an evidence snapshot. The doctor did not independently collect "
+            "that snapshot or verify its upstream collection claims."
+        ),
+        "local_enterprise_probe": (
+            "The doctor performed its bounded, read-only local Splunk Enterprise probes and then "
+            "normalized those observations."
+        ),
+        "operator_context_only": (
+            "No evidence snapshot or local Enterprise probe was used; only explicit operator context "
+            "was normalized."
+        ),
+    }
+    return (
+        "# Evidence Collection Notes\n\n"
+        f"Artifact: `{NORMALIZED_EVIDENCE_RELATIVE_PATH}`\n\n"
+        "The artifact is a normalized, augmented, and redacted doctor evidence record. "
+        "It is not a verbatim copy of supplied input.\n\n"
+        f"- Evidence source mode: `{source}`\n"
+        f"- Platform resolution: `{platform_resolution}`\n"
+        f"- Local collection performed by this doctor run: `{'yes' if local_collection else 'no'}`\n\n"
+        f"{source_descriptions.get(source, 'The evidence source mode was not recognized.')}\n\n"
+        "## Source Collection Notes (redacted)\n\n"
+        f"{rendered_notes}\n\n"
+        "The doctor performs no live REST or ACS mutation while producing this bundle.\n"
+    )
 
 
 def write_base_outputs(
@@ -3028,27 +4484,19 @@ def write_base_outputs(
     fix_plan: dict[str, Any],
     evidence: dict[str, Any],
 ) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for packet_dir_name in ("handoffs", "support-tickets"):
-        packet_dir = output_dir / packet_dir_name
-        if packet_dir.is_dir():
-            for stale_packet in packet_dir.glob("SAD-*.md"):
-                stale_packet.unlink()
-    stale_applied = output_dir / "applied-fixes.json"
-    if stale_applied.is_file():
-        stale_applied.unlink()
+    ensure_safe_output_layout(output_dir)
+    packet_pattern = re.compile(r"SAD-[A-Z0-9-]+\.md")
+    cleanup_generated_files(output_dir / "handoffs", packet_pattern)
+    cleanup_generated_files(output_dir / "support-tickets", packet_pattern)
+    remove_generated_file(output_dir / "applied-fixes.json")
+    remove_generated_file(output_dir / LEGACY_EVIDENCE_RELATIVE_PATH)
     write_file(output_dir / "doctor-report.json", json_dumps(report))
     write_file(output_dir / "doctor-report.md", render_doctor_markdown(report))
     write_file(output_dir / "fix-plan.json", json_dumps(fix_plan))
     write_file(output_dir / "fix-plan.md", render_fix_plan_markdown(fix_plan))
     write_file(output_dir / "coverage-report.json", json_dumps(report["coverage"]))
-    write_file(output_dir / "evidence" / "input-evidence.redacted.json", json_dumps(redact(evidence)))
-    write_file(
-        output_dir / "evidence" / "collection-notes.md",
-        "# Evidence Collection Notes\n\n"
-        "Live REST and ACS mutations are not performed by this doctor. "
-        "Evidence supplied through `--evidence-file` is redacted before writing.\n",
-    )
+    write_file(output_dir / NORMALIZED_EVIDENCE_RELATIVE_PATH, json_dumps(redact(evidence)))
+    write_file(output_dir / COLLECTION_NOTES_RELATIVE_PATH, render_collection_notes(evidence))
 
 
 def selected_fix_ids(value: str) -> list[str]:
@@ -3153,12 +4601,19 @@ def render_direct_packet(output_dir: Path, finding: dict[str, Any]) -> None:
     write_file(output_dir / "handoffs" / f"{safe_rel_name(fix_id)}.md", "\n".join(packet))
 
 
-def apply_selected_fixes(output_dir: Path, findings: list[dict[str, Any]], fixes: list[str]) -> dict[str, Any]:
+def apply_selected_fixes(
+    output_dir: Path,
+    findings: list[dict[str, Any]],
+    fixes: list[str],
+    generated_at: str | None = None,
+) -> dict[str, Any]:
     selected = validate_selected_fixes(findings, fixes)
 
     applied: list[dict[str, Any]] = []
     for finding in selected:
         fix_id = finding["id"]
+        packet_directory = "support-tickets" if finding["fix_kind"] == "manual_support" else "handoffs"
+        packet_relative_path = f"{packet_directory}/{safe_rel_name(fix_id)}.md"
         if finding["fix_kind"] == "delegated_fix":
             render_handoff_packet(output_dir, finding)
         elif finding["fix_kind"] == "manual_support":
@@ -3170,11 +4625,13 @@ def apply_selected_fixes(output_dir: Path, findings: list[dict[str, Any]], fixes
                 "id": fix_id,
                 "fix_kind": finding["fix_kind"],
                 "live_mutation_performed": False,
-                "packet": "handoffs" if finding["fix_kind"] != "manual_support" else "support-tickets",
+                "packet": packet_directory,
+                "artifact": packet_relative_path,
             }
         )
     result = {
-        "generated_at": now_iso(),
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": generated_at or now_iso(),
         "selected_fixes": applied,
         "safety": "local packets rendered only; no Splunk mutation performed by doctor",
     }
@@ -3209,6 +4666,7 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
 
     evidence, platform = load_evidence(args)
     augment_lifecycle_evidence(evidence, platform)
+    generated_at = now_iso()
     diagnostics = evidence.setdefault("diagnostics", {})
     if not isinstance(diagnostics, dict):
         die("Evidence field 'diagnostics' must be a JSON object when present.")
@@ -3223,24 +4681,19 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
         item["id"] for item in rules_for_completeness if not rule_is_assessed(item, evidence)
     ]
     diagnostics["evidence_incomplete"] = bool(diagnostics["unassessed_rule_ids"])
-    product_coverage = build_product_coverage(redact(evidence), platform)
-    inferred_products = sorted(
-        {
-            value
-            for route in product_coverage["routes"]
-            if route["detected"]
-            for value in route["detected_values"]
-        }
-    )
-    if inferred_products:
+    explicit_products, inferred_products = detected_product_values(evidence)
+    if explicit_products or inferred_products:
         products = evidence.setdefault("products", {})
-        if isinstance(products, dict):
-            products.setdefault("detected", inferred_products)
-    findings = evaluate_rules(evidence, platform, product_coverage)
+        if not isinstance(products, dict):
+            die("Evidence field 'products' must be a JSON object when product inventory is present.")
+        products["detected"] = sorted(set(explicit_products + inferred_products))
+    product_coverage = build_product_coverage(evidence, platform)
+    findings = evaluate_rules(evidence, platform, product_coverage, generated_at)
     coverage = build_coverage(platform, findings, evidence, product_coverage)
     report = {
+        "schema_version": SCHEMA_VERSION,
         "skill": SKILL_NAME,
-        "generated_at": now_iso(),
+        "generated_at": generated_at,
         "platform": platform,
         "target_search_head": redact_string(args.target_search_head),
         "splunk_uri": sanitize_uri(args.splunk_uri),
@@ -3256,25 +4709,35 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
             "required_rule_fields": sorted(REQUIRED_RULE_FIELDS),
         },
     }
-    fix_plan = build_fix_plan(findings)
+    report.update(report_health_summary(findings, coverage))
+    generated_report_errors = report_schema_errors(report)
+    if generated_report_errors:
+        die("Generated report validation failed: " + "; ".join(generated_report_errors))
+    fix_plan = build_fix_plan(findings, generated_at)
     return report, fix_plan, evidence
 
 
-def text_summary(report: dict[str, Any]) -> str:
+def text_summary(report: dict[str, Any], *, artifacts_written: bool = True) -> str:
     lines = [
         f"Splunk Admin Doctor generated {len(report['findings'])} finding(s) for {report['platform']}.",
+        f"Health status: {report['health_status']} (healthy={report['healthy']}).",
         f"Evidence complete: {report['coverage']['complete']} ({report['coverage']['evidence_status_summary']}).",
-        "Reports: doctor-report.md, doctor-report.json, fix-plan.md, fix-plan.json, coverage-report.json",
     ]
+    if artifacts_written:
+        lines.append(
+            "Reports: doctor-report.md/json, fix-plan.md/json, coverage-report.json, "
+            "evidence/normalized-evidence.redacted.json, artifact-manifest.json"
+        )
+    else:
+        lines.append("Dry run: no report or packet files were written.")
     if report["findings"]:
         top = report["findings"][0]
         lines.append(f"Top finding: {top['id']} ({top['severity']})")
     return "\n".join(lines) + "\n"
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    output_dir = Path(args.output_dir).expanduser().resolve()
+def execute(args: argparse.Namespace) -> int:
+    output_dir = Path(os.path.abspath(os.path.expanduser(args.output_dir)))
 
     if args.phase == "validate":
         validation = validate_catalog()
@@ -3311,20 +4774,36 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json_dumps(payload), end="")
         else:
-            print(text_summary(report), end="")
+            print(text_summary(report, artifacts_written=False), end="")
         if args.require_complete_evidence and not report["coverage"]["complete"]:
             return 3
         if args.strict and any(SEVERITY_RANK[item["severity"]] >= SEVERITY_RANK["high"] for item in report["findings"]):
             return 2
         return 0
 
-    write_base_outputs(output_dir, report, fix_plan, evidence)
+    if args.phase == "apply":
+        # Validate before cleanup or any artifact write so a typo or a
+        # diagnose-only selection cannot alter a prior valid output bundle.
+        validate_selected_fixes(report["findings"], selected_fix_ids(args.fixes))
 
     result: Any = report
-    if args.phase == "fix-plan":
-        result = fix_plan
-    elif args.phase == "apply":
-        result = apply_selected_fixes(output_dir, report["findings"], selected_fix_ids(args.fixes))
+    with output_bundle_lock(output_dir):
+        # Removing the old commit marker first ensures an interrupted rewrite
+        # cannot be mistaken for a complete, internally consistent bundle.
+        remove_generated_file(output_dir / INTEGRITY_MANIFEST_NAME)
+        write_base_outputs(output_dir, report, fix_plan, evidence)
+        if args.phase == "fix-plan":
+            result = fix_plan
+        elif args.phase == "apply":
+            result = apply_selected_fixes(
+                output_dir,
+                report["findings"],
+                selected_fix_ids(args.fixes),
+                report["generated_at"],
+            )
+        # The manifest is the bundle commit marker and is always written last,
+        # after phase-specific packets and applied-fixes.json exist.
+        write_integrity_manifest(output_dir, report, args.phase)
 
     if args.json:
         print(json_dumps(result), end="")
@@ -3338,6 +4817,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.strict and any(SEVERITY_RANK[item["severity"]] >= SEVERITY_RANK["high"] for item in report["findings"]):
         return 2
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        return execute(args)
+    except (OSError, RuntimeError) as exc:
+        print(f"ERROR: secure file operation failed: {redact_string(str(exc))}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

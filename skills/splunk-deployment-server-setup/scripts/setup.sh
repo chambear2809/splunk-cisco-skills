@@ -94,6 +94,10 @@ Safety gates:
 File-based secrets (chmod 600 required):
   --admin-password-file PATH         Splunk admin password file (for bootstrap/reload/inspect)
 
+Lab-only transport override:
+  SPLUNK_ALLOW_INSECURE_HTTP=true    Permit http:// management URIs with a warning.
+                                      Credentials/session keys are otherwise HTTPS-only.
+
 Other:
   --apply                            Execute rendered scripts
   --live                             Enable live API checks in validate/inspect phases

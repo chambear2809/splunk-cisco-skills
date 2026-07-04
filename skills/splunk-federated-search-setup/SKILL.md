@@ -72,6 +72,11 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password
 bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_admin_password
 ```
 
+Credential-bearing REST apply requires a credential-free HTTPS origin and
+never follows redirects. Plaintext HTTP is refused unless an operator
+explicitly sets `SPLUNK_ALLOW_INSECURE_HTTP=true` for an isolated, short-lived
+lab; disabling certificate verification does not authorize HTTP.
+
 Collect non-secret values in `template.example`: provider names, remote
 management endpoints, service-account usernames, provider modes, federated
 index names, dataset types and names, app contexts, AWS account IDs, AWS

@@ -40,19 +40,26 @@ is younger than 30 days.
 
 | Phase | Behavior |
 |-------|----------|
-| `render` | Render reviewable assets. Windows uses this as the normal v1 handoff. |
+| `render` | Default. Render reviewable assets without changing a target host. Windows uses this as the normal v1 handoff. |
 | `download` | Resolve/download/cache/verify the package. |
-| `install` | Fresh install, upgrade, or same-version no-op. |
-| `enroll` | Apply deployment-server, indexer, or Splunk Cloud enrollment. |
+| `install` | Fresh install, upgrade, or same-version no-op. Live apply requires `--accept-forwarder-mutation`. |
+| `enroll` | Apply deployment-server, indexer, or Splunk Cloud enrollment. Live apply requires `--accept-forwarder-mutation`. |
 | `status` | Check binary, version, service state, and selected enrollment config. |
-| `all` | Unix-like targets run download, install, enroll, and status; Windows renders. |
+| `all` | Unix-like targets run download, install, enroll, and status and require `--accept-forwarder-mutation`; Windows renders. |
 
 Render and dry-run phases remain available for download-only or unsupported v1
 targets so operators can inspect exact package metadata and handoff notes without
 attempting an apply.
 
+The mutation acknowledgement is deliberately separate from phase selection.
+It is not required for render, dry-run, download, status, or Windows rendered
+handoffs. This version has no live remove phase; any future host-removal path
+must use the same explicit acknowledgement before deleting runtime state.
+
 ## Install Safety
 
+- Running `setup.sh` with no `--phase` is render-only. Live installs, upgrades,
+  and enrollment changes fail closed without `--accept-forwarder-mutation`.
 - The skill rejects packages that are not named like official Universal
   Forwarder packages.
 - Existing installs are inspected before upgrade. If the target appears to be

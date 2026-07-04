@@ -10,16 +10,19 @@ mode-600 local state before performing a collection readback.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from contextlib import contextmanager
 from typing import Any, Iterable
 
 
@@ -27,6 +30,9 @@ API_BASE = "https://api.thousandeyes.com/v7"
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9._~/-]+$")
 SAFE_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+SAFE_FIELD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*$")
+STATE_SCHEMA_VERSION = 2
+MAX_STATE_BYTES = 1024 * 1024
 DEFAULT_ID_KEYS = (
     "id",
     "streamId",
@@ -53,14 +59,55 @@ class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 def read_secret_file(raw_path: str) -> str:
     path = Path(raw_path)
-    if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
-        raise ApplyError(f"secret file must be a non-empty regular, non-symlink file: {path}")
-    mode = path.stat().st_mode & 0o777
-    if mode != 0o600:
-        raise ApplyError(f"secret file must have mode 600 (found {oct(mode)}): {path}")
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ApplyError("this runtime cannot enforce O_NOFOLLOW for secret files")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeError) as exc:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        raise ApplyError(f"cannot securely open secret file: {path}") from exc
+    try:
+        before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_size < 1
+            or before.st_size > 65536
+        ):
+            raise ApplyError(
+                f"secret file must be a non-empty single-link mode-600 regular file: {path}"
+            )
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(fd)
+        if (
+            (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
+            or after.st_nlink != 1
+        ):
+            raise ApplyError(f"secret file changed while it was read: {path}")
+    finally:
+        os.close(fd)
+    try:
+        lines = b"".join(chunks).decode("utf-8").splitlines()
+    except UnicodeError as exc:
         raise ApplyError(f"secret file is not readable UTF-8: {path}") from exc
     if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
         raise ApplyError(f"secret file must contain exactly one non-empty line: {path}")
@@ -202,7 +249,28 @@ def payload_digest(payload: dict[str, Any]) -> str:
 
 
 def extract_id(value: Any, id_keys: tuple[str, ...]) -> str | None:
-    for obj in iter_dicts(value):
+    if not isinstance(value, dict):
+        return None
+    candidates: list[dict[str, Any]] = [value]
+    # TE create responses may wrap the created resource once. Never recurse
+    # through arbitrary nested dictionaries where an unrelated generic `id`
+    # (for example, an agent or header object) could be mistaken for the new
+    # resource ID.
+    for wrapper in (
+        "stream",
+        "connector",
+        "test",
+        "alertRule",
+        "rule",
+        "template",
+        "data",
+    ):
+        child = value.get(wrapper)
+        if isinstance(child, dict):
+            candidates.append(child)
+        elif isinstance(child, list) and len(child) == 1 and isinstance(child[0], dict):
+            candidates.append(child[0])
+    for obj in candidates:
         for key in id_keys:
             candidate = obj.get(key)
             if isinstance(candidate, (str, int)) and str(candidate).strip():
@@ -225,17 +293,81 @@ def find_by_id(value: Any, wanted: str, id_keys: tuple[str, ...]) -> dict[str, A
     return None
 
 
-def find_by_identity(
-    value: Any,
+def stable_identity(
     desired: dict[str, Any],
     identity_fields: tuple[str, ...],
-) -> dict[str, Any] | None:
+    optional_fields: tuple[str, ...] = (),
+    constants: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if not identity_fields:
-        return None
+        raise ApplyError(
+            "ensure-create requires authoritative, non-empty --identity-fields before mutation"
+        )
+    constants = constants or {}
+    all_fields = (*identity_fields, *optional_fields, *constants)
+    if len(all_fields) != len(set(all_fields)):
+        raise ApplyError("ensure-create identity fields, optional fields, and constants must be unique")
+    identity: dict[str, Any] = {}
+    for field in identity_fields:
+        if not SAFE_FIELD_RE.fullmatch(field):
+            raise ApplyError(f"unsafe identity field: {field!r}")
+        if field not in desired:
+            raise ApplyError(f"identity field {field!r} is absent from the create payload")
+        value = desired[field]
+        if value is None or value == "" or value == [] or value == {}:
+            raise ApplyError(
+                f"identity field {field!r} must be non-empty in the create payload"
+            )
+        identity[field] = {"present": True, "value": value}
+    for field in optional_fields:
+        if not SAFE_FIELD_RE.fullmatch(field):
+            raise ApplyError(f"unsafe optional identity field: {field!r}")
+        identity[field] = (
+            {"present": True, "value": desired[field]}
+            if field in desired
+            else {"present": False}
+        )
+    for field, value in constants.items():
+        if not SAFE_FIELD_RE.fullmatch(field) or value is None or value == "":
+            raise ApplyError(f"invalid identity constant: {field!r}")
+        identity[field] = {"present": True, "value": value}
+    return identity
+
+
+def parse_identity_constants(values: list[str]) -> dict[str, str]:
+    constants: dict[str, str] = {}
+    for item in values:
+        field, separator, value = item.partition("=")
+        field = field.strip()
+        value = value.strip()
+        if not separator or not SAFE_FIELD_RE.fullmatch(field) or not value:
+            raise ApplyError(
+                "--identity-constant must use a safe non-empty FIELD=VALUE form"
+            )
+        if field in constants:
+            raise ApplyError(f"duplicate identity constant: {field!r}")
+        constants[field] = value
+    return constants
+
+
+def find_identity_matches(
+    value: Any,
+    identity: dict[str, Any],
+) -> list[dict[str, Any]]:
+    matches: list[dict[str, Any]] = []
     for obj in iter_dicts(value):
-        if all(field in desired and obj.get(field) == desired[field] for field in identity_fields):
-            return obj
-    return None
+        matched = True
+        for field, expectation in identity.items():
+            present = bool(expectation.get("present"))
+            if present != (field in obj):
+                matched = False
+                break
+            if present and obj[field] != expectation.get("value"):
+                matched = False
+                break
+        if matched:
+            matches.append(obj)
+    return matches
 
 
 def find_converged(
@@ -255,31 +387,83 @@ def state_path(state_dir: Path, key: str) -> Path:
     return state_dir / f"{key}.json"
 
 
-def read_state(state_dir: Path, key: str) -> dict[str, Any] | None:
-    if state_dir.is_symlink() or (state_dir.exists() and not state_dir.is_dir()):
+def validate_state_dir(state_dir: Path, *, create: bool) -> None:
+    if state_dir.parent.is_symlink():
+        raise ApplyError(f"apply state parent must not be a symlink: {state_dir.parent}")
+    if not state_dir.exists():
+        if not create:
+            return
+        # Concurrent first use may race here. exist_ok avoids a spurious
+        # FileExistsError; the descriptor-independent lstat checks below still
+        # reject a symlink or non-private directory created by an attacker.
+        state_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
+    metadata = state_dir.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
         raise ApplyError(f"apply state directory must be a real directory: {state_dir}")
-    path = state_path(state_dir, key)
-    if not path.exists():
-        return None
-    if path.is_symlink() or not path.is_file():
-        raise ApplyError(f"apply state must be a regular, non-symlink file: {path}")
-    if path.stat().st_mode & 0o777 != 0o600:
-        raise ApplyError(f"apply state must have mode 600: {path}")
+    if stat.S_IMODE(metadata.st_mode) & 0o077:
+        raise ApplyError(f"apply state directory must have mode 0700 or stricter: {state_dir}")
+
+
+def _read_private_json(path: Path) -> dict[str, Any]:
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ApplyError("this runtime cannot enforce O_NOFOLLOW for apply state")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        raise ApplyError(f"cannot securely open apply state: {path}") from exc
+    try:
+        before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_size < 1
+            or before.st_size > MAX_STATE_BYTES
+        ):
+            raise ApplyError(f"apply state must be a private single-link regular file: {path}")
+        chunks: list[bytes] = []
+        remaining = MAX_STATE_BYTES + 1
+        while remaining:
+            chunk = os.read(fd, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(fd)
+        if (
+            (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+            or after.st_nlink != 1
+        ):
+            raise ApplyError(f"apply state changed while it was read: {path}")
+    finally:
+        os.close(fd)
+    raw = b"".join(chunks)
+    if len(raw) > MAX_STATE_BYTES:
+        raise ApplyError(f"apply state exceeds the {MAX_STATE_BYTES}-byte limit: {path}")
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
         raise ApplyError(f"apply state is unreadable or corrupt: {path}") from exc
     if not isinstance(value, dict):
         raise ApplyError(f"apply state has an invalid schema: {path}")
     return value
 
 
-def write_state(state_dir: Path, key: str, value: dict[str, Any]) -> None:
-    if state_dir.is_symlink() or (state_dir.exists() and not state_dir.is_dir()):
-        raise ApplyError(f"apply state directory must be a real directory: {state_dir}")
-    state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    state_dir.chmod(0o700)
+def read_state(state_dir: Path, key: str) -> dict[str, Any] | None:
+    validate_state_dir(state_dir, create=False)
     path = state_path(state_dir, key)
+    if not path.exists():
+        return None
+    return _read_private_json(path)
+
+
+def write_state(state_dir: Path, key: str, value: dict[str, Any]) -> None:
+    validate_state_dir(state_dir, create=True)
+    path = state_path(state_dir, key)
+    if path.exists() or path.is_symlink():
+        _read_private_json(path)
     temp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -293,24 +477,174 @@ def write_state(state_dir: Path, key: str, value: dict[str, Any]) -> None:
             os.fsync(handle.fileno())
         os.replace(temp_path, path)
         os.chmod(path, 0o600)
+        directory_fd = os.open(state_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     finally:
         if temp_path is not None and temp_path.exists():
             temp_path.unlink()
 
 
-def ensure_create(args: argparse.Namespace, token: str) -> str:
-    desired = substituted_payload(args)
-    desired_digest = payload_digest(desired)
-    identity_fields = parse_csv(args.identity_fields)
-    id_keys = parse_csv(args.id_keys) or DEFAULT_ID_KEYS
-    state_dir = Path(args.state_dir)
-    _, before = api_request("GET", args.collection_path, token, args.account_group_id)
+@contextmanager
+def create_state_lock(state_dir: Path, key: str):
+    """Serialize one logical create across preflight, POST, and readback."""
+    validate_state_dir(state_dir, create=True)
+    # Validate the key with the same allowlist used for state filenames.
+    state_path(state_dir, key)
+    lock_path = state_dir / f".{key}.lock"
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ApplyError("this runtime cannot enforce O_NOFOLLOW for create locks")
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        fd = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise ApplyError(f"cannot securely open create lock: {lock_path}") from exc
+    try:
+        metadata = os.fstat(fd)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise ApplyError(f"create lock must be a private single-link file: {lock_path}")
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
+
+def create_state_record(
+    *,
+    status: str,
+    desired_digest: str,
+    identity_fields: tuple[str, ...],
+    identity: dict[str, Any],
+    collection_path: str,
+    create_path: str,
+    object_id_value: str = "",
+    reason: str = "",
+) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "status": status,
+        "payload_sha256": desired_digest,
+        "identity_fields": list(identity_fields),
+        "identity": identity,
+        "collection_path": collection_path,
+        "create_path": create_path,
+        "verified_exists": status == "verified",
+        "manual_reconcile": status in {"in_progress", "ambiguous"},
+    }
+    if object_id_value:
+        value["id"] = object_id_value
+    if reason:
+        value["reason"] = reason
+    return value
+
+
+def write_ambiguous_create_state(
+    state_dir: Path,
+    key: str,
+    *,
+    desired_digest: str,
+    identity_fields: tuple[str, ...],
+    identity: dict[str, Any],
+    collection_path: str,
+    create_path: str,
+    reason: str,
+    object_id_value: str = "",
+) -> None:
+    write_state(
+        state_dir,
+        key,
+        create_state_record(
+            status="ambiguous",
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            object_id_value=object_id_value,
+            reason=reason,
+        ),
+    )
+
+
+def prepare_create(args: argparse.Namespace) -> dict[str, Any]:
+    rendered_payload = load_payload(args.payload_file)
+    desired = substituted_payload(args)
+    # Fingerprint the non-secret rendered payload. Token rotation must not
+    # create a secret-derived state oracle or look like unrelated config drift.
+    desired_digest = payload_digest(rendered_payload)
+    identity_fields = parse_csv(args.identity_fields)
+    if len(identity_fields) != len(set(identity_fields)):
+        raise ApplyError("ensure-create identity fields must be unique")
+    optional_identity_fields = parse_csv(getattr(args, "identity_optional_fields", ""))
+    identity_constants = parse_identity_constants(getattr(args, "identity_constant", []))
+    identity = stable_identity(
+        desired,
+        identity_fields,
+        optional_identity_fields,
+        identity_constants,
+    )
+    identity_fields = tuple(identity)
+    id_keys = parse_csv(args.id_keys) or DEFAULT_ID_KEYS
+    if any(not SAFE_FIELD_RE.fullmatch(key) for key in id_keys):
+        raise ApplyError("ensure-create ID keys contain an unsafe field name")
+    collection_path = validate_path(args.collection_path)
+    create_path = validate_path(args.create_path)
+    return {
+        "desired": desired,
+        "desired_digest": desired_digest,
+        "identity_fields": identity_fields,
+        "identity": identity,
+        "id_keys": id_keys,
+        "collection_path": collection_path,
+        "create_path": create_path,
+        "state_dir": Path(args.state_dir),
+    }
+
+
+def _ensure_create_locked(
+    args: argparse.Namespace,
+    token: str,
+    prepared: dict[str, Any],
+) -> str:
+    desired = prepared["desired"]
+    desired_digest = prepared["desired_digest"]
+    identity_fields = prepared["identity_fields"]
+    identity = prepared["identity"]
+    id_keys = prepared["id_keys"]
+    collection_path = prepared["collection_path"]
+    create_path = prepared["create_path"]
+    state_dir = prepared["state_dir"]
+
+    # Read durable state before any API request. A persisted in-progress state
+    # means the prior process may have reached POST and must never auto-retry.
     previous = read_state(state_dir, args.key)
     if previous is not None:
+        previous_status = str(previous.get("status", "")).strip()
+        if previous_status in {"in_progress", "ambiguous"}:
+            reason = str(previous.get("reason", "prior create did not converge")).strip()
+            raise ApplyError(
+                f"create state for {args.key} is {previous_status} ({reason}); "
+                "manual reconciliation is required and automatic POST retry is blocked"
+            )
+        if previous_status not in {"", "verified", "created_pending_readback"}:
+            raise ApplyError(
+                f"create state for {args.key} has unknown status {previous_status!r}; "
+                "manual reconciliation is required"
+            )
         previous_id = str(previous.get("id", "")).strip()
         if not previous_id:
-            raise ApplyError(f"state for {args.key} has no retained object ID")
+            raise ApplyError(
+                f"state for {args.key} has no retained object ID; manual reconciliation is required"
+            )
         previous_digest = str(previous.get("payload_sha256", "")).strip()
         if not previous_digest:
             raise ApplyError(
@@ -320,27 +654,42 @@ def ensure_create(args: argparse.Namespace, token: str) -> str:
             raise ApplyError(
                 f"rendered payload for {args.key} changed after create; no update schema is encoded"
             )
+        _, before = api_request("GET", collection_path, token, args.account_group_id)
         found = find_by_id(before, previous_id, id_keys)
         if found is None:
             raise ApplyError(
                 f"retained object ID {previous_id!r} is absent from live readback; refusing a duplicate create"
             )
-        matched = find_by_identity([found], desired, identity_fields)
-        if identity_fields and matched is None:
+        if not find_identity_matches([found], identity):
             raise ApplyError(
-                f"retained object ID {previous_id!r} no longer matches rendered identity fields; review drift before retrying"
+                f"retained object ID {previous_id!r} no longer matches rendered identity fields; "
+                "review drift before retrying"
             )
         write_state(
             state_dir,
             args.key,
-            {"id": previous_id, "payload_sha256": desired_digest, "verified_exists": True},
+            create_state_record(
+                status="verified",
+                desired_digest=desired_digest,
+                identity_fields=identity_fields,
+                identity=identity,
+                collection_path=collection_path,
+                create_path=create_path,
+                object_id_value=previous_id,
+            ),
         )
         print(f"SKIPPED {args.key}: retained live ID {previous_id} exists", file=sys.stderr)
         return previous_id
 
-    existing = find_by_identity(before, desired, identity_fields)
-    if existing is not None:
-        existing_id = object_id(existing, id_keys)
+    _, before = api_request("GET", collection_path, token, args.account_group_id)
+    existing_matches = find_identity_matches(before, identity)
+    if len(existing_matches) > 1:
+        raise ApplyError(
+            f"multiple live objects match the stable identity for {args.key}; "
+            "manual reconciliation is required before mutation"
+        )
+    if existing_matches:
+        existing_id = object_id(existing_matches[0], id_keys)
         if not existing_id:
             raise ApplyError(
                 f"live object matches {args.key} identity but exposes no usable ID; refusing a duplicate create"
@@ -348,42 +697,138 @@ def ensure_create(args: argparse.Namespace, token: str) -> str:
         write_state(
             state_dir,
             args.key,
-            {"id": existing_id, "payload_sha256": desired_digest, "verified_exists": True},
+            create_state_record(
+                status="verified",
+                desired_digest=desired_digest,
+                identity_fields=identity_fields,
+                identity=identity,
+                collection_path=collection_path,
+                create_path=create_path,
+                object_id_value=existing_id,
+            ),
         )
         print(f"SKIPPED {args.key}: adopted existing live object {existing_id}", file=sys.stderr)
         return existing_id
 
-    _, created = api_request(
-        "POST", args.create_path, token, args.account_group_id, desired
-    )
-    created_id = extract_id(created, id_keys)
-    if created_id:
-        # Retain the ID before the follow-up GET. If readback is temporarily
-        # unavailable, a retry will fail closed instead of issuing another POST.
-        write_state(
-            state_dir,
-            args.key,
-            {"id": created_id, "payload_sha256": desired_digest, "verified_exists": False},
-        )
-
-    _, after = api_request("GET", args.collection_path, token, args.account_group_id)
-    live = find_by_id(after, created_id, id_keys) if created_id else None
-    if live is None:
-        live = find_by_identity(after, desired, identity_fields)
-    if live is None:
-        raise ApplyError(
-            f"create for {args.key} returned success but collection readback did not expose the object"
-        )
-    live_id = object_id(live, id_keys) or created_id
-    if not live_id:
-        raise ApplyError(f"created {args.key} is visible but exposes no usable object ID")
+    # Persist and fsync intent before POST. If the process is interrupted at
+    # any later instruction, this in-progress record blocks a second POST.
     write_state(
         state_dir,
         args.key,
-        {"id": live_id, "payload_sha256": desired_digest, "verified_exists": True},
+        create_state_record(
+            status="in_progress",
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            reason="create intent persisted before POST",
+        ),
     )
-    print(f"CREATED {args.key}: live ID {live_id} verified by collection readback", file=sys.stderr)
-    return live_id
+    try:
+        _, created = api_request("POST", create_path, token, args.account_group_id, desired)
+    except (ApplyError, OSError, ValueError) as exc:
+        write_ambiguous_create_state(
+            state_dir,
+            args.key,
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            reason="POST outcome is unknown",
+        )
+        raise ApplyError(
+            f"create for {args.key} did not return a trustworthy result; manual reconciliation is required"
+        ) from exc
+
+    created_id = extract_id(created, id_keys)
+    if not created_id:
+        write_ambiguous_create_state(
+            state_dir,
+            args.key,
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            reason="successful POST response exposed no usable object ID",
+        )
+        raise ApplyError(
+            f"create for {args.key} returned success without a usable ID; "
+            "manual reconciliation is required and automatic POST retry is blocked"
+        )
+
+    write_state(
+        state_dir,
+        args.key,
+        create_state_record(
+            status="created_pending_readback",
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            object_id_value=created_id,
+        ),
+    )
+    try:
+        _, after = api_request("GET", collection_path, token, args.account_group_id)
+    except (ApplyError, OSError, ValueError) as exc:
+        write_ambiguous_create_state(
+            state_dir,
+            args.key,
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            object_id_value=created_id,
+            reason="post-create collection readback failed",
+        )
+        raise ApplyError(
+            f"create for {args.key} returned ID {created_id!r} but readback failed; "
+            "manual reconciliation is required"
+        ) from exc
+    live = find_by_id(after, created_id, id_keys)
+    if live is None or not find_identity_matches([live], identity):
+        write_ambiguous_create_state(
+            state_dir,
+            args.key,
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            object_id_value=created_id,
+            reason="post-create readback did not expose the returned ID with matching identity",
+        )
+        raise ApplyError(
+            f"create for {args.key} returned ID {created_id!r} but exact collection readback failed; "
+            "manual reconciliation is required and automatic POST retry is blocked"
+        )
+    write_state(
+        state_dir,
+        args.key,
+        create_state_record(
+            status="verified",
+            desired_digest=desired_digest,
+            identity_fields=identity_fields,
+            identity=identity,
+            collection_path=collection_path,
+            create_path=create_path,
+            object_id_value=created_id,
+        ),
+    )
+    print(f"CREATED {args.key}: live ID {created_id} verified by collection readback", file=sys.stderr)
+    return created_id
+
+
+def ensure_create(args: argparse.Namespace, token: str) -> str:
+    prepared = prepare_create(args)
+    state_dir = prepared["state_dir"]
+    with create_state_lock(state_dir, args.key):
+        return _ensure_create_locked(args, token, prepared)
 
 
 def ensure_put(args: argparse.Namespace, token: str) -> str:
@@ -418,18 +863,11 @@ def ensure_put(args: argparse.Namespace, token: str) -> str:
 
 
 def post_action(args: argparse.Namespace, token: str) -> str:
-    state_dir = Path(args.state_dir)
-    previous = read_state(state_dir, args.key)
-    if previous is not None:
-        api_request("GET", args.readback_path, token, args.account_group_id)
-        print(f"SKIPPED {args.key}: prior action and readback retained", file=sys.stderr)
-        return args.key
-    api_request("GET", args.readback_path, token, args.account_group_id)
-    api_request("POST", args.action_path, token, args.account_group_id, {})
-    api_request("GET", args.readback_path, token, args.account_group_id)
-    write_state(state_dir, args.key, {"readback": args.readback_path, "converged": True})
-    print(f"APPLIED {args.key}: follow-up resource read succeeded", file=sys.stderr)
-    return args.key
+    del token
+    raise ApplyError(
+        "post-action is disabled: the configured readback does not prove the POST action's "
+        "postcondition, so interruption-safe retry cannot be guaranteed"
+    )
 
 
 def redact(value: Any) -> Any:
@@ -475,6 +913,8 @@ def parse_args() -> argparse.Namespace:
     create.add_argument("--collection-path", required=True)
     create.add_argument("--create-path", required=True)
     create.add_argument("--identity-fields", required=True)
+    create.add_argument("--identity-optional-fields", default="")
+    create.add_argument("--identity-constant", action="append", default=[])
     create.add_argument("--id-keys", default=",".join(DEFAULT_ID_KEYS))
     add_payload_options(create)
 

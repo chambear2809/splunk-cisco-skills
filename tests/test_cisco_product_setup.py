@@ -225,7 +225,7 @@ sourcetypes = cisco:test
             self.module.find_scan_package = original
             self.module.fetch_scan_source = original_fetch
 
-        self.assertEqual(catalog["product_count"], 84)
+        self.assertEqual(catalog["product_count"], 85)
         self.assertEqual(catalog["scan_source"]["kind"], "scan_public_catalog")
 
     def test_resolve_aci(self) -> None:
@@ -245,6 +245,77 @@ sourcetypes = cisco:test
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertEqual(payload["status"], "resolved")
         self.assertEqual(payload["matches"][0]["id"], "cisco_duo")
+
+    def test_resolve_asa_ftd_syslog_intents_to_dedicated_ta(self) -> None:
+        queries = (
+            "Cisco ASA syslog",
+            "ASA syslog",
+            "Cisco FTD syslog",
+            "FTD syslog",
+            "Cisco Secure Firewall syslog",
+            "Splunk_TA_cisco-asa",
+        )
+        for query in queries:
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "resolved")
+                product = payload["matches"][0]
+                self.assertEqual(product["id"], "cisco_asa_ftd_syslog")
+                self.assertEqual(product["automation_state"], "partial")
+                self.assertEqual(product["route_type"], "asa_ta")
+                self.assertEqual(product["primary_skill"], "cisco-asa-ta-setup")
+
+    def test_resolve_secure_firewall_api_intents_to_security_cloud(self) -> None:
+        for query in (
+            "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+            "Cisco Secure Firewall API",
+            "FMC API",
+            "FTD API",
+            "Cisco FTD API",
+            "eStreamer",
+            "FTD eStreamer",
+            "Cisco FTD eStreamer",
+        ):
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "resolved")
+                product = payload["matches"][0]
+                self.assertEqual(product["id"], "cisco_secure_firewall")
+                self.assertEqual(product["route_type"], "security_cloud_variant")
+                self.assertEqual(product["primary_skill"], "cisco-security-cloud-setup")
+                self.assertEqual(set(product["route"]["variants"]), {"api", "estreamer"})
+                self.assertEqual(
+                    product["sourcetypes"],
+                    ["cisco:sfw:estreamer", "cisco:sfw:policy"],
+                )
+
+    def test_bare_asa_ftd_requests_return_explicit_collection_choice(self) -> None:
+        expected_ids = {"cisco_asa_ftd_syslog", "cisco_secure_firewall"}
+        expected_skills = {"cisco-asa-ta-setup", "cisco-security-cloud-setup"}
+        for query in ("ASA", "FTD", "Cisco ASA", "Cisco FTD", "Cisco Firepower Threat Defense"):
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 2, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "ambiguous")
+                self.assertEqual({item["id"] for item in payload["matches"]}, expected_ids)
+                self.assertEqual(
+                    {item["primary_skill"] for item in payload["matches"]},
+                    expected_skills,
+                )
+
+        result = self.run_command(
+            "bash",
+            str(RESOLVE_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "Cisco ASA",
+        )
+        self.assertEqual(result.returncode, 2, msg=result.stdout + result.stderr)
+        self.assertIn("Cisco ASA / FTD Syslog", result.stdout)
+        self.assertIn("-> cisco-asa-ta-setup", result.stdout)
+        self.assertIn("-> cisco-security-cloud-setup", result.stdout)
 
     def test_resolve_ai_defense_prefers_active_product_over_legacy_keyword(self) -> None:
         for query in ("Cisco AI Defense", "cisco_ai_defense"):
@@ -694,6 +765,58 @@ version = {version}
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertIn("variant: required", result.stdout)
         self.assertIn("Missing values for configure:\n  - variant", result.stdout)
+
+    def test_dry_run_asa_syslog_routes_to_ta_action_path(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "FTD syslog",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["resolved_product"]["id"], "cisco_asa_ftd_syslog")
+        self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
+        self.assertEqual(payload["resolved_product"]["primary_skill"], "cisco-asa-ta-setup")
+        self.assertEqual(payload["route"]["type"], "asa_ta")
+        self.assertEqual(payload["route"]["default_index"], "cisco_asa")
+        self.assertEqual(payload["route"]["sourcetypes"], ["cisco:asa"])
+        self.assertIn("external syslog receiver", payload["route"]["handoff"])
+        self.assertEqual(payload["install_apps"][0]["app_name"], "Splunk_TA_cisco-asa")
+        self.assertEqual(payload["install_apps"][0]["splunkbase_id"], "1620")
+        self.assertEqual(payload["missing_values_for_configure"], [])
+        self.assertIn(
+            "skills/cisco-asa-ta-setup/scripts/setup.sh",
+            payload["workflow_scripts"],
+        )
+        self.assertIn(
+            "skills/cisco-asa-ta-setup/scripts/validate.sh",
+            payload["workflow_scripts"],
+        )
+
+    def test_secure_firewall_syslog_variant_is_not_a_security_cloud_route(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_secure_firewall",
+            "--set",
+            "variant",
+            "syslog",
+            "--dry-run",
+        )
+        self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+        self.assertIn("Invalid value 'syslog' for variant", result.stderr)
+        self.assertIn("--product 'Cisco ASA syslog'", result.stderr)
+        self.assertIn("cisco-asa-ta-setup", result.stderr)
+        self.assertIn("api", result.stderr)
+        self.assertIn("estreamer", result.stderr)
 
     def test_dry_run_duo_requires_ikey_and_skey_but_not_proxy_password(self) -> None:
         result = self.run_command(

@@ -1,3 +1,4 @@
-display_name: "Splunk Synthetics Setup"
-short_description: "Render focused Synthetic Monitoring specs and native-ops handoffs"
-default_prompt: "Use $splunk-observability-synthetics-setup to render Synthetic Monitoring browser, API, HTTP, SSL, or port test plans and delegate them to native-ops."
+interface:
+  display_name: "Splunk Observability Synthetics Setup"
+  short_description: "Render Synthetic Monitoring plans and handoffs"
+  default_prompt: "Use $splunk-observability-synthetics-setup to render focused Synthetic Monitoring specs and native-ops handoffs."

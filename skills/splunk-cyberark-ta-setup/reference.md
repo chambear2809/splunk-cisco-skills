@@ -4,7 +4,7 @@
 
 | Product | App directory | Splunkbase | Verified | Support note |
 | --- | --- | --- | --- | --- |
-| CyberArk EPM | `Splunk_TA_cyberark_epm` | `5160` | `4.0.0` | Supported API collection path |
+| CyberArk EPM | `Splunk_TA_cyberark_epm` | `5160` | `4.0.0` reviewed pin (`5.0.0` public current) | Supported API collection path; review the new major release before changing the default pin |
 | CyberArk EPV/PTA | `Splunk_TA_cyberark` | `2891` | `1.2.0` | Archived/not-supported parser-only path |
 
 ## EPM Inputs And Source Types

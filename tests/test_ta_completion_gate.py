@@ -30,6 +30,7 @@ TA_COMPANION_SKILLS = {
 }
 
 TA_MENTION_EXCLUDED_SKILLS = {
+    "cisco-product-setup",
     "cisco-isovalent-platform-setup",
     "cisco-meraki-aam-thousandeyes-setup",
     "cisco-thousandeyes-mcp-setup",

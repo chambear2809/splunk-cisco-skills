@@ -133,6 +133,42 @@ release section when cutting a release.
 
 ### Changed
 
+- Hardened `cloud_batch_uninstall.sh` for production use: strict concrete app
+  names, all-target/version preflight before mutation, exact removal plans,
+  non-interactive `--yes`, separately acknowledged topology-risk REST fallback,
+  URL-encoded app endpoints, bounded tri-state ACS/REST absence verification,
+  stop-on-partial-error behavior, and private per-app recovery evidence. ACS
+  request acceptance alone is no longer reported as successful removal.
+
+- Made `splunk-dashboard-studio-setup` live and transactional: preflight now
+  snapshots the exact view and ACL, status detects content/owner/sharing and
+  exact read/write-role drift, and apply verifies the same normalized role sets.
+  Ambiguous responses, signals, or ACL/readback failures now use GET-only
+  reconciliation: failed creates and updates are retained with private
+  before/current snapshots and reviewed recovery guidance because REST has no
+  verified conditional restore or delete contract.
+- Removed automatic compensating restore POSTs from
+  `splunk-knowledge-objects-setup`. Failed existing or new object, ACL, and
+  automatic-lookup mutations are retained with private before/current snapshots
+  and partial/manual-recovery evidence, eliminating the guard-GET-to-restore-POST
+  race that could overwrite a concurrent edit.
+- Added fail-closed render-bundle ownership markers for the seven incompatible
+  legacy/current skill pairs covering CIM data models, Dashboard Studio, DDAA,
+  Ingest Actions, knowledge objects, KV Store, and Secure Gateway. Existing
+  output paths remain unchanged; each renderer can adopt its own unmarked
+  legacy bundle, but rejects peer-owned or detectably mixed bundles before any
+  render/apply workflow can consume stale artifacts.
+- Made `splunk-universal-forwarder-setup` render-only by default. Live install,
+  upgrade, enrollment, and combined phases now require the explicit
+  `--accept-forwarder-mutation` acknowledgement, including rendered apply
+  scripts.
+- Made Cisco ASA/FTD routing collection-aware: syslog and
+  `Splunk_TA_cisco-asa` requests use `cisco-asa-ta-setup`, API/eStreamer
+  requests stay on Cisco Security Cloud, and bare ASA/FTD requests return an
+  explicit two-owner choice.
+- Normalized every skill's `agents/openai.yaml` to the canonical `interface`
+  schema and constrained UI descriptions to the supported 25–64 character
+  range while preserving skill-specific action prompts.
 - Added Splunk Cloud Platform `10.5.2605` support while retaining verified
   Splunk Enterprise/SOK/POD 10.4 baselines; refreshed all 119 public
   Splunkbase registry records against a 10.5 compatibility target, updated
@@ -232,6 +268,28 @@ release section when cutting a release.
 
 ### Security
 
+- Added a shared fail-closed curl policy for Splunkbase, AppDynamics, Edge
+  Processor, SOAR, ThousandEyes, Meraki, and Observability probes: user curl
+  configuration is ignored, credential-bearing redirects are disabled or
+  followed only after credentials are stripped, protocols are constrained,
+  secret files/configs use no-follow single-link checks, and transfer
+  timeouts are bounded. Enterprise/Forwarder package downloads now use the
+  same curl isolation and HTTPS policy; plaintext mirrors require the warned
+  `APP_DOWNLOAD_ALLOW_HTTP=true` lab-only override.
+- Credential-bearing Splunk REST paths now reject plaintext HTTP by default,
+  keep `SPLUNK_VERIFY_SSL=false` separate from transport authorization, and
+  require the warned `SPLUNK_ALLOW_INSECURE_HTTP=true` opt-in for isolated
+  short-lived labs. Curl protocols and redirects are constrained, and direct
+  MCP-loader, MCP bearer-validation, deployment-bundle, and Deployment Server
+  clients use the same policy. Generated Dashboard Studio, Federated Search
+  status/toggle, DDAA, ACS private-connectivity, and Platform PKI shell clients
+  now also ignore user curl configuration, disable URL globbing, reject
+  credential-bearing redirects, and validate credential-free HTTPS origins.
+- Removed shell `eval` from Deployment Server and Search Head Cluster rendered
+  artifact validators so hostile output-directory names remain data, not code.
+- Hardened shared coding-agent telemetry output writes against symlink,
+  hardlink, parent-path, and target-swap attacks with descriptor-relative,
+  no-follow, atomic replacement and mode validation.
 - MCP server now redacts subprocess output before returning it to the model:
   `Authorization` headers, JWT tokens, PEM private-key blocks, and
   `password=`/`token=`/`api_key=`/etc. KV-style secrets are replaced with
@@ -245,6 +303,17 @@ release section when cutting a release.
 
 ### Tests
 
+- Added bidirectional ownership regressions for all seven incompatible render
+  pairs, plus marker-contract drift, unmarked mixed-bundle refusal, compatible
+  legacy adoption, and dry-run non-mutation coverage.
+- Extended the skill metadata validator to enforce canonical
+  `agents/openai.yaml` interface fields, action-prompt skill references, and UI
+  description lengths. Its dependency-free fallback now understands the
+  nested mappings used by the repository.
+- Added regressions for Universal Forwarder mutation gates, ASA/FTD route
+  selection, plaintext REST rejection and lab opt-in, validator path
+  injection, atomic coding-agent output safety, and generated authenticated
+  Splunk/ACS curl transport policy.
 - Added a repo-readiness guard that keeps the Agent Skills specification
   callouts present in README, CONTRIBUTING, and the pull request template.
 - Expanded `tests/check_skill_frontmatter.py` to enforce Agent Skills

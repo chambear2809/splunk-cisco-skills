@@ -253,6 +253,9 @@ SSH_USER_PEER={shell_quote(args.peer_ssh_user)}
 SSH_USER_SH={shell_quote(args.sh_ssh_user)}
 SSH_USER_MGR={shell_quote(args.manager_ssh_user)}
 MANAGER_URI={cluster_uri}
+# Import the operator's SSH trust pin. push_conf dynamically scopes the
+# per-host SSH identity before invoking the shared host-key policy.
+load_splunk_connection_settings >/dev/null
 
 require() {{
   for path in "$@"; do
@@ -270,13 +273,24 @@ require "${{SECRET_FILE}}" "${{ADMIN_PW_FILE}}"
 push_conf() {{
   local user="$1" host="$2" rel="$3"
   local local_path="${{RENDER_DIR}}/${{rel}}"
+  local SPLUNK_SSH_HOST="${{host}}"
+  local SPLUNK_SSH_PORT="${{SPLUNK_CLUSTER_SSH_PORT:-22}}"
+  local SPLUNK_SSH_USER="${{user}}"
   if [[ ! -s "${{local_path}}" ]]; then
     log "ERROR: rendered config missing: ${{local_path}}"
     exit 1
   fi
-  scp -o StrictHostKeyChecking=accept-new -p \\
+  if ! hbs_prepare_ssh_trust false; then
+    log "ERROR: SSH host-key trust is not production-ready for ${{user}}@${{host}}."
+    exit 1
+  fi
+  if ! scp "${{HBS_SSH_TRUST_ARGS[@]}}" -o BatchMode=yes -p \\
     "${{local_path}}" "${{SECRET_FILE}}" \\
-    "${{user}}@${{host}}:/tmp/"
+    "${{user}}@${{host}}:/tmp/"; then
+    hbs_cleanup_ssh_trust
+    log "ERROR: failed to stage indexer-cluster config on ${{user}}@${{host}}."
+    exit 1
+  fi
   local secret_basename conf_basename
   secret_basename="$(basename "${{SECRET_FILE}}")"
   conf_basename="$(basename "${{local_path}}")"
@@ -290,7 +304,7 @@ push_conf() {{
   # `splunk stop && splunk start`. This keeps the admin password out of
   # `splunk` argv on the remote host.
   # shellcheck disable=SC2087
-  ssh -o StrictHostKeyChecking=accept-new "${{user}}@${{host}}" bash -s <<REMOTE_EOF
+  if ! ssh "${{HBS_SSH_TRUST_ARGS[@]}}" -o BatchMode=yes "${{user}}@${{host}}" bash -s <<REMOTE_EOF
 set -euo pipefail
 cleanup_secret() {{
   shred -u /tmp/${{secret_basename}} 2>/dev/null || rm -f /tmp/${{secret_basename}}
@@ -315,6 +329,12 @@ if sudo -u splunk /opt/splunk/bin/splunk status >/dev/null 2>&1; then
 fi
 sudo -u splunk /opt/splunk/bin/splunk start --answer-yes --no-prompt --accept-license
 REMOTE_EOF
+  then
+    hbs_cleanup_ssh_trust
+    log "ERROR: indexer-cluster bootstrap failed on ${{user}}@${{host}}."
+    exit 1
+  fi
+  hbs_cleanup_ssh_trust
 }}
 
 # 1. Configure manager(s) and restart.
@@ -625,14 +645,14 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + f'SITE_SF={site_sf}\n'
             + "# Per Splunk doc: keep legacy replication_factor / search_factor for old\n"
             + "# buckets; add multisite settings for new buckets. The pass4SymmKey is\n"
-            + "# fed to curl via --data-urlencode @file so it never lands on argv.\n"
-            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
+            + "# descriptor-validated and streamed to curl stdin so it never lands on argv.\n"
+            + 'credential_curl_stream_file "${SECRET_FILE}" | splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "mode=manager" \\\n'
             + '  --data-urlencode "multisite=true" \\\n'
             + '  --data-urlencode "available_sites=${AVAILABLE_SITES}" \\\n'
             + '  --data-urlencode "site_replication_factor=${SITE_RF}" \\\n'
             + '  --data-urlencode "site_search_factor=${SITE_SF}" \\\n'
-            + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
+            + '  --data-urlencode "secret@-" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "cluster manager multisite conversion" "Restart the manager through its supported service path before assigning peer sites."\n'
             + 'log "PARTIAL: Manager configured for multisite; restart and peer-site assignment remain required."\n'
@@ -647,9 +667,9 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'if [[ ! -s "${SECRET_FILE}" ]]; then\n'
             + '  echo "ERROR: idxc secret file empty: ${SECRET_FILE}" >&2; exit 1\n'
             + 'fi\n'
-            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
+            + 'credential_curl_stream_file "${SECRET_FILE}" | splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "mode=manager" \\\n'
-            + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
+            + '  --data-urlencode "secret@-" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "new cluster manager configuration" "Restart the new manager through its supported service path before updating peer/search-head manager_uri."\n'
             + 'log "PARTIAL: New manager configured at ${MANAGER_URI}; restart and peer/search-head cutover remain required."\n'
@@ -707,7 +727,7 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  echo "ERROR: Cannot decommission ${SITE}: no remaining sites would exist." >&2\n'
             + '  exit 1\n'
             + 'fi\n'
-            + 'splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
+            + 'credential_curl_stream_file "${SECRET_FILE}" | splunk_curl "${SK}" --fail-with-body --show-error -X POST \\\n'
             + '  --data-urlencode "available_sites=${remaining}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "cluster manager site decommission" "Restart the manager through its supported service path so available_sites=${remaining} takes effect."\n'
@@ -752,7 +772,7 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  --data-urlencode "mode=peer" \\\n'
             + '  --data-urlencode "manager_uri=${REMOTE_MANAGER_URI}" \\\n'
             + '  --data-urlencode "replication_port=${REPLICATION_PORT}" \\\n'
-            + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
+            + '  --data-urlencode "secret@-" \\\n'
             + '  "${PEER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
             + 'platform_restart_handoff "non-clustered indexer migration" "Restart the peer through documented peer semantics so it can join the cluster safely."\n'
             + 'log "PARTIAL: ${INDEXER_HOST} is configured to join the cluster; a peer-safe restart remains required."\n'

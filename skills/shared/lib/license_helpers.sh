@@ -55,15 +55,14 @@ license_install_files() {
     fi
     local file
     for file in "$@"; do
-        if [[ ! -s "${file}" ]]; then
-            log "ERROR: License file missing or empty: ${file}"
+        if [[ ! -s "${file}" || "${file##*/}" != *.lic ]]; then
+            log "ERROR: License file missing, empty, or not named *.lic: ${file}"
             return 1
         fi
-        # POST with multipart/form-data; the file path stays in curl argv (a
-        # path is not a secret) but the .lic content is read by curl itself
-        # rather than expanded by the shell.
-        splunk_curl "${sk}" -X POST \
-            -F "license=@${file}" \
+        # The default REST wrapper rejects @PATH body arguments. Stream the
+        # descriptor-validated .lic on stdin through its explicit @- form.
+        credential_curl_stream_file "${file}" | splunk_curl "${sk}" -X POST \
+            -F "license=@-" \
             "${manager_uri}/services/licenser/licenses?output_mode=json" >/dev/null \
             || { log "ERROR: License install failed for ${file}"; return 1; }
     done

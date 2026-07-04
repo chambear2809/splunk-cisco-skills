@@ -202,15 +202,17 @@ Supported non-secret connection selectors are:
 - `connection.verify_ssl` or `SPLUNK_VERIFY_SSL`
 - `connection.allow_insecure_tls` or `SPLUNK_ALLOW_INSECURE_TLS`
 - `connection.ca_cert_file` or `SPLUNK_CA_CERT`
-- `connection.allow_insecure_http: true` only for a separately accepted,
-  short-lived loopback lab endpoint
+- `SPLUNK_ALLOW_INSECURE_HTTP=true` only for a separately accepted,
+  isolated short-lived lab endpoint; the client emits an explicit credential
+  exposure warning
 
 TLS verification defaults to true. Prefer a private CA bundle over disabling
 verification. `verify_ssl: false` is rejected unless the operator also sets
 `connection.allow_insecure_tls: true` (or
 `SPLUNK_ALLOW_INSECURE_TLS=true`) for an explicitly accepted, short-lived lab
 target. Insecure HTTP and disabled certificate verification are never valid
-production completion evidence.
+production completion evidence. Authenticated requests never follow redirects,
+so passwords and session keys cannot be forwarded to a redirected endpoint.
 
 Use a session key when possible. Keep username/password values in the credential
 file. The spec contains environment variable names, never secret values.

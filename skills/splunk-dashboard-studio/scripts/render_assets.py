@@ -8,8 +8,14 @@ import json
 import re
 import shlex
 import stat
+import sys
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+
+BUNDLE_OWNER = "splunk-dashboard-studio"
 
 VIZ_TYPE_MAP = {
     "table": "splunk.table",
@@ -261,6 +267,48 @@ dashboard_id={did}
 mgmt_uri="${{SPLUNK_MGMT_URI:-https://localhost:8089}}"
 base="${{mgmt_uri}}/servicesNS/${{owner}}/${{app}}/data/ui/views"
 
+if ! python3 - "${{mgmt_uri}}" <<'PY_URI'
+import os
+import sys
+from urllib.parse import urlsplit
+
+raw = sys.argv[1]
+try:
+    parsed = urlsplit(raw)
+    parsed.port
+except ValueError:
+    raise SystemExit(1)
+allow_http = os.environ.get("SPLUNK_ALLOW_INSECURE_HTTP", "").strip().lower() in {{
+    "1", "true", "yes", "on"
+}}
+valid = (
+    parsed.scheme.lower() in ({{"https", "http"}} if allow_http else {{"https"}})
+    and bool(parsed.hostname)
+    and parsed.username is None
+    and parsed.password is None
+    and parsed.path in ("", "/")
+    and not parsed.query
+    and not parsed.fragment
+    and not any(character.isspace() for character in raw)
+)
+raise SystemExit(0 if valid else 1)
+PY_URI
+then
+  echo "SPLUNK_MGMT_URI must be a credential-free HTTPS origin. Plaintext HTTP requires SPLUNK_ALLOW_INSECURE_HTTP=true for an isolated lab." >&2
+  exit 2
+fi
+
+transport=(--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff)
+case "${{mgmt_uri}}" in
+  [Hh][Tt][Tt][Pp]://*)
+    echo "WARNING: LAB ONLY: sending Splunk credentials over plaintext HTTP." >&2
+    transport=(--proto '=http,https' --proto-redir '=http,https' --max-redirs 0 --globoff)
+    ;;
+esac
+splunk_rest_curl() {{
+  command curl -q "$@" "${{transport[@]}}"
+}}
+
 # Authenticate without putting secrets on the command line:
 #   SPLUNK_CURL_CONFIG=/path/to/curl.cfg  # chmod 600; e.g. a line: user = "admin:<password>"
 # or SPLUNK_USERNAME=<user>               # curl prompts for the password interactively
@@ -275,8 +323,29 @@ if [[ -n "${{SPLUNK_CURL_CONFIG:-}}" ]]; then
     echo "SPLUNK_CURL_CONFIG must have mode 600 (found ${{config_mode}})." >&2
     exit 2
   fi
+  if ! python3 - "${{SPLUNK_CURL_CONFIG}}" <<'PY_CONFIG'
+import sys
+from pathlib import Path
+
+lines = [
+    line
+    for line in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+    if line.strip() and not line.lstrip().startswith("#")
+]
+candidate = lines[0].strip() if len(lines) == 1 else ""
+auth_only = candidate.startswith(("user ", "user\t", "user=", "user:"))
+raise SystemExit(0 if auth_only else 1)
+PY_CONFIG
+  then
+    echo "SPLUNK_CURL_CONFIG must contain exactly one auth-only user directive; URL, redirect, proxy, and transfer options are refused." >&2
+    exit 2
+  fi
   auth=(--config "${{SPLUNK_CURL_CONFIG}}")
 elif [[ -n "${{SPLUNK_USERNAME:-}}" ]]; then
+  if [[ "${{SPLUNK_USERNAME}}" == *:* || "${{SPLUNK_USERNAME}}" == *$'\\n'* || "${{SPLUNK_USERNAME}}" == *$'\\r'* ]]; then
+    echo "SPLUNK_USERNAME must contain only a username; inline :password material and newlines are refused." >&2
+    exit 2
+  fi
   auth=(--user "${{SPLUNK_USERNAME}}")
 else
   echo "Set SPLUNK_CURL_CONFIG=/path/to/curl.cfg (chmod 600) or SPLUNK_USERNAME=<user> first." >&2
@@ -299,7 +368,7 @@ read -r -p "Type APPLY to continue: " confirm
 [[ "${{confirm}}" == "APPLY" ]] || {{ echo "Aborted."; exit 1; }}
 
 # eai:data is read from dashboard.xml; the definition is never passed on the command line.
-if ! probe_code="$(curl "${{tls[@]}}" "${{auth[@]}}" --silent --show-error \\
+if ! probe_code="$(splunk_rest_curl "${{tls[@]}}" "${{auth[@]}}" --silent --show-error \\
   --output /dev/null --write-out '%{{http_code}}' \\
   "${{base}}/${{dashboard_id}}?output_mode=json")"; then
   echo "Dashboard existence probe failed at the transport/TLS layer; no mutation attempted." >&2
@@ -308,13 +377,13 @@ fi
 case "${{probe_code}}" in
   200)
     echo "View exists; updating definition."
-    curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+    splunk_rest_curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
       "${{base}}/${{dashboard_id}}" \\
       --data-urlencode "eai:data@dashboard.xml" -o /dev/null
     ;;
   404)
     echo "Creating new view."
-    curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+    splunk_rest_curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
       "${{base}}" \\
       --data-urlencode "name=${{dashboard_id}}" \\
       --data-urlencode "eai:data@dashboard.xml" -o /dev/null
@@ -327,7 +396,7 @@ esac
 
 readback="$(mktemp)"
 trap 'rm -f "${{readback}}"' EXIT
-curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
+splunk_rest_curl "${{tls[@]}}" "${{auth[@]}}" --fail-with-body --silent --show-error \\
   "${{base}}/${{dashboard_id}}?output_mode=json" -o "${{readback}}"
 python3 - dashboard.xml "${{readback}}" "${{dashboard_id}}" <<'PY'
 import json
@@ -394,6 +463,7 @@ def render(args: argparse.Namespace, panels: list[dict]) -> dict:
     dashboard_id = args.dashboard_id or slugify(args.title)
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "dashboard-studio"
+    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
     definition = build_definition(args, panels)
     assets: list[str] = []
     if not args.dry_run:

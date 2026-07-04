@@ -31,6 +31,7 @@ MODE_SET=false
 APPLY=false
 OUTPUT_PATH=""
 STOP_ON_ERROR=false
+CONTINUE_ON_ERROR=false
 STRICT=false
 SK=""
 
@@ -64,7 +65,8 @@ Operations:
 Options:
   --max-size-mb N                   maxTotalDataSizeMB for new indexes (default: 512000)
   --output PATH                     Write declarative workflow JSON output to a file
-  --stop-on-error                   Halt declarative apply on first failed action (no rollback)
+  --stop-on-error                   Halt declarative apply on first failed action (default; no rollback)
+  --continue-on-error               Continue after failures (explicit high-risk override; no rollback)
   --strict                          Fail fast on unknown top-level YAML sections (typo guard)
   --help                            Show this help text
 
@@ -135,6 +137,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --stop-on-error) STOP_ON_ERROR=true; ANY_OPERATION=true; shift ;;
+        --continue-on-error) CONTINUE_ON_ERROR=true; ANY_OPERATION=true; shift ;;
         --strict) STRICT=true; ANY_OPERATION=true; shift ;;
         --enable-dm)
             require_arg "$1" $# || exit 1
@@ -190,6 +193,11 @@ if [[ "${MODE}" == "apply" && "${APPLY}" != "true" ]]; then
     exit 1
 fi
 
+if [[ "${STOP_ON_ERROR}" == "true" && "${CONTINUE_ON_ERROR}" == "true" ]]; then
+    log "ERROR: --stop-on-error and --continue-on-error are mutually exclusive."
+    exit 1
+fi
+
 run_declarative_workflow() {
     local args=("--mode" "${MODE}")
     if [[ -n "${SPEC_PATH}" ]]; then
@@ -201,6 +209,9 @@ run_declarative_workflow() {
     if [[ "${STOP_ON_ERROR}" == "true" ]]; then
         args+=("--stop-on-error")
     fi
+    if [[ "${CONTINUE_ON_ERROR}" == "true" ]]; then
+        args+=("--continue-on-error")
+    fi
     if [[ "${STRICT}" == "true" ]]; then
         args+=("--strict")
     fi
@@ -209,7 +220,7 @@ run_declarative_workflow() {
 
 # Detect imperative shortcuts so we can run them after the declarative phase
 # instead of silently dropping them when --spec/--mode/--apply are also set.
-# --stop-on-error/--strict are declarative modifiers, not imperative work, so
+# Error-policy flags and --strict are declarative modifiers, not imperative work, so
 # they do NOT trigger the imperative phase on their own.
 imperative_phase_requested() {
     [[ "${BASELINE}" == "true" ]] && return 0

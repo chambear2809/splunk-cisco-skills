@@ -61,19 +61,11 @@ fi
 ERRORS=0
 WARNINGS=0
 
-check() {
-    local label="$1" condition="$2"
-    if ! eval "${condition}" &>/dev/null; then
+check_file() {
+    local label="$1" path="$2"
+    if [[ ! -f "${path}" ]]; then
         echo "FAIL: ${label}" >&2
         ERRORS=$((ERRORS + 1))
-    fi
-}
-
-warn() {
-    local label="$1" condition="$2"
-    if ! eval "${condition}" &>/dev/null; then
-        echo "WARN: ${label}"
-        WARNINGS=$((WARNINGS + 1))
     fi
 }
 
@@ -89,16 +81,18 @@ for f in "shc/bootstrap/sequenced-bootstrap.sh" \
           "shc/handoffs/license-peers.txt" \
           "shc/handoffs/es-deployer.txt" \
           "shc/handoffs/monitoring-console.txt"; do
-    check "Required file ${f} exists" "[[ -f '${OUTPUT_DIR}/${f}' ]]"
+    check_file "Required file ${f} exists" "${OUTPUT_DIR}/${f}"
 done
 
 # pass4SymmKey must not be inlined. Check actual conf assignments and CLI
 # flags, not explanatory prose that merely names the setting.
 inline_pass4=false
+# shellcheck disable=SC2016  # Literal $SHC_SECRET patterns must not expand here.
 if grep -rInE '^[[:space:]]*pass4SymmKey[[:space:]]*=' "${OUTPUT_DIR}" 2>/dev/null | \
     grep -Ev '=[[:space:]]*(\$SHC_SECRET|\$\{SHC_SECRET\}|YOUR_|.*cat[[:space:]].*splunk_shc_secret)' | grep -q .; then
     inline_pass4=true
 fi
+# shellcheck disable=SC2016  # Literal $SHC_SECRET patterns must not expand here.
 if grep -rIn -- '--pass4SymmKey' "${OUTPUT_DIR}" 2>/dev/null | \
     grep -Ev '(\$SHC_SECRET|\$\{SHC_SECRET\}|YOUR_|cat[[:space:]].*splunk_shc_secret)' | grep -q .; then
     inline_pass4=true

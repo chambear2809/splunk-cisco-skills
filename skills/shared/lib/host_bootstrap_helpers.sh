@@ -5,6 +5,10 @@
 [[ -n "${_HOST_BOOTSTRAP_HELPERS_LOADED:-}" ]] && return 0
 _HOST_BOOTSTRAP_HELPERS_LOADED=true
 
+_HBS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_HBS_LIB_DIR}/credential_curl_helpers.sh"
+
 HBS_ENTERPRISE_DOWNLOAD_PAGE_URL="${HBS_ENTERPRISE_DOWNLOAD_PAGE_URL:-https://www.splunk.com/en_us/download/splunk-enterprise.html}"
 HBS_UNIVERSAL_FORWARDER_DOWNLOAD_PAGE_URL="${HBS_UNIVERSAL_FORWARDER_DOWNLOAD_PAGE_URL:-https://www.splunk.com/en_us/download/universal-forwarder.html}"
 HBS_LATEST_METADATA_MAX_AGE_SECONDS="${HBS_LATEST_METADATA_MAX_AGE_SECONDS:-2592000}"
@@ -513,12 +517,39 @@ PY
 
 hbs_prepare_download_curl_args() {
     local max_time="${1:-600}"
+    local allow_http="${APP_DOWNLOAD_ALLOW_HTTP:-false}"
+    local protocols="=https"
 
     _set_app_download_curl_tls_args || return 1
-    _hbs_download_curl_args=(-sSLf --retry 3 --retry-delay 1 --connect-timeout 15 --max-time "${max_time}")
+    if hbs_bool_is_true "${allow_http}"; then
+        protocols="=http,https"
+    fi
+    _hbs_download_curl_args=(
+        -q -sSfL --retry 3 --retry-delay 1 --connect-timeout 15
+        --max-time "${max_time}" --proto "${protocols}" --proto-redir "${protocols}"
+        --max-redirs 5 --globoff
+    )
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_app_download_curl_tls_args.
     if [[ ${#_tls_verify_args[@]} -gt 0 ]]; then
         _hbs_download_curl_args+=("${_tls_verify_args[@]}")
+    fi
+}
+
+hbs_validate_download_url() {
+    local url="${1:-}" allow_http="${APP_DOWNLOAD_ALLOW_HTTP:-false}"
+    if ! credential_curl_validate_url "${url}" "${allow_http}"; then
+        echo "ERROR: Package/checksum URL must be a credential-free HTTPS URL." >&2
+        echo "       APP_DOWNLOAD_ALLOW_HTTP=true is a lab-only plaintext override." >&2
+        return 1
+    fi
+    if [[ "${url,,}" == http://* ]]; then
+        if ! hbs_bool_is_true "${allow_http}"; then
+            return 1
+        fi
+        if [[ -z "${_WARNED_APP_DOWNLOAD_HTTP:-}" ]]; then
+            echo "WARNING: LAB ONLY: APP_DOWNLOAD_ALLOW_HTTP=true permits package downloads and any supplied Basic credentials over plaintext HTTP." >&2
+            _WARNED_APP_DOWNLOAD_HTTP=1
+        fi
     fi
 }
 
@@ -540,6 +571,10 @@ hbs_make_curl_auth_config() {
     auth_config="$(mktemp)"
     chmod 600 "${auth_config}"
     printf 'user = "%s:%s"\n' "$(hbs_curl_config_escape "${username}")" "$(hbs_curl_config_escape "${password}")" > "${auth_config}"
+    if ! credential_curl_validate_auth_config "${auth_config}"; then
+        rm -f "${auth_config}"
+        return 1
+    fi
     printf '%s' "${auth_config}"
 }
 
@@ -553,6 +588,7 @@ hbs_fetch_url_text() {
         echo "ERROR: Download URL is required." >&2
         return 1
     }
+    hbs_validate_download_url "${url}" || return 1
 
     hbs_prepare_download_curl_args 180 || return 1
     if [[ -n "${username}" || -n "${password}" ]]; then
@@ -1265,6 +1301,7 @@ hbs_download_file() {
         echo "ERROR: Download URL is required." >&2
         return 1
     }
+    hbs_validate_download_url "${url}" || return 1
 
     output_dir="$(dirname "${output_path}")"
     mkdir -p "${output_dir}"
@@ -1338,23 +1375,291 @@ hbs_load_ssh_for_execution() {
     load_splunk_ssh_credentials
 }
 
-hbs_make_sshpass_file() {
-    # NOTE: This function is invoked via $(hbs_make_sshpass_file) in every
-    # call site, which forks a subshell. Any EXIT trap registered here would
-    # fire on subshell exit and delete the temp file BEFORE the caller can
-    # use it — so we deliberately do not register one. Each caller is
-    # responsible for `rm -f "${pass_file}"` after the sshpass call.
-    local pass_file
-    pass_file="$(mktemp)"
-    chmod 600 "${pass_file}"
-    printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
-    printf '%s' "${pass_file}"
+HBS_SSH_TRUST_ARGS=()
+HBS_SSH_TRUST_TEMP_FILE=""
+_HBS_WARNED_SSH_TOFU=false
+
+hbs_validate_ssh_target() {
+    python3 - "${SPLUNK_SSH_HOST:-}" "${SPLUNK_SSH_PORT:-}" "${SPLUNK_SSH_USER:-}" <<'PY'
+import ipaddress
+import re
+import sys
+
+host, raw_port, user = sys.argv[1:]
+if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9._-]{0,63}", user):
+    raise SystemExit("ERROR: SPLUNK_SSH_USER contains unsupported characters.")
+if not raw_port.isascii() or not raw_port.isdecimal():
+    raise SystemExit("ERROR: SPLUNK_SSH_PORT must be a decimal integer from 1 through 65535.")
+port = int(raw_port, 10)
+if not 1 <= port <= 65535:
+    raise SystemExit("ERROR: SPLUNK_SSH_PORT must be a decimal integer from 1 through 65535.")
+if not host or len(host) > 253 or any(character.isspace() for character in host):
+    raise SystemExit("ERROR: SPLUNK_SSH_HOST is empty or malformed.")
+try:
+    ipaddress.ip_address(host)
+except ValueError:
+    labels = host.split(".")
+    if any(
+        not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+        for label in labels
+    ):
+        raise SystemExit("ERROR: SPLUNK_SSH_HOST must be a DNS name or IP address.")
+PY
+}
+
+hbs_validate_ssh_password() {
+    if [[ -z "${SPLUNK_SSH_PASS:-}" || "${SPLUNK_SSH_PASS}" == *$'\n'* || "${SPLUNK_SSH_PASS}" == *$'\r'* ]]; then
+        echo "ERROR: SPLUNK_SSH_PASS must be a non-empty single-line password." >&2
+        return 1
+    fi
+}
+
+hbs_prepare_known_hosts_copy() {
+    local path="${1:-}"
+    local private_copy cleanup_command
+    private_copy="$(python3 - "${path}" <<'PY'
+import os
+import stat
+import sys
+import tempfile
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_absolute() or not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: SPLUNK_SSH_KNOWN_HOSTS_FILE must be an absolute path on a platform with O_NOFOLLOW.")
+try:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+except OSError as error:
+    raise SystemExit(f"ERROR: cannot securely open SPLUNK_SSH_KNOWN_HOSTS_FILE: {error}")
+try:
+    metadata = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_size < 1
+        or metadata.st_size > 4 * 1024 * 1024
+        or metadata.st_uid not in {0, os.geteuid()}
+        or stat.S_IMODE(metadata.st_mode) & 0o022
+    ):
+        raise SystemExit(
+            "ERROR: SPLUNK_SSH_KNOWN_HOSTS_FILE must be a non-empty, single-link, "
+            "owner/root-owned regular file that is not group/world writable."
+        )
+    chunks = []
+    remaining = 4 * 1024 * 1024 + 1
+    while remaining > 0:
+        chunk = os.read(descriptor, min(65536, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+    if (
+        remaining == 0
+        or (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+        != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        or after.st_nlink != 1
+    ):
+        raise SystemExit("ERROR: SPLUNK_SSH_KNOWN_HOSTS_FILE changed while it was read.")
+finally:
+    os.close(descriptor)
+payload = b"".join(chunks)
+output_fd, output_name = tempfile.mkstemp(prefix=".splunk-known-hosts-")
+try:
+    os.fchmod(output_fd, 0o600)
+    view = memoryview(payload)
+    while view:
+        written = os.write(output_fd, view)
+        if written <= 0:
+            raise OSError("short known_hosts copy write")
+        view = view[written:]
+    os.fsync(output_fd)
+except BaseException:
+    os.close(output_fd)
+    try:
+        os.unlink(output_name)
+    except FileNotFoundError:
+        pass
+    raise
+else:
+    os.close(output_fd)
+print(output_name, end="")
+PY
+    )" || return 1
+    HBS_SSH_TRUST_TEMP_FILE="${private_copy}"
+    printf -v cleanup_command 'rm -f -- %q 2>/dev/null || true' "${private_copy}"
+    hbs_append_cleanup_trap "${cleanup_command}" EXIT INT TERM HUP
+    HBS_SSH_TRUST_ARGS=(
+        -o StrictHostKeyChecking=yes
+        -o "UserKnownHostsFile=${private_copy}"
+        -o GlobalKnownHostsFile=/dev/null
+    )
+}
+
+hbs_cleanup_ssh_trust() {
+    if [[ -n "${HBS_SSH_TRUST_TEMP_FILE:-}" ]]; then
+        rm -f -- "${HBS_SSH_TRUST_TEMP_FILE}"
+    fi
+    HBS_SSH_TRUST_TEMP_FILE=""
+    HBS_SSH_TRUST_ARGS=()
+}
+
+hbs_prepare_fingerprint_known_hosts() {
+    local expected_fingerprint="$1"
+    local scanned_file matched_file key_line actual_fingerprint cleanup_command
+
+    if [[ ! "${expected_fingerprint}" =~ ^SHA256:[A-Za-z0-9+/]{43}$ ]]; then
+        echo "ERROR: SPLUNK_SSH_HOST_KEY_FINGERPRINT must be one OpenSSH SHA256 fingerprint (SHA256:...)." >&2
+        return 1
+    fi
+    if ! command -v ssh-keyscan >/dev/null 2>&1 || ! command -v ssh-keygen >/dev/null 2>&1; then
+        echo "ERROR: fingerprint-pinned SSH requires ssh-keyscan and ssh-keygen." >&2
+        return 1
+    fi
+
+    scanned_file="$(mktemp)" || return 1
+    matched_file="$(mktemp)" || {
+        rm -f -- "${scanned_file}"
+        return 1
+    }
+    chmod 600 "${scanned_file}" "${matched_file}"
+    printf -v cleanup_command 'rm -f -- %q %q 2>/dev/null || true' "${scanned_file}" "${matched_file}"
+    hbs_append_cleanup_trap "${cleanup_command}" EXIT INT TERM HUP
+
+    if ! ssh-keyscan -T 10 -p "${SPLUNK_SSH_PORT}" "${SPLUNK_SSH_HOST}" > "${scanned_file}" 2>/dev/null; then
+        rm -f -- "${scanned_file}" "${matched_file}"
+        echo "ERROR: ssh-keyscan could not retrieve a host key for ${SPLUNK_SSH_HOST}:${SPLUNK_SSH_PORT}." >&2
+        return 1
+    fi
+
+    while IFS= read -r key_line; do
+        [[ -n "${key_line}" && "${key_line}" != \#* ]] || continue
+        actual_fingerprint="$(printf '%s\n' "${key_line}" | ssh-keygen -lf - -E sha256 2>/dev/null | awk 'NR == 1 { print $2 }')"
+        if [[ "${actual_fingerprint}" == "${expected_fingerprint}" ]]; then
+            printf '%s\n' "${key_line}" >> "${matched_file}"
+        fi
+    done < "${scanned_file}"
+    rm -f -- "${scanned_file}"
+
+    if [[ ! -s "${matched_file}" ]]; then
+        rm -f -- "${matched_file}"
+        echo "ERROR: scanned SSH host keys did not match SPLUNK_SSH_HOST_KEY_FINGERPRINT; refusing the connection." >&2
+        return 1
+    fi
+
+    HBS_SSH_TRUST_TEMP_FILE="${matched_file}"
+    HBS_SSH_TRUST_ARGS=(
+        -o StrictHostKeyChecking=yes
+        -o "UserKnownHostsFile=${matched_file}"
+        -o GlobalKnownHostsFile=/dev/null
+    )
+}
+
+hbs_prepare_ssh_trust() {
+    local require_password="${1:-true}"
+    local known_hosts_file="${SPLUNK_SSH_KNOWN_HOSTS_FILE:-}"
+    local fingerprint="${SPLUNK_SSH_HOST_KEY_FINGERPRINT:-}"
+    local tofu="${SPLUNK_SSH_ALLOW_TOFU:-false}"
+
+    hbs_cleanup_ssh_trust
+    hbs_validate_ssh_target || return 1
+    case "${require_password}" in
+        1|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn])
+            hbs_validate_ssh_password || return 1
+            ;;
+        0|[Ff][Aa][Ll][Ss][Ee]|[Nn]|[Nn][Oo]|[Oo][Ff][Ff])
+            ;;
+        *)
+            echo "ERROR: hbs_prepare_ssh_trust password-policy argument must be true or false." >&2
+            return 1
+            ;;
+    esac
+
+    if [[ -n "${known_hosts_file}" && -n "${fingerprint}" ]]; then
+        echo "ERROR: set only one SSH trust pin: SPLUNK_SSH_KNOWN_HOSTS_FILE or SPLUNK_SSH_HOST_KEY_FINGERPRINT." >&2
+        return 1
+    fi
+    if [[ -n "${known_hosts_file}" ]]; then
+        hbs_prepare_known_hosts_copy "${known_hosts_file}"
+        return $?
+    fi
+    if [[ -n "${fingerprint}" ]]; then
+        hbs_prepare_fingerprint_known_hosts "${fingerprint}"
+        return $?
+    fi
+
+    case "${tofu}" in
+        1|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn])
+            if [[ "${_HBS_WARNED_SSH_TOFU}" != "true" ]]; then
+                echo "WARNING: LAB-ONLY SSH TOFU IS ENABLED (SPLUNK_SSH_ALLOW_TOFU=true)." >&2
+                echo "WARNING: The first SSH connection is not authenticated and can be intercepted. Pin known_hosts or a SHA256 fingerprint for production." >&2
+                _HBS_WARNED_SSH_TOFU=true
+            fi
+            HBS_SSH_TRUST_ARGS=(-o StrictHostKeyChecking=accept-new)
+            return 0
+            ;;
+        ""|0|[Ff][Aa][Ll][Ss][Ee]|[Nn]|[Nn][Oo]|[Oo][Ff][Ff])
+            echo "ERROR: production SSH requires SPLUNK_SSH_KNOWN_HOSTS_FILE or SPLUNK_SSH_HOST_KEY_FINGERPRINT." >&2
+            echo "       Set SPLUNK_SSH_ALLOW_TOFU=true only for an isolated, disposable lab." >&2
+            return 1
+            ;;
+        *)
+            echo "ERROR: SPLUNK_SSH_ALLOW_TOFU must be true or false." >&2
+            return 1
+            ;;
+    esac
+}
+
+hbs_validate_remote_stage_path() {
+    local remote_dir="${1:-}" remote_name="${2:-}"
+    python3 - "${remote_dir}" "${remote_name}" <<'PY'
+import re
+import sys
+from pathlib import PurePosixPath
+
+raw_dir, name = sys.argv[1:]
+directory = PurePosixPath(raw_dir)
+safe_component = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,254}")
+if (
+    not raw_dir.startswith("/")
+    or raw_dir == "/"
+    or len(raw_dir) > 1024
+    or "//" in raw_dir
+    or raw_dir.endswith("/")
+    or any(part in {"", ".", ".."} or not safe_component.fullmatch(part) for part in directory.parts[1:])
+):
+    raise SystemExit(
+        "ERROR: SPLUNK_REMOTE_TMPDIR must be a normalized absolute path below / "
+        "using only letters, numbers, dot, underscore, and hyphen in each component."
+    )
+if (
+    not safe_component.fullmatch(name)
+    or name in {".", ".."}
+    or PurePosixPath(name).name != name
+):
+    raise SystemExit(
+        "ERROR: the remote staging name must be one safe basename using only "
+        "letters, numbers, dot, underscore, and hyphen."
+    )
+PY
 }
 
 hbs_run_target_cmd() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
-    local quoted pass_file ssh_target
+    local quoted ssh_target rc
 
     if [[ "${execution_mode}" == "local" ]]; then
         bash -lc "${raw_cmd}"
@@ -1367,20 +1672,24 @@ hbs_run_target_cmd() {
         return 1
     fi
 
+    hbs_prepare_ssh_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
-    pass_file="$(hbs_make_sshpass_file)"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    sshpass -f "${pass_file}" ssh \
+    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
+        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}"
-    local rc=$?
-    rm -f "${pass_file}"
+        "${ssh_target}" "bash -lc ${quoted}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
     return "${rc}"
 }
 
@@ -1388,7 +1697,7 @@ hbs_run_target_cmd_with_stdin() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
     local stdin_content="${3:-}"
-    local quoted pass_file ssh_target
+    local quoted ssh_target rc
 
     if [[ -z "${stdin_content}" ]]; then
         hbs_run_target_cmd "${execution_mode}" "${raw_cmd}"
@@ -1406,27 +1715,31 @@ hbs_run_target_cmd_with_stdin() {
         return 1
     fi
 
+    hbs_prepare_ssh_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
-    pass_file="$(hbs_make_sshpass_file)"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    sshpass -f "${pass_file}" ssh \
+    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
+        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}" <<<"${stdin_content}"
-    local rc=$?
-    rm -f "${pass_file}"
+        "${ssh_target}" "bash -lc ${quoted}" <<<"${stdin_content}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
     return "${rc}"
 }
 
 hbs_capture_target_cmd() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
-    local quoted pass_file ssh_target
+    local quoted ssh_target rc
 
     if [[ "${execution_mode}" == "local" ]]; then
         bash -lc "${raw_cmd}"
@@ -1439,20 +1752,24 @@ hbs_capture_target_cmd() {
         return 1
     fi
 
+    hbs_prepare_ssh_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
-    pass_file="$(hbs_make_sshpass_file)"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    sshpass -f "${pass_file}" ssh \
+    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
+        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}"
-    local rc=$?
-    rm -f "${pass_file}"
+        "${ssh_target}" "bash -lc ${quoted}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
     return "${rc}"
 }
 
@@ -1460,7 +1777,7 @@ hbs_stage_file_for_execution() {
     local execution_mode="${1:-local}"
     local local_path="${2:-}"
     local remote_name="${3:-}"
-    local remote_dir remote_path upload_path upload_dir pass_file ssh_target
+    local remote_dir remote_path upload_path upload_dir resolved_remote_name ssh_target scp_target rc
 
     if [[ "${execution_mode}" == "local" ]]; then
         hbs_resolve_abs_path "${local_path}"
@@ -1474,13 +1791,15 @@ hbs_stage_file_for_execution() {
     fi
 
     remote_dir="${SPLUNK_REMOTE_TMPDIR:-/tmp}"
-    remote_path="${remote_dir%/}/${remote_name:-$(basename "${local_path}")}"
+    resolved_remote_name="${remote_name:-$(basename "${local_path}")}"
+    hbs_validate_remote_stage_path "${remote_dir}" "${resolved_remote_name}" || return 1
+    remote_path="${remote_dir%/}/${resolved_remote_name}"
     upload_dir="/tmp"
-    upload_path="${upload_dir%/}/${remote_name:-$(basename "${local_path}")}.stage.$$"
+    upload_path="${upload_dir%/}/${resolved_remote_name}.stage.$$"
 
     if [[ "${SPLUNK_SSH_USER}" == "root" ]]; then
         upload_dir="${remote_dir}"
-        upload_path="${upload_dir%/}/${remote_name:-$(basename "${local_path}")}.stage.$$"
+        upload_path="${upload_dir%/}/${resolved_remote_name}.stage.$$"
     fi
 
     hbs_run_target_cmd "${execution_mode}" "$(hbs_shell_join mkdir -p "${upload_dir}")" >/dev/null
@@ -1488,19 +1807,27 @@ hbs_stage_file_for_execution() {
         hbs_run_target_cmd "${execution_mode}" "$(hbs_prefix_with_sudo "${execution_mode}" "$(hbs_shell_join mkdir -p "${remote_dir}")")" >/dev/null
     fi
 
-    pass_file="$(hbs_make_sshpass_file)"
+    hbs_prepare_ssh_trust || return 1
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
+    scp_target="${ssh_target}:${upload_path}"
+    if [[ "${SPLUNK_SSH_HOST}" == *:* ]]; then
+        scp_target="${SPLUNK_SSH_USER}@[${SPLUNK_SSH_HOST}]:${upload_path}"
+    fi
 
-    sshpass -f "${pass_file}" scp \
+    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 scp \
         -P "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
+        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${local_path}" "${ssh_target}:${upload_path}"
-    local rc=$?
-    rm -f "${pass_file}"
+        "${local_path}" "${scp_target}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
     if [[ "${rc}" -ne 0 ]]; then
         echo "ERROR: Failed to stage ${local_path} to ${upload_path}." >&2
         return "${rc}"

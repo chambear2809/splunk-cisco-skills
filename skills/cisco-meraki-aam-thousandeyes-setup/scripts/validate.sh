@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/credential_curl_helpers.sh"
 
 usage() {
     cat <<'EOF'
@@ -98,10 +103,136 @@ if [[ -z "${TE_TOKEN_FILE}" && -z "${MERAKI_API_KEY_FILE}" ]]; then
     exit 2
 fi
 
-mkdir -p "${OUTPUT_DIR}"
+if [[ -n "${MERAKI_ORG_ID}" && ! "${MERAKI_ORG_ID}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --meraki-org-id must be numeric." >&2
+    exit 2
+fi
+if [[ -n "${ACCOUNT_GROUP_ID}" && ! "${ACCOUNT_GROUP_ID}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --account-group-id must be numeric." >&2
+    exit 2
+fi
+MERAKI_API_BASE="${MERAKI_API_BASE%/}"
+if [[ "${MERAKI_API_BASE}" != "https://api.meraki.com/api/v1" ]]; then
+    echo "ERROR: --meraki-api-base must be exactly https://api.meraki.com/api/v1." >&2
+    exit 2
+fi
+credential_curl_prepare_transport false
+
+if ! OUTPUT_DIR="$(python3 - "${OUTPUT_DIR}" "${SCRIPT_DIR}" <<'PY'
+import json
+import os
+import stat
+import sys
+from pathlib import Path
+
+raw, script_dir = sys.argv[1:]
+marker_name = ".cisco-meraki-aam-validation-bundle.json"
+owner = "cisco-meraki-aam-thousandeyes-setup"
+schema = 1
+if not raw or not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: --output-dir is empty or this platform lacks O_NOFOLLOW")
+
+path = Path(os.path.abspath(raw))
+if sys.platform == "darwin" and len(path.parts) > 1 and path.parts[1] in {"tmp", "var"}:
+    alias = Path("/") / path.parts[1]
+    try:
+        alias_info = alias.lstat()
+        target = alias.resolve(strict=True)
+    except OSError:
+        pass
+    else:
+        if (
+            stat.S_ISLNK(alias_info.st_mode)
+            and alias_info.st_uid == 0
+            and target.parts[:2] == ("/", "private")
+        ):
+            path = target.joinpath(*path.parts[2:])
+
+repo = Path(script_dir).resolve().parents[2]
+protected = {Path("/"), Path.home().resolve(), repo}
+if path in protected:
+    raise SystemExit(f"ERROR: refusing protected --output-dir: {path}")
+if ".." in path.parts:
+    raise SystemExit("ERROR: --output-dir must not contain parent traversal")
+
+flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+directory_fd = os.open("/", flags)
+created_final = False
+try:
+    components = path.parts[1:]
+    for index, component in enumerate(components):
+        try:
+            child_fd = os.open(component, flags, dir_fd=directory_fd)
+        except FileNotFoundError:
+            os.mkdir(component, 0o700, dir_fd=directory_fd)
+            child_fd = os.open(component, flags, dir_fd=directory_fd)
+            if index == len(components) - 1:
+                created_final = True
+        os.close(directory_fd)
+        directory_fd = child_fd
+
+    info = os.fstat(directory_fd)
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or info.st_uid != os.geteuid()
+        or stat.S_IMODE(info.st_mode) != 0o700
+    ):
+        raise SystemExit("ERROR: validation output bundle must be an owner-only mode-0700 directory")
+
+    entries = set(os.listdir(directory_fd))
+    if marker_name not in entries:
+        if entries or not created_final and entries:
+            raise SystemExit(
+                "ERROR: existing --output-dir is not an empty or marker-owned validation bundle"
+            )
+        payload = json.dumps(
+            {"owner": owner, "schema": schema},
+            sort_keys=True,
+            indent=2,
+        ).encode("utf-8") + b"\n"
+        marker_fd = os.open(
+            marker_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            0o600,
+            dir_fd=directory_fd,
+        )
+        try:
+            os.write(marker_fd, payload)
+            os.fsync(marker_fd)
+        finally:
+            os.close(marker_fd)
+        os.fsync(directory_fd)
+
+    marker_fd = os.open(
+        marker_name,
+        os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=directory_fd,
+    )
+    try:
+        marker_info = os.fstat(marker_fd)
+        if (
+            not stat.S_ISREG(marker_info.st_mode)
+            or marker_info.st_nlink != 1
+            or stat.S_IMODE(marker_info.st_mode) != 0o600
+        ):
+            raise SystemExit("ERROR: validation bundle marker is not a private single-link file")
+        marker = json.loads(os.read(marker_fd, 65536).decode("utf-8"))
+    finally:
+        os.close(marker_fd)
+    if marker != {"owner": owner, "schema": schema}:
+        raise SystemExit("ERROR: validation output bundle marker owner/schema mismatch")
+finally:
+    os.close(directory_fd)
+
+print(path, end="")
+PY
+)"; then
+    exit 2
+fi
 
 MERAKI_CURL_CONFIG=""
 TE_CURL_CONFIG=""
+ACTIVE_RESPONSE_FILE=""
 cleanup() {
     if [[ -n "${MERAKI_CURL_CONFIG}" ]]; then
         rm -f "${MERAKI_CURL_CONFIG}"
@@ -109,7 +240,104 @@ cleanup() {
     if [[ -n "${TE_CURL_CONFIG}" ]]; then
         rm -f "${TE_CURL_CONFIG}"
     fi
+    if [[ -n "${ACTIVE_RESPONSE_FILE}" ]]; then
+        rm -f "${ACTIVE_RESPONSE_FILE}"
+    fi
     return 0
+}
+
+write_api_json() {
+    local url="$1" auth_config="$2" accept_header="$3" output_name="$4" allowed_prefix="$5"
+    if [[ ! "${output_name}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.json$ ]]; then
+        echo "ERROR: internal API evidence filename is unsafe: ${output_name}" >&2
+        return 2
+    fi
+    if ! credential_curl_validate_url "${url}" false; then
+        echo "ERROR: refusing credential-bearing request to an unsafe URL." >&2
+        return 2
+    fi
+    if [[ "${url}" != "${allowed_prefix}"* ]]; then
+        echo "ERROR: refusing credential-bearing request outside its pinned API origin/path." >&2
+        return 2
+    fi
+    ACTIVE_RESPONSE_FILE="$(mktemp "${OUTPUT_DIR}/.${output_name}.XXXXXX")"
+    chmod 600 "${ACTIVE_RESPONSE_FILE}"
+    if ! curl -q -sS -f "${url}" \
+        -K "${auth_config}" \
+        -H "Accept: ${accept_header}" \
+        -o "${ACTIVE_RESPONSE_FILE}" \
+        --connect-timeout 10 --max-time 120 \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}"; then
+        rm -f "${ACTIVE_RESPONSE_FILE}"
+        ACTIVE_RESPONSE_FILE=""
+        return 1
+    fi
+    python3 - "${ACTIVE_RESPONSE_FILE##*/}" "${output_name}" "${OUTPUT_DIR}" <<'PY'
+import json
+import os
+import stat
+import sys
+
+source_name, destination_name, parent = sys.argv[1:]
+marker_name = ".cisco-meraki-aam-validation-bundle.json"
+flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+parent_fd = os.open(
+    parent,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+)
+try:
+    parent_stat = os.fstat(parent_fd)
+    if (
+        not stat.S_ISDIR(parent_stat.st_mode)
+        or stat.S_IMODE(parent_stat.st_mode) != 0o700
+        or parent_stat.st_uid != os.geteuid()
+    ):
+        raise SystemExit("ERROR: API evidence directory is not a private owned directory")
+    marker_fd = os.open(marker_name, flags, dir_fd=parent_fd)
+    try:
+        marker_stat = os.fstat(marker_fd)
+        marker = json.loads(os.read(marker_fd, 65536).decode("utf-8"))
+        if (
+            not stat.S_ISREG(marker_stat.st_mode)
+            or marker_stat.st_nlink != 1
+            or stat.S_IMODE(marker_stat.st_mode) != 0o600
+            or marker != {"owner": "cisco-meraki-aam-thousandeyes-setup", "schema": 1}
+        ):
+            raise SystemExit("ERROR: API evidence bundle marker is invalid")
+    finally:
+        os.close(marker_fd)
+    source_fd = os.open(source_name, flags, dir_fd=parent_fd)
+    try:
+        source_stat = os.fstat(source_fd)
+        if (
+            not stat.S_ISREG(source_stat.st_mode)
+            or source_stat.st_nlink != 1
+            or stat.S_IMODE(source_stat.st_mode) != 0o600
+        ):
+            raise SystemExit("ERROR: API response staging file is unsafe")
+    finally:
+        os.close(source_fd)
+    try:
+        destination_fd = os.open(destination_name, flags, dir_fd=parent_fd)
+    except FileNotFoundError:
+        destination_fd = None
+    if destination_fd is not None:
+        try:
+            destination_stat = os.fstat(destination_fd)
+            if (
+                not stat.S_ISREG(destination_stat.st_mode)
+                or destination_stat.st_nlink != 1
+                or stat.S_IMODE(destination_stat.st_mode) != 0o600
+            ):
+                raise SystemExit("ERROR: API evidence destination is unsafe")
+        finally:
+            os.close(destination_fd)
+    os.replace(source_name, destination_name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+    os.fsync(parent_fd)
+finally:
+    os.close(parent_fd)
+PY
+    ACTIVE_RESPONSE_FILE=""
 }
 trap cleanup EXIT
 
@@ -136,24 +364,21 @@ if [[ -n "${MERAKI_API_KEY_FILE}" ]]; then
     check_secret_file "${MERAKI_API_KEY_FILE}" "--meraki-api-key-file"
     MERAKI_CURL_CONFIG="$(mktemp)"
     chmod 600 "${MERAKI_CURL_CONFIG}"
-    { printf 'header = "X-Cisco-Meraki-API-Key: '; tr -d '\r\n' < "${MERAKI_API_KEY_FILE}"; printf '"\n'; } > "${MERAKI_CURL_CONFIG}"
+    credential_curl_write_header_config \
+        "${MERAKI_API_KEY_FILE}" "X-Cisco-Meraki-API-Key" "${MERAKI_CURL_CONFIG}"
 
-    MERAKI_API_BASE="${MERAKI_API_BASE%/}"
-    curl -sS -f "${MERAKI_API_BASE}/organizations?perPage=1000" \
-        -K "${MERAKI_CURL_CONFIG}" \
-        -H "Accept: application/json" \
-        -o "${OUTPUT_DIR}/meraki-organizations.json"
+    write_api_json "${MERAKI_API_BASE}/organizations?perPage=1000" \
+        "${MERAKI_CURL_CONFIG}" "application/json" "meraki-organizations.json" \
+        "${MERAKI_API_BASE}/"
 
     if [[ -n "${MERAKI_ORG_ID}" ]]; then
-        curl -sS -f "${MERAKI_API_BASE}/organizations/${MERAKI_ORG_ID}/networks?perPage=1000" \
-            -K "${MERAKI_CURL_CONFIG}" \
-            -H "Accept: application/json" \
-            -o "${OUTPUT_DIR}/meraki-networks.json"
+        write_api_json "${MERAKI_API_BASE}/organizations/${MERAKI_ORG_ID}/networks?perPage=1000" \
+            "${MERAKI_CURL_CONFIG}" "application/json" "meraki-networks.json" \
+            "${MERAKI_API_BASE}/"
 
-        curl -sS -f "${MERAKI_API_BASE}/organizations/${MERAKI_ORG_ID}/devices?perPage=1000" \
-            -K "${MERAKI_CURL_CONFIG}" \
-            -H "Accept: application/json" \
-            -o "${OUTPUT_DIR}/meraki-devices.json"
+        write_api_json "${MERAKI_API_BASE}/organizations/${MERAKI_ORG_ID}/devices?perPage=1000" \
+            "${MERAKI_CURL_CONFIG}" "application/json" "meraki-devices.json" \
+            "${MERAKI_API_BASE}/"
     fi
 fi
 
@@ -161,26 +386,27 @@ if [[ -n "${TE_TOKEN_FILE}" ]]; then
     check_secret_file "${TE_TOKEN_FILE}" "--te-token-file"
     TE_CURL_CONFIG="$(mktemp)"
     chmod 600 "${TE_CURL_CONFIG}"
-    { printf 'header = "Authorization: Bearer '; tr -d '\r\n' < "${TE_TOKEN_FILE}"; printf '"\n'; } > "${TE_CURL_CONFIG}"
+    credential_curl_write_header_config \
+        "${TE_TOKEN_FILE}" "Authorization" "${TE_CURL_CONFIG}" "Bearer "
 
     query=""
     if [[ -n "${ACCOUNT_GROUP_ID}" ]]; then
         query="?aid=${ACCOUNT_GROUP_ID}"
     fi
 
-    curl -sS -f "https://api.thousandeyes.com/v7/agents${query}" \
-        -K "${TE_CURL_CONFIG}" \
-        -H "Accept: application/hal+json, application/json" \
-        -o "${OUTPUT_DIR}/agents.json"
+    write_api_json "https://api.thousandeyes.com/v7/agents${query}" \
+        "${TE_CURL_CONFIG}" "application/hal+json, application/json" "agents.json" \
+        "https://api.thousandeyes.com/v7/"
 
-    curl -sS -f "https://api.thousandeyes.com/v7/tests${query}" \
-        -K "${TE_CURL_CONFIG}" \
-        -H "Accept: application/hal+json, application/json" \
-        -o "${OUTPUT_DIR}/tests.json"
+    write_api_json "https://api.thousandeyes.com/v7/tests${query}" \
+        "${TE_CURL_CONFIG}" "application/hal+json, application/json" "tests.json" \
+        "https://api.thousandeyes.com/v7/"
 fi
 
 python3 - "$OUTPUT_DIR" "$AGENT_FILTER" "$TEST_FILTER" "$NETWORK_FILTER" "$MX_SERIAL_FILTER" "$PRINT_JSON" <<'PY'
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -190,6 +416,116 @@ test_filter = sys.argv[3].lower()
 network_filter = sys.argv[4].lower()
 mx_serial_filter = sys.argv[5].lower()
 print_json = sys.argv[6] == "true"
+marker_name = ".cisco-meraki-aam-validation-bundle.json"
+read_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+bundle_fd = os.open(
+    out,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+)
+bundle_info = os.fstat(bundle_fd)
+if (
+    not stat.S_ISDIR(bundle_info.st_mode)
+    or bundle_info.st_uid != os.geteuid()
+    or stat.S_IMODE(bundle_info.st_mode) != 0o700
+):
+    raise SystemExit("ERROR: validation output bundle is not a private owned directory")
+marker_fd = os.open(marker_name, read_flags, dir_fd=bundle_fd)
+try:
+    marker_info = os.fstat(marker_fd)
+    marker = json.loads(os.read(marker_fd, 65536).decode("utf-8"))
+finally:
+    os.close(marker_fd)
+if (
+    not stat.S_ISREG(marker_info.st_mode)
+    or marker_info.st_nlink != 1
+    or stat.S_IMODE(marker_info.st_mode) != 0o600
+    or marker != {"owner": "cisco-meraki-aam-thousandeyes-setup", "schema": 1}
+):
+    raise SystemExit("ERROR: validation output bundle marker is invalid")
+
+loaded_names = set()
+
+
+def read_private_file(name):
+    try:
+        descriptor = os.open(name, read_flags, dir_fd=bundle_fd)
+    except FileNotFoundError:
+        return None
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_size > 64 * 1024 * 1024
+        ):
+            raise SystemExit(f"ERROR: unsafe validation evidence file: {name}")
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (
+            (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            or after.st_nlink != 1
+        ):
+            raise SystemExit(f"ERROR: validation evidence changed during read: {name}")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def atomic_private_write(name, content):
+    if "/" in name or name in {"", ".", ".."}:
+        raise SystemExit("ERROR: unsafe summary output name")
+    try:
+        existing_fd = os.open(name, read_flags, dir_fd=bundle_fd)
+    except FileNotFoundError:
+        existing_fd = None
+    if existing_fd is not None:
+        try:
+            existing = os.fstat(existing_fd)
+            if (
+                not stat.S_ISREG(existing.st_mode)
+                or existing.st_nlink != 1
+                or stat.S_IMODE(existing.st_mode) != 0o600
+            ):
+                raise SystemExit(f"ERROR: unsafe summary destination: {name}")
+        finally:
+            os.close(existing_fd)
+    temporary = f".{name}.{os.getpid()}.{os.urandom(16).hex()}.tmp"
+    descriptor = os.open(
+        temporary,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+        0o600,
+        dir_fd=bundle_fd,
+    )
+    created = True
+    try:
+        payload = content.encode("utf-8")
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise SystemExit(f"ERROR: short summary write: {name}")
+            view = view[written:]
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(temporary, name, src_dir_fd=bundle_fd, dst_dir_fd=bundle_fd)
+        created = False
+        os.fsync(bundle_fd)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if created:
+            try:
+                os.unlink(temporary, dir_fd=bundle_fd)
+            except FileNotFoundError:
+                pass
 
 SUPPORTED_MX_MODELS = {
     "MX67", "MX67W", "MX67C", "MX68", "MX68W", "MX68CW", "MX75", "MX85",
@@ -211,13 +547,15 @@ def normalize_mx_model(model):
 
 
 def load(name):
-    path = out / name
-    if not path.exists():
+    raw = read_private_file(name)
+    if raw is None:
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SystemExit(f"{name} is not JSON: {exc}")
+    loaded_names.add(name)
+    return payload
 
 
 def first_list(payload, preferred):
@@ -350,7 +688,7 @@ summary = {
     ],
 }
 
-(out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+atomic_private_write("summary.json", json.dumps(summary, indent=2, sort_keys=True) + "\n")
 
 lines = [
     "# Meraki AAM ThousandEyes Live Validation",
@@ -406,21 +744,21 @@ if summary["matching_tests"]:
         )
 else:
     lines.append("- None")
-(out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+atomic_private_write("summary.md", "\n".join(lines) + "\n")
 
 failures = []
-if (out / "meraki-organizations.json").exists() and not meraki_orgs:
+if "meraki-organizations.json" in loaded_names and not meraki_orgs:
     failures.append("Meraki API returned no organizations")
-if (out / "meraki-networks.json").exists() and not matching_networks:
+if "meraki-networks.json" in loaded_names and not matching_networks:
     failures.append("no Meraki networks matched the requested organization/filter")
-if (out / "meraki-devices.json").exists() and not any(
+if "meraki-devices.json" in loaded_names and not any(
     normalize_mx_model(device.get("model")) in SUPPORTED_MX_MODELS
     for device in matching_mx_devices
 ):
     failures.append("no supported MX/C8 devices matched the requested filters")
-if (out / "agents.json").exists() and not matching_agents:
+if "agents.json" in loaded_names and not matching_agents:
     failures.append("no ThousandEyes agents matched the requested filters")
-if (out / "tests.json").exists() and not matching_tests:
+if "tests.json" in loaded_names and not matching_tests:
     failures.append("no ThousandEyes tests matched the requested filters")
 
 if print_json:
@@ -431,4 +769,5 @@ if failures:
     for failure in failures:
         print(f"ERROR: {failure}", file=sys.stderr)
     raise SystemExit(1)
+os.close(bundle_fd)
 PY

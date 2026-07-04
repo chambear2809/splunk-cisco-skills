@@ -404,7 +404,9 @@ if [[ ( -n "${{acs_planned_v4}}" || -n "${{acs_planned_v6}}" ) && "${{ALLOW_ACS_
   discovered_v4=""
   if [[ -z "${{operator_v4}}" ]]; then
     for url in https://checkip.amazonaws.com https://ifconfig.me https://api.ipify.org; do
-      candidate=$(curl -sS --connect-timeout 5 --max-time 10 "${{url}}" 2>/dev/null | tr -d '[:space:]' || true)
+      candidate=$(curl -q -sS --connect-timeout 5 --max-time 10 "${{url}}" \
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff \
+        2>/dev/null | tr -d '[:space:]' || true)
       if [[ -n "${{candidate}}" ]]; then
         discovered_v4="${{candidate}}"
         break

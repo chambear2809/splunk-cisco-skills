@@ -213,7 +213,8 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         "# Splunk SOAR (On-prem single) Post-install Checklist\n\n"
         f"1. Visit `https://{args.soar_hostname or '<soar-host>'}:{args.soar_https_port}/`.\n"
         "2. Complete the first-time onboarding tour (admin password reset, EULA).\n"
-        "3. Mint an `automation` REST user via `cloud/automation-user.sh`.\n"
+        "3. Mint an `automation` REST user with the explicit gate: "
+        "`SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION=true cloud/automation-user.sh`.\n"
         "4. Configure SAML / LDAP / OAuth in Splunk SOAR -> Administration -> User Management.\n"
         "5. Install Splunk-side apps:\n"
         "   ```bash\n"
@@ -488,7 +489,9 @@ def render_cloud(args: argparse.Namespace) -> dict:
         f"1. Accept the Splunk SOAR (Cloud) tenant invite from Splunk ({admin}).\n"
         f"2. Visit `{tenant or 'https://<tenant-host>/soar'}/login` and complete first-time onboarding.\n"
         "3. Run `cloud/jwt-token-helper.sh` to capture a long-lived JWT into `/tmp/soar_api_token` (chmod 600).\n"
-        "4. Run `cloud/automation-user.sh` to mint a dedicated `automation` REST user.\n"
+        "4. Run `SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION=true cloud/automation-user.sh` "
+        "to mint a dedicated `automation` REST user. Reruns retain an existing "
+        "valid private token without a POST.\n"
         "5. Apply the SOAR Cloud IP allowlist via `cloud/apply-allowlist.sh` (NOT the Splunk Cloud ACS allowlist).\n"
         "6. To reach private network resources, install Automation Broker via `automation-broker/install.sh`.\n"
         "7. Install Splunk-side apps via `splunk-side/install-*.sh`, then follow the\n"
@@ -548,9 +551,9 @@ def render_cloud(args: argparse.Namespace) -> dict:
         + 'token_mode="$(stat -c "%a" "${TOKEN_FILE}" 2>/dev/null || stat -f "%Lp" "${TOKEN_FILE}" 2>/dev/null)"\n'
         + '[[ "${token_mode}" == "600" ]] || { echo "ERROR: SOAR API token file must be chmod 600." >&2; exit 1; }\n\n'
         + "# SOAR Cloud allowlist managed via SOAR tenant API (NOT ACS).\n"
-        + 'response="$(soar_rest_call "${TENANT_URL}" "${TOKEN_FILE}" PUT \\\n'
+        + 'response="$(credential_curl_stream_file "${PLAN_FILE}" | soar_rest_call "${TENANT_URL}" "${TOKEN_FILE}" PUT \\\n'
         + '  /rest/system_settings/ip_allowlist \\\n'
-        + '  --data-binary @"${PLAN_FILE}" -w "\\n%{http_code}" || printf "\\n000")"\n'
+        + '  --data-binary @- -w "\\n%{http_code}" || printf "\\n000")"\n'
         + 'http_code="$(printf "%s\\n" "${response}" | tail -1)"\n'
         + 'case "${http_code}" in 200|201|204) ;; *) echo "ERROR: SOAR allowlist update failed (HTTP ${http_code})." >&2; exit 1 ;; esac\n'
         + 'echo "OK: SOAR Cloud allowlist applied. Run /rest/system_info to confirm."\n'
@@ -563,19 +566,19 @@ def render_cloud(args: argparse.Namespace) -> dict:
         + 'ADMIN_PW_FILE="${SOAR_ADMIN_PASSWORD_FILE:-/tmp/soar_admin_password}"\n'
         + 'USERNAME="${SOAR_AUTOMATION_USER:-automation_splunk}"\n'
         + 'NEW_TOKEN_FILE="${NEW_TOKEN_FILE:-/tmp/soar_automation_token}"\n'
+        + 'SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION="${SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION:-false}"\n'
+        + 'SOAR_ROTATE_AUTOMATION_TOKEN="${SOAR_ROTATE_AUTOMATION_TOKEN:-false}"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/credential_helpers.sh"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/soar_helpers.sh"\n\n'
-        + 'if [[ ! -s "${ADMIN_PW_FILE}" ]]; then\n'
-        + '  echo "ERROR: SOAR admin password file empty: ${ADMIN_PW_FILE}" >&2\n'
-        + '  exit 1\n'
-        + 'fi\n\n'
         + "# soar_create_automation_user wraps the 3-step SOAR REST flow\n"
-        + "# (create user -> look up id -> mint token) using curl config via\n"
-        + "# process substitution. The admin password never lands on argv,\n"
-        + "# response bodies are mktemp'd at 0600 and unlinked, and the new\n"
-        + "# automation token is written under umask 077 with chmod 600.\n"
+        + "# (create user -> look up id -> mint token) using descriptor-bound\n"
+        + "# curl auth configs. A durable pre-POST journal blocks ambiguous\n"
+        + "# retries, response files are signal-cleaned, and the token is\n"
+        + "# installed atomically through a no-follow directory descriptor.\n"
+        + "# Existing valid private tokens are retained. To rotate, set both\n"
+        + "# SOAR_ROTATE_AUTOMATION_TOKEN=true and the acceptance gate above.\n"
         + 'soar_create_automation_user "${TENANT_URL}" "${ADMIN_PW_FILE}" "${USERNAME}" "${NEW_TOKEN_FILE}"\n'
     )
     out["automation-user.sh"] = make_script(auto_user_body)

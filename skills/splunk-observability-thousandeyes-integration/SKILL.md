@@ -33,7 +33,10 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
    - **Tests**: `POST /v7/tests/{type}` for `http-server`, `page-load`, `web-transactions`, `api`, `agent-to-server`, `agent-to-agent`, `bgp`, `dns-server`, `dns-trace`, `dnssec`, `sip-server`, `voice`, `ftp-server`.
    - **Alert Rules**: `POST /v7/alerts/rules` aligned with the SignalFlow detector specs we ship for O11y.
    - **Labels**, **Tags**, and **TE-side Dashboards** are rendered for operator/API handoff; their generated apply scripts fail closed before mutation.
-   - **TE Templates**: `POST /v7/templates` and `POST /v7/templates/{id}/deploy` (Handlebars-only credential placeholders).
+   - **TE Templates**: verified `POST /v7/templates` creation with
+     Handlebars-only credential placeholders. Deployment remains a TE UI
+     handoff because template-resource readback does not prove deploy
+     completion and cannot make an interrupted deploy POST retry-safe.
 
 ## Out of scope (handed off)
 
@@ -55,7 +58,9 @@ For the Splunk TA or any dashboard-companion handoff, follow [the shared TA comp
   - `--o11y-ingest-token-file` for the Splunk Observability **Org access token** with ingest authorization (used as `X-SF-Token` in the OTLP metric stream `customHeaders`).
   - `--o11y-api-token-file` for the Splunk Observability **User API access token** (used as `X-SF-Token` in the Integrations 2.0 APM connector and SignalFlow validate calls).
 - Reject every direct token flag (`--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`).
-- Token files must be non-symlink regular files containing exactly one non-empty UTF-8 line and must be `chmod 600`. There is no permission bypass.
+- Token files must be single-link, non-symlink regular files containing exactly
+  one non-empty UTF-8 line and must be `chmod 600`. Live validators open them
+  with no-follow descriptor checks. There is no permission bypass.
 - TE Templates render with **Handlebars placeholders only** — TE API rejects plain-text credentials with HTTP 400.
 - Apply scripts read token files at runtime through the fixed-origin HTTPS client; the renderer never reads token files. Every TE request is scoped with the rendered numeric `account_group_id` as `?aid=`.
 
@@ -79,6 +84,8 @@ For the Splunk TA or any dashboard-companion handoff, follow [the shared TA comp
    ```
 
 4. Review `splunk-observability-thousandeyes-rendered/`:
+   - `.splunk-observability-thousandeyes-bundle.json` — private exclusive-root
+     marker required before any managed directory can be cleaned on rerender.
    - `te-payloads/` — request bodies for `POST/PUT /v7/streams`, connector + APM operation, per-test JSON, alert rules, labels, tags, TE dashboards, templates.
    - `dashboards/` — one SignalFlow spec per selected test type (consumable by `splunk-observability-dashboard-builder`).
    - `detectors/` — starter detector specs (consumable by `splunk-observability-native-ops`).
@@ -111,7 +118,20 @@ For the Splunk TA or any dashboard-companion handoff, follow [the shared TA comp
 
    Every live apply requires an explicit section list (or `all`) and `--i-accept-te-mutations`. `all` means the currently automatable sections: stream, APM, tests, alert rules, and templates. Labels, tags, and TE dashboards remain render-only and fail closed if selected.
 
-   Successful creates retain server-returned IDs under the rendered output's mode-700 `state/` directory and verify them by collection/item readback. Keep that state with the output. Deleting it prevents safe name-based adoption and a fresh apply may create a duplicate. A connection loss after the server accepts a POST but before its response arrives is inherently ambiguous and requires operator reconciliation.
+   Successful creates retain server-returned IDs under the rendered output's
+   mode-700 `state/` directory and verify them by collection/item readback.
+   Each logical object has a private cross-process lock, and an fsynced
+   `in_progress` intent is written before POST. A missing ID, failed exact
+   readback, or uncertain transport becomes `ambiguous` with
+   `manual_reconcile: true`; later applies block before any second POST. Never
+   delete or hand-edit ambiguous state to force a retry—reconcile the live TE
+   object and retained ID first.
+
+   Rerender preserves `state/` intentionally. It only cleans generated
+   directories after validating the exclusive marker, canonical bundle root,
+   expected top-level layout, same-filesystem trees, and single-link regular
+   files. Root, home, repository-root, unmarked non-empty, symlinked, and
+   hardlinked output targets fail without recursive deletion.
 
 ## Per-test-type metric coverage (TE OpenTelemetry Data Model v2)
 

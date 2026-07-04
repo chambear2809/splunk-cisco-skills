@@ -1,5 +1,4 @@
-name: splunk-appdynamics-dual-agent-setup
-short_description: "Apply Java Dual Signal mode after collector-first validation"
-entrypoint: "skills/splunk-appdynamics-dual-agent-setup/SKILL.md"
-safe_first_command: "bash skills/splunk-appdynamics-dual-agent-setup/scripts/setup.sh --help"
-validation_command: "bash skills/splunk-appdynamics-dual-agent-setup/scripts/validate.sh --help"
+interface:
+  display_name: "Splunk AppDynamics Dual Agent Setup"
+  short_description: "Apply Java Dual Signal mode after collector-first validation"
+  default_prompt: "Use $splunk-appdynamics-dual-agent-setup to apply Java Dual Signal mode after collector-first validation."

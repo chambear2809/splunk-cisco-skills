@@ -30,6 +30,9 @@ ALLOWED_KEYS = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+    "SPLUNK_SSH_HOST_KEY_FINGERPRINT",
+    "SPLUNK_SSH_ALLOW_TOFU",
     "SPLUNK_REMOTE_TMPDIR",
     "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER",
@@ -60,6 +63,7 @@ ALLOWED_KEYS = [
     "SPLUNK_PASSWORD",
     "SB_USER",
     "SB_PASS",
+    "SPLUNK_ALLOW_INSECURE_HTTP",
     "SPLUNK_VERIFY_SSL",
     "SPLUNKBASE_VERIFY_SSL",
     "SPLUNKBASE_CA_CERT",
@@ -243,6 +247,18 @@ class TestCredentialParsing(unittest.TestCase):
         result = parse_credential_file(text)
         self.assertEqual(result["SPLUNK_VERIFY_SSL"], "true")
 
+    def test_lab_only_insecure_http_key_allowed_for_flat_and_profile_config(self):
+        text = textwrap.dedent("""\
+            SPLUNK_ALLOW_INSECURE_HTTP="false"
+            PROFILE_lab__SPLUNK_ALLOW_INSECURE_HTTP="true"
+        """)
+        self.assertEqual(
+            parse_credential_file(text)["SPLUNK_ALLOW_INSECURE_HTTP"], "false"
+        )
+        self.assertEqual(
+            parse_credential_file(text, "lab")["SPLUNK_ALLOW_INSECURE_HTTP"], "true"
+        )
+
     def test_target_role_keys_are_allowed(self):
         text = textwrap.dedent("""\
             SPLUNK_TARGET_ROLE="search-tier"
@@ -279,10 +295,19 @@ class TestCredentialParsing(unittest.TestCase):
 
     def test_remote_bootstrap_keys_allowed(self):
         text = textwrap.dedent("""\
+            SPLUNK_SSH_KNOWN_HOSTS_FILE="/secure/splunk_known_hosts"
+            SPLUNK_SSH_HOST_KEY_FINGERPRINT="SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            SPLUNK_SSH_ALLOW_TOFU="false"
             SPLUNK_REMOTE_TMPDIR="/var/tmp"
             SPLUNK_REMOTE_SUDO="true"
         """)
         result = parse_credential_file(text)
+        self.assertEqual(result["SPLUNK_SSH_KNOWN_HOSTS_FILE"], "/secure/splunk_known_hosts")
+        self.assertEqual(
+            result["SPLUNK_SSH_HOST_KEY_FINGERPRINT"],
+            "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        )
+        self.assertEqual(result["SPLUNK_SSH_ALLOW_TOFU"], "false")
         self.assertEqual(result["SPLUNK_REMOTE_TMPDIR"], "/var/tmp")
         self.assertEqual(result["SPLUNK_REMOTE_SUDO"], "true")
 

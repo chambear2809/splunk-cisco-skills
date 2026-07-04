@@ -117,6 +117,9 @@ When adding a skill under `skills/<skill-name>/`, include:
   `Use when` trigger
 - Concise `SKILL.md` body content: keep the main file under 500 lines and move
   detailed reference material to `reference.md` or `references/`
+- `agents/openai.yaml` using the canonical `interface` mapping with a
+  25–64-character `short_description` and a concise `default_prompt` that
+  explicitly invokes `$<skill-name>`
 - `scripts/setup.sh` and/or `scripts/validate.sh` when automation exists
 - `reference.md` when product behavior or operational details exceed the short
   skill instructions

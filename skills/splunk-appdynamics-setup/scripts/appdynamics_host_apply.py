@@ -8,13 +8,15 @@ import json
 import os
 import shutil
 import shlex
+import stat
 import subprocess
 import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 SECRET_MARKERS = (
@@ -94,7 +96,105 @@ def target_sudo(target: dict[str, Any], sudo: bool | None = None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def build_ssh_command(target: dict[str, Any], remote_command: str | list[str], sudo: bool = False) -> list[str]:
+@contextmanager
+def pinned_known_hosts_file(target: dict[str, Any]) -> Iterator[Path]:
+    known_hosts = str(target.get("ssh_known_hosts_file") or "").strip()
+    if not known_hosts:
+        raise ValueError(
+            "SSH target requires ssh_known_hosts_file; first-use accept-new trust is not production-safe"
+        )
+    source = Path(known_hosts)
+    if not source.is_absolute() or any(character in known_hosts for character in "\r\n\x00"):
+        raise ValueError("ssh_known_hosts_file must be an absolute, single-line path")
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ValueError("secure known_hosts loading requires O_NOFOLLOW support")
+    try:
+        source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    except OSError as exc:
+        raise ValueError(f"cannot securely open ssh_known_hosts_file: {source}") from exc
+    try:
+        before = os.fstat(source_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size < 1
+            or before.st_size > 4 * 1024 * 1024
+            or before.st_uid not in {0, os.geteuid()}
+            or stat.S_IMODE(before.st_mode) & 0o022
+        ):
+            raise ValueError(
+                "ssh_known_hosts_file must be a non-empty, single-link, owner/root-owned "
+                "regular file that is not group/world writable"
+            )
+        chunks: list[bytes] = []
+        remaining = 4 * 1024 * 1024 + 1
+        while remaining > 0:
+            chunk = os.read(source_fd, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(source_fd)
+        if (
+            remaining == 0
+            or (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
+            or after.st_nlink != 1
+        ):
+            raise ValueError("ssh_known_hosts_file changed while it was read")
+    finally:
+        os.close(source_fd)
+
+    copy_fd, copy_name = tempfile.mkstemp(prefix=".appd-known-hosts-")
+    copy_path = Path(copy_name)
+    try:
+        os.fchmod(copy_fd, 0o600)
+        view = memoryview(b"".join(chunks))
+        while view:
+            written = os.write(copy_fd, view)
+            if written <= 0:
+                raise OSError("short known_hosts copy write")
+            view = view[written:]
+        os.fsync(copy_fd)
+        os.close(copy_fd)
+        copy_fd = -1
+        yield copy_path
+    finally:
+        if copy_fd >= 0:
+            os.close(copy_fd)
+        copy_path.unlink(missing_ok=True)
+
+
+def ssh_host_key_args(known_hosts_file: Path) -> list[str]:
+    return [
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        "-o",
+        "GlobalKnownHostsFile=/dev/null",
+        "-o",
+        "StrictHostKeyChecking=yes",
+    ]
+
+
+def build_ssh_command(
+    target: dict[str, Any],
+    remote_command: str | list[str],
+    sudo: bool = False,
+    *,
+    trusted_known_hosts: Path,
+) -> list[str]:
     host = str(target.get("host") or "")
     if not host:
         raise ValueError("SSH target requires host")
@@ -108,30 +208,28 @@ def build_ssh_command(target: dict[str, Any], remote_command: str | list[str], s
     key_file = target.get("ssh_key_file")
     if key_file:
         argv.extend(["-i", str(key_file)])
-    known_hosts = target.get("ssh_known_hosts_file")
-    if known_hosts:
-        argv.extend(["-o", f"UserKnownHostsFile={known_hosts}", "-o", "StrictHostKeyChecking=yes"])
-    else:
-        argv.extend(["-o", "StrictHostKeyChecking=accept-new"])
+    argv.extend(ssh_host_key_args(trusted_known_hosts))
     argv.extend([destination, wrapped])
     return argv
 
 
-def build_scp_command(target: dict[str, Any], local_path: Path, remote_path: str) -> list[str]:
+def build_scp_command(
+    target: dict[str, Any],
+    local_path: Path,
+    remote_path: str,
+    *,
+    trusted_known_hosts: Path,
+) -> list[str]:
     host = str(target.get("host") or "")
     if not host:
         raise ValueError("SSH target requires host")
     user = str(target.get("ssh_user") or target.get("user") or "")
     destination = f"{user}@{host}:{remote_path}" if user else f"{host}:{remote_path}"
-    argv = ["scp", "-q"]
+    argv = ["scp", "-q", "-o", "BatchMode=yes"]
     key_file = target.get("ssh_key_file")
     if key_file:
         argv.extend(["-i", str(key_file)])
-    known_hosts = target.get("ssh_known_hosts_file")
-    if known_hosts:
-        argv.extend(["-o", f"UserKnownHostsFile={known_hosts}", "-o", "StrictHostKeyChecking=yes"])
-    else:
-        argv.extend(["-o", "StrictHostKeyChecking=accept-new"])
+    argv.extend(ssh_host_key_args(trusted_known_hosts))
     argv.extend([str(local_path), destination])
     return argv
 
@@ -168,13 +266,20 @@ class HostExecutor:
     def run(self, command: str | list[str], *, sudo: bool | None = None, label: str = "") -> CommandResult:
         started = utc_now()
         if execution_mode(self.target) == "ssh":
-            argv = build_ssh_command(self.target, command, sudo=target_sudo(self.target, sudo))
+            with pinned_known_hosts_file(self.target) as trusted_known_hosts:
+                argv = build_ssh_command(
+                    self.target,
+                    command,
+                    sudo=target_sudo(self.target, sudo),
+                    trusted_known_hosts=trusted_known_hosts,
+                )
+                proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=300)
         else:
             local_command = shell_join(command)
             argv = ["bash", "-lc", local_command]
             if target_sudo(self.target, sudo):
                 argv = ["sudo", "-n", *argv]
-        proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=300)
+            proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=300)
         return CommandResult(
             target=target_display(self.target),
             command=argv,
@@ -198,12 +303,19 @@ class HostExecutor:
             raise RuntimeError(f"{target_display(self.target)}: {label} must exist and be chmod 600: {path}")
 
         if execution_mode(self.target) == "ssh":
-            argv = build_ssh_command(self.target, f"cat {quoted}", sudo=target_sudo(self.target, sudo))
+            with pinned_known_hosts_file(self.target) as trusted_known_hosts:
+                argv = build_ssh_command(
+                    self.target,
+                    f"cat {quoted}",
+                    sudo=target_sudo(self.target, sudo),
+                    trusted_known_hosts=trusted_known_hosts,
+                )
+                proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
         else:
             argv = ["bash", "-lc", f"cat {quoted}"]
             if target_sudo(self.target, sudo):
                 argv = ["sudo", "-n", *argv]
-        proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
+            proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
         if proc.returncode != 0:
             raise RuntimeError(f"{target_display(self.target)}: could not read {label}: {path}")
         value = proc.stdout.rstrip("\r\n")
@@ -334,13 +446,19 @@ class HostExecutor:
         local_stage = backup_dir / f"ssh-stage-{uuid.uuid4().hex}"
         local_stage.write_bytes(payload)
         try:
-            scp = subprocess.run(
-                build_scp_command(self.target, local_stage, remote_stage),
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=300,
-            )
+            with pinned_known_hosts_file(self.target) as trusted_known_hosts:
+                scp = subprocess.run(
+                    build_scp_command(
+                        self.target,
+                        local_stage,
+                        remote_stage,
+                        trusted_known_hosts=trusted_known_hosts,
+                    ),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=300,
+                )
             if scp.returncode != 0:
                 raise RuntimeError(f"scp failed for {destination}: {scp.stderr}")
             checksum = self.run(f"sha256sum {shlex.quote(remote_stage)} | awk '{{print $1}}'", label=f"stage checksum {label}".strip())

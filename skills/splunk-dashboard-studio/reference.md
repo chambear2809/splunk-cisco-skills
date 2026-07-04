@@ -88,7 +88,12 @@ quoting hazards). Authenticate without secrets in argv by exporting
 `SPLUNK_CURL_CONFIG=/path/to/curl.cfg` (chmod 600; e.g. a line
 `user = "admin:<password>"`) or `SPLUNK_USERNAME=<user>` (curl prompts for the
 password); override the management endpoint with `SPLUNK_MGMT_URI`
-(default `https://localhost:8089`). It checks whether the view exists, creates or
+(default `https://localhost:8089`). A supplied curl config is accepted only when
+its sole active directive is `user`; URL, redirect, proxy, and transfer options
+are refused. The generated client disables user curl configuration, redirects,
+and URL globbing and requires a credential-free HTTPS origin. Plaintext HTTP is
+available only with the explicit lab-only `SPLUNK_ALLOW_INSECURE_HTTP=true`
+opt-in. It checks whether the view exists, creates or
 updates accordingly, and is gated behind a typed `APPLY` confirmation. On Splunk
 Cloud, the underlying REST runs on the search tier; ensure the `search-api` IP
 allow list permits your host (`splunk-cloud-acs-admin-setup`).

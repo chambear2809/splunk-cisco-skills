@@ -60,6 +60,15 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/pgbouncer_password
 The skill reads these via `--*-file` flags and never embeds the value in
 rendered output.
 
+`cloud/automation-user.sh` is idempotent when its destination already holds a
+private single-link mode-600 token: it exits without a REST mutation. A new
+mint or rotation requires the explicit non-secret gate
+`SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION=true`; rotation also requires
+`SOAR_ROTATE_AUTOMATION_TOKEN=true`. The helper fsyncs a private pre-POST
+journal beside the token. An interrupted/uncertain POST, missing response key,
+or uncertain atomic write becomes `ambiguous` and blocks retries until an
+operator inspects the automation user and revokes any orphan token.
+
 ## Quick Start
 
 Render a single-instance unprivileged install:
@@ -122,6 +131,17 @@ the documented Mission Control UI.
 Cluster provisioning, backup, and restore require a pre-enrolled SSH
 known-hosts file; generated scripts use strict host-key checking and never
 silently accept a new host key.
+
+To mint the rendered Cloud automation token after review:
+
+```bash
+SOAR_ACCEPT_TOKEN_MINT_OR_ROTATION=true \
+  bash splunk-soar-rendered/cloud/automation-user.sh
+```
+
+Do not delete an `*.mint-state.json` file in `in_progress` or `ambiguous`
+state to force a retry. Reconcile the live user's tokens and revoke any
+unknown credential first.
 
 Validate Splunk-side SOAR apps (reads credentials from the project-root
 `credentials` file, checks that `splunk_app_soar` is installed, and prints a

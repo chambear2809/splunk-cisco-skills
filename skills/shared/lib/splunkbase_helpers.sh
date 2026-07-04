@@ -7,6 +7,10 @@
 [[ -n "${_SPLUNKBASE_HELPERS_LOADED:-}" ]] && return 0
 _SPLUNKBASE_HELPERS_LOADED=true
 
+_SPLUNKBASE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SPLUNKBASE_LIB_DIR}/credential_curl_helpers.sh"
+
 _splunkbase_append_cleanup_trap() {
     if declare -F hbs_append_cleanup_trap >/dev/null 2>&1; then
         hbs_append_cleanup_trap "$@"
@@ -39,17 +43,18 @@ get_splunkbase_session() {
     local response_file cookie_file http_code response session
 
     _set_splunkbase_curl_tls_args || return 1
+    credential_curl_prepare_transport false
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
     _splunkbase_append_cleanup_trap "rm -f $(printf '%q' "${cookie_file}") $(printf '%q' "${response_file}")" EXIT INT TERM
 
-    if [[ -n "${SB_COOKIE_JAR:-}" && -f "${SB_COOKIE_JAR}" ]]; then
-        rm -f "${SB_COOKIE_JAR}"
-    fi
+    # Never unlink an inherited SB_COOKIE_JAR path. This helper only cleans
+    # unpredictable temp files it created and registered above.
+    SB_COOKIE_JAR=""
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    http_code=$(curl -s --connect-timeout 30 --max-time 120 \
+    http_code=$(curl -q -s --connect-timeout 30 --max-time 120 \
         ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         -X POST "https://splunkbase.splunk.com/api/account:login" \
         -K <(
@@ -58,7 +63,8 @@ get_splunkbase_session() {
         ) \
         -c "${cookie_file}" \
         -o "${response_file}" \
-        -w '%{http_code}' 2>/dev/null || echo "000")
+        -w '%{http_code}' \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}" 2>/dev/null || echo "000")
 
     response=$(<"${response_file}")
     rm -f "${response_file}"
@@ -88,10 +94,12 @@ get_splunkbase_release_metadata() {
     local metadata
 
     _set_splunkbase_curl_tls_args || return 1
+    credential_curl_prepare_transport false
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    metadata=$(curl -s --connect-timeout 30 --max-time 120 \
-        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
+    metadata=$(curl -q -s --connect-timeout 30 --max-time 120 \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -147,7 +155,7 @@ download_splunkbase_release() {
     local app_id="$1"
     local app_version="$2"
     local output_path="$3"
-    local tmp_file meta http_code effective_url
+    local tmp_file header_file meta http_code effective_url redirect_url
 
     SB_DOWNLOAD_HTTP_CODE=""
     SB_DOWNLOAD_ERROR_HINT=""
@@ -159,28 +167,76 @@ download_splunkbase_release() {
     get_splunkbase_release_metadata "${app_id}" "${app_version}" || return 1
 
     tmp_file="$(mktemp)"
+    header_file="$(mktemp)"
     # shellcheck disable=SC2034  # read by callers after download_splunkbase_release returns
     SB_DOWNLOAD_EFFECTIVE_URL=""
 
     mkdir -p "$(dirname "${output_path}")"
     if ! _set_splunkbase_curl_tls_args; then
-        rm -f "${tmp_file}"
+        rm -f "${tmp_file}" "${header_file}"
         return 1
     fi
+    if ! credential_curl_validate_url "${SB_DOWNLOAD_SOURCE_URL}" false; then
+        rm -f "${tmp_file}" "${header_file}"
+        echo "ERROR: Splunkbase download URL was not a credential-free HTTPS URL." >&2
+        return 1
+    fi
+    credential_curl_prepare_transport false
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    meta=$(curl -sL ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+    meta=$(curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         -b "${SB_COOKIE_JAR}" \
         -K <(printf 'header = "X-Auth-Token: %s"\n' "$(_curl_config_escape "${SB_SESSION_ID}")") \
+        -D "${header_file}" \
         -o "${tmp_file}" \
         -w $'%{http_code}\t%{url_effective}' \
-        "${SB_DOWNLOAD_SOURCE_URL}" 2>/dev/null || printf '000\t')
+        "${SB_DOWNLOAD_SOURCE_URL}" \
+        "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}" 2>/dev/null || printf '000\t')
 
     http_code="${meta%%$'\t'*}"
     effective_url=""
     if [[ "${meta}" == *$'\t'* ]]; then
         effective_url="${meta#*$'\t'}"
     fi
+
+    if [[ "${http_code}" == 3?? ]]; then
+        redirect_url="$(python3 - "${SB_DOWNLOAD_SOURCE_URL}" "${header_file}" <<'PY'
+import sys
+from pathlib import Path
+from urllib.parse import urljoin
+
+base, header_path = sys.argv[1:]
+location = ""
+for raw_line in Path(header_path).read_text(encoding="iso-8859-1").splitlines():
+    if raw_line.lower().startswith("location:"):
+        location = raw_line.split(":", 1)[1].strip()
+if location:
+    print(urljoin(base, location), end="")
+PY
+)"
+        if [[ -z "${redirect_url}" ]] || ! credential_curl_validate_url "${redirect_url}" false; then
+            rm -f "${tmp_file}" "${header_file}"
+            echo "ERROR: Splunkbase returned an invalid or non-HTTPS download redirect." >&2
+            return 1
+        fi
+        # Never forward the Splunkbase cookie or X-Auth-Token across a redirect.
+        # The redirect target must be a self-contained HTTPS download URL.
+        : > "${tmp_file}"
+        : > "${header_file}"
+        meta=$(curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+            -D "${header_file}" \
+            -o "${tmp_file}" \
+            -w $'%{http_code}\t%{url_effective}' \
+            "${redirect_url}" \
+            "${CREDENTIAL_CURL_TRANSPORT_ARGS[@]}" 2>/dev/null || printf '000\t')
+        http_code="${meta%%$'\t'*}"
+        effective_url=""
+        if [[ "${meta}" == *$'\t'* ]]; then
+            effective_url="${meta#*$'\t'}"
+        fi
+    fi
+
+    rm -f "${header_file}"
 
     if [[ "${http_code}" == "200" ]] && [[ -s "${tmp_file}" ]] && _is_splunk_package "${tmp_file}"; then
         # shellcheck disable=SC2034  # read by callers after download_splunkbase_release returns

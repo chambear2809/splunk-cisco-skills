@@ -34,16 +34,22 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
   registry's repo-verified release. `--app-version` selects another exact,
   operator-reviewed release, but an unregistered version has no reusable
   compatibility evidence and fails closed without a documented
-  `--accept-unsupported-platform` exception. Use `--accept-unverified-release`
-  to request public latest without claiming repository verification.
+  `--accept-unsupported-platform` exception. `--accept-unverified-release`
+  pins the registry-recorded `latest_release_version`; it never leaves ACS or
+  the downloader on a moving `latest`. Unknown numeric IDs additionally require
+  an explicit `--app-version` plus both release and platform acknowledgements.
 - Fallback path: if Splunkbase is unavailable (no credentials, download
   failure, private app), the caller must rerun with `--source local`; in
   interactive mode the installer lists packages in `splunk-ta/`. It does not
   silently switch sources after a failed Splunkbase operation.
 - Cloud: ACS fetches the release directly from Splunkbase.
-- Enterprise: the installer downloads the package, caches it in `splunk-ta/`,
-  and installs it through the management API. For remote hosts, local packages
-  are staged over SSH first.
+- Enterprise: the installer downloads the exact package into `splunk-ta/` and
+  installs it through the management API. Cached Splunkbase bytes are reused
+  only when `--expected-sha256` matches; without an operator/publisher digest,
+  the exact release is redownloaded over authenticated HTTPS. Before upload,
+  archive paths, top-level app identity, `[package] id`, and `[launcher] version`
+  are inspected and the resolved exact version is compatibility-checked again.
+  For remote hosts, local packages are staged over SSH first.
 - For known Cisco packages, the installer auto-resolves the Splunkbase ID and
   license-ack URL from `skills/shared/app_registry.json`.
 - Known registry packages are checked against the target Splunk minor before
@@ -189,8 +195,8 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 | `--app-version VER` | Select an exact operator-reviewed release; unregistered release evidence fails closed |
 | `--target-splunk-version VER` | Override the shared Cloud/Enterprise compatibility target |
 | `--accept-unsupported-platform` | Explicitly override a known platform-listing gap with documented approval |
-| `--accept-unverified-release` | Request public latest instead of the repo-verified version; does not certify it |
-| `--expected-sha256 HEX` | Required publisher SHA-256 for non-Splunkbase URL downloads |
+| `--accept-unverified-release` | Pin the registry-recorded public latest instead of the repo-verified version; unknown IDs also require `--app-version` |
+| `--expected-sha256 HEX` | Required for URL downloads and for reuse of cached Splunkbase package bytes |
 | `--license-ack-url URL` | Third-party license acknowledgment URL for ACS installs |
 | `--pre-vetted` | Skip ACS inspection only for an already reviewed private app |
 | `--update` | Upgrade an existing app |
@@ -225,9 +231,11 @@ Asks for confirmation before removing, then restarts Splunk automatically and
 waits for the management API to return. Use `--no-restart` only when batching
 changes.
 
-On Cloud, an ACS-accepted uninstall returns nonzero if neither search-tier nor
-equivalent completion evidence is available. Follow the printed ACS/search-tier
-verification handoff before treating the app as removed.
+On Cloud, `uninstall_app.sh` delegates to the same hardened state machine as
+`cloud_batch_uninstall.sh`. An ACS-accepted request is never completion:
+bounded verification must obtain definitive ACS absence. A search-tier REST
+404 alone cannot prove removal, and any channel that still reports the app
+present (including ACS/REST disagreement) forces a nonzero result.
 Enterprise and bundle removals also read back `/services/apps/local` after the
 activation path and return nonzero unless the app is absent.
 
@@ -237,14 +245,63 @@ bash skills/splunk-app-install/scripts/uninstall_app.sh
 
 Prompts for: app selection and confirmation. Credentials are read from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
 
+### cloud_batch_install.sh
+
+Batch install expands registry dependencies in dependency-first order, resolves
+an exact version for every app, and snapshots ACS list/describe state before the
+first mutation. `--version` is accepted for exactly one requested root; expanded
+dependencies keep their own registry pins. Each ACS operation must converge to
+the exact expected version and a recognized terminal status through bounded
+list/describe polling. HTTP 409 is accepted only after that exact state is
+proven.
+
+The batch stops at the first failure and never restarts partial state. Apps that
+were absent in the initial snapshot and whose successful install is attributable
+to this batch are uninstalled in reverse order, with ACS absence verification.
+If compensation or verification is incomplete, the script exits nonzero and
+retains a mode-0600 JSONL recovery journal under `${SPLUNK_BATCH_RECOVERY_DIR}`
+(or the system temporary directory). A successful fully verified batch removes
+the transient journal.
+
+### cloud_batch_uninstall.sh
+
+Safely removes multiple Splunk Cloud apps through ACS. The batch helper rejects
+unsafe/ambiguous app names, preflights ACS existence and current version for
+every target before the first mutation, prints the exact removal plan, and
+requires `--yes` in non-interactive use. It revalidates the exact planned
+state/version immediately before each ACS or direct REST mutation. An ACS rc=0
+is only request acceptance; every app must reach definitive bounded ACS
+absence. REST-only 404, transport/authentication errors, malformed responses,
+and 5xx responses never count as absence. If either channel reports the app
+present, or ACS and REST disagree, the run fails unless a separately authorized
+fallback safely reconciles the state and final ACS absence is then proved.
+
+```bash
+bash skills/shared/scripts/cloud_batch_uninstall.sh --yes \
+  Splunk_TA_Cisco_Intersight Splunk_TA_cisco_meraki
+```
+
+Direct search-tier REST DELETE is not an automatic fallback. It requires the
+separate `--accept-rest-fallback` acknowledgement because it can bypass ACS
+ownership, desynchronize a search head cluster, or affect only the contacted
+member. Partial/ambiguous outcomes stop later mutations, exit nonzero, and
+write a private JSON evidence file with per-app versions, request outcomes,
+final verification, and exact recovery guidance. Use `--evidence-file PATH` to
+select its location.
+
+The single-app wrapper accepts the same Cloud-only `--accept-rest-fallback`,
+`--verify-attempts`, `--verify-interval`, and `--evidence-file` flags and passes
+them to the batch state machine. `--yes` confirms only the named app; direct
+REST mutation still requires `--accept-rest-fallback` independently.
+
 ## Workflow
 
 1. **Determine the operation** — install, list, or uninstall.
 2. **Look up the app ID** from `skills/shared/app_registry.json` when
    available. Only ask the user for the app ID if it is not already known.
 3. **Try Splunkbase first**: run with `--source splunkbase --app-id <ID>`
-   to pull the repo-verified version (or public latest only when explicitly
-   requested with `--accept-unverified-release`).
+   to pull the repo-verified version (or the exact registry-recorded public
+   latest only when explicitly requested with `--accept-unverified-release`).
 4. **Fall back to local**: if Splunkbase fails (no creds, download error,
    private app), retry with `--source local` to install from `splunk-ta/`.
 5. **Enterprise**: wait for the automatic restart and management API recovery.

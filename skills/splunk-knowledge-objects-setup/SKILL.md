@@ -25,7 +25,10 @@ ACL plan before writing them live.
 
 Never ask for the Splunk admin password; apply reads the project `credentials`
 file via the shared helper. Setting `sharing=global` is broad and refuses to
-apply without `--accept-global-sharing`.
+apply without `--accept-global-sharing`. App/global objects must use owner
+`nobody`; private (`user`) objects must name a user owner. Owner names must
+match the strict Splunk username allowlist, and every REST namespace segment is
+URL-encoded before use.
 
 ## Quick Start
 
@@ -51,6 +54,14 @@ bash skills/splunk-knowledge-objects-setup/scripts/setup.sh --phase apply \
   --fields-list "_key,ip,risk" --sharing app --owner nobody --read-roles "*"
 ```
 
+Query the real object, ACL, and optional automatic-lookup binding and fail on
+drift:
+
+```bash
+bash skills/splunk-knowledge-objects-setup/scripts/setup.sh --phase status \
+  --object-kind macro --name net_idx --definition 'index IN ("a","b")'
+```
+
 ## What It Renders
 
 - `savedsearches.conf`, `macros.conf`, `transforms.conf`, `props.conf`,
@@ -60,7 +71,27 @@ bash skills/splunk-knowledge-objects-setup/scripts/setup.sh --phase apply \
 
 ## Apply And ACL
 
-Apply writes the object via the REST `configs/conf-*` endpoints (SHC
-deployer-bundle aware) and then sets sharing/ownership on the object's `/acl`
-endpoint. CSV lookup content is placed in the app `lookups/` directory or
-uploaded via the lookup editor; the definition is written via REST.
+`preflight` is a live, read-only phase: it authenticates, proves the target app
+and conf collection are readable, and snapshots the existing object, ACL, and
+optional automatic-lookup stanza. `status` also performs live REST reads and
+writes a mode-600 `knowledge-objects/state/live-status.json`; it is not an
+alias for rendered intent.
+
+Apply uses the REST `configs/conf-*` endpoints, sets the object's `/acl`, reads
+the result back, and fails if content or governance differs from the request.
+If any step fails after mutation, it performs GET-only reconciliation. A
+pre-existing or newly created object, ACL, or automatic-lookup stanza is never
+restored, overwritten, or deleted automatically: Splunk exposes no verified
+conditional `If-Match` write/delete contract, so another actor can edit state
+after any guard GET. Failed state is retained with mode-600 before/current
+snapshots under a mode-700 `knowledge-objects/state/manual-cleanup-*`
+directory, explicit reviewed recovery guidance, and
+`rollback=partial`/`manual_cleanup_required=true` in mode-600
+`apply-evidence.json`. If every queried target already matches its exact
+pre-transaction state, reconciliation records that no failed mutation remains.
+
+Transactional REST apply fails closed for SHC deployer-bundle delivery because
+a member REST ACL update cannot be atomic with a deployer file write. For that
+topology, use `splunk-knowledge-objects` to render content plus `local.meta` and
+push one reviewed deployer bundle. CSV lookup content remains a separate file:
+place it in the app `lookups/` directory or upload it through the lookup editor.

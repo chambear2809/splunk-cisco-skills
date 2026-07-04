@@ -185,13 +185,23 @@ def test_registry_live_audit_compares_only_explicit_cloud_fields(monkeypatch) ->
         include_cloud_metadata: bool = False,
         verified_release_version: str | None = None,
     ) -> dict:
-        assert verified_release_version is None
+        assert verified_release_version == "0.4.1"
         requested[app_id] = include_cloud_metadata
         result = {
             "splunkbase_id": app_id,
             "latest_version": "0.4.1",
             "latest_release_date": "May 1, 2026",
             "platform_versions": ["10.5"],
+            "latest_release_facts": {
+                "version": "0.4.1",
+                "release_date": "May 1, 2026",
+                "platform_versions": ["10.5"],
+            },
+            "verified_release_facts": {
+                "version": "0.4.1",
+                "release_date": "May 1, 2026",
+                "platform_versions": ["10.5"],
+            },
         }
         if include_cloud_metadata:
             result.update(
@@ -243,6 +253,17 @@ def test_registry_live_audit_compares_exact_verified_release_platforms(monkeypat
             "latest_release_date": "June 3, 2026",
             "platform_versions": ["10.4", "10.3"],
             "verified_platform_versions": ["10.5", "10.4", "10.3"],
+            "verified_release_date": "May 16, 2025",
+            "latest_release_facts": {
+                "version": "3.2.0",
+                "release_date": "June 3, 2026",
+                "platform_versions": ["10.4", "10.3"],
+            },
+            "verified_release_facts": {
+                "version": "3.1.0",
+                "release_date": "May 16, 2025",
+                "platform_versions": ["10.5", "10.4", "10.3"],
+            },
         }
 
     monkeypatch.setattr(module, "fetch_splunkbase", fake_fetch)

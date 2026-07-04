@@ -684,6 +684,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -705,10 +706,15 @@ for raw in open("collection-searches.spl", encoding="utf-8"):
 out = Path(out_path)
 if out.is_symlink():
     raise SystemExit(f"ERROR: evidence output must not be a symlink: {{out}}")
-flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+flags = os.O_WRONLY | os.O_CREAT
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
 fd = os.open(out, flags, 0o600)
+output_info = os.fstat(fd)
+if not stat.S_ISREG(output_info.st_mode) or output_info.st_nlink != 1:
+    os.close(fd)
+    raise SystemExit(f"ERROR: evidence output must be a single-link regular file: {{out}}")
+os.ftruncate(fd, 0)
 os.fchmod(fd, 0o600)
 
 url = f"{{splunk_uri}}/services/search/v2/jobs/export"
@@ -1144,11 +1150,15 @@ if not token:
 if any(char.isspace() for char in token):
     raise SystemExit(f"ERROR: token file must contain one whitespace-free token: {{token_path}}")
 escaped = token.replace("\\", "\\\\").replace('"', '\\"')
-flags = os.O_WRONLY | os.O_TRUNC
+flags = os.O_WRONLY
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
 fd = os.open(config_path, flags)
 try:
+    config_info = os.fstat(fd)
+    if not stat.S_ISREG(config_info.st_mode) or config_info.st_nlink != 1:
+        raise SystemExit(f"ERROR: curl auth config must be a single-link regular file: {{config_path}}")
+    os.ftruncate(fd, 0)
     os.fchmod(fd, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write('header = "Authorization: {auth_scheme} ' + escaped + '"\\n')

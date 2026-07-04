@@ -59,19 +59,11 @@ fi
 ERRORS=0
 WARNINGS=0
 
-check() {
-    local label="$1" condition="$2"
-    if ! eval "${condition}" &>/dev/null; then
+check_file() {
+    local label="$1" path="$2"
+    if [[ ! -f "${path}" ]]; then
         echo "FAIL: ${label}" >&2
         ERRORS=$((ERRORS + 1))
-    fi
-}
-
-warn() {
-    local label="$1" condition="$2"
-    if ! eval "${condition}" &>/dev/null; then
-        echo "WARN: ${label}"
-        WARNINGS=$((WARNINGS + 1))
     fi
 }
 
@@ -87,7 +79,7 @@ for f in "ds/bootstrap/enable-deploy-server.sh" \
           "ds/preflight-report.md" \
           "ds/handoffs/agent-management.txt" \
           "ds/handoffs/monitoring-console.txt"; do
-    check "Required file ${f} exists" "[[ -f '${OUTPUT_DIR}/${f}' ]]"
+    check_file "Required file ${f} exists" "${OUTPUT_DIR}/${f}"
 done
 
 # filterType must be explicit in any .conf file — skip .md documentation files

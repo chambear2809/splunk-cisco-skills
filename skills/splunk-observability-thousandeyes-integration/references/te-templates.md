@@ -38,9 +38,13 @@ The render-time enforcement walks the entire `template_body` tree and matches ke
 The skill's `apply-template.sh`:
 
 1. Preflights the template collection, POSTs `/v7/templates`, retains the returned template ID, and verifies that ID by collection readback.
-2. If `--deploy-templates` was passed, POSTs `/v7/templates/{id}/deploy` once per retained state and confirms that the template resource is still readable. This readback does not prove every asynchronous child asset finished deploying.
+2. Refuses `--deploy-templates` before mutation. A readable template resource
+   is not an authoritative postcondition for the asynchronous deploy action,
+   so it cannot distinguish completion from an interrupted/ambiguous POST or
+   make retry safe.
 
-Operators can also deploy templates through the TE UI (Manage > Templates > Deploy) which is preferable for first-time deployments because the UI surfaces dependent inputs and confirmations.
+Deploy templates through the TE UI (Manage > Templates > Deploy), which
+surfaces dependent inputs, confirmations, and deployment status.
 
 ## Spec shape
 

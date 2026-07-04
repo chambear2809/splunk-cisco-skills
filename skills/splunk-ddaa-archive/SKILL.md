@@ -53,8 +53,10 @@ Never paste the ACS token into chat or argv. Provide it as a local file:
 bash skills/shared/scripts/write_secret_file.sh /tmp/acs_token
 ```
 
-The rendered apply script reads the token from that file. Use `template.example`
-for non-secret values: stack, index, datatype, and retention days.
+The rendered apply script reads the token from that file. Its ACS client is
+HTTPS-only, does not follow redirects, and ignores user curl configuration. Use
+`template.example` for non-secret values: stack, index, datatype, and retention
+days.
 
 ## Quick Start
 

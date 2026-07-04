@@ -80,14 +80,22 @@ ensure_session() {
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 }
 
-json_payload_from_pairs() {
-    local args_file output rc restore_errexit=false
+read_required_secret() {
+    local label="$1" secret_path="$2" value
+    if ! value="$(read_secret_file "${secret_path}")"; then
+        log "ERROR: Could not securely read ${label}; use a single-link regular secret file with mode 0400 or 0600." >&2
+        return 1
+    fi
+    printf '%s' "${value}"
+}
 
-    args_file="$(mktemp)"
-    chmod 600 "${args_file}"
-    for arg in "$@"; do
-        printf '%s\0' "${arg}"
-    done > "${args_file}"
+json_payload_from_pairs() {
+    local output rc restore_errexit=false xtrace_was_enabled=false
+
+    if (( $# % 2 != 0 )); then
+        log "ERROR: json_payload_from_pairs requires key/value pairs." >&2
+        return 1
+    fi
 
     case $- in
         *e*)
@@ -95,12 +103,20 @@ json_payload_from_pairs() {
             set +e
             ;;
     esac
-    output=$(python3 - "${args_file}" <<'PY'
+    case $- in
+        *x*)
+            set +x
+            xtrace_was_enabled=true
+            ;;
+    esac
+    output=$(
+        for arg in "$@"; do
+            printf '%s\0' "${arg}"
+        done | python3 -c '
 import json
 import sys
-from pathlib import Path
 
-raw = Path(sys.argv[1]).read_bytes()
+raw = sys.stdin.buffer.read()
 args = raw.split(b"\0")
 if args and args[-1] == b"":
     args.pop()
@@ -113,13 +129,13 @@ for i in range(0, len(args), 2):
         payload[key] = value
 
 print(json.dumps(payload), end="")
-PY
-)
+'
+    )
     rc=$?
+    [[ "${xtrace_was_enabled}" == "true" ]] && set -x
     if [[ "${restore_errexit}" == "true" ]]; then
         set -e
     fi
-    rm -f "${args_file}"
     [[ "${rc}" -eq 0 ]] || return "${rc}"
     printf '%s' "${output}"
 }
@@ -132,11 +148,12 @@ org_accounts_request() {
     fi
 
     if [[ -n "${payload}" ]]; then
-        splunk_curl "${SK}" \
-            -X "${method}" \
-            -H "Content-Type: application/json" \
-            -d "${payload}" \
-            "${url}" -w '\n%{http_code}' 2>/dev/null || true
+        printf '%s' "${payload}" \
+            | splunk_curl "${SK}" \
+                -X "${method}" \
+                -H "Content-Type: application/json" \
+                -d @- \
+                "${url}" -w '\n%{http_code}' 2>/dev/null || true
     else
         splunk_curl "${SK}" \
             -X "${method}" \
@@ -151,8 +168,12 @@ discover_org_id() {
     [[ -n "${API_KEY_FILE}" ]] || { log "ERROR: --api-key-file is required for --discover-org-id."; exit 1; }
     [[ -n "${API_SECRET_FILE}" ]] || { log "ERROR: --api-secret-file is required for --discover-org-id."; exit 1; }
 
-    api_key="$(read_secret_file "${API_KEY_FILE}")"
-    api_secret="$(read_secret_file "${API_SECRET_FILE}")"
+    if ! api_key="$(read_required_secret "Secure Access API key" "${API_KEY_FILE}")"; then
+        exit 1
+    fi
+    if ! api_secret="$(read_required_secret "Secure Access API secret" "${API_SECRET_FILE}")"; then
+        exit 1
+    fi
     payload="$(json_payload_from_pairs apiKey "${api_key}" apiSecret "${api_secret}" baseURL "${BASE_URL}")"
 
     response="$(org_accounts_request POST "action=get_orgId" "${payload}")"
@@ -223,7 +244,9 @@ main() {
     fi
 
     if $DISCOVER_ORG_ID; then
-        discovered_org_id="$(discover_org_id)"
+        if ! discovered_org_id="$(discover_org_id)"; then
+            exit 1
+        fi
         if [[ -z "${ORG_ID}" ]]; then
             ORG_ID="${discovered_org_id}"
             log "Discovered org ID: ${ORG_ID}"
@@ -252,8 +275,12 @@ main() {
                 log "ERROR: Updating credentials requires --base-url, --api-key-file, and --api-secret-file together."
                 exit 1
             }
-            api_key="$(read_secret_file "${API_KEY_FILE}")"
-            api_secret="$(read_secret_file "${API_SECRET_FILE}")"
+            if ! api_key="$(read_required_secret "Secure Access API key" "${API_KEY_FILE}")"; then
+                exit 1
+            fi
+            if ! api_secret="$(read_required_secret "Secure Access API secret" "${API_SECRET_FILE}")"; then
+                exit 1
+            fi
         fi
 
         if [[ -n "${TIMEZONE_VALUE}" || -n "${STORAGE_REGION}" || "${has_creds}" == "true" || "${has_indexes}" == "true" ]]; then
@@ -293,8 +320,12 @@ main() {
     [[ -n "${API_KEY_FILE}" ]] || { log "ERROR: --api-key-file is required for account creation."; exit 1; }
     [[ -n "${API_SECRET_FILE}" ]] || { log "ERROR: --api-secret-file is required for account creation."; exit 1; }
 
-    api_key="$(read_secret_file "${API_KEY_FILE}")"
-    api_secret="$(read_secret_file "${API_SECRET_FILE}")"
+    if ! api_key="$(read_required_secret "Secure Access API key" "${API_KEY_FILE}")"; then
+        exit 1
+    fi
+    if ! api_secret="$(read_required_secret "Secure Access API secret" "${API_SECRET_FILE}")"; then
+        exit 1
+    fi
 
     payload="$(json_payload_from_pairs \
         orgId "${ORG_ID}" \

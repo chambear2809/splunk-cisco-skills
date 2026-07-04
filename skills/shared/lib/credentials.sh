@@ -43,6 +43,9 @@ allowed_keys = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+    "SPLUNK_SSH_HOST_KEY_FINGERPRINT",
+    "SPLUNK_SSH_ALLOW_TOFU",
     "SPLUNK_REMOTE_TMPDIR",
     "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER",
@@ -73,6 +76,7 @@ allowed_keys = [
     "SPLUNK_PASSWORD",
     "SB_USER",
     "SB_PASS",
+    "SPLUNK_ALLOW_INSECURE_HTTP",
     "SPLUNK_VERIFY_SSL",
     "SPLUNKBASE_VERIFY_SSL",
     "SPLUNKBASE_CA_CERT",
@@ -191,7 +195,9 @@ flat_target_keys = {
     "SPLUNK_SEARCH_API_URI", "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
-    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
+    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+    "SPLUNK_SSH_HOST_KEY_FINGERPRINT", "SPLUNK_SSH_ALLOW_TOFU",
+    "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER", "SPLUNK_PASS",
     "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK", "SPLUNK_CLOUD_SEARCH_HEAD",
@@ -205,7 +211,8 @@ flat_target_keys = {
     "SPLUNK_MCP_SPLUNK_JWT_FILE", "ACS_SERVER",
     "STACK_USERNAME", "STACK_PASSWORD", "STACK_TOKEN", "STACK_TOKEN_USER",
     "SPLUNK_USERNAME", "SPLUNK_PASSWORD", "SB_USER", "SB_PASS",
-    "SPLUNK_VERIFY_SSL", "SPLUNKBASE_VERIFY_SSL", "SPLUNKBASE_CA_CERT",
+    "SPLUNK_ALLOW_INSECURE_HTTP", "SPLUNK_VERIFY_SSL",
+    "SPLUNKBASE_VERIFY_SSL", "SPLUNKBASE_CA_CERT",
     "APP_DOWNLOAD_VERIFY_SSL", "APP_DOWNLOAD_CA_CERT",
 }
 
@@ -384,7 +391,7 @@ load_oncall_settings() {
 
 _search_profile_overrides_key() {
     case "${1:-}" in
-        SPLUNK_HOST|SPLUNK_MGMT_PORT|SPLUNK_SEARCH_API_URI|SPLUNK_URI|SPLUNK_SSH_HOST|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS)
+        SPLUNK_HOST|SPLUNK_MGMT_PORT|SPLUNK_SEARCH_API_URI|SPLUNK_URI|SPLUNK_SSH_HOST|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_SSH_KNOWN_HOSTS_FILE|SPLUNK_SSH_HOST_KEY_FINGERPRINT|SPLUNK_SSH_ALLOW_TOFU|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS|SPLUNK_ALLOW_INSECURE_HTTP)
             return 0
             ;;
         *)
@@ -461,6 +468,27 @@ _search_profile_credential_value() {
     [[ -n "${search_profile}" ]] || return 0
 
     _credential_value_for_profile_key "${search_profile}" "${1:-}" "${2:-${_CRED_FILE}}"
+}
+
+# Load only the plaintext-HTTP policy bit, without importing usernames,
+# passwords, or tokens into a password-file-only caller's shell environment.
+load_splunk_transport_policy() {
+    local profile_name="" policy_value=""
+
+    if [[ -n "${SPLUNK_ALLOW_INSECURE_HTTP:-}" ]]; then
+        return 0
+    fi
+    [[ -f "${_CRED_FILE}" ]] || return 0
+
+    profile_name="$(resolve_search_credential_profile 2>/dev/null || true)"
+    if [[ -z "${profile_name}" ]]; then
+        profile_name="$(resolve_credential_profile 2>/dev/null || true)"
+    fi
+    policy_value="$(_credential_value_for_profile_key \
+        "${profile_name}" "SPLUNK_ALLOW_INSECURE_HTTP" "${_CRED_FILE}")"
+    if [[ -n "${policy_value}" ]]; then
+        printf -v SPLUNK_ALLOW_INSECURE_HTTP '%s' "${policy_value}"
+    fi
 }
 
 _profile_value_or_current() {

@@ -1,5 +1,4 @@
-name: splunk-appdynamics-dashboards-reports-setup
-short_description: "Render AppDynamics dashboards, reports, ThousandEyes, and War Room plans"
-entrypoint: "skills/splunk-appdynamics-dashboards-reports-setup/SKILL.md"
-safe_first_command: "bash skills/splunk-appdynamics-dashboards-reports-setup/scripts/setup.sh --help"
-validation_command: "bash skills/splunk-appdynamics-dashboards-reports-setup/scripts/validate.sh --help"
+interface:
+  display_name: "Splunk AppDynamics Dashboards Reports Setup"
+  short_description: "Render AppDynamics dashboards, reports, and War Rooms"
+  default_prompt: "Use $splunk-appdynamics-dashboards-reports-setup to render AppDynamics dashboards, reports, ThousandEyes, and War Room plans."

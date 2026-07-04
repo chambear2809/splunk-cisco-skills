@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -1138,7 +1139,7 @@ def test_scripted_auth_refusal_in_preflight(tmp_path: Path) -> None:
 
 
 def test_scripted_auth_ack_changes_preflight_body(tmp_path: Path) -> None:
-    """When --allow-scripted-auth is passed, the preflight WARN-not-fails on Scripted."""
+    """The compatibility flag is visible but cannot override Scripted refusal."""
     out = tmp_path / "out"
     args = base_render_args(out)
     args.append("--allow-scripted-auth")
@@ -1146,6 +1147,7 @@ def test_scripted_auth_ack_changes_preflight_body(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     preflight = (render_dir(out) / "preflight.sh").read_text(encoding="utf-8")
     assert "allow_scripted_auth=true" in preflight
+    assert 'fail "authType = Scripted is forbidden' in preflight
 
 
 # ---------------------------------------------------------------------------
@@ -1434,3 +1436,481 @@ def test_apply_cluster_manager_fails_closed_without_secret_argv() -> None:
     )
     assert "auth-passphrase-file" not in src
     assert "exit 2" in src
+
+
+# ---------------------------------------------------------------------------
+# Transactional apply + fail-closed public validation regressions
+# ---------------------------------------------------------------------------
+
+
+def _write_fake_splunk(splunk_home: Path) -> Path:
+    binary = splunk_home / "bin/splunk"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text(
+        r'''#!/usr/bin/env python3
+import os
+import re
+import sys
+from pathlib import Path
+
+home = Path(__file__).resolve().parents[1]
+app = home / "etc/apps/000_public_exposure_hardening"
+count_file = home / "restart-count"
+args = sys.argv[1:]
+
+def config_value(filename: str, key: str, fallback: str) -> str:
+    path = app / "local" / filename
+    if not path.is_file():
+        return fallback
+    match = re.search(rf"^{re.escape(key)}\s*=\s*(.*)$", path.read_text(encoding="utf-8"), re.MULTILINE)
+    return match.group(1).strip() if match else fallback
+
+if args and args[0] == "version":
+    print("Splunk 10.4.0 (build test)")
+    raise SystemExit(0)
+
+if args and args[0] == "restart":
+    count = int(count_file.read_text(encoding="utf-8")) + 1 if count_file.exists() else 1
+    count_file.write_text(str(count), encoding="utf-8")
+    if os.environ.get("FAKE_FAIL_FIRST_RESTART") == "1" and count == 1:
+        raise SystemExit(1)
+    if os.environ.get("FAKE_ENCRYPT") == "1":
+        for relative, keys in (
+            ("local/server.conf", ("pass4SymmKey", "sslPassword")),
+            ("local/authentication.conf", ("bindDNpassword",)),
+        ):
+            path = app / relative
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            for key in keys:
+                text = re.sub(
+                    rf"^({re.escape(key)}\s*=\s*).*$",
+                    lambda match: match.group(1) + "$7$encrypted",
+                    text,
+                    flags=re.MULTILINE,
+                )
+            path.write_text(text, encoding="utf-8")
+    print("restart complete")
+    raise SystemExit(0)
+
+if args and args[0] == "status":
+    print("splunkd is running")
+    raise SystemExit(0)
+
+if args and args[0] == "btool":
+    if len(args) > 1 and args[1] == "check":
+        if os.environ.get("FAKE_BTOOL_FAIL") == "1":
+            print("injected btool failure", file=sys.stderr)
+            raise SystemExit(2)
+        print("No configuration errors")
+        raise SystemExit(0)
+    if os.environ.get("FAKE_BTOOL_EMPTY") == "1":
+        raise SystemExit(0)
+    conf = args[1] if len(args) > 1 else ""
+    stanza = args[3] if len(args) > 3 else ""
+    mapping = {
+        ("authorize", "role_admin"): "[role_admin]\nnever_lockout = disabled\n",
+        ("authorize", ""): "[role_admin]\nnever_lockout = disabled\n[role_public_reader]\nsearch = enabled\n",
+        ("authentication", "authentication"): "[authentication]\nauthType = Splunk\n",
+        ("web", "settings"): (
+            "[settings]\nenableSplunkWebClientNetloc = false\n"
+            "request.show_tracebacks = false\ncrossOriginSharingPolicy = \n"
+        ),
+        ("server", "httpServer"): (
+            "[httpServer]\nverboseLoginFailMsg = false\n"
+            "sendStrictTransportSecurityHeader = true\n"
+        ),
+        ("inputs", "http"): "[http]\ndisabled = 0\nenableSSL = 1\n",
+        ("outputs", "tcpout"): "[tcpout]\ndefaultGroup = primary_indexers\n",
+        ("server", "general"): (
+            "[general]\npass4SymmKey = "
+            + config_value("server.conf", "pass4SymmKey", "$7$prior")
+            + "\n"
+        ),
+        ("server", "sslConfig"): (
+            "[sslConfig]\nsslPassword = "
+            + config_value("server.conf", "sslPassword", "$7$prior")
+            + "\n"
+        ),
+    }
+    if conf == "authentication" and stanza not in {"", "authentication"}:
+        print(f"[{stanza}]\nbindDNpassword = " + config_value("authentication.conf", "bindDNpassword", "$7$prior"))
+    else:
+        sys.stdout.write(mapping.get((conf, stanza), f"[{stanza}]\nstate = enabled\n"))
+    raise SystemExit(0)
+
+raise SystemExit(0)
+''',
+        encoding="utf-8",
+    )
+    binary.chmod(0o700)
+    return binary
+
+
+def _tree_snapshot(root: Path) -> dict[str, tuple[bytes, int]]:
+    return {
+        str(path.relative_to(root)): (path.read_bytes(), path.stat().st_mode & 0o777)
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def _assert_no_plaintext(root: Path, *values: str) -> None:
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        for value in values:
+            assert value.encode() not in data, f"plaintext remained in {path}"
+
+
+def _render_transaction_target(
+    tmp_path: Path,
+    splunk_home: Path,
+    *extra: str,
+) -> Path:
+    out = tmp_path / "rendered"
+    result = run_render(
+        *base_render_args(out, **{"--splunk-home": str(splunk_home)}),
+        *extra,
+    )
+    assert result.returncode == 0, result.stderr
+    return render_dir(out)
+
+
+def test_generated_direct_apply_transaction_contract_and_tls_policy(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    rendered = _render_transaction_target(tmp_path, home)
+    helper = (rendered / "splunk/transaction-helpers.sh").read_text(encoding="utf-8")
+    search = (rendered / "splunk/apply-search-head.sh").read_text(encoding="utf-8")
+    hec = (rendered / "splunk/apply-hec-tier.sh").read_text(encoding="utf-8")
+    hf = (rendered / "splunk/apply-heavy-forwarder.sh").read_text(encoding="utf-8")
+    preflight = (rendered / "preflight.sh").read_text(encoding="utf-8")
+    validate = (rendered / "validate.sh").read_text(encoding="utf-8")
+
+    for token in ("O_NOFOLLOW", "st_nlink != 1", "SPX_TXN_ROOT", "spx_restore_transaction"):
+        assert token in helper
+    for signal in ("ERR", "INT", "TERM", "EXIT"):
+        assert "trap" in helper and signal in helper
+    for script in (search, hec, hf):
+        assert 'source "$script_dir/transaction-helpers.sh"' in script
+        assert "spx_atomic_swap" in script
+        assert "spx_validate_common_live_config" in script
+        assert "spx_restart_and_verify" in script
+    for script in (preflight, validate):
+        assert "curl -q --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in script
+        assert "--connect-timeout 10 --max-time 30" in script
+        assert "-verify_hostname \"$fqdn\"" in script
+        assert "-verify_return_error" in script
+        assert "curl -k" not in script
+        assert "curl -sk" not in script
+
+
+def test_search_head_restart_failure_restores_exact_state_and_scrubs_plaintext(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    _write_fake_splunk(home)
+    old_app = home / "etc/apps/000_public_exposure_hardening"
+    (old_app / "local").mkdir(parents=True)
+    (old_app / "local/original.conf").write_text("original = true\n", encoding="utf-8")
+    (old_app / "local/original.conf").chmod(0o640)
+    launch = home / "etc/splunk-launch.conf"
+    launch.write_text("CUSTOM_SETTING=preserve-me\n", encoding="utf-8")
+    launch.chmod(0o640)
+    old_snapshot = _tree_snapshot(old_app)
+    launch_snapshot = (launch.read_bytes(), launch.stat().st_mode & 0o777)
+
+    pass_file = tmp_path / "pass4"
+    ssl_file = tmp_path / "ssl"
+    pass_file.write_text("pass4-plaintext", encoding="utf-8")
+    ssl_file.write_text("ssl-plaintext", encoding="utf-8")
+    pass_file.chmod(0o600)
+    ssl_file.chmod(0o600)
+    rendered = _render_transaction_target(
+        tmp_path,
+        home,
+        "--pass4symmkey-file",
+        str(pass_file),
+        "--ssl-key-password-file",
+        str(ssl_file),
+        "--enable-fips",
+        "true",
+        "--fips-version",
+        "140-3",
+    )
+    env = {**os.environ, "FAKE_FAIL_FIRST_RESTART": "1", "FAKE_ENCRYPT": "1"}
+    result = subprocess.run(
+        ["bash", str(rendered / "splunk/apply-search-head.sh")],
+        cwd=rendered,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode != 0
+    assert _tree_snapshot(old_app) == old_snapshot
+    assert (launch.read_bytes(), launch.stat().st_mode & 0o777) == launch_snapshot
+    assert (home / "restart-count").read_text(encoding="utf-8") == "2"
+    assert "Rollback restart verified" in result.stderr
+    assert not list((home / "etc").glob(".public-exposure-txn.*"))
+    _assert_no_plaintext(home, "pass4-plaintext", "ssl-plaintext")
+
+
+def test_search_head_btool_and_encryption_failures_both_rollback(tmp_path: Path) -> None:
+    for mode in ("btool", "encryption"):
+        case = tmp_path / mode
+        home = case / "splunk"
+        _write_fake_splunk(home)
+        old_app = home / "etc/apps/000_public_exposure_hardening"
+        old_app.mkdir(parents=True)
+        (old_app / "original.txt").write_text(f"old-{mode}\n", encoding="utf-8")
+        old_snapshot = _tree_snapshot(old_app)
+        secret = case / "pass4"
+        secret.parent.mkdir(parents=True, exist_ok=True)
+        secret.write_text(f"plaintext-{mode}", encoding="utf-8")
+        secret.chmod(0o600)
+        rendered = _render_transaction_target(
+            case,
+            home,
+            "--pass4symmkey-file",
+            str(secret),
+        )
+        env = dict(os.environ)
+        if mode == "btool":
+            env["FAKE_BTOOL_FAIL"] = "1"
+        else:
+            env["FAKE_ENCRYPT"] = "0"
+        result = subprocess.run(
+            ["bash", str(rendered / "splunk/apply-search-head.sh")],
+            cwd=rendered,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        assert _tree_snapshot(old_app) == old_snapshot
+        expected_restarts = "1" if mode == "btool" else "2"
+        assert (home / "restart-count").read_text(encoding="utf-8") == expected_restarts
+        assert not list((home / "etc").glob(".public-exposure-txn.*"))
+        _assert_no_plaintext(home, f"plaintext-{mode}")
+
+
+def test_search_head_success_requires_and_persists_encryption(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    _write_fake_splunk(home)
+    secret = tmp_path / "pass4"
+    secret.write_text("success-plaintext", encoding="utf-8")
+    secret.chmod(0o600)
+    rendered = _render_transaction_target(
+        tmp_path,
+        home,
+        "--pass4symmkey-file",
+        str(secret),
+    )
+    result = subprocess.run(
+        ["bash", str(rendered / "splunk/apply-search-head.sh")],
+        cwd=rendered,
+        env={**os.environ, "FAKE_ENCRYPT": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    local_server = home / "etc/apps/000_public_exposure_hardening/local/server.conf"
+    assert "pass4SymmKey = $7$encrypted" in local_server.read_text(encoding="utf-8")
+    assert not list((home / "etc").glob(".public-exposure-txn.*"))
+    _assert_no_plaintext(home, "success-plaintext")
+
+
+def test_secret_hardlink_is_rejected_before_mutation(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    _write_fake_splunk(home)
+    old_app = home / "etc/apps/000_public_exposure_hardening"
+    old_app.mkdir(parents=True)
+    (old_app / "original.txt").write_text("unchanged\n", encoding="utf-8")
+    old_snapshot = _tree_snapshot(old_app)
+    secret = tmp_path / "secret"
+    linked = tmp_path / "secret-linked"
+    secret.write_text("hardlink-plaintext", encoding="utf-8")
+    secret.chmod(0o600)
+    os.link(secret, linked)
+    rendered = _render_transaction_target(
+        tmp_path,
+        home,
+        "--pass4symmkey-file",
+        str(linked),
+    )
+    result = subprocess.run(
+        ["bash", str(rendered / "splunk/apply-search-head.sh")],
+        cwd=rendered,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode != 0
+    assert "exactly one hard link" in result.stderr
+    assert _tree_snapshot(old_app) == old_snapshot
+    assert not (home / "restart-count").exists()
+    assert not list((home / "etc").glob(".public-exposure-txn.*"))
+
+
+def test_hec_and_heavy_forwarder_restart_failures_restore_prior_app(tmp_path: Path) -> None:
+    cases = (
+        (
+            "hec",
+            "apply-hec-tier.sh",
+            ("--enable-hec", "true"),
+        ),
+        (
+            "hf",
+            "apply-heavy-forwarder.sh",
+            (
+                "--topology",
+                "shc-with-hec-and-hf",
+                "--enable-hec",
+                "true",
+                "--enable-s2s",
+                "true",
+                "--indexer-cluster-cidr",
+                "10.0.20.0/24",
+            ),
+        ),
+    )
+    for name, script_name, extra in cases:
+        case = tmp_path / name
+        home = case / "splunk"
+        _write_fake_splunk(home)
+        old_app = home / "etc/apps/000_public_exposure_hardening"
+        old_app.mkdir(parents=True)
+        (old_app / "original.txt").write_text(f"old-{name}\n", encoding="utf-8")
+        old_snapshot = _tree_snapshot(old_app)
+        rendered = _render_transaction_target(case, home, *extra)
+        result = subprocess.run(
+            ["bash", str(rendered / "splunk" / script_name)],
+            cwd=rendered,
+            env={**os.environ, "FAKE_FAIL_FIRST_RESTART": "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        assert _tree_snapshot(old_app) == old_snapshot
+        assert (home / "restart-count").read_text(encoding="utf-8") == "2"
+        assert not list((home / "etc").glob(".public-exposure-txn.*"))
+
+
+def test_setup_apply_phase_runs_preflight_before_selected_apply() -> None:
+    setup = SETUP_SCRIPT.read_text(encoding="utf-8")
+    apply_case = re.search(r"apply\)\n(.*?)\n\s*;;", setup, flags=re.DOTALL)
+    assert apply_case
+    body = apply_case.group(1)
+    assert body.index("run_rendered_script preflight.sh") < body.index(
+        'run_rendered_script "$(apply_script_for_target)"'
+    )
+
+
+def test_preflight_and_validate_fail_closed_on_empty_btool_and_pin_curl_policy(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    _write_fake_splunk(home)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    curl_log = tmp_path / "curl.jsonl"
+    fake_curl = bin_dir / "curl"
+    fake_curl.write_text(
+        r'''#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+    handle.write(json.dumps(args) + "\n")
+if "-I" in args:
+    print("HTTP/1.1 200 OK\r")
+    print("Strict-Transport-Security: max-age=31536000\r")
+    print("Content-Security-Policy: frame-ancestors 'self'\r")
+    print("X-Content-Type-Options: nosniff\r")
+    print("Set-Cookie: splunkweb_csrf_token_test=value\r")
+for index, value in enumerate(args):
+    if value == "-w" and index + 1 < len(args):
+        template = args[index + 1]
+        if "redirect_url" in template:
+            print("https://splunk.example.com/ 301", end="")
+        elif "http_code" in template:
+            print("403", end="")
+        break
+''',
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o700)
+    fake_openssl = bin_dir / "openssl"
+    fake_openssl.write_text(
+        "#!/usr/bin/env bash\n"
+        "case \" $* \" in *' -tls1 '*|*' -tls1_1 '*) exit 1 ;; esac\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake_openssl.chmod(0o700)
+    ca_file = tmp_path / "public-ca.pem"
+    ca_file.write_text("test-ca\n", encoding="utf-8")
+    rendered = _render_transaction_target(
+        tmp_path,
+        home,
+        "--public-ca-file",
+        str(ca_file),
+    )
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "FAKE_BTOOL_EMPTY": "1",
+        "CURL_LOG": str(curl_log),
+    }
+
+    preflight = subprocess.run(
+        ["bash", str(rendered / "preflight.sh")],
+        cwd=rendered,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert preflight.returncode != 0
+    assert "btool returned empty output" in preflight.stderr
+
+    report = tmp_path / "validate-report.json"
+    validate = subprocess.run(
+        ["bash", str(rendered / "validate.sh"), str(report)],
+        cwd=rendered,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert validate.returncode != 0
+    report_data = json.loads(report.read_text(encoding="utf-8"))
+    assert report_data["failures"] > 0
+    assert any(
+        item["check"].startswith("btool_") and item["status"] == "fail"
+        for item in report_data["checks"]
+    )
+
+    calls = [json.loads(line) for line in curl_log.read_text(encoding="utf-8").splitlines()]
+    assert calls
+    for args in calls:
+        assert args[0] == "-q"
+        assert "--max-redirs" in args and args[args.index("--max-redirs") + 1] == "0"
+        assert "--connect-timeout" in args
+        assert "--max-time" in args
+        assert "-k" not in args and "--insecure" not in args
+        if any(value.startswith("https://") for value in args):
+            assert "--cacert" in args
+            assert str(ca_file) in args

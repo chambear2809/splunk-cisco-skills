@@ -7,6 +7,10 @@
 [[ -n "${_REST_HELPERS_LOADED:-}" ]] && return 0
 _REST_HELPERS_LOADED=true
 
+_REST_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_REST_LIB_DIR}/credential_curl_helpers.sh"
+
 # Shared Python helper for normalizing the Splunk 'disabled' field.
 # Safe for interpolation inside double-quoted python3 -c strings.
 _PY_NORMALIZE_DISABLED="
@@ -42,6 +46,259 @@ _warn_once() {
     fi
     printf '%s\n' "${message}" >&2
     printf -v "${guard_var}" '%s' "true"
+}
+
+_splunk_transport_curl_args=()
+
+_reset_splunk_transport_curl_args() {
+    # Authenticated helpers never follow redirects. curl has no option that
+    # constrains redirects to the original origin, so zero redirects is the
+    # fail-closed way to prevent forwarding a caller-supplied Authorization
+    # header or login body to another host.
+    _splunk_transport_curl_args=(
+        --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
+    )
+}
+
+_check_splunk_transport_uri() {
+    local uri="$1"
+    local operation="${2:-Authenticated Splunk REST request}"
+    local allow_http=false authority=""
+    if declare -F load_splunk_transport_policy >/dev/null 2>&1; then
+        load_splunk_transport_policy
+    fi
+    authority="${uri#*://}"
+    authority="${authority%%[/?#]*}"
+    if [[ "${authority}" == *"@"* ]]; then
+        echo "ERROR: ${operation} requires a credential-free Splunk URI; embedded userinfo is refused." >&2
+        return 1
+    fi
+    case "${uri}" in
+        [Hh][Tt][Tt][Pp][Ss]://*)
+            ;;
+        [Hh][Tt][Tt][Pp]://*)
+            if ! _bool_is_true "${SPLUNK_ALLOW_INSECURE_HTTP:-false}"; then
+                echo "ERROR: ${operation} refuses plaintext HTTP." >&2
+                echo "       Use HTTPS. For an isolated short-lived lab only, explicitly set SPLUNK_ALLOW_INSECURE_HTTP=true." >&2
+                return 1
+            fi
+            allow_http=true
+            _splunk_transport_curl_args=(
+                --proto '=http,https' --proto-redir '=http,https' --max-redirs 0 --globoff
+            )
+            _warn_once \
+                "_WARNED_SPLUNK_INSECURE_HTTP" \
+                "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true permits credentials/session keys over plaintext HTTP. Network observers can recover them."
+            ;;
+        *)
+            echo "ERROR: ${operation} requires an explicit https:// Splunk URI." >&2
+            return 1
+            ;;
+    esac
+    if ! credential_curl_validate_url "${uri}" "${allow_http}"; then
+        echo "ERROR: ${operation} requires one syntactically valid, credential-free HTTP(S) URL." >&2
+        return 1
+    fi
+}
+
+_prepare_splunk_transport_for_uri() {
+    _reset_splunk_transport_curl_args
+    _check_splunk_transport_uri "$1" "${2:-Authenticated Splunk REST request}"
+}
+
+_prepare_splunk_transport_for_curl_args() {
+    local argument="" uri="" expect_url=false expect_option_value=false
+    local option_name="" header_name="" url_count=0
+    _reset_splunk_transport_curl_args
+    for argument in "$@"; do
+        if [[ "${expect_url}" == "true" ]]; then
+            _check_splunk_transport_uri "${argument}" "Authenticated Splunk REST request" || return 1
+            url_count=$((url_count + 1))
+            expect_url=false
+            continue
+        fi
+        if [[ "${expect_option_value}" == "true" ]]; then
+            if [[ "${option_name}" == "-H" || "${option_name}" == "--header" ]]; then
+                if [[ "${argument}" == @* || "${argument}" == *$'\r'* || "${argument}" == *$'\n'* || "${argument}" != *:* ]]; then
+                    echo "ERROR: Authenticated Splunk REST request rejects file-backed or malformed caller headers." >&2
+                    return 1
+                fi
+                header_name="${argument%%:*}"
+                if [[ ! "${header_name}" =~ ^[A-Za-z0-9-]+$ ]]; then
+                    echo "ERROR: Authenticated Splunk REST request rejects malformed caller header names." >&2
+                    return 1
+                fi
+                case "${header_name,,}" in
+                    authorization|proxy-authorization|host|cookie|x-auth-token|ph-auth-token|content-length|transfer-encoding|connection)
+                        echo "ERROR: Authenticated Splunk REST request owns authentication, authority, and framing headers." >&2
+                        return 1
+                        ;;
+                esac
+            fi
+            case "${option_name}" in
+                -d|--data|--data-ascii|--data-binary|--data-raw)
+                    if [[ "${argument}" == @* && "${argument}" != "@-" ]]; then
+                        echo "ERROR: Authenticated Splunk REST request rejects file-backed body arguments; stream a descriptor-validated file on stdin with @-." >&2
+                        return 1
+                    fi
+                    ;;
+                --data-urlencode)
+                    if [[ "${argument}" == @* && "${argument}" != "@-" ]] || \
+                       [[ "${argument}" != *=* && "${argument}" == *@* && "${argument}" != *@- ]]; then
+                        echo "ERROR: Authenticated Splunk REST request rejects file-backed URL-encoded body arguments; stream a descriptor-validated file on stdin." >&2
+                        return 1
+                    fi
+                    ;;
+                -F|--form)
+                    local form_value="${argument#*=}"
+                    if [[ "${argument}" != *=* || "${argument}" == *$'\r'* || "${argument}" == *$'\n'* || \
+                          "${argument}" == *';'[Hh][Ee][Aa][Dd][Ee][Rr][Ss]=* ]] || \
+                       { [[ "${form_value}" == @* || "${form_value}" == \<* ]] && [[ "${form_value}" != "@-" ]]; }; then
+                        echo "ERROR: Authenticated Splunk REST request rejects file-backed or malformed form arguments." >&2
+                        return 1
+                    fi
+                    ;;
+            esac
+            expect_option_value=false
+            option_name=""
+            continue
+        fi
+        case "${argument}" in
+            --|--next|--config|--config=*|-K*|-[^-]*K*|-:*|-[^-]*:*)
+                echo "ERROR: Authenticated Splunk REST request rejects curl config/transfer-boundary options." >&2
+                return 1
+                ;;
+            --location|--location-trusted|--max-redirs|--max-redirs=*|-L*|-[^-]*L*)
+                echo "ERROR: Authenticated Splunk REST request rejects caller redirect controls." >&2
+                return 1
+                ;;
+            --globoff|--no-globoff|-g)
+                echo "ERROR: Authenticated Splunk REST request owns curl URL-globbing policy." >&2
+                return 1
+                ;;
+            --variable|--variable=*|--expand-*)
+                echo "ERROR: Authenticated Splunk REST request rejects curl URL expansion options." >&2
+                return 1
+                ;;
+            --insecure|--no-insecure|--cacert|--cacert=*|--capath|--capath=*|\
+            --ca-native|--no-ca-native|--proxy-insecure|--no-proxy-insecure|\
+            --proxy-cacert|--proxy-cacert=*|--proxy-capath|--proxy-capath=*|\
+            --doh-insecure|--no-doh-insecure|--ssl-no-revoke|\
+            --ssl-revoke-best-effort|-k*|-[^-]*k*)
+                echo "ERROR: Authenticated Splunk REST request owns curl TLS verification policy; use SPLUNK_VERIFY_SSL or SPLUNK_CA_CERT." >&2
+                return 1
+                ;;
+            --proto|--proto=*|--proto-default|--proto-default=*|--proto-redir|--proto-redir=*)
+                echo "ERROR: Authenticated Splunk REST request owns curl protocol and redirect policy." >&2
+                return 1
+                ;;
+            --url)
+                expect_url=true
+                ;;
+            --url=*)
+                uri="${argument#--url=}"
+                _check_splunk_transport_uri "${uri}" "Authenticated Splunk REST request" || return 1
+                url_count=$((url_count + 1))
+                ;;
+            [Hh][Tt][Tt][Pp]://*|[Hh][Tt][Tt][Pp][Ss]://*)
+                _check_splunk_transport_uri "${argument}" "Authenticated Splunk REST request" || return 1
+                url_count=$((url_count + 1))
+                ;;
+            -X|--request|-o|--output|-w|--write-out|-H|--header|-d|--data|\
+            --data-ascii|--data-binary|--data-raw|--data-urlencode|-F|--form|\
+            --connect-timeout|--max-time)
+                expect_option_value=true
+                option_name="${argument}"
+                ;;
+            --fail|--fail-with-body|--show-error|-f|-s|-S|--silent)
+                ;;
+            -*)
+                echo "ERROR: Authenticated Splunk REST request rejects unsupported curl option: ${argument}" >&2
+                return 1
+                ;;
+            *)
+                echo "ERROR: Authenticated Splunk REST request rejects a non-HTTP(S) or ambiguous URL token." >&2
+                return 1
+                ;;
+        esac
+    done
+    if [[ "${expect_url}" == "true" ]]; then
+        echo "ERROR: Authenticated Splunk REST request received --url without a value." >&2
+        return 1
+    fi
+    if [[ "${expect_option_value}" == "true" ]]; then
+        echo "ERROR: Authenticated Splunk REST request received ${option_name} without a value." >&2
+        return 1
+    fi
+    if ((url_count != 1)); then
+        echo "ERROR: Authenticated Splunk REST request requires exactly one explicit Splunk HTTP(S) URL; found ${url_count}." >&2
+        return 1
+    fi
+}
+
+_validate_splunk_session_key() {
+    local session_key="${1:-}"
+    if [[ -z "${session_key}" || ${#session_key} -gt 65536 || \
+          "${session_key}" == *$'\r'* || "${session_key}" == *$'\n'* || \
+          "${session_key}" == *'"'* || "${session_key}" == *'\'* ]]; then
+        echo "ERROR: Splunk session key is empty or unsafe for curl config transport." >&2
+        return 1
+    fi
+}
+
+_secure_password_form_body() {
+    local source_path="${1:-}" user="${2:-admin}"
+    python3 - "${source_path}" "${user}" <<'PY'
+import os
+import stat
+import sys
+from urllib.parse import urlencode
+
+source_path, user = sys.argv[1:]
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(1)
+read_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+try:
+    source_fd = os.open(source_path, read_flags)
+except OSError:
+    raise SystemExit(1)
+try:
+    before = os.fstat(source_fd)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) not in {0o400, 0o600}
+        or before.st_size < 1
+        or before.st_size > 65536
+    ):
+        raise SystemExit(1)
+    chunks = []
+    while True:
+        chunk = os.read(source_fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    after = os.fstat(source_fd)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(source_fd)
+
+value = b"".join(chunks)
+if value.endswith(b"\n"):
+    value = value[:-1]
+if not value or b"\x00" in value or b"\r" in value or b"\n" in value:
+    raise SystemExit(1)
+try:
+    password = value.decode("utf-8")
+except UnicodeDecodeError:
+    raise SystemExit(1)
+print(urlencode({"username": user, "password": password}), end="")
+PY
 }
 
 _set_tls_verify_args() {
@@ -99,8 +356,8 @@ _set_splunkbase_curl_tls_args() {
 }
 
 _set_app_download_curl_tls_args() {
-    local verify_value="${APP_DOWNLOAD_VERIFY_SSL:-${SPLUNK_VERIFY_SSL:-}}"
-    local ca_cert="${APP_DOWNLOAD_CA_CERT:-${SPLUNK_CA_CERT:-}}"
+    local verify_value="${APP_DOWNLOAD_VERIFY_SSL:-}"
+    local ca_cert="${APP_DOWNLOAD_CA_CERT:-}"
 
     # Default to verified TLS for remote app/package downloads. Public
     # mirrors and Splunkbase-style URLs always have valid CA certificates;
@@ -166,6 +423,8 @@ verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
     local host port http_code
 
+    _prepare_splunk_transport_for_uri "${uri}" "Splunk REST connectivity probe" || return 1
+
     host="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.hostname or '')" "${uri}" 2>/dev/null || true)"
     port="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.port or 8089)" "${uri}" 2>/dev/null || echo 8089)"
 
@@ -189,8 +448,11 @@ verify_search_api_connectivity() {
     _set_splunk_curl_tls_args || return 1
     local curl_stderr curl_rc
     curl_stderr=$(mktemp)
-    http_code=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} --connect-timeout 8 --max-time 15 \
-        -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>"${curl_stderr}" || echo "000")
+    http_code=$(curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        --connect-timeout 8 --max-time 15 -o /dev/null -w '%{http_code}' \
+        "${uri}/services/auth/login" \
+        ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"} \
+        2>"${curl_stderr}" || echo "000")
     curl_rc=$?
     case "${http_code}" in
         000)
@@ -230,26 +492,29 @@ verify_search_api_connectivity() {
 get_session_key() {
     local uri="${1:-https://localhost:8089}"
     local body sk
+    _prepare_splunk_transport_for_uri "${uri}" "Splunk username/password authentication" || return 1
     _set_splunk_curl_tls_args || return 1
     body=$(form_urlencode_pairs username "${SPLUNK_USER}" password "${SPLUNK_PASS}") || return 1
     sk=$(printf '%s' "${body}" \
-        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
+        | curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+            --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- \
+            ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"} 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
 
     if [[ -z "${sk}" ]]; then
         verify_search_api_connectivity "${uri}" 2>&1 | while IFS= read -r line; do echo "${line}" >&2; done
         return 1
     fi
+    _validate_splunk_session_key "${sk}" || return 1
     printf '%s' "${sk}"
 }
 
 # get_session_key_from_password_file <uri> <password_file> [user]
 #
 # Mints a Splunk session key without ever placing the admin password on argv.
-# The password is read from disk by curl itself via the `--data-urlencode
-# password@<file>` form, so it never appears in `ps`, /proc/*/cmdline, or
-# the shell's command history. The username is not secret and is allowed on
-# argv.
+# The password is read through an O_NOFOLLOW descriptor and a URL-encoded form
+# body is streamed to curl on stdin, so it never appears in argv, /proc cmdline,
+# or shell history. The username is not secret and is allowed on argv.
 #
 # Use this in any script that reads the admin password from a file
 # (`SPLUNK_ADMIN_PASSWORD_FILE`, `--admin-password-file`, etc.) and then
@@ -260,30 +525,40 @@ get_session_key_from_password_file() {
     local uri="${1:-}"
     local pw_file="${2:-}"
     local user="${3:-admin}"
-    local sk
+    local form_body sk xtrace_was_enabled=false
 
     if [[ -z "${uri}" || -z "${pw_file}" ]]; then
         log "ERROR: get_session_key_from_password_file requires <uri> <password_file>"
         return 1
     fi
-    if [[ ! -s "${pw_file}" ]]; then
-        log "ERROR: Splunk admin password file missing or empty: ${pw_file}"
+    _prepare_splunk_transport_for_uri "${uri}" "Splunk password-file authentication" || return 1
+    _set_splunk_curl_tls_args || return 1
+    case $- in
+        *x*)
+            set +x
+            xtrace_was_enabled=true
+            ;;
+    esac
+    if ! form_body="$(_secure_password_form_body "${pw_file}" "${user}" 2>/dev/null)"; then
+        [[ "${xtrace_was_enabled}" == "true" ]] && set -x
+        log "ERROR: Splunk admin password file must be a single-link, non-symlink mode-0400/0600 regular file containing one non-empty UTF-8 line."
         return 1
     fi
-
-    _set_splunk_curl_tls_args || return 1
-    sk=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
-        --connect-timeout 10 --max-time 30 \
-        --data-urlencode "username=${user}" \
-        --data-urlencode "password@${pw_file}" \
-        "${uri}/services/auth/login" 2>/dev/null \
+    sk=$(printf '%s' "${form_body}" \
+        | curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+            --connect-timeout 10 --max-time 30 -d @- \
+            "${uri}/services/auth/login" \
+            ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"} 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
+    form_body=""
+    [[ "${xtrace_was_enabled}" == "true" ]] && set -x
 
     if [[ -z "${sk}" ]]; then
         echo "ERROR: Failed to obtain session key from ${uri} using ${pw_file}." >&2
         verify_search_api_connectivity "${uri}" 2>&1 | while IFS= read -r line; do echo "${line}" >&2; done
         return 1
     fi
+    _validate_splunk_session_key "${sk}" || return 1
     printf '%s' "${sk}"
 }
 
@@ -299,10 +574,13 @@ splunk_curl() {
     local connect_timeout="${SPLUNK_REST_CONNECT_TIMEOUT:-10}"
     local max_time="${SPLUNK_REST_MAX_TIME:-120}"
     shift
+    _validate_splunk_session_key "${sk}" || return 1
+    _prepare_splunk_transport_for_curl_args "$@" || return 1
     _set_splunk_curl_tls_args || return 1
-    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+    curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         --connect-timeout "${connect_timeout}" --max-time "${max_time}" \
-        -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
+        -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@" \
+        ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"}
 }
 
 splunk_curl_post() {
@@ -313,24 +591,59 @@ splunk_curl_post() {
     shift
     post_data="$1"
     shift
+    _validate_splunk_session_key "${sk}" || return 1
+    _prepare_splunk_transport_for_curl_args "$@" || return 1
     _set_splunk_curl_tls_args || return 1
     printf '%s' "${post_data}" \
-        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        | curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
             --connect-timeout "${connect_timeout}" --max-time "${max_time}" \
-            -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
+            -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@" \
+            ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"}
 }
 
 read_secret_file() {
     local fpath="$1"
-    if [[ ! -f "${fpath}" ]]; then
-        echo "ERROR: Secret file not found: ${fpath}" >&2
-        return 1
-    fi
-    local val
-    val=$(<"${fpath}")
-    val="${val#"${val%%[![:space:]]*}"}"
-    val="${val%"${val##*[![:space:]]}"}"
-    printf '%s' "${val}"
+    python3 - "${fpath}" <<'PY'
+import os
+import stat
+import sys
+
+path = sys.argv[1]
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit(1)
+try:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+except OSError:
+    print(f"ERROR: Secret file not found or unsafe: {path}", file=sys.stderr)
+    raise SystemExit(1)
+try:
+    before = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) not in {0o400, 0o600}
+        or before.st_size < 1
+        or before.st_size > 65536
+    ):
+        raise SystemExit(1)
+    raw = os.read(descriptor, 65537)
+    after = os.fstat(descriptor)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(descriptor)
+try:
+    value = raw.decode("utf-8").strip()
+except UnicodeDecodeError:
+    raise SystemExit(1)
+if not value or "\x00" in value or "\r" in value or "\n" in value:
+    raise SystemExit(1)
+print(value, end="")
+PY
 }
 
 _curl_config_escape() {
@@ -439,18 +752,12 @@ _urlencode() {
 }
 
 form_urlencode_pairs() {
-    local args_file output rc restore_errexit=false
+    local output rc restore_errexit=false xtrace_was_enabled=false
 
     if (( $# % 2 != 0 )); then
         echo "ERROR: form_urlencode_pairs requires key/value pairs." >&2
         return 1
     fi
-
-    args_file="$(mktemp)"
-    chmod 600 "${args_file}"
-    for arg in "$@"; do
-        printf '%s\0' "${arg}"
-    done > "${args_file}"
 
     case $- in
         *e*)
@@ -458,47 +765,55 @@ form_urlencode_pairs() {
             set +e
             ;;
     esac
-    output=$(python3 - "${args_file}" <<'PY'
+    case $- in
+        *x*)
+            set +x
+            xtrace_was_enabled=true
+            ;;
+    esac
+    output=$(
+        for arg in "$@"; do
+            printf '%s\0' "${arg}"
+        done | python3 -c '
 import sys
 from urllib.parse import quote_plus
-from pathlib import Path
 
-raw = Path(sys.argv[1]).read_bytes()
+raw = sys.stdin.buffer.read()
 args = raw.split(b"\0")
 if args and args[-1] == b"":
     args.pop()
 args = [value.decode("utf-8") for value in args]
 parts = []
-for i in range(0, len(args), 2):
-    key = args[i]
-    value = args[i + 1]
-    parts.append(f"{quote_plus(key)}={quote_plus(value)}")
-
+for index in range(0, len(args), 2):
+    parts.append(f"{quote_plus(args[index])}={quote_plus(args[index + 1])}")
 print("&".join(parts), end="")
-PY
-)
+'
+    )
     rc=$?
+    [[ "${xtrace_was_enabled}" == "true" ]] && set -x
     if [[ "${restore_errexit}" == "true" ]]; then
         set -e
     fi
-    rm -f "${args_file}"
     [[ "${rc}" -eq 0 ]] || return "${rc}"
     printf '%s' "${output}"
 }
 
 rest_check_app() {
     local sk="$1" uri="$2" app="$3"
-    local http_code
+    local encoded_app http_code
+    encoded_app=$(_urlencode "${app}") || return 1
     http_code=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
-        "${uri}/services/apps/local/${app}?output_mode=json" \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" \
         -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 
 rest_get_app_version() {
     local sk="$1" uri="$2" app="$3"
+    local encoded_app
+    encoded_app=$(_urlencode "${app}") || return 1
     splunk_curl "${sk}" \
-        "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null \
         | python3 -c "
 import json, sys
 d = json.load(sys.stdin)

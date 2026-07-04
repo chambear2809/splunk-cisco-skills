@@ -250,12 +250,13 @@ deployment_apply_profile_globals() {
     local profile_name="${1:-}"
     local key value
     local -a reset_keys=(
-        SPLUNK_HOST SPLUNK_MGMT_PORT SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SSH_HOST SPLUNK_TARGET_ROLE SPLUNK_HEC_URL
+        SPLUNK_HOST SPLUNK_MGMT_PORT SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SSH_HOST
+        SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
     )
     local -a keys=(
         SPLUNK_HOST SPLUNK_MGMT_PORT SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_USER SPLUNK_PASS
         SPLUNK_SSH_HOST SPLUNK_SSH_PORT SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_REMOTE_TMPDIR SPLUNK_REMOTE_SUDO
-        SPLUNK_TARGET_ROLE SPLUNK_HEC_URL
+        SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
     )
 
     if [[ -n "${profile_name}" ]]; then
@@ -315,6 +316,8 @@ deployment_bundle_apply_current_profile() {
     case "${kind}" in
         shc)
             [[ -n "${target_uri}" && -n "${auth_user}" && -n "${auth_pass}" ]] || return 1
+            _prepare_splunk_transport_for_uri \
+                "${target_uri}" "Search-head-cluster bundle authentication" || return 1
             ;;
         idxc)
             [[ -n "${auth_user}" && -n "${auth_pass}" ]] || return 1

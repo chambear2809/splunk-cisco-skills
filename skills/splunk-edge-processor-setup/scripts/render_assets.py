@@ -62,6 +62,7 @@ def csv_list(value: str) -> list[str]:
 # label / IP character class so a bogus value like `../../etc/passwd`
 # cannot escape the operator's chosen output directory.
 _HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_OBJECT_NAME_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 def validate_host_token(host: str) -> str:
@@ -71,6 +72,15 @@ def validate_host_token(host: str) -> str:
             "(allowed: letters, digits, '.', '_', '-')."
         )
     return host
+
+
+def validate_object_name(value: str, label: str) -> str:
+    if value in {"", ".", ".."} or not _OBJECT_NAME_RE.fullmatch(value):
+        die(
+            f"{label} {value!r} is unsafe for a rendered file/API path "
+            "(allowed: letters, digits, '.', '_', ':', '-'; no traversal)."
+        )
+    return value
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -548,8 +558,8 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
             'shopt -s nullglob\n'
             'for st in "${CONTROL_DIR}"/source-types/*.json; do\n'
             '  name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\\"name\\"])" "${st}")\n'
-            '  ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
-            '    "/source-types/${name}" --data-binary @"${st}" >/dev/null\n'
+            '  credential_curl_stream_file "${st}" | ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
+            '    "/source-types/${name}" --data-binary @- >/dev/null\n'
             '  echo "OK: source-type ${name} applied"\n'
             'done\n\n'
         )
@@ -558,16 +568,16 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
             'shopt -s nullglob\n'
             'for dest in "${CONTROL_DIR}"/destinations/*.json; do\n'
             '  name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\\"name\\"])" "${dest}")\n'
-            '  ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
-            '    "/destinations/${name}" --data-binary @"${dest}" >/dev/null\n'
+            '  credential_curl_stream_file "${dest}" | ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
+            '    "/destinations/${name}" --data-binary @- >/dev/null\n'
             '  echo "OK: destination ${name} applied"\n'
             'done\n\n'
         )
     body += (
         f'EP_OBJECT="${{CONTROL_DIR}}/edge-processors/{ep_name}.json"\n'
         'if [[ -f "${EP_OBJECT}" ]]; then\n'
-        '  ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
-        f'    "/edge-processors/{ep_name}" --data-binary @"${{EP_OBJECT}}" >/dev/null\n'
+        '  credential_curl_stream_file "${EP_OBJECT}" | ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
+        f'    "/edge-processors/{ep_name}" --data-binary @- >/dev/null\n'
         f'  echo "OK: edge-processor object {ep_name} applied"\n'
         'fi\n\n'
     )
@@ -576,8 +586,8 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
             'shopt -s nullglob\n'
             'for pipe in "${CONTROL_DIR}"/pipelines/*.json; do\n'
             '  name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\\"name\\"])" "${pipe}")\n'
-            '  ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
-            '    "/pipelines/${name}" --data-binary @"${pipe}" >/dev/null\n'
+            '  credential_curl_stream_file "${pipe}" | ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
+            '    "/pipelines/${name}" --data-binary @- >/dev/null\n'
             '  echo "OK: pipeline ${name} applied"\n'
             'done\n\n'
             "# Attach all pipelines to the EP object.\n"
@@ -779,10 +789,16 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
 
 
 def render_all(args: argparse.Namespace) -> dict:
+    args.ep_name = validate_object_name(args.ep_name, "--ep-name")
     instances = parse_instances(args.ep_instances)
     destinations = parse_destinations(args.ep_destinations)
     pipelines = parse_pipelines(args.ep_pipelines)
     source_types = csv_list(args.ep_source_types)
+    source_types = [validate_object_name(name, "--ep-source-types name") for name in source_types]
+    for destination in destinations:
+        destination["name"] = validate_object_name(destination["name"], "--ep-destinations name")
+    for pipeline in pipelines:
+        pipeline["name"] = validate_object_name(pipeline["name"], "--ep-pipelines name")
 
     if args.ep_fips_mode == "enabled" and any(i["mode"] == "docker" for i in instances):
         die("FIPS mode is not supported for Docker/containerized Edge Processor instances.")

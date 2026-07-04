@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import argparse
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
+import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -12,6 +18,23 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SETUP = REPO_ROOT / "skills/splunk-observability-thousandeyes-integration/scripts/setup.sh"
+TE_CLIENT_PATH = (
+    REPO_ROOT
+    / "skills/splunk-observability-thousandeyes-integration/scripts/te_api_client.py"
+)
+BUNDLE_MARKER = ".splunk-observability-thousandeyes-bundle.json"
+
+
+def load_te_client():
+    spec = importlib.util.spec_from_file_location("test_te_api_client", TE_CLIENT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+TE_CLIENT = load_te_client()
 
 
 def run_setup(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -78,6 +101,33 @@ def write_spec(path: Path, **overrides: object) -> Path:
     spec.update(overrides)
     path.write_text(json.dumps(spec, indent=2, sort_keys=True), encoding="utf-8")
     return path
+
+
+def ensure_create_args(
+    tmp_path: Path,
+    *,
+    identity_fields: str = "name",
+    key: str = "asset",
+) -> argparse.Namespace:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    payload = tmp_path / f"{key.replace(':', '-')}.json"
+    payload.write_text(json.dumps({"name": "stable-asset", "type": "generic"}), encoding="utf-8")
+    return argparse.Namespace(
+        payload_file=str(payload),
+        secret_placeholder="",
+        secret_file="",
+        value_placeholder="",
+        value=None,
+        identity_fields=identity_fields,
+        identity_optional_fields="",
+        identity_constant=[],
+        id_keys="id",
+        state_dir=str(tmp_path / "state"),
+        key=key,
+        collection_path="assets",
+        create_path="assets",
+        account_group_id="1234",
+    )
 
 
 def test_render_produces_payloads_and_handoffs(tmp_path: Path) -> None:
@@ -246,6 +296,23 @@ def test_rendered_apply_path_uses_fixed_origin_client_and_keeps_token_values_off
     assert "response.status < 200 or response.status >= 300" in client
     assert "payload_sha256" in client
 
+    signalflow = (output / "scripts/validate-signalflow.sh").read_text(encoding="utf-8")
+    assert "curl -q --fail-with-body" in signalflow
+    assert "--proto '=https' --proto-redir '=https' --max-redirs 0 --globoff" in signalflow
+    assert "os.O_NOFOLLOW" in signalflow
+    assert "os.O_EXCL" in signalflow
+    assert "os.O_TRUNC" not in signalflow
+    assert "st_nlink != 1" in signalflow
+    assert "changed while it was read" in signalflow
+    assert "tr -d" not in signalflow
+    syntax = subprocess.run(
+        ["bash", "-n", str(output / "scripts/validate-signalflow.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert syntax.returncode == 0, syntax.stderr
+
 
 def test_all_live_apply_scripts_require_mutation_acceptance_and_account_scope(
     tmp_path: Path,
@@ -408,3 +475,419 @@ def test_alert_rule_requires_expression(tmp_path: Path) -> None:
     result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
     assert result.returncode == 1
     assert "expression is required" in combined_output(result)
+
+
+# ---------------------------------------------------------------------------
+# Exclusive render bundle + durable ensure-create journal regressions
+# ---------------------------------------------------------------------------
+
+
+def test_render_bundle_marker_preserves_private_state_across_rerender(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    first = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert first.returncode == 0, combined_output(first)
+
+    marker = output / BUNDLE_MARKER
+    marker_data = json.loads(marker.read_text(encoding="utf-8"))
+    assert marker_data == {
+        "bundle_root": str(output.resolve()),
+        "schema": 1,
+        "skill": "splunk-observability-thousandeyes-integration",
+    }
+    assert marker.stat().st_mode & 0o777 == 0o600
+
+    state = output / "state"
+    state.mkdir(mode=0o700)
+    retained = state / "stream.json"
+    retained.write_text('{"id":"stream-123","status":"verified"}\n', encoding="utf-8")
+    retained.chmod(0o600)
+    before = retained.read_bytes()
+
+    second = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert second.returncode == 0, combined_output(second)
+    assert retained.read_bytes() == before
+    assert retained.stat().st_mode & 0o777 == 0o600
+
+
+def test_renderer_refuses_unmarked_nonempty_output_without_deleting(tmp_path: Path) -> None:
+    output = tmp_path / "not-a-bundle"
+    managed = output / "scripts"
+    managed.mkdir(parents=True)
+    sentinel = managed / "do-not-delete.txt"
+    sentinel.write_text("owned by somebody else\n", encoding="utf-8")
+    spec = write_spec(tmp_path / "spec.json")
+
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 1
+    assert "non-empty unmarked output directory" in combined_output(result)
+    assert sentinel.read_text(encoding="utf-8") == "owned by somebody else\n"
+    assert not (output / BUNDLE_MARKER).exists()
+
+
+@pytest.mark.parametrize("unsafe_root", [Path("/"), Path.home(), REPO_ROOT])
+def test_renderer_refuses_root_home_and_repository_roots(
+    unsafe_root: Path, tmp_path: Path
+) -> None:
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup(
+        "--render",
+        "--spec",
+        str(spec),
+        "--output-dir",
+        str(unsafe_root),
+    )
+    assert result.returncode == 1
+    assert "refusing unsafe output bundle root" in combined_output(result)
+
+
+def test_renderer_rejects_symlink_output_and_managed_directory(tmp_path: Path) -> None:
+    spec = write_spec(tmp_path / "spec.json")
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    sentinel = victim / "sentinel"
+    sentinel.write_text("preserve\n", encoding="utf-8")
+    output_link = tmp_path / "output-link"
+    output_link.symlink_to(victim, target_is_directory=True)
+
+    root_result = run_setup(
+        "--render", "--spec", str(spec), "--output-dir", str(output_link)
+    )
+    assert root_result.returncode == 1
+    assert "must not be a symlink" in combined_output(root_result)
+    assert sentinel.read_text(encoding="utf-8") == "preserve\n"
+
+    output = tmp_path / "rendered"
+    initial = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert initial.returncode == 0, combined_output(initial)
+    shutil.rmtree(output / "dashboards")
+    (output / "dashboards").symlink_to(victim, target_is_directory=True)
+    rerender = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rerender.returncode == 1
+    assert "never a link or file" in combined_output(rerender)
+    assert sentinel.read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_renderer_rejects_hardlinked_marker_and_managed_file(tmp_path: Path) -> None:
+    spec = write_spec(tmp_path / "spec.json")
+
+    marker_output = tmp_path / "marker-output"
+    initial = run_setup(
+        "--render", "--spec", str(spec), "--output-dir", str(marker_output)
+    )
+    assert initial.returncode == 0, combined_output(initial)
+    os.link(marker_output / BUNDLE_MARKER, tmp_path / "marker-hardlink")
+    marker_retry = run_setup(
+        "--render", "--spec", str(spec), "--output-dir", str(marker_output)
+    )
+    assert marker_retry.returncode == 1
+    assert "single-link regular file" in combined_output(marker_retry)
+
+    file_output = tmp_path / "file-output"
+    initial = run_setup("--render", "--spec", str(spec), "--output-dir", str(file_output))
+    assert initial.returncode == 0, combined_output(initial)
+    external = tmp_path / "external-content"
+    external.write_text("must survive\n", encoding="utf-8")
+    linked = file_output / "scripts/hardlinked-content"
+    os.link(external, linked)
+    retry = run_setup("--render", "--spec", str(spec), "--output-dir", str(file_output))
+    assert retry.returncode == 1
+    assert "single-link regular files" in combined_output(retry)
+    assert external.read_text(encoding="utf-8") == "must survive\n"
+    assert linked.exists()
+
+
+def test_generated_create_flows_always_supply_stable_identity(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        tests=[{"type": "http-server", "name": "Checkout", "url": "https://example.com"}],
+        alert_rules=[
+            {
+                "name": "Checkout alert",
+                "test_type": "http-server",
+                "expression": "((responseTime > 500 ms))",
+            }
+        ],
+        templates=[
+            {
+                "name": "Checkout template",
+                "template_body": {"credentials": {"api_key": "{{te.api_key}}"}},
+            }
+        ],
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    scripts = rendered_text(output / "scripts")
+    assert "--identity-fields ''" not in scripts
+    for expected in (
+        "--identity-fields type,signal,endpointType,streamEndpointUrl,dataModelVersion",
+        "--identity-optional-fields testMatch,filters",
+        "--identity-fields type,name,target",
+        '"--identity-fields", "testName"',
+        '"--identity-constant", f"type={item[\'type\']}"',
+        "--identity-fields ruleName,alertType",
+        "--identity-fields name",
+    ):
+        assert expected in scripts
+
+
+def test_ensure_create_rejects_empty_identity_before_any_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = ensure_create_args(tmp_path, identity_fields="")
+    calls: list[str] = []
+
+    def unexpected_request(method: str, *_args: object, **_kwargs: object):
+        calls.append(method)
+        raise AssertionError("API request must not run without stable identity")
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", unexpected_request)
+    with pytest.raises(TE_CLIENT.ApplyError, match="authoritative, non-empty"):
+        TE_CLIENT.ensure_create(args, "token")
+    assert calls == []
+    assert not Path(args.state_dir).exists()
+
+
+def test_ensure_create_journals_before_post_and_blocks_retry_after_missing_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = ensure_create_args(tmp_path)
+    calls: list[str] = []
+
+    def fake_request(method: str, *_args: object, **_kwargs: object):
+        calls.append(method)
+        if method == "GET":
+            return 200, []
+        state_path = Path(args.state_dir) / "asset.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert state["status"] == "in_progress"
+        assert state["manual_reconcile"] is True
+        assert state_path.stat().st_mode & 0o777 == 0o600
+        assert Path(args.state_dir).stat().st_mode & 0o777 == 0o700
+        return 201, {}
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", fake_request)
+    with pytest.raises(TE_CLIENT.ApplyError, match="without a usable ID"):
+        TE_CLIENT.ensure_create(args, "token")
+    state = TE_CLIENT.read_state(Path(args.state_dir), "asset")
+    assert state is not None
+    assert state["status"] == "ambiguous"
+    assert state["manual_reconcile"] is True
+    assert "no usable object ID" in state["reason"]
+    assert calls.count("POST") == 1
+
+    call_count = len(calls)
+    with pytest.raises(TE_CLIENT.ApplyError, match="automatic POST retry is blocked"):
+        TE_CLIENT.ensure_create(args, "token")
+    assert len(calls) == call_count
+    assert calls.count("POST") == 1
+
+
+def test_ensure_create_marks_transport_and_readback_outcomes_ambiguous(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport_args = ensure_create_args(tmp_path / "transport", key="transport")
+    transport_calls: list[str] = []
+
+    def transport_failure(method: str, *_args: object, **_kwargs: object):
+        transport_calls.append(method)
+        if method == "GET":
+            return 200, []
+        raise TE_CLIENT.ApplyError("connection reset after send")
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", transport_failure)
+    with pytest.raises(TE_CLIENT.ApplyError, match="manual reconciliation"):
+        TE_CLIENT.ensure_create(transport_args, "token")
+    transport_state = TE_CLIENT.read_state(Path(transport_args.state_dir), "transport")
+    assert transport_state is not None and transport_state["status"] == "ambiguous"
+    assert transport_calls.count("POST") == 1
+
+    readback_root = tmp_path / "readback"
+    readback_root.mkdir()
+    readback_args = ensure_create_args(readback_root, key="readback")
+    readback_calls: list[str] = []
+
+    def missing_readback(method: str, *_args: object, **_kwargs: object):
+        readback_calls.append(method)
+        if method == "POST":
+            return 201, {"id": "created-123"}
+        return 200, []
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", missing_readback)
+    with pytest.raises(TE_CLIENT.ApplyError, match="exact collection readback failed"):
+        TE_CLIENT.ensure_create(readback_args, "token")
+    readback_state = TE_CLIENT.read_state(Path(readback_args.state_dir), "readback")
+    assert readback_state is not None
+    assert readback_state["status"] == "ambiguous"
+    assert readback_state["id"] == "created-123"
+    call_count = len(readback_calls)
+    with pytest.raises(TE_CLIENT.ApplyError, match="automatic POST retry is blocked"):
+        TE_CLIENT.ensure_create(readback_args, "token")
+    assert len(readback_calls) == call_count
+    assert readback_calls.count("POST") == 1
+
+
+def test_ensure_create_refuses_duplicate_identity_and_hardlinked_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = ensure_create_args(tmp_path)
+    calls: list[str] = []
+
+    def duplicate_readback(method: str, *_args: object, **_kwargs: object):
+        calls.append(method)
+        assert method == "GET"
+        return 200, [
+            {"id": "one", "name": "stable-asset"},
+            {"id": "two", "name": "stable-asset"},
+        ]
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", duplicate_readback)
+    with pytest.raises(TE_CLIENT.ApplyError, match="multiple live objects"):
+        TE_CLIENT.ensure_create(args, "token")
+    assert calls == ["GET"]
+    assert not (Path(args.state_dir) / "asset.json").exists()
+
+    state_dir = tmp_path / "hardlink-state"
+    TE_CLIENT.write_state(state_dir, "asset", {"status": "ambiguous"})
+    os.link(state_dir / "asset.json", tmp_path / "state-hardlink")
+    with pytest.raises(TE_CLIENT.ApplyError, match="single-link regular file"):
+        TE_CLIENT.read_state(state_dir, "asset")
+
+
+def test_ensure_create_serializes_concurrent_process_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = ensure_create_args(tmp_path)
+    remote: list[dict[str, str]] = []
+    request_lock = threading.Lock()
+    post_count = 0
+
+    def fake_request(method: str, *_args: object, **_kwargs: object):
+        nonlocal post_count
+        if method == "GET":
+            with request_lock:
+                return 200, list(remote)
+        time.sleep(0.1)
+        with request_lock:
+            post_count += 1
+            created = {"id": "created-once", "name": "stable-asset"}
+            remote.append(created)
+            return 201, dict(created)
+
+    monkeypatch.setattr(TE_CLIENT, "api_request", fake_request)
+    results: list[str] = []
+    errors: list[BaseException] = []
+
+    def worker() -> None:
+        try:
+            results.append(TE_CLIENT.ensure_create(args, "token"))
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker), threading.Thread(target=worker)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+    assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    assert results == ["created-once", "created-once"]
+    assert post_count == 1
+
+
+def test_stream_selector_and_test_type_are_part_of_stable_identity() -> None:
+    stream = {
+        "type": "opentelemetry",
+        "signal": "metric",
+        "endpointType": "http",
+        "streamEndpointUrl": "https://ingest.us0.signalfx.com/v2/datapoint/otlp",
+        "dataModelVersion": "v2",
+        "filters": {"testTypes": ["http-server"]},
+    }
+    identity = TE_CLIENT.stable_identity(
+        stream,
+        ("type", "signal", "endpointType", "streamEndpointUrl", "dataModelVersion"),
+        ("testMatch", "filters"),
+    )
+    wrong_selector = {**stream, "filters": {"testTypes": ["agent-to-server"]}}
+    assert TE_CLIENT.find_identity_matches([wrong_selector], identity) == []
+    assert TE_CLIENT.find_identity_matches([stream], identity) == [stream]
+
+    test_identity = TE_CLIENT.stable_identity(
+        {"testName": "Checkout"},
+        ("testName",),
+        constants={"type": "http-server"},
+    )
+    wrong_type = {"id": "other", "testName": "Checkout", "type": "agent-to-server"}
+    assert TE_CLIENT.find_identity_matches([wrong_type], test_identity) == []
+    assert TE_CLIENT.extract_id({"headers": [{"id": "nested-wrong"}]}, ("id",)) is None
+
+
+def test_template_deploy_fails_before_any_post_action(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        templates=[
+            {
+                "name": "Safe template",
+                "template_body": {"credentials": {"api_key": "{{te.api_key}}"}},
+            }
+        ],
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    script = (output / "scripts/apply-template.sh").read_text(encoding="utf-8")
+    assert "automated template deploy is disabled" in script
+    assert "post-action" not in script
+    assert script.index("automated template deploy is disabled") < script.index("ensure-create")
+
+
+@pytest.mark.parametrize("link_kind", ["symlink", "hardlink"])
+def test_signalflow_auth_config_refuses_link_replacement_without_truncation(
+    link_kind: str, tmp_path: Path
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+
+    token = tmp_path / "o11y-token"
+    token.write_text("private-token-value\n", encoding="utf-8")
+    token.chmod(0o600)
+    victim = tmp_path / f"{link_kind}-victim"
+    victim.write_text("must-not-be-truncated\n", encoding="utf-8")
+    attack_dir = tmp_path / f"{link_kind}-work"
+    attack_dir.mkdir()
+    config_path = attack_dir / "o11y-curl.conf"
+    if link_kind == "symlink":
+        config_path.symlink_to(victim)
+    else:
+        os.link(victim, config_path)
+
+    fake_bin = tmp_path / f"{link_kind}-bin"
+    fake_bin.mkdir()
+    fake_mktemp = fake_bin / "mktemp"
+    fake_mktemp.write_text(
+        '#!/usr/bin/env bash\nprintf \'%s\\n\' "${ATTACK_DIR:?}"\n',
+        encoding="utf-8",
+    )
+    fake_mktemp.chmod(0o700)
+    env = {
+        **os.environ,
+        "ATTACK_DIR": str(attack_dir),
+        "O11Y_API_TOKEN_FILE": str(token),
+        "REALM": "us0",
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+    }
+    result = subprocess.run(
+        ["bash", str(output / "scripts/validate-signalflow.sh")],
+        cwd=output,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert victim.read_text(encoding="utf-8") == "must-not-be-truncated\n"

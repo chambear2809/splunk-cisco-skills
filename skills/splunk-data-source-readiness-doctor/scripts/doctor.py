@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import ssl
@@ -25,6 +26,7 @@ DEFAULT_REGISTRY_FILE = REPO_ROOT / "skills/shared/app_registry.json"
 DEFAULT_SOURCE_PACKS_FILE = REPO_ROOT / "skills/splunk-data-source-readiness-doctor/source_packs.json"
 DEFAULT_TARGETS = ("es", "itsi", "ari")
 ALL_TARGETS = {"es", "itsi", "ari"}
+_INSECURE_HTTP_WARNING_EMITTED = False
 
 FIX_KINDS = {
     "direct_fix",
@@ -2791,11 +2793,46 @@ def apply_selected_fixes(output_dir: Path, findings: list[dict[str, Any]], fixes
     return result
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so the Splunk session key stays on one origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _env_bool(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def normalize_splunk_uri(value: str) -> str:
+    global _INSECURE_HTTP_WARNING_EMITTED
+    if any(character.isspace() for character in value):
+        die("--splunk-uri must not contain whitespace")
     uri = value.rstrip("/")
-    parsed = urllib.parse.urlparse(uri)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        die("--splunk-uri must be an http(s) URI such as https://localhost:8089")
+    try:
+        parsed = urllib.parse.urlsplit(uri)
+        parsed.port
+    except ValueError:
+        die("--splunk-uri is invalid or contains an invalid port")
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"} or not parsed.hostname:
+        die("--splunk-uri must be an absolute https://host[:port] origin")
+    if parsed.username is not None or parsed.password is not None:
+        die("--splunk-uri must not contain embedded userinfo credentials")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        die("--splunk-uri must not contain a path, query, or fragment")
+    if scheme == "http" and not _env_bool("SPLUNK_ALLOW_INSECURE_HTTP"):
+        die(
+            "live collection refuses plaintext HTTP; use HTTPS, or set "
+            "SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab"
+        )
+    if scheme == "http" and not _INSECURE_HTTP_WARNING_EMITTED:
+        print(
+            "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true sends the Splunk "
+            "session key over plaintext HTTP.",
+            file=sys.stderr,
+        )
+        _INSECURE_HTTP_WARNING_EMITTED = True
     return uri
 
 
@@ -2868,8 +2905,15 @@ def execute_export_search(args: argparse.Namespace, session_key: str, spec: dict
         method="POST",
     )
     context = ssl._create_unverified_context() if args.no_verify_tls else ssl.create_default_context()
+    parsed_uri = urllib.parse.urlsplit(uri)
+    transport_handler = (
+        urllib.request.HTTPSHandler(context=context)
+        if parsed_uri.scheme.lower() == "https"
+        else urllib.request.HTTPHandler()
+    )
+    opener = urllib.request.build_opener(_NoRedirectHandler(), transport_handler)
     try:
-        with urllib.request.urlopen(request, timeout=args.collect_timeout_seconds, context=context) as response:
+        with opener.open(request, timeout=args.collect_timeout_seconds) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
         return {

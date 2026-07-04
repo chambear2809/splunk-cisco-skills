@@ -49,6 +49,7 @@ TOOL_COUNT="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1],
 log "Session key obtained. Loading ${TOOL_COUNT} MCP tools..."
 
 export __SPLUNK_SK="${SESSION_KEY}"
+export __SPLUNK_ALLOW_INSECURE_HTTP="${SPLUNK_ALLOW_INSECURE_HTTP:-false}"
 splunk_export_python_tls_env || {
     log "ERROR: Could not configure TLS settings for MCP tool loading."
     exit 1

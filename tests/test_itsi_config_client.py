@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import io
 import sys
+import threading
 import unittest
+from contextlib import redirect_stderr
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import URLError
@@ -11,7 +15,6 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import lib.client as client_module  # noqa: E402
 from lib.client import ClientConfig, SplunkRestClient  # noqa: E402
 from lib.common import ValidationError  # noqa: E402
 
@@ -896,12 +899,118 @@ class SplunkRestClientTests(unittest.TestCase):
     def test_request_wraps_urlerror_as_validation_error(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username="user", password="pass", session_key=None))
 
-        with patch.object(client_module, "urlopen", side_effect=URLError("timed out")):
+        with patch.object(client._opener, "open", side_effect=URLError("timed out")):
             with self.assertRaises(ValidationError) as error:
                 client.app_exists("SA-ITOA")
 
         self.assertIn("timed out", str(error.exception))
         self.assertIn("GET", str(error.exception))
+
+    def test_authenticated_requests_refuse_redirects_without_forwarding_session_key(self) -> None:
+        target_authorization: list[str | None] = []
+        redirect_authorization: list[str | None] = []
+
+        class TargetHandler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                target_authorization.append(self.headers.get("Authorization"))
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"entry": []}')
+
+            def log_message(self, *_args: object) -> None:
+                return
+
+        target = ThreadingHTTPServer(("127.0.0.1", 0), TargetHandler)
+
+        class RedirectHandler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                redirect_authorization.append(self.headers.get("Authorization"))
+                self.send_response(302)
+                self.send_header(
+                    "Location",
+                    f"http://127.0.0.1:{target.server_port}/credential-target",
+                )
+                self.end_headers()
+
+            def log_message(self, *_args: object) -> None:
+                return
+
+        redirect = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True)
+            for server in (target, redirect)
+        ]
+        for thread in threads:
+            thread.start()
+        try:
+            client = SplunkRestClient(
+                ClientConfig(
+                    base_url=f"http://127.0.0.1:{redirect.server_port}",
+                    verify_ssl=False,
+                    username=None,
+                    password=None,
+                    session_key="sensitive-session-key",
+                )
+            )
+            with self.assertRaisesRegex(ValidationError, "HTTP 302"):
+                client.app_exists("SA-ITOA")
+        finally:
+            for server in (redirect, target):
+                server.shutdown()
+                server.server_close()
+            for thread in threads:
+                thread.join(timeout=5)
+
+        self.assertEqual(len(redirect_authorization), 1)
+        self.assertEqual(target_authorization, [])
+
+    def test_from_spec_requires_explicit_environment_ack_for_plaintext_http(self) -> None:
+        environment = {
+            "SPLUNK_SEARCH_API_URI": "http://127.0.0.1:8089",
+            "SPLUNK_SESSION_KEY": "token",
+        }
+        with patch.dict("os.environ", environment, clear=True):
+            with self.assertRaisesRegex(ValidationError, "SPLUNK_ALLOW_INSECURE_HTTP=true"):
+                SplunkRestClient.from_spec({"connection": {}})
+
+    def test_from_spec_warns_when_plaintext_http_is_explicitly_accepted(self) -> None:
+        environment = {
+            "SPLUNK_SEARCH_API_URI": "http://127.0.0.1:8089",
+            "SPLUNK_SESSION_KEY": "token",
+            "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+        }
+        stderr = io.StringIO()
+        with patch.dict("os.environ", environment, clear=True), redirect_stderr(stderr):
+            client = SplunkRestClient.from_spec({"connection": {}})
+
+        self.assertEqual(client.config.base_url, "http://127.0.0.1:8089")
+        self.assertIn("LAB ONLY", stderr.getvalue())
+        self.assertIn("plaintext HTTP", stderr.getvalue())
+
+    def test_from_spec_rejects_legacy_spec_http_acknowledgement(self) -> None:
+        environment = {
+            "SPLUNK_SEARCH_API_URI": "http://127.0.0.1:8089",
+            "SPLUNK_SESSION_KEY": "token",
+        }
+        with patch.dict("os.environ", environment, clear=True):
+            with self.assertRaisesRegex(ValidationError, "not accepted"):
+                SplunkRestClient.from_spec(
+                    {"connection": {"allow_insecure_http": True}}
+                )
+
+    def test_from_spec_rejects_uri_userinfo_without_echoing_it(self) -> None:
+        secret = "do-not-echo-this-password"
+        environment = {
+            "SPLUNK_SEARCH_API_URI": f"https://operator:{secret}@example.com:8089",
+            "SPLUNK_SESSION_KEY": "token",
+        }
+        with patch.dict("os.environ", environment, clear=True):
+            with self.assertRaises(ValidationError) as raised:
+                SplunkRestClient.from_spec({"connection": {}})
+
+        self.assertIn("inline credentials", str(raised.exception))
+        self.assertNotIn(secret, str(raised.exception))
 
     def test_discovery_helpers_use_itsi_interfaces(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))

@@ -7,7 +7,13 @@ import argparse
 import json
 import re
 import stat
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+
+BUNDLE_OWNER = "splunk-knowledge-objects-setup"
 
 GENERATED_FILES = {
     "README.md",
@@ -94,10 +100,20 @@ def clean_render_dir(render_dir: Path) -> None:
 
 
 def validate(args: argparse.Namespace) -> None:
-    if not re.fullmatch(r"[A-Za-z0-9_.:-]+", args.app_name or ""):
-        die("--app-name must contain only letters, numbers, underscore, dot, colon, or hyphen.")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", args.app_name or ""):
+        die("--app-name must start with a letter or number and use at most 128 letters, numbers, underscore, dot, colon, or hyphen characters.")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}", args.owner or ""):
+        die("--owner must be a 1-128 character Splunk username using letters, numbers, dot, underscore, @, or hyphen.")
     if not args.name and args.object_kind != "tag":
         die(f"--name is required for object-kind {args.object_kind}.")
+    if args.name in {".", ".."}:
+        die("--name must not be a dot path segment.")
+    if args.auto_lookup_sourcetype in {".", ".."}:
+        die("--auto-lookup-sourcetype must not be a dot path segment.")
+    if args.sharing == "user" and args.owner == "nobody":
+        die("sharing=user requires an explicit user owner, not nobody.")
+    if args.sharing != "user" and args.owner != "nobody":
+        die("app/global knowledge objects must use owner=nobody.")
     no_newline(args.name, "--name")
     if args.object_kind == "savedsearch":
         if not args.search:
@@ -240,6 +256,7 @@ def endpoint_for(kind: str) -> str:
 
 
 def render_acl_plan(args: argparse.Namespace) -> str:
+    default_read_roles = [] if args.sharing == "user" else ["*"]
     return json.dumps(
         {
             "app_name": args.app_name,
@@ -248,7 +265,7 @@ def render_acl_plan(args: argparse.Namespace) -> str:
             "endpoint": endpoint_for(args.object_kind),
             "sharing": args.sharing,
             "owner": args.owner,
-            "read_roles": csv_list(args.read_roles) or ["*"],
+            "read_roles": csv_list(args.read_roles) or default_read_roles,
             "write_roles": csv_list(args.write_roles),
         },
         indent=2,
@@ -276,13 +293,18 @@ Files map to the conf the object lives in:
 For CSV lookups, place `lookup-stub.csv` (renamed to your filename) in the app's
 `lookups/` directory or upload it through the lookup editor; the apply step
 writes the lookup definition via REST. Global sharing requires
-`--accept-global-sharing` at apply time.
+`--accept-global-sharing` at apply time. Failed live mutations are retained for
+reviewed recovery with private before/current snapshots under `state/`; the
+runner performs GET-only reconciliation and never issues an automatic restore
+POST or DELETE because the endpoints have no verified conditional write/delete
+contract.
 """
 
 
 def render(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "knowledge-objects"
+    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)

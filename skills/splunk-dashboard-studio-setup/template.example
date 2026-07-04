@@ -20,5 +20,7 @@ definition_file:
 # Sharing / ownership
 owner: nobody
 sharing: app                # user | app | global
+read_roles: "*"             # exact comma-separated set
+write_roles: ""             # exact comma-separated set; empty means none
 
 # Overwriting an existing dashboard requires --accept-overwrite

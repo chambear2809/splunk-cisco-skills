@@ -8,7 +8,14 @@ import json
 import re
 import shlex
 import stat
+import sys
 from pathlib import Path
+from urllib.parse import urlsplit
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+
+BUNDLE_OWNER = "splunk-ddaa-archive"
 
 MAX_ARCHIVE_RETENTION_DAYS = 3650
 
@@ -93,8 +100,22 @@ def validate(args: argparse.Namespace) -> None:
         die(f"--archival-retention-days must be <= {MAX_ARCHIVE_RETENTION_DAYS} (10 years).")
     if "\n" in (args.token_file or "") or "\r" in (args.token_file or ""):
         die("--token-file must not contain newlines.")
-    if not args.acs_base.startswith("https://"):
-        die("--acs-base must be an https URL.")
+    try:
+        parsed_acs_base = urlsplit(args.acs_base)
+        parsed_acs_base.port
+    except ValueError:
+        die("--acs-base must be a valid HTTPS origin.")
+    if (
+        parsed_acs_base.scheme.lower() != "https"
+        or not parsed_acs_base.hostname
+        or parsed_acs_base.username is not None
+        or parsed_acs_base.password is not None
+        or parsed_acs_base.path not in ("", "/")
+        or parsed_acs_base.query
+        or parsed_acs_base.fragment
+        or any(character.isspace() for character in args.acs_base)
+    ):
+        die("--acs-base must be a credential-free HTTPS origin without a path, query, or fragment.")
 
 
 def create_payload(args: argparse.Namespace) -> dict:
@@ -126,6 +147,9 @@ def render_enable(args: argparse.Namespace) -> str:
 acs_base={base}
 stack={stack}
 operation={shell_quote(operation)}
+acs_curl() {{
+  command curl -q "$@" --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
+}}
 if [[ "${{operation}}" == "plan" ]]; then
   echo "Plan only: review {payload_file} and run with --operation enable|update|create to apply."
   exit 0
@@ -137,12 +161,14 @@ token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
 token="$(cat "${{token_file}}")"
 [[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
   || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
+token_escaped="${{token//\\\\/\\\\\\\\}}"
 curl_config="$(mktemp)"
 response_file="$(mktemp)"
 chmod 600 "${{curl_config}}" "${{response_file}}"
 trap 'rm -f "${{curl_config}}" "${{response_file}}"' EXIT
-printf 'header = "Authorization: Bearer %s"\\n' "${{token}}" > "${{curl_config}}"
+printf 'header = "Authorization: Bearer %s"\\n' "${{token_escaped}}" > "${{curl_config}}"
 token=""
+token_escaped=""
 
 url="${{acs_base}}/${{stack}}/adminconfig/v2/indexes{url_suffix}"
 echo "Applying DDAA via {method} ${{url}}"
@@ -153,7 +179,7 @@ echo "cannot be disabled via the API. Confirm to continue."
 read -r -p "Type APPLY to continue: " confirm
 [[ "${{confirm}}" == "APPLY" ]] || {{ echo "Aborted."; exit 1; }}
 
-http_code=$(curl -sS -o "${{response_file}}" -w '%{{http_code}}' \\
+http_code=$(acs_curl -sS -o "${{response_file}}" -w '%{{http_code}}' \\
   -X {method} "${{url}}" \\
   -K "${{curl_config}}" \\
   -H "Content-Type: application/json" \\
@@ -181,6 +207,9 @@ def render_status(args: argparse.Namespace) -> str:
 acs_base={base}
 stack={stack}
 index={index}
+acs_curl() {{
+  command curl -q "$@" --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
+}}
 [[ -s "${{token_file}}" ]] || {{ echo "ERROR: ACS token file missing or empty: ${{token_file}}" >&2; exit 1; }}
 token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
 [[ "${{token_mode}}" == "600" || "${{token_mode}}" == "400" ]] \\
@@ -188,14 +217,16 @@ token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
 token="$(cat "${{token_file}}")"
 [[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
   || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
+token_escaped="${{token//\\\\/\\\\\\\\}}"
 curl_config="$(mktemp)"
 chmod 600 "${{curl_config}}"
 trap 'rm -f "${{curl_config}}"' EXIT
-printf 'header = "Authorization: Bearer %s"\\n' "${{token}}" > "${{curl_config}}"
+printf 'header = "Authorization: Bearer %s"\\n' "${{token_escaped}}" > "${{curl_config}}"
 token=""
+token_escaped=""
 url="${{acs_base}}/${{stack}}/adminconfig/v2/indexes/${{index}}"
 echo "GET ${{url}}"
-curl -fsS "${{url}}" \\
+acs_curl -fsS "${{url}}" \\
   -K "${{curl_config}}" \\
   | python3 -c 'import json,sys
 try:
@@ -287,6 +318,7 @@ those changes. Restore is UI-only and restored data is temporary (30 days).
 def render(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "ddaa"
+    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)

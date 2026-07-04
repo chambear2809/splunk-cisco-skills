@@ -958,14 +958,14 @@ def section_token_auth(spec: dict[str, Any]) -> str:
         "source skills/shared/lib/credential_helpers.sh",
         "load_splunk_connection_settings",
         "SK=\"$(get_session_key \"${SPLUNK_SEARCH_API_URI}\")\"",
-        "splunk_curl \"${SK}\" --fail --location --max-redirs 0 --output /dev/null --show-error \\",
+        "splunk_curl \"${SK}\" --fail --output /dev/null --show-error \\",
         "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth?output_mode=json\"",
         "```",
         "",
         "## Enable (no restart required)",
         "",
         "```bash",
-        "splunk_curl \"${SK}\" --fail --location --max-redirs 0 --output /dev/null --show-error -X POST \\",
+        "splunk_curl \"${SK}\" --fail --output /dev/null --show-error -X POST \\",
         "  \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth\" \\",
         "  -d disabled=false",
         "```",
@@ -1557,7 +1557,7 @@ fi
 
 curl() {
   command curl -q --fail --silent --show-error --output /dev/null \
-    --proto '=https' --proto-redir '=https' --location --max-redirs 0 "$@"
+    --proto '=https' --proto-redir '=https' --location --max-redirs 0 --globoff "$@"
 }
 
 CURL_TLS_ARGS=()

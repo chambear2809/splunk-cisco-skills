@@ -69,6 +69,19 @@ Never rely on the implicit default.
 | `/services/deployment/server/_reload` | POST | Reload DS config (no restart) |
 | `/services/server/info` | GET | DS health check (used by LB) |
 
+### Management transport policy
+
+All credential-bearing management calls require an `https://` URI. Setting
+`SPLUNK_VERIFY_SSL=false` is only a certificate-verification exception for
+self-signed HTTPS endpoints; it never enables plaintext HTTP. An isolated,
+short-lived lab can explicitly set `SPLUNK_ALLOW_INSECURE_HTTP=true`, which
+emits a warning before credentials or session keys are sent.
+
+The shared curl helpers reject redirects for authenticated requests because
+curl cannot constrain a caller-supplied authorization header to one origin.
+The generated Python drift client permits same-origin redirects only and
+rejects any scheme, host, or port change before forwarding Basic auth.
+
 ## HA Pair Configuration
 
 For fleets > 5,000 UFs, run two DS instances behind a load balancer:

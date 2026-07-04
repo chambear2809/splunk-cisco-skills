@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -78,16 +80,263 @@ def repo_rel(path: Path) -> str:
         return str(path)
 
 
-def write_text(path: Path, content: str, executable: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    if executable:
-        mode = path.stat().st_mode
-        path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+def absolute_path_no_follow(path: Path) -> Path:
+    """Return an absolute lexical path without resolving symlink components."""
+    return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def _open_safe_output_directory(path: Path) -> int:
+    """Open/create a directory tree without following symlink components."""
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise UsageError("platform lacks O_NOFOLLOW/O_DIRECTORY; cannot write outputs safely")
+
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    descriptor = os.open(absolute.anchor or os.sep, flags)
+    try:
+        for component in absolute.parts[1:]:
+            if component in {"", "."}:
+                continue
+            try:
+                child = os.open(component, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, mode=0o755, dir_fd=descriptor)
+                except FileExistsError:
+                    # Another writer won the create race. The no-follow open
+                    # below still requires the winner to be a real directory.
+                    pass
+                child = os.open(component, flags, dir_fd=descriptor)
+            metadata = os.fstat(child)
+            if not stat.S_ISDIR(metadata.st_mode):
+                os.close(child)
+                raise UsageError(f"output directory component is not a directory: {path}")
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except OSError as exc:
+        os.close(descriptor)
+        raise UsageError(
+            f"output directory must not contain symlinks or non-directories: {path}"
+        ) from exc
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def _output_target_metadata(directory_fd: int, name: str, path: Path) -> os.stat_result | None:
+    try:
+        metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        raise UsageError(
+            f"output target must be a single-hardlink regular file, not a symlink or special file: {path}"
+        )
+    return metadata
+
+
+def _output_fingerprint(metadata: os.stat_result | None) -> tuple[int, ...] | None:
+    if metadata is None:
+        return None
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _atomic_write_bytes(
+    path: Path,
+    content: bytes,
+    *,
+    executable: bool = False,
+    mode: int | None = None,
+) -> None:
+    """Atomically write bytes without following path or target symlinks."""
+    path = Path(path)
+    if path.name in {"", ".", ".."}:
+        raise UsageError(f"output target must name a file: {path}")
+    if mode is not None and (mode < 0 or mode > 0o7777):
+        raise UsageError(f"invalid output mode for {path}: {mode:o}")
+
+    directory_fd: int | None = None
+    temporary_fd: int | None = None
+    temporary_name: str | None = None
+    try:
+        directory_fd = _open_safe_output_directory(path.parent)
+        initial = _output_target_metadata(directory_fd, path.name, path)
+        if mode is not None:
+            final_mode = mode
+        elif initial is None:
+            final_mode = 0o755 if executable else 0o644
+        else:
+            final_mode = stat.S_IMODE(initial.st_mode)
+            if executable:
+                final_mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        for _ in range(128):
+            candidate = f".{path.name}.{secrets.token_hex(12)}.tmp"
+            try:
+                temporary_fd = os.open(candidate, flags, 0o600, dir_fd=directory_fd)
+                temporary_name = candidate
+                break
+            except FileExistsError:
+                continue
+        if temporary_fd is None or temporary_name is None:
+            raise UsageError(f"could not allocate a private temporary output for: {path}")
+
+        payload = content
+        offset = 0
+        while offset < len(payload):
+            written = os.write(temporary_fd, payload[offset:])
+            if written <= 0:
+                raise OSError("short write while creating rendered output")
+            offset += written
+        os.fchmod(temporary_fd, final_mode)
+        os.fsync(temporary_fd)
+        os.close(temporary_fd)
+        temporary_fd = None
+
+        current = _output_target_metadata(directory_fd, path.name, path)
+        if _output_fingerprint(current) != _output_fingerprint(initial):
+            raise UsageError(f"output target changed while it was being rendered: {path}")
+
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        temporary_name = None
+        final = _output_target_metadata(directory_fd, path.name, path)
+        if final is None or stat.S_IMODE(final.st_mode) != final_mode:
+            raise UsageError(f"output target failed final validation: {path}")
+        os.fsync(directory_fd)
+    except UsageError:
+        raise
+    except OSError as exc:
+        raise UsageError(f"could not safely write output target {path}: {exc}") from exc
+    finally:
+        if temporary_fd is not None:
+            os.close(temporary_fd)
+        if temporary_name is not None and directory_fd is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
+def write_text(
+    path: Path,
+    content: str,
+    executable: bool = False,
+    *,
+    mode: int | None = None,
+) -> None:
+    """Atomically write text without following path or target symlinks."""
+    _atomic_write_bytes(
+        path,
+        content.encode("utf-8"),
+        executable=executable,
+        mode=mode,
+    )
 
 
 def write_json(path: Path, payload: Any, executable: bool = False) -> None:
     write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n", executable=executable)
+
+
+def read_bytes_safe(path: Path) -> tuple[bytes, int]:
+    """Read a single-link regular file through no-follow descriptors."""
+    path = Path(path)
+    if path.name in {"", ".", ".."}:
+        raise UsageError(f"input source must name a file: {path}")
+
+    directory_fd: int | None = None
+    source_fd: int | None = None
+    try:
+        directory_fd = _open_safe_output_directory(path.parent)
+        initial = _output_target_metadata(directory_fd, path.name, path)
+        if initial is None:
+            raise UsageError(f"input source does not exist: {path}")
+        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        source_fd = os.open(path.name, flags, dir_fd=directory_fd)
+        opened = os.fstat(source_fd)
+        if _output_fingerprint(opened) != _output_fingerprint(initial):
+            raise UsageError(f"input source changed while it was being opened: {path}")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(source_fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        final = os.fstat(source_fd)
+        if _output_fingerprint(final) != _output_fingerprint(opened):
+            raise UsageError(f"input source changed while it was being read: {path}")
+        return b"".join(chunks), stat.S_IMODE(opened.st_mode)
+    except UsageError:
+        raise
+    except OSError as exc:
+        raise UsageError(f"could not safely read input source {path}: {exc}") from exc
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
+def copy_file_safe(source: Path, target: Path, *, mode: int | None = None) -> None:
+    """Atomically copy a regular file without following source or target links."""
+    payload, source_mode = read_bytes_safe(source)
+    _atomic_write_bytes(target, payload, mode=source_mode if mode is None else mode)
+
+
+def reset_output_subdirectories(output_dir: Path, children: tuple[str, ...]) -> None:
+    """Remove renderer-owned child directories without following symlinks."""
+    if not getattr(shutil.rmtree, "avoids_symlink_attacks", False):
+        raise UsageError("platform lacks symlink-safe shutil.rmtree support")
+
+    directory_fd: int | None = None
+    try:
+        directory_fd = _open_safe_output_directory(output_dir)
+        for child in children:
+            if Path(child).name != child or child in {"", ".", ".."}:
+                raise UsageError(f"unsafe renderer-owned output name: {child}")
+            try:
+                metadata = os.stat(child, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise UsageError(
+                    f"renderer-owned output must be a real directory, not a symlink or special file: "
+                    f"{output_dir / child}"
+                )
+            try:
+                shutil.rmtree(child, dir_fd=directory_fd)
+            except OSError as exc:
+                raise UsageError(
+                    f"could not safely remove renderer-owned output: {output_dir / child}"
+                ) from exc
+        os.fsync(directory_fd)
+    finally:
+        if directory_fd is not None:
+            os.close(directory_fd)
 
 
 def load_structured_file(path: Path) -> dict[str, Any]:

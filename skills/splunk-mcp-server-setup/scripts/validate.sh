@@ -204,8 +204,26 @@ PY
 
 mcp_post_json_with_code() {
     local url="$1" payload="$2"
-    local token escaped_token
+    local token escaped_token transport_protocol="=https"
+    local -a extra_headers=()
     shift 2
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -H|--header)
+                require_arg "$1" $# || return 1
+                if [[ "$2" == *$'\n'* || "$2" == *$'\r'* ]]; then
+                    log "ERROR: MCP probe header contains a newline."
+                    return 1
+                fi
+                extra_headers+=(--header "$2")
+                shift 2
+                ;;
+            *)
+                log "ERROR: Unsupported MCP probe curl option: $1"
+                return 1
+                ;;
+        esac
+    done
     if [[ -n "${MCP_BEARER_TOKEN_FILE}" ]]; then
         token="$(read_secret_file "${MCP_BEARER_TOKEN_FILE}")" || return 1
         if [[ -z "${token}" || "${token}" == *$'\n'* || "${token}" == *$'\r'* || ${#token} -gt 65536 ]]; then
@@ -214,8 +232,11 @@ mcp_post_json_with_code() {
         fi
         escaped_token="$(_curl_config_escape "${token}")"
         _set_splunk_curl_tls_args || return 1
+        case "${url}" in
+            [Hh][Tt][Tt][Pp]://*) transport_protocol="=http,https" ;;
+        esac
         # shellcheck disable=SC2154  # populated by _set_splunk_curl_tls_args
-        curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
             --connect-timeout "${SPLUNK_REST_CONNECT_TIMEOUT:-10}" \
             --max-time "${SPLUNK_REST_MAX_TIME:-120}" \
             -K <(printf 'header = "Authorization: Bearer %s"\n' "${escaped_token}") \
@@ -224,7 +245,12 @@ mcp_post_json_with_code() {
             -H 'MCP-Protocol-Version: 2025-06-18' \
             -H 'Content-Type: application/json' \
             -d "${payload}" \
-            -w '\n%{http_code}' "$@" 2>/dev/null || echo "000"
+            -w '\n%{http_code}' "${extra_headers[@]}" \
+            --proto "${transport_protocol}" \
+            --proto-redir "${transport_protocol}" \
+            --max-redirs 0 \
+            --globoff \
+            2>/dev/null || echo "000"
         return
     fi
     splunk_curl "${SK}" -X POST "${url}" \
@@ -232,7 +258,7 @@ mcp_post_json_with_code() {
         -H 'MCP-Protocol-Version: 2025-06-18' \
         -H 'Content-Type: application/json' \
         -d "${payload}" \
-        -w '\n%{http_code}' "$@" 2>/dev/null || echo "000"
+        -w '\n%{http_code}' "${extra_headers[@]}" 2>/dev/null || echo "000"
 }
 
 app_visible() {

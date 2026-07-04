@@ -435,19 +435,35 @@ def render_apply_script(args: argparse.Namespace) -> str:
                 "",
             ]
         )
-    command = args.source_command or "bash skills/splunk-universal-forwarder-setup/scripts/setup.sh --phase all"
     if not args.source_command:
         return "\n".join(
             [
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
                 "",
-                "echo 'No automated apply command was rendered. Re-run setup.sh --phase all with --execution local or --execution ssh after review.' >&2",
+                "echo 'No automated apply command was rendered. Re-run setup.sh --phase all --accept-forwarder-mutation with --execution local or --execution ssh after review.' >&2",
                 "exit 2",
                 "",
             ]
         )
-    return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + f"exec {command}\n"
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            'if [[ "${1:-}" != "--accept-forwarder-mutation" ]]; then',
+            "  echo 'ERROR: Applying this reviewed packet requires --accept-forwarder-mutation.' >&2",
+            "  exit 2",
+            "fi",
+            "shift",
+            'if [[ "$#" -ne 0 ]]; then',
+            "  echo 'ERROR: Unexpected arguments after --accept-forwarder-mutation.' >&2",
+            "  exit 2",
+            "fi",
+            f"exec {args.source_command}",
+            "",
+        ]
+    )
 
 
 def render_readme(args: argparse.Namespace) -> str:
@@ -463,7 +479,12 @@ def render_readme(args: argparse.Namespace) -> str:
         files.append("`apply-universal-forwarder.sh`")
     file_list = "\n".join(f"- {item}" for item in files)
     if apply_state == "local-ssh":
-        apply_note = "Automated apply is supported for this target/package combination."
+        apply_note = (
+            "Automated apply is supported for this target/package combination. "
+            "After review, run `apply-universal-forwarder.sh "
+            "--accept-forwarder-mutation`; the acknowledgement is required before "
+            "the packet can change a host."
+        )
     elif apply_state == "render-only":
         apply_note = "Windows v1 is a rendered PowerShell handoff. Copy the MSI and script to the target, then run from an elevated PowerShell session."
     elif apply_state == "download-only":

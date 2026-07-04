@@ -34,7 +34,10 @@ measured from the **index creation date** (not rolling). The archive period is
 
 The rendered `enable-ddaa.sh` calls the ACS API with `curl`, reading the Bearer
 token from a local file (never argv/chat), and is gated behind a typed `APPLY`
-confirmation. `status.sh` reads the values back.
+confirmation. `status.sh` reads the values back. Both scripts accept only a
+credential-free HTTPS ACS origin, ignore user curl configuration, refuse
+redirects, and disable URL globbing so the Bearer token stays on its intended
+origin.
 
 ## Restore (UI-Only)
 

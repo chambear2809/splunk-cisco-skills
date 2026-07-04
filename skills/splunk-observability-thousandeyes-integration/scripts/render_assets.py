@@ -23,13 +23,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
+import stat
 from pathlib import Path
 from typing import Any
 
 
 SKILL_NAME = "splunk-observability-thousandeyes-integration"
+BUNDLE_MARKER_NAME = ".splunk-observability-thousandeyes-bundle.json"
+BUNDLE_MARKER_SCHEMA = 1
+MANAGED_DIR_NAMES = ("te-payloads", "dashboards", "detectors", "scripts")
+PRESERVED_DIR_NAMES = ("state",)
+ALLOWED_BUNDLE_ENTRIES = {
+    BUNDLE_MARKER_NAME,
+    *MANAGED_DIR_NAMES,
+    *PRESERVED_DIR_NAMES,
+    "metadata.json",
+}
+MAX_MARKER_BYTES = 16 * 1024
 
 
 def _load_yaml_module():
@@ -201,6 +214,213 @@ DEFAULT_DETECTORS: dict[str, list[dict[str, Any]]] = {
 
 class SpecError(ValueError):
     """Raised when the input spec violates skill constraints."""
+
+
+def repository_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def validated_output_path(raw_path: str) -> Path:
+    """Return a canonical safe bundle path without adopting existing content."""
+    lexical = Path(os.path.abspath(os.path.expanduser(raw_path)))
+    if lexical.is_symlink():
+        raise SpecError(f"output bundle root must not be a symlink: {lexical}")
+    resolved = lexical.resolve(strict=False)
+    forbidden = {
+        Path("/").resolve(),
+        Path.home().resolve(),
+        repository_root().resolve(),
+    }
+    if resolved in forbidden:
+        raise SpecError(
+            f"refusing unsafe output bundle root {resolved}; choose a dedicated child directory"
+        )
+    if lexical.exists() and not lexical.is_dir():
+        raise SpecError(f"output bundle root must be a directory: {lexical}")
+    return resolved
+
+
+def _read_bundle_marker(marker: Path, expected_root: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise SpecError("this runtime cannot enforce O_NOFOLLOW for the bundle marker")
+    flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(marker, flags)
+    except OSError as exc:
+        raise SpecError(f"cannot securely open output bundle marker {marker}: {exc}") from exc
+    try:
+        before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) & 0o077
+            or before.st_size < 1
+            or before.st_size > MAX_MARKER_BYTES
+        ):
+            raise SpecError(
+                f"output bundle marker must be a private single-link regular file: {marker}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_MARKER_BYTES + 1
+        while remaining:
+            chunk = os.read(fd, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(fd)
+        if (
+            (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+            or after.st_nlink != 1
+        ):
+            raise SpecError(f"output bundle marker changed while it was read: {marker}")
+    finally:
+        os.close(fd)
+    raw = b"".join(chunks)
+    if len(raw) > MAX_MARKER_BYTES:
+        raise SpecError(f"output bundle marker exceeds {MAX_MARKER_BYTES} bytes: {marker}")
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise SpecError(f"output bundle marker is invalid JSON: {marker}") from exc
+    expected = {
+        "schema": BUNDLE_MARKER_SCHEMA,
+        "skill": SKILL_NAME,
+        "bundle_root": str(expected_root),
+    }
+    if value != expected:
+        raise SpecError(
+            f"output directory is not the marker-owned {SKILL_NAME} bundle rooted at {expected_root}"
+        )
+
+
+def _write_bundle_marker(marker: Path, bundle_root: Path) -> None:
+    value = {
+        "schema": BUNDLE_MARKER_SCHEMA,
+        "skill": SKILL_NAME,
+        "bundle_root": str(bundle_root),
+    }
+    payload = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise SpecError("this runtime cannot enforce O_NOFOLLOW for the bundle marker")
+    flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(marker, flags, 0o600)
+    except OSError as exc:
+        raise SpecError(f"cannot create exclusive output bundle marker {marker}: {exc}") from exc
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise SpecError(f"new output bundle marker failed descriptor validation: {marker}")
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise SpecError(f"output bundle marker write did not complete: {marker}")
+            view = view[written:]
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.chmod(marker, 0o600, follow_symlinks=False)
+    directory_fd = os.open(bundle_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _validate_bundle_tree(path: Path, bundle_device: int, *, private: bool = False) -> None:
+    """Reject links, mount crossings, and special files before recursive cleanup."""
+    try:
+        root_metadata = path.lstat()
+    except OSError as exc:
+        raise SpecError(f"cannot inspect bundle path {path}: {exc}") from exc
+    if not stat.S_ISDIR(root_metadata.st_mode) or stat.S_ISLNK(root_metadata.st_mode):
+        raise SpecError(f"bundle directory must be a real directory, never a link or file: {path}")
+    if root_metadata.st_dev != bundle_device:
+        raise SpecError(f"bundle directory crosses a filesystem boundary: {path}")
+    if private and stat.S_IMODE(root_metadata.st_mode) & 0o077:
+        raise SpecError(f"preserved state directory must have mode 0700 or stricter: {path}")
+    for current, dir_names, file_names in os.walk(path, topdown=True, followlinks=False):
+        current_path = Path(current)
+        current_metadata = current_path.lstat()
+        if not stat.S_ISDIR(current_metadata.st_mode) or current_metadata.st_dev != bundle_device:
+            raise SpecError(f"unsafe directory encountered in output bundle: {current_path}")
+        for name in [*dir_names, *file_names]:
+            child = current_path / name
+            metadata = child.lstat()
+            if stat.S_ISLNK(metadata.st_mode):
+                raise SpecError(f"output bundle contains a symlink and will not be cleaned: {child}")
+            if metadata.st_dev != bundle_device:
+                raise SpecError(f"output bundle crosses a filesystem boundary at: {child}")
+            if name in dir_names:
+                if not stat.S_ISDIR(metadata.st_mode):
+                    raise SpecError(f"non-directory encountered where a directory was expected: {child}")
+                continue
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                raise SpecError(
+                    f"output bundle files must be single-link regular files before cleanup: {child}"
+                )
+            if private and stat.S_IMODE(metadata.st_mode) & 0o077:
+                raise SpecError(f"preserved state file must have mode 0600 or stricter: {child}")
+
+
+def _validate_top_level_file(path: Path, bundle_device: int) -> None:
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_dev != bundle_device
+    ):
+        raise SpecError(f"output bundle file is not a safe single-link regular file: {path}")
+
+
+def prepare_output_bundle(raw_path: str) -> Path:
+    """Create or validate the exclusive renderer-owned root before any cleanup."""
+    out = validated_output_path(raw_path)
+    if not out.exists():
+        out.mkdir(parents=True, mode=0o755)
+    if out.is_symlink() or not out.is_dir():
+        raise SpecError(f"output bundle root must be a real directory: {out}")
+    root_metadata = out.lstat()
+    bundle_device = root_metadata.st_dev
+    marker = out / BUNDLE_MARKER_NAME
+    entries = list(out.iterdir())
+    marker_present = marker.exists() or marker.is_symlink()
+    if marker_present:
+        _read_bundle_marker(marker, out)
+    else:
+        if entries:
+            raise SpecError(
+                f"refusing to adopt non-empty unmarked output directory {out}; "
+                "choose an empty dedicated bundle directory"
+            )
+        _write_bundle_marker(marker, out)
+
+    unexpected = sorted(entry.name for entry in out.iterdir() if entry.name not in ALLOWED_BUNDLE_ENTRIES)
+    if unexpected:
+        raise SpecError(
+            f"marker-owned output bundle contains unexpected top-level entries: {', '.join(unexpected)}"
+        )
+    if (metadata_path := out / "metadata.json").exists() or metadata_path.is_symlink():
+        _validate_top_level_file(metadata_path, bundle_device)
+    if (state_path := out / "state").exists() or state_path.is_symlink():
+        _validate_bundle_tree(state_path, bundle_device, private=True)
+
+    managed_to_clean: list[Path] = []
+    for managed_name in MANAGED_DIR_NAMES:
+        managed = out / managed_name
+        if not managed.exists() and not managed.is_symlink():
+            continue
+        _validate_bundle_tree(managed, bundle_device)
+        managed_to_clean.append(managed)
+    for managed in managed_to_clean:
+        shutil.rmtree(managed)
+    return out
 
 
 def parse_args() -> argparse.Namespace:
@@ -962,7 +1182,9 @@ if [[ -n "${TE_STREAM_ID:-}" ]]; then
 else
     "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
         --key stream --collection-path streams --create-path streams \\
-        --identity-fields '' --id-keys id,streamId \\
+        --identity-fields type,signal,endpointType,streamEndpointUrl,dataModelVersion \\
+        --identity-optional-fields testMatch,filters \\
+        --id-keys id,streamId \\
         --payload-file "${PAYLOAD_FILE}" \\
         --secret-placeholder '${O11Y_INGEST_TOKEN}' --secret-file "${O11Y_INGEST_TOKEN_FILE}"
 fi
@@ -976,7 +1198,7 @@ OPERATION_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/apm-operation.json
 COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
 CONNECTOR_ID="$("${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
     --key apm-connector --collection-path connectors/generic --create-path connectors/generic \\
-    --identity-fields '' --id-keys id,connectorId \\
+    --identity-fields type,name,target --id-keys id,connectorId \\
     --payload-file "${CONNECTOR_FILE}" \\
     --secret-placeholder '${O11Y_API_TOKEN}' --secret-file "${O11Y_API_TOKEN_FILE}")"
 [[ "${CONNECTOR_ID}" =~ ^[A-Za-z0-9._~-]+$ ]] || { echo "ERROR: connector readback returned an unsafe or empty ID." >&2; exit 2; }
@@ -1017,7 +1239,8 @@ for item in items:
         "--key", f"test:{item['type']}:{item['slug']}",
         "--collection-path", "tests",
         "--create-path", f"tests/{item['type']}",
-        "--identity-fields", "",
+        "--identity-fields", "testName",
+        "--identity-constant", f"type={item['type']}",
         "--id-keys", "testId,id",
         "--payload-file", payload_file,
     ]
@@ -1036,7 +1259,7 @@ for payload in "${payloads[@]}"; do
     slug="$(basename "${payload}" .json)"
     "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
         --key "alert-rule:${slug}" --collection-path alerts/rules --create-path alerts/rules \\
-        --identity-fields '' --id-keys ruleId,id --payload-file "${payload}"
+        --identity-fields ruleName,alertType --id-keys ruleId,id --payload-file "${payload}"
 done
 """
 
@@ -1061,19 +1284,17 @@ PAYLOADS_DIR="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/templates"
 shopt -s nullglob
 payloads=("${PAYLOADS_DIR}"/*.json)
 (( ${#payloads[@]} > 0 )) || { echo "ERROR: templates was selected but no payloads were rendered." >&2; exit 2; }
+if [[ "${DEPLOY_TEMPLATES:-false}" == "true" ]]; then
+    echo "ERROR: automated template deploy is disabled because template readback does not prove deploy completion; no changes were made." >&2
+    exit 2
+fi
 COMMON=(--token-file "${TE_TOKEN_FILE}" --account-group-id "${TE_ACCOUNT_GROUP_ID}" --state-dir "${TE_STATE_DIR}")
 for payload in "${payloads[@]}"; do
     slug="$(basename "${payload}" .json)"
     TEMPLATE_ID="$("${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" ensure-create \\
         --key "template:${slug}" --collection-path templates --create-path templates \\
-        --identity-fields '' --id-keys id,templateId --payload-file "${payload}")"
+        --identity-fields name --id-keys id,templateId --payload-file "${payload}")"
     [[ "${TEMPLATE_ID}" =~ ^[A-Za-z0-9._~-]+$ ]] || { echo "ERROR: template readback returned an unsafe or empty ID." >&2; exit 2; }
-    if [[ "${DEPLOY_TEMPLATES:-false}" == "true" ]]; then
-        "${PYTHON_BIN}" "${TE_API_CLIENT}" "${COMMON[@]}" post-action \\
-            --key "template-deploy:${TEMPLATE_ID}" \\
-            --action-path "templates/${TEMPLATE_ID}/deploy" \\
-            --readback-path "templates/${TEMPLATE_ID}"
-    fi
 done
 """
 
@@ -1098,6 +1319,7 @@ def list_helper(name: str, description: str, url_path: str, account_group_id: st
 VALIDATE_SIGNALFLOW_BODY = """\
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 # Read-only metric-catalog reachability probe. This does not compile or execute
 # the rendered SignalFlow programs; use the documented WebSocket handoff for that.
@@ -1108,28 +1330,95 @@ if [[ -z "${O11Y_API_TOKEN_FILE:-}" || -L "${O11Y_API_TOKEN_FILE}" || ! -f "${O1
     echo "ERROR: O11Y_API_TOKEN_FILE must point at a regular, non-symlink mode-600 token file." >&2
     exit 2
 fi
-TOKEN_MODE="$(stat -f '%A' "${O11Y_API_TOKEN_FILE}" 2>/dev/null || stat -c '%a' "${O11Y_API_TOKEN_FILE}")"
-[[ "${TOKEN_MODE}" == "600" ]] || { echo "ERROR: O11Y_API_TOKEN_FILE must have mode 600 (found ${TOKEN_MODE})." >&2; exit 2; }
-python3 - "${O11Y_API_TOKEN_FILE}" <<'PY'
-from pathlib import Path
+WORK_DIR="$(mktemp -d)"
+chmod 700 "${WORK_DIR}"
+O11Y_CURL_CONFIG="${WORK_DIR}/o11y-curl.conf"
+RESPONSE_FILE="${WORK_DIR}/response.json"
+trap 'rm -rf "${WORK_DIR}"' EXIT
+python3 - "${O11Y_API_TOKEN_FILE}" "${O11Y_CURL_CONFIG}" <<'PY'
+import os
+import stat
 import sys
+
+source_path, output_path = sys.argv[1:]
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: this runtime cannot enforce O_NOFOLLOW for O11Y_API_TOKEN_FILE")
+read_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
 try:
-    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
-except (OSError, UnicodeError):
-    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE is not readable UTF-8")
-if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
-    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE must contain exactly one non-empty line")
+    source_fd = os.open(source_path, read_flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot securely open O11Y_API_TOKEN_FILE: {exc}")
+try:
+    before = os.fstat(source_fd)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or before.st_size < 1
+        or before.st_size > 65536
+    ):
+        raise SystemExit("ERROR: O11Y_API_TOKEN_FILE must be a single-link mode-600 regular file")
+    chunks = []
+    while True:
+        chunk = os.read(source_fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    after = os.fstat(source_fd)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or after.st_nlink != 1
+    ):
+        raise SystemExit("ERROR: O11Y_API_TOKEN_FILE changed while it was read")
+finally:
+    os.close(source_fd)
+try:
+    text = b"".join(chunks).decode("utf-8")
+except UnicodeDecodeError:
+    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE is not valid UTF-8")
+lines = text.splitlines()
+if (
+    len(lines) != 1
+    or not lines[0]
+    or "\\r" in text
+    or "\\x00" in text
+    or '"' in lines[0]
+    or "\\\\" in lines[0]
+):
+    raise SystemExit("ERROR: O11Y_API_TOKEN_FILE must contain one curl-config-safe line")
+payload = f'header = "X-SF-Token: {lines[0]}"\\n'.encode("utf-8")
+write_flags = (
+    os.O_WRONLY
+    | os.O_CREAT
+    | os.O_EXCL
+    | getattr(os, "O_CLOEXEC", 0)
+    | os.O_NOFOLLOW
+)
+try:
+    output_fd = os.open(output_path, write_flags, 0o600)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot securely open private curl config: {exc}")
+try:
+    metadata = os.fstat(output_fd)
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) != 0o600:
+        raise SystemExit("ERROR: private curl config failed descriptor validation")
+    view = memoryview(payload)
+    while view:
+        written = os.write(output_fd, view)
+        if written <= 0:
+            raise SystemExit("ERROR: private curl config write did not complete")
+        view = view[written:]
+    os.fsync(output_fd)
+finally:
+    os.close(output_fd)
 PY
-O11Y_CURL_CONFIG="$(mktemp)"
-RESPONSE_FILE="$(mktemp)"
-chmod 600 "${O11Y_CURL_CONFIG}" "${RESPONSE_FILE}"
-{ printf 'header = "X-SF-Token: '; tr -d '\\r\\n' < "${O11Y_API_TOKEN_FILE}"; printf '"\\n'; } > "${O11Y_CURL_CONFIG}"
-trap 'rm -f "${O11Y_CURL_CONFIG}" "${RESPONSE_FILE}"' EXIT
 echo "Probing the ThousandEyes metric catalog via api.${REALM}.signalfx.com ..."
-curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \\
+curl -q --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \\
     -K "${O11Y_CURL_CONFIG}" \\
     "https://api.${REALM}.signalfx.com/v2/metric?query=thousandeyes&limit=1" \\
-    -o "${RESPONSE_FILE}"
+    -o "${RESPONSE_FILE}" \\
+    --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
 python3 - "${RESPONSE_FILE}" <<'PY'
 import json
 import sys
@@ -1216,10 +1505,15 @@ def main() -> int:
         return 1
     test_types_for_handoff = collect_test_types_for_handoff(spec)
     detector_thresholds = (spec.get("detectors") or {}).get("thresholds") or {}
+    try:
+        output_target = validated_output_path(args.output_dir)
+    except SpecError as exc:
+        print(f"ERROR: {exc}", file=__import__("sys").stderr)
+        return 1
 
     plan = {
         "skill": SKILL_NAME,
-        "output_dir": str(Path(args.output_dir).resolve()),
+        "output_dir": str(output_target),
         "realm": realm,
         "stream": stream is not None,
         "apm_connector": apm is not None,
@@ -1242,17 +1536,11 @@ def main() -> int:
                 print(f"  {key}: {value}")
         return 0
 
-    out = Path(args.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    # These directories are fully renderer-owned. Clear them so removed spec
-    # entries cannot survive as stale payloads and be applied later. Preserve
-    # state/ separately for retained remote IDs and idempotent reruns.
-    for managed_name in ("te-payloads", "dashboards", "detectors", "scripts"):
-        managed = out / managed_name
-        if managed.is_symlink() or managed.is_file():
-            managed.unlink()
-        elif managed.is_dir():
-            shutil.rmtree(managed)
+    try:
+        out = prepare_output_bundle(args.output_dir)
+    except SpecError as exc:
+        print(f"ERROR: {exc}", file=__import__("sys").stderr)
+        return 1
 
     if stream is not None:
         write_json(out / "te-payloads/stream.json", stream)

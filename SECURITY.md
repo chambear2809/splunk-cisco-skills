@@ -28,6 +28,27 @@ Local secret files are intentionally ignored:
 Use `skills/shared/scripts/write_secret_file.sh` to create temporary secret
 files without putting secret values in shell history.
 
+Credential-bearing Splunk management REST calls require an explicit
+`https://` URI. Disabling certificate verification does not authorize
+plaintext HTTP. `SPLUNK_ALLOW_INSECURE_HTTP=true` is a warned escape hatch for
+an isolated, short-lived lab only and must never be enabled on a routed or
+shared network.
+
+Credential-bearing API clients and package downloads ignore user curl
+configuration, constrain protocols and redirects, and verify TLS by default.
+`SPLUNK_VERIFY_SSL=false` does not weaken package-download TLS. Use
+`APP_DOWNLOAD_CA_CERT` for an internal mirror CA; the separate
+`APP_DOWNLOAD_ALLOW_HTTP=true` escape hatch is lab-only and can expose both
+package contents and supplied Basic credentials.
+
+Password-based SSH and SCP bootstrap operations require an operator-reviewed
+`SPLUNK_SSH_KNOWN_HOSTS_FILE` or an out-of-band verified
+`SPLUNK_SSH_HOST_KEY_FINGERPRINT`. Passwords are supplied to `sshpass` through
+an inherited file descriptor, not a temporary file or command argument.
+`SPLUNK_SSH_ALLOW_TOFU=true` restores `accept-new` behavior only for an
+isolated, disposable lab and leaves the first connection vulnerable to
+interception.
+
 ## Local Skill MCP Server
 
 The repo-local `splunk-cisco-skills` MCP server (`agent/run-splunk-cisco-skills-mcp.py`)

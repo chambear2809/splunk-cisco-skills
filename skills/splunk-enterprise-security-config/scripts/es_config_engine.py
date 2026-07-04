@@ -16,8 +16,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, unquote, urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import quote, unquote, urlencode, urlsplit
+from urllib.request import (
+    HTTPHandler,
+    HTTPRedirectHandler,
+    HTTPSHandler,
+    Request,
+    build_opener,
+)
 
 # Splunk's auth endpoint returns a small, trusted XML document (sessionKey),
 # but defense-in-depth wants a hardened XML parser per the repo's
@@ -3193,6 +3199,7 @@ class CredentialLoader:
         "SPLUNK_PASSWORD",
         "SPLUNK_VERIFY_SSL",
         "SPLUNK_CA_CERT",
+        "SPLUNK_ALLOW_INSECURE_HTTP",
     }
 
     def __init__(self, project_root: Path):
@@ -3758,25 +3765,70 @@ def count_search_events(response: Any) -> int:
     return 0
 
 
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Refuse redirects so login bodies and session keys stay on one origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        return None
+
+
+def _validate_splunk_origin(value: str, *, allow_insecure_http: bool) -> tuple[str, str]:
+    """Return a credential-free Splunk origin and its validated scheme."""
+    if any(character.isspace() for character in value):
+        raise EsConfigError("Splunk URI must not contain whitespace.")
+    origin = value.rstrip("/")
+    try:
+        parsed = urlsplit(origin)
+        parsed.port
+    except ValueError as exc:
+        raise EsConfigError("Splunk URI is invalid or contains an invalid port.") from exc
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"} or not parsed.hostname:
+        raise EsConfigError("Splunk URI must be an absolute https://host[:port] origin.")
+    if parsed.username is not None or parsed.password is not None:
+        raise EsConfigError("Splunk URI must not contain embedded userinfo credentials.")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise EsConfigError("Splunk URI must not contain a path, query, or fragment.")
+    if scheme == "http" and not allow_insecure_http:
+        raise EsConfigError(
+            "Splunk REST refuses plaintext HTTP. Use HTTPS, or set "
+            "SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab."
+        )
+    if scheme == "http":
+        print(
+            "WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true permits Splunk credentials "
+            "and session keys over plaintext HTTP.",
+            file=sys.stderr,
+        )
+    return origin, scheme
+
+
 class SplunkClient:
     def __init__(self, project_root: Path, spec: dict[str, Any]):
         self.project_root = project_root
         self.spec = spec
         credentials = CredentialLoader(project_root).load()
         connection = spec.get("connection") if isinstance(spec.get("connection"), dict) else {}
-        self.base_url = str(
+        raw_base_url = str(
             connection.get("base_url")
             or credentials.get("SPLUNK_SEARCH_API_URI")
             or credentials.get("SPLUNK_URI")
             or ""
-        ).rstrip("/")
+        )
         self.username = str(connection.get("username") or credentials.get("SPLUNK_USER") or credentials.get("SPLUNK_USERNAME") or "")
         self.password = str(credentials.get("SPLUNK_PASS") or credentials.get("SPLUNK_PASSWORD") or "")
         self.verify_ssl = boolish(connection.get("verify_ssl", credentials.get("SPLUNK_VERIFY_SSL")), default=True)
         self.ca_cert = str(connection.get("ca_cert") or credentials.get("SPLUNK_CA_CERT") or "")
         self.session_key = ""
-        if not self.base_url:
+        if not raw_base_url.strip():
             raise EsConfigError("Missing Splunk URI. Configure SPLUNK_SEARCH_API_URI or SPLUNK_URI in credentials.")
+        self.base_url, scheme = _validate_splunk_origin(
+            raw_base_url,
+            allow_insecure_http=str(
+                credentials.get("SPLUNK_ALLOW_INSECURE_HTTP") or ""
+            ).strip().lower()
+            in {"1", "true", "yes", "on"},
+        )
         if not self.username or not self.password:
             raise EsConfigError("Missing Splunk credentials. Run skills/shared/scripts/setup_credentials.sh.")
         self.context = None
@@ -3784,12 +3836,21 @@ class SplunkClient:
             self.context = ssl.create_default_context(cafile=self.ca_cert)
         elif not self.verify_ssl:
             self.context = ssl._create_unverified_context()
+        transport_handler = (
+            HTTPSHandler(context=self.context) if scheme == "https" else HTTPHandler()
+        )
+        self._opener = build_opener(_NoRedirectHandler(), transport_handler)
 
     def login(self) -> None:
         body = urlencode({"username": self.username, "password": self.password}).encode("utf-8")
         request = Request(f"{self.base_url}/services/auth/login", data=body, method="POST")
-        with urlopen(request, context=self.context, timeout=30) as response:
-            raw = response.read()
+        try:
+            with self._opener.open(request, timeout=30) as response:
+                raw = response.read()
+        except HTTPError as exc:
+            raise EsConfigError(f"Splunk login failed with HTTP {exc.code}.") from exc
+        except URLError as exc:
+            raise EsConfigError(f"Splunk login failed: {exc}") from exc
         root = _xml_fromstring(raw)
         session = root.findtext(".//sessionKey")
         if not session:
@@ -3824,7 +3885,7 @@ class SplunkClient:
                 headers["Content-Type"] = "application/x-www-form-urlencoded"
         request = Request(url, data=data, headers=headers, method=method.upper())
         try:
-            with urlopen(request, context=self.context, timeout=45) as response:
+            with self._opener.open(request, timeout=45) as response:
                 raw = response.read()
         except HTTPError as exc:
             if exc.code == 404:
@@ -3997,7 +4058,7 @@ class SplunkClient:
             method=method.upper(),
         )
         try:
-            with urlopen(request, context=self.context, timeout=120) as response:
+            with self._opener.open(request, timeout=120) as response:
                 raw = response.read()
         except HTTPError as exc:
             if exc.code == 404:
@@ -4371,7 +4432,7 @@ class Runner:
         project_root: Path,
         spec: dict[str, Any],
         *,
-        stop_on_error: bool = False,
+        stop_on_error: bool = True,
         strict: bool = False,
     ):
         self.project_root = project_root
@@ -4390,7 +4451,7 @@ class Runner:
         for action_dict in self.plan["actions"]:
             action = Action(**action_dict)
             if stopped_at is not None:
-                # When --stop-on-error fires, mark every remaining action as
+                # Under the default fail-stop policy, mark every remaining action as
                 # 'skipped' so operators can see exactly which work did NOT
                 # run. There is no rollback; previously-applied actions stay
                 # applied.
@@ -4398,7 +4459,7 @@ class Runner:
                     "target": action.target,
                     "operation": action.operation,
                     "status": "skipped",
-                    "reason": "Skipped because --stop-on-error tripped on a prior action.",
+                    "reason": "Skipped because the fail-stop policy tripped on a prior action.",
                 })
                 continue
             if not action.apply_supported:
@@ -4804,10 +4865,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--spec", help="YAML or JSON ES config spec")
     parser.add_argument("--mode", choices=("preview", "apply", "validate", "inventory", "export"), default="preview")
     parser.add_argument("--output", help="Write JSON output to this path")
-    parser.add_argument(
+    error_policy = parser.add_mutually_exclusive_group()
+    error_policy.add_argument(
         "--stop-on-error",
+        dest="stop_on_error",
         action="store_true",
-        help="Halt apply on the first failed action (no rollback; remaining actions are marked 'skipped').",
+        default=True,
+        help="Halt apply on the first failed action (default; retained for explicit compatibility).",
+    )
+    error_policy.add_argument(
+        "--continue-on-error",
+        dest="stop_on_error",
+        action="store_false",
+        help=(
+            "Continue mutating after a failed action (explicit high-risk override; "
+            "there is no rollback)."
+        ),
     )
     parser.add_argument(
         "--strict",

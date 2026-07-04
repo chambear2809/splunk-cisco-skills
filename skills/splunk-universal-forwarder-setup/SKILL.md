@@ -75,7 +75,15 @@ Useful additions:
 - `--target-arch auto|amd64|arm64|ppc64le|s390x|x64|x86|intel|universal2|freebsd13-amd64|freebsd14-amd64|sparc|powerpc`
 - `--allow-stale-latest`
 - `--output-dir PATH`
+- `--accept-forwarder-mutation` for a reviewed live install, upgrade, or
+  enrollment
 - `--dry-run --json`
+
+The default phase is `render`. It writes reviewable assets and does not install,
+upgrade, or enroll a host. Live Unix-like `install`, `enroll`, and `all` phases
+refuse to run unless `--accept-forwarder-mutation` is present. An `install`
+phase also covers upgrades of an existing Universal Forwarder. Render, dry-run,
+download, status, and Windows handoff paths do not require the acknowledgement.
 
 ## Enrollment Modes
 
@@ -94,6 +102,7 @@ Linux install and deployment-server enrollment:
 ```bash
 bash skills/splunk-universal-forwarder-setup/scripts/setup.sh \
   --phase all \
+  --accept-forwarder-mutation \
   --target-os linux \
   --source remote \
   --url latest \

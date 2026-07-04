@@ -8,6 +8,8 @@ import os
 import re
 import subprocess
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
@@ -64,6 +66,62 @@ def write_supported_fake_splunk_home(path: Path) -> None:
         encoding="utf-8",
     )
     binary.chmod(0o755)
+
+
+def render_rest_apply_fixture(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    admin_password = tmp_path / "admin-password"
+    provider_password = tmp_path / "provider-password"
+    admin_password.write_text("admin-test-password", encoding="utf-8")
+    provider_password.write_text("provider-test-password", encoding="utf-8")
+    admin_password.chmod(0o600)
+    provider_password.chmod(0o600)
+    spec = {
+        "providers": [
+            {
+                "name": "alpha",
+                "type": "splunk",
+                "mode": "standard",
+                "host_port": "remote.example.test:8089",
+                "service_account": "federated_svc",
+                "password_file": str(provider_password),
+            }
+        ],
+        "federated_indexes": [
+            {
+                "name": "alpha_idx",
+                "provider": "alpha",
+                "dataset_type": "index",
+                "dataset_name": "main",
+            }
+        ],
+    }
+    spec_path = write_spec(tmp_path, "rest-spec.json", spec)
+    output = tmp_path / "rest-output"
+    result = run_render("--output-dir", str(output), "--spec", str(spec_path))
+    assert result.returncode == 0, result.stderr
+    render_dir = output / "federated-search"
+    env = {
+        **os.environ,
+        "SPLUNK_REST_USER": "admin",
+        "SPLUNK_REST_PASSWORD_FILE": str(admin_password),
+    }
+    env.pop("SPLUNK_ALLOW_INSECURE_HTTP", None)
+    return render_dir, env
+
+
+def run_rest_apply(
+    render_dir: Path,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(render_dir / "apply-rest.sh")],
+        cwd=render_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -594,6 +652,113 @@ def test_apply_rest_payload_includes_password_substitution(tmp_path: Path) -> No
     assert "SPLUNK_REST_PASSWORD_FILE" in rest
     assert "/services/data/federated/provider" in rest
     assert "/services/data/federated/index" in rest
+
+
+def test_apply_rest_refuses_http_without_explicit_lab_opt_in(tmp_path: Path) -> None:
+    render_dir, env = render_rest_apply_fixture(tmp_path)
+    env["SPLUNK_REST_URI"] = "http://127.0.0.1:9"
+    result = run_rest_apply(render_dir, env)
+    assert result.returncode != 0
+    assert "refuses plaintext HTTP" in result.stderr
+
+
+def test_apply_rest_allows_explicit_lab_http_with_warning(tmp_path: Path) -> None:
+    authorization_headers: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            authorization_headers.append(self.headers.get("Authorization", ""))
+            content_length = int(self.headers.get("Content-Length", "0"))
+            self.rfile.read(content_length)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "LAB ONLY" in result.stderr
+        assert len(authorization_headers) == 2
+        assert all(value.startswith("Basic ") for value in authorization_headers)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_apply_rest_rejects_uri_userinfo_without_echoing_secret(tmp_path: Path) -> None:
+    render_dir, env = render_rest_apply_fixture(tmp_path)
+    env["SPLUNK_REST_URI"] = "https://embedded:uri-secret@example.test:8089"
+    result = run_rest_apply(render_dir, env)
+    assert result.returncode != 0
+    assert "userinfo" in result.stderr
+    assert "uri-secret" not in result.stderr
+
+
+def test_apply_rest_refuses_redirect_without_forwarding_credentials(tmp_path: Path) -> None:
+    target_authorization: list[str] = []
+
+    class TargetHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            target_authorization.append(self.headers.get("Authorization", ""))
+            self.send_response(200)
+            self.end_headers()
+
+        def do_POST(self) -> None:  # noqa: N802
+            self.do_GET()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    target = ThreadingHTTPServer(("127.0.0.1", 0), TargetHandler)
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:{target.server_port}/credential-target",
+            )
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    redirect = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+    threads = [
+        threading.Thread(target=server.serve_forever, daemon=True)
+        for server in (target, redirect)
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{redirect.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode != 0
+        assert "HTTP 302" in result.stderr
+        assert target_authorization == []
+    finally:
+        for server in (redirect, target):
+            server.shutdown()
+            server.server_close()
 
 
 # ---------------------------------------------------------------------------
