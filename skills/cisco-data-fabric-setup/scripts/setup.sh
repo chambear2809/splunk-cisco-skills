@@ -100,10 +100,14 @@ while [[ $# -gt 0 ]]; do
         --json) JSON_OUTPUT=true; shift ;;
         --spec) require_value "$1" "$#"; SPEC="$2"; shift 2 ;;
         --output-dir) require_value "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
-        --token|--password|--api-key|--api-token|--access-token|--bearer-token|--client-secret|--private-key|--secret)
+        --token|--password|--authorization|--secret|\
+        --*-token|--*-password|--*-key|--*-secret|\
+        --*_token|--*_password|--*_key|--*_secret)
             reject_secret_flag
             ;;
-        --token=*|--password=*|--api-key=*|--api-token=*|--access-token=*|--bearer-token=*|--client-secret=*|--private-key=*|--secret=*)
+        --token=*|--password=*|--authorization=*|--secret=*|\
+        --*-token=*|--*-password=*|--*-key=*|--*-secret=*|\
+        --*_token=*|--*_password=*|--*_key=*|--*_secret=*)
             reject_secret_flag
             ;;
         --help|-h) usage; exit 0 ;;

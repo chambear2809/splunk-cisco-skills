@@ -444,6 +444,17 @@ def test_direct_secret_flags_and_secret_looking_spec_keys_are_rejected(tmp_path:
     assert result.returncode != 0
     assert secret not in result.stdout + result.stderr
 
+    for flag in ("--llm-api-key", "--openai-api-key", "--model_api_key"):
+        result = run_cmd(
+            "bash", str(SETUP), "--render", f"{flag}=LLM_SECRET_SHOULD_NOT_ECHO",
+            "--output-dir", str(tmp_path / "llm-rendered"), check=False,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "LLM_SECRET_SHOULD_NOT_ECHO" not in combined
+        assert "Direct secret values are not accepted" in combined
+        assert "Unknown option" not in combined
+
     spec = tmp_path / "bad.yaml"
     spec.write_text(
         "api_version: cisco-data-fabric-setup/v1\nai_activation:\n  token: SHOULD_NOT_RENDER\n",
