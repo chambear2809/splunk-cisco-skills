@@ -72,8 +72,8 @@ pre-commit run --all-files
 Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
 `bash -n` on every skill script, the Agent Skills frontmatter and
 progressive-disclosure contract, the repo-readiness check (operator catalog links,
-agent catalog parity, and symlinks), `generate_deployment_docs.py --check`, `ruff`,
-and `yamllint`. The full
+agent catalog parity, and symlinks), generated deployment and skill-validation
+matrix freshness, `ruff`, and `yamllint`. The full
 pytest / bats / shellcheck suite is intentionally not in pre-commit: keep
 those in CI and in the explicit commands below for fast local feedback.
 
@@ -95,6 +95,8 @@ shellcheck --severity=warning $(find skills -name '*.sh' -print)
 ruff check skills/ tests/ agent/
 yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents
 python3 skills/shared/scripts/generate_deployment_docs.py --check
+python3 skills/shared/scripts/audit_skill_validation.py
+python3 skills/shared/scripts/generate_skill_validation_matrix.py --check
 if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
   python3 skills/cisco-product-setup/scripts/build_catalog.py --check
 else
@@ -127,6 +129,9 @@ When adding a skill under `skills/<skill-name>/`, include:
   non-secret configuration values
 - tests for argument parsing, dry runs, credential handling, and any shared
   helper behavior
+- the skill name in `skills/shared/skill_validation_registry.json`; add
+  sanitized integration or live evidence only when a target, ISO date, and
+  reviewable evidence file or URL are available
 
 Also update:
 

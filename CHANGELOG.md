@@ -9,6 +9,10 @@ release section when cutting a release.
 
 ### Added
 
+- Generated `SKILL_VALIDATION_MATRIX.md` and its checked-in evidence registry,
+  separating interface contracts, direct test references, offline smoke scripts,
+  advertised live/strict modes, TA completion requirements, and sanitized
+  integration/live/apply results for every skill.
 - New `galileo-platform-setup` skill: render-first Galileo SaaS/Enterprise
   integration with Splunk Platform (HEC/OTLP) and Splunk Observability Cloud.
   Covers `export_records` to Splunk HEC, Observe OpenTelemetry/OpenInference

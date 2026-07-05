@@ -36,7 +36,7 @@ explicit installer acknowledgement.
 Every skill now declares a machine-readable 10.5 status in its `SKILL.md`
 frontmatter. See the generated
 [`SPLUNK_10_5_COMPATIBILITY.md`](SPLUNK_10_5_COMPATIBILITY.md) matrix for all
-165 classifications, package evidence, and the meaning of supported,
+skill classifications, package evidence, and the meaning of supported,
 conditional, blocked, self-managed, delegated, and not-applicable statuses.
 
 ## Start Here
@@ -123,6 +123,12 @@ Run commands from the repository root.
 For the exhaustive operator catalog, use
 [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). For local tooling and live-access
 requirements by skill, use [`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md).
+For checked-in test surfaces, offline smoke coverage, advertised live/strict
+modes, TA completion gates, and sanitized target-backed results, use the
+generated [`SKILL_VALIDATION_MATRIX.md`](SKILL_VALIDATION_MATRIX.md).
+Before claiming full product or feature coverage, run the offline contract audit
+documented in
+[`product_feature_coverage_contract.md`](skills/shared/references/product_feature_coverage_contract.md).
 
 ## How The Repo Operates
 

@@ -97,6 +97,21 @@ repos:
             DEPLOYMENT_ROLE_MATRIX\.md
           )$
 
+      - id: skill-validation-matrix-fresh
+        name: Skill validation registry and matrix freshness
+        entry: python3 skills/shared/scripts/generate_skill_validation_matrix.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            SKILL_VALIDATION_MATRIX\.md|
+            skills/.*/SKILL\.md|
+            skills/.*/scripts/.*|
+            skills/shared/skill_validation_registry\.json|
+            skills/shared/scripts/(audit|generate)_skill_validation\.py|
+            tests/test_.*\.(py|bats)
+          )$
+
       - id: ruff-lint
         name: ruff (Python lint)
         entry: ruff check
