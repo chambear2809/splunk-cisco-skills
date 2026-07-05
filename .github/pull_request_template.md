@@ -13,6 +13,7 @@
 - [ ] `yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents`
 - [ ] `python3 skills/shared/scripts/generate_deployment_docs.py --check`
 - [ ] `python3 skills/shared/scripts/generate_skill_ux_catalog.py --check`
+- [ ] `python3 skills/shared/scripts/generate_skill_validation_matrix.py --check`
 - [ ] Pinned SCAN source fixture and generated catalog freshness check passes
 - [ ] `python3 tests/check_skill_frontmatter.py`
 - [ ] `python3 tests/check_repo_readiness.py`

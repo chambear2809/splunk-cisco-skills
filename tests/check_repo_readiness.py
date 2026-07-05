@@ -18,6 +18,7 @@ REQUIRED_TOP_LEVEL = [
     "LICENSE",
     "CHANGELOG.md",
     "SPLUNK_10_5_COMPATIBILITY.md",
+    "SKILL_VALIDATION_MATRIX.md",
     "SKILL_REQUIREMENTS.md",
     ".gitattributes",
     ".github/CODEOWNERS",
@@ -69,6 +70,8 @@ AGENT_SKILLS_CALLOUTS = {
         "https://agentskills.io/specification",
     ],
 }
+
+PRODUCT_FEATURE_COVERAGE_DOC = "skills/shared/references/product_feature_coverage_contract.md"
 
 LOCAL_ARTIFACT_ROOTS = [
     "cisco-isovalent-platform-rendered",
@@ -262,6 +265,7 @@ def check_catalog_sync(errors: list[str]) -> None:
         "SKILL_UX_CATALOG.md",
         "SKILL_REQUIREMENTS.md",
         "SPLUNK_10_5_COMPATIBILITY.md",
+        "SKILL_VALIDATION_MATRIX.md",
     ):
         if required_link not in readme_text:
             errors.append(f"README.md: missing operator catalog link: {required_link}")
@@ -479,6 +483,41 @@ def check_agent_skills_callouts(errors: list[str]) -> None:
             )
 
 
+def check_product_feature_coverage_contract(errors: list[str]) -> None:
+    doc_path = REPO_ROOT / PRODUCT_FEATURE_COVERAGE_DOC
+    script_path = REPO_ROOT / "skills/shared/scripts/audit_product_feature_coverage.py"
+    if not doc_path.is_file():
+        errors.append(f"{PRODUCT_FEATURE_COVERAGE_DOC}: missing coverage contract")
+        return
+    if not script_path.is_file():
+        errors.append("skills/shared/scripts/audit_product_feature_coverage.py: missing audit script")
+        return
+    text = doc_path.read_text(encoding="utf-8")
+    for fragment in (
+        "Skill catalog",
+        "App/package routing",
+        "Product routers",
+        "Production safety",
+        "audit_product_feature_coverage.py",
+    ):
+        if fragment not in text:
+            errors.append(f"{PRODUCT_FEATURE_COVERAGE_DOC}: missing contract fragment: {fragment}")
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        errors.append(
+            "skills/shared/scripts/audit_product_feature_coverage.py failed: "
+            + result.stdout
+            + result.stderr
+        )
+
+
 def check_skill_script_references(errors: list[str]) -> None:
     """Ensure UI-advertised safe-first/validation skill scripts exist.
 
@@ -631,6 +670,7 @@ def main() -> int:
     check_secret_examples(errors)
     check_smoke_script_no_sudo_password(errors)
     check_agent_skills_callouts(errors)
+    check_product_feature_coverage_contract(errors)
     check_skill_script_references(errors)
     check_mcp_tool_schema(errors)
     check_registry_skill_refs(errors)
