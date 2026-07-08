@@ -40,6 +40,64 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             timeout=60,
         )
 
+    def test_sok_helm_list_all_supports_helm3_helm4_and_fails_closed(self) -> None:
+        helper = self.embedded_renderer_code("HELM_LIST_ALL_FUNCTION")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            mock = root / "helm"
+            log = root / "helm.log"
+            mock.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' \"$*\" >>\"$HELM_MOCK_LOG\"\n"
+                "if [ \"${1:-}\" = list ] && [ \"${2:-}\" = --help ]; then\n"
+                "  [ \"${HELM_MOCK_MODE:-}\" != help-fail ] || exit 7\n"
+                "  if [ \"${HELM_MOCK_MODE:-}\" = helm3 ]; then\n"
+                "    printf '%s\\n' '  -a, --all  show all releases'\n"
+                "  else\n"
+                "    printf '%s\\n' '  -A, --all-namespaces  list all namespaces'\n"
+                "  fi\n"
+                "  exit 0\n"
+                "fi\n"
+                "[ \"${HELM_MOCK_LIST_FAIL:-false}\" != true ] || exit 8\n"
+                "if [ \"${HELM_MOCK_MODE:-}\" = helm4 ]; then\n"
+                "  for arg in \"$@\"; do [ \"$arg\" != --all ] || exit 9; done\n"
+                "fi\n"
+                "printf '%s\\n' release\n",
+                encoding="utf-8",
+            )
+            mock.chmod(0o700)
+            environment = {
+                **os.environ,
+                "PATH": f"{root}{os.pathsep}{os.environ['PATH']}",
+                "HELM_MOCK_LOG": str(log),
+            }
+
+            def run(mode: str, *, list_fail: bool = False) -> subprocess.CompletedProcess:
+                log.write_text("", encoding="utf-8")
+                return subprocess.run(
+                    ["bash", "-c", helper + "\nhelm_list_all --namespace ns -q"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env={
+                        **environment,
+                        "HELM_MOCK_MODE": mode,
+                        "HELM_MOCK_LIST_FAIL": "true" if list_fail else "false",
+                    },
+                )
+
+            helm3 = run("helm3")
+            self.assertEqual(helm3.returncode, 0, msg=helm3.stderr)
+            self.assertIn("list --all --namespace ns -q", log.read_text())
+            helm4 = run("helm4")
+            self.assertEqual(helm4.returncode, 0, msg=helm4.stderr)
+            self.assertIn("list --namespace ns -q", log.read_text())
+            self.assertNotIn("list --all --namespace", log.read_text())
+            failed_list = run("helm4", list_fail=True)
+            self.assertNotEqual(failed_list.returncode, 0)
+            failed_help = run("help-fail")
+            self.assertNotEqual(failed_help.returncode, 0)
+
     @staticmethod
     def embedded_renderer_code(assignment_name: str) -> str:
         tree = ast.parse(RENDERER.read_text(encoding="utf-8"))
@@ -365,6 +423,529 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 "enterprise.splunk.com/admin-managed-pv"
             )
 
+    def test_sok_fresh_install_guard_fails_closed_before_mutation(self) -> None:
+        guard = self.embedded_renderer_code("fresh_install_guard_code")
+
+        def crd(plural: str, kind: str) -> dict[str, object]:
+            return {
+                "apiVersion": "apiextensions.k8s.io/v1",
+                "kind": "CustomResourceDefinition",
+                "metadata": {"name": f"{plural}.enterprise.splunk.com"},
+                "spec": {
+                    "group": "enterprise.splunk.com",
+                    "names": {"kind": kind, "plural": plural},
+                    "scope": "Namespaced",
+                    "versions": [
+                        {
+                            "name": "v4",
+                            "served": True,
+                            "storage": True,
+                            "schema": {
+                                "openAPIV3Schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "spec": {
+                                            "type": "object",
+                                            "properties": {
+                                                "replicas": {"type": "integer"}
+                                            },
+                                        }
+                                    },
+                                }
+                            },
+                        }
+                    ],
+                },
+            }
+
+        reviewed_crds = [
+            crd("clustermanagers", "ClusterManager"),
+            crd("clustermasters", "ClusterMaster"),
+            crd("indexerclusters", "IndexerCluster"),
+            crd("ingestorclusters", "IngestorCluster"),
+            crd("licensemanagers", "LicenseManager"),
+            crd("licensemasters", "LicenseMaster"),
+            crd("monitoringconsoles", "MonitoringConsole"),
+            crd("objectstorages", "ObjectStorage"),
+            crd("queues", "Queue"),
+            crd("searchheadclusters", "SearchHeadCluster"),
+            crd("standalones", "Standalone"),
+        ]
+        live_crds = json.loads(json.dumps(reviewed_crds))
+        for item in live_crds:
+            spec = item["spec"]
+            kind = spec["names"]["kind"]
+            spec["names"].update(
+                {"singular": kind.lower(), "listKind": kind + "List"}
+            )
+            spec["preserveUnknownFields"] = False
+            spec["conversion"] = {"strategy": "None"}
+            spec["versions"][0]["deprecated"] = False
+            item["status"] = {
+                "conditions": [
+                    {"type": "Established", "status": "True"},
+                    {"type": "NamesAccepted", "status": "True"},
+                ],
+                "storedVersions": ["v4"],
+            }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            expected_path = root / "reviewed-crds.json"
+            live_path = root / "live-crds.json"
+            resources_path = root / "resources.json"
+            log_path = root / "kubectl.log"
+            expected_path.write_text(
+                json.dumps(
+                    {"apiVersion": "v1", "kind": "List", "items": reviewed_crds}
+                ),
+                encoding="utf-8",
+            )
+            live_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+            resources_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+            expected_digest = hashlib.sha256(expected_path.read_bytes()).hexdigest()
+            kubectl = bin_dir / "kubectl"
+            kubectl.write_text(
+                f"""#!{sys.executable}
+import json
+import os
+import sys
+from pathlib import Path
+
+arguments = sys.argv[1:]
+Path(os.environ["MOCK_KUBECTL_LOG"]).open("a", encoding="utf-8").write(
+    " ".join(arguments) + "\\n"
+)
+if "namespace" in arguments:
+    if os.environ.get("MOCK_NAMESPACE_EXISTS") == "true":
+        name = arguments[arguments.index("namespace") + 1]
+        metadata = {{"name": name}}
+        if os.environ.get("MOCK_NAMESPACE_TERMINATING") == "true":
+            metadata["deletionTimestamp"] = "2026-07-08T00:00:00Z"
+        print(json.dumps({{
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": metadata,
+            "status": {{"phase": os.environ.get("MOCK_NAMESPACE_PHASE", "Active")}},
+        }}))
+elif "customresourcedefinitions.apiextensions.k8s.io" in arguments:
+    if os.environ.get("MOCK_CRD_INVENTORY_FAIL") == "true":
+        raise SystemExit("forbidden CRD inventory")
+    print(Path(os.environ["MOCK_CRDS"]).read_text(encoding="utf-8"))
+elif any(argument.endswith(".enterprise.splunk.com") for argument in arguments):
+    if os.environ.get("MOCK_FOREIGN_RESOURCE") == "true" and any(
+        argument == "standalones.enterprise.splunk.com" for argument in arguments
+    ):
+        print(json.dumps({{"items": [{{"apiVersion": "enterprise.splunk.com/v4", "kind": "Standalone", "metadata": {{"name": "foreign", "namespace": "other"}}}}]}}))
+    elif os.environ.get("MOCK_LICENSE_MANAGER_NAME") and any(
+        argument == "licensemanagers.enterprise.splunk.com" for argument in arguments
+    ):
+        metadata = {{
+            "name": os.environ["MOCK_LICENSE_MANAGER_NAME"],
+            "namespace": "splunk-validation",
+            "uid": "license-manager-uid",
+            "resourceVersion": "7",
+            "generation": 1,
+            "annotations": {{
+                "meta.helm.sh/release-name": os.environ.get(
+                    "MOCK_LICENSE_MANAGER_OWNER", "shared-license"
+                ),
+                "meta.helm.sh/release-namespace": "splunk-validation",
+            }},
+        }}
+        status = {{"phase": "Ready", "message": "", "observedGeneration": 1}}
+        if os.environ.get("MOCK_LICENSE_MANAGER_UNHEALTHY") == "true":
+            metadata["deletionTimestamp"] = "2026-07-08T00:00:00Z"
+            metadata["annotations"]["enterprise.splunk.com/paused"] = "true"
+            status["message"] = "stale failure"
+        print(json.dumps({{"items": [{{"apiVersion": "enterprise.splunk.com/v4", "kind": "LicenseManager", "metadata": metadata, "status": status}}]}}))
+    else:
+        print(Path(os.environ["MOCK_RESOURCES"]).read_text(encoding="utf-8"))
+else:
+    raise SystemExit("unexpected kubectl arguments: " + " ".join(arguments))
+""",
+                encoding="utf-8",
+            )
+            kubectl.chmod(0o700)
+
+            base_environment = {
+                **os.environ,
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+                "MOCK_KUBECTL_LOG": str(log_path),
+                "MOCK_CRDS": str(live_path),
+                "MOCK_RESOURCES": str(resources_path),
+            }
+
+            def check(
+                *, allowed_resources: str = "[]", **environment: str
+            ) -> subprocess.CompletedProcess:
+                log_path.write_text("", encoding="utf-8")
+                return subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        guard,
+                        "splunk-validation",
+                        "splunk-validation",
+                        "target-enterprise",
+                        str(expected_path),
+                        expected_digest,
+                        allowed_resources,
+                    ],
+                    cwd=root,
+                    env={**base_environment, **environment},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=30,
+                )
+
+            existing_namespace = check(MOCK_NAMESPACE_EXISTS="true")
+            self.assertEqual(
+                existing_namespace.returncode,
+                0,
+                msg=existing_namespace.stdout + existing_namespace.stderr,
+            )
+            namespace_commands = log_path.read_text(encoding="utf-8")
+            self.assertIn("get namespace splunk-validation", namespace_commands)
+            self.assertIn("customresourcedefinitions", namespace_commands)
+            self.assertNotIn("apply", namespace_commands)
+
+            terminating_namespace = check(
+                MOCK_NAMESPACE_EXISTS="true", MOCK_NAMESPACE_TERMINATING="true"
+            )
+            self.assertNotEqual(terminating_namespace.returncode, 0)
+            self.assertIn("not a healthy Active namespace", terminating_namespace.stderr)
+
+            skipped_for_existing_validation = check(
+                MOCK_NAMESPACE_EXISTS="true", SOK_VALIDATE_EXISTING="true"
+            )
+            self.assertEqual(
+                skipped_for_existing_validation.returncode,
+                0,
+                msg=(
+                    skipped_for_existing_validation.stdout
+                    + skipped_for_existing_validation.stderr
+                ),
+            )
+            self.assertEqual(log_path.read_text(encoding="utf-8"), "")
+
+            no_existing_crds = check()
+            self.assertEqual(
+                no_existing_crds.returncode,
+                0,
+                msg=no_existing_crds.stdout + no_existing_crds.stderr,
+            )
+
+            unreadable_inventory = check(MOCK_CRD_INVENTORY_FAIL="true")
+            self.assertNotEqual(unreadable_inventory.returncode, 0)
+            self.assertIn("forbidden CRD inventory", unreadable_inventory.stderr)
+
+            live_path.write_text(
+                json.dumps({"items": live_crds[:1]}), encoding="utf-8"
+            )
+            partial_inventory = check()
+            self.assertNotEqual(partial_inventory.returncode, 0)
+            self.assertIn("partial or foreign", partial_inventory.stderr)
+            self.assertNotIn("apply", log_path.read_text(encoding="utf-8"))
+
+            live_path.write_text(json.dumps({"items": live_crds}), encoding="utf-8")
+            exact_orphaned_inventory = check()
+            self.assertEqual(
+                exact_orphaned_inventory.returncode,
+                0,
+                msg=(
+                    exact_orphaned_inventory.stdout
+                    + exact_orphaned_inventory.stderr
+                ),
+            )
+
+            terminating_crds = json.loads(json.dumps(live_crds))
+            terminating_crds[0]["metadata"]["deletionTimestamp"] = (
+                "2026-07-08T00:00:00Z"
+            )
+            terminating_crds[0]["status"]["conditions"].append(
+                {"type": "Terminating", "status": "True"}
+            )
+            live_path.write_text(
+                json.dumps({"items": terminating_crds}), encoding="utf-8"
+            )
+            terminating_inventory = check()
+            self.assertNotEqual(terminating_inventory.returncode, 0)
+            self.assertIn("not established", terminating_inventory.stderr)
+
+            drifted_crds = json.loads(json.dumps(live_crds))
+            drifted_crds[0]["spec"]["versions"][0]["schema"]["openAPIV3Schema"][
+                "properties"
+            ]["spec"]["properties"]["replicas"]["minimum"] = 1
+            live_path.write_text(
+                json.dumps({"items": drifted_crds}), encoding="utf-8"
+            )
+            drifted_inventory = check()
+            self.assertNotEqual(drifted_inventory.returncode, 0)
+            self.assertIn("differs from the reviewed bundle", drifted_inventory.stderr)
+
+            live_path.write_text(json.dumps({"items": live_crds}), encoding="utf-8")
+            populated_inventory = check(MOCK_FOREIGN_RESOURCE="true")
+            self.assertNotEqual(populated_inventory.returncode, 0)
+            self.assertIn("foreign SOK resources", populated_inventory.stderr)
+            self.assertNotIn("apply", log_path.read_text(encoding="utf-8"))
+
+            allowed_license_manager = json.dumps(
+                [
+                    {
+                        "kind": "LicenseManager",
+                        "name": "shared-lm",
+                        "namespace": "splunk-validation",
+                    }
+                ]
+            )
+            accepted_license_manager = check(
+                allowed_resources=allowed_license_manager,
+                MOCK_LICENSE_MANAGER_NAME="shared-lm",
+            )
+            self.assertEqual(
+                accepted_license_manager.returncode,
+                0,
+                msg=(
+                    accepted_license_manager.stdout
+                    + accepted_license_manager.stderr
+                ),
+            )
+            wrong_license_manager = check(
+                allowed_resources=allowed_license_manager,
+                MOCK_LICENSE_MANAGER_NAME="foreign-lm",
+            )
+            self.assertNotEqual(wrong_license_manager.returncode, 0)
+            self.assertIn("foreign SOK resources", wrong_license_manager.stderr)
+            unhealthy_license_manager = check(
+                allowed_resources=allowed_license_manager,
+                MOCK_LICENSE_MANAGER_NAME="shared-lm",
+                MOCK_LICENSE_MANAGER_UNHEALTHY="true",
+            )
+            self.assertNotEqual(unhealthy_license_manager.returncode, 0)
+            self.assertIn("terminating", unhealthy_license_manager.stderr)
+            target_owned_license_manager = check(
+                allowed_resources=allowed_license_manager,
+                MOCK_LICENSE_MANAGER_NAME="shared-lm",
+                MOCK_LICENSE_MANAGER_OWNER="target-enterprise",
+            )
+            self.assertNotEqual(target_owned_license_manager.returncode, 0)
+            self.assertIn("target Enterprise release", target_owned_license_manager.stderr)
+
+    def test_sok_existing_license_manager_guard_requires_separate_live_owner(
+        self,
+    ) -> None:
+        guard = self.embedded_renderer_code("license_manager_guard")
+        healthy = {
+            "apiVersion": "enterprise.splunk.com/v4",
+            "kind": "LicenseManager",
+            "metadata": {
+                "name": "shared-lm",
+                "namespace": "splunk-validation",
+                "uid": "license-manager-uid",
+                "resourceVersion": "7",
+                "generation": 1,
+                "annotations": {
+                    "meta.helm.sh/release-name": "shared-license",
+                    "meta.helm.sh/release-namespace": "splunk-validation",
+                },
+            },
+            "status": {
+                "phase": "Ready",
+                "message": "",
+                "observedGeneration": 1,
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            helm = root / "helm"
+            helm.write_text(
+                "#!/bin/sh\n"
+                "[ \"${HELM_OWNER_MODE:-healthy}\" != fail ] || { "
+                "printf 'owner unavailable\\n' >&2; exit 7; }\n"
+                "printf '%s\\n' '{\"name\":\"shared-license\","
+                "\"namespace\":\"splunk-validation\","
+                "\"info\":{\"status\":\"deployed\"}}'\n",
+                encoding="utf-8",
+            )
+            helm.chmod(0o700)
+
+            def check(
+                item: dict[str, object], *, owner_mode: str = "healthy"
+            ) -> subprocess.CompletedProcess:
+                return subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        guard,
+                        "shared-lm",
+                        "splunk-validation",
+                        "target-enterprise",
+                    ],
+                    input=json.dumps(item),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env={
+                        **os.environ,
+                        "PATH": f"{root}{os.pathsep}{os.environ['PATH']}",
+                        "HELM_OWNER_MODE": owner_mode,
+                    },
+                )
+
+            accepted = check(healthy)
+            self.assertEqual(accepted.returncode, 0, msg=accepted.stderr)
+            missing_owner = json.loads(json.dumps(healthy))
+            missing_owner["metadata"]["annotations"].clear()
+            rejected_owner = check(missing_owner)
+            self.assertNotEqual(rejected_owner.returncode, 0)
+            self.assertIn("Helm owner linkage", rejected_owner.stderr)
+            target_owned = json.loads(json.dumps(healthy))
+            target_owned["metadata"]["annotations"][
+                "meta.helm.sh/release-name"
+            ] = "target-enterprise"
+            rejected_target = check(target_owned)
+            self.assertNotEqual(rejected_target.returncode, 0)
+            self.assertIn("target Enterprise release", rejected_target.stderr)
+            deleting = json.loads(json.dumps(healthy))
+            deleting["metadata"]["deletionTimestamp"] = "2026-07-08T00:00:00Z"
+            rejected_deleting = check(deleting)
+            self.assertNotEqual(rejected_deleting.returncode, 0)
+            self.assertIn("terminating", rejected_deleting.stderr)
+            unavailable_owner = check(healthy, owner_mode="fail")
+            self.assertNotEqual(unavailable_owner.returncode, 0)
+            self.assertIn("owner unavailable", unavailable_owner.stderr)
+
+    def test_sok_crd_staging_executes_hash_checks_on_the_same_bytes(self) -> None:
+        download = self.embedded_renderer_code("crd_download_code")
+        preflight_guard = self.embedded_renderer_code("staged_crd_probe_code")
+        runtime_guard = self.embedded_renderer_code("crd_runtime_guard_code")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "source.yaml"
+            destination = root / "staged.yaml"
+            source.write_bytes(b"apiVersion: v1\nkind: List\nitems: []\n")
+            expected = hashlib.sha256(source.read_bytes()).hexdigest()
+            staged = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    download,
+                    source.as_uri(),
+                    expected,
+                    str(destination),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(staged.returncode, 0, msg=staged.stderr)
+            self.assertEqual(destination.read_bytes(), source.read_bytes())
+            preflight_accepted = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    preflight_guard,
+                    str(destination),
+                    expected,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                preflight_accepted.returncode, 0, msg=preflight_accepted.stderr
+            )
+            accepted = subprocess.run(
+                [sys.executable, "-c", runtime_guard, str(destination), expected],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(accepted.returncode, 0, msg=accepted.stderr)
+            destination.write_bytes(destination.read_bytes() + b"# drift\n")
+            rejected = subprocess.run(
+                [sys.executable, "-c", runtime_guard, str(destination), expected],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("differs from review", rejected.stderr)
+            preflight_rejected = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    preflight_guard,
+                    str(destination),
+                    expected,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(preflight_rejected.returncode, 0)
+            self.assertIn("differs from review", preflight_rejected.stderr)
+
+    def test_sok_fresh_apply_orders_guards_and_stages_one_remote_crd(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            result = self.run_renderer(
+                "--target",
+                "sok",
+                "--architecture",
+                "s1",
+                "--namespace",
+                "splunk-validation",
+                "--operator-namespace",
+                "splunk-validation",
+                "--output-dir",
+                str(output_dir),
+                "--accept-splunk-general-terms",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = output_dir / "sok"
+            apply = (render_dir / "apply.sh").read_text(encoding="utf-8")
+            preflight = "SOK_VALIDATE_EXISTING=false ./preflight.sh"
+            namespace_create = "ensure_fresh_namespace splunk-validation"
+            crd_apply = "./crds-install.sh"
+            crd_stage = 'export SOK_CRD_FILE="${apply_stage}/splunk-operator-crds.yaml"'
+            self.assertLess(apply.index(crd_stage), apply.index(preflight))
+            self.assertLess(apply.index(preflight), apply.index(namespace_create))
+            self.assertLess(apply.index(namespace_create), apply.rindex(crd_apply))
+            self.assertEqual(apply.count(crd_stage), 1)
+            self.assertIn('kubectl create namespace "${name}"', apply)
+            self.assertNotIn("kubectl apply -f namespace.yaml", apply)
+            self.assertNotIn(
+                "kubectl apply -f namespace.yaml",
+                (render_dir / "helm-install-operator.sh").read_text(encoding="utf-8"),
+            )
+            self.assertNotIn(
+                "kubectl apply -f namespace.yaml",
+                (render_dir / "helm-install-enterprise.sh").read_text(
+                    encoding="utf-8"
+                ),
+            )
+            self.assertNotIn(
+                "--create-namespace",
+                (render_dir / "helm-install-enterprise.sh").read_text(
+                    encoding="utf-8"
+                ),
+            )
+            crd_installer = (render_dir / "crds-install.sh").read_text(
+                encoding="utf-8"
+            )
+            self.assertNotIn("https://", crd_installer)
+            self.assertIn('kubectl apply -f "${SOK_CRD_FILE}" --server-side', crd_installer)
+            self.assertIn(
+                'kubectl wait --for=condition=Established --timeout=5m -f "${SOK_CRD_FILE}"',
+                crd_installer,
+            )
+            self.assertIn("staged CRD manifest SHA-256 differs from review", crd_installer)
+
     def test_sok_upgrade_requires_one_deployed_helm_release(self) -> None:
         guard = self.embedded_renderer_code("upgrade_guard_code")
 
@@ -543,6 +1124,24 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                     "spec": {
                         "livenessInitialDelaySeconds": 300,
                         "readinessInitialDelaySeconds": 10,
+                        "livenessProbe": {
+                            "initialDelaySeconds": 30,
+                            "timeoutSeconds": 30,
+                            "periodSeconds": 30,
+                            "failureThreshold": 3,
+                        },
+                        "readinessProbe": {
+                            "initialDelaySeconds": 10,
+                            "timeoutSeconds": 5,
+                            "periodSeconds": 5,
+                            "failureThreshold": 3,
+                        },
+                        "startupProbe": {
+                            "initialDelaySeconds": 40,
+                            "timeoutSeconds": 30,
+                            "periodSeconds": 30,
+                            "failureThreshold": 12,
+                        },
                         "resources": {
                             "requests": {"cpu": "1", "memory": "1Gi"},
                             "limits": {"cpu": "1", "memory": "1Gi"},
@@ -761,7 +1360,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 container[probe_name] = {
                     "exec": {"command": [f"/mnt/probes/{script_name}"]},
                     "initialDelaySeconds": (
-                        300
+                        30
                         if probe_name == "livenessProbe"
                         else 10
                         if probe_name == "readinessProbe"
@@ -1002,12 +1601,15 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             ),
         ]
 
-        def controller_input(candidate: dict[str, object]) -> str:
+        def controller_input(
+            candidate: dict[str, object],
+            resources: dict[str, object] = custom_resources,
+        ) -> str:
             return "\n".join(
                 json.dumps(value)
                 for value in (
                     candidate,
-                    custom_resources,
+                    resources,
                     config_maps,
                     smartstore_secret,
                 )
@@ -1023,6 +1625,19 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
         self.assertEqual(
             controllers_healthy.returncode, 0, msg=controllers_healthy.stderr
         )
+        custom_probe_resources = json.loads(json.dumps(custom_resources))
+        custom_probe_resources["items"][0]["spec"]["livenessProbe"][
+            "periodSeconds"
+        ] = 31
+        rejected_custom_probe = subprocess.run(
+            controller_command,
+            input=controller_input(statefulsets, custom_probe_resources),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(rejected_custom_probe.returncode, 0)
+        self.assertIn("custom probe contract", rejected_custom_probe.stderr)
         semantically_equal_resources = json.loads(json.dumps(statefulsets))
         semantically_equal_resources["items"][0]["spec"]["template"]["spec"][
             "containers"
@@ -1360,6 +1975,8 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 pod_spec = json.loads(
                     json.dumps(stateful["spec"]["template"]["spec"])
                 )
+                pod_spec["serviceAccountName"] = "default"
+                pod_spec["serviceAccount"] = "default"
                 pod_spec["nodeName"] = f"runtime-node-{ordinal}"
                 pod_spec["volumes"].extend(
                     {
@@ -2252,6 +2869,43 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
 
             healthy = run_contract(live)
             self.assertEqual(healthy.returncode, 0, msg=healthy.stderr)
+            defaulted_false_host_fields = json.loads(json.dumps(live))
+            defaulted_false_host_fields["spec"]["template"]["spec"].update(
+                {
+                    "hostNetwork": False,
+                    "hostPID": False,
+                    "hostIPC": False,
+                    "shareProcessNamespace": False,
+                }
+            )
+            accepted_defaulted_host_fields = run_contract(defaulted_false_host_fields)
+            self.assertEqual(
+                accepted_defaulted_host_fields.returncode,
+                0,
+                msg=accepted_defaulted_host_fields.stderr,
+            )
+            enabled_host_network = json.loads(json.dumps(defaulted_false_host_fields))
+            enabled_host_network["spec"]["template"]["spec"]["hostNetwork"] = True
+            rejected_host_network = run_contract(enabled_host_network)
+            self.assertNotEqual(rejected_host_network.returncode, 0)
+            self.assertIn("hostNetwork", rejected_host_network.stderr)
+            helm4_owned = json.loads(json.dumps(live))
+            helm4_owned["metadata"]["labels"][
+                "app.kubernetes.io/managed-by"
+            ] = "Helm"
+            accepted_helm4_label = run_contract(helm4_owned)
+            self.assertEqual(
+                accepted_helm4_label.returncode,
+                0,
+                msg=accepted_helm4_label.stderr,
+            )
+            unexpected_manager = json.loads(json.dumps(live))
+            unexpected_manager["metadata"]["labels"][
+                "app.kubernetes.io/managed-by"
+            ] = "Other"
+            rejected_manager = run_contract(unexpected_manager)
+            self.assertNotEqual(rejected_manager.returncode, 0)
+            self.assertIn("raw Helm intent", rejected_manager.stderr)
             drifted = json.loads(json.dumps(live))
             drifted["spec"]["replicas"] = 2
             rejected = run_contract(drifted)
@@ -2317,6 +2971,12 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             self.assertEqual(
                 accepted.returncode, 0, msg=accepted.stdout + accepted.stderr
             )
+            render_dir = Path(tmpdir) / "sok"
+            apply = (render_dir / "apply.sh").read_text(encoding="utf-8")
+            preflight = (render_dir / "preflight.sh").read_text(encoding="utf-8")
+            self.assertIn("\n./preflight.sh\n", apply)
+            self.assertNotIn("SOK_VALIDATE_EXISTING=false ./preflight.sh", apply)
+            self.assertNotIn("fresh bundle will not adopt it", preflight)
 
     def test_sok_requires_explicit_terms_for_every_reconcile(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
