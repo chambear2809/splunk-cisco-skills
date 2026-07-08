@@ -8,6 +8,7 @@ galileo:
   console_url: ""
 
 agent_control:
+  # Credential-free origin only. HTTPS is required outside loopback.
   server_url: "http://localhost:8000"
   server_host: "0.0.0.0"
   server_port: "8000"
@@ -26,6 +27,7 @@ otel:
 
 splunk:
   platform: "enterprise"
+  # Credential-free origin or /services/collector[/event]; normalized to /event.
   hec_url: "https://splunk.example.com:8088/services/collector/event"
   hec_token_name: "agent_control_events"
   hec_allowed_indexes: "agent_control"

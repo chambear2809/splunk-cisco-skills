@@ -36,6 +36,11 @@ Agent Observability `Controls` console tab, Log stream control attachment, or
 exported control-span evidence. This skill is for external/open-source Agent
 Control runtime and server assets.
 
+The July 7, 2026 AI Assistant beta, global dashboards, generic alert webhooks,
+experiment groups, and large-dataset batching are Galileo Platform features;
+route those requests to `galileo-platform-setup`. They do not change this
+standalone Agent Control server contract.
+
 ## Supported Paths
 
 1. **Server readiness**: render Docker/external server readiness notes, health
@@ -124,6 +129,12 @@ Never pass token values on the command line or in chat. Direct token/password
 flags such as `--agent-control-api-key`, `--agent-control-admin-key`,
 `--splunk-hec-token`, `--o11y-token`, `--token`, `--api-key`, `--password`, and
 `--authorization` are rejected.
+
+Because Agent Control and HEC requests carry credentials, their URLs must not
+embed user information. `--server-url` accepts only an HTTP(S) origin (no path,
+query, or fragment), and `--splunk-hec-url` accepts an origin or the exact
+`/services/collector[/event]` path. Both require HTTPS outside loopback; the
+renderer normalizes the HEC destination to `/services/collector/event`.
 
 ## Validation
 

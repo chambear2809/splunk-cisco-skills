@@ -83,7 +83,12 @@ Configuration:
   --multimodal-asset-policy NAME
   --allow-raw-media-in-splunk   Render an explicit approval marker for raw media
                                 in Splunk handoffs; default is metadata-only
-  --export-format jsonl|csv     Galileo export_records format (default: jsonl)
+  --export-format jsonl|jsonl_flat|csv
+                                Galileo export_records format (default: jsonl)
+  --export-computed-metrics-only true|false
+                                Export only records with computed enabled metrics
+  --include-code-metric-metadata true|false
+                                Include metadata returned by code scorers
   --redact true|false           export_records redaction setting (default: true)
   --root-type session|trace|span
   --since ISO8601               REST export lower-bound
@@ -112,7 +117,7 @@ Secret files:
   --splunk-hec-token-file PATH  Splunk HEC token file
   --o11y-token-file PATH        Splunk Observability token file
 
-Direct token/password flags such as --galileo-api-key, --splunk-hec-token,
+Direct token/password flags such as --galileo-api-key, --galileo-webhook-token, --splunk-hec-token,
 --o11y-token, --token, --api-key, --password, and --authorization are rejected.
 EOF
 }
@@ -172,15 +177,15 @@ while [[ $# -gt 0 ]]; do
         --allow-raw-media-in-splunk) RENDER_ARGS+=("$1"); shift ;;
         --spec) require_value "$1" "$#"; SPEC="$2"; shift 2 ;;
         --output-dir) require_value "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
-        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--luna-scorer-map|--luna-list-only|--luna-recompute|--luna-strict|--luna-recompute-limit|--galileo-api-base|--galileo-console-url|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
+        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--luna-scorer-map|--luna-list-only|--luna-recompute|--luna-strict|--luna-recompute-limit|--galileo-api-base|--galileo-console-url|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--export-computed-metrics-only|--include-code-metric-metadata|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
             require_value "$1" "$#"
             RENDER_ARGS+=("$1" "$2")
             shift 2
             ;;
-        --galileo-api-key|--galileo-bearer-token|--splunk-hec-token|--hec-token|--o11y-token|--access-token|--api-key|--api-token|--authorization|--bearer-token|--password|--sf-token|--token)
+        --galileo-api-key|--galileo-bearer-token|--galileo-webhook-token|--splunk-hec-token|--hec-token|--o11y-token|--access-token|--api-key|--api-token|--authorization|--bearer-token|--password|--sf-token|--token)
             reject_secret_flag
             ;;
-        --galileo-api-key=*|--galileo-bearer-token=*|--splunk-hec-token=*|--hec-token=*|--o11y-token=*|--access-token=*|--api-key=*|--api-token=*|--authorization=*|--bearer-token=*|--password=*|--sf-token=*|--token=*)
+        --galileo-api-key=*|--galileo-bearer-token=*|--galileo-webhook-token=*|--splunk-hec-token=*|--hec-token=*|--o11y-token=*|--access-token=*|--api-key=*|--api-token=*|--authorization=*|--bearer-token=*|--password=*|--sf-token=*|--token=*)
             reject_secret_flag
             ;;
         --help|-h) usage; exit 0 ;;

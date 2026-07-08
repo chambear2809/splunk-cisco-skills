@@ -17,6 +17,8 @@ galileo:
   dataset_dir: ""
   prompt_manifest: ""
   experiment_manifest: ""
+  # Experiment manifest items may set experiment_group or
+  # experiment_group_id. This requires Galileo Python SDK >=2.2.0.
   protect_stage_manifest: ""
   metrics: "correctness,completeness"
   luna_scorer_map: "./galileo-platform-rendered/lifecycle/luna-scorer-map.example.json"
@@ -30,6 +32,8 @@ galileo:
 hec_export:
   root_type: "trace"
   export_format: "jsonl"
+  export_computed_metrics_only: false
+  include_code_metric_metadata: false
   redact: true
   since: ""
   until: ""
@@ -102,3 +106,5 @@ secrets:
   galileo_api_key_file: "/tmp/galileo_api_key"
   splunk_hec_token_file: "/tmp/splunk_hec_token"
   o11y_token_file: "/tmp/splunk_o11y_token"
+  # The generic-alert relay uses a separate mode-0600 shared token file passed
+  # directly as --galileo-webhook-token-file; do not put its value here.

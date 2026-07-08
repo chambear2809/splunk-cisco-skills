@@ -18,8 +18,8 @@ release section when cutting a release.
   Covers `export_records` to Splunk HEC, Observe OpenTelemetry/OpenInference
   snippets, Protect invoke snippets, Evaluate/experiment/dataset/metric/
   annotation handoffs, and OTel Collector, dashboard, and detector handoffs;
-  supports `--o11y-only` to omit Splunk Platform HEC dependencies. 14 unit
-  tests.
+  supports `--o11y-only` to omit Splunk Platform HEC dependencies, with a
+  dedicated regression suite.
 - New `galileo-agent-control-setup` skill: render-first Agent Control server
   readiness, file-backed auth templates, controls, Python/TypeScript runtime
   snippets, OTel sink config, custom Splunk HEC event sink, and Observability
@@ -136,6 +136,27 @@ release section when cutting a release.
   fully validated, and MCP-registered.
 
 ### Changed
+
+- Updated every Galileo workflow for the July 7, 2026 release. The platform
+  skill now renders AI Assistant beta and cross-project global-dashboard
+  readiness, a payload-v1 generic alert webhook relay for Splunk HEC,
+  `galileo>=2.2.0` experiment-group assignment, and large-dataset batched
+  processing readiness and handoff assets. The object lifecycle now records
+  owner-only exact-ID cleanup ledgers, validates experiment-group membership,
+  re-reads exact dataset and prompt IDs after deletion, and narrowly works
+  around the Galileo SDK 2.4.0 project permission-enum
+  readback mismatch only after exact REST project verification. Galileo OTLP
+  defaults now use `/otel/traces`; the MCP catalog is refreshed to server
+  `1.28.1`, fails on server-version drift, and
+  is now checked weekly with the Galileo product-coverage audit. The audit also
+  fails closed when Galileo publishes a release newer than the reviewed
+  `2026-07-07` baseline. Rendered MCP clients now use a dependency-free
+  stdio-to-Streamable-HTTP bridge with JSON/SSE, session, cancellation,
+  redirect, IPv6-loopback, and secret-file safeguards. Agent Control runtime
+  and Splunk HEC URLs now reject remote cleartext, embedded credentials,
+  ambiguous HEC paths, and authenticated redirects. Observe export supports
+  the current JSONL-flat and computed/code-metric options, while webhook
+  delivery and search-time deduplication semantics are explicit.
 
 - Hardened `cloud_batch_uninstall.sh` for production use: strict concrete app
   names, all-target/version preflight before mutation, exact removal plans,

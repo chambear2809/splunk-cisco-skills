@@ -20,7 +20,7 @@ Direct HTTP clients need:
 
 ```text
 Galileo-API-Key: <provided by client secret store>
-Accept: text/event-stream
+Accept: application/json, text/event-stream
 ```
 
 Do not inline the API key into rendered files.
@@ -42,6 +42,29 @@ Optional key check:
 
 - **Connection hangs on GET**: use JSON-RPC POST for MCP methods; a plain GET
   against the stream endpoint can wait for events.
+- **HTTP 406 during initialize**: do not send an SSE-only Accept header. MCP
+  Streamable HTTP clients must advertise both `application/json` and
+  `text/event-stream` for POST responses.
+- **Local bridge initialize timeout**: re-render the current dependency-free
+  bridge. Older rendered assets delegated to `mcp-remote` and could hang during
+  initialize against Galileo. Confirm the bridge does not contain
+  `mcp-remote`, then run the focused pytest fake-server regression.
+- **Secret-file permission failure**: run `chmod 600` on
+  `.env.galileo-mcp` and `GALILEO_API_KEY_FILE`. Use
+  `GALILEO_MCP_ALLOW_LOOSE_KEY_PERMS=1` only in a disposable lab.
+- **Redirect rejected**: this is intentional. Resolve the canonical MCP URL;
+  neither the bridge nor authenticated probe forwards the Galileo API key
+  across redirects.
+- **Remote HTTP URL rejected**: use HTTPS. Cleartext HTTP is allowed only for
+  loopback validation fixtures and cannot be rendered into a remote direct
+  client configuration.
+- **Server notification stream repeatedly closes**: the bridge reconnects with
+  capped exponential backoff and bounds each SSE event independently. A 400,
+  401, 403, 404, 405, redirect, or non-SSE GET response disables only the
+  optional event stream; JSON-RPC POST methods remain available.
+- **Cancellation appears delayed**: use the current bridge. It serializes only
+  initialize/initialized; later requests and notifications are concurrent so
+  `notifications/cancelled` is not queued behind the target tool call.
 - **Method Not Allowed on OPTIONS**: the endpoint supports GET, POST, and
   DELETE; use POST for JSON-RPC method calls.
 - **Authentication required from tenant tools**: set the API key in the client

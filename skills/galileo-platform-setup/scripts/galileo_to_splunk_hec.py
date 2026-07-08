@@ -8,6 +8,8 @@ file contents.
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 import ssl
@@ -99,7 +101,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--experiment-id", default=os.getenv("GALILEO_EXPERIMENT_ID", ""))
     parser.add_argument("--metrics-testing-id", default=os.getenv("GALILEO_METRICS_TESTING_ID", ""))
     parser.add_argument("--root-type", choices=sorted(ROOT_TYPES), default=os.getenv("GALILEO_ROOT_TYPE", "trace"))
-    parser.add_argument("--export-format", choices=["jsonl", "csv"], default=os.getenv("GALILEO_EXPORT_FORMAT", "jsonl"))
+    parser.add_argument(
+        "--export-format",
+        choices=["jsonl", "jsonl_flat", "csv"],
+        default=os.getenv("GALILEO_EXPORT_FORMAT", "jsonl"),
+    )
+    parser.add_argument(
+        "--export-computed-metrics-only",
+        action="store_true",
+        help="Export only records whose enabled metrics are computed (not valid with jsonl_flat).",
+    )
+    parser.add_argument(
+        "--include-code-metric-metadata",
+        action="store_true",
+        help="Include code-scorer metadata returned alongside computed scores.",
+    )
     parser.add_argument("--redact", choices=["true", "false"], default=os.getenv("GALILEO_EXPORT_REDACT", "true"))
     parser.add_argument("--file-name", default=os.getenv("GALILEO_EXPORT_FILE_NAME", ""))
     parser.add_argument("--column-id", action="append", default=[], help="Column ID for CSV exports. Repeatable.")
@@ -109,7 +125,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--sort-field", default="updated_at")
     parser.add_argument("--filter-key", choices=["name", "column_id"], default="column_id")
     parser.add_argument("--filter-json", action="append", default=[], help="Extra Galileo filter JSON object. Repeatable.")
-    parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Compatibility alias for --max-records.",
+    )
     parser.add_argument("--max-records", type=int)
     parser.add_argument("--cursor-file", default=os.getenv("GALILEO_SPLUNK_CURSOR_FILE"))
     parser.add_argument("--splunk-hec-url", default=os.getenv("SPLUNK_HEC_URL", ""))
@@ -124,9 +144,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--print-export-request", action="store_true", help="Print the export_records request JSON and exit.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--insecure", action="store_true", help="Disable TLS verification for Splunk HEC.")
+    parser.add_argument(
+        "--allow-insecure-hec-http",
+        action="store_true",
+        help="Allow reviewed plaintext HTTP to a non-loopback Splunk HEC endpoint.",
+    )
     args = parser.parse_args(raw_args)
     if not args.project_id:
         raise SystemExit("ERROR: --project-id or GALILEO_PROJECT_ID is required.")
+    if args.batch_size <= 0:
+        raise SystemExit("ERROR: --batch-size must be a positive integer.")
+    if args.max_records is not None and args.max_records <= 0:
+        raise SystemExit("ERROR: --max-records must be a positive integer.")
+    if args.limit is not None:
+        if args.limit <= 0:
+            raise SystemExit("ERROR: --limit must be a positive integer.")
+        if args.max_records is not None:
+            raise SystemExit("ERROR: Use only one of --limit or --max-records.")
+        args.max_records = args.limit
+    if args.export_computed_metrics_only and args.export_format == "jsonl_flat":
+        raise SystemExit(
+            "ERROR: --export-computed-metrics-only is not supported with jsonl_flat."
+        )
+    args.galileo_api_base = normalize_galileo_api_base(args.galileo_api_base)
     return args
 
 
@@ -188,6 +228,70 @@ def write_cursor(path: str | None, payload: dict[str, Any]) -> None:
     tmp_path.replace(cursor_path)
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject redirects so credential-bearing headers cannot cross origins."""
+
+    def redirect_request(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+def open_without_redirect(
+    request: urllib.request.Request,
+    *,
+    timeout: float,
+    ssl_context: ssl.SSLContext | None = None,
+) -> Any:
+    handlers: list[Any] = [NoRedirectHandler()]
+    if ssl_context is not None:
+        handlers.append(urllib.request.HTTPSHandler(context=ssl_context))
+    return urllib.request.build_opener(*handlers).open(request, timeout=timeout)
+
+
+def safe_url_for_error(url: str) -> str:
+    """Return an origin/path-only URL that cannot expose presigned credentials."""
+
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return "<invalid-url>"
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return "<invalid-url>"
+    host = parsed.hostname
+    if ":" in host:
+        host = f"[{host}]"
+    netloc = f"{host}:{port}" if port is not None else host
+    return urllib.parse.urlunparse(
+        (parsed.scheme, netloc, parsed.path or "/", "", "", "")
+    )
+
+
+def normalize_galileo_api_base(raw_url: str) -> str:
+    """Validate a credential-free API origin before attaching the Galileo key."""
+
+    try:
+        parsed = urllib.parse.urlparse(raw_url)
+        _ = parsed.port
+    except ValueError as exc:
+        raise SystemExit("ERROR: Galileo API base is invalid.") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise SystemExit("ERROR: Galileo API base must be an absolute HTTP(S) origin.")
+    if parsed.username or parsed.password:
+        raise SystemExit("ERROR: Galileo API base must not contain credentials.")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(
+            "ERROR: Galileo API base must be an origin without path, params, query, or fragment."
+        )
+    loopback = parsed.hostname.lower() in {"127.0.0.1", "::1", "localhost"}
+    if parsed.scheme != "https" and not loopback:
+        raise SystemExit(
+            "ERROR: Galileo API base must use HTTPS unless the host is loopback."
+        )
+    return urllib.parse.urlunparse(
+        (parsed.scheme, parsed.netloc, "", "", "", "")
+    ).rstrip("/")
+
+
 def request_bytes(
     method: str,
     url: str,
@@ -200,14 +304,27 @@ def request_bytes(
         data = json.dumps(body, separators=(",", ":")).encode("utf-8")
         headers = {**headers, "Content-Type": "application/json"}
     request = urllib.request.Request(url, method=method, headers=headers, data=data)
+    error_url = safe_url_for_error(url)
     try:
-        with urllib.request.urlopen(request, context=ssl_context, timeout=60) as response:
+        with open_without_redirect(
+            request, timeout=60, ssl_context=ssl_context
+        ) as response:
             return response.read(), response.headers.get("Content-Type", "")
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{method} {url} failed with HTTP {exc.code}: {detail}") from exc
+        if 300 <= exc.code < 400:
+            raise RuntimeError(
+                f"{method} {error_url} returned HTTP {exc.code}; redirects are disabled"
+            ) from exc
+        # Response bodies can echo a presigned request URL or credential-bearing
+        # metadata. Keep errors actionable without copying remote content.
+        raise RuntimeError(
+            f"{method} {error_url} failed with HTTP {exc.code}"
+        ) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"{method} {url} failed: {exc.reason}") from exc
+        reason_type = type(exc.reason).__name__
+        raise RuntimeError(
+            f"{method} {error_url} request failed ({reason_type})"
+        ) from exc
 
 
 def request_json(
@@ -236,14 +353,41 @@ def splunk_headers(args: argparse.Namespace) -> dict[str, str]:
     }
 
 
-def normalize_hec_url(raw_url: str | None) -> str:
+def normalize_hec_url(
+    raw_url: str | None, *, allow_insecure_http: bool = False
+) -> str:
     if not raw_url:
         raise SystemExit("ERROR: --splunk-hec-url or SPLUNK_HEC_URL is required.")
-    url = raw_url.rstrip("/")
-    parsed = urllib.parse.urlparse(url)
-    if "/services/collector" in parsed.path:
-        return url
-    return f"{url}/services/collector/event"
+    try:
+        parsed = urllib.parse.urlparse(raw_url)
+        _ = parsed.port
+    except ValueError as exc:
+        raise SystemExit("ERROR: Splunk HEC URL is invalid.") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise SystemExit("ERROR: Splunk HEC URL must be an absolute HTTP(S) URL.")
+    if parsed.username or parsed.password:
+        raise SystemExit("ERROR: Splunk HEC URL must not contain credentials.")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(
+            "ERROR: Splunk HEC URL must not contain params, query, or fragment."
+        )
+    loopback = parsed.hostname in {"127.0.0.1", "::1", "localhost"}
+    if parsed.scheme != "https" and not loopback and not allow_insecure_http:
+        raise SystemExit(
+            "ERROR: Splunk HEC URL must use HTTPS unless it is loopback or "
+            "--allow-insecure-hec-http was explicitly reviewed."
+        )
+    path = parsed.path.rstrip("/")
+    if path in {"", "/"}:
+        path = "/services/collector/event"
+    elif path == "/services/collector":
+        path += "/event"
+    elif path != "/services/collector/event":
+        raise SystemExit(
+            "ERROR: Splunk HEC URL path must be empty, /services/collector, or "
+            "/services/collector/event."
+        )
+    return parsed._replace(path=path).geturl()
 
 
 def build_filters(args: argparse.Namespace, since: str | None) -> list[dict[str, Any]]:
@@ -282,6 +426,12 @@ def build_export_records_request(args: argparse.Namespace, since: str | None = N
         "root_type": args.root_type,
         "export_format": args.export_format,
         "redact": str(args.redact).lower() not in {"0", "false", "no"},
+        "export_computed_metrics_only": bool(
+            getattr(args, "export_computed_metrics_only", False)
+        ),
+        "include_code_metric_metadata": bool(
+            getattr(args, "include_code_metric_metadata", False)
+        ),
         "filters": build_filters(args, since),
         "sort": {
             "column_id": args.sort_field,
@@ -314,7 +464,26 @@ def parse_jsonl(text: str) -> list[dict[str, Any]]:
     return records
 
 
-def extract_records_from_payload(payload: Any) -> list[dict[str, Any]]:
+def parse_csv_records(text: str) -> list[dict[str, Any]]:
+    field_limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(field_limit)
+            break
+        except OverflowError:
+            field_limit //= 10
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    if not reader.fieldnames:
+        return []
+    return [
+        {str(key): value for key, value in row.items() if key is not None}
+        for row in reader
+    ]
+
+
+def extract_records_from_payload(
+    payload: Any, *, export_format: str = "jsonl"
+) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, dict)]
     if not isinstance(payload, dict):
@@ -326,15 +495,49 @@ def extract_records_from_payload(payload: Any) -> list[dict[str, Any]]:
     for key in ("jsonl", "content", "file_content"):
         value = payload.get(key)
         if isinstance(value, str):
-            return parse_jsonl(value)
+            return parse_csv_records(value) if export_format == "csv" else parse_jsonl(value)
     return [payload]
 
 
-def download_records_from_url(url: str, headers: dict[str, str]) -> list[dict[str, Any]]:
-    raw, _content_type = request_bytes("GET", url, headers)
+def safe_download_headers(
+    download_url: str, api_base: str, api_headers: dict[str, str]
+) -> dict[str, str]:
+    download = urllib.parse.urlparse(download_url)
+    api = urllib.parse.urlparse(api_base)
+    if download.scheme not in {"http", "https"} or not download.hostname:
+        raise RuntimeError("Galileo export download URL must be absolute HTTP(S)")
+    if download.username or download.password or download.fragment:
+        raise RuntimeError("Galileo export download URL contains unsafe URL components")
+
+    def origin(parsed: urllib.parse.ParseResult) -> tuple[str, str, int | None]:
+        default_port = 443 if parsed.scheme == "https" else 80 if parsed.scheme == "http" else None
+        return parsed.scheme, (parsed.hostname or "").lower(), parsed.port or default_port
+
+    same_origin = origin(download) == origin(api)
+    if download.scheme != "https" and not (same_origin and api.scheme == "http"):
+        raise RuntimeError("Cross-origin Galileo export downloads must use HTTPS")
+    # Export URLs must be self-authorizing (for example, a pre-signed object
+    # store URL). Never attach the Galileo API key: urllib preserves custom
+    # headers across redirects, which could otherwise leak it cross-origin.
+    del api_headers
+    return {}
+
+
+def download_records_from_url(
+    url: str,
+    headers: dict[str, str],
+    *,
+    api_base: str,
+    export_format: str = "jsonl",
+) -> list[dict[str, Any]]:
+    raw, content_type = request_bytes(
+        "GET", url, safe_download_headers(url, api_base, headers)
+    )
     text = raw.decode("utf-8")
+    if export_format == "csv" or "csv" in content_type.lower():
+        return parse_csv_records(text)
     try:
-        return extract_records_from_payload(json.loads(text))
+        return extract_records_from_payload(json.loads(text), export_format=export_format)
     except json.JSONDecodeError:
         return parse_jsonl(text)
 
@@ -705,8 +908,12 @@ def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str,
     raw, content_type = request_bytes("POST", url, headers, build_export_records_request(args, since))
     text = raw.decode("utf-8")
     normalized_content_type = content_type.lower()
-    if any(marker in normalized_content_type for marker in ("jsonl", "ndjson")) or (
-        args.export_format == "jsonl" and "\n" in text and not text.lstrip().startswith(("{", "["))
+    if "csv" in normalized_content_type:
+        records = parse_csv_records(text)
+    elif any(marker in normalized_content_type for marker in ("jsonl", "ndjson")) or (
+        args.export_format in {"jsonl", "jsonl_flat"}
+        and "\n" in text
+        and not text.lstrip().startswith(("{", "["))
     ):
         records = parse_jsonl(text)
     else:
@@ -715,11 +922,14 @@ def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str,
         except json.JSONDecodeError:
             # Some Galileo deployments return newline-delimited JSON with the
             # generic application/json content type. Fall back only when the
-            # caller explicitly requested JSONL; malformed JSON for other
-            # formats must still fail closed.
-            if args.export_format != "jsonl":
-                raise
-            records = parse_jsonl(text)
+            # caller explicitly requested JSONL. CSV exports can likewise be
+            # returned with a generic content type, so parse the requested
+            # wire format rather than silently dropping the response.
+            records = (
+                parse_jsonl(text)
+                if args.export_format in {"jsonl", "jsonl_flat"}
+                else parse_csv_records(text)
+            )
             payload = None
         if payload is None:
             if args.max_records:
@@ -728,10 +938,15 @@ def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str,
         for key in ("file_url", "download_url", "url"):
             value = payload.get(key) if isinstance(payload, dict) else None
             if isinstance(value, str) and value.startswith(("http://", "https://")):
-                records = download_records_from_url(value, headers)
+                records = download_records_from_url(
+                    value,
+                    headers,
+                    api_base=args.galileo_api_base,
+                    export_format=args.export_format,
+                )
                 break
         else:
-            records = extract_records_from_payload(payload)
+            records = extract_records_from_payload(payload, export_format=args.export_format)
     if args.max_records:
         return records[: args.max_records]
     return records
@@ -788,6 +1003,40 @@ def compact_record(record: dict[str, Any], args: argparse.Namespace) -> dict[str
         payload["output"] = record.get("output")
         payload["dataset_input"] = record.get("dataset_input")
         payload["dataset_output"] = record.get("dataset_output")
+    if getattr(args, "export_format", "jsonl") in {"csv", "jsonl_flat"}:
+        mapped_columns = {
+            "id",
+            "type",
+            "project_id",
+            "run_id",
+            "trace_id",
+            "session_id",
+            "parent_id",
+            "external_id",
+            "name",
+            "status_code",
+            "created_at",
+            "updated_at",
+            "is_complete",
+            "tags",
+            "user_metadata",
+            "dataset_metadata",
+            "metrics",
+            "metric_info",
+            "feedback_rating_info",
+            "annotations",
+            "redacted_input",
+            "redacted_output",
+        }
+        safe_metric_prefixes = ("metrics/", "metrics.")
+        exported_columns = {
+            key: value
+            for key, value in record.items()
+            if key not in mapped_columns
+            and (args.include_raw or key.lower().startswith(safe_metric_prefixes))
+        }
+        if exported_columns:
+            payload["exported_columns"] = exported_columns
     return {key: value for key, value in payload.items() if value is not None}
 
 
@@ -840,15 +1089,56 @@ def hec_envelope(record: dict[str, Any], args: argparse.Namespace) -> dict[str, 
 def send_to_splunk(args: argparse.Namespace, envelopes: list[dict[str, Any]]) -> None:
     if not envelopes:
         return
-    url = normalize_hec_url(args.splunk_hec_url)
+    url = normalize_hec_url(
+        args.splunk_hec_url,
+        allow_insecure_http=getattr(args, "allow_insecure_hec_http", False),
+    )
     context = ssl._create_unverified_context() if args.insecure else None
     response = request_json("POST", url, splunk_headers(args), envelopes, context)
-    if isinstance(response, dict) and response.get("code") not in (None, 0):
+    if not isinstance(response, dict) or response.get("code") != 0:
         raise RuntimeError(f"Splunk HEC rejected batch: {response}")
 
 
 def chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
+    if size <= 0:
+        raise ValueError("chunk size must be positive")
     return [items[index : index + size] for index in range(0, len(items), size)]
+
+
+def envelope_log_summary(envelope: dict[str, Any]) -> dict[str, Any]:
+    """Build a metadata-only sample safe for terminal and CI logs."""
+
+    event = envelope.get("event")
+    event_dict = event if isinstance(event, dict) else {}
+    safe_event_fields = {
+        key: event_dict[key]
+        for key in (
+            "galileo_record_key",
+            "galileo_project_id",
+            "galileo_log_stream_id",
+            "galileo_record_id",
+            "galileo_record_type",
+            "galileo_trace_id",
+            "galileo_session_id",
+            "created_at",
+            "updated_at",
+            "status_code",
+        )
+        if key in event_dict
+    }
+    return {
+        key: value
+        for key, value in {
+            "time": envelope.get("time"),
+            "source": envelope.get("source"),
+            "sourcetype": envelope.get("sourcetype"),
+            "index": envelope.get("index"),
+            "host": envelope.get("host"),
+            "event": safe_event_fields,
+            "event_field_count": len(event_dict),
+        }.items()
+        if value is not None
+    }
 
 
 def max_timestamp(records: list[dict[str, Any]], field: str) -> str | None:
@@ -870,8 +1160,11 @@ def main() -> int:
 
     print(f"Fetched {len(records)} Galileo {args.root_type} record(s).", file=sys.stderr)
     if envelopes:
-        print("First Splunk envelope sample:", file=sys.stderr)
-        print(json.dumps(envelopes[0], indent=2, sort_keys=True), file=sys.stderr)
+        print("First Splunk envelope metadata sample:", file=sys.stderr)
+        print(
+            json.dumps(envelope_log_summary(envelopes[0]), indent=2, sort_keys=True),
+            file=sys.stderr,
+        )
 
     if args.dry_run:
         print("Dry run complete; no events sent.", file=sys.stderr)

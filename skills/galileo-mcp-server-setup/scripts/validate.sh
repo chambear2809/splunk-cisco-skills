@@ -52,10 +52,22 @@ check_file "${OUTPUT_DIR}/coverage/tool-catalog.json"
 check_file "${OUTPUT_DIR}/observability/mcp-tool-span-logging.md"
 
 python3 - "${OUTPUT_DIR}/metadata.json" <<'PY'
-import json, sys
+import ipaddress
+import json
+import sys
+from urllib.parse import urlparse
+
 with open(sys.argv[1], encoding="utf-8") as fh:
     data = json.load(fh)
-required = {"skill", "mcp_url", "clients", "expected_tools", "expected_tool_count"}
+required = {
+    "skill",
+    "mcp_url",
+    "clients",
+    "expected_server",
+    "expected_tools",
+    "expected_tool_count",
+    "tool_catalog_reviewed",
+}
 missing = required - set(data)
 if missing:
     raise SystemExit(f"metadata.json missing keys: {sorted(missing)}")
@@ -63,10 +75,38 @@ if data["skill"] != "galileo-mcp-server-setup":
     raise SystemExit("metadata.json skill mismatch")
 if not str(data["mcp_url"]).endswith("/mcp/http/mcp"):
     raise SystemExit("metadata.json mcp_url does not end with /mcp/http/mcp")
+parsed_url = urlparse(str(data["mcp_url"]))
+host = (parsed_url.hostname or "").rstrip(".").lower()
+is_loopback = host == "localhost" or host.endswith(".localhost")
+if not is_loopback:
+    try:
+        is_loopback = ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        pass
+if parsed_url.scheme == "http" and not is_loopback:
+    raise SystemExit("metadata.json mcp_url must use HTTPS outside loopback testing")
 if data.get("expected_prompts_count") != 0 or data.get("expected_resources_count") != 0:
     raise SystemExit("metadata.json expected prompt/resource counts should be zero")
+if data["expected_server"] != {"name": "EvalsInIDEServer", "version_observed": "1.28.1"}:
+    raise SystemExit("metadata.json observed server identity/version is stale")
+if data["tool_catalog_reviewed"] != "2026-07-08":
+    raise SystemExit("metadata.json tool catalog review date is stale")
+if data.get("stdio_bridge") != {
+    "transport": "streamable_http",
+    "runtime": "node_core_modules",
+    "redirects": "disabled",
+    "response_types": ["application/json", "text/event-stream"],
+    "post_handshake_requests": "concurrent",
+    "sse_framing": "bounded_per_event",
+    "sse_reconnect": "capped_exponential_backoff",
+}:
+    raise SystemExit("metadata.json stdio bridge contract is missing or stale")
 tools = data.get("expected_tools")
-if not isinstance(tools, list) or len(tools) != data["expected_tool_count"]:
+if (
+    not isinstance(tools, list)
+    or len(tools) != data["expected_tool_count"]
+    or data["expected_tool_count"] != 9
+):
     raise SystemExit("metadata.json expected_tools does not match expected_tool_count")
 for tool in tools:
     for key in ("name", "risk_group", "required", "properties", "schema_sha256"):
@@ -79,8 +119,19 @@ import json, sys
 with open(sys.argv[1], encoding="utf-8") as fh:
     data = json.load(fh)
 matrix = data.get("product_gap_matrix")
-if not isinstance(matrix, list) or len(matrix) < 8:
+if not isinstance(matrix, list) or len(matrix) < 32:
     raise SystemExit("product-gap-matrix.json does not contain expected coverage rows")
+areas = {row.get("area") for row in matrix}
+required_areas = {
+    "AI Assistant beta, evidence-linked investigation, and enterprise enablement",
+    "Global dashboards across projects and log streams",
+    "Generic alert webhooks, payload v1.0, authentication, testing, and deduplication",
+    "Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates",
+    "Large-dataset batched Playground and experiment metric processing",
+}
+missing = required_areas - areas
+if missing:
+    raise SystemExit(f"product-gap-matrix.json missing July 7 boundaries: {sorted(missing)}")
 PY
 
 python3 - "${OUTPUT_DIR}/coverage/tool-catalog.json" <<'PY'
@@ -90,6 +141,12 @@ with open(sys.argv[1], encoding="utf-8") as fh:
 tools = data.get("tools")
 if not isinstance(tools, list) or data.get("tool_count") != len(tools):
     raise SystemExit("tool-catalog.json tool_count mismatch")
+if data.get("tool_count") != 9:
+    raise SystemExit("tool-catalog.json observed tool count changed")
+if data.get("observed_server") != {"name": "EvalsInIDEServer", "version": "1.28.1"}:
+    raise SystemExit("tool-catalog.json observed server identity/version is stale")
+if data.get("reviewed_on") != "2026-07-08":
+    raise SystemExit("tool-catalog.json review date is stale")
 for tool in tools:
     for key in ("name", "risk_group", "required", "properties", "schema_sha256", "coverage", "auto_allow"):
         if key not in tool:
@@ -112,6 +169,10 @@ PY
             cursor.mcp.json|vscode.mcp.json)
                 grep -q 'mcp/http/mcp' "${OUTPUT_DIR}/mcp/${cfg}" || {
                     log "ERROR: ${cfg} does not reference a Galileo MCP endpoint."
+                    exit 1
+                }
+                grep -q 'application/json, text/event-stream' "${OUTPUT_DIR}/mcp/${cfg}" || {
+                    log "ERROR: ${cfg} does not advertise both Streamable HTTP response types."
                     exit 1
                 }
                 ;;
@@ -147,10 +208,39 @@ if [[ -f "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" ]]; then
     else
         log "  WARN: node not on PATH; skipping JS syntax check."
     fi
+    grep -q 'application/json, text/event-stream' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" || {
+        log "ERROR: run-galileo-mcp.js does not support JSON and SSE responses."
+        exit 1
+    }
+    grep -q 'Mcp-Session-Id' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" || {
+        log "ERROR: run-galileo-mcp.js does not propagate MCP session IDs."
+        exit 1
+    }
+    grep -q 'MCP redirects are disabled' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" || {
+        log "ERROR: run-galileo-mcp.js does not fail closed on redirects."
+        exit 1
+    }
+    grep -q 'notifications/cancelled bypass' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" || {
+        log "ERROR: run-galileo-mcp.js does not preserve cancellation concurrency."
+        exit 1
+    }
+    grep -q 'scheduleServerEventReconnect' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" || {
+        log "ERROR: run-galileo-mcp.js does not implement SSE reconnect backoff."
+        exit 1
+    }
+    if grep -q 'mcp-remote' "${OUTPUT_DIR}/mcp/run-galileo-mcp.js"; then
+        log "ERROR: run-galileo-mcp.js still depends on mcp-remote."
+        exit 1
+    fi
 fi
 
 if [[ -f "${OUTPUT_DIR}/mcp/run-galileo-mcp.sh" && ! -x "${OUTPUT_DIR}/mcp/run-galileo-mcp.sh" ]]; then
     log "ERROR: run-galileo-mcp.sh is not executable."
+    exit 1
+fi
+if [[ -f "${OUTPUT_DIR}/mcp/run-galileo-mcp.sh" ]] && \
+    grep -q 'mcp-remote' "${OUTPUT_DIR}/mcp/run-galileo-mcp.sh"; then
+    log "ERROR: run-galileo-mcp.sh still depends on mcp-remote."
     exit 1
 fi
 
@@ -174,7 +264,7 @@ for path in root.rglob("*"):
         bad.append((path, "placeholder YOUR-API-KEY"))
     if re.search(r"Bearer [A-Za-z0-9._-]{12,}", text):
         bad.append((path, "inline bearer token-like value"))
-    if re.search(r"GALILEO_API_KEY=(?!''|\"\"|\$\{)[^'\n#][^\n#]{7,}", text):
+    if re.search(r"GALILEO_API_KEY=(?!''|\"\"|\"\$\(|\$\(|\$\{)[^'\n#][^\n#]{7,}", text):
         bad.append((path, "populated GALILEO_API_KEY assignment"))
     if re.search(r'"Galileo-API-Key"\s*:\s*"(?!\$\{)[^"]{8,}"', text):
         bad.append((path, "inline Galileo-API-Key header value"))

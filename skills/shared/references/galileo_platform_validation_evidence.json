@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "skill": "galileo-platform-setup",
+  "sanitization": "No AWS account or resource identifiers, cluster or context names, namespaces, tenant, project, log-stream, trace, dataset, prompt, or experiment identifiers, service endpoints or hosts, credentials, tokens, local credential or repository paths, personal data, raw tenant content, telemetry payloads, or mutable resource names are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-08-defenseclaw-eks-galileo-platform",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "DefenseClaw workloads on AWS EKS",
+        "galileo": "hosted service using two authorized tenant profiles",
+        "splunk": "in-cluster Splunk HTTP Event Collector health surface",
+        "write_data_policy": "synthetic validation content only",
+        "source_repository_access": "DefenseClaw repository and deployed configuration remained read-only"
+      },
+      "targets": [
+        "Galileo Platform REST and OTLP surfaces used by DefenseClaw",
+        "Rendered Galileo-to-Splunk webhook and HEC bridge assets",
+        "In-cluster Splunk HEC health surface"
+      ],
+      "result": "partial",
+      "evidence": {
+        "live_read_only": {
+          "authorized_profile_authentication_passed": 2,
+          "existing_trace_inventory_passed": true,
+          "redacted_trace_export_passed": true,
+          "raw_input_and_output_excluded": true,
+          "scorer_catalog_inventory_passed": true,
+          "splunk_hec_health_passed": true
+        },
+        "render_and_validation": {
+          "authorized_profile_count": 2,
+          "platform_render_passed": true,
+          "platform_validation_passed": true,
+          "july_7_release_readiness_assets_passed": true,
+          "release_features_checked": [
+            "AI Assistant readiness handoff",
+            "global dashboard handoff",
+            "generic alert webhook handoff",
+            "experiment group readiness",
+            "large-dataset batching handoff"
+          ]
+        },
+        "live_object_and_trace_lifecycle": {
+          "temporary_project_create_passed": true,
+          "temporary_log_stream_create_passed": true,
+          "synthetic_trace_ingest_passed": true,
+          "exact_trace_readback_passed": true,
+          "redacted_export_passed": true,
+          "exact_trace_delete_passed": true,
+          "post_delete_absence_passed": true,
+          "temporary_project_delete_passed": true
+        },
+        "otlp": {
+          "protobuf_trace_ingest_otel_v1_traces_passed": true,
+          "protobuf_trace_ingest_otel_traces_passed": true
+        },
+        "integration_mock": {
+          "synthetic_generic_webhook_to_relay_to_mock_hec_passed": true,
+          "redacted_existing_trace_to_hec_envelope_to_mock_hec_passed": true
+        },
+        "regression": {
+          "defenseclaw_python_tests_passed": 97,
+          "defenseclaw_python_tests_skipped": 1,
+          "defenseclaw_subtests_passed": 11,
+          "defenseclaw_go_galileo_tests_passed": true
+        }
+      },
+      "limitations": [
+        "At the time of this run, experiment-group execution was blocked because Galileo SDK 2.4.0 project readback rejected tenant permission actions that its installed model did not recognize; the temporary project was still deleted through the documented REST boundary.",
+        "At the time of this run, dataset, prompt, Protect-stage, and Control mutation were not attempted because the lifecycle helper did not yet provide sufficiently scoped ownership and cleanup guarantees for those objects.",
+        "AI Assistant and global dashboards were validated as rendered console-evidence handoffs, not through tenant UI observation or public CRUD APIs.",
+        "At the time of this run, large-dataset batching was not exercised because available datasets were small and experiment execution was blocked.",
+        "The live Splunk check covered HEC health; event delivery used a mock HEC rather than a retained live Splunk event."
+      ],
+      "cleanup": {
+        "temporary_galileo_projects_remaining": 0,
+        "temporary_galileo_log_streams_remaining": 0,
+        "synthetic_validation_traces_remaining": 0,
+        "temporary_kubernetes_objects_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
+    },
+    {
+      "id": "2026-07-08-defenseclaw-eks-galileo-platform-repaired-lifecycle",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "DefenseClaw workloads on AWS EKS",
+        "galileo": "authorized hosted-service tenant using Galileo Python SDK 2.4.0",
+        "write_data_policy": "unique disposable names and synthetic validation content only",
+        "source_repository_access": "DefenseClaw repository and deployed configuration remained read-only"
+      },
+      "targets": [
+        "Repaired Galileo disposable object lifecycle and ownership-ledger cleanup",
+        "Galileo experiment-group assignment and filtered membership readback"
+      ],
+      "result": "pass",
+      "evidence": {
+        "live_disposable_object_lifecycle": {
+          "temporary_project_create_passed": true,
+          "temporary_log_stream_create_passed": true,
+          "project_scoped_dataset_create_passed": true,
+          "prompt_create_passed": true,
+          "experiment_create_passed": true,
+          "experiment_group_assignment_passed": true,
+          "experiment_group_filtered_readback_passed": true,
+          "raw_tenant_content_retained": false
+        },
+        "sdk_compatibility": {
+          "known_permission_enum_mismatch_matched_narrowly": true,
+          "exact_project_rest_validation_passed": true,
+          "dataset_project_scope_workaround_passed": true,
+          "experiment_project_scope_workaround_passed": true,
+          "unrelated_errors_bypassed": false
+        },
+        "owned_cleanup": {
+          "dataset_deleted_by_exact_id": 1,
+          "prompt_deleted_by_exact_id": 1,
+          "project_deleted_by_exact_id": 1,
+          "log_stream_covered_by_exact_project_delete": 1,
+          "experiment_covered_by_exact_project_delete": 1,
+          "project_post_delete_absence_passed": true,
+          "dataset_post_delete_absence_passed": true,
+          "prompt_post_delete_absence_passed": true,
+          "exact_id_http_404_absence_handling_passed": true
+        }
+      },
+      "limitations": [
+        "Protect-stage creation and Agent Control mutation were not needed for the July 7 release-feature lifecycle run and were not exercised.",
+        "AI Assistant and global dashboards remain console-evidence handoffs rather than tenant UI observations or public CRUD validation.",
+        "Large-dataset batched experiment execution was not exercised to avoid unbounded model-provider cost; small synthetic dataset lifecycle coverage passed.",
+        "The Observe export bridge still parses a complete export response in memory; it is not a streaming implementation for arbitrarily large exports.",
+        "Live Splunk event delivery was not retained; the separate integration run used a mock HEC and the live cluster check covered HEC health."
+      ],
+      "cleanup": {
+        "temporary_galileo_projects_remaining": 0,
+        "temporary_galileo_datasets_remaining": 0,
+        "temporary_galileo_prompts_remaining": 0,
+        "project_scoped_log_streams_experiments_and_groups_remaining": 0,
+        "temporary_kubernetes_objects_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
+    }
+  ]
+}

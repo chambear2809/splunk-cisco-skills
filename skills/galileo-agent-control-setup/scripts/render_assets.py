@@ -8,12 +8,14 @@ only commands and examples that reference secret file paths.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import stat
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 
 SKILL_NAME = "galileo-agent-control-setup"
@@ -199,6 +201,104 @@ def get_nested(spec: dict[str, Any], dotted: str, default: Any) -> Any:
     return current
 
 
+def is_loopback_host(host: str) -> bool:
+    """Return whether a URL hostname is safe for local plaintext testing."""
+
+    normalized = host.lower()
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return normalized == "localhost" or normalized.endswith(".localhost")
+
+
+def normalized_netloc(host: str, port: int | None) -> str:
+    """Build a credential-free netloc, preserving valid IPv6 bracket syntax."""
+
+    normalized_host = host.lower()
+    if ":" in normalized_host:
+        normalized_host = f"[{normalized_host}]"
+    if port is not None:
+        return f"{normalized_host}:{port}"
+    return normalized_host
+
+
+def normalize_server_url(value: str) -> str:
+    """Validate and normalize the credential-bearing Agent Control base URL."""
+
+    raw = value.strip()
+    try:
+        parsed = urlparse(raw)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise SystemExit("ERROR: Agent Control server URL is invalid") from exc
+    if any(character.isspace() for character in raw):
+        raise SystemExit("ERROR: Agent Control server URL is invalid")
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise SystemExit(
+            "ERROR: Agent Control server URL must be an absolute HTTP(S) origin"
+        )
+    if parsed.username is not None or parsed.password is not None:
+        raise SystemExit("ERROR: Agent Control server URL must not contain credentials")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(
+            "ERROR: Agent Control server URL must be an origin without path, "
+            "parameters, query, or fragment"
+        )
+    if port is not None and port < 1:
+        raise SystemExit("ERROR: Agent Control server URL contains an invalid port")
+    if parsed.scheme == "http" and not is_loopback_host(host):
+        raise SystemExit(
+            "ERROR: Agent Control server URL must use HTTPS outside loopback testing"
+        )
+    return urlunparse(
+        (parsed.scheme, normalized_netloc(host, port), "", "", "", "")
+    )
+
+
+def normalize_hec_url(value: str) -> str:
+    """Normalize a safe Splunk URL to the JSON event collector endpoint."""
+
+    raw = value.strip()
+    try:
+        parsed = urlparse(raw)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise SystemExit("ERROR: Splunk HEC URL is invalid") from exc
+    if any(character.isspace() for character in raw):
+        raise SystemExit("ERROR: Splunk HEC URL is invalid")
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise SystemExit("ERROR: Splunk HEC URL must be an absolute HTTP(S) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise SystemExit("ERROR: Splunk HEC URL must not contain credentials")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(
+            "ERROR: Splunk HEC URL must not contain parameters, query, or fragment"
+        )
+    if port is not None and port < 1:
+        raise SystemExit("ERROR: Splunk HEC URL contains an invalid port")
+    if parsed.scheme == "http" and not is_loopback_host(host):
+        raise SystemExit("ERROR: Splunk HEC URL must use HTTPS outside loopback testing")
+    if parsed.path in {"", "/"}:
+        path = "/services/collector/event"
+    elif parsed.path in {"/services/collector", "/services/collector/"}:
+        path = "/services/collector/event"
+    elif parsed.path in {
+        "/services/collector/event",
+        "/services/collector/event/",
+    }:
+        path = "/services/collector/event"
+    else:
+        raise SystemExit(
+            "ERROR: Splunk HEC URL path must be empty, /services/collector, or "
+            "/services/collector/event"
+        )
+    return urlunparse(
+        (parsed.scheme, normalized_netloc(host, port), path, "", "", "")
+    )
+
+
 def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, Any]:
     def arg_or_spec(arg_name: str, spec_key: str, default: str = "") -> str:
         value = getattr(args, arg_name)
@@ -208,9 +308,45 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
 
     index = arg_or_spec("splunk_index", "splunk.index", "agent_control")
     allowed = arg_or_spec("hec_allowed_indexes", "splunk.hec_allowed_indexes", "") or index
+    server_url = normalize_server_url(
+        arg_or_spec("server_url", "agent_control.server_url", "http://localhost:8000")
+    )
+    splunk_hec_url = arg_or_spec("splunk_hec_url", "splunk.hec_url", "")
+    if splunk_hec_url:
+        splunk_hec_url = normalize_hec_url(splunk_hec_url)
+    galileo_console_url = arg_or_spec("galileo_console_url", "galileo.console_url", "")
+    if galileo_console_url:
+        parsed_console = urlparse(galileo_console_url)
+        if parsed_console.scheme not in {"http", "https"} or not parsed_console.hostname:
+            raise SystemExit("ERROR: Galileo console URL must be an absolute HTTP(S) URL")
+        if parsed_console.username or parsed_console.password:
+            raise SystemExit("ERROR: Galileo console URL must not contain credentials")
+        if (
+            parsed_console.path not in {"", "/"}
+            or parsed_console.params
+            or parsed_console.query
+            or parsed_console.fragment
+        ):
+            raise SystemExit(
+                "ERROR: Galileo console URL must not contain a path, parameters, query, or fragment"
+            )
+        try:
+            parsed_console.port
+        except ValueError as exc:
+            raise SystemExit("ERROR: Galileo console URL contains an invalid port") from exc
+        if parsed_console.scheme == "http":
+            host = parsed_console.hostname.lower()
+            try:
+                loopback = ipaddress.ip_address(host).is_loopback
+            except ValueError:
+                loopback = host == "localhost" or host.endswith(".localhost")
+            if not loopback:
+                raise SystemExit(
+                    "ERROR: Galileo console URL must use HTTPS outside loopback testing"
+                )
     return {
-        "galileo_console_url": arg_or_spec("galileo_console_url", "galileo.console_url", ""),
-        "server_url": arg_or_spec("server_url", "agent_control.server_url", "http://localhost:8000"),
+        "galileo_console_url": galileo_console_url,
+        "server_url": server_url,
         "server_host": arg_or_spec("server_host", "agent_control.server_host", "0.0.0.0"),
         "server_port": arg_or_spec("server_port", "agent_control.server_port", "8000"),
         "agent_name": arg_or_spec("agent_name", "agent.name", "splunk-governed-agent"),
@@ -227,7 +363,7 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
         "service_name": arg_or_spec("service_name", "runtime.service_name", "agent-control-runtime"),
         "otlp_endpoint": arg_or_spec("otlp_endpoint", "otel.endpoint", "http://localhost:4318/v1/traces"),
         "splunk_platform": arg_or_spec("splunk_platform", "splunk.platform", "enterprise"),
-        "splunk_hec_url": arg_or_spec("splunk_hec_url", "splunk.hec_url", ""),
+        "splunk_hec_url": splunk_hec_url,
         "splunk_hec_token_file": arg_or_spec(
             "splunk_hec_token_file",
             "secrets.splunk_hec_token_file",
@@ -429,8 +565,10 @@ agent_control in production entrypoints.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import os
 from pathlib import Path
+from urllib import parse
 
 import agent_control
 from agent_control import ControlViolationError, control
@@ -443,8 +581,46 @@ def _read_secret_file(env_name: str) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
 
+def _normalize_agent_control_base_url(value: str) -> str:
+    raw = value.strip()
+    try:
+        parsed = parse.urlparse(raw)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise RuntimeError("AGENT_CONTROL_BASE_URL is invalid") from exc
+    if any(character.isspace() for character in raw):
+        raise RuntimeError("AGENT_CONTROL_BASE_URL is invalid")
+    if parsed.scheme not in {{"http", "https"}} or not host:
+        raise RuntimeError("AGENT_CONTROL_BASE_URL must be an absolute HTTP(S) origin")
+    if parsed.username is not None or parsed.password is not None:
+        raise RuntimeError("AGENT_CONTROL_BASE_URL must not contain credentials")
+    if parsed.path not in {{"", "/"}} or parsed.params or parsed.query or parsed.fragment:
+        raise RuntimeError(
+            "AGENT_CONTROL_BASE_URL must be an origin without path, parameters, "
+            "query, or fragment"
+        )
+    if port is not None and port < 1:
+        raise RuntimeError("AGENT_CONTROL_BASE_URL contains an invalid port")
+    normalized_host = host.lower()
+    try:
+        loopback = ipaddress.ip_address(normalized_host).is_loopback
+    except ValueError:
+        loopback = normalized_host == "localhost" or normalized_host.endswith(".localhost")
+    if parsed.scheme == "http" and not loopback:
+        raise RuntimeError(
+            "AGENT_CONTROL_BASE_URL must use HTTPS outside loopback testing"
+        )
+    if ":" in normalized_host:
+        normalized_host = f"[{{normalized_host}}]"
+    netloc = f"{{normalized_host}}:{{port}}" if port is not None else normalized_host
+    return parse.urlunparse((parsed.scheme, netloc, "", "", "", ""))
+
+
 def init_agent_control() -> None:
-    os.environ.setdefault("AGENT_CONTROL_BASE_URL", {config["server_url"]!r})
+    os.environ["AGENT_CONTROL_BASE_URL"] = _normalize_agent_control_base_url(
+        os.environ.get("AGENT_CONTROL_BASE_URL", {config["server_url"]!r})
+    )
     if "AGENT_CONTROL_API_KEY" not in os.environ:
         os.environ["AGENT_CONTROL_API_KEY"] = _read_secret_file("AGENT_CONTROL_API_KEY_FILE")
     agent_control.init(
@@ -478,7 +654,40 @@ if __name__ == "__main__":
 // Keep API key loading in your runtime secret manager; do not inline keys.
 
 const agentName = {json.dumps(config["agent_name"])};
-const serverUrl = process.env.AGENT_CONTROL_BASE_URL ?? {json.dumps(config["server_url"])};
+
+function isLoopback(hostname: string): boolean {{
+  const host = hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  return host === "localhost" || host.endsWith(".localhost") || host === "::1" || /^127\\./.test(host);
+}}
+
+function normalizeServerUrl(value: string): string {{
+  let parsed: URL;
+  try {{
+    parsed = new URL(value);
+  }} catch {{
+    throw new Error("AGENT_CONTROL_BASE_URL is invalid");
+  }}
+  if (!(["http:", "https:"] as string[]).includes(parsed.protocol)) {{
+    throw new Error("AGENT_CONTROL_BASE_URL must be an absolute HTTP(S) origin");
+  }}
+  if (parsed.username || parsed.password) {{
+    throw new Error("AGENT_CONTROL_BASE_URL must not contain credentials");
+  }}
+  if (parsed.pathname !== "/" || parsed.search || parsed.hash) {{
+    throw new Error("AGENT_CONTROL_BASE_URL must be an origin without path, query, or fragment");
+  }}
+  if (parsed.port === "0") {{
+    throw new Error("AGENT_CONTROL_BASE_URL contains an invalid port");
+  }}
+  if (parsed.protocol === "http:" && !isLoopback(parsed.hostname)) {{
+    throw new Error("AGENT_CONTROL_BASE_URL must use HTTPS outside loopback testing");
+  }}
+  return parsed.origin;
+}}
+
+const serverUrl = normalizeServerUrl(
+  process.env.AGENT_CONTROL_BASE_URL ?? {json.dumps(config["server_url"])}
+);
 
 export async function initAgentControl() {{
   const apiKeyFile = process.env.AGENT_CONTROL_API_KEY_FILE;
@@ -513,11 +722,12 @@ objects using sourcetype {config["splunk_sourcetype"]!r}.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 from pathlib import Path
 from typing import Iterable
-from urllib import request
+from urllib import parse, request
 
 from agent_control import register_control_event_sink
 from agent_control_telemetry import BaseControlEventSink, SinkResult
@@ -530,14 +740,71 @@ def _read_secret_file(env_name: str) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
 
+def _is_loopback_host(host: str) -> bool:
+    normalized = host.lower()
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return normalized == "localhost" or normalized.endswith(".localhost")
+
+
+def _normalize_hec_url(value: str) -> str:
+    raw = value.strip()
+    try:
+        parsed = parse.urlparse(raw)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise RuntimeError("SPLUNK_HEC_URL is invalid") from exc
+    if any(character.isspace() for character in raw):
+        raise RuntimeError("SPLUNK_HEC_URL is invalid")
+    if parsed.scheme not in {{"http", "https"}} or not host:
+        raise RuntimeError("SPLUNK_HEC_URL must be an absolute HTTP(S) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise RuntimeError("SPLUNK_HEC_URL must not contain credentials")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise RuntimeError(
+            "SPLUNK_HEC_URL must not contain parameters, query, or fragment"
+        )
+    if port is not None and port < 1:
+        raise RuntimeError("SPLUNK_HEC_URL contains an invalid port")
+    if parsed.scheme == "http" and not _is_loopback_host(host):
+        raise RuntimeError("SPLUNK_HEC_URL must use HTTPS outside loopback testing")
+    if parsed.path in {{"", "/"}}:
+        path = "/services/collector/event"
+    elif parsed.path in {{"/services/collector", "/services/collector/"}}:
+        path = "/services/collector/event"
+    elif parsed.path in {{
+        "/services/collector/event",
+        "/services/collector/event/",
+    }}:
+        path = "/services/collector/event"
+    else:
+        raise RuntimeError(
+            "SPLUNK_HEC_URL path must be empty, /services/collector, or "
+            "/services/collector/event"
+        )
+    normalized_host = host.lower()
+    if ":" in normalized_host:
+        normalized_host = f"[{{normalized_host}}]"
+    netloc = f"{{normalized_host}}:{{port}}" if port is not None else normalized_host
+    return parse.urlunparse((parsed.scheme, netloc, path, "", "", ""))
+
+
+class NoRedirectHandler(request.HTTPRedirectHandler):
+    """Reject redirects so the Splunk authorization header never gets forwarded."""
+
+    def redirect_request(self, *_args: object, **_kwargs: object) -> None:
+        return None
+
+
 class SplunkHecControlEventSink(BaseControlEventSink):
     def __init__(self) -> None:
-        base_url = os.environ.get("SPLUNK_HEC_URL", {config["splunk_hec_url"]!r}).rstrip("/")
-        if "/services/collector" in base_url:
-            self.url = base_url
-        else:
-            self.url = base_url + "/services/collector/event"
+        self.url = _normalize_hec_url(
+            os.environ.get("SPLUNK_HEC_URL", {config["splunk_hec_url"]!r})
+        )
         self.token = _read_secret_file("SPLUNK_HEC_TOKEN_FILE")
+        self._opener = request.build_opener(NoRedirectHandler())
 
     def write_events(self, events: Iterable[object]) -> SinkResult:
         accepted = 0
@@ -555,7 +822,7 @@ class SplunkHecControlEventSink(BaseControlEventSink):
                 data=json.dumps(envelope).encode("utf-8"),
                 headers={{"Authorization": f"Splunk {{self.token}}", "Content-Type": "application/json"}},
             )
-            with request.urlopen(req, timeout=30):
+            with self._opener.open(req, timeout=30):
                 accepted += 1
         return SinkResult(accepted=accepted, dropped=0)
 

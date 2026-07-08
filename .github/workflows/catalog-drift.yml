@@ -36,3 +36,20 @@ jobs:
         run: >-
           python3 skills/cisco-product-setup/scripts/build_catalog.py
           --check-live-source
+
+  galileo-product-and-mcp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Compare the Galileo MCP server with the pinned tool catalog
+        run: >-
+          python3 skills/galileo-mcp-server-setup/scripts/probe_mcp.py
+          --fail-on-drift --json
+
+      - name: Detect new Galileo releases and product coverage gaps
+        run: >-
+          python3 skills/galileo-mcp-server-setup/scripts/audit_product_coverage.py
+          --json

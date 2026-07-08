@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "skill": "galileo-mcp-server-setup",
+  "sanitization": "No AWS account or resource identifiers, cluster or context names, namespaces, tenant, project, log-stream, trace, or experiment identifiers, MCP or service endpoints, credentials, tokens, local credential or repository paths, personal data, raw tool results, tenant telemetry, or mutable resource names are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-08-defenseclaw-eks-galileo-mcp",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "DefenseClaw workloads on AWS EKS",
+        "galileo": "hosted MCP service using two authorized tenant profiles",
+        "source_repository_access": "DefenseClaw repository and deployed configuration remained read-only"
+      },
+      "targets": [
+        "Galileo EvalsInIDEServer 1.28.1",
+        "Generated MCP client bridge configuration"
+      ],
+      "result": "partial",
+      "evidence": {
+        "live_server_contract": {
+          "authorized_profile_count": 2,
+          "server_version": "1.28.1",
+          "expected_tool_count": 9,
+          "unexpected_tools": 0,
+          "missing_tools": 0,
+          "tool_schema_drift": 0,
+          "prompts_reported": 0,
+          "resources_reported": 0
+        },
+        "live_read_only_tools": {
+          "direct_authenticated_http_transport_passed": true,
+          "get_logstream_insights_passed": true,
+          "get_logstream_signals_passed": true,
+          "raw_tool_results_retained": false
+        },
+        "documentation_coverage": {
+          "deep_audit_passed": true,
+          "coverage_rules_passed": 28,
+          "latest_reviewed_release": "2026-07-07"
+        }
+      },
+      "limitations": [
+        "At the time of this run, the generated stdio bridge did not complete MCP initialization with mcp-remote 0.1.37 even though direct authenticated HTTP MCP calls succeeded.",
+        "At the time of this run, the generated bridge's forced text/event-stream Accept header was rejected with HTTP 406 when sent alone; removing that header did not fully resolve the mcp-remote interoperability issue.",
+        "Write-capable MCP tools were not invoked during this read-only validation."
+      ],
+      "cleanup": {
+        "temporary_mcp_bridge_processes_remaining": 0,
+        "temporary_port_forwards_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
+    },
+    {
+      "id": "2026-07-08-defenseclaw-eks-galileo-mcp-repaired-bridge",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "Rendered dependency-free Node.js stdio bridge",
+        "galileo": "authorized hosted MCP service",
+        "source_repository_access": "DefenseClaw repository and deployed configuration remained read-only"
+      },
+      "targets": [
+        "Galileo EvalsInIDEServer 1.28.1",
+        "Rendered dependency-free stdio-to-Streamable-HTTP bridge"
+      ],
+      "result": "pass",
+      "evidence": {
+        "live_rendered_bridge": {
+          "authenticated_initialize_passed": true,
+          "server_name": "EvalsInIDEServer",
+          "server_version": "1.28.1",
+          "expected_tool_count": 9,
+          "unexpected_tools": 0,
+          "missing_tools": 0,
+          "tool_schema_drift": 0,
+          "get_logstream_insights_passed": true,
+          "get_logstream_signals_passed": true,
+          "secret_exposed": false,
+          "raw_tool_results_retained": false
+        },
+        "transport_and_regression": {
+          "json_and_sse_response_support_passed": true,
+          "session_and_protocol_header_forwarding_passed": true,
+          "redirect_rejection_passed": true,
+          "remote_cleartext_rejection_passed": true,
+          "bracketed_ipv6_loopback_http_passed": true,
+          "deep_product_coverage_audit_passed": true
+        }
+      },
+      "limitations": [
+        "Write-capable MCP tools were intentionally outside this read-only validation dimension."
+      ],
+      "cleanup": {
+        "temporary_mcp_bridge_processes_remaining": 0,
+        "temporary_port_forwards_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
+    }
+  ]
+}
