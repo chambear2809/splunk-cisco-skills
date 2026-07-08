@@ -534,13 +534,40 @@ Splunk OTel/Kubernetes collection workflow.
 ### SOK Apply and Status Ordering
 
 The Enterprise resources cannot be server-dry-run before their CRDs exist. For
-a new install, `apply.sh` verifies the bundle/cluster, creates the reviewed
-namespaces and CRDs, then runs `server-dry-run.sh all` before either Helm install.
+a new install, `apply.sh` verifies the bundle/cluster and forces fresh preflight
+semantics even if the caller exported the existing-validation environment flag.
+Preflight accepts an absent namespace or a healthy Active, non-terminating
+namespace pre-staged with reviewed dependency references; existing namespace
+metadata is not changed, and exact Helm/Operator/CR collision checks still run.
+It then inventories all `enterprise.splunk.com` CRDs. An empty CRD inventory proceeds to normal
+creation. A non-empty inventory is accepted only when its complete normalized
+spec contract exactly equals the SHA-verified reviewed 3.1.0 manifest, all CRDs
+are established on reviewed stored versions, and no SOK CR exists cluster-wide
+apart from an explicitly reviewed existing LicenseManager identity; partial,
+drifted, extra, unreadable, terminating, or otherwise populated inventories fail
+closed. The LicenseManager exception itself must have the exact v4 identity, a
+separate currently deployed Helm owner release, complete API-server identity, no
+deletion/pause/admin-managed-PV state, a current generation, and clean `Ready`
+status. The fresh path then explicitly creates only absent namespaces, applies
+CRDs, and runs `server-dry-run.sh all` before either Helm install. Helm is not
+allowed to create namespaces implicitly.
+
+The remote development path downloads the pinned CRD manifest once into an
+apply-private directory, verifies its rendered SHA-256, and exports that same
+file to preflight, server-side apply, and the Established wait. The production
+path uses the hash-verified local CRD snapshot already tracked by the bundle.
+Helm release inventory feature-detects Helm 3's `--all` option versus Helm 4's
+all-status default; help or list failures stop the operation.
+
 For an upgrade, it runs the Operator dry-run before any CRD mutation, applies
 the reviewed CRDs, then runs the Enterprise dry-run against the new schemas
 before changing either Helm release. This is the minimum-mutation ordering; the
 CRD apply is deliberately the only mutation that can precede the Enterprise
 dry-run on an upgrade.
+
+`SOK_VALIDATE_EXISTING=true` is reserved for the validator's read-only
+post-deployment preflight/status path. Fresh `apply.sh` overrides it to `false`,
+so it cannot suppress the namespace or CRD ownership guards during mutation.
 
 Status regenerates the Operator server-side contract and exactly compares all
 Helm-owned Deployments, ClusterRoles/Bindings, Roles/Bindings, ServiceAccounts,

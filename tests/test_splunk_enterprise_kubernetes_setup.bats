@@ -24,6 +24,16 @@ if [[ "${1:-}" == "-c" && "${2:-}" == *"urllib.request.urlopen"* ]]; then
   printf 'python3 offline-url-check\n' >> "${K8S_CMD_LOG}"
   exit 0
 fi
+if [[ "${1:-}" == "-c" && "${2:-}" == *"cannot download reviewed CRD manifest"* ]]; then
+  destination="${@: -1}"
+  printf '%s\n' 'apiVersion: v1' > "${destination}"
+  printf 'python3 staged-crd-download\n' >> "${K8S_CMD_LOG}"
+  exit 0
+fi
+if [[ "${1:-}" == "-c" && "${2:-}" == *"staged CRD manifest SHA-256 differs"* ]]; then
+  printf 'python3 staged-crd-hash-check\n' >> "${K8S_CMD_LOG}"
+  exit 0
+fi
 if [[ "${1:-}" == "-c" && "${2:-}" == *"PyYAML 6.x is required"* ]]; then
   printf 'python3 pyyaml-version-check\n' >> "${K8S_CMD_LOG}"
   exit 0
@@ -39,7 +49,11 @@ write_mock_kubectl() {
 set -euo pipefail
 printf 'kubectl %s\n' "$*" >> "${K8S_CMD_LOG}"
 
-if [[ " ${*} " == *" version -o json "* ]]; then
+if [[ -n "${K8S_MOCK_EXISTING_NAMESPACE:-}" && " ${*} " == *" get namespace ${K8S_MOCK_EXISTING_NAMESPACE} "* ]]; then
+  printf '%s\n' "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"name\":\"${K8S_MOCK_EXISTING_NAMESPACE}\"},\"status\":{\"phase\":\"Active\"}}"
+elif [[ " ${*} " == *" get customresourcedefinitions.apiextensions.k8s.io "* ]]; then
+  printf '%s\n' '{"items":[]}'
+elif [[ " ${*} " == *" version -o json "* ]]; then
   printf '%s\n' '{"serverVersion":{"gitVersion":"v1.33.5"}}'
 elif [[ "${1:-}" == "version" ]]; then
   printf 'Client Version: v1.33.5\n'
@@ -457,9 +471,11 @@ PY
     [[ "${log_text}" =~ "kubectl version -o json" ]]
     [[ "${log_text}" =~ "kubectl create --raw /apis/authorization.k8s.io/v1/selfsubjectaccessreviews -f -" ]]
     [[ "${log_text}" =~ "helm show chart splunk/splunk-operator --version 3.1.0" ]]
-    [[ "${log_text}" =~ "python3 offline-url-check" ]]
+    [[ "${log_text}" =~ "python3 staged-crd-download" ]]
+    [[ "${log_text}" =~ "python3 staged-crd-hash-check" ]]
+    [[ ! "${log_text}" =~ "python3 offline-url-check" ]]
     [[ "${log_text}" =~ "aws eks describe-cluster --name demo --region us-west-2" ]]
-    [[ "${log_text}" =~ "kubectl apply -f https://github.com/splunk/splunk-operator/releases/download/3.1.0/splunk-operator-crds.yaml --server-side" ]]
+    [[ "${log_text}" =~ "splunk-operator-crds.yaml --server-side" ]]
     [[ "${log_text}" =~ "helm upgrade --install splunk-operator splunk/splunk-operator" ]]
     [[ "${log_text}" =~ "helm upgrade --install splunk-enterprise splunk/splunk-enterprise" ]]
     python3 - "${K8S_CMD_LOG}" <<'PY'
@@ -467,11 +483,36 @@ from pathlib import Path
 import sys
 lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
 preflight = next(i for i, line in enumerate(lines) if line == "kubectl cluster-info")
+namespace = next(i for i, line in enumerate(lines) if line == "kubectl create namespace splunk-operator")
 crds = next(i for i, line in enumerate(lines) if "splunk-operator-crds.yaml" in line and line.startswith("kubectl apply"))
 operator = next(i for i, line in enumerate(lines) if line.startswith("helm upgrade --install splunk-operator"))
 enterprise = next(i for i, line in enumerate(lines) if line.startswith("helm upgrade --install splunk-enterprise"))
-assert preflight < crds < operator < enterprise
+assert preflight < namespace < crds < operator < enterprise
 PY
+}
+
+@test "enterprise kubernetes fresh SOK apply preserves a healthy staged namespace" {
+    make_mock_path
+    output_dir="${TMP_ROOT}/rendered"
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh" \
+      --target sok \
+      --architecture s1 \
+      --output-dir "${output_dir}" \
+      --accept-splunk-general-terms
+    [ "$status" -eq 0 ]
+
+    : > "${K8S_CMD_LOG}"
+    run env K8S_MOCK_EXISTING_NAMESPACE=splunk-operator \
+      bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh" \
+      --target sok \
+      --phase apply \
+      --output-dir "${output_dir}"
+    [ "$status" -eq 0 ]
+    log_text="$(cat "${K8S_CMD_LOG}")"
+    [[ "${log_text}" =~ "kubectl --request-timeout=30s get namespace splunk-operator" ]]
+    [[ ! "${log_text}" =~ "kubectl create namespace" ]]
+    [[ "${log_text}" =~ "splunk-operator-crds.yaml --server-side" ]]
+    [[ "${log_text}" =~ "helm upgrade --install" ]]
 }
 
 @test "enterprise kubernetes SOK apply uses bundled license helper without repeated inputs" {

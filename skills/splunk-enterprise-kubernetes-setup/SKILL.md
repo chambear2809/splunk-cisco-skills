@@ -93,16 +93,8 @@ The default phase is `render` and does not contact or mutate a cluster.
   `cluster-config.yaml`; `deploy.sh` refreshes the bundle hash afterward. Remove
   that field only from a separate copy made for sharing.
 
-Dry-run plans do not render or execute:
-
-```bash
-bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
-  --target sok \
-  --architecture c3 \
-  --accept-splunk-general-terms \
-  --dry-run \
-  --json
-```
+Dry-run plans do not render or execute; use `--dry-run --json` for a
+machine-readable preview.
 
 ## SOK Workflow
 
@@ -117,6 +109,33 @@ the rendered bundle or logs.
 Namespace-scoped mode is the default and requires the operator and Enterprise
 namespace to be the same. For separate namespaces, use a cluster-scoped operator
 and include the Enterprise namespace in `--watch-namespaces`.
+
+A fresh SOK bundle creates an absent namespace explicitly. A healthy Active,
+non-terminating namespace may already exist so reviewed SmartStore/Queue/App
+Framework Secrets, IRSA ServiceAccounts, image-pull references, or an existing
+LicenseManager can be staged; the bundle leaves that namespace's metadata
+unchanged. Exact Helm, Operator, and global CR collision checks prevent this
+from becoming an existing-deployment adoption path. Use `--allow-upgrade` only
+for the exact already-managed Helm releases; its preflight proves release,
+Operator, CR, and namespace ownership before mutation. Fresh preflight also
+inventories `enterprise.splunk.com` CRDs cluster-wide. No CRDs is the normal
+creation path. If any exist, the complete live CRD set and normalized specs must
+exactly equal the SHA-verified reviewed 3.1.0 release manifest, every CRD must be
+established on reviewed stored versions, and no SOK CR may exist anywhere in
+the cluster, except an explicitly reviewed existing LicenseManager identity.
+Partial, drifted, extra, unreadable, terminating, or otherwise populated
+inventories fail before namespace or CRD mutation. `validate.sh --live` retains
+its separate existing-deployment readback mode and is not an apply bypass.
+The LicenseManager exception requires an exact v4 API identity, a separate
+currently deployed Helm owner release, complete API-server identity, no
+deletion/pause/admin-managed-PV state, current generation, and a clean `Ready`
+status.
+For the remote development path, `apply.sh` downloads the pinned CRD manifest
+once into a private staging directory, verifies its SHA-256, and uses that same
+staged file for preflight comparison, server-side apply, and the Established
+wait. Production uses the hash-verified local CRD snapshot in the reviewed
+bundle. Generated Helm inventory helpers detect Helm 3 versus Helm 4 and fail
+closed if compatibility discovery or release listing fails.
 
 The chart exposes first-class SVA presets only for S1, C3, and M4. The upstream
 CRDs can compose C1/C11, C13, M2/M12, M3/M13, and M14, but this skill does not
@@ -140,18 +159,9 @@ bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
   --accept-splunk-general-terms
 ```
 
-Render separate namespaces with cluster-scoped RBAC:
-
-```bash
-bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
-  --target sok \
-  --architecture c3 \
-  --operator-scope cluster \
-  --operator-namespace splunk-operator \
-  --namespace splunk \
-  --watch-namespaces splunk \
-  --accept-splunk-general-terms
-```
+For separate namespaces, render cluster-scoped RBAC with
+`--operator-scope cluster`, distinct operator/Enterprise namespaces, and the
+Enterprise namespace in `--watch-namespaces`.
 
 `--deployment-profile production` is a guardrail, not sizing approval. It
 requires reviewed local 3.1 charts/CRDs, digest-pinned images, exact cluster
@@ -302,14 +312,6 @@ configuration and Cisco/Splunk vendor handoff; do not relabel it as ES or ITSI.
 The selectors always retain a primary core search tier. A sole ES/ITSI premium
 search tier without that primary tier is not represented and is a manual/vendor
 handoff.
-
-Render-only permits review placeholders:
-
-```bash
-bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
-  --target pod \
-  --pod-profile pod-xlarge-itsi
-```
 
 A bundle intended for live use requires exact, unique controller/worker IPs,
 the executable installer, license and SSH-key files, and an explicit immutable

@@ -50,6 +50,20 @@ VERIFIED_SOK_PROBE_SHA256 = {
         "startupProbe.sh": "b8497b1365e88d2321e2802154ecbbadf4305536e2179fac8b11f25067f0c216",
     }
 }
+HELM_LIST_ALL_FUNCTION = r'''helm_list_all() {
+  local list_help
+  if ! list_help="$(helm list --help 2>&1)"; then
+    printf 'ERROR: unable to inspect Helm list compatibility.\n' >&2
+    return 1
+  fi
+  if printf '%s\n' "${list_help}" | grep -Eq -- '(^|[[:space:]])--all([=[:space:]]|$)'; then
+    helm list --all "$@"
+  else
+    # Helm 4 removed --all because every status is listed by default.
+    helm list "$@"
+  fi
+}
+'''
 SOK_ARCHITECTURES = {"s1", "c3", "m4"}
 POD_PROFILES = {
     "pod-small",
@@ -3169,6 +3183,19 @@ def render_namespace(args: argparse.Namespace) -> str:
 
 def render_sok_preflight(args: argparse.Namespace) -> str:
     watched_namespaces = split_csv(args.watch_namespaces) or [args.namespace]
+    expected_crd_source = (
+        "./splunk-operator-crds.yaml"
+        if args.crd_manifest
+        else (
+            "https://github.com/splunk/splunk-operator/releases/download/"
+            f"{args.operator_version}/splunk-operator-crds.yaml"
+        )
+    )
+    expected_crd_sha256 = (
+        file_sha256(Path(args.crd_manifest).expanduser())
+        if args.crd_manifest
+        else VERIFIED_SOK_ARTIFACT_SHA256.get(args.operator_version, {}).get("crds", "")
+    )
     compatibility_args = [
         "python3 compatibility-check.py",
         f"--operator-version {shell_quote(args.operator_version)}",
@@ -3193,14 +3220,44 @@ def render_sok_preflight(args: argparse.Namespace) -> str:
             "kubectl apply --dry-run=client --server-side=false -f ./splunk-operator-crds.yaml >/dev/null",
         ]
     else:
+        staged_crd_probe_code = """import hashlib
+import sys
+from pathlib import Path
+path, expected = sys.argv[1:]
+candidate = Path(path)
+if not candidate.is_file() or candidate.is_symlink():
+    raise SystemExit("ERROR: staged CRD manifest is missing or unsafe")
+payload = candidate.read_bytes()
+if len(payload) > 16 * 1024 * 1024:
+    raise SystemExit("ERROR: staged CRD manifest exceeds 16 MiB")
+if hashlib.sha256(payload).hexdigest() != expected.lower():
+    raise SystemExit("ERROR: staged CRD manifest SHA-256 differs from review")
+"""
+        remote_crd_probe = (
+            "python3 -c "
+            + shell_quote(
+                "import urllib.request; urllib.request.urlopen("
+                + repr(
+                    "https://github.com/splunk/splunk-operator/releases/download/"
+                    f"{args.operator_version}/splunk-operator-crds.yaml"
+                )
+                + ", timeout=30).read(1)"
+            )
+        )
+        staged_or_remote_crd_probe = (
+            'if [[ -n "${SOK_CRD_FILE:-}" ]]; then '
+            f"python3 -c {shell_quote(staged_crd_probe_code)} "
+            f'"${{SOK_CRD_FILE}}" {shell_quote(expected_crd_sha256)}; '
+            f"else {remote_crd_probe}; fi"
+        )
         artifact_checks = [
             "helm repo add splunk https://splunk.github.io/splunk-operator/ --force-update >/dev/null",
             "helm repo update splunk --timeout 2m >/dev/null",
             f"helm show chart splunk/splunk-operator --version {shell_quote(chart_version(args))} >/dev/null",
             f"helm show chart splunk/splunk-enterprise --version {shell_quote(chart_version(args))} >/dev/null",
-            f"python3 -c {shell_quote('import urllib.request; urllib.request.urlopen(' + repr(f'https://github.com/splunk/splunk-operator/releases/download/{args.operator_version}/splunk-operator-crds.yaml') + ', timeout=30).read(1)')}",
+            staged_or_remote_crd_probe,
         ]
-    lines = ["python3 bundle-verify.py verify . sok"]
+    lines = ["python3 bundle-verify.py verify . sok", HELM_LIST_ALL_FUNCTION]
     if args.eks_cluster_name:
         lines.append("./eks-update-kubeconfig.sh")
     lines.extend(
@@ -3240,6 +3297,36 @@ def render_sok_preflight(args: argparse.Namespace) -> str:
             "verbs": ["get", "list"],
         },
     ]
+    if not args.allow_upgrade:
+        access_requirements.append(
+            {
+                "group": "apiextensions.k8s.io",
+                "resource": "customresourcedefinitions",
+                "verbs": ["list"],
+                "fresh_only": True,
+            }
+        )
+        for resource in (
+            "clustermanagers",
+            "clustermasters",
+            "indexerclusters",
+            "ingestorclusters",
+            "licensemanagers",
+            "licensemasters",
+            "monitoringconsoles",
+            "objectstorages",
+            "queues",
+            "searchheadclusters",
+            "standalones",
+        ):
+            access_requirements.append(
+                {
+                    "group": "enterprise.splunk.com",
+                    "resource": resource,
+                    "verbs": ["list"],
+                    "fresh_only": True,
+                }
+            )
     operator_resources = (
         ("apps", "deployments"),
         ("", "persistentvolumeclaims"),
@@ -3428,11 +3515,15 @@ def render_sok_preflight(args: argparse.Namespace) -> str:
             }
         )
     rbac_guard_code = """import json
+import os
 import subprocess
 import sys
 
 requirements = json.loads(sys.argv[1])
 for requirement in requirements:
+    fresh_only = requirement.pop("fresh_only", False)
+    if fresh_only and os.environ.get("SOK_VALIDATE_EXISTING") == "true":
+        continue
     for verb in requirement.pop("verbs"):
         attributes = {**requirement, "verb": verb}
         payload = {
@@ -3468,6 +3559,476 @@ for requirement in requirements:
         f"python3 -c {shell_quote(rbac_guard_code)} "
         f"{shell_quote(json.dumps(access_requirements, sort_keys=True))}"
     )
+    fresh_install_guard_code = """import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from urllib.request import urlopen
+
+(
+    namespace,
+    operator_namespace,
+    target_release,
+    expected_source,
+    expected_sha256,
+    allowed_resources_json,
+) = sys.argv[1:]
+if os.environ.get("SOK_VALIDATE_EXISTING") == "true":
+    raise SystemExit(0)
+expected_source = os.environ.get("SOK_CRD_FILE", expected_source)
+
+group = "enterprise.splunk.com"
+try:
+    allowed_resources = json.loads(allowed_resources_json)
+except json.JSONDecodeError as exc:
+    raise SystemExit("ERROR: reviewed existing-resource inventory is invalid") from exc
+if not isinstance(allowed_resources, list):
+    raise SystemExit("ERROR: reviewed existing-resource inventory is not a list")
+allowed_identities = set()
+for resource in allowed_resources:
+    if not isinstance(resource, dict) or set(resource) != {"kind", "name", "namespace"}:
+        raise SystemExit("ERROR: reviewed existing-resource identity is malformed")
+    identity = (resource["kind"], resource["namespace"], resource["name"])
+    if any(not isinstance(value, str) or not value for value in identity):
+        raise SystemExit("ERROR: reviewed existing-resource identity is incomplete")
+    allowed_identities.add(identity)
+if len(allowed_identities) != len(allowed_resources):
+    raise SystemExit("ERROR: reviewed existing-resource identities are duplicated")
+
+
+def kubectl(*arguments):
+    result = subprocess.run(
+        ["kubectl", "--request-timeout=30s", *arguments],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        raise SystemExit(
+            result.stderr.strip()
+            or "ERROR: fresh-install Kubernetes inventory failed"
+        )
+    return result.stdout.strip()
+
+
+def json_payload(raw, description):
+    if not raw:
+        raise SystemExit(f"ERROR: {description} returned an empty response")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"ERROR: {description} returned invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"ERROR: {description} did not return a JSON object")
+    return payload
+
+
+# A fresh bundle may use a pre-created namespace for reviewed Secrets,
+# ServiceAccounts, or an existing LicenseManager. It never mutates namespace
+# metadata. Exact Helm, Operator, and CR collision checks below still prevent
+# adoption of an existing deployment.
+for candidate in dict.fromkeys((namespace, operator_namespace)):
+    raw = kubectl("get", "namespace", candidate, "--ignore-not-found", "-o", "json")
+    if raw:
+        payload = json_payload(raw, f"namespace inventory for {candidate}")
+        metadata = payload.get("metadata", {})
+        live_name = metadata.get("name")
+        if (
+            payload.get("apiVersion") != "v1"
+            or payload.get("kind") != "Namespace"
+            or live_name != candidate
+            or metadata.get("deletionTimestamp")
+            or payload.get("status", {}).get("phase") != "Active"
+        ):
+            raise SystemExit(
+                f"ERROR: target namespace {candidate!r} is not a healthy Active namespace"
+            )
+
+
+live_inventory = json_payload(
+    kubectl("get", "customresourcedefinitions.apiextensions.k8s.io", "-o", "json"),
+    "cluster CRD inventory",
+)
+all_live_items = live_inventory.get("items")
+if not isinstance(all_live_items, list):
+    raise SystemExit("ERROR: cluster CRD inventory has no items list")
+live_group_items = []
+for item in all_live_items:
+    if not isinstance(item, dict):
+        raise SystemExit("ERROR: cluster CRD inventory contains a malformed item")
+    name = item.get("metadata", {}).get("name", "")
+    if item.get("spec", {}).get("group") == group or (
+        isinstance(name, str) and name.endswith("." + group)
+    ):
+        live_group_items.append(item)
+
+# No existing SOK CRD means the normal reviewed CRD install path remains a
+# creation, not an adoption. Do not fetch the remote manifest unnecessarily.
+if not live_group_items:
+    raise SystemExit(0)
+
+if not expected_sha256:
+    raise SystemExit(
+        "ERROR: existing enterprise.splunk.com CRDs cannot be adopted by an "
+        "unverified release bundle without a reviewed CRD SHA-256"
+    )
+if not expected_sha256.isascii() or len(expected_sha256) != 64 or any(
+    character not in "0123456789abcdef" for character in expected_sha256.lower()
+):
+    raise SystemExit("ERROR: reviewed CRD SHA-256 is malformed")
+
+if expected_source.startswith(("https://", "http://")):
+    try:
+        with urlopen(expected_source, timeout=30) as response:
+            expected_bytes = response.read(16 * 1024 * 1024 + 1)
+    except Exception as exc:
+        raise SystemExit(
+            f"ERROR: cannot retrieve reviewed CRD manifest {expected_source!r}: {exc}"
+        ) from exc
+else:
+    expected_path = Path(expected_source)
+    if not expected_path.is_file() or expected_path.is_symlink():
+        raise SystemExit(
+            f"ERROR: reviewed CRD manifest is missing or unsafe: {expected_source}"
+        )
+    expected_bytes = expected_path.read_bytes()
+if len(expected_bytes) > 16 * 1024 * 1024:
+    raise SystemExit("ERROR: reviewed CRD manifest exceeds the 16 MiB safety limit")
+actual_sha256 = hashlib.sha256(expected_bytes).hexdigest()
+if actual_sha256 != expected_sha256.lower():
+    raise SystemExit(
+        "ERROR: reviewed CRD manifest SHA-256 differs from the rendered contract: "
+        f"expected {expected_sha256.lower()}, found {actual_sha256}"
+    )
+
+try:
+    import yaml
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        "ERROR: fresh CRD contract validation requires PyYAML 6.x; install the "
+        "repository requirements"
+    ) from exc
+if int(str(getattr(yaml, "__version__", "0")).split(".", 1)[0]) != 6:
+    raise SystemExit(
+        f"ERROR: fresh CRD contract validation requires PyYAML 6.x; found "
+        f"{getattr(yaml, '__version__', 'unknown')!r}"
+    )
+
+
+def flatten_documents(documents):
+    for document in documents:
+        if not isinstance(document, dict):
+            continue
+        if document.get("kind") == "List":
+            yield from flatten_documents(document.get("items", []))
+        else:
+            yield document
+
+
+def crd_map(items, description):
+    result = {}
+    for item in items:
+        if not isinstance(item, dict):
+            raise SystemExit(f"ERROR: {description} contains a malformed CRD")
+        name = item.get("metadata", {}).get("name")
+        if not isinstance(name, str) or not name:
+            raise SystemExit(f"ERROR: {description} contains a CRD without a name")
+        if name in result:
+            raise SystemExit(f"ERROR: {description} contains duplicate CRD {name}")
+        result[name] = item
+    return result
+
+
+def normalize_crd_spec(value, crd_name):
+    if not isinstance(value, dict):
+        raise SystemExit(f"ERROR: CRD {crd_name} spec is not a mapping")
+    spec = json.loads(json.dumps(value))
+    names = spec.get("names")
+    if not isinstance(names, dict):
+        raise SystemExit(f"ERROR: CRD {crd_name} spec.names is not a mapping")
+    kind = names.get("kind")
+    if not names.get("singular") and isinstance(kind, str):
+        names["singular"] = kind.lower()
+    if not names.get("listKind") and isinstance(kind, str) and kind:
+        names["listKind"] = kind + "List"
+    if "preserveUnknownFields" not in spec:
+        spec["preserveUnknownFields"] = False
+    conversion = spec.get("conversion")
+    if conversion is None:
+        spec["conversion"] = {"strategy": "None"}
+    elif not isinstance(conversion, dict):
+        raise SystemExit(f"ERROR: CRD {crd_name} spec.conversion is not a mapping")
+    else:
+        service = (
+            conversion.get("webhook", {})
+            .get("clientConfig", {})
+            .get("service")
+        )
+        if isinstance(service, dict) and service.get("port") is None:
+            service["port"] = 443
+    versions = spec.get("versions")
+    if not isinstance(versions, list) or not versions:
+        raise SystemExit(f"ERROR: CRD {crd_name} has no version contract")
+    normalized_versions = []
+    version_names = []
+    for version in versions:
+        if not isinstance(version, dict) or not isinstance(version.get("name"), str):
+            raise SystemExit(f"ERROR: CRD {crd_name} has a malformed version")
+        normalized_version = json.loads(json.dumps(version))
+        if "deprecated" not in normalized_version:
+            normalized_version["deprecated"] = False
+        columns = normalized_version.get("additionalPrinterColumns", [])
+        if not isinstance(columns, list) or not all(
+            isinstance(column, dict) for column in columns
+        ):
+            raise SystemExit(
+                f"ERROR: CRD {crd_name} version {version.get('name')} has "
+                "malformed additionalPrinterColumns"
+            )
+        normalized_versions.append(normalized_version)
+        version_names.append(normalized_version["name"])
+    if len(set(version_names)) != len(version_names):
+        raise SystemExit(f"ERROR: CRD {crd_name} has duplicate version names")
+    spec["versions"] = sorted(
+        normalized_versions, key=lambda version: version["name"]
+    )
+    return spec
+
+
+def first_difference(expected, actual, path="spec"):
+    if type(expected) is not type(actual):
+        return path
+    if isinstance(expected, dict):
+        if set(expected) != set(actual):
+            return f"{path}.{sorted(set(expected) ^ set(actual))[0]}"
+        for key in sorted(expected):
+            difference = first_difference(expected[key], actual[key], f"{path}.{key}")
+            if difference:
+                return difference
+        return ""
+    if isinstance(expected, list):
+        if len(expected) != len(actual):
+            return path
+        for index, (expected_item, actual_item) in enumerate(zip(expected, actual)):
+            difference = first_difference(
+                expected_item, actual_item, f"{path}[{index}]"
+            )
+            if difference:
+                return difference
+        return ""
+    return "" if expected == actual else path
+
+
+def require_allowed_resource_healthy(item, identity):
+    kind, namespace, name = identity
+    metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+    annotations = metadata.get("annotations", {})
+    generation = metadata.get("generation")
+    if kind != "LicenseManager":
+        raise SystemExit(f"ERROR: unsupported reviewed existing resource kind {kind!r}")
+    if (
+        item.get("apiVersion") != "enterprise.splunk.com/v4"
+        or item.get("kind") != kind
+        or metadata.get("name") != name
+        or metadata.get("namespace") != namespace
+    ):
+        raise SystemExit("ERROR: reviewed existing LicenseManager identity differs")
+    if metadata.get("deletionTimestamp") or metadata.get("ownerReferences"):
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager is terminating or "
+            "unexpectedly controller-owned"
+        )
+    if not isinstance(annotations, dict):
+        raise SystemExit("ERROR: reviewed existing LicenseManager annotations are invalid")
+    if any(
+        key.lower().endswith(".enterprise.splunk.com/paused")
+        for key in annotations
+        if isinstance(key, str)
+    ):
+        raise SystemExit("ERROR: reviewed existing LicenseManager is paused")
+    if annotations.get("enterprise.splunk.com/admin-managed-pv") not in (
+        None,
+        "",
+        "false",
+    ):
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager enables unreviewed "
+            "admin-managed PVs"
+        )
+    owner_release = annotations.get("meta.helm.sh/release-name")
+    owner_namespace = annotations.get("meta.helm.sh/release-namespace")
+    if not isinstance(owner_release, str) or not owner_release or owner_namespace != namespace:
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager has no exact Helm owner linkage"
+        )
+    if owner_release == target_release:
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager cannot be owned by the target "
+            "Enterprise release"
+        )
+    if (
+        not isinstance(metadata.get("uid"), str)
+        or not metadata.get("uid")
+        or not isinstance(metadata.get("resourceVersion"), str)
+        or not metadata.get("resourceVersion")
+        or not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or generation < 1
+    ):
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager API identity is incomplete"
+        )
+    status = item.get("status", {})
+    if not isinstance(status, dict):
+        raise SystemExit("ERROR: reviewed existing LicenseManager status is invalid")
+    if status.get("phase") != "Ready" or status.get("message") not in (None, ""):
+        raise SystemExit(
+            "ERROR: reviewed existing LicenseManager is not cleanly Ready"
+        )
+    if status.get("observedGeneration") not in (None, generation):
+        raise SystemExit("ERROR: reviewed existing LicenseManager status is stale")
+    for condition in status.get("conditions", []):
+        if not isinstance(condition, dict):
+            raise SystemExit(
+                "ERROR: reviewed existing LicenseManager has an invalid condition"
+            )
+        observed = condition.get("observedGeneration")
+        if observed is not None and observed != generation:
+            raise SystemExit(
+                "ERROR: reviewed existing LicenseManager has a stale condition"
+            )
+
+
+try:
+    reviewed_documents = list(
+        flatten_documents(yaml.safe_load_all(expected_bytes.decode("utf-8")))
+    )
+except (UnicodeDecodeError, yaml.YAMLError) as exc:
+    raise SystemExit(f"ERROR: reviewed CRD manifest is invalid YAML: {exc}") from exc
+reviewed_group_items = [
+    item
+    for item in reviewed_documents
+    if item.get("kind") == "CustomResourceDefinition"
+    and item.get("spec", {}).get("group") == group
+]
+reviewed_crds = crd_map(reviewed_group_items, "reviewed CRD manifest")
+live_crds = crd_map(live_group_items, "live enterprise.splunk.com inventory")
+if not reviewed_crds:
+    raise SystemExit("ERROR: reviewed manifest contains no enterprise.splunk.com CRDs")
+if set(reviewed_crds) != set(live_crds):
+    missing = sorted(set(reviewed_crds) - set(live_crds))
+    unexpected = sorted(set(live_crds) - set(reviewed_crds))
+    raise SystemExit(
+        "ERROR: live enterprise.splunk.com CRD inventory is partial or foreign; "
+        f"missing={missing}, unexpected={unexpected}. Refusing adoption."
+    )
+
+for crd_name in sorted(reviewed_crds):
+    reviewed_spec = normalize_crd_spec(
+        reviewed_crds[crd_name].get("spec", {}), crd_name
+    )
+    live_spec = normalize_crd_spec(live_crds[crd_name].get("spec", {}), crd_name)
+    difference = first_difference(reviewed_spec, live_spec)
+    if difference:
+        raise SystemExit(
+            f"ERROR: live CRD {crd_name} differs from the reviewed bundle at "
+            f"{difference}; refusing adoption"
+        )
+    live_versions = {
+        version.get("name") for version in live_spec.get("versions", [])
+    }
+    conditions = {
+        condition.get("type"): condition.get("status")
+        for condition in live_crds[crd_name].get("status", {}).get("conditions", [])
+        if isinstance(condition, dict)
+    }
+    stored_versions = set(
+        live_crds[crd_name].get("status", {}).get("storedVersions", [])
+    )
+    if (
+        live_crds[crd_name].get("metadata", {}).get("deletionTimestamp")
+        or conditions.get("Terminating") == "True"
+        or conditions.get("Established") != "True"
+        or conditions.get("NamesAccepted") != "True"
+        or not stored_versions
+        or not stored_versions.issubset(live_versions)
+    ):
+        raise SystemExit(
+            f"ERROR: live CRD {crd_name} is not established on reviewed versions"
+        )
+
+# A matching orphaned CRD set can be safely re-applied. A fresh release must
+# not change the API contract beneath any CR owned by another release/operator.
+for crd_name in sorted(live_crds):
+    spec = live_crds[crd_name].get("spec", {})
+    plural = spec.get("names", {}).get("plural")
+    scope = spec.get("scope")
+    if not isinstance(plural, str) or not plural:
+        raise SystemExit(f"ERROR: live CRD {crd_name} has no plural resource name")
+    arguments = ["get", f"{plural}.{group}"]
+    if scope == "Namespaced":
+        arguments.append("--all-namespaces")
+    arguments.extend(("-o", "json"))
+    resource_payload = json_payload(
+        kubectl(*arguments), f"cluster-wide {crd_name} resource inventory"
+    )
+    items = resource_payload.get("items")
+    if not isinstance(items, list):
+        raise SystemExit(f"ERROR: cluster-wide {crd_name} inventory has no items list")
+    foreign_items = []
+    for item in items:
+        metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+        identity = (
+            item.get("kind", "") if isinstance(item, dict) else "",
+            metadata.get("namespace", ""),
+            metadata.get("name", ""),
+        )
+        if identity in allowed_identities:
+            require_allowed_resource_healthy(item, identity)
+        else:
+            foreign_items.append(item)
+    if foreign_items:
+        identities = []
+        for item in foreign_items[:20]:
+            metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+            identity = "/".join(
+                entry
+                for entry in (
+                    metadata.get("namespace", ""),
+                    item.get("kind", "") if isinstance(item, dict) else "",
+                    metadata.get("name", "<unknown>"),
+                )
+                if entry
+            )
+            identities.append(identity)
+        raise SystemExit(
+            "ERROR: existing foreign SOK resources prevent fresh CRD adoption: "
+            + ", ".join(identities)
+        )
+"""
+    if not args.allow_upgrade:
+        allowed_existing_resources = []
+        if args.existing_license_manager:
+            allowed_existing_resources.append(
+                {
+                    "kind": "LicenseManager",
+                    "name": args.existing_license_manager,
+                    "namespace": (
+                        args.existing_license_manager_namespace or args.namespace
+                    ),
+                }
+            )
+        lines.append(
+            'if [[ "${SOK_VALIDATE_EXISTING:-false}" != true ]]; then '
+            f"python3 -c {shell_quote(fresh_install_guard_code)} "
+            f"{shell_quote(args.namespace)} {shell_quote(args.operator_namespace)} "
+            f"{shell_quote(args.release_name)} "
+            f"{shell_quote(expected_crd_source)} "
+            f"{shell_quote(expected_crd_sha256)} "
+            f"{shell_quote(json.dumps(allowed_existing_resources, sort_keys=True))}; fi"
+        )
     operator_collision_guard_code = """import json
 import os
 import subprocess
@@ -3681,8 +4242,8 @@ if wanted < current:
 """
         lines.extend(
             [
-                f"helm list --all --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(upgrade_guard_code)} {shell_quote(args.operator_release_name)} {shell_quote(chart_version(args))} splunk-operator {shell_quote(args.operator_namespace)}",
-                f"helm list --all --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(upgrade_guard_code)} {shell_quote(args.release_name)} {shell_quote(chart_version(args))} splunk-enterprise {shell_quote(args.namespace)}",
+                f"helm_list_all --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(upgrade_guard_code)} {shell_quote(args.operator_release_name)} {shell_quote(chart_version(args))} splunk-operator {shell_quote(args.operator_namespace)}",
+                f"helm_list_all --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(upgrade_guard_code)} {shell_quote(args.release_name)} {shell_quote(chart_version(args))} splunk-enterprise {shell_quote(args.namespace)}",
             ]
         )
         live_upgrade_guard_code = """import json
@@ -4361,8 +4922,10 @@ if items:
         lines.extend(
             [
                 'if [[ "${SOK_VALIDATE_EXISTING:-false}" != true ]]; then',
-                f"  if helm list --all --namespace {shell_quote(args.operator_namespace)} -q | grep -Fxq {shell_quote(args.operator_release_name)}; then printf 'ERROR: Existing operator release requires a reviewed --allow-upgrade bundle.\\n' >&2; exit 1; fi",
-                f"  if helm list --all --namespace {shell_quote(args.namespace)} -q | grep -Fxq {shell_quote(args.release_name)}; then printf 'ERROR: Existing Enterprise release requires a reviewed --allow-upgrade bundle.\\n' >&2; exit 1; fi",
+                f"  if ! operator_releases=\"$(helm_list_all --namespace {shell_quote(args.operator_namespace)} -q)\"; then printf 'ERROR: Unable to inventory Operator Helm releases.\\n' >&2; exit 1; fi",
+                f"  if printf '%s\\n' \"${{operator_releases}}\" | grep -Fxq {shell_quote(args.operator_release_name)}; then printf 'ERROR: Existing operator release requires a reviewed --allow-upgrade bundle.\\n' >&2; exit 1; fi",
+                f"  if ! enterprise_releases=\"$(helm_list_all --namespace {shell_quote(args.namespace)} -q)\"; then printf 'ERROR: Unable to inventory Enterprise Helm releases.\\n' >&2; exit 1; fi",
+                f"  if printf '%s\\n' \"${{enterprise_releases}}\" | grep -Fxq {shell_quote(args.release_name)}; then printf 'ERROR: Existing Enterprise release requires a reviewed --allow-upgrade bundle.\\n' >&2; exit 1; fi",
                 *fresh_resource_checks,
                 f"  if kubectl get deployment splunk-operator-controller-manager --namespace {shell_quote(args.operator_namespace)} --ignore-not-found -o name | grep -q .; then printf 'ERROR: An existing Splunk Operator Deployment requires a reviewed --allow-upgrade bundle.\\n' >&2; exit 1; fi",
                 *(
@@ -4433,18 +4996,95 @@ for key in sorted(required):
     if args.existing_license_manager:
         lm_namespace = args.existing_license_manager_namespace or args.namespace
         license_manager_guard = """import json
+import subprocess
 import sys
 item = json.load(sys.stdin)
-phase = item.get("status", {}).get("phase")
-if phase != "Ready":
+name, namespace, target_release = sys.argv[1:4]
+metadata = item.get("metadata", {})
+annotations = metadata.get("annotations", {})
+generation = metadata.get("generation")
+if (
+    item.get("apiVersion") != "enterprise.splunk.com/v4"
+    or item.get("kind") != "LicenseManager"
+    or metadata.get("name") != name
+    or metadata.get("namespace") != namespace
+):
+    raise SystemExit("ERROR: existing LicenseManager does not match the reviewed v4 identity")
+if metadata.get("deletionTimestamp") or metadata.get("ownerReferences"):
+    raise SystemExit("ERROR: existing LicenseManager is terminating or unexpectedly controller-owned")
+if not isinstance(annotations, dict):
+    raise SystemExit("ERROR: existing LicenseManager annotations are invalid")
+if any(
+    key.lower().endswith(".enterprise.splunk.com/paused")
+    for key in annotations
+    if isinstance(key, str)
+):
+    raise SystemExit("ERROR: existing LicenseManager is paused")
+if annotations.get("enterprise.splunk.com/admin-managed-pv") not in (None, "", "false"):
+    raise SystemExit("ERROR: existing LicenseManager enables unreviewed admin-managed PVs")
+if (
+    not isinstance(annotations.get("meta.helm.sh/release-name"), str)
+    or not annotations.get("meta.helm.sh/release-name")
+    or annotations.get("meta.helm.sh/release-namespace") != namespace
+):
+    raise SystemExit("ERROR: existing LicenseManager has no exact Helm owner linkage")
+owner_release = annotations["meta.helm.sh/release-name"]
+if owner_release == target_release:
     raise SystemExit(
-        f"ERROR: existing LicenseManager is not Ready (phase={phase!r}); "
-        "resolve licensing health before applying dependent resources"
+        "ERROR: existing LicenseManager cannot be owned by the target Enterprise release"
+    )
+if (
+    not isinstance(metadata.get("uid"), str)
+    or not metadata.get("uid")
+    or not isinstance(metadata.get("resourceVersion"), str)
+    or not metadata.get("resourceVersion")
+    or not isinstance(generation, int)
+    or isinstance(generation, bool)
+    or generation < 1
+):
+    raise SystemExit("ERROR: existing LicenseManager API identity is incomplete")
+status = item.get("status", {})
+if not isinstance(status, dict):
+    raise SystemExit("ERROR: existing LicenseManager status is invalid")
+if status.get("phase") != "Ready" or status.get("message") not in (None, ""):
+    raise SystemExit("ERROR: existing LicenseManager is not cleanly Ready")
+if status.get("observedGeneration") not in (None, generation):
+    raise SystemExit("ERROR: existing LicenseManager status is stale")
+for condition in status.get("conditions", []):
+    if not isinstance(condition, dict):
+        raise SystemExit("ERROR: existing LicenseManager has an invalid condition")
+    observed = condition.get("observedGeneration")
+    if observed is not None and observed != generation:
+        raise SystemExit("ERROR: existing LicenseManager has a stale condition")
+owner = subprocess.run(
+    ["helm", "status", owner_release, "--namespace", namespace, "-o", "json"],
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+if owner.returncode:
+    raise SystemExit(
+        owner.stderr.strip()
+        or "ERROR: existing LicenseManager Helm owner release is unavailable"
+    )
+try:
+    owner_status = json.loads(owner.stdout)
+except json.JSONDecodeError as exc:
+    raise SystemExit("ERROR: existing LicenseManager Helm owner returned invalid JSON") from exc
+if (
+    owner_status.get("name") != owner_release
+    or owner_status.get("namespace") != namespace
+    or str(owner_status.get("info", {}).get("status", "")).lower() != "deployed"
+):
+    raise SystemExit(
+        "ERROR: existing LicenseManager Helm owner is not the exact deployed release"
     )
 """
         lines.append(
             f"kubectl get licensemanager {shell_quote(args.existing_license_manager)} --namespace {shell_quote(lm_namespace)} -o json | "
-            f"python3 -c {shell_quote(license_manager_guard)}"
+            f"python3 -c {shell_quote(license_manager_guard)} "
+            f"{shell_quote(args.existing_license_manager)} {shell_quote(lm_namespace)} "
+            f"{shell_quote(args.release_name)}"
         )
     if args.splunk_service_account:
         irsa_service_account_guard = """import json
@@ -4788,6 +5428,16 @@ identities, and upgrade safety. The owner/mode/SHA-256 manifest detects
 accidental single-file drift while the manifest and verifier remain trusted;
 it is not a signature or an external attestation.
 
+A fresh apply creates only absent namespaces and leaves a healthy Active,
+pre-staged namespace unchanged. Exact release, Operator, and CR collision checks
+still reject existing deployments. If any `enterprise.splunk.com` CRD already
+exists, preflight accepts only the complete SHA-verified reviewed CRD contract
+with no SOK custom resources anywhere in the cluster except the explicitly
+reviewed existing LicenseManager identity; partial, drifted, extra, terminating,
+or otherwise populated inventories fail before mutation. Only a separately
+rendered `--allow-upgrade` bundle can operate on the exact already-managed
+Helm/CR ownership path.
+
 For every SOK reconcile, the operator container must receive
 `SPLUNK_GENERAL_TERMS={SGT_ACCEPTANCE}`. This directory renders that only when
 the setup command included `--accept-splunk-general-terms`.
@@ -4864,6 +5514,7 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
         operator_chart_ref = "./splunk-operator-chart.tgz"
         enterprise_chart_ref = "./splunk-enterprise-chart.tgz"
         crd_ref = "./splunk-operator-crds.yaml"
+        crd_expected_sha256 = verified["crds"]
         helm_repo_setup = ": # reviewed local Helm archives are bundle snapshots"
     else:
         operator_chart_ref = "splunk/splunk-operator"
@@ -4872,6 +5523,14 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
             "https://github.com/splunk/splunk-operator/releases/download/"
             f"{args.operator_version}/splunk-operator-crds.yaml"
         )
+        crd_expected_sha256 = VERIFIED_SOK_ARTIFACT_SHA256.get(
+            args.operator_version, {}
+        ).get("crds", "")
+        if not crd_expected_sha256:
+            die(
+                "Live SOK apply requires a verified CRD digest for the selected "
+                "Operator version; supply a reviewed local artifact trio."
+            )
         helm_repo_setup = (
             "helm repo add splunk https://splunk.github.io/splunk-operator/ --force-update\n"
             "helm repo update splunk --timeout 2m"
@@ -5070,11 +5729,56 @@ actual_uid="$(kubectl --request-timeout=30s get namespace kube-system -o json | 
         f"[[ \"${{SOK_APPLY_ORCHESTRATED:-}}\" == {shell_quote(apply_token)} ]] || "
         "{ printf 'ERROR: internal mutation helper; run ./apply.sh.\\n' >&2; exit 1; };\n"
     )
+    crd_runtime_guard_code = """import hashlib
+import os
+import stat
+import sys
+
+path, expected = sys.argv[1:]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+try:
+    descriptor = os.open(path, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot open staged CRD manifest safely: {exc}") from exc
+digest = hashlib.sha256()
+try:
+    before = os.fstat(descriptor)
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        raise SystemExit("ERROR: staged CRD manifest is not a singly linked regular file")
+    if before.st_size > 16 * 1024 * 1024:
+        raise SystemExit("ERROR: staged CRD manifest exceeds 16 MiB")
+    while True:
+        chunk = os.read(descriptor, 1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+    after = os.fstat(descriptor)
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        raise SystemExit("ERROR: staged CRD manifest changed while hashing")
+finally:
+    os.close(descriptor)
+if digest.hexdigest() != expected.lower():
+    raise SystemExit("ERROR: staged CRD manifest SHA-256 differs from review")
+"""
     emit(
         "crds-install.sh",
         make_script(
-            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}kubectl apply -f {shell_quote(crd_ref)} --server-side
-kubectl wait --for=condition=Established --timeout=5m -f {shell_quote(crd_ref)}
+            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}[[ -n "${{SOK_CRD_FILE:-}}" ]] || {{ printf 'ERROR: apply did not stage the reviewed CRD manifest.\\n' >&2; exit 1; }}
+python3 -c {shell_quote(crd_runtime_guard_code)} "${{SOK_CRD_FILE}}" {shell_quote(crd_expected_sha256)}
+kubectl apply -f "${{SOK_CRD_FILE}}" --server-side
+kubectl wait --for=condition=Established --timeout=5m -f "${{SOK_CRD_FILE}}"
 """
         ),
         executable=True,
@@ -5140,18 +5844,20 @@ fi
     emit(
         "helm-install-operator.sh",
         make_script(
-            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}if helm list --all --namespace {shell_quote(args.operator_namespace)} -q | grep -Fxq {shell_quote(args.operator_release_name)} && [[ {allow_upgrade} != true ]]; then
+            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}{HELM_LIST_ALL_FUNCTION}if ! existing_releases="$(helm_list_all --namespace {shell_quote(args.operator_namespace)} -q)"; then
+  printf 'ERROR: Unable to inventory Operator Helm releases.\\n' >&2
+  exit 1
+fi
+if printf '%s\\n' "${{existing_releases}}" | grep -Fxq {shell_quote(args.operator_release_name)} && [[ {allow_upgrade} != true ]]; then
   printf 'ERROR: Operator release already exists; rerender with --allow-upgrade after upgrade review.\\n' >&2
   exit 1
 fi
 values_args=(--values operator-values.yaml)
 {operator_overlay_line}
 {helm_repo_setup}
-kubectl apply -f namespace.yaml
 helm upgrade --install {shell_quote(args.operator_release_name)} {shell_quote(operator_chart_ref)} \\
   --version {shell_quote(chart_version(args))} \\
   --namespace {shell_quote(args.operator_namespace)} \\
-  --create-namespace \\
   --wait \
   --timeout 15m \
   "${{values_args[@]}}"
@@ -5162,18 +5868,20 @@ helm upgrade --install {shell_quote(args.operator_release_name)} {shell_quote(op
     emit(
         "helm-install-enterprise.sh",
         make_script(
-            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}if helm list --all --namespace {shell_quote(args.namespace)} -q | grep -Fxq {shell_quote(args.release_name)} && [[ {allow_upgrade} != true ]]; then
+            f"""{internal_guard}{kubeconfig_prefix}{cluster_guard}{HELM_LIST_ALL_FUNCTION}if ! existing_releases="$(helm_list_all --namespace {shell_quote(args.namespace)} -q)"; then
+  printf 'ERROR: Unable to inventory Enterprise Helm releases.\\n' >&2
+  exit 1
+fi
+if printf '%s\\n' "${{existing_releases}}" | grep -Fxq {shell_quote(args.release_name)} && [[ {allow_upgrade} != true ]]; then
   printf 'ERROR: Enterprise release already exists; rerender with --allow-upgrade after backup and upgrade review.\\n' >&2
   exit 1
 fi
 values_args=(--values enterprise-values.yaml)
 {enterprise_overlay_line}
 {helm_repo_setup}
-kubectl apply -f namespace.yaml
 helm upgrade --install {shell_quote(args.release_name)} {shell_quote(enterprise_chart_ref)} \\
   --version {shell_quote(chart_version(args))} \\
   --namespace {shell_quote(args.namespace)} \\
-  --create-namespace \\
   --wait \
   --timeout 15m \
   "${{values_args[@]}}"
@@ -5209,13 +5917,87 @@ kubectl cluster-info
             executable=True,
         )
     apply_eks = "./eks-update-kubeconfig.sh" if args.eks_cluster_name else ":"
+    apply_preflight = (
+        "./preflight.sh"
+        if args.allow_upgrade
+        else "SOK_VALIDATE_EXISTING=false ./preflight.sh"
+    )
+    namespace_health_code = """import json
+import sys
+item = json.load(sys.stdin)
+metadata = item.get("metadata", {})
+if (
+    item.get("apiVersion") != "v1"
+    or item.get("kind") != "Namespace"
+    or metadata.get("name") != sys.argv[1]
+    or metadata.get("deletionTimestamp")
+    or item.get("status", {}).get("phase") != "Active"
+):
+    raise SystemExit("ERROR: existing target namespace is not healthy and Active")
+"""
+    fresh_namespace_create = f"""ensure_fresh_namespace() {{
+  local name="$1"
+  local existing
+  if ! existing="$(kubectl --request-timeout=30s get namespace "${{name}}" --ignore-not-found -o json)"; then
+    printf 'ERROR: Unable to inventory target namespace %s.\\n' "${{name}}" >&2
+    return 1
+  fi
+  if [[ -n "${{existing}}" ]]; then
+    printf '%s\\n' "${{existing}}" | python3 -c {shell_quote(namespace_health_code)} "${{name}}"
+    return
+  fi
+  kubectl create namespace "${{name}}"
+}}
+ensure_fresh_namespace {shell_quote(args.namespace)}"""
+    if args.operator_namespace != args.namespace:
+        fresh_namespace_create += (
+            f"\nensure_fresh_namespace {shell_quote(args.operator_namespace)}"
+        )
+    crd_download_code = """import hashlib
+import os
+import sys
+from urllib.request import urlopen
+
+url, expected, destination = sys.argv[1:]
+try:
+    with urlopen(url, timeout=30) as response:
+        payload = response.read(16 * 1024 * 1024 + 1)
+except Exception as exc:
+    raise SystemExit(f"ERROR: cannot download reviewed CRD manifest: {exc}") from exc
+if len(payload) > 16 * 1024 * 1024:
+    raise SystemExit("ERROR: reviewed CRD manifest exceeds 16 MiB")
+if hashlib.sha256(payload).hexdigest() != expected.lower():
+    raise SystemExit("ERROR: downloaded CRD manifest SHA-256 differs from review")
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+descriptor = os.open(destination, flags, 0o600)
+try:
+    view = memoryview(payload)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:
+            raise OSError("short write while staging CRD manifest")
+        view = view[written:]
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+"""
+    apply_stage_setup = """apply_stage="$(mktemp -d "${TMPDIR:-/tmp}/splunk-sok-apply.XXXXXX")"
+chmod 0700 "${apply_stage}"
+trap 'rm -rf "${apply_stage}"' EXIT HUP INT TERM
+"""
+    if local_artifacts:
+        crd_stage = 'export SOK_CRD_FILE="${PWD}/splunk-operator-crds.yaml"'
+    else:
+        crd_stage = (
+            f"python3 -c {shell_quote(crd_download_code)} "
+            f"{shell_quote(crd_ref)} {shell_quote(crd_expected_sha256)} "
+            '"${apply_stage}/splunk-operator-crds.yaml"\n'
+            'export SOK_CRD_FILE="${apply_stage}/splunk-operator-crds.yaml"'
+        )
     license_stage = ":"
     license_apply = ":"
     if args.license_file:
-        license_stage = f"""apply_stage="$(mktemp -d "${{TMPDIR:-/tmp}}/splunk-sok-apply.XXXXXX")"
-chmod 0700 "${{apply_stage}}"
-trap 'rm -rf "${{apply_stage}}"' EXIT HUP INT TERM
-python3 bundle-verify.py copy-external . {shell_quote(canonical_file(args.license_file))} "${{apply_stage}}/splunk.lic"
+        license_stage = f"""python3 bundle-verify.py copy-external . {shell_quote(canonical_file(args.license_file))} "${{apply_stage}}/splunk.lic"
 export SOK_LICENSE_FILE="${{apply_stage}}/splunk.lic"
 """
         license_apply = "./create-license-configmap.sh"
@@ -5224,8 +6006,9 @@ export SOK_LICENSE_FILE="${{apply_stage}}/splunk.lic"
         make_script(
             f"""python3 bundle-verify.py verify . sok
 {apply_eks}
-./preflight.sh
+{apply_stage_setup}{crd_stage}
 {license_stage}
+{apply_preflight}
 export SOK_APPLY_ORCHESTRATED={shell_quote(apply_token)}
 if [[ {allow_upgrade} == true ]]; then
   ./server-dry-run.sh operator
@@ -5233,7 +6016,7 @@ if [[ {allow_upgrade} == true ]]; then
   ./server-dry-run.sh enterprise
 else
   ./verify-cluster.sh
-  kubectl apply -f namespace.yaml
+  {fresh_namespace_create}
   ./crds-install.sh
   ./server-dry-run.sh
 fi
@@ -6341,17 +7124,13 @@ for contract in expected:
         raise SystemExit(f"ERROR: StatefulSet/{name} App Framework volume differs")
     probe_defaults = {
         "livenessProbe": {
-            "initialDelaySeconds": reviewed_spec.get(
-                "livenessInitialDelaySeconds", 30
-            ) or 30,
+            "initialDelaySeconds": 30,
             "timeoutSeconds": 30,
             "periodSeconds": 30,
             "failureThreshold": 3,
         },
         "readinessProbe": {
-            "initialDelaySeconds": reviewed_spec.get(
-                "readinessInitialDelaySeconds", 10
-            ) or 10,
+            "initialDelaySeconds": 10,
             "timeoutSeconds": 5,
             "periodSeconds": 5,
             "failureThreshold": 3,
@@ -6363,11 +7142,10 @@ for contract in expected:
             "failureThreshold": 12,
         },
     }
-    if any(
-        reviewed_spec.get(field)
-        for field in ("livenessProbe", "readinessProbe", "startupProbe")
-    ):
-        raise SystemExit(f"ERROR: StatefulSet/{name} has a custom probe contract")
+    for probe_name, expected_probe in probe_defaults.items():
+        reviewed_probe = reviewed_spec.get(probe_name)
+        if reviewed_probe not in (None, {}) and reviewed_probe != expected_probe:
+            raise SystemExit(f"ERROR: StatefulSet/{name} has a custom probe contract")
     for probe_name, script_name in (
         ("livenessProbe", "livenessProbe.sh"),
         ("readinessProbe", "readinessProbe.sh"),
@@ -6896,6 +7674,7 @@ for contract in expected:
                 "hostUsers": True,
                 "restartPolicy": "Always",
                 "schedulerName": "default-scheduler",
+                "serviceAccountName": "default",
                 "terminationGracePeriodSeconds": 30,
             }
             if pod_spec.get(field, defaults.get(field)) != stateful_template.get(
@@ -7698,6 +8477,7 @@ dynamic_annotations = {
     "pv.kubernetes.io/bind-completed",
     "pv.kubernetes.io/bound-by-controller",
     "volume.beta.kubernetes.io/storage-provisioner",
+    "volume.kubernetes.io/selected-node",
     "volume.kubernetes.io/storage-provisioner",
 }
 
@@ -7707,6 +8487,14 @@ def reviewed_annotations(item):
         for key, value in item.get("metadata", {}).get("annotations", {}).items()
         if key not in dynamic_annotations
     }
+
+def reviewed_labels(item):
+    labels = copy.deepcopy(item.get("metadata", {}).get("labels", {}))
+    # Helm 4 adds its standard ownership label to rendered objects that omit
+    # it. Preserve every other label and reject any non-standard value.
+    if labels.get("app.kubernetes.io/managed-by") == "Helm":
+        labels.pop("app.kubernetes.io/managed-by")
+    return labels
 
 def named_inventory(values, path):
     if values is None:
@@ -7783,8 +8571,8 @@ def enforce_raw_intent(raw_item, live_item):
     live_metadata = live_item.get("metadata", {})
     require_same(
         f"{kind} metadata.labels",
-        raw_metadata.get("labels", {}),
-        live_metadata.get("labels", {}),
+        reviewed_labels(raw_item),
+        reviewed_labels(live_item),
     )
     require_same(
         f"{kind} metadata.annotations",
@@ -7880,6 +8668,10 @@ def enforce_raw_intent(raw_item, live_item):
             "dnsPolicy": "ClusterFirst",
             "schedulerName": "default-scheduler",
             "enableServiceLinks": True,
+            "hostNetwork": False,
+            "hostPID": False,
+            "hostIPC": False,
+            "shareProcessNamespace": False,
         }
         unexpected_pod_fields = set(live_pod) - set(raw_pod) - set(pod_default_fields) - {
             "serviceAccount"
@@ -7899,8 +8691,8 @@ def enforce_raw_intent(raw_item, live_item):
         ):
             raise SystemExit("ERROR: live Operator pod serviceAccount alias differs")
         for field in (
-            "serviceAccountName", "securityContext", "hostNetwork", "hostPID",
-            "hostIPC", "nodeSelector", "affinity", "tolerations",
+            "serviceAccountName", "securityContext",
+            "nodeSelector", "affinity", "tolerations",
             "terminationGracePeriodSeconds",
         ):
             require_same(
@@ -7991,7 +8783,7 @@ def canonical(item):
     value["metadata"] = {
         "name": metadata.get("name", ""),
         "namespace": metadata.get("namespace") or (namespace if namespaced else ""),
-        "labels": metadata.get("labels", {}),
+        "labels": reviewed_labels(value),
         "annotations": annotations,
     }
     if value.get("kind") == "ServiceAccount":
@@ -8005,6 +8797,16 @@ def canonical(item):
             "ipFamilyPolicy", "internalTrafficPolicy",
         ):
             spec.pop(field, None)
+    if value.get("kind") == "Deployment":
+        pod_spec = value.get("spec", {}).get("template", {}).get("spec", {})
+        for field in (
+            "hostNetwork",
+            "hostPID",
+            "hostIPC",
+            "shareProcessNamespace",
+        ):
+            if pod_spec.get(field) is False:
+                pod_spec.pop(field, None)
     template_metadata = (
         value.get("spec", {}).get("template", {}).get("metadata", {})
     )
@@ -8995,10 +9797,10 @@ trap - EXIT
         "status.sh",
         make_script(
             f"""python3 bundle-verify.py verify . sok
-{kubeconfig_prefix}{cluster_guard}helm status {shell_quote(args.operator_release_name)} --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(helm_status_guard)} {shell_quote(args.operator_release_name)}
+{kubeconfig_prefix}{cluster_guard}{HELM_LIST_ALL_FUNCTION}helm status {shell_quote(args.operator_release_name)} --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(helm_status_guard)} {shell_quote(args.operator_release_name)}
 helm status {shell_quote(args.release_name)} --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(helm_status_guard)} {shell_quote(args.release_name)}
-helm list --all --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(helm_list_guard)} {shell_quote(args.operator_release_name)} {shell_quote(args.operator_namespace)} {shell_quote('splunk-operator-' + chart_version(args))}
-helm list --all --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(helm_list_guard)} {shell_quote(args.release_name)} {shell_quote(args.namespace)} {shell_quote('splunk-enterprise-' + chart_version(args))}
+helm_list_all --namespace {shell_quote(args.operator_namespace)} -o json | python3 -c {shell_quote(helm_list_guard)} {shell_quote(args.operator_release_name)} {shell_quote(args.operator_namespace)} {shell_quote('splunk-operator-' + chart_version(args))}
+helm_list_all --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(helm_list_guard)} {shell_quote(args.release_name)} {shell_quote(args.namespace)} {shell_quote('splunk-enterprise-' + chart_version(args))}
 kubectl rollout status deployment/splunk-operator-controller-manager --namespace {shell_quote(args.operator_namespace)} --timeout=10m
 {operator_health_shell}
 {operator_contract_shell}

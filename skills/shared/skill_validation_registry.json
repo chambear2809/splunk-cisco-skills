@@ -170,6 +170,19 @@
     "widefield-splunk-siem-setup"
   ],
   "evidence": {
+    "splunk-enterprise-kubernetes-setup": {
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "AWS EKS isolated-worker lab; Kubernetes 1.34.8; Splunk Operator for Kubernetes 3.1.0; Splunk Enterprise 10.4.1; S1 standalone"
+        ],
+        "last_verified": "2026-07-08",
+        "evidence": [
+          "skills/shared/references/splunk_enterprise_kubernetes_validation_evidence.json"
+        ],
+        "notes": "An isolated EKS run verified the pinned SOK 3.1.0 and Splunk Enterprise 10.4.1 S1 lifecycle from a clean baseline through strict render, preflight, guarded apply, status and live validation, real SPL search, authenticated receiver ingest, pod recreation, canary search using preserved storage, and zero-residue cleanup. The run used the development profile with production-shaped isolated compute and encrypted gp3 storage; external licensing and SmartStore, C3/M4, Splunk POD, upgrades, backup and restore, disaster recovery, UI behavior, and failure-domain continuity remain unverified."
+      }
+    },
     "splunk-observability-database-monitoring-setup": {
       "live_apply_e2e": {
         "status": "partial",

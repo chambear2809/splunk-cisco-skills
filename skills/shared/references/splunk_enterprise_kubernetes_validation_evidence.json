@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "skill": "splunk-enterprise-kubernetes-setup",
+  "sanitization": "No AWS account or resource identifiers, cluster or context names, API endpoints, regions, namespace, release, secret, node-group, node, PV, or PVC names, IP addresses, credentials, tokens, license paths, raw logs, events, search text, REST payloads, or local paths are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-08-eks-sok-s1",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "AWS EKS isolated-worker lab",
+        "kubernetes": "1.34.8",
+        "architecture": "linux/amd64",
+        "helm_major": 4,
+        "topology": "SOK S1 standalone",
+        "deployment_profile": "development with production-shaped isolated compute",
+        "storage": "EBS CSI gp3 with encryption enabled"
+      },
+      "targets": [
+        "Splunk Operator for Kubernetes 3.1.0 with Splunk Enterprise 10.4.1, S1 standalone"
+      ],
+      "result": "partial",
+      "evidence": {
+        "release_contract": {
+          "splunk_operator_for_kubernetes": "3.1.0",
+          "splunk_enterprise": "10.4.1",
+          "operator_chart_sha256": "c71c1a7fe495c1122c1b0b1b689a366f759107950130c6fcf1f0c453e5d57efd",
+          "enterprise_chart_sha256": "0d46b934f78a270b2c9bbacb9f442855f125069800d0a1373eb5f21c54e7fc71",
+          "crds_sha256": "d974a6f2c768ad60d8eb56b2dc571354b4dfe48873cbff4e478ca6aa3e2fb3fe",
+          "operator_image_digest": "sha256:40faf52d127166a4cccb9284897bdb7d09f7d1e2860dbd554433ddcb3b983968",
+          "enterprise_image_digest": "sha256:af4f671c9c931bfd80954e7f1baaff8540d1378ae26b098666cf05256bb24311"
+        },
+        "cluster_lifecycle": {
+          "official_artifact_hashes_verified": true,
+          "strict_static_validation_passed": true,
+          "live_preflight_passed": true,
+          "guarded_apply_from_clean_baseline_passed": true,
+          "status_contract_passed": true,
+          "live_validation_passed": true,
+          "namespace_scoped_operator_ready": true,
+          "standalone_ready": true,
+          "verified_crd_count": 11,
+          "bound_persistent_volume_claim_count": 3,
+          "encrypted_persistent_volume_count": 3,
+          "dedicated_tainted_worker_placement": true,
+          "standalone_requests_equal_limits": true,
+          "standalone_cpu": "24",
+          "standalone_memory": "16Gi"
+        },
+        "application_e2e": {
+          "admin_secret_contract": true,
+          "hec_token_present": true,
+          "server_information_contract": true,
+          "search_result_count": 1,
+          "authenticated_receiver_ingest": true,
+          "canary_before_pod_recreation_count": 1,
+          "pod_identity_changed": true,
+          "statefulset_identity_preserved": true,
+          "storage_identity_preserved": true,
+          "helm_revision_preserved": true,
+          "canary_after_pod_recreation_count": 1,
+          "temporary_index_removed": true
+        },
+        "regression_suite": "Relevant coverage passed 84 pytest tests and 273 subtests plus 12 Bats scenarios. Bash syntax, Python compilation, full ShellCheck for cleanup helpers, error-level ShellCheck for generated assets, validation-registry audit, generated-matrix drift, and diff checks passed."
+      },
+      "limitations": [
+        "No external Splunk license or exclusive SmartStore bucket was available, so this is not a full production-profile certification.",
+        "C3, M4, Splunk POD on Cisco UCS, SmartStore, external License Manager, ingress and TLS, backup and restore, upgrades, autoscaling, disaster recovery, UI behavior, and multi-zone failure continuity were not live-tested."
+      ],
+      "cleanup": {
+        "run_scoped_helm_releases_remaining": 0,
+        "run_scoped_namespaces_remaining": 0,
+        "run_scoped_custom_resources_remaining": 0,
+        "run_created_custom_resource_definitions_remaining": 0,
+        "run_scoped_rbac_objects_remaining": 0,
+        "run_scoped_workloads_remaining": 0,
+        "run_scoped_services_remaining": 0,
+        "run_scoped_endpoint_slices_remaining": 0,
+        "run_scoped_config_maps_remaining": 0,
+        "run_scoped_secrets_remaining": 0,
+        "run_scoped_jobs_remaining": 0,
+        "run_scoped_persistent_volume_claims_remaining": 0,
+        "run_scoped_persistent_volumes_remaining": 0,
+        "run_scoped_volume_attachments_remaining": 0,
+        "run_scoped_storage_classes_remaining": 0,
+        "temporary_node_groups_remaining": 0,
+        "temporary_autoscaling_groups_remaining": 0,
+        "temporary_workers_remaining": 0,
+        "temporary_compute_instances_remaining": 0,
+        "temporary_cloud_block_volumes_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "baseline_restored": true
+      }
+    }
+  ]
+}
