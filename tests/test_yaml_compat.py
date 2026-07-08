@@ -118,6 +118,29 @@ def test_fallback_inline_lists_and_scalars(yaml_compat, force_no_pyyaml) -> None
     assert parsed["literal"] == "1.0"
 
 
+def test_fallback_parses_indentless_block_sequences(
+    yaml_compat, force_no_pyyaml
+) -> None:
+    """Accept the valid block-sequence layout emitted by PyYAML safe_dump."""
+
+    text = (
+        "root:\n"
+        "  values:\n"
+        "  - one\n"
+        "  - two\n"
+        "  next: ok\n"
+        "top:\n"
+        "- name: first\n"
+        "  items:\n"
+        "  - alpha\n"
+    )
+    parsed = yaml_compat.load_yaml_or_json(text)
+    assert parsed == {
+        "root": {"values": ["one", "two"], "next": "ok"},
+        "top": [{"name": "first", "items": ["alpha"]}],
+    }
+
+
 def test_fallback_rejects_tabs_in_indent(yaml_compat, force_no_pyyaml) -> None:
     with pytest.raises(yaml_compat.YamlCompatError):
         yaml_compat.load_yaml_or_json("a:\n\t- x\n")

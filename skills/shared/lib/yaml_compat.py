@@ -103,6 +103,18 @@ class _SimpleYamlParser:
             if raw_value == "":
                 if index < len(self.lines) and self.lines[index][0] > indent:
                     value, index = self._parse_block(index, self.lines[index][0])
+                elif (
+                    index < len(self.lines)
+                    and self.lines[index][0] == indent
+                    and (
+                        self.lines[index][1] == "-"
+                        or self.lines[index][1].startswith("- ")
+                    )
+                ):
+                    # PyYAML emits block sequences without additional indentation:
+                    # ``key:\n- value``. This is valid YAML and must remain readable
+                    # by the no-PyYAML fallback used by production shell helpers.
+                    value, index = self._parse_list(index, indent)
                 else:
                     value = {}
             elif raw_value in {"|", "|-", "|+", ">", ">-", ">+"}:

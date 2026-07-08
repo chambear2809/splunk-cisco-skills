@@ -1,30 +1,60 @@
-# Splunk Observability Database Monitoring spec
+# Splunk Observability Database Monitoring production spec
 #
-# Copy this file to template.local and fill in non-secret values only.
-# Never place passwords, datasource strings, access tokens, or API keys here.
+# Collector/chart release: 0.155.0
+# Copy this file to template.local and keep only non-secret values here.
+# Database passwords, datasource strings, and access tokens belong in the
+# referenced Kubernetes Secrets or a chmod-600 host env file.
 
 api_version: splunk-observability-database-monitoring-setup/v1
 
 realm: us1
-cluster_name: "lab-cluster"
-distribution: kubernetes  # kubernetes | openshift | eks | gke | linux
+cluster_name: production-cluster
+distribution: kubernetes
+# Distribution: kubernetes, aks, eks, eks/auto-mode, gke, gke/autopilot,
+# openshift, linux, or windows. Render all handoffs for review, but authorize
+# exactly one scraper runtime. Change owner only in a reviewed migration.
+scrape_owner: kubernetes  # kubernetes | linux | windows
 
 collector:
-  version: v0.150.0
+  version: v0.155.0
+  chart_version: 0.155.0
   namespace: splunk-otel
   release_name: splunk-otel-collector
-  secret_name: splunk-otel-collector-splunk
-  token_key: splunk_observability_access_token
+  # Required for live Kubernetes mutation. The action checks this context and
+  # passes it explicitly to every kubectl and Helm operation.
+  kube_context: production-cluster-admin
+  # The DBMon overlay reuses the base chart's token environment and neither
+  # guesses a Secret name nor replaces the chart-owned realm/access token.
+  # SQL Server requires at least 2048 MiB. Size above that after measuring all
+  # enabled receivers; Splunk recommends no more than 30 DB servers/collector.
+  memory_mib: 4096
+  cpu_limit: "2"
 
 outputs:
   kubernetes: true
   linux: true
+  windows: true
 
-# Keep false for production. Set true only for lab/demo targets that are
-# receiver-compatible but outside Splunk's published DBMon support matrix.
+# Required when PostgreSQL, MySQL, or MariaDB is selected. Replace this example
+# with the ticket/report proving representative-load sizing for this collector.
+sizing_evidence:
+  reference: CHANGE-1234-load-test-report
+  reviewed_by: db-platform-owner
+  reviewed_at: "2026-07-07"
+  peak_memory_mib: 3072
+  peak_cpu_cores: 1.5
+  target_count: 5
+
+# Keep false in production. The explicit opt-in exists only for lab validation
+# of combinations outside Splunk's published DBMon support matrix.
 allow_unsupported_targets: false
 
 targets:
+  # Every target receives an identity-filtered API probe. Direct non-loopback
+  # endpoints derive service.instance.id; datasource and loopback targets must
+  # declare the expected non-secret validation_filters value explicitly.
+  # PostgreSQL support is version/platform specific. Current published pairs
+  # include Azure Flexible Server 14.20/17.7 and AWS RDS 14.15/17.5.
   - name: orders_postgres
     type: postgresql
     platform: aws-rds
@@ -35,7 +65,7 @@ targets:
     credentials:
       kubernetes_secret:
         name: dbmon-orders-postgres
-        namespace: splunk-otel
+        namespace: splunk-otel  # Must equal collector.namespace.
         username_key: username
         password_key: password
       linux_env:
@@ -44,41 +74,127 @@ targets:
     events:
       query_sample: true
       top_query: true
+    advanced:
+      query_sample_collection:
+        max_rows_per_query: 100
+      tls:
+        insecure: false
+        insecure_skip_verify: false
 
+  # SQL Server datasource mode keeps the complete TLS connection string in one
+  # Secret key. Runtime preflight requires URL form with exactly one
+  # encrypt=true and trustservercertificate=false query option; percent-encode
+  # reserved credential characters. Put the database in the database= query
+  # option because a URL path names a SQL Server instance. If certificate=
+  # names a CA file, use a .pem suffix (the pinned driver rejects .crt) and
+  # mount it read-only in the base clusterReceiver values;
+  # apply verifies that the datasource path is covered by that mount.
+  # Semicolon-form DSNs are rejected.
   - name: billing_sqlserver
     type: sqlserver
     platform: self-hosted
     version: "2022"
-    server: billing-sql.example.internal
-    port: 1433
+    connection_mode: datasource
+    # Non-secret expected identity parsed from the datasource at runtime.
+    validation_filters:
+      service.instance.id: billing-sql.example.internal:1433
     credentials:
       kubernetes_secret:
         name: dbmon-billing-sqlserver
         namespace: splunk-otel
-        username_key: username
-        password_key: password
+        datasource_key: datasource
       linux_env:
-        username_var: DBMON_BILLING_SQLSERVER_USERNAME
-        password_var: DBMON_BILLING_SQLSERVER_PASSWORD
+        datasource_var: DBMON_BILLING_SQLSERVER_DATASOURCE
     events:
       query_sample: true
       top_query: true
+    advanced:
+      query_sample_collection:
+        max_rows_per_query: 100
 
+  # Oracle datasource mode likewise keeps the TLS/TNS datasource in the Secret.
+  # Runtime preflight requires URL form with SSL=enable and SSL%20Verify=true.
+  # If WALLET= names a wallet directory, mount it read-only in the base
+  # clusterReceiver values; apply verifies that the datasource path is covered.
+  # Configure one receiver target per RAC node.
   - name: erp_oracle_node1
     type: oracledb
     platform: oracle-rac
     version: "19c"
-    endpoint: erp-oracle-node1.example.internal:1521
-    service: ERPPROD
+    connection_mode: datasource
+    # Non-secret expected identity parsed from the datasource at runtime.
+    validation_filters:
+      service.instance.id: erp-oracle-node1.example.internal:1521/ERPPROD
     credentials:
       kubernetes_secret:
         name: dbmon-erp-oracle-node1
         namespace: splunk-otel
-        username_key: username
-        password_key: password
+        datasource_key: datasource
       linux_env:
-        username_var: DBMON_ERP_ORACLE_NODE1_USERNAME
-        password_var: DBMON_ERP_ORACLE_NODE1_PASSWORD
+        datasource_var: DBMON_ERP_ORACLE_NODE1_DATASOURCE
     events:
       query_sample: true
       top_query: true
+      session_wait_sample: true
+    advanced:
+      query_sample_collection:
+        max_rows_per_query: 100
+        allowed_comment_keys:
+          - traceparent
+      top_query_collection:
+        collection_interval: 60s
+        allowed_comment_keys:
+          - traceparent
+      session_wait_event_collection:
+        max_rows_per_query: 100
+
+  # The current Splunk DBMon product matrix supports MySQL 5.7+ on AWS RDS and
+  # standalone. Explain plans require MySQL 8.0+. The receiver's audited
+  # allow_native_passwords default remains enabled; change it only after
+  # verifying the database account's authentication plugin.
+  - name: catalog_mysql
+    type: mysql
+    platform: aws-rds
+    version: "8.4"
+    endpoint: catalog-mysql.example.internal:3306
+    credentials:
+      kubernetes_secret:
+        name: dbmon-catalog-mysql
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_CATALOG_MYSQL_USERNAME
+        password_var: DBMON_CATALOG_MYSQL_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
+    advanced:
+      tls:
+        insecure: false
+        insecure_skip_verify: false
+
+  # MariaDB 10.5+ is production-supported on AWS RDS and standalone. Metrics,
+  # query samples, top queries, and traceparent propagation are available; the
+  # pinned receiver does not provide MariaDB explain plans.
+  - name: identity_mariadb
+    type: mariadb
+    platform: standalone
+    version: "10.11"
+    endpoint: identity-mariadb.example.internal:3306
+    credentials:
+      kubernetes_secret:
+        name: dbmon-identity-mariadb
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_IDENTITY_MARIADB_USERNAME
+        password_var: DBMON_IDENTITY_MARIADB_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
+    advanced:
+      tls:
+        insecure: false
+        insecure_skip_verify: false

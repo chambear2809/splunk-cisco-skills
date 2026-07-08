@@ -169,5 +169,20 @@
     "widefield-security-setup",
     "widefield-splunk-siem-setup"
   ],
-  "evidence": {}
+  "evidence": {
+    "splunk-observability-database-monitoring-setup": {
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "AWS EKS lab; MySQL 8.4.10 and MariaDB 10.11.18 standalone; Splunk OTel Collector/chart 0.155.0; us1",
+          "AWS EKS isolated-node lab; Amazon RDS PostgreSQL 17.5, self-hosted SQL Server 2022 CU25 and Oracle Database Free 26ai; Splunk OTel Collector/chart 0.155.0; us1"
+        ],
+        "last_verified": "2026-07-07",
+        "evidence": [
+          "skills/shared/references/splunk_observability_dbmon_validation_evidence.json"
+        ],
+        "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai. Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified."
+      }
+    }
+  }
 }
