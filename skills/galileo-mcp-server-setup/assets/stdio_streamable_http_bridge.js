@@ -173,6 +173,8 @@ let eventReconnectTimer = null;
 let eventReconnectAttempt = 0;
 let eventStreamDisabled = false;
 let shuttingDown = false;
+let initializeMessage = null;
+let initializedMessage = null;
 
 class BridgeError extends Error {
   constructor(message, statusCode = 0) {
@@ -332,7 +334,38 @@ function makeRequest(method, body, onResponse) {
   return request;
 }
 
-function postMessage(input) {
+function stopServerEventStream() {
+  if (eventReconnectTimer) clearTimeout(eventReconnectTimer);
+  eventReconnectTimer = null;
+  if (activeEventRequest) activeEventRequest.destroy();
+  activeEventRequest = null;
+}
+
+function resetSessionState() {
+  stopServerEventStream();
+  sessionId = "";
+  protocolVersion = "";
+  eventReconnectAttempt = 0;
+  eventStreamDisabled = false;
+}
+
+function isHandshakeMessage(input) {
+  return input.method === "initialize" || input.method === "notifications/initialized";
+}
+
+async function restartSession() {
+  if (!initializeMessage) throw new BridgeError("MCP session expired before initialize replay");
+  resetSessionState();
+  await postMessage(initializeMessage, { emitResponses: false, recoverSession: false });
+  if (initializedMessage) {
+    await postMessage(initializedMessage, { emitResponses: false, recoverSession: false });
+    startServerEventStream();
+  }
+}
+
+function postMessage(input, options = {}) {
+  const emitResponses = options.emitResponses !== false;
+  const recoverSession = options.recoverSession !== false;
   const body = JSON.stringify(input);
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -351,6 +384,12 @@ function postMessage(input) {
       }
       if (status < 200 || status >= 300) {
         response.resume();
+        if (status === 404 && sessionId && recoverSession && !isHandshakeMessage(input)) {
+          restartSession()
+            .then(() => postMessage(input, { emitResponses, recoverSession: false }))
+            .then(resolve, reject);
+          return;
+        }
         finish(reject, new BridgeError("MCP server rejected request", status));
         return;
       }
@@ -370,7 +409,7 @@ function postMessage(input) {
       const processMessage = (message) => {
         if (!message || typeof message !== "object") return;
         updateProtocolState(input, message);
-        emitMessage(message);
+        if (emitResponses) emitMessage(message);
         if (hasRequestId(input) && sameId(input.id, message.id)) {
           matchingResponseSeen = true;
           if (contentType === "text/event-stream") {
@@ -464,6 +503,10 @@ function startServerEventStream() {
     if ([400, 401, 403, 404, 405].includes(status)) {
       response.resume();
       if (activeEventRequest === request) activeEventRequest = null;
+      if (status === 404 && sessionId) {
+        restartSession().catch((err) => warn(err.message || "could not restart MCP session"));
+        return;
+      }
       disableServerEventStream();
       return;
     }
@@ -586,11 +629,13 @@ input.on("line", (line) => {
       });
       return;
     }
-    initializationPromise = postMessage(message).then(() => startServerEventStream());
+    initializeMessage = message;
+    initializationPromise = postMessage(message);
     readyPromise = initializationPromise;
     operation = initializationPromise;
   } else if (message.method === "notifications/initialized") {
-    operation = readyPromise.then(() => postMessage(message));
+    initializedMessage = message;
+    operation = readyPromise.then(() => postMessage(message)).then(() => startServerEventStream());
     readyPromise = operation;
   } else {
     // Once initialize/initialized completes, requests and notifications run
@@ -604,9 +649,7 @@ input.on("line", (line) => {
 async function shutdown(exitCode) {
   if (shuttingDown) return;
   shuttingDown = true;
-  if (eventReconnectTimer) clearTimeout(eventReconnectTimer);
-  eventReconnectTimer = null;
-  if (activeEventRequest) activeEventRequest.destroy();
+  stopServerEventStream();
   await Promise.allSettled([...pendingOperations]);
   await closeSession();
   process.exit(exitCode);

@@ -65,6 +65,113 @@ def test_server_identity_is_part_of_fail_on_drift_classification() -> None:
     ) is True
 
 
+def test_probe_preserves_streamable_http_session_and_initialized_lifecycle() -> None:
+    probe = load_script(PROBE, "galileo_mcp_probe_stateful_session")
+    state: dict[str, object] = {"requests": []}
+
+    class StatefulProbeHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+        def send_json(self, payload: object, *, session: bool = False) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            if session:
+                self.send_header("Mcp-Session-Id", "probe-session")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def send_empty(self, status: int) -> None:
+            self.send_response(status)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+            length = int(self.headers.get("Content-Length", "0"))
+            message = json.loads(self.rfile.read(length))
+            requests = state["requests"]
+            assert isinstance(requests, list)
+            requests.append(
+                {
+                    "method": message.get("method"),
+                    "session": self.headers.get("Mcp-Session-Id"),
+                    "protocol": self.headers.get("MCP-Protocol-Version"),
+                }
+            )
+            method = message.get("method")
+            if method == "initialize":
+                self.send_json(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "result": {
+                            "protocolVersion": "2025-03-26",
+                            "capabilities": {"tools": {}, "prompts": {}, "resources": {}},
+                            "serverInfo": {
+                                "name": probe.EXPECTED_SERVER_NAME,
+                                "version": probe.EXPECTED_SERVER_VERSION,
+                            },
+                        },
+                    },
+                    session=True,
+                )
+            elif self.headers.get("Mcp-Session-Id") != "probe-session":
+                self.send_empty(400)
+            elif method == "notifications/initialized":
+                self.send_empty(202)
+            elif method == "tools/list":
+                self.send_json({"jsonrpc": "2.0", "id": message.get("id"), "result": {"tools": []}})
+            elif method == "prompts/list":
+                self.send_json(
+                    {"jsonrpc": "2.0", "id": message.get("id"), "result": {"prompts": []}}
+                )
+            elif method == "resources/list":
+                self.send_json(
+                    {"jsonrpc": "2.0", "id": message.get("id"), "result": {"resources": []}}
+                )
+            else:
+                self.send_empty(400)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), StatefulProbeHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        args = type(
+            "Args",
+            (),
+            {
+                "mcp_url": f"http://127.0.0.1:{server.server_port}/mcp/http/mcp",
+                "galileo_console_url": "",
+                "timeout": 5.0,
+                "auth_check": False,
+                "galileo_api_key_file": "",
+                "allow_loose_key_perms": False,
+            },
+        )()
+        report = probe.build_report(args)
+        assert report["server"]["name"] == probe.EXPECTED_SERVER_NAME
+        requests = state["requests"]
+        assert isinstance(requests, list)
+        assert [item["method"] for item in requests] == [
+            "initialize",
+            "notifications/initialized",
+            "tools/list",
+            "prompts/list",
+            "resources/list",
+        ]
+        assert requests[0]["session"] is None
+        assert all(item["session"] == "probe-session" for item in requests[1:])
+        assert all(item["protocol"] == "2025-03-26" for item in requests[1:])
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=2)
+
+
 @pytest.mark.parametrize(
     ("mcp_url", "console_url"),
     [
@@ -376,6 +483,12 @@ def test_generated_stdio_bridge_supports_streamable_http_end_to_end(tmp_path: Pa
                     }
                 )
             elif method == "prompts/list":
+                if state.setdefault("expired_prompts_once", False) is False:
+                    state["expired_prompts_once"] = True
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 self.send_json(
                     {"jsonrpc": "2.0", "id": request_id, "result": {"prompts": []}}
                 )
@@ -652,9 +765,46 @@ def test_generated_stdio_bridge_supports_streamable_http_end_to_end(tmp_path: Pa
             and item["message"].get("method") == "initialize"
         )
         assert initialize["session"] is None
-        subsequent = [item for item in requests if item is not initialize]
-        assert all(item["session"] == "session-test" for item in subsequent)
-        assert all(item["protocol"] == "2025-03-26" for item in subsequent)
+        initialized_index = next(
+            index
+            for index, item in enumerate(requests)
+            if isinstance(item["message"], dict)
+            and item["message"].get("method") == "notifications/initialized"
+        )
+        first_get_index = next(
+            index for index, item in enumerate(requests) if item["method"] == "GET"
+        )
+        assert first_get_index > initialized_index
+        initialize_count = sum(
+            1
+            for item in requests
+            if isinstance(item["message"], dict)
+            and item["message"].get("method") == "initialize"
+        )
+        initialized_count = sum(
+            1
+            for item in requests
+            if isinstance(item["message"], dict)
+            and item["message"].get("method") == "notifications/initialized"
+        )
+        assert initialize_count == 2
+        assert initialized_count == 2
+        assert all(
+            item["session"] is None
+            for item in requests
+            if isinstance(item["message"], dict)
+            and item["message"].get("method") == "initialize"
+        )
+        post_initialize = [
+            item
+            for item in requests
+            if not (
+                isinstance(item["message"], dict)
+                and item["message"].get("method") == "initialize"
+            )
+        ]
+        assert all(item["session"] == "session-test" for item in post_initialize)
+        assert all(item["protocol"] == "2025-03-26" for item in post_initialize)
     finally:
         server.shutdown()
         server.server_close()

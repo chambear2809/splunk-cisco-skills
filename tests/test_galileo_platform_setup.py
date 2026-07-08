@@ -1527,6 +1527,31 @@ def test_project_rest_fallback_rejects_cleartext_non_loopback_api_key_transport(
     assert lifecycle._validated_api_base() == "http://127.0.0.1:8080"
 
 
+def test_project_rest_fallback_accepts_empty_success_response(monkeypatch) -> None:
+    lifecycle = load_script(LIFECYCLE, "galileo_object_lifecycle_project_empty_delete")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b""
+
+    class Opener:
+        def open(self, _request, timeout):
+            assert timeout == 60
+            return Response()
+
+    monkeypatch.setenv("GALILEO_API_BASE", "https://api.example.invalid")
+    monkeypatch.setenv("GALILEO_API_KEY", "test-secret-must-not-be-logged")
+    monkeypatch.setattr(lifecycle.urllib.request, "build_opener", lambda *_handlers: Opener())
+
+    assert lifecycle._project_rest_request("DELETE", "/v2/projects/project-id") == {}
+
+
 def test_project_delete_fallback_is_exact_and_limited_to_known_schema_error(monkeypatch) -> None:
     lifecycle = load_script(LIFECYCLE, "galileo_object_lifecycle_project_delete")
     project_id = "11111111-1111-4111-8111-111111111111"

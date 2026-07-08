@@ -245,34 +245,67 @@ def parse_sse_json(text: str) -> dict[str, Any]:
     raise RuntimeError(f"No JSON-RPC data event found: {text[:200]!r}")
 
 
-def rpc(mcp_url: str, method: str, params: dict[str, Any] | None, timeout: float) -> dict[str, Any]:
-    payload = {
-        "jsonrpc": "2.0",
-        "id": method,
-        "method": method,
-        "params": params or {},
-    }
-    if method == "initialize":
-        payload["params"] = {
-            "protocolVersion": "2025-03-26",
-            "capabilities": {},
-            "clientInfo": {"name": "galileo-mcp-server-setup-probe", "version": "0.0.0"},
+class McpHttpSession:
+    def __init__(self, mcp_url: str, timeout: float) -> None:
+        self.mcp_url = mcp_url
+        self.timeout = timeout
+        self.session_id = ""
+        self.protocol_version = ""
+
+    def rpc(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id": method,
+            "method": method,
+            "params": params or {},
         }
-    request = urllib.request.Request(
-        mcp_url,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
+        if method == "initialize":
+            payload["params"] = {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "galileo-mcp-server-setup-probe", "version": "0.0.0"},
+            }
+        result = self._post(payload, expected_id=payload["id"])
+        if method == "initialize":
+            protocol_version = result.get("protocolVersion")
+            if isinstance(protocol_version, str) and protocol_version:
+                self.protocol_version = protocol_version
+        return result
+
+    def notify_initialized(self) -> None:
+        self._post(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            expected_id=None,
+        )
+
+    def _post(self, payload: dict[str, Any], expected_id: object | None) -> dict[str, Any]:
+        headers = {
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
-        },
-    )
-    with open_no_redirect(request, timeout=timeout) as response:
-        body = response.read().decode("utf-8", "replace")
-    data = parse_sse_json(body)
-    if "error" in data:
-        raise RuntimeError(f"{method} failed: {data['error']}")
-    return data.get("result") or {}
+        }
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        if self.protocol_version:
+            headers["MCP-Protocol-Version"] = self.protocol_version
+        request = urllib.request.Request(
+            self.mcp_url,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers=headers,
+        )
+        with open_no_redirect(request, timeout=self.timeout) as response:
+            session_header = response.headers.get("Mcp-Session-Id")
+            if session_header:
+                self.session_id = session_header
+            body = response.read().decode("utf-8", "replace")
+        if not body.strip():
+            return {}
+        data = parse_sse_json(body)
+        if "error" in data:
+            raise RuntimeError(f"{payload.get('method')} failed: {data['error']}")
+        if expected_id is not None and data.get("id") != expected_id:
+            raise RuntimeError(f"{payload.get('method')} returned a mismatched JSON-RPC id")
+        return data.get("result") or {}
 
 
 def check_key_permissions(target: Path, allow_loose: bool) -> None:
@@ -376,10 +409,12 @@ def schema_drift(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     mcp_url = derive_mcp_url(args.mcp_url, args.galileo_console_url)
-    initialize = rpc(mcp_url, "initialize", None, args.timeout)
-    tools_result = rpc(mcp_url, "tools/list", {}, args.timeout)
-    prompts_result = rpc(mcp_url, "prompts/list", {}, args.timeout)
-    resources_result = rpc(mcp_url, "resources/list", {}, args.timeout)
+    session = McpHttpSession(mcp_url, args.timeout)
+    initialize = session.rpc("initialize")
+    session.notify_initialized()
+    tools_result = session.rpc("tools/list", {})
+    prompts_result = session.rpc("prompts/list", {})
+    resources_result = session.rpc("resources/list", {})
 
     tools = tools_result.get("tools") or []
     live_names = [tool.get("name", "") for tool in tools]

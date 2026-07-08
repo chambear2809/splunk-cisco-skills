@@ -343,6 +343,8 @@ def _project_rest_request(
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError("Galileo project compatibility request failed") from exc
+    if not payload.strip():
+        return {}
     try:
         decoded = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
