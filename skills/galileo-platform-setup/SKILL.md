@@ -6,7 +6,9 @@ description: >-
   Splunk wiring for Galileo SaaS or Enterprise deployments. Covers projects,
   log streams, datasets, prompts, experiments, metrics, annotations, feedback,
   RBAC, provider handoffs, trace maintenance/metrics APIs, Luna Studio training,
-  metadata-only media export, HEC/OTLP/OTel handoffs, dashboards, and detectors.
+  metadata-only media export, AI Assistant beta readiness, global dashboards,
+  generic alert webhook relay, SDK experiment groups, large-dataset batching,
+  HEC/OTLP/OTel handoffs, dashboards, and detectors.
   Use when configuring Galileo-to-Splunk Platform or Splunk Observability Cloud setup,
   including multimodal traces and multi-model experiment comparison evidence.
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
@@ -38,9 +40,11 @@ console URL unless the user provides explicit endpoint overrides.
 1. **Platform readiness**: render endpoint derivation, `/v2/healthcheck`,
    auth mode inventory, RBAC/group/project-sharing checklist, Luna Enterprise
    readiness, metric sampling/filtering coverage, Protect invoke readiness, and
-   Signals/Trends/annotation coverage.
+   Signals/Trends/annotation coverage. The July 7, 2026 release gate also
+   tracks AI Assistant beta, organization-wide global dashboards, generic
+   alert webhooks, experiment groups, and large-dataset batched processing.
 2. **Galileo object lifecycle**: create or validate projects, log streams,
-   datasets, prompts, experiments, log stream metrics, Protect stages, and
+   datasets, prompts, experiments and experiment-group assignment, log stream metrics, Protect stages, and
    Agent Control targets using `scripts/galileo_object_lifecycle.py`. The
    rendered coverage matrix also tracks auth/RBAC, integrations, costs,
    dataset query/preview/content maintenance, prompt rendering, custom scorers,
@@ -77,14 +81,20 @@ console URL unless the user provides explicit endpoint overrides.
 6. **Protect runtime**: render a file-secret-backed legacy Python helper for
    `/v2/protect/invoke` where an existing deployment still uses Protect.
 7. **Evaluate assets**: render handoffs for experiments, datasets, metrics
-   testing, annotations, feedback, Signals, and Trends.
+   testing, annotations, feedback, Signals, Trends, AI Assistant investigations,
+   experiment-group ranking, and large-dataset progress-validation handoff.
 8. **Multimodal observability**: render GalileoLogger, file/upload,
    LangChain/LangGraph, multimodal quality metric, Splunk metadata-only export,
    and validation-search handoffs for image, audio, and PDF/document traces.
 9. **Agent Observability Controls**: render console inventory, Log stream
    attachment, control-span export, and Splunk search evidence handoffs without
    claiming undocumented control CRUD API support.
-10. **Splunk handoffs**:
+10. **Latest Galileo console and push workflows**: render guarded handoffs for
+    cross-project global dashboards and AI Assistant beta. Render a v1.0
+    generic-alert payload, Splunk searches, and
+    `galileo_alert_webhook_relay.py` because Galileo's Bearer webhook auth is
+    not directly compatible with Splunk HEC's `Authorization: Splunk` scheme.
+11. **Splunk handoffs**:
    - HEC token/service: `splunk-hec-service-setup`
    - Splunk Platform OTLP input: `splunk-connect-for-otlp-setup`
    - Splunk OTel Collector: `splunk-observability-otel-collector-setup`
@@ -184,6 +194,39 @@ Explicit Splunk Platform sections (`observe-export`, `splunk-hec`,
 Use `--lifecycle-manifest`, `--dataset-dir`, `--prompt-manifest`,
 `--experiment-manifest`, `--protect-stage-manifest`, and `--metrics` when the
 tenant needs Galileo objects provisioned before export or runtime handoff.
+Experiment-group assignment requires `galileo>=2.2.0`; set
+`experiment_group` or `experiment_group_id` on an experiment manifest item.
+The helper passes only configured group fields to create/run operations.
+Dataset get/create operations are associated with the resolved project. If a
+manifest sets `update_existing: true`, Galileo appends rows as a new dataset
+version; the lifecycle helper records that this mutation has no automatic
+rollback. When `--log-stream-id` is supplied, also supply the Log stream name:
+Galileo SDK 2.4.0 resolves it by project-scoped name and the helper then verifies
+the returned ID exactly. Metric enablement is allowed only on a Log stream
+created by the same lifecycle operation because Galileo can replace existing
+scorer settings and the helper does not claim restore state it did not capture.
+
+Every non-dry lifecycle apply writes a mode-`0600` created-object ownership
+ledger (use `--ownership-ledger` to choose its path). For disposable validation,
+clean only those recorded exact IDs:
+
+```bash
+python3 skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py \
+  --cleanup-created \
+  --galileo-api-key-file /tmp/galileo_api_key \
+  --api-base "$GALILEO_API_BASE" \
+  --ownership-ledger ./galileo-lifecycle-ownership.json \
+  --output ./galileo-lifecycle-cleanup-result.json
+```
+
+Cleanup deletes project-associated datasets by exact dataset ID first, then an
+owned prompt by exact prompt ID, then an owned project by exact project ID and
+verifies its absence. It fails closed before creating Log streams, experiments,
+or Protect stages in a pre-existing project because those SDK surfaces expose no
+documented exact-ID delete operation. The SDK 2.4.0 project permission-enum
+readback incompatibility has a narrowly matched documented REST fallback;
+authentication, authorization, network, and unrelated SDK errors still fail.
+
 Use `--luna-list-only true` to inventory current and available scorers without
 patching metric settings. Use `--luna-scorer-map`, `--luna-recompute true`, and
 `--luna-strict true` when replacing preset LLM judge scorers with Luna/SLM
@@ -209,12 +252,14 @@ with `reliable=true` and `include_trace_ids=true`, and verify storage through
 Use file-based flags only:
 
 - `--galileo-api-key-file`
+- `--galileo-webhook-token-file` (webhook relay runtime only)
 - `--splunk-hec-token-file`
 - `--o11y-token-file`
 
 Never pass token values on the command line or in chat. Direct token/password
 flags such as `--galileo-api-key`, `--splunk-hec-token`, `--o11y-token`,
-`--token`, `--api-key`, `--password`, and `--authorization` are rejected.
+`--galileo-webhook-token`, `--token`, `--api-key`, `--password`, and
+`--authorization` are rejected.
 
 Rendered output must not contain token values. Apply wrappers read token files
 at runtime and keep secret material out of argv.
@@ -236,7 +281,8 @@ For code validation:
 python3 -m py_compile \
   skills/galileo-platform-setup/scripts/render_assets.py \
   skills/galileo-platform-setup/scripts/galileo_to_splunk_hec.py \
-  skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py
+  skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py \
+  skills/galileo-platform-setup/scripts/galileo_alert_webhook_relay.py
 ```
 
 See `reference.md` for endpoint notes, field mapping, apply sections, and

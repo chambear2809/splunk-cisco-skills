@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
+import types
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +39,27 @@ def rendered_text(root: Path) -> str:
         if path.is_file():
             chunks.append(path.read_text(encoding="utf-8"))
     return "\n".join(chunks)
+
+
+def load_generated_sink(path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
+    agent_control = types.ModuleType("agent_control")
+    agent_control.register_control_event_sink = lambda _sink: None
+    telemetry = types.ModuleType("agent_control_telemetry")
+    telemetry.BaseControlEventSink = object
+
+    class SinkResult:
+        def __init__(self, *, accepted: int, dropped: int) -> None:
+            self.accepted = accepted
+            self.dropped = dropped
+
+    telemetry.SinkResult = SinkResult
+    monkeypatch.setitem(sys.modules, "agent_control", agent_control)
+    monkeypatch.setitem(sys.modules, "agent_control_telemetry", telemetry)
+    spec = importlib.util.spec_from_file_location("generated_agent_control_hec_sink", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_setup_help_lists_apply_sections() -> None:
@@ -174,6 +199,149 @@ def test_rendered_files_do_not_contain_token_values(tmp_path: Path) -> None:
     assert str(admin_file) in text
     assert str(hec_file) in text
     assert str(o11y_file) in text
+
+
+def test_server_url_is_normalized_and_runtime_overrides_are_revalidated(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(output_dir),
+        "--server-url",
+        "https://CONTROL.Example.COM:8443/",
+    )
+
+    metadata = json.loads((output_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["server_url"] == "https://control.example.com:8443"
+    python_runtime = (output_dir / "runtime/python-control.py").read_text(encoding="utf-8")
+    typescript_runtime = (output_dir / "runtime/typescript-control.ts").read_text(
+        encoding="utf-8"
+    )
+    assert "_normalize_agent_control_base_url" in python_runtime
+    assert "AGENT_CONTROL_BASE_URL must not contain credentials" in python_runtime
+    assert "normalizeServerUrl" in typescript_runtime
+    assert "must use HTTPS outside loopback testing" in typescript_runtime
+
+
+@pytest.mark.parametrize(
+    "server_url",
+    [
+        "https://user:SERVER_SECRET@control.example.com",
+        "https://control.example.com/api",
+        "https://control.example.com?tenant=other",
+        "https://control.example.com#fragment",
+        "https://control.example.com:bad",
+        "https://control.example.com:0",
+        "http://control.example.com:8000",
+        "ftp://control.example.com",
+        "control.example.com",
+    ],
+)
+def test_server_url_rejects_unsafe_credential_transport(
+    tmp_path: Path, server_url: str
+) -> None:
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(tmp_path / "rendered"),
+        "--server-url",
+        server_url,
+        check=False,
+    )
+
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "Agent Control server URL" in combined
+    assert "SERVER_SECRET" not in combined
+
+
+def test_hec_url_normalizes_to_exact_event_path_and_disables_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(output_dir),
+        "--splunk-hec-url",
+        "https://SPLUNK.Example.COM:8088/services/collector/",
+    )
+
+    sink_path = output_dir / "sinks/splunk-hec-sink.py"
+    sink_source = sink_path.read_text(encoding="utf-8")
+    assert "https://splunk.example.com:8088/services/collector/event" in sink_source
+    assert "request.build_opener(NoRedirectHandler())" in sink_source
+    assert "request.urlopen(" not in sink_source
+
+    sink_module = load_generated_sink(sink_path, monkeypatch)
+    assert (
+        sink_module._normalize_hec_url("http://127.0.0.1:8088")
+        == "http://127.0.0.1:8088/services/collector/event"
+    )
+    assert (
+        sink_module._normalize_hec_url(
+            "https://splunk.example.com:8088/services/collector"
+        )
+        == "https://splunk.example.com:8088/services/collector/event"
+    )
+    handler = sink_module.NoRedirectHandler()
+    assert handler.redirect_request(None, None, 302, "Found", {}, "https://other") is None
+
+
+@pytest.mark.parametrize(
+    "hec_url",
+    [
+        "https://user:HEC_SECRET@splunk.example.com:8088/services/collector/event",
+        "https://splunk.example.com:8088/services/collector/raw",
+        "https://splunk.example.com:8088//services/collector/event",
+        "https://splunk.example.com:8088/services/collector/event?token=secret",
+        "https://splunk.example.com:bad/services/collector/event",
+        "https://splunk.example.com:0/services/collector/event",
+        "http://splunk.example.com:8088/services/collector/event",
+        "ftp://splunk.example.com:8088/services/collector/event",
+    ],
+)
+def test_hec_url_rejects_unsafe_credential_transport(tmp_path: Path, hec_url: str) -> None:
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(tmp_path / "rendered"),
+        "--splunk-hec-url",
+        hec_url,
+        check=False,
+    )
+
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "Splunk HEC URL" in combined
+    assert "HEC_SECRET" not in combined
+
+
+def test_generated_hec_runtime_rejects_unsafe_environment_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd("bash", str(SETUP), "--render", "--output-dir", str(output_dir))
+    sink_module = load_generated_sink(output_dir / "sinks/splunk-hec-sink.py", monkeypatch)
+
+    for unsafe_url in [
+        "https://user:secret@splunk.example.com:8088/services/collector/event",
+        "https://splunk.example.com:8088/services/collector/raw",
+        "https://splunk.example.com:8088//services/collector/event",
+        "https://splunk.example.com:8088/services/collector/event?token=secret",
+        "https://splunk.example.com:0/services/collector/event",
+        "http://splunk.example.com:8088/services/collector/event",
+    ]:
+        with pytest.raises(RuntimeError):
+            sink_module._normalize_hec_url(unsafe_url)
 
 
 def test_handoffs_include_otel_and_splunk_hec(tmp_path: Path) -> None:

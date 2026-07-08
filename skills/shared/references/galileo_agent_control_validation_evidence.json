@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "skill": "galileo-agent-control-setup",
+  "sanitization": "No AWS account or resource identifiers, cluster or context names, namespaces, service endpoints, credentials, tokens, control schemas, agent names, control data, local credential paths, or repository paths are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-08-defenseclaw-eks-agent-control-read-only",
+      "date": "2026-07-08",
+      "environment": {
+        "runtime": "Agent Control server used by DefenseClaw on AWS EKS",
+        "source_repository_access": "DefenseClaw repository and deployed configuration remained read-only"
+      },
+      "targets": [
+        "Deployed Agent Control health and authenticated read-only schema surfaces",
+        "Hardened rendered Agent Control and Splunk HEC credential transports"
+      ],
+      "result": "pass",
+      "evidence": {
+        "live_read_only": {
+          "deployment_ready_passed": true,
+          "health_http_status": 200,
+          "health_response_passed": true,
+          "unauthenticated_protected_read_rejected": true,
+          "authenticated_protected_read_http_status": 200,
+          "authenticated_schema_object_passed": true,
+          "raw_schema_retained": false
+        },
+        "render_and_regression": {
+          "agent_control_render_validation_passed": true,
+          "remote_cleartext_agent_control_url_rejected": true,
+          "remote_cleartext_splunk_hec_url_rejected": true,
+          "credential_bearing_urls_rejected": true,
+          "ambiguous_hec_paths_rejected": true,
+          "authenticated_hec_redirects_rejected": true,
+          "runtime_url_overrides_revalidated": true
+        }
+      },
+      "limitations": [
+        "Control, policy, binding, evaluator, and observability-event mutations were intentionally outside this read-only validation run.",
+        "The Splunk HEC and OpenTelemetry sink assets were rendered and regression-tested; no retained live sink event was created."
+      ],
+      "cleanup": {
+        "temporary_port_forwards_remaining": 0,
+        "temporary_kubernetes_objects_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
+    }
+  ]
+}

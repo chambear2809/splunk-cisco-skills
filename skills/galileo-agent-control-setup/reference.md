@@ -49,16 +49,25 @@ The OTel sink uses Agent Control SDK environment settings:
 
 The custom Splunk sink reads `SPLUNK_HEC_TOKEN_FILE` at runtime and sends JSON
 objects to `/services/collector/event` with `sourcetype=agent_control:events:json`.
+It validates both rendered and runtime `SPLUNK_HEC_URL` values, rejects embedded
+credentials, ambiguous paths, invalid ports, and plaintext remote destinations,
+and disables redirects so the `Authorization` header stays on the reviewed
+origin. Root and `/services/collector` inputs normalize to the exact event path.
+
+`AGENT_CONTROL_BASE_URL` follows the same credential-bound transport policy: it
+must be a credential-free HTTP(S) origin, use a valid port, contain no path,
+query, or fragment, and use HTTPS unless the hostname is loopback. The rendered
+Python and TypeScript snippets revalidate environment overrides before use.
 
 ## Troubleshooting
 
 - Agent Control health fails: verify `server/external-server-readiness.md`, URL,
   port, TLS, and network reachability.
-- Auth failures: verify API key files, admin key files, server-side auth
-  enablement, and key rotation policy.
+- Auth failures: verify API key files, admin key files, the credential-free
+  HTTPS server origin, server-side auth enablement, and key rotation policy.
 - Controls do not fire: confirm the agent name, registered steps, scope, stages,
   and whether the policy is enabled.
 - OTel sink is silent: confirm the OTLP endpoint and that the SDK was installed
   with the OTel extra where required.
-- Splunk HEC sink fails: verify HEC token file, allowed indexes, HEC URL, and
-  sourcetype/index settings.
+- Splunk HEC sink fails: verify HEC token file, allowed indexes, exact HEC event
+  URL, HTTPS/TLS, and sourcetype/index settings. Redirect responses are rejected.

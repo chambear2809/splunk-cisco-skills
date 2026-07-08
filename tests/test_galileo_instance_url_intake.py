@@ -6,6 +6,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GALILEO_CONSOLE_URL = "https://console.demo-v2.galileocloud.io/"
@@ -73,6 +75,150 @@ def test_platform_render_uses_user_supplied_console_url(tmp_path: Path) -> None:
     assert f"export GALILEO_CONSOLE_URL='{GALILEO_CONSOLE_URL}'" in runtime_env
 
 
+@pytest.mark.parametrize(
+    ("console_url", "api_base", "mcp_url"),
+    [
+        (
+            "https://app.galileo.ai/",
+            "https://api.galileo.ai",
+            "https://api.galileo.ai/mcp/http/mcp",
+        ),
+        (
+            "https://console.galileo.ai/",
+            "https://api.galileo.ai",
+            "https://api.galileo.ai/mcp/http/mcp",
+        ),
+        (
+            "https://console-galileo.apps.example.com/",
+            "https://api-galileo.apps.example.com",
+            "https://api-galileo.apps.example.com/mcp/http/mcp",
+        ),
+    ],
+)
+def test_platform_and_mcp_share_console_url_derivation(
+    tmp_path: Path, console_url: str, api_base: str, mcp_url: str
+) -> None:
+    platform_output = tmp_path / "platform"
+    mcp_output = tmp_path / "mcp"
+    run_cmd(
+        "bash",
+        "skills/galileo-platform-setup/scripts/setup.sh",
+        "--render",
+        "--galileo-console-url",
+        console_url,
+        "--output-dir",
+        str(platform_output),
+    )
+    run_cmd(
+        "bash",
+        "skills/galileo-mcp-server-setup/scripts/setup.sh",
+        "--render",
+        "--client",
+        "cursor",
+        "--galileo-console-url",
+        console_url,
+        "--output-dir",
+        str(mcp_output),
+    )
+
+    readiness = json.loads(
+        (platform_output / "readiness/readiness-report.json").read_text(encoding="utf-8")
+    )
+    metadata = json.loads((mcp_output / "metadata.json").read_text(encoding="utf-8"))
+    assert readiness["galileo"]["api_base"] == api_base
+    assert (
+        platform_output / "otel/collector-galileo-fanout.yaml"
+    ).read_text(encoding="utf-8").find(api_base + "/otel/traces") >= 0
+    assert metadata["mcp_url"] == mcp_url
+
+
+@pytest.mark.parametrize(
+    "console_url",
+    [
+        "https://user:password@console.galileo.ai/",
+        "https://console.galileo.ai/a/path",
+        "https://console.galileo.ai/?tenant=other",
+        "https://console.galileo.ai:bad/",
+        "http://console.galileo.ai/",
+        "ftp://console.galileo.ai/",
+    ],
+)
+def test_platform_rejects_unsafe_or_ambiguous_console_urls(
+    tmp_path: Path, console_url: str
+) -> None:
+    platform_result = run_cmd(
+        "bash",
+        "skills/galileo-platform-setup/scripts/setup.sh",
+        "--render",
+        "--galileo-console-url",
+        console_url,
+        "--galileo-api-base",
+        "https://api.galileo.ai",
+        "--output-dir",
+        str(tmp_path / "platform-invalid"),
+        check=False,
+    )
+    mcp_result = run_cmd(
+        "bash",
+        "skills/galileo-mcp-server-setup/scripts/setup.sh",
+        "--render",
+        "--client",
+        "cursor",
+        "--galileo-console-url",
+        console_url,
+        "--output-dir",
+        str(tmp_path / "mcp-invalid"),
+        check=False,
+    )
+    agent_control_result = run_cmd(
+        "bash",
+        "skills/galileo-agent-control-setup/scripts/setup.sh",
+        "--render",
+        "--galileo-console-url",
+        console_url,
+        "--output-dir",
+        str(tmp_path / "agent-control-invalid"),
+        check=False,
+    )
+
+    assert platform_result.returncode != 0
+    assert "Galileo console URL" in platform_result.stdout + platform_result.stderr
+    assert mcp_result.returncode != 0
+    assert "Galileo console URL" in mcp_result.stdout + mcp_result.stderr
+    assert agent_control_result.returncode != 0
+    assert "Galileo console URL" in agent_control_result.stdout + agent_control_result.stderr
+
+
+@pytest.mark.parametrize(
+    "api_base",
+    [
+        "https://user:secret@api.galileo.ai/",
+        "https://api.galileo.ai/v2",
+        "https://api.galileo.ai/?token=secret",
+        "http://api.galileo.ai/",
+        "ftp://api.galileo.ai/",
+    ],
+)
+def test_platform_rejects_unsafe_api_base_even_with_valid_console(
+    tmp_path: Path, api_base: str
+) -> None:
+    result = run_cmd(
+        "bash",
+        "skills/galileo-platform-setup/scripts/setup.sh",
+        "--render",
+        "--galileo-console-url",
+        GALILEO_CONSOLE_URL,
+        "--galileo-api-base",
+        api_base,
+        "--output-dir",
+        str(tmp_path / "platform-invalid-api"),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Galileo API base" in result.stdout + result.stderr
+
+
 def test_platform_template_requires_galileo_url_intake(tmp_path: Path) -> None:
     result = run_cmd(
         "bash",
@@ -88,6 +234,24 @@ def test_platform_template_requires_galileo_url_intake(tmp_path: Path) -> None:
 
     assert result.returncode != 0
     assert "Galileo instance URL intake is required" in result.stdout + result.stderr
+
+
+def test_platform_rejects_remote_plaintext_otel_endpoint(tmp_path: Path) -> None:
+    result = run_cmd(
+        "bash",
+        "skills/galileo-platform-setup/scripts/setup.sh",
+        "--render",
+        "--galileo-console-url",
+        GALILEO_CONSOLE_URL,
+        "--galileo-otel-endpoint",
+        "http://collector.example.com/otel/traces",
+        "--output-dir",
+        str(tmp_path / "platform-invalid-otel"),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Galileo OTLP endpoint" in result.stdout + result.stderr
 
 
 def test_agent_control_render_preserves_user_supplied_console_url(tmp_path: Path) -> None:

@@ -9,6 +9,13 @@
 - Galileo datasets: `https://docs.galileo.ai/sdk-api/experiments/datasets`
 - Galileo prompts: `https://docs.galileo.ai/sdk-api/experiments/prompts`
 - Galileo experiments: `https://docs.galileo.ai/sdk-api/python/reference/experiments`
+- Galileo experiment groups:
+  `https://docs.galileo.ai/sdk-api/experiments/experiment-groups`
+- Galileo AI Assistant beta: `https://docs.galileo.ai/concepts/ai-assistant`
+- Galileo generic alert webhooks:
+  `https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs#generic-webhook-notifications`
+- Galileo July 7, 2026 release:
+  `https://docs.galileo.ai/release-notes#2026-07-07`
 - Galileo OpenTelemetry/OpenInference: `https://docs.galileo.ai/sdk-api/third-party-integrations/opentelemetry-and-openinference`
 - Galileo multimodal observability:
   `https://docs.galileo.ai/concepts/logging/multimodal-observability`
@@ -86,6 +93,23 @@ Lifecycle inputs:
   only where `create: true`.
 - `--metrics`: comma-separated built-in metric names to enable on the log
   stream or attach to experiment definitions.
+- `--ownership-ledger`: path for the mode-`0600` exact-ID ledger written after
+  each created object; defaults beside the lifecycle result.
+- `--cleanup-created`: delete only objects proven by that ledger. Datasets are
+  deleted by exact ID with project-association validation, prompts by exact ID,
+  and then an owned project by exact ID and verified absent. Creation fails
+  closed for Log streams, experiments, and Protect stages in a pre-existing
+  project because those SDK surfaces expose no documented exact delete.
+
+Dataset lookup and creation use `project_id` (or `project_name` when no ID is
+available). `update_existing: true` appends rows as a new Galileo dataset
+version and is explicitly non-reversible; cleanup never claims to roll it back.
+An explicit Log stream ID must be paired with its name because Galileo SDK
+2.4.0 exposes project-scoped name lookup; the returned object must match the
+requested ID exactly. Project or Log stream setup failure stops metrics and all
+child-object calls. Configured metrics fail closed on a pre-existing Log stream;
+they are enabled only when that stream was created by the same ownership ledger,
+so existing scorer settings are never replaced without captured restore state.
 
 Rendered lifecycle assets:
 
@@ -94,9 +118,16 @@ Rendered lifecycle assets:
 - `lifecycle/product-coverage-matrix.json`
 - `lifecycle/product-coverage-matrix.md`
 - `scripts/apply-object-lifecycle.sh`
+- `scripts/cleanup-object-lifecycle.sh`
 - `scripts/apply-luna-scorers.sh`
 - `scripts/galileo_object_lifecycle.py`
 - `scripts/galileo_luna_scorers.py`
+
+Experiment entries accept `experiment_group` and `experiment_group_id` with
+Galileo Python SDK 2.2.0 or later. A name can create its group on demand; an ID
+must already resolve in the project. When both are supplied, the SDK gives the
+ID precedence. Group listing/filtering, moving existing experiments, and
+weighted rankings are covered by the rendered operator handoff.
 
 ## Luna Scorer Settings
 
@@ -139,6 +170,17 @@ Product coverage surfaces tracked in the matrix:
 - Experiments, experiment groups, tags, comparison, search, metric settings,
   available columns, metrics APIs, paginated search, and optional experiment
   runs
+- AI Assistant beta enterprise/LLM-integration readiness, evidence-link
+  verification, read-only limitations, and reviewed remediation handoff
+- Organization-wide global dashboards across projects and Log streams, with a
+  console evidence workflow and explicit public global-CRUD API gap
+- Generic alert webhooks with auth-mode review, payload v1.0 schema,
+  at-least-once relay delivery, downstream Splunk `event_id` deduplication,
+  `dedup_key` lifecycle correlation, metadata routing, test-event validation,
+  and a Bearer-to-Splunk-HEC relay
+- Playground and experiment processing for datasets with thousands of rows,
+  using Galileo-managed batching, async progress evidence, and paginated reads
+  without an invented client batch-size control or maximum
 - Evaluate workflow runs
 - Python and TypeScript SDK parity, Observe/Evaluate workflow classes, package
   versioning, and runtime package handoffs
@@ -182,7 +224,7 @@ Product coverage surfaces tracked in the matrix:
   LangChain/LangGraph runtime protection
 - MCP tool-call logging and tool spans
 - Galileo alerts, email notifications, Slack webhooks, and Splunk detector
-  mapping
+  mapping, plus generic webhook delivery through the rendered HEC relay
 - Protect stages, rules, rulesets, actions, notifications, and invocation
   runtime
 - Agent Control log stream target resolution
@@ -211,8 +253,12 @@ The bridge script uses:
 
 - `POST /v2/projects/{project_id}/export_records`
 - `root_type`: `session`, `trace`, or `span`
-- `export_format`: `jsonl` by default
+- `export_format`: `jsonl` by default; current API options are `jsonl`,
+  `jsonl_flat`, and `csv`
 - `redact`: `true` by default
+- optional `export_computed_metrics_only`; Galileo rejects this with
+  `jsonl_flat`, so use `jsonl` or `csv`
+- optional `include_code_metric_metadata` for reviewed code-scorer metadata
 - optional `log_stream_id`, `experiment_id`, and `metrics_testing_id`
 
 The Splunk event defaults are:
@@ -246,7 +292,35 @@ Preferred record fields:
 
 Raw prompt/response fields are excluded unless the operator explicitly passes
 `--include-raw` to the bridge script and confirms Splunk is an approved
-destination.
+destination. Unknown CSV columns are also excluded without that approval;
+computed `metrics/…` columns remain eligible for the metadata-only path. The
+terminal sample is always metadata-only, even when raw fields are approved for
+delivery to Splunk.
+
+## Galileo July 7, 2026 Release Assets
+
+The release-specific readiness contract is
+`readiness/galileo-2026-07-07-readiness.json`. Companion assets are:
+
+- `evaluate/ai-assistant-handoff.md`
+- `evaluate/experiment-groups-and-scaling-handoff.md`
+- `dashboards/galileo-global-dashboard-handoff.md`
+- `alerts/generic-webhook-handoff.md`
+- `alerts/galileo-alert-webhook-payload.example.json`
+- `scripts/galileo_alert_webhook_relay.py`
+- `splunk-platform/galileo-alert-hec-event.example.json`
+- `splunk-platform/galileo-alert-webhook-search-examples.spl`
+
+AI Assistant and global dashboards are console/evidence workflows because no
+public automation API is documented for either surface. The alert relay is
+needed because Galileo's generic token mode sends `Authorization: Bearer`,
+while Splunk HEC requires `Authorization: Splunk`. Both relay credentials must
+come from mode-0600 files. Expose the loopback listener only through an
+operator-owned HTTPS reverse proxy and validate a Galileo test event end to end.
+The export bridge and alert relay both require HTTPS for non-loopback HEC URLs,
+reject credentials and ambiguous URL components, and refuse HTTP redirects.
+Plaintext non-loopback HEC requires the explicit
+`--allow-insecure-hec-http` review override.
 
 ## Codex Notify Runtime Logging
 

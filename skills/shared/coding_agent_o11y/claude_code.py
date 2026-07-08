@@ -1163,7 +1163,7 @@ def render_collector_overlay(config: dict[str, Any]) -> str:
     galileo_block = ""
     if galileo_enabled:
         galileo_block = f"""  otlp_http/galileo:
-    endpoint: {yaml_quote(galileo_endpoint_str)}
+    traces_endpoint: {yaml_quote(galileo_endpoint_str)}
     headers:
       Galileo-API-Key: "${{env:GALILEO_API_KEY}}"
       project: {yaml_quote(galileo_project)}

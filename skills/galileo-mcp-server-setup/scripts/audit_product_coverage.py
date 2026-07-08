@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any
 
 
 DEFAULT_DOCS_INDEX_URL = "https://docs.galileo.ai/llms-full.txt"
+LATEST_REVIEWED_RELEASE = "2026-07-07"
+RELEASE_LABEL_RE = re.compile(r'<Update\s+label=["\'](\d{4}-\d{2}-\d{2})["\']')
 
 PRODUCT_RULES: list[dict[str, Any]] = [
     {
@@ -41,6 +44,29 @@ PRODUCT_RULES: list[dict[str, Any]] = [
         "matrix_markers": ["Prompt template creation", "Experiment setup"],
     },
     {
+        "id": "ai_assistant_beta",
+        "docs_markers": ["AI Assistant (Beta)", "concepts/ai-assistant"],
+        "matrix_markers": [
+            "AI Assistant beta, evidence-linked investigation, and enterprise enablement"
+        ],
+    },
+    {
+        "id": "global_dashboards",
+        "docs_markers": ["Global dashboards", "Chart across projects"],
+        "matrix_markers": ["Global dashboards across projects and log streams"],
+    },
+    {
+        "id": "generic_alert_webhooks",
+        "docs_markers": [
+            "Generic webhook notifications",
+            "alert.triggered",
+            "dedup_key",
+        ],
+        "matrix_markers": [
+            "Generic alert webhooks, payload v1.0, authentication, testing, and deduplication"
+        ],
+    },
+    {
         "id": "experiment_groups_playgrounds_ci",
         "docs_markers": [
             "Experiment Groups",
@@ -49,7 +75,17 @@ PRODUCT_RULES: list[dict[str, Any]] = [
             "Run Experiments in Unit Tests",
         ],
         "matrix_markers": [
-            "Experiment groups, comparison, ranking, playground runs, and unit-test gates"
+            "Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates"
+        ],
+    },
+    {
+        "id": "large_dataset_batched_experiments",
+        "docs_markers": [
+            "Scaling improvements in Playground and experiments",
+            "thousands of rows",
+        ],
+        "matrix_markers": [
+            "Large-dataset batched Playground and experiment metric processing"
         ],
     },
     {
@@ -246,10 +282,15 @@ PRODUCT_RULES: list[dict[str, Any]] = [
 
 
 FALLBACK_DOCS_INDEX = "\n".join(
-    marker
-    for rule in PRODUCT_RULES
-    for marker in rule["docs_markers"]
-    if not rule.get("optional_docs")
+    [
+        *(
+            marker
+            for rule in PRODUCT_RULES
+            for marker in rule["docs_markers"]
+            if not rule.get("optional_docs")
+        ),
+        f'<Update label="{LATEST_REVIEWED_RELEASE}">',
+    ]
 )
 
 
@@ -290,6 +331,25 @@ def missing_coverage(docs_index: str, matrix: str) -> list[dict[str, Any]]:
     docs_lower = docs_index.lower()
     matrix_lower = matrix.lower()
     missing: list[dict[str, Any]] = []
+    release_dates = RELEASE_LABEL_RE.findall(docs_index)
+    latest_release = max(release_dates, default="")
+    if not release_dates:
+        missing.append(
+            {
+                "id": "release_label_not_found",
+                "reason": "release_note_date_markup_not_found",
+                "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
+            }
+        )
+    elif latest_release > LATEST_REVIEWED_RELEASE:
+        missing.append(
+            {
+                "id": "unreviewed_release",
+                "reason": "newer_release_note_detected",
+                "latest_documented_release": latest_release,
+                "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
+            }
+        )
     for rule in PRODUCT_RULES:
         docs_hits = [
             marker for marker in rule["docs_markers"] if marker.lower() in docs_lower
@@ -325,10 +385,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     matrix_path = Path(args.matrix)
     matrix = matrix_path.read_text(encoding="utf-8")
     failures = missing_coverage(docs_index, matrix)
+    release_dates = RELEASE_LABEL_RE.findall(docs_index)
     return {
         "docs_source": source,
         "matrix": str(matrix_path),
         "rules_checked": len(PRODUCT_RULES),
+        "latest_documented_release": max(release_dates, default=None),
+        "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
         "missing_coverage": failures,
         "ok": not failures,
     }

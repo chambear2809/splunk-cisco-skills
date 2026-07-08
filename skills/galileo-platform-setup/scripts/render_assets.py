@@ -8,6 +8,7 @@ only commands that reference secret file paths.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import shutil
@@ -15,6 +16,7 @@ import stat
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 
 SKILL_NAME = "galileo-platform-setup"
@@ -57,6 +59,7 @@ DIRECT_SECRET_FLAGS = {
     "--bearer-token",
     "--galileo-api-key",
     "--galileo-bearer-token",
+    "--galileo-webhook-token",
     "--hec-token",
     "--o11y-token",
     "--password",
@@ -113,7 +116,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--multimodal-quality-metrics", default="")
     parser.add_argument("--multimodal-asset-policy", default="")
     parser.add_argument("--allow-raw-media-in-splunk", action="store_true")
-    parser.add_argument("--export-format", choices=["jsonl", "csv"], default="")
+    parser.add_argument(
+        "--export-format", choices=["jsonl", "jsonl_flat", "csv"], default=""
+    )
+    parser.add_argument(
+        "--export-computed-metrics-only", choices=["true", "false"], default=""
+    )
+    parser.add_argument(
+        "--include-code-metric-metadata", choices=["true", "false"], default=""
+    )
     parser.add_argument("--redact", choices=["true", "false"], default="")
     parser.add_argument("--galileo-api-key-file", default="")
     parser.add_argument("--splunk-platform", choices=["enterprise", "cloud"], default="")
@@ -272,11 +283,17 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
             "with the user's Galileo console URL, or pass --galileo-api-base only when "
             "the user explicitly confirmed that API base."
         )
-    if not api_base:
+    if console_url:
+        validate_galileo_root_url(console_url, "Galileo console URL")
+    if api_base:
+        api_base = normalize_api_base(api_base)
+    else:
         api_base = derive_api_base(console_url)
     otel_endpoint = arg_or_spec("galileo_otel_endpoint", "galileo.otel_endpoint", "")
     if not otel_endpoint:
-        otel_endpoint = api_base.rstrip("/") + "/otel/v1/traces"
+        otel_endpoint = api_base.rstrip("/") + "/otel/traces"
+    else:
+        otel_endpoint = normalize_http_endpoint(otel_endpoint, "Galileo OTLP endpoint")
 
     multimodal_enabled_value = args.multimodal_enabled or str(
         get_nested(spec, "multimodal.enabled", "true") or "true"
@@ -284,6 +301,25 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     allow_raw_media = bool(args.allow_raw_media_in_splunk) or str(
         get_nested(spec, "multimodal.allow_raw_media_in_splunk", "false") or "false"
     ).lower() in {"1", "yes", "true"}
+    export_format = arg_or_spec("export_format", "hec_export.export_format", "jsonl")
+    if export_format not in {"csv", "jsonl", "jsonl_flat"}:
+        raise SystemExit(
+            "ERROR: hec_export.export_format must be csv, jsonl, or jsonl_flat"
+        )
+    export_computed_metrics_only = str(
+        args.export_computed_metrics_only
+        or get_nested(spec, "hec_export.export_computed_metrics_only", "false")
+        or "false"
+    ).lower() in {"1", "yes", "true"}
+    include_code_metric_metadata = str(
+        args.include_code_metric_metadata
+        or get_nested(spec, "hec_export.include_code_metric_metadata", "false")
+        or "false"
+    ).lower() in {"1", "yes", "true"}
+    if export_computed_metrics_only and export_format == "jsonl_flat":
+        raise SystemExit(
+            "ERROR: export_computed_metrics_only is not supported with jsonl_flat"
+        )
     return {
         "project_id": arg_or_spec("project_id", "galileo.project_id", ""),
         "project_name": arg_or_spec("project_name", "galileo.project_name", "galileo-project"),
@@ -334,7 +370,9 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
         "galileo_otel_endpoint": otel_endpoint,
         "experiment_id": arg_or_spec("experiment_id", "galileo.experiment_id", ""),
         "metrics_testing_id": arg_or_spec("metrics_testing_id", "galileo.metrics_testing_id", ""),
-        "export_format": arg_or_spec("export_format", "hec_export.export_format", "jsonl"),
+        "export_format": export_format,
+        "export_computed_metrics_only": export_computed_metrics_only,
+        "include_code_metric_metadata": include_code_metric_metadata,
         "redact": arg_or_spec("redact", "hec_export.redact", "true").lower() not in {"0", "false", "no"},
         "galileo_api_key_file": arg_or_spec(
             "galileo_api_key_file",
@@ -437,13 +475,85 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     }
 
 
+def validate_galileo_root_url(value: str, label: str) -> Any:
+    raw = value.strip()
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise SystemExit(f"ERROR: {label} must be an absolute HTTP(S) URL")
+    if parsed.username or parsed.password:
+        raise SystemExit(f"ERROR: {label} must not contain credentials")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(
+            f"ERROR: {label} must not contain a path, parameters, query, or fragment"
+        )
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: {label} contains an invalid port") from exc
+    if parsed.scheme == "http":
+        host = parsed.hostname.lower()
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = host == "localhost" or host.endswith(".localhost")
+        if not loopback:
+            raise SystemExit(f"ERROR: {label} must use HTTPS outside loopback testing")
+    return parsed
+
+
+def normalize_api_base(api_base: str) -> str:
+    parsed = validate_galileo_root_url(api_base, "Galileo API base")
+    return urlunparse((parsed.scheme, parsed.netloc, "", "", "", "")).rstrip("/")
+
+
+def normalize_http_endpoint(value: str, label: str) -> str:
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise SystemExit(f"ERROR: {label} must be an absolute HTTP(S) URL")
+    if parsed.username or parsed.password or parsed.params or parsed.query or parsed.fragment:
+        raise SystemExit(f"ERROR: {label} contains unsafe URL components")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: {label} contains an invalid port") from exc
+    if parsed.scheme == "http":
+        host = parsed.hostname.lower()
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = host == "localhost" or host.endswith(".localhost")
+        if not loopback:
+            raise SystemExit(f"ERROR: {label} must use HTTPS outside loopback testing")
+    return value.strip().rstrip("/")
+
+
 def derive_api_base(console_url: str) -> str:
-    url = console_url.strip().rstrip("/")
-    if not url:
-        return "https://api.galileo.ai"
-    if "://console." in url:
-        return url.replace("://console.", "://api.", 1)
-    return url.replace("console", "api", 1)
+    raw = console_url.strip()
+    if not raw:
+        raise SystemExit("ERROR: Galileo console URL is required")
+    parsed = validate_galileo_root_url(raw, "Galileo console URL")
+    host = parsed.hostname.lower()
+    if host == "app.galileo.ai":
+        api_host = "api.galileo.ai"
+    elif host.startswith("console."):
+        api_host = "api." + host[len("console.") :]
+    elif host.startswith("console-"):
+        api_host = "api-" + host[len("console-") :]
+    elif host.startswith("api.") or host.startswith("api-"):
+        api_host = host
+    else:
+        raise SystemExit(
+            "ERROR: Cannot derive the Galileo API host from this console URL. "
+            "Pass --galileo-api-base with the user-confirmed API base."
+        )
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise SystemExit("ERROR: Galileo console URL contains an invalid port") from exc
+    netloc = api_host + (f":{port}" if port is not None else "")
+    return urlunparse((parsed.scheme, netloc, "", "", "", "")).rstrip("/")
 
 
 def selected_sections(value: str, *, o11y_only: bool = False) -> list[str]:
@@ -546,6 +656,7 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_ob
   --project-name {shell_quote(config["project_name"])}
   --log-stream-name {shell_quote(config["log_stream"])}
   --api-base {shell_quote(config["galileo_api_base"])}
+  --ownership-ledger "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-ownership.json"
   --output "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-result.json")
 """
     if config["project_id"]:
@@ -571,6 +682,26 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_ob
     object_lifecycle += 'exec "${cmd[@]}"\n'
     write_text(scripts_dir / "apply-object-lifecycle.sh", object_lifecycle, executable=True)
     scripts["object-lifecycle"] = "scripts/apply-object-lifecycle.sh"
+
+    cleanup_object_lifecycle = f"""{script_header()}
+{require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
+cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py"
+  --cleanup-created
+  --galileo-api-key-file "${{GALILEO_API_KEY_FILE}}"
+  --api-base {shell_quote(config["galileo_api_base"])}
+  --ownership-ledger "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-ownership.json"
+  --output "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-cleanup-result.json")
+"""
+    if config["galileo_console_url"]:
+        cleanup_object_lifecycle += (
+            f'cmd+=(--console-url {shell_quote(config["galileo_console_url"])})\n'
+        )
+    cleanup_object_lifecycle += 'exec "${cmd[@]}"\n'
+    write_text(
+        scripts_dir / "cleanup-object-lifecycle.sh",
+        cleanup_object_lifecycle,
+        executable=True,
+    )
 
     luna_scorers = f"""{script_header()}
 {require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
@@ -638,6 +769,10 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_to
   --splunk-source {shell_quote(config["splunk_source"])}
     --splunk-sourcetype {shell_quote(config["splunk_sourcetype"])})
 """
+    if config["export_computed_metrics_only"]:
+        observe_export += "cmd+=(--export-computed-metrics-only)\n"
+    if config["include_code_metric_metadata"]:
+        observe_export += "cmd+=(--include-code-metric-metadata)\n"
     if config["splunk_host"]:
         observe_export += f'cmd+=(--splunk-host {shell_quote(config["splunk_host"])})\n'
     if config["cursor_file"]:
@@ -1121,6 +1256,18 @@ def render_readiness(output_dir: Path, config: dict[str, Any]) -> None:
             "trends": "covered_by_dashboard_detector_handoffs",
             "annotations_feedback": "covered_by_evaluate/annotation-feedback-handoff.md",
         },
+        "latest_release": {
+            "target": "2026-07-07",
+            "reviewed_at": "2026-07-08",
+            "asset": "readiness/galileo-2026-07-07-readiness.json",
+            "features": [
+                "ai_assistant_beta",
+                "global_dashboards",
+                "generic_alert_webhooks",
+                "experiment_groups",
+                "large_dataset_batched_processing",
+            ],
+        },
     }
     write_json(output_dir / "readiness/readiness-report.json", report)
     write_text(
@@ -1134,13 +1281,274 @@ echo
     )
 
 
+def render_release_2026_07_07_assets(output_dir: Path, config: dict[str, Any]) -> None:
+    release_url = "https://docs.galileo.ai/release-notes#2026-07-07"
+    write_json(
+        output_dir / "readiness/galileo-2026-07-07-readiness.json",
+        {
+            "api_version": f"{SKILL_NAME}/release-readiness/v1",
+            "release_date": "2026-07-07",
+            "reviewed_at": "2026-07-08",
+            "source": release_url,
+            "features": {
+                "ai_assistant_beta": {
+                    "status": "enterprise_console_enablement_handoff",
+                    "automation": "no_public_api_documented",
+                    "requires": [
+                        "enterprise_enablement_by_galileo_support",
+                        "configured_llm_integration",
+                    ],
+                    "grounding_inputs": [
+                        "available_traces_spans_sessions_and_evaluation_scores"
+                    ],
+                    "safety": [
+                        "read_only",
+                        "verify_ai_generated_answers_against_cited_evidence",
+                        "review_recommendations_before_applying_controls_or_metric_changes",
+                    ],
+                    "asset": "evaluate/ai-assistant-handoff.md",
+                },
+                "global_dashboards": {
+                    "status": "organization_console_handoff",
+                    "scope": "cross_project_and_log_stream",
+                    "metric_families": ["safety", "evaluations", "usage", "cost"],
+                    "automation": "no_global_dashboard_crud_in_public_v2_openapi",
+                    "asset": "dashboards/galileo-global-dashboard-handoff.md",
+                },
+                "generic_alert_webhooks": {
+                    "status": "console_configuration_plus_splunk_relay",
+                    "payload_version": "1.0",
+                    "auth_modes": ["none", "bearer_header_token", "http_basic"],
+                    "downstream_correlation_fields": ["event_id", "dedup_key"],
+                    "relay_delivery": "at_least_once_downstream_search_dedup",
+                    "assets": [
+                        "alerts/generic-webhook-handoff.md",
+                        "alerts/galileo-alert-webhook-payload.example.json",
+                        "scripts/galileo_alert_webhook_relay.py",
+                        "splunk-platform/galileo-alert-hec-event.example.json",
+                        "splunk-platform/galileo-alert-webhook-search-examples.spl",
+                    ],
+                },
+                "experiment_groups": {
+                    "status": "automated_create_or_run_assignment_plus_console_ranking_handoff",
+                    "minimum_python_sdk": "galileo>=2.2.0",
+                    "manifest_fields": ["experiment_group", "experiment_group_id"],
+                    "precedence": ["explicit_group", "dataset_group", "other_experiments"],
+                    "asset": "evaluate/experiment-groups-and-scaling-handoff.md",
+                },
+                "large_dataset_batched_processing": {
+                    "status": "galileo_managed_batching_handoff",
+                    "documented_scale": "thousands_of_rows",
+                    "client_batch_size": "not_documented",
+                    "requirements": [
+                        "do_not_impose_legacy_low_row_caps",
+                        "poll_async_job_progress",
+                        "paginate_result_reads",
+                        "preserve_dataset_and_experiment_group_lineage",
+                    ],
+                    "asset": "evaluate/experiment-groups-and-scaling-handoff.md",
+                },
+            },
+        },
+    )
+    write_text(
+        output_dir / "evaluate/ai-assistant-handoff.md",
+        f"""# Galileo AI Assistant Beta Handoff
+
+Source: {release_url}
+
+The AI Assistant is an enterprise beta in the Galileo console. Ask Galileo
+support to enable it, then confirm the project has a configured LLM integration
+(the documented prerequisite). Review whatever relevant telemetry is available,
+such as traces, spans, sessions, Signals, or evaluation scores, to assess how
+well an investigation can be grounded. Open it from a Log stream or Experiment.
+
+Treat every answer as read-only guidance. Follow its evidence links back to the
+source traces or sessions and independently verify the diagnosis. Conversations
+are saved, but context does not carry between conversations. The Assistant does
+not apply prompt, metric, or control changes; route a reviewed recommendation to
+the appropriate Evaluate workflow or Galileo Agent Observability Controls
+handoff. No public AI Assistant API is documented, so this skill does not claim
+automated enablement, querying, or remediation.
+""",
+    )
+    write_text(
+        output_dir / "evaluate/experiment-groups-and-scaling-handoff.md",
+        f"""# Galileo Experiment Groups And Large-Dataset Scaling
+
+Source: {release_url}
+
+Python experiment-group support requires `galileo>=2.2.0`. Set
+`experiment_group` or `experiment_group_id` on an experiment in
+`lifecycle/object-lifecycle-manifest.example.json`; the lifecycle helper passes
+the value to `create_experiment` and `run_experiment`. When both are set, the
+SDK gives the ID precedence. Use `list_experiment_groups` and
+`get_experiments(..., experiment_group=...)` to validate membership. Ranking
+criteria and moving existing experiments remain reviewed console/API handoffs.
+Never rename or delete system-managed groups.
+
+If no explicit group is supplied, Galileo groups dataset-backed experiments by
+dataset and places other experiments in its default group. Preserve dataset,
+model, provider, prompt-version, and group lineage when comparing or exporting
+results.
+
+Galileo now batches Playground and experiment metric processing for datasets
+with thousands of rows. The release does not document a client batch-size knob
+or exact maximum. Do not add an artificial low row cap. Let the SDK/platform
+own write batching, poll asynchronous job progress, page result reads, retain
+the source dataset, and record completion/error evidence before treating a
+large experiment as successful.
+""",
+    )
+    write_text(
+        output_dir / "dashboards/galileo-global-dashboard-handoff.md",
+        f"""# Galileo Global Dashboard Handoff
+
+Source: {release_url}
+
+Use the Galileo organization-level console to build a customizable view across
+projects and Log streams. Inventory safety, evaluation, usage, and cost metrics;
+standardize project, Log stream, environment, owner, and service names before
+charting; then verify every intended project is visible under the operator's
+RBAC scope. Capture the dashboard URL, selected time range, metric definitions,
+filters, and screenshot or export evidence for handoff.
+
+The current public v2 Trends dashboard routes remain scoped to one project and
+one Log stream. No documented global-dashboard CRUD route is present, so this
+skill treats Galileo global dashboards as a console/evidence workflow. The
+separate `dashboards/galileo-dashboard.yaml` asset builds a Splunk Observability
+Cloud dashboard and must not be described as automating Galileo's global
+dashboard.
+""",
+    )
+    webhook_payload = {
+        "version": "1.0",
+        "event": "alert.triggered",
+        "event_id": "a1b2c3d4-example",
+        "timestamp": "2026-07-07T10:30:00Z",
+        "alert": {
+            "id": "alert-id",
+            "name": "High hallucination rate",
+            "status": "triggered",
+            "previous_status": "healthy",
+        },
+        "scope": {
+            "org_id": "org-id",
+            "project_id": config["project_id"] or "project-id",
+            "project_name": config["project_name"],
+            "log_stream_id": config["log_stream_id"] or "log-stream-id",
+            "log_stream_name": config["log_stream"],
+        },
+        "conditions": [
+            {
+                "metric": "metrics/context_adherence",
+                "aggregation": "Average",
+                "operator": "less than",
+                "threshold": 0.5,
+                "observed_value": 0.34,
+            }
+        ],
+        "dedup_key": "alert-id:project-id:log-stream-id",
+        "deep_link": "https://console.galileo.ai/project/example/log-streams/example",
+        "metadata": {
+            "team": "platform",
+            "env": config["deployment_environment"],
+            "service": config["service_name"],
+        },
+    }
+    write_json(output_dir / "alerts/galileo-alert-webhook-payload.example.json", webhook_payload)
+    write_json(
+        output_dir / "splunk-platform/galileo-alert-hec-event.example.json",
+        {
+            "source": "galileo-alert-webhook",
+            "sourcetype": "galileo:alert:webhook:json",
+            "index": config["splunk_index"],
+            "fields": {
+                "galileo_alert_event_id": webhook_payload["event_id"],
+                "galileo_alert_event_type": webhook_payload["event"],
+                "galileo_alert_dedup_key": webhook_payload["dedup_key"],
+                "galileo_alert_id": webhook_payload["alert"]["id"],
+                "galileo_alert_status": webhook_payload["alert"]["status"],
+                "galileo_project_id": webhook_payload["scope"]["project_id"],
+                "galileo_log_stream_id": webhook_payload["scope"]["log_stream_id"],
+            },
+            "event": webhook_payload,
+        },
+    )
+    write_text(
+        output_dir / "alerts/generic-webhook-handoff.md",
+        f"""# Galileo Generic Alert Webhook To Splunk
+
+Source: https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs#generic-webhook-notifications
+
+Galileo configures generic webhooks in the console with no auth, a Bearer
+header token, or HTTP Basic. Credentials are write-only. Splunk HEC requires
+its own `Splunk` authorization scheme, so Galileo's Bearer mode cannot call HEC directly.
+Deploy `scripts/galileo_alert_webhook_relay.py` behind an HTTPS reverse proxy,
+configure Galileo with **Header token**, and store that distinct shared token
+and the Splunk HEC token in separate mode-0600 files.
+Keep the relay on loopback. If a container topology requires a non-loopback
+listener, `--allow-public-http-listener` is a reviewed acknowledgement and an
+operator-managed HTTPS reverse proxy remains mandatory.
+
+```bash
+python3 scripts/galileo_alert_webhook_relay.py \
+  --listen-host 127.0.0.1 \
+  --listen-port 8787 \
+  --path /galileo/alerts \
+  --galileo-webhook-token-file /run/secrets/galileo_webhook_token \
+  --splunk-hec-url {config["splunk_hec_url"] or "https://splunk.example.com:8088/services/collector/event"} \
+  --splunk-hec-token-file /run/secrets/splunk_hec_token \
+  --splunk-index {config["splunk_index"]}
+```
+
+The relay accepts the documented payload version `1.0`, preserves the complete
+event, and indexes `event_id` and `dedup_key`. Relay delivery is at-least-once:
+it deliberately does not keep local deduplication state. Use the provided
+Splunk search to suppress retries by `galileo_alert_event_id`, and use
+`galileo_alert_dedup_key` to correlate trigger and clear lifecycle events.
+Galileo does not currently document signatures or delivery retry guarantees,
+so do not claim either. Send a console test event and require Galileo to show **Active**,
+the relay to return HTTP 200, and Splunk to return one searchable event before
+enabling production notifications. Metadata values should carry team,
+environment, and service routing context without secrets.
+""",
+    )
+    write_text(
+        output_dir / "splunk-platform/galileo-alert-webhook-search-examples.spl",
+        f"""index="{config["splunk_index"]}" sourcetype="galileo:alert:webhook:json"
+| dedup galileo_alert_event_id
+| spath path=timestamp output=galileo_alert_timestamp
+| spath path=alert.name output=galileo_alert_name
+| spath path=conditions{{}}.observed_value output=galileo_observed_values
+| stats latest(galileo_alert_timestamp) as latest values(galileo_alert_status) as statuses values(galileo_observed_values) as observed_values by galileo_alert_dedup_key galileo_alert_id galileo_alert_name
+
+index="{config["splunk_index"]}" sourcetype="galileo:alert:webhook:json"
+| dedup galileo_alert_event_id
+| spath path=timestamp output=galileo_alert_timestamp
+| stats latest(galileo_alert_status) as current_status latest(galileo_alert_timestamp) as latest by galileo_alert_dedup_key galileo_project_id galileo_log_stream_id
+
+index="{config["splunk_index"]}" sourcetype="galileo:alert:webhook:json"
+| spath path=version output=galileo_payload_version
+| where isnull(galileo_alert_event_id) OR isnull(galileo_alert_dedup_key) OR galileo_payload_version!="1.0"
+| stats count by galileo_payload_version galileo_alert_event_type
+""",
+    )
+
+
 def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
     api_base = config["galileo_api_base"].rstrip("/")
     return [
         {
             "surface": "Projects",
-            "lifecycle": ["create", "get", "list", "share_rbac_review"],
-            "coverage": "automated_create_or_get_plus_readiness_handoff",
+            "lifecycle": [
+                "create",
+                "get",
+                "exact_id_owned_cleanup",
+                "list",
+                "share_rbac_review",
+            ],
+            "coverage": "automated_create_get_and_owned_cleanup_plus_readiness_handoff",
             "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json"],
             "apply_script": "scripts/apply-object-lifecycle.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/projects",
@@ -1186,16 +1594,26 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Log streams",
-            "lifecycle": ["create", "get", "list", "enable_metrics"],
-            "coverage": "automated_create_or_get_and_optional_metric_enablement",
+            "lifecycle": [
+                "create_in_owned_disposable_project",
+                "project_scoped_name_get_with_exact_id_verification",
+                "list",
+                "enable_metrics_on_newly_created_owned_stream_only",
+            ],
+            "coverage": "automated_get_and_owned_project_create_with_fail_closed_metric_enablement",
             "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json"],
             "apply_script": "scripts/apply-object-lifecycle.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/log_streams",
         },
         {
             "surface": "Datasets",
-            "lifecycle": ["create", "get", "version_review", "delete_handoff"],
-            "coverage": "automated_create_from_manifest_or_dataset_dir",
+            "lifecycle": [
+                "project_scoped_create",
+                "project_scoped_get",
+                "version_review",
+                "owned_exact_id_delete_with_project_validation",
+            ],
+            "coverage": "automated_project_scoped_create_get_and_owned_cleanup",
             "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
             "apply_script": "scripts/apply-object-lifecycle.sh",
             "docs": "https://docs.galileo.ai/sdk-api/experiments/datasets",
@@ -1230,8 +1648,8 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Prompts",
-            "lifecycle": ["create", "get", "list", "version_review", "delete_handoff"],
-            "coverage": "automated_create_from_manifest",
+            "lifecycle": ["create", "get", "list", "version_review", "owned_exact_id_delete"],
+            "coverage": "automated_create_get_and_owned_cleanup_from_manifest",
             "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
             "apply_script": "scripts/apply-object-lifecycle.sh",
             "docs": "https://docs.galileo.ai/sdk-api/experiments/prompts",
@@ -1261,15 +1679,40 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "surface": "Experiment groups, tags, comparison, search, and metric settings",
             "lifecycle": [
-                "experiment_group_review",
+                "experiment_group_name_or_id_assignment",
+                "experiment_group_auto_create_by_name",
+                "list_and_filter_groups_handoff",
+                "dataset_default_group_validation",
+                "weighted_ranking_handoff",
                 "experiment_tags_handoff",
                 "comparison_handoff",
                 "search_and_metrics_handoff",
             ],
-            "coverage": "rendered_handoff_with_experiment_create_or_run_automation",
-            "rendered_assets": ["evaluate/experiment-handoff.md", "lifecycle/product-coverage-matrix.json"],
+            "coverage": "automated_group_assignment_for_create_or_run_plus_list_rank_move_handoffs",
+            "rendered_assets": [
+                "evaluate/experiment-groups-and-scaling-handoff.md",
+                "lifecycle/object-lifecycle-manifest.example.json",
+                "lifecycle/product-coverage-matrix.json",
+            ],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/experiments/experiment-groups",
+        },
+        {
+            "surface": "Large-dataset Playground and experiment batched processing",
+            "lifecycle": [
+                "thousands_of_rows_readiness",
+                "server_managed_metric_batching",
+                "async_progress_polling_handoff",
+                "paginated_results_handoff",
+                "resume_and_completion_evidence",
+            ],
+            "coverage": "rendered_scale_handoff_without_undocumented_client_batch_controls",
+            "rendered_assets": [
+                "evaluate/experiment-groups-and-scaling-handoff.md",
+                "readiness/galileo-2026-07-07-readiness.json",
+            ],
             "apply_script": "scripts/apply-evaluate-assets.sh",
-            "docs": "https://docs.galileo.ai/sdk-api/python/reference/experiments",
+            "docs": "https://docs.galileo.ai/release-notes#2026-07-07",
         },
         {
             "surface": "Experiment columns, metrics APIs, and paginated search",
@@ -1635,9 +2078,26 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Galileo alerts and notifications",
-            "lifecycle": ["email_alert_handoff", "slack_webhook_handoff", "metric_threshold_handoff"],
-            "coverage": "rendered_handoff_and_splunk_detector_mapping",
-            "rendered_assets": ["detectors/galileo-detectors.yaml", "readiness/readiness-report.json"],
+            "lifecycle": [
+                "email_alert_handoff",
+                "slack_webhook_handoff",
+                "generic_webhook_console_handoff",
+                "none_bearer_basic_auth_review",
+                "payload_v1_schema_validation",
+                "downstream_search_event_id_deduplication",
+                "dedup_key_trigger_clear_correlation",
+                "metadata_routing",
+                "splunk_hec_auth_relay",
+                "metric_threshold_handoff",
+            ],
+            "coverage": "rendered_generic_webhook_relay_schema_and_splunk_detector_mapping",
+            "rendered_assets": [
+                "alerts/generic-webhook-handoff.md",
+                "alerts/galileo-alert-webhook-payload.example.json",
+                "scripts/galileo_alert_webhook_relay.py",
+                "splunk-platform/galileo-alert-webhook-search-examples.spl",
+                "detectors/galileo-detectors.yaml",
+            ],
             "apply_script": "scripts/apply-detectors.sh",
             "docs": "https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs",
         },
@@ -1721,6 +2181,42 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "rendered_assets": ["dashboards/galileo-dashboard.yaml", "detectors/galileo-detectors.yaml"],
             "apply_script": "scripts/apply-dashboards.sh",
             "docs": "https://docs.galileo.ai/api-reference/trends_dashboard/get-trends",
+        },
+        {
+            "surface": "Global dashboards across projects and Log streams",
+            "lifecycle": [
+                "organization_console_handoff",
+                "cross_project_metric_inventory",
+                "safety_evaluation_usage_cost_views",
+                "rbac_scope_validation",
+                "dashboard_url_filter_and_screenshot_evidence",
+                "public_api_gap_guardrail",
+            ],
+            "coverage": "rendered_console_handoff_without_undocumented_global_dashboard_crud",
+            "rendered_assets": [
+                "dashboards/galileo-global-dashboard-handoff.md",
+                "readiness/galileo-2026-07-07-readiness.json",
+            ],
+            "apply_script": "scripts/apply-dashboards.sh",
+            "docs": "https://docs.galileo.ai/release-notes#2026-07-07",
+        },
+        {
+            "surface": "AI Assistant (beta) investigations",
+            "lifecycle": [
+                "enterprise_enablement_handoff",
+                "llm_integration_readiness",
+                "log_stream_and_experiment_investigations",
+                "trace_span_session_eval_evidence_links",
+                "read_only_recommendation_review",
+                "agent_control_or_evaluate_followup",
+            ],
+            "coverage": "rendered_console_readiness_and_evidence_handoff_without_undocumented_api_claims",
+            "rendered_assets": [
+                "evaluate/ai-assistant-handoff.md",
+                "readiness/galileo-2026-07-07-readiness.json",
+            ],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/concepts/ai-assistant",
         },
         {
             "surface": "Run insights, health scores, and token usage",
@@ -1858,12 +2354,39 @@ def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
             {
                 "name": f"{config['project_name']}-baseline",
                 "mode": "create_only",
+                "experiment_group": f"{config['project_name']} Baselines",
+                "experiment_group_id": "",
                 "dataset_name": "",
                 "prompt_name": "",
                 "metrics": metrics,
                 "tags": {"source": SKILL_NAME},
             }
         ],
+        "experiment_processing": {
+            "minimum_group_sdk": "galileo>=2.2.0",
+            "large_dataset_batching": "managed_by_galileo",
+            "documented_scale": "thousands_of_rows",
+            "client_batch_size": "not_documented_do_not_invent",
+            "validation": [
+                "poll_async_job_progress",
+                "page_result_reads",
+                "record_completion_and_error_evidence",
+            ],
+        },
+        "ownership_cleanup": {
+            "ledger": "lifecycle/object-lifecycle-ownership.json",
+            "cleanup_script": "scripts/cleanup-object-lifecycle.sh",
+            "exact_id_only": True,
+            "dataset_delete_requires_project_association": True,
+            "project_delete_covers_child_objects": True,
+            "metric_enablement": "newly_created_owned_log_stream_only",
+            "existing_project_child_cleanup": {
+                "dataset": "exact_id_with_project_validation",
+                "prompt": "exact_id",
+                "log_stream_experiment_protect_stage": "fail_closed_before_create",
+            },
+            "update_existing_dataset_rows": "creates_version_no_automatic_rollback",
+        },
         "protect_stages": [
             {
                 "name": "production",
@@ -2038,6 +2561,8 @@ log_stream:
 experiments:
   experiment_id: {json.dumps(config["experiment_id"])}
   metrics_testing_id: {json.dumps(config["metrics_testing_id"])}
+  experiment_groups: automated_for_create_and_run_with_galileo_sdk_2_2_or_later
+  large_dataset_batching: galileo_managed_no_documented_client_batch_size
 coverage:
   evaluate: rendered_handoff
   object_lifecycle: lifecycle/object-lifecycle-manifest.example.json
@@ -2049,6 +2574,10 @@ coverage:
   datasets: operator_review
   annotations_feedback: rendered_handoff
   signals_trends: rendered_handoff
+  ai_assistant_beta: evaluate/ai-assistant-handoff.md
+  experiment_groups_and_scaling: evaluate/experiment-groups-and-scaling-handoff.md
+  global_dashboards: dashboards/galileo-global-dashboard-handoff.md
+  generic_alert_webhooks: alerts/generic-webhook-handoff.md
   product_coverage_matrix: lifecycle/product-coverage-matrix.json
 """,
     )
@@ -2068,6 +2597,13 @@ coverage before enabling production dashboards or detectors. For multi-model
 comparison, run the same dataset and metric set across model variants, then
 track model name, provider, prompt version, and experiment group in tags or
 metadata so Splunk searches can compare outputs without mixing cohorts.
+
+For Galileo 2.2.0 and later, set `experiment_group` or
+`experiment_group_id` in the lifecycle manifest. See
+`evaluate/experiment-groups-and-scaling-handoff.md` for default dataset
+grouping, weighted ranking, and the large-dataset batched-processing readiness workflow.
+This asset is a readiness and evidence handoff; it does not itself execute a
+thousand-row experiment or implement Galileo's server-managed batch polling.
 """,
     )
     write_text(
@@ -2415,6 +2951,8 @@ SPLUNK_SOURCETYPE={shell_quote(config["splunk_sourcetype"])}
             "root_type": config["root_type"],
             "export_format": config["export_format"],
             "redact": config["redact"],
+            "export_computed_metrics_only": config["export_computed_metrics_only"],
+            "include_code_metric_metadata": config["include_code_metric_metadata"],
             "log_stream_id": config["log_stream_id"] or None,
             "experiment_id": config["experiment_id"] or None,
             "metrics_testing_id": config["metrics_testing_id"] or None,
@@ -2543,7 +3081,7 @@ def render_otel(output_dir: Path, config: dict[str, Any]) -> None:
 
 exporters:
   otlphttp/galileo:
-    endpoint: {config["galileo_otel_endpoint"]}
+    traces_endpoint: {config["galileo_otel_endpoint"]}
     headers:
       Galileo-API-Key: ${{env:GALILEO_API_KEY}}
       project: {config["project_name"]}
@@ -2703,10 +3241,13 @@ def build_apply_plan(
             "handoff": "handoff.md",
             "runtime": "runtime/",
             "readiness": "readiness/",
+            "latest_release": "readiness/galileo-2026-07-07-readiness.json",
             "lifecycle": "lifecycle/",
             "evaluate": "evaluate/",
+            "alerts": "alerts/",
             "multimodal": "multimodal/",
             "controls": "controls/",
+            "dashboards": "dashboards/",
             "splunk_platform": "splunk-platform/",
             "otel": "otel/",
             "scripts": "scripts/",
@@ -2770,6 +3311,17 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
                 "domain_count": len(product_coverage_matrix(config)),
                 "asset": "lifecycle/product-coverage-matrix.json",
             },
+            "galileo_release_2026_07_07": {
+                "status": "automated_where_documented_plus_guarded_console_handoffs",
+                "asset": "readiness/galileo-2026-07-07-readiness.json",
+                "covers": [
+                    "ai_assistant_beta_readiness",
+                    "global_dashboard_console_evidence",
+                    "generic_alert_webhook_v1_relay_to_splunk_hec",
+                    "experiment_group_create_and_run_assignment",
+                    "large_dataset_batched_processing_readiness_handoff",
+                ],
+            },
             "galileo_export_records_to_splunk_hec": {
                 "status": "automated",
                 "script": "scripts/galileo_to_splunk_hec.py",
@@ -2789,7 +3341,7 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             },
             "galileo_evaluate_experiments_datasets_annotations": {
                 "status": "automated_lifecycle_plus_rendered_handoff",
-                "assets": ["evaluate/", "lifecycle/"],
+                "assets": ["evaluate/", "lifecycle/", "alerts/"],
             },
             "galileo_multimodal_observability": {
                 "status": "rendered_handoff",
@@ -2847,6 +3399,13 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
     lines.extend(
         [
             "",
+            "## Galileo 2026-07-07 Release",
+            "- AI Assistant beta: `evaluate/ai-assistant-handoff.md`",
+            "- Global dashboards: `dashboards/galileo-global-dashboard-handoff.md`",
+            "- Generic alert webhook relay: `alerts/generic-webhook-handoff.md`",
+            "- Experiment groups and large datasets: `evaluate/experiment-groups-and-scaling-handoff.md`",
+            "- Machine-readable readiness: `readiness/galileo-2026-07-07-readiness.json`",
+            "",
             "## Delegation Targets",
             "- `object-lifecycle` -> `galileo-platform-setup`",
             "- `splunk-hec` -> `splunk-hec-service-setup`",
@@ -2867,7 +3426,12 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
 
 
 def maybe_copy_runtime_scripts(output_dir: Path) -> None:
-    for name in ("galileo_to_splunk_hec.py", "galileo_object_lifecycle.py", "galileo_luna_scorers.py"):
+    for name in (
+        "galileo_to_splunk_hec.py",
+        "galileo_object_lifecycle.py",
+        "galileo_luna_scorers.py",
+        "galileo_alert_webhook_relay.py",
+    ):
         source = Path(__file__).with_name(name)
         if not source.is_file():
             continue
@@ -2890,6 +3454,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     render_readiness(output_dir, config)
+    render_release_2026_07_07_assets(output_dir, config)
     render_object_lifecycle(output_dir, config)
     render_runtime(output_dir, config)
     render_evaluate_assets(output_dir, config)

@@ -44,6 +44,11 @@ logging needs a separate `notify`-based bridge that runs after `turn-ended`,
 parses the local Codex session JSONL, and writes a Galileo `codex.turn` trace
 through the Galileo trace ingest API.
 
+Those traces can ground Galileo AI Assistant beta investigations, but this
+skill does not enable or query the Assistant. Use `galileo-platform-setup` for
+enterprise enablement, LLM-integration readiness, evidence-link verification,
+and reviewed-remediation handoffs for the July 7, 2026 Galileo release.
+
 ## Safety Rules
 
 - Never pass Splunk tokens on argv.

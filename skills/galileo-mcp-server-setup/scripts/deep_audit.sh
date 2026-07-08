@@ -15,6 +15,7 @@ JSON_OUTPUT=false
 TEMP_OUTPUT=false
 LOOSE_KEY=""
 EMPTY_KEY=""
+UNSAFE_SECRET_FIXTURE=""
 EXPECTED_FAILURE_OUT="/tmp/galileo-mcp-expected-failure.out"
 
 cleanup() {
@@ -24,6 +25,9 @@ cleanup() {
     fi
     if [[ -n "${EMPTY_KEY}" ]]; then
         rm -f "${EMPTY_KEY}"
+    fi
+    if [[ -n "${UNSAFE_SECRET_FIXTURE}" ]]; then
+        rm -f "${UNSAFE_SECRET_FIXTURE}"
     fi
     if [[ "${TEMP_OUTPUT}" == "true" && "${KEEP_OUTPUT}" != "true" && -n "${OUTPUT_DIR}" ]]; then
         rm -rf "${OUTPUT_DIR}"
@@ -102,6 +106,45 @@ run_step python3 -m py_compile \
     "${SCRIPT_DIR}/probe_mcp.py" \
     "${SCRIPT_DIR}/audit_product_coverage.py"
 
+run_step python3 - "${SCRIPT_DIR}" <<'PY'
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(sys.argv[1])))
+import probe_mcp  # noqa: E402
+import render_assets  # noqa: E402
+
+expected = "https://api.galileo.ai/mcp/http/mcp"
+for module in (probe_mcp, render_assets):
+    actual = module.derive_mcp_url("", "https://app.galileo.ai")
+    if actual != expected:
+        raise SystemExit(f"{module.__name__} app URL derivation returned {actual!r}")
+    loopback = module.derive_mcp_url("http://127.0.0.1:43199/mcp/http/mcp", "")
+    if loopback != "http://127.0.0.1:43199/mcp/http/mcp":
+        raise SystemExit(f"{module.__name__} rejected loopback HTTP validation")
+    try:
+        module.derive_mcp_url("http://api.galileo.ai/mcp/http/mcp", "")
+    except ValueError:
+        pass
+    else:
+        raise SystemExit(f"{module.__name__} accepted non-loopback cleartext HTTP")
+
+clean_report = {
+    "server_drift": [],
+    "unknown_tools": [],
+    "missing_tools": [],
+    "schema_drift": [],
+    "prompts_count": 0,
+    "resources_count": 0,
+}
+if probe_mcp.report_has_drift(clean_report):
+    raise SystemExit("clean MCP report was classified as drift")
+server_drift_report = {**clean_report, "server_drift": [{"field": "version"}]}
+if not probe_mcp.report_has_drift(server_drift_report):
+    raise SystemExit("server identity/version drift was not classified as drift")
+print("MCP URL derivation and drift classification checks passed.")
+PY
+
 if command -v ruff >/dev/null 2>&1; then
     run_step ruff check \
         "${SCRIPT_DIR}/render_assets.py" \
@@ -143,9 +186,17 @@ run_step bash "${SCRIPT_DIR}/setup.sh" \
     --output-dir "${OUTPUT_DIR}-spec"
 
 if command -v node >/dev/null 2>&1; then
+    run_step node --check "${SKILL_DIR}/assets/stdio_streamable_http_bridge.js"
     run_step node --check "${OUTPUT_DIR}/mcp/run-galileo-mcp.js"
 else
     log "deep-audit: node not found; skipping generated JS check."
+fi
+
+if grep -R -n 'mcp-remote' \
+    "${OUTPUT_DIR}/mcp/run-galileo-mcp.js" \
+    "${OUTPUT_DIR}/mcp/run-galileo-mcp.sh"; then
+    log "ERROR: rendered bridge unexpectedly depends on mcp-remote."
+    exit 1
 fi
 
 run_step bash -n \
@@ -174,13 +225,46 @@ gap = json.loads((root / "coverage/product-gap-matrix.json").read_text(encoding=
 
 if metadata["expected_tool_count"] != catalog["tool_count"]:
     raise SystemExit("metadata/tool-catalog tool counts differ")
-if len(gap.get("product_gap_matrix") or []) < 18:
+if metadata.get("expected_server") != {
+    "name": "EvalsInIDEServer",
+    "version_observed": "1.28.1",
+}:
+    raise SystemExit("metadata server identity/version is stale")
+if metadata.get("tool_catalog_reviewed") != "2026-07-08":
+    raise SystemExit("metadata catalog review date is stale")
+if catalog.get("observed_server") != {
+    "name": "EvalsInIDEServer",
+    "version": "1.28.1",
+}:
+    raise SystemExit("tool catalog server identity/version is stale")
+if catalog.get("reviewed_on") != "2026-07-08":
+    raise SystemExit("tool catalog review date is stale")
+if catalog.get("tool_count") != 9:
+    raise SystemExit("observed MCP tool count changed")
+if len(gap.get("product_gap_matrix") or []) < 32:
     raise SystemExit("product gap matrix is unexpectedly narrow")
 for tool in catalog["tools"]:
     if len(tool["schema_sha256"]) != 64:
         raise SystemExit(f"invalid schema hash for {tool['name']}")
 
-text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in root.rglob("*") if p.is_file())
+readme = (root / "mcp" / "README.md").read_text(encoding="utf-8")
+for marker in [
+    "July 7, 2026 product boundaries",
+    "AI Assistant beta",
+    "Global dashboards",
+    "Generic alert webhooks",
+    "Python SDK >=2.2.0",
+    "Large-dataset Playground",
+    "galileo-platform-setup",
+]:
+    if marker not in readme:
+        raise SystemExit(f"generated README missing boundary marker: {marker}")
+
+text = "\n".join(
+    p.read_text(encoding="utf-8", errors="ignore")
+    for p in root.rglob("*")
+    if p.is_file()
+)
 checks = [
     ("placeholder YOUR-API-KEY", "YOUR-API-KEY" in text),
     ("inline bearer token-like value", re.search(r"Bearer [A-Za-z0-9._-]{12,}", text)),
@@ -194,6 +278,13 @@ for reason, matched in checks:
         raise SystemExit(reason)
 print("Generated artifact deep audit passed.")
 PY
+
+UNSAFE_SECRET_FIXTURE="${OUTPUT_DIR}/mcp/unsafe-inline-secret.txt"
+printf 'GALILEO_API_KEY=definitely-inline-secret\n' >"${UNSAFE_SECRET_FIXTURE}"
+expect_failure "inline API key assignment rejection" \
+    bash "${SCRIPT_DIR}/validate.sh" --output-dir "${OUTPUT_DIR}"
+rm -f "${UNSAFE_SECRET_FIXTURE}"
+UNSAFE_SECRET_FIXTURE=""
 
 expect_failure "direct secret flag rejection" \
     bash "${SCRIPT_DIR}/setup.sh" --authorization=secret-value
@@ -225,6 +316,68 @@ if [[ "${SKIP_LIVE}" != "true" ]]; then
         PRODUCT_ARGS+=(--offline)
     fi
     run_step python3 "${SCRIPT_DIR}/probe_mcp.py" "${PROBE_ARGS[@]}"
+    if command -v node >/dev/null 2>&1; then
+        run_step python3 - "${OUTPUT_DIR}" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path(sys.argv[1])
+metadata = json.loads((root / "metadata.json").read_text(encoding="utf-8"))
+messages = [
+    {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "galileo-skill-deep-audit", "version": "1"},
+        },
+    },
+    {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    {"jsonrpc": "2.0", "id": 3, "method": "prompts/list", "params": {}},
+    {"jsonrpc": "2.0", "id": 4, "method": "resources/list", "params": {}},
+]
+env = dict(os.environ)
+env.update(
+    GALILEO_MCP_URL=metadata["mcp_url"],
+    GALILEO_API_KEY="non-secret-catalog-probe",
+    GALILEO_MCP_TIMEOUT_MS="20000",
+)
+result = subprocess.run(
+    ["node", str(root / "mcp/run-galileo-mcp.js")],
+    input="".join(json.dumps(message) + "\n" for message in messages),
+    text=True,
+    capture_output=True,
+    env=env,
+    timeout=40,
+    check=False,
+)
+if result.returncode != 0:
+    raise SystemExit("rendered stdio bridge live probe exited nonzero")
+responses = {
+    message.get("id"): message
+    for line in result.stdout.splitlines()
+    if (message := json.loads(line)).get("id") is not None
+}
+server = responses.get(1, {}).get("result", {}).get("serverInfo", {})
+if server != {"name": "EvalsInIDEServer", "version": "1.28.1"}:
+    raise SystemExit(f"rendered bridge server identity drift: {server!r}")
+if len(responses.get(2, {}).get("result", {}).get("tools", [])) != 9:
+    raise SystemExit("rendered bridge live tools/list count changed")
+if responses.get(3, {}).get("result", {}).get("prompts") != []:
+    raise SystemExit("rendered bridge live prompts/list changed")
+if responses.get(4, {}).get("result", {}).get("resources") != []:
+    raise SystemExit("rendered bridge live resources/list changed")
+print("Rendered stdio bridge live initialize/catalog probe passed.")
+PY
+    else
+        log "deep-audit: node not found; skipping rendered bridge live probe."
+    fi
     run_step python3 "${SCRIPT_DIR}/audit_product_coverage.py" "${PRODUCT_ARGS[@]}"
 else
     run_step python3 "${SCRIPT_DIR}/audit_product_coverage.py" --offline

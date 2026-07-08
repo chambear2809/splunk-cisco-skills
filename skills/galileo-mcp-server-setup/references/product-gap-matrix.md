@@ -8,7 +8,11 @@
 | Dataset versioning, content update, download, sharing, and collaborators | Not MCP server setup | `galileo-platform-setup` for dataset lifecycle and access governance |
 | Prompt template creation | Partial MCP coverage | `galileo-platform-setup` for prompt manifests/versioning |
 | Experiment setup | Guidance only | `galileo-platform-setup` for create/run assets |
-| Experiment groups, comparison, ranking, playground runs, and unit-test gates | Guidance or docs-search only | `galileo-platform-setup` for experiment group and CI workflow handoffs |
+| AI Assistant beta, evidence-linked investigation, and enterprise enablement | Docs-search only; no public Assistant API or MCP tool documented | `galileo-platform-setup` for AI Assistant readiness, enablement, and console evidence |
+| Global dashboards across projects and log streams | Docs-search only; public Trends API remains log-stream scoped | `galileo-platform-setup` for global-dashboard UI readiness and evidence |
+| Generic alert webhooks, payload v1.0, authentication, testing, and deduplication | Docs-search only; no public alert/webhook CRUD API or MCP tool documented | `galileo-platform-setup` for webhook runbooks, receiver/relay design, and validation |
+| Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates | Guidance or docs-search only | `galileo-platform-setup` for experiment group and CI workflow handoffs |
+| Large-dataset batched Playground and experiment metric processing | Dataset creation/status only; no batched experiment-execution MCP tool | `galileo-platform-setup` for batched execution, progress, and result validation; do not claim an undocumented exact maximum |
 | Projects, project sharing, users, groups, RBAC, SSO, and API keys | Not MCP server setup | `galileo-platform-setup` for enterprise/admin readiness |
 | Log stream signals/insights | Tenant-read MCP coverage | `galileo-platform-setup` for metrics/trends/export context |
 | Observe traces, sessions, spans, exports, metrics, run insights, and alerts | Not MCP server setup | `galileo-platform-setup` for Observe runtime/export and Splunk wiring |

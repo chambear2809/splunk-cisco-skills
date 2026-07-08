@@ -33,18 +33,22 @@ default Galileo Cloud instance.
 
 Pass the URL as `--galileo-console-url "$GALILEO_CONSOLE_URL"` or set
 `galileo.console_url` in the spec. The renderer derives the MCP URL from that
-console URL unless the user provides a specific `--mcp-url`.
+console URL unless the user provides a specific `--mcp-url`. HTTPS is required
+for every non-loopback console and MCP endpoint; cleartext HTTP is accepted
+only for `localhost`, `*.localhost`, or loopback IP validation fixtures.
 
 ## Supported Paths
 
 1. **Client setup**: render Cursor, VS Code, Codex, Claude Code, and AWS Kiro
    configs for `https://api.galileo.ai/mcp/http/mcp` or a self-hosted Galileo
    deployment.
-2. **Secret-safe bridges**: use environment placeholders or local
-   `.env.galileo-mcp` bridge files; never inline Galileo API keys.
+2. **Secret-safe bridges**: use environment placeholders or owner-only local
+   `.env.galileo-mcp` bridge files; never inline Galileo API keys. The rendered
+   dependency-free Node.js bridge translates stdio JSON-RPC to Streamable HTTP
+   directly; it does not rely on `mcp-remote`.
 3. **Tool inventory**: probe `initialize`, `tools/list`, `prompts/list`, and
-   `resources/list` without credentials, then compare live tool names and
-   schemas with the checked-in catalog.
+   `resources/list` without credentials, then compare live server identity,
+   version, tool names, and schemas with the checked-in catalog.
 4. **Risk gating**: treat dataset and prompt creation tools as
    write/generation tools that require explicit operator review.
 5. **Observability handoff**: render a Python MCP client + `add_tool_span`
@@ -60,6 +64,28 @@ console URL unless the user provides a specific `--mcp-url`.
      Python/TypeScript SDK reference work, provider/cost management, and any
      other Galileo capability outside the live MCP tool catalog: explicit
      handoff, not silent omission
+
+### July 7, 2026 product boundaries
+
+The July 7 release adds platform capabilities, not new tools in the observed
+9-tool MCP catalog. Keep these explicit when planning MCP client setup:
+
+- AI Assistant is an enterprise beta console feature that requires a configured
+  LLM integration and support enablement. It is currently read-only and has no
+  documented public Assistant API or MCP tool. Hand off readiness, enablement,
+  and console evidence to `galileo-platform-setup`.
+- Global dashboards span projects and log streams in the console. The documented
+  public Trends API remains project/log-stream scoped, so do not claim global
+  dashboard CRUD automation; hand off UI readiness and evidence.
+- Generic alert webhooks support None, Bearer, or Basic authentication and a
+  version 1.0 payload, but no public webhook/alert CRUD API or MCP tool is
+  documented. Hand off receiver or relay design, configuration, and validation.
+- Experiment groups require Galileo Python SDK 2.2.0 or later. The MCP
+  `setup_galileo_experiment` tool provides guidance only; group lifecycle,
+  comparison, and ranking remain a platform handoff.
+- Large-dataset Playground and experiment metric processing now uses batching.
+  Galileo does not document an exact maximum or client-side batch-size control;
+  MCP dataset creation/status does not automate batched experiment execution.
 
 ## Safe First Command
 
@@ -141,9 +167,28 @@ Use file-based or client-side secret injection only:
 - `${input:galileo-api-key}` for VS Code prompt-string workflows
 - `.env.galileo-mcp` local-only bridge file for Codex, Claude Code, and Kiro
 
+Run `chmod 600 mcp/.env.galileo-mcp` after copying the example. The bridge also
+checks a referenced `GALILEO_API_KEY_FILE` for owner-only permissions. The
+lab-only `GALILEO_MCP_ALLOW_LOOSE_KEY_PERMS=1` override is never rendered or
+enabled automatically.
+
+The bridge sends `Accept: application/json, text/event-stream`, captures and
+propagates `Mcp-Session-Id`, sends the negotiated `MCP-Protocol-Version`, and
+supports JSON and SSE responses for initialize, notifications, tools, prompts,
+and resources. HTTP redirects are rejected so the Galileo API key cannot be
+forwarded to another origin. The initialize/initialized exchange is ordered;
+subsequent POSTs are concurrent so `notifications/cancelled` can bypass the
+tool request it cancels. Server SSE is bounded per event and reconnects with
+capped exponential backoff; a server that rejects GET disables that optional
+stream without affecting POST calls.
+
 Never pass API keys in chat or argv. Direct secret flags such as
 `--galileo-api-key`, `--api-key`, `--token`, `--password`, and
 `--authorization` are rejected.
+
+The optional authenticated `/v2/current_user` probe rejects HTTP redirects and
+returns only status plus response-key names. It never forwards the
+`Galileo-API-Key` header to a redirect target or includes its value in errors.
 
 ## Tool Groups
 

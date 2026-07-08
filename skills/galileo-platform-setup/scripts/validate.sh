@@ -53,6 +53,7 @@ check_file "${OUTPUT_DIR}/apply-plan.json"
 check_file "${OUTPUT_DIR}/coverage-report.json"
 check_file "${OUTPUT_DIR}/handoff.md"
 check_file "${OUTPUT_DIR}/readiness/readiness-report.json"
+check_file "${OUTPUT_DIR}/readiness/galileo-2026-07-07-readiness.json"
 check_exec "${OUTPUT_DIR}/readiness/healthcheck.sh"
 check_file "${OUTPUT_DIR}/lifecycle/object-lifecycle-manifest.example.json"
 check_file "${OUTPUT_DIR}/lifecycle/luna-scorer-map.example.json"
@@ -61,7 +62,11 @@ check_file "${OUTPUT_DIR}/lifecycle/product-coverage-matrix.md"
 check_file "${OUTPUT_DIR}/runtime/python-opentelemetry-env.sh"
 check_file "${OUTPUT_DIR}/runtime/python-galileo-protect.py"
 check_file "${OUTPUT_DIR}/evaluate/evaluate-assets.yaml"
+check_file "${OUTPUT_DIR}/evaluate/ai-assistant-handoff.md"
+check_file "${OUTPUT_DIR}/evaluate/experiment-groups-and-scaling-handoff.md"
 check_file "${OUTPUT_DIR}/evaluate/multimodal-metrics-handoff.yaml"
+check_file "${OUTPUT_DIR}/alerts/generic-webhook-handoff.md"
+check_file "${OUTPUT_DIR}/alerts/galileo-alert-webhook-payload.example.json"
 check_file "${OUTPUT_DIR}/multimodal/multimodal-observability.md"
 check_file "${OUTPUT_DIR}/multimodal/multimodal-intake.example.json"
 check_file "${OUTPUT_DIR}/controls/agent-observability-controls.md"
@@ -69,10 +74,15 @@ check_file "${OUTPUT_DIR}/controls/control-intake.example.json"
 check_file "${OUTPUT_DIR}/controls/splunk-search-examples.spl"
 check_file "${OUTPUT_DIR}/splunk-platform/hec-event-sample.json"
 check_file "${OUTPUT_DIR}/splunk-platform/export-records-request.json"
+check_file "${OUTPUT_DIR}/splunk-platform/galileo-alert-hec-event.example.json"
+check_file "${OUTPUT_DIR}/splunk-platform/galileo-alert-webhook-search-examples.spl"
 check_file "${OUTPUT_DIR}/splunk-platform/multimodal-search-examples.spl"
 check_file "${OUTPUT_DIR}/otel/collector-galileo-fanout.yaml"
+check_file "${OUTPUT_DIR}/dashboards/galileo-global-dashboard-handoff.md"
+check_exec "${OUTPUT_DIR}/scripts/galileo_alert_webhook_relay.py"
 check_exec "${OUTPUT_DIR}/scripts/apply-readiness.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-object-lifecycle.sh"
+check_exec "${OUTPUT_DIR}/scripts/cleanup-object-lifecycle.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-luna-scorers.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-export.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-runtime.sh"
@@ -133,8 +143,20 @@ multimodal = coverage.get("coverage", {}).get("galileo_multimodal_observability"
 if multimodal.get("status") != "rendered_handoff":
     raise SystemExit("coverage report must include Galileo multimodal observability handoff coverage")
 full_matrix = coverage.get("coverage", {}).get("galileo_full_feature_coverage_matrix", {})
-if full_matrix.get("status") != "rendered" or full_matrix.get("domain_count", 0) < 53:
+if full_matrix.get("status") != "rendered" or full_matrix.get("domain_count", 0) < 57:
     raise SystemExit("coverage report must include the full Galileo feature coverage matrix")
+release = coverage.get("coverage", {}).get("galileo_release_2026_07_07", {})
+expected_release_features = {
+    "ai_assistant_beta_readiness",
+    "global_dashboard_console_evidence",
+    "generic_alert_webhook_v1_relay_to_splunk_hec",
+    "experiment_group_create_and_run_assignment",
+    "large_dataset_batched_processing_readiness_handoff",
+}
+if release.get("status") != "automated_where_documented_plus_guarded_console_handoffs":
+    raise SystemExit("coverage report must include Galileo 2026-07-07 release coverage")
+if set(release.get("covers") or []) != expected_release_features:
+    raise SystemExit("Galileo 2026-07-07 release feature coverage is incomplete")
 matrix = json.loads(Path(sys.argv[1]).with_name("lifecycle").joinpath("product-coverage-matrix.json").read_text(encoding="utf-8"))
 surfaces = {item.get("surface") for item in matrix}
 for surface in (
@@ -150,6 +172,7 @@ for surface in (
     "Prompt templates, rendering, and version utilities",
     "Experiments",
     "Experiment groups, tags, comparison, search, and metric settings",
+    "Large-dataset Playground and experiment batched processing",
     "Experiment columns, metrics APIs, and paginated search",
     "Evaluate workflow runs",
     "Python and TypeScript SDK parity",
@@ -181,6 +204,8 @@ for surface in (
     "Annotation templates, ratings, and queues",
     "Feedback templates and ratings",
     "Trends dashboards, widgets, sections, Signals, and insights",
+    "Global dashboards across projects and Log streams",
+    "AI Assistant (beta) investigations",
     "Run insights, health scores, and token usage",
     "Jobs, async tasks, validation status, and progress polling",
     "Search, runs, traces SDK utilities, decorators, handlers, and wrappers",
@@ -194,13 +219,60 @@ for surface in (
 ):
     if surface not in surfaces:
         raise SystemExit(f"product coverage matrix missing {surface}")
+release_readiness = json.loads(
+    Path(sys.argv[1]).with_name("readiness").joinpath("galileo-2026-07-07-readiness.json").read_text(encoding="utf-8")
+)
+if release_readiness.get("release_date") != "2026-07-07":
+    raise SystemExit("latest Galileo release readiness date is stale")
+if set((release_readiness.get("features") or {})) != {
+    "ai_assistant_beta",
+    "global_dashboards",
+    "generic_alert_webhooks",
+    "experiment_groups",
+    "large_dataset_batched_processing",
+}:
+    raise SystemExit("latest Galileo release readiness features are incomplete")
+manifest = json.loads(
+    Path(sys.argv[1]).with_name("lifecycle").joinpath("object-lifecycle-manifest.example.json").read_text(encoding="utf-8")
+)
+experiment = (manifest.get("experiments") or [{}])[0]
+if "experiment_group" not in experiment or "experiment_group_id" not in experiment:
+    raise SystemExit("object lifecycle manifest must support experiment groups")
+ownership = manifest.get("ownership_cleanup") or {}
+if ownership.get("exact_id_only") is not True:
+    raise SystemExit("object lifecycle manifest must require exact-ID cleanup")
+if ownership.get("dataset_delete_requires_project_association") is not True:
+    raise SystemExit("object lifecycle dataset cleanup must validate project association")
+if ownership.get("metric_enablement") != "newly_created_owned_log_stream_only":
+    raise SystemExit("object lifecycle must not replace metrics on pre-existing Log streams")
+webhook = json.loads(
+    Path(sys.argv[1]).with_name("alerts").joinpath("galileo-alert-webhook-payload.example.json").read_text(encoding="utf-8")
+)
+for key in ("version", "event", "event_id", "timestamp", "alert", "scope", "conditions", "dedup_key", "deep_link", "metadata"):
+    if key not in webhook:
+        raise SystemExit(f"Galileo webhook payload example missing {key}")
+if webhook.get("version") != "1.0":
+    raise SystemExit("Galileo webhook payload example must use version 1.0")
 request = json.loads(Path(sys.argv[1]).with_name("splunk-platform").joinpath("export-records-request.json").read_text(encoding="utf-8"))
-if request.get("export_format") != "jsonl":
-    raise SystemExit("export_records request must default to jsonl")
-for key in ("root_type", "redact", "log_stream_id", "experiment_id", "metrics_testing_id"):
+if request.get("export_format") not in {"csv", "jsonl", "jsonl_flat"}:
+    raise SystemExit("export_records request has an unsupported export_format")
+if request.get("export_computed_metrics_only") and request.get("export_format") == "jsonl_flat":
+    raise SystemExit("export_records computed-metrics-only is incompatible with jsonl_flat")
+for key in (
+    "root_type",
+    "redact",
+    "export_computed_metrics_only",
+    "include_code_metric_metadata",
+    "log_stream_id",
+    "experiment_id",
+    "metrics_testing_id",
+):
     if key not in request:
         raise SystemExit(f"export_records request missing {key}")
 PY
+
+python3 -m py_compile "${OUTPUT_DIR}/scripts/galileo_alert_webhook_relay.py"
+bash -n "${OUTPUT_DIR}/scripts/cleanup-object-lifecycle.sh"
 
 if grep -RIl . "${OUTPUT_DIR}" | xargs grep -E -- 'Authorization:[[:space:]]*(Splunk|Bearer)[[:space:]]+[A-Za-z0-9._=-]{12,}' >/dev/null 2>&1; then
     log "ERROR: Rendered output appears to contain a concrete authorization secret."

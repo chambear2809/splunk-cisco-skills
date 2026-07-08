@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import sys
@@ -14,7 +15,11 @@ from urllib.parse import urlparse, urlunparse
 SKILL_NAME = "galileo-mcp-server-setup"
 DEFAULT_MCP_URL = "https://api.galileo.ai/mcp/http/mcp"
 EXPECTED_SERVER_NAME = "EvalsInIDEServer"
-EXPECTED_SERVER_VERSION = "1.27.1"
+EXPECTED_SERVER_VERSION = "1.28.1"
+CATALOG_REVIEW_DATE = "2026-07-08"
+BRIDGE_SOURCE = (
+    Path(__file__).resolve().parent.parent / "assets/stdio_streamable_http_bridge.js"
+)
 
 VALID_CLIENTS = {"cursor", "claude", "codex", "vscode", "kiro"}
 DEFAULT_CLIENTS = ["cursor", "claude", "codex", "vscode", "kiro"]
@@ -38,6 +43,23 @@ DIRECT_SECRET_FLAGS = {
     "--password",
     "--token",
 }
+
+
+def is_loopback_hostname(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    host = hostname.rstrip(".").lower()
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def require_https_or_loopback(parsed: Any, label: str) -> None:
+    if parsed.scheme == "http" and not is_loopback_hostname(parsed.hostname):
+        raise ValueError(f"{label} must use HTTPS outside loopback testing")
 
 TOOL_CATALOG: list[dict[str, Any]] = [
     {
@@ -178,9 +200,29 @@ PRODUCT_GAP_MATRIX: list[dict[str, str]] = [
         "handoff": "galileo-platform-setup for create/run assets",
     },
     {
-        "area": "Experiment groups, comparison, ranking, playground runs, and unit-test gates",
+        "area": "AI Assistant beta, evidence-linked investigation, and enterprise enablement",
+        "mcp_coverage": "docs_search_only_no_public_assistant_api",
+        "handoff": "galileo-platform-setup for AI Assistant readiness, enablement, and console evidence",
+    },
+    {
+        "area": "Global dashboards across projects and log streams",
+        "mcp_coverage": "docs_search_only_trends_api_remains_log_stream_scoped",
+        "handoff": "galileo-platform-setup for global-dashboard UI readiness and evidence",
+    },
+    {
+        "area": "Generic alert webhooks, payload v1.0, authentication, testing, and deduplication",
+        "mcp_coverage": "docs_search_only_no_public_alert_webhook_crud_api",
+        "handoff": "galileo-platform-setup for webhook runbooks, receiver/relay design, and validation",
+    },
+    {
+        "area": "Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates",
         "mcp_coverage": "guidance_or_docs_search_only",
         "handoff": "galileo-platform-setup for experiment group and CI workflow handoffs",
+    },
+    {
+        "area": "Large-dataset batched Playground and experiment metric processing",
+        "mcp_coverage": "dataset_creation_status_only_no_batched_experiment_execution",
+        "handoff": "galileo-platform-setup for batched execution, progress, and result validation; no undocumented exact maximum",
     },
     {
         "area": "Projects, project sharing, users, groups, RBAC, SSO, and API keys",
@@ -502,9 +544,13 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     )
     server_names["cursor"] = cursor_server
     server_names["vscode"] = vscode_server
+    try:
+        derived_mcp_url = derive_mcp_url(mcp_url, console_url)
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: {exc}") from exc
     return {
         "clients": selected_clients(clients_raw),
-        "mcp_url": derive_mcp_url(mcp_url, console_url),
+        "mcp_url": derived_mcp_url,
         "galileo_console_url": console_url,
         "accept_write_tools": accept_write,
         "server_names": server_names,
@@ -513,20 +559,55 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
 
 
 def derive_mcp_url(mcp_url: str, console_url: str) -> str:
+    derived_from_console = DEFAULT_MCP_URL
+    if console_url.strip():
+        raw = console_url.strip()
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("Galileo console URL must be an absolute HTTP(S) URL")
+        require_https_or_loopback(parsed, "Galileo console URL")
+        if parsed.username or parsed.password:
+            raise ValueError("Galileo console URL must not contain credentials")
+        if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+            raise ValueError(
+                "Galileo console URL must not contain a path, parameters, query, or fragment"
+            )
+        host = parsed.hostname.lower()
+        if host == "app.galileo.ai":
+            api_host = "api.galileo.ai"
+        elif host.startswith("console."):
+            api_host = "api." + host[len("console.") :]
+        elif host.startswith("console-"):
+            api_host = "api-" + host[len("console-") :]
+        elif host.startswith("api.") or host.startswith("api-"):
+            api_host = host
+        else:
+            raise ValueError("Cannot derive Galileo MCP API host from the console URL")
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Galileo console URL contains an invalid port") from exc
+        netloc = api_host + (f":{port}" if port is not None else "")
+        derived_from_console = urlunparse(
+            (parsed.scheme, netloc, "/mcp/http/mcp", "", "", "")
+        )
     if mcp_url.strip():
+        parsed_mcp = urlparse(mcp_url.strip())
+        if parsed_mcp.scheme not in {"http", "https"} or not parsed_mcp.hostname:
+            raise ValueError("Galileo MCP URL must be an absolute HTTP(S) URL")
+        require_https_or_loopback(parsed_mcp, "Galileo MCP URL")
+        if parsed_mcp.username or parsed_mcp.password:
+            raise ValueError("Galileo MCP URL must not contain credentials")
+        if parsed_mcp.params or parsed_mcp.query or parsed_mcp.fragment:
+            raise ValueError("Galileo MCP URL must not contain parameters, query, or fragment")
+        try:
+            parsed_mcp.port
+        except ValueError as exc:
+            raise ValueError("Galileo MCP URL contains an invalid port") from exc
         return mcp_url.strip().rstrip("/")
-    if not console_url.strip():
-        return DEFAULT_MCP_URL
-    raw = console_url.strip()
-    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
-        raw = "https://" + raw
-    parsed = urlparse(raw)
-    host = parsed.netloc or parsed.path.split("/", 1)[0]
-    if "console" in host:
-        host = host.replace("console", "api", 1)
-    elif not host.startswith("api."):
-        host = "api." + host
-    return urlunparse((parsed.scheme or "https", host, "/mcp/http/mcp", "", "", ""))
+    return derived_from_console
 
 
 def write_text(path: Path, content: str, *, executable: bool = False) -> None:
@@ -548,6 +629,7 @@ def tool_catalog_payload() -> dict[str, Any]:
             "name": EXPECTED_SERVER_NAME,
             "version": EXPECTED_SERVER_VERSION,
         },
+        "reviewed_on": CATALOG_REVIEW_DATE,
         "tool_count": len(TOOL_CATALOG),
         "tools": TOOL_CATALOG,
         "prompts_expected": [],
@@ -557,7 +639,7 @@ def tool_catalog_payload() -> dict[str, Any]:
 
 def bridge_env_example(mcp_url: str, key_file: str = "") -> str:
     return (
-        "# Copy to .env.galileo-mcp and keep the populated file local only.\n"
+        "# Copy to .env.galileo-mcp, run chmod 600, and keep it local only.\n"
         f"GALILEO_MCP_URL={mcp_url}\n"
         "GALILEO_API_KEY=''\n"
         f"GALILEO_API_KEY_FILE={key_file}\n"
@@ -573,7 +655,7 @@ def cursor_config(mcp_url: str, server_name: str) -> str:
                 "url": mcp_url,
                 "headers": {
                     "Galileo-API-Key": "${env:GALILEO_API_KEY}",
-                    "Accept": "text/event-stream",
+                    "Accept": "application/json, text/event-stream",
                 },
             }
         }
@@ -596,7 +678,7 @@ def vscode_config(mcp_url: str, server_name: str) -> str:
                 "url": mcp_url,
                 "headers": {
                     "Galileo-API-Key": "${input:galileo-api-key}",
-                    "Accept": "text/event-stream",
+                    "Accept": "application/json, text/event-stream",
                 },
             }
         },
@@ -648,164 +730,19 @@ def bridge_shell_script() -> str:
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/.env.galileo-mcp"
+BRIDGE_JS="${SCRIPT_DIR}/run-galileo-mcp.js"
 
-if [[ -f "${ENV_FILE}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${ENV_FILE}"
-    set +a
-fi
-
-if [[ -z "${GALILEO_MCP_URL:-}" ]]; then
-    echo "galileo-mcp: set GALILEO_MCP_URL in ${ENV_FILE}" >&2
+if ! command -v node >/dev/null 2>&1; then
+    echo "galileo-mcp: Node.js is required" >&2
     exit 1
 fi
 
-if [[ -z "${GALILEO_API_KEY:-}" ]]; then
-    if [[ -n "${GALILEO_API_KEY_FILE:-}" && -r "${GALILEO_API_KEY_FILE}" ]]; then
-        GALILEO_API_KEY="$(tr -d '\\r\\n' < "${GALILEO_API_KEY_FILE}")"
-        export GALILEO_API_KEY
-    else
-        echo "galileo-mcp: set GALILEO_API_KEY or GALILEO_API_KEY_FILE in ${ENV_FILE}" >&2
-        exit 1
-    fi
-fi
-
-if [[ "${GALILEO_MCP_INSECURE_TLS:-}" == "1" ]]; then
-    export NODE_TLS_REJECT_UNAUTHORIZED=0
-fi
-
-if command -v mcp-remote >/dev/null 2>&1; then
-    MCP_REMOTE=(mcp-remote)
-elif command -v npx >/dev/null 2>&1; then
-    MCP_REMOTE=(npx mcp-remote)
-else
-    echo "galileo-mcp: install mcp-remote or Node.js/npx" >&2
-    exit 1
-fi
-
-# shellcheck disable=SC2016 # mcp-remote expands ${GALILEO_API_KEY} from env.
-exec "${MCP_REMOTE[@]}" "${GALILEO_MCP_URL}" \\
-    --transport http-only \\
-    --header 'Galileo-API-Key: ${GALILEO_API_KEY}' \\
-    --header 'Accept: text/event-stream'
+exec node "${BRIDGE_JS}"
 """
 
 
 def bridge_js_script() -> str:
-    return r'''#!/usr/bin/env node
-"use strict";
-
-const fs = require("fs");
-const path = require("path");
-const { execFileSync, spawn } = require("child_process");
-
-const scriptDir = __dirname;
-const envFile = path.join(scriptDir, ".env.galileo-mcp");
-
-function parseShellWord(value) {
-  let result = "";
-  let state = "normal";
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (state === "single") {
-      if (ch === "'") state = "normal";
-      else result += ch;
-      continue;
-    }
-    if (state === "double") {
-      if (ch === '"') state = "normal";
-      else if (ch === "\\") {
-        i += 1;
-        if (i < value.length) result += value[i];
-      } else result += ch;
-      continue;
-    }
-    if (ch === "'") state = "single";
-    else if (ch === '"') state = "double";
-    else if (ch === "\\") {
-      i += 1;
-      if (i < value.length) result += value[i];
-    } else result += ch;
-  }
-  return result;
-}
-
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = parseShellWord(trimmed.slice(eq + 1).trim());
-    if (!(key in process.env)) process.env[key] = val;
-  }
-}
-
-loadEnvFile(envFile);
-
-function fail(message) {
-  process.stderr.write("galileo-mcp: " + message + "\n");
-  process.exit(1);
-}
-
-if (!process.env.GALILEO_MCP_URL) {
-  fail("set GALILEO_MCP_URL in " + envFile);
-}
-if (!process.env.GALILEO_API_KEY && process.env.GALILEO_API_KEY_FILE) {
-  try {
-    process.env.GALILEO_API_KEY = fs.readFileSync(process.env.GALILEO_API_KEY_FILE, "utf8").trim();
-  } catch (err) {
-    fail("could not read GALILEO_API_KEY_FILE: " + err.message);
-  }
-}
-if (!process.env.GALILEO_API_KEY) {
-  fail("set GALILEO_API_KEY or GALILEO_API_KEY_FILE in " + envFile);
-}
-if (process.env.GALILEO_MCP_INSECURE_TLS === "1") {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
-
-function findMcpRemote() {
-  try {
-    const result = execFileSync(
-      process.platform === "win32" ? "where" : "which",
-      ["mcp-remote"],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
-    ).trim().split(/\r?\n/)[0].trim();
-    if (result) return { cmd: result, args: [] };
-  } catch (_) {
-    // Fall back to npx.
-  }
-  return { cmd: process.platform === "win32" ? "npx.cmd" : "npx", args: ["mcp-remote"] };
-}
-
-const remote = findMcpRemote();
-const args = [
-  ...remote.args,
-  process.env.GALILEO_MCP_URL,
-  "--transport",
-  "http-only",
-  "--header",
-  "Galileo-API-Key: ${GALILEO_API_KEY}",
-  "--header",
-  "Accept: text/event-stream",
-];
-
-const child = spawn(remote.cmd, args, { stdio: "inherit" });
-child.on("error", function(err) {
-  process.stderr.write("galileo-mcp: failed to start mcp-remote: " + err.message + "\n");
-  process.exit(1);
-});
-child.on("exit", function(code, signal) {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code !== null ? code : 0);
-});
-'''
+    return BRIDGE_SOURCE.read_text(encoding="utf-8")
 
 
 def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) -> str:
@@ -818,12 +755,24 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
         "# Galileo MCP Server - rendered client configurations",
         "",
         f"Server URL: `{mcp_url}`",
+        f"Observed server: `{EXPECTED_SERVER_NAME}` version `{EXPECTED_SERVER_VERSION}`",
+        f"Catalog reviewed: `{CATALOG_REVIEW_DATE}`",
         f"Selected clients: `{', '.join(clients)}`",
         "",
         "## Safety posture",
         "",
         "- These files are render-first handoffs; no client config was applied.",
         "- Do not commit `.env.galileo-mcp` or any populated API-key file.",
+        "- The stdio bridge is dependency-free Node.js and speaks MCP Streamable HTTP",
+        "  directly; it does not invoke `mcp-remote` or place the API key in argv.",
+        "- The bridge rejects redirects, enforces owner-only secret files, propagates",
+        "  MCP session/protocol headers, and accepts both JSON and SSE responses.",
+        "- Renderer and probe URLs require HTTPS outside explicit loopback testing;",
+        "  authenticated probes also reject redirects without forwarding the key.",
+        "- After the initialize/initialized gate, POSTs run concurrently so a",
+        "  cancellation notification cannot be trapped behind its tool call.",
+        "- Server SSE uses bounded per-event framing and capped exponential-backoff",
+        "  reconnects; unsupported GET streams are disabled without affecting POSTs.",
         "- Unknown future MCP tools should stay manual-approval-only until reviewed.",
         "",
         "## Tool groups",
@@ -857,7 +806,33 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
                 "",
             ]
         )
-    lines.extend(["## Install steps", ""])
+    lines.extend(
+        [
+            "## July 7, 2026 product boundaries",
+            "",
+            "These release features are not new tools in the observed 9-tool MCP catalog:",
+            "",
+            "- AI Assistant beta is read-only, requires enterprise support enablement and",
+            "  a configured LLM integration, and has no documented public Assistant API",
+            "  or MCP tool.",
+            "- Global dashboards span projects and log streams in the console; the public",
+            "  Trends API remains project/log-stream scoped, with no documented global",
+            "  dashboard CRUD endpoint.",
+            "- Generic alert webhooks support None, Bearer, or Basic authentication and a",
+            "  payload v1.0, but no public alert/webhook CRUD API or MCP tool is documented.",
+            "- Experiment groups require Galileo Python SDK >=2.2.0;",
+            "  `setup_galileo_experiment` is guidance-only and does not manage groups.",
+            "- Large-dataset Playground and experiment metric processing uses batching,",
+            "  but MCP dataset creation/status does not run batched experiments and Galileo",
+            "  documents no exact maximum or client batch-size control.",
+            "",
+            "Use `galileo-platform-setup` for readiness, configuration handoffs, receiver",
+            "or relay design, execution, and validation evidence for these capabilities.",
+            "",
+            "## Install steps",
+            "",
+        ]
+    )
     if "cursor" in clients:
         lines.extend(
             [
@@ -886,7 +861,7 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
                 "### Codex",
                 "",
                 "- Copy `mcp/.env.galileo-mcp.example` to `mcp/.env.galileo-mcp` and",
-                "  set `GALILEO_API_KEY` locally.",
+                "  set `GALILEO_API_KEY` locally, then run `chmod 600` on that file.",
                 "- Run `bash mcp/codex-register-galileo-mcp.sh`.",
                 "",
             ]
@@ -897,7 +872,7 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
                 "### Claude Code",
                 "",
                 "- Copy `mcp/.env.galileo-mcp.example` to `mcp/.env.galileo-mcp` and",
-                "  set `GALILEO_API_KEY` locally.",
+                "  set `GALILEO_API_KEY` locally, then run `chmod 600` on that file.",
                 "- Merge `mcp/claude.mcp.json` into the Claude Code MCP config.",
                 "",
             ]
@@ -908,7 +883,7 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
                 "### AWS Kiro",
                 "",
                 "- Copy `mcp/.env.galileo-mcp.example` to `mcp/.env.galileo-mcp` and",
-                "  set `GALILEO_API_KEY` locally.",
+                "  set `GALILEO_API_KEY` locally, then run `chmod 600` on that file.",
                 "- Merge `mcp/kiro.mcp.json` into Kiro MCP settings.",
                 "",
             ]
@@ -979,7 +954,7 @@ async def connect_mcp():
             url=os.environ.get("MCP_SERVER_URL", "{mcp_url}"),
             headers={{
                 "Galileo-API-Key": os.environ["GALILEO_API_KEY"],
-                "Accept": "text/event-stream",
+                "Accept": "application/json, text/event-stream",
             }},
         )
     )
@@ -1031,6 +1006,7 @@ def render_metadata(
             "name": EXPECTED_SERVER_NAME,
             "version_observed": EXPECTED_SERVER_VERSION,
         },
+        "tool_catalog_reviewed": CATALOG_REVIEW_DATE,
         "expected_tool_count": len(TOOL_CATALOG),
         "expected_tools": [
             {
@@ -1044,6 +1020,15 @@ def render_metadata(
         ],
         "expected_prompts_count": 0,
         "expected_resources_count": 0,
+        "stdio_bridge": {
+            "transport": "streamable_http",
+            "runtime": "node_core_modules",
+            "redirects": "disabled",
+            "response_types": ["application/json", "text/event-stream"],
+            "post_handshake_requests": "concurrent",
+            "sse_framing": "bounded_per_event",
+            "sse_reconnect": "capped_exponential_backoff",
+        },
         "galileo_api_key_file_provided": bool(key_file),
     }
     return json_text(payload)

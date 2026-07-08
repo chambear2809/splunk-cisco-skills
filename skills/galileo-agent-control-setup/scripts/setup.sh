@@ -45,7 +45,7 @@ Apply sections:
 Configuration:
   --spec PATH                   Optional YAML/JSON spec (api_version: galileo-agent-control-setup/v1)
   --output-dir DIR              Rendered output directory
-  --server-url URL              Agent Control server URL (default: http://localhost:8000)
+  --server-url URL              Credential-free Agent Control origin; HTTPS off loopback
   --galileo-console-url URL     Galileo instance console URL for tenant context
   --server-host HOST            Server bind host for rendered env
   --server-port PORT            Server port for rendered env
@@ -55,7 +55,7 @@ Configuration:
   --service-name NAME           OTel service.name for runtime assets
   --otlp-endpoint URL           OTLP HTTP endpoint for Agent Control OTel sink
   --splunk-platform enterprise|cloud
-  --splunk-hec-url URL          Splunk HEC event URL or base HEC URL
+  --splunk-hec-url URL          HEC origin/event URL; HTTPS off loopback, no credentials
   --splunk-index INDEX          Splunk destination index (default: agent_control)
   --splunk-source SOURCE        Splunk source (default: agent-control)
   --splunk-sourcetype VALUE     Splunk sourcetype (default: agent_control:events:json)

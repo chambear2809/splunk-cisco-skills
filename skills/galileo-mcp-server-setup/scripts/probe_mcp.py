@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import re
 import sys
@@ -16,7 +17,7 @@ from urllib.parse import urlparse, urlunparse
 
 DEFAULT_MCP_URL = "https://api.galileo.ai/mcp/http/mcp"
 EXPECTED_SERVER_NAME = "EvalsInIDEServer"
-EXPECTED_SERVER_VERSION = "1.27.1"
+EXPECTED_SERVER_VERSION = "1.28.1"
 EXPECTED_TOOLS: dict[str, dict[str, Any]] = {
     "integrate_galileo_with_langchain": {
         "risk_group": "guidance_public",
@@ -98,6 +99,46 @@ EXPECTED_TOOLS: dict[str, dict[str, Any]] = {
 }
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Return redirect responses to the caller without forwarding headers."""
+
+    def redirect_request(  # noqa: PLR0913 - urllib callback signature.
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        del req, fp, code, msg, headers, newurl
+        return None
+
+
+NO_REDIRECT_OPENER = urllib.request.build_opener(NoRedirectHandler())
+
+
+def is_loopback_hostname(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    host = hostname.rstrip(".").lower()
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def require_https_or_loopback(parsed: Any, label: str) -> None:
+    if parsed.scheme == "http" and not is_loopback_hostname(parsed.hostname):
+        raise ValueError(f"{label} must use HTTPS outside loopback testing")
+
+
+def open_no_redirect(request: urllib.request.Request, timeout: float) -> Any:
+    return NO_REDIRECT_OPENER.open(request, timeout=timeout)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mcp-url", default="")
@@ -116,20 +157,55 @@ def parse_args() -> argparse.Namespace:
 
 
 def derive_mcp_url(mcp_url: str, console_url: str) -> str:
+    derived_from_console = DEFAULT_MCP_URL
+    if console_url.strip():
+        raw = console_url.strip()
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("Galileo console URL must be an absolute HTTP(S) URL")
+        require_https_or_loopback(parsed, "Galileo console URL")
+        if parsed.username or parsed.password:
+            raise ValueError("Galileo console URL must not contain credentials")
+        if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+            raise ValueError(
+                "Galileo console URL must not contain a path, parameters, query, or fragment"
+            )
+        host = parsed.hostname.lower()
+        if host == "app.galileo.ai":
+            api_host = "api.galileo.ai"
+        elif host.startswith("console."):
+            api_host = "api." + host[len("console.") :]
+        elif host.startswith("console-"):
+            api_host = "api-" + host[len("console-") :]
+        elif host.startswith("api.") or host.startswith("api-"):
+            api_host = host
+        else:
+            raise ValueError("Cannot derive Galileo MCP API host from the console URL")
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Galileo console URL contains an invalid port") from exc
+        netloc = api_host + (f":{port}" if port is not None else "")
+        derived_from_console = urlunparse(
+            (parsed.scheme, netloc, "/mcp/http/mcp", "", "", "")
+        )
     if mcp_url.strip():
+        parsed_mcp = urlparse(mcp_url.strip())
+        if parsed_mcp.scheme not in {"http", "https"} or not parsed_mcp.hostname:
+            raise ValueError("Galileo MCP URL must be an absolute HTTP(S) URL")
+        require_https_or_loopback(parsed_mcp, "Galileo MCP URL")
+        if parsed_mcp.username or parsed_mcp.password:
+            raise ValueError("Galileo MCP URL must not contain credentials")
+        if parsed_mcp.params or parsed_mcp.query or parsed_mcp.fragment:
+            raise ValueError("Galileo MCP URL must not contain parameters, query, or fragment")
+        try:
+            parsed_mcp.port
+        except ValueError as exc:
+            raise ValueError("Galileo MCP URL contains an invalid port") from exc
         return mcp_url.strip().rstrip("/")
-    if not console_url.strip():
-        return DEFAULT_MCP_URL
-    raw = console_url.strip()
-    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
-        raw = "https://" + raw
-    parsed = urlparse(raw)
-    host = parsed.netloc or parsed.path.split("/", 1)[0]
-    if "console" in host:
-        host = host.replace("console", "api", 1)
-    elif not host.startswith("api."):
-        host = "api." + host
-    return urlunparse((parsed.scheme or "https", host, "/mcp/http/mcp", "", "", ""))
+    return derived_from_console
 
 
 def api_base_from_mcp_url(mcp_url: str) -> str:
@@ -169,34 +245,67 @@ def parse_sse_json(text: str) -> dict[str, Any]:
     raise RuntimeError(f"No JSON-RPC data event found: {text[:200]!r}")
 
 
-def rpc(mcp_url: str, method: str, params: dict[str, Any] | None, timeout: float) -> dict[str, Any]:
-    payload = {
-        "jsonrpc": "2.0",
-        "id": method,
-        "method": method,
-        "params": params or {},
-    }
-    if method == "initialize":
-        payload["params"] = {
-            "protocolVersion": "2025-03-26",
-            "capabilities": {},
-            "clientInfo": {"name": "galileo-mcp-server-setup-probe", "version": "0.0.0"},
+class McpHttpSession:
+    def __init__(self, mcp_url: str, timeout: float) -> None:
+        self.mcp_url = mcp_url
+        self.timeout = timeout
+        self.session_id = ""
+        self.protocol_version = ""
+
+    def rpc(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id": method,
+            "method": method,
+            "params": params or {},
         }
-    request = urllib.request.Request(
-        mcp_url,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
+        if method == "initialize":
+            payload["params"] = {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "galileo-mcp-server-setup-probe", "version": "0.0.0"},
+            }
+        result = self._post(payload, expected_id=payload["id"])
+        if method == "initialize":
+            protocol_version = result.get("protocolVersion")
+            if isinstance(protocol_version, str) and protocol_version:
+                self.protocol_version = protocol_version
+        return result
+
+    def notify_initialized(self) -> None:
+        self._post(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            expected_id=None,
+        )
+
+    def _post(self, payload: dict[str, Any], expected_id: object | None) -> dict[str, Any]:
+        headers = {
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        body = response.read().decode("utf-8", "replace")
-    data = parse_sse_json(body)
-    if "error" in data:
-        raise RuntimeError(f"{method} failed: {data['error']}")
-    return data.get("result") or {}
+        }
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        if self.protocol_version:
+            headers["MCP-Protocol-Version"] = self.protocol_version
+        request = urllib.request.Request(
+            self.mcp_url,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers=headers,
+        )
+        with open_no_redirect(request, timeout=self.timeout) as response:
+            session_header = response.headers.get("Mcp-Session-Id")
+            if session_header:
+                self.session_id = session_header
+            body = response.read().decode("utf-8", "replace")
+        if not body.strip():
+            return {}
+        data = parse_sse_json(body)
+        if "error" in data:
+            raise RuntimeError(f"{payload.get('method')} failed: {data['error']}")
+        if expected_id is not None and data.get("id") != expected_id:
+            raise RuntimeError(f"{payload.get('method')} returned a mismatched JSON-RPC id")
+        return data.get("result") or {}
 
 
 def check_key_permissions(target: Path, allow_loose: bool) -> None:
@@ -226,6 +335,7 @@ def read_secret_file(path: str, allow_loose: bool) -> str:
 def auth_check(
     mcp_url: str, key_file: str, timeout: float, allow_loose_key_perms: bool
 ) -> dict[str, Any]:
+    mcp_url = derive_mcp_url(mcp_url, "")
     key = read_secret_file(key_file, allow_loose_key_perms)
     api_base = api_base_from_mcp_url(mcp_url)
     request = urllib.request.Request(
@@ -234,11 +344,11 @@ def auth_check(
         headers={"Galileo-API-Key": key},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with open_no_redirect(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8", "replace"))
         return {"ok": True, "status": 200, "user_keys": sorted(payload.keys())}
     except urllib.error.HTTPError as exc:
-        return {"ok": False, "status": exc.code, "error": exc.reason}
+        return {"ok": False, "status": exc.code, "error": "HTTP request rejected"}
 
 
 def tool_schema(tool: dict[str, Any]) -> dict[str, list[str]]:
@@ -299,10 +409,12 @@ def schema_drift(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     mcp_url = derive_mcp_url(args.mcp_url, args.galileo_console_url)
-    initialize = rpc(mcp_url, "initialize", None, args.timeout)
-    tools_result = rpc(mcp_url, "tools/list", {}, args.timeout)
-    prompts_result = rpc(mcp_url, "prompts/list", {}, args.timeout)
-    resources_result = rpc(mcp_url, "resources/list", {}, args.timeout)
+    session = McpHttpSession(mcp_url, args.timeout)
+    initialize = session.rpc("initialize")
+    session.notify_initialized()
+    tools_result = session.rpc("tools/list", {})
+    prompts_result = session.rpc("prompts/list", {})
+    resources_result = session.rpc("resources/list", {})
 
     tools = tools_result.get("tools") or []
     live_names = [tool.get("name", "") for tool in tools]
@@ -310,12 +422,27 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     missing = sorted(set(EXPECTED_TOOLS) - set(live_names))
     schema_changes = schema_drift(tools)
     warnings: list[str] = []
+    server_drift: list[dict[str, Any]] = []
     server = initialize.get("serverInfo") or {}
     if server.get("name") != EXPECTED_SERVER_NAME:
+        server_drift.append(
+            {
+                "field": "name",
+                "expected": EXPECTED_SERVER_NAME,
+                "live": server.get("name"),
+            }
+        )
         warnings.append(
             f"Unexpected server name {server.get('name')!r}; expected {EXPECTED_SERVER_NAME!r}."
         )
     if server.get("version") != EXPECTED_SERVER_VERSION:
+        server_drift.append(
+            {
+                "field": "version",
+                "expected": EXPECTED_SERVER_VERSION,
+                "live": server.get("version"),
+            }
+        )
         warnings.append(
             f"Server version changed from observed {EXPECTED_SERVER_VERSION} to {server.get('version')}."
         )
@@ -354,6 +481,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "resources_count": len(resources),
         "unknown_tools": unknown,
         "missing_tools": missing,
+        "server_drift": server_drift,
         "schema_drift": schema_changes,
         "warnings": warnings,
     }
@@ -365,6 +493,17 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             args.allow_loose_key_perms,
         )
     return report
+
+
+def report_has_drift(report: dict[str, Any]) -> bool:
+    return bool(
+        report["server_drift"]
+        or report["unknown_tools"]
+        or report["missing_tools"]
+        or report["schema_drift"]
+        or report["prompts_count"]
+        or report["resources_count"]
+    )
 
 
 def main() -> int:
@@ -389,13 +528,7 @@ def main() -> int:
         if "auth_check" in report:
             check = report["auth_check"]
             print(f"Auth check: status={check.get('status')} ok={check.get('ok')}")
-    if args.fail_on_drift and (
-        report["unknown_tools"]
-        or report["missing_tools"]
-        or report["schema_drift"]
-        or report["prompts_count"]
-        or report["resources_count"]
-    ):
+    if args.fail_on_drift and report_has_drift(report):
         return 3
     return 0
 

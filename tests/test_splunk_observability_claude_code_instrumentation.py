@@ -192,7 +192,8 @@ def test_local_collector_renders_valid_settings_and_collector_overlay(tmp_path: 
     overlay = overlay_path.read_text(encoding="utf-8")
     assert "send_otlp_histograms: true" in overlay
     assert "otlp_http/galileo" in overlay
-    assert "https://api.galileo.ai/otel/traces" in overlay
+    assert "traces_endpoint: \"https://api.galileo.ai/otel/traces\"" in overlay
+    assert '\n    endpoint: "https://api.galileo.ai/otel/traces"' not in overlay
     assert '${env:GALILEO_API_KEY}' in overlay
     assert "project: " in overlay
     assert "logstream: " in overlay

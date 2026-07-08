@@ -361,6 +361,12 @@ is no way to attach a second auth header to Claude Code's global
 `OTEL_EXPORTER_OTLP_HEADERS`, and re-using the same header for two back ends
 is unsafe.
 
+These exported traces can ground Galileo AI Assistant beta investigations, but
+this skill does not enable or query the Assistant. Use
+`galileo-platform-setup` for the enterprise enablement, LLM-integration
+readiness, evidence-link verification, and reviewed-remediation handoff added
+for the July 7, 2026 Galileo release.
+
 ## Provider And Model Normalization
 
 The collector infers `aws.bedrock` from Bedrock ARNs and Bedrock model IDs and
