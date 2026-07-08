@@ -762,8 +762,8 @@
         "label": "`splunk-observability-database-monitoring-setup`",
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; DBMon uses the customer-managed Splunk OTel Collector runtime rendered by splunk-observability-otel-collector-setup",
-        "cloud_config_path": "Rendered Kubernetes clusterReceiver overlay, Linux collector fragment, placeholder-only DB credential Secret stubs, and gateway-routing reference for Splunk Database Monitoring events",
-        "notes": "Render/validate-first Splunk Database Monitoring workflow for PostgreSQL, Microsoft SQL Server, and Oracle Database. Enforces DBMon realm availability, collector version floors, official support matrix, clusterReceiver placement, logs/dbmon event exporter, and file/env/Secret-only credential handling."
+        "cloud_config_path": "Audited Collector/chart 0.155.0 packet with context-bound singleton Kubernetes clusterReceiver values and revision-drift-safe apply/rollback, durable resumable Linux systemd apply/rollback, fail-closed Windows validation handoff, prerequisite/APM/product runbooks, and target-filtered API evidence",
+        "notes": "Production-action Splunk Database Monitoring workflow for Microsoft SQL Server, MySQL 5.7+, MariaDB 10.5+, Oracle Database, and provider-paired PostgreSQL. Records the pinned receiver's explain-plan gaps for MySQL 5.7 and MariaDB while retaining metrics and query-event coverage. Enforces official matrices, reviewed sizing and secure transport, one scrape owner, duplicate prevention, isolated metrics/dbmon* + logs/dbmon* + signalfx/dbmon + otlp_http/dbmon, exact collector validation, resumable rollback, target-filtered SignalFlow probes, and applicable product/APM/AI evidence."
       },
       {
         "kind": "workflow",
@@ -1536,7 +1536,7 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "Render/validate-first Splunk Database Monitoring workflow for PostgreSQL, Microsoft SQL Server, and Oracle Database. Renders Splunk OTel Collector Kubernetes clusterReceiver overlays and Linux collector fragments, validates official DBMon realm/platform/version support, and keeps all credentials in Kubernetes Secrets or local environment variables."
+      "notes": "Render, pinned-collector validate, safely apply, verify, and roll back Splunk Database Monitoring for Microsoft SQL Server, MySQL 5.7+, MariaDB 10.5+, Oracle Database, and provider-paired PostgreSQL. Records explain-plan gaps for MySQL 5.7 and MariaDB while retaining metrics and query-event coverage. Covers one scrape owner, context-bound singleton Kubernetes clusterReceiver, resumable Linux systemd actions, fail-closed Windows validation, isolated metric/event pipelines, reviewed sizing/transport/secret guardrails, target-filtered API proof, and applicable product/APM/AI evidence."
     },
     {
       "skill": "splunk-observability-k8s-auto-instrumentation-setup",

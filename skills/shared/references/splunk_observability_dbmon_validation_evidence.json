@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "skill": "splunk-observability-database-monitoring-setup",
+  "sanitization": "No account IDs, cluster names, endpoints, database names, usernames, credentials, tokens, query text, or raw collector logs are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-07-eks-mysql-mariadb",
+      "date": "2026-07-07",
+      "environment": {
+        "runtime": "AWS EKS lab",
+        "kubernetes": "1.34",
+        "architecture": "linux/amd64",
+        "collector": "Splunk OTel Collector 0.155.0",
+        "helm_chart": "splunk-otel-collector 0.155.0",
+        "realm": "us1"
+      },
+      "targets": [
+        "MySQL 8.4.10 standalone",
+        "MariaDB 10.11.18 standalone"
+      ],
+      "result": "partial",
+      "evidence": {
+        "transport": "Both database clients and receivers used certificate-verifying TLS; workload clients negotiated TLS 1.3.",
+        "workload": "Each engine completed 90 controlled queries across the 10-second query-sample and 60-second top-query intervals.",
+        "collector_delta_15s": {
+          "accepted_metric_points": 214,
+          "accepted_query_event_records": 27,
+          "refused_metric_points": 0,
+          "refused_query_event_records": 0,
+          "exported_metric_points": 214,
+          "exported_query_event_records": 27
+        },
+        "tenant_api": {
+          "mysql_identity_filtered_signalflow_messages": 30,
+          "mariadb_identity_filtered_signalflow_messages": 27,
+          "metric_catalog_match_per_target": true
+        },
+        "lifecycle": "The guarded Helm 4 apply, scoped live validation, state-backed rollback, isolated release uninstall, namespace UID-checked deletion, and zero-residue checks passed.",
+        "regression_suite": "70 pytest tests passed, 3 skipped; 15 Bats tests passed; ShellCheck, Python compilation, and diff checks passed."
+      },
+      "limitations": [
+        "The DBMon product UI, query details, explain plans, dependencies, metadata, alerts, APM correlation, and AI query assistance were not directly verified.",
+        "MariaDB explain plans are not supported by the pinned receiver.",
+        "SQL Server, Oracle Database, and provider-paired PostgreSQL were not part of this run."
+      ],
+      "cleanup": "All run-scoped Kubernetes resources, Helm state, local rendered artifacts, port-forwards, and containers were removed; the pre-existing collector release was unchanged."
+    },
+    {
+      "id": "2026-07-07-eks-postgresql-sqlserver-oracle",
+      "date": "2026-07-07",
+      "environment": {
+        "runtime": "AWS EKS isolated-node lab",
+        "kubernetes": "1.34",
+        "architecture": "linux/amd64",
+        "collector": "Splunk OTel Collector 0.155.0",
+        "helm_chart": "splunk-otel-collector 0.155.0",
+        "realm": "us1"
+      },
+      "targets": [
+        "Amazon RDS for PostgreSQL 17.5",
+        "Microsoft SQL Server 2022 CU25 Developer self-hosted",
+        "Oracle Database Free 26ai self-hosted"
+      ],
+      "result": "partial",
+      "evidence": {
+        "isolation": "All database fixtures, jobs, and the singleton cluster receiver ran in a dedicated namespace on one temporary tainted and node-selected On-Demand worker; the existing shared collector release was not changed.",
+        "transport": "PostgreSQL used verify-full TLS 1.3 with the AWS RDS CA; SQL Server used mandatory encrypted TDS over TLS 1.2 with a private CA and hostname verification; Oracle used TCPS over TLS 1.3 with a mounted auto-login wallet.",
+        "least_privilege": "PostgreSQL used pg_monitor plus documented statistics grants, with lab-only workload-object reads added to exercise eligible explain plans; SQL Server used the documented 2022 performance-state/database-definition grants and was not sysadmin; Oracle used CREATE SESSION plus the complete 0.155 metric/event view grant set.",
+        "collector_delta": {
+          "oracledb_accepted_metric_points": 69,
+          "oracledb_accepted_query_event_records": 300,
+          "postgresql_accepted_metric_points": 99,
+          "postgresql_accepted_query_event_records": 56,
+          "sqlserver_accepted_metric_points": 24,
+          "sqlserver_accepted_query_event_records": 11,
+          "failed_records_all_targets": 0,
+          "refused_records_all_targets": 0
+        },
+        "positive_exporter_counters": {
+          "scope": "Observed positive absolute DBMon exporter counters after the controlled workloads; these are not claimed as interval deltas.",
+          "signalfx_dbmon_sent_metric_points": 511,
+          "otlp_http_dbmon_sent_query_event_records": 1078
+        },
+        "tenant_api": {
+          "identity_filtered_positive_signalflow_per_target": true,
+          "metric_catalog_match_per_target": true,
+          "postgresql_metric": "postgresql.database.count",
+          "sqlserver_metric": "sqlserver.lock.wait.rate",
+          "oracle_metric": "oracledb.executions"
+        },
+        "lifecycle": "Pinned-image config validation, guarded Helm 4 apply, scoped live validation, two automatic failure rollbacks, a committed apply, and an explicit state-backed rollback passed. The explicit rollback restored byte-identical values and manifest without singleton pod-overlap deadlock.",
+        "production_regressions_found_and_fixed": "The run corrected SQL Server PEM trust-path handling and grants, completed Oracle view grants, validated secret-backed trust mounts, made singleton rollback quiesce/resume, repeated-rollback lineage, and signal recovery fail closed, added bounded restart-aware current/previous collector-log inspection, distinguished upstream best-effort PostgreSQL per-statement EXPLAIN errors from receiver failure, and changed SignalFlow validation to consume bounded SSE events without waiting for EOF.",
+        "regression_suite": "89 DBMon pytest tests and 15 Kubernetes-helper Bats tests passed. Broader agent/YAML coverage passed 76 tests, 1 skip, and 613 subtests; 11 compatibility/metadata tests and all 166 repository-specific skill-frontmatter checks passed. ShellCheck, Bash syntax checks, Python compilation, validation-registry and compatibility audits, generated-matrix drift check, 7 matrix tests, and diff checks passed."
+      },
+      "limitations": [
+        "The DBMon product UI, query-detail and explain-plan display, dependencies, metadata, and alerts were not directly observed because no authenticated Chrome session was available.",
+        "APM trace correlation and licensed AI query assistance were not enabled or verified.",
+        "Azure managed variants, AWS RDS MySQL and MariaDB, SQL Server and Oracle managed-service variants, Oracle RAC, Linux service apply, and Windows handoff were not live-tested in this run."
+      ],
+      "cleanup": "The Helm release and namespace, database fixtures and secrets, managed PostgreSQL instance and its dedicated networking, dedicated EKS node group and worker, local credentials/logs, and port-forwards were removed; absence checks passed."
+    }
+  ]
+}

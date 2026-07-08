@@ -174,47 +174,42 @@ teardown() {
     [ -x "${OUT_DIR}/scripts/apply-isovalent-overlay.sh" ]
 }
 
-# --- dbmon gate -----------------------------------------------------------
+# --- dbmon production actions --------------------------------------------
 
 @test "dbmon: --render produces apply-dbmon-overlay.sh" {
+    dbmon_out="${OUT_DIR}/dbmon-rendered"
     run bash "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/scripts/setup.sh" \
         --render \
-        --output-dir "${OUT_DIR}" \
+        --output-dir "${dbmon_out}" \
         --realm us0 --cluster-name t --distribution kubernetes
     [ "$status" -eq 0 ]
-    [ -x "${OUT_DIR}/scripts/apply-dbmon-overlay.sh" ]
+    [ -x "${dbmon_out}/scripts/apply-dbmon-overlay.sh" ]
+    [ -x "${dbmon_out}/scripts/rollback-dbmon-k8s.sh" ]
+    [ -x "${dbmon_out}/scripts/apply-dbmon-linux.sh" ]
+    [ -x "${dbmon_out}/scripts/rollback-dbmon-linux.sh" ]
 }
 
 @test "dbmon: --apply without --accept-k8s-apply refuses" {
-    bash "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/scripts/setup.sh" \
-        --render --output-dir "${OUT_DIR}" \
-        --realm us0 --cluster-name t --distribution kubernetes >/dev/null
-
-    fake_token="$(mktemp)"
-    chmod 600 "${fake_token}"
-    echo "fake" > "${fake_token}"
-    run env SPLUNK_O11Y_TOKEN_FILE="${fake_token}" bash \
+    dbmon_out="${OUT_DIR}/dbmon-rendered"
+    run bash \
         "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/scripts/setup.sh" \
-        --apply \
-        --output-dir "${OUT_DIR}" \
+        --apply-k8s \
+        --output-dir "${dbmon_out}" \
         --realm us0 --cluster-name t --distribution kubernetes
-    rm -f "${fake_token}"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"requires --accept-k8s-apply"* ]]
+    [[ "$output" == *"--accept-k8s-apply is required"* ]]
+    [[ "$output" == *"passed static validation"* ]]
 }
 
-@test "dbmon: --apply with --accept-k8s-apply but no token file refuses" {
-    bash "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/scripts/setup.sh" \
-        --render --output-dir "${OUT_DIR}" \
-        --realm us0 --cluster-name t --distribution kubernetes >/dev/null
-
+@test "dbmon: render and static validation do not require an access token file" {
     empty_creds="$(mktemp)"
+    dbmon_out="${OUT_DIR}/dbmon-rendered"
     run env -u SPLUNK_O11Y_TOKEN_FILE SPLUNK_CREDENTIALS_FILE="${empty_creds}" bash \
         "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/scripts/setup.sh" \
-        --apply --accept-k8s-apply \
-        --output-dir "${OUT_DIR}" \
+        --render --validate \
+        --output-dir "${dbmon_out}" \
         --realm us0 --cluster-name t --distribution kubernetes
     rm -f "${empty_creds}"
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"SPLUNK_O11Y_TOKEN_FILE"* ]]
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"passed static validation"* ]]
 }
