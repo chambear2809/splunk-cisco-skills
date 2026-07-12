@@ -36,10 +36,13 @@ rest_create_or_update_account() {
     # failures (DNS, TLS, connection refused) can be distinguished from
     # legitimate-but-error HTTP responses. A bare `tail -1` on garbage output
     # would otherwise yield a fake "HTTP code" and mislead the caller.
-    resp=$(splunk_curl_post "${sk}" \
+    if resp=$(splunk_curl_post "${sk}" \
         "${create_body}" \
-        "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    curl_rc=$?
+        "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null); then
+        curl_rc=0
+    else
+        curl_rc=$?
+    fi
     http_code=$(echo "${resp}" | tail -1)
 
     if [[ "${curl_rc}" -ne 0 ]] || ! [[ "${http_code}" =~ ^[0-9]{3}$ ]]; then
@@ -63,10 +66,13 @@ rest_create_or_update_account() {
                     return 1
                 fi
             fi
-            resp=$(splunk_curl_post "${sk}" \
+            if resp=$(splunk_curl_post "${sk}" \
                 "${update_body}" \
-                "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-            curl_rc=$?
+                "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null); then
+                curl_rc=0
+            else
+                curl_rc=$?
+            fi
             http_code=$(echo "${resp}" | tail -1)
             if [[ "${curl_rc}" -ne 0 ]] || ! [[ "${http_code}" =~ ^[0-9]{3}$ ]]; then
                 echo "ERROR: Update account failed (curl exit ${curl_rc}, transport or TLS failure; reported HTTP '${http_code:-empty}')." >&2

@@ -197,7 +197,6 @@ def build_auto_spec(args: argparse.Namespace) -> dict[str, Any]:
     instrumentation["languages"] = [args.language]
     instrumentation["runtime_metrics_enabled"] = args.language in {"java", "nodejs"}
     spec["instrumentation_crs"] = [instrumentation]
-    spec["operator"]["multi_instrumentation"] = False
     spec["namespace_annotations"] = {}
     spec["workload_annotations"] = [
         {
@@ -209,8 +208,6 @@ def build_auto_spec(args: argparse.Namespace) -> dict[str, Any]:
         }
     ]
     spec["obi"]["enabled"] = False
-    spec["vendors"]["detect"] = False
-    spec["vendors"]["exclude"] = []
     return spec
 
 

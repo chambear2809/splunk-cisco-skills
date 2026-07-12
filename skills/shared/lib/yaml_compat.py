@@ -139,6 +139,8 @@ class _SimpleYamlParser:
                     item, index = self._parse_block(index, self.lines[index][0])
                 else:
                     item = None
+            elif raw_item in {"|", "|-", "|+", ">", ">-", ">+"}:
+                item, index = self._parse_block_scalar(index, indent)
             elif _looks_like_mapping_item(raw_item):
                 key, raw_value = _split_key_value(raw_item, self.source)
                 item = {key: _parse_scalar(raw_value) if raw_value else {}}
@@ -181,7 +183,14 @@ def _dump_node(value: Any, *, indent: int, sort_keys: bool) -> str:
                 lines.append(f"{pad}{rendered_key}:")
                 lines.append(_dump_node(child, indent=indent + 2, sort_keys=sort_keys))
             else:
-                lines.append(f"{pad}{rendered_key}: {_format_scalar(child)}")
+                rendered = _format_scalar(child)
+                first, *remaining = rendered.splitlines()
+                lines.append(f"{pad}{rendered_key}: {first}")
+                # _format_scalar emits block-scalar content with two spaces of
+                # relative indentation. Preserve that relationship beneath a
+                # nested mapping key instead of accidentally moving the block
+                # to the document root.
+                lines.extend(f"{pad}{line}" for line in remaining)
         return "\n".join(lines)
     if isinstance(value, list):
         if not value:
@@ -192,7 +201,10 @@ def _dump_node(value: Any, *, indent: int, sort_keys: bool) -> str:
                 lines.append(f"{pad}-")
                 lines.append(_dump_node(item, indent=indent + 2, sort_keys=sort_keys))
             else:
-                lines.append(f"{pad}- {_format_scalar(item)}")
+                rendered = _format_scalar(item)
+                first, *remaining = rendered.splitlines()
+                lines.append(f"{pad}- {first}")
+                lines.extend(f"{pad}{line}" for line in remaining)
         return "\n".join(lines)
     return f"{pad}{_format_scalar(value)}"
 
@@ -293,8 +305,8 @@ def _parse_key(raw: str) -> str:
     return str(parsed)
 
 
-_YAML_TRUE_LITERALS = frozenset({"true", "yes", "on", "y"})
-_YAML_FALSE_LITERALS = frozenset({"false", "no", "off", "n"})
+_YAML_TRUE_LITERALS = frozenset({"true", "yes", "on"})
+_YAML_FALSE_LITERALS = frozenset({"false", "no", "off"})
 
 
 def _parse_scalar(raw: str) -> Any:
@@ -311,10 +323,11 @@ def _parse_scalar(raw: str) -> Any:
         return [_parse_scalar(part.strip()) for part in _split_inline(inner)]
     if lowered in {"null", "~"}:
         return None
-    # YAML 1.1 booleans: PyYAML's safe_load treats yes/no/on/off/y/n (case
-    # insensitive) as bools, so the fallback must do the same to round-trip
-    # operator-authored specs identically. _is_plain_safe already quotes these
-    # literals on dump to avoid accidental coercion.
+    # YAML 1.1 booleans: PyYAML's safe_load treats yes/no/on/off (case
+    # insensitive) as bools, while the single-letter y/n forms remain strings.
+    # The fallback must do the same so operator-authored specs parse identically.
+    # _is_plain_safe already quotes these literals on dump to avoid accidental
+    # coercion.
     if lowered in _YAML_TRUE_LITERALS:
         return True
     if lowered in _YAML_FALSE_LITERALS:

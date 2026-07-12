@@ -35,14 +35,16 @@ This handles children that emit multiple overlay files (e.g. a future split wher
 The umbrella's `deep_merge(a, b)` function:
 
 - For dict values: recursive merge, with `b` taking precedence for scalar leaves.
-- For list values: concatenate `a + b`. (Caveat: lists of dicts are NOT smart-merged by key; if the same exporter appears in both `a` and `b`, you'll see duplicate entries. The umbrella avoids this by using disjoint receiver/processor/pipeline names per child.)
+- For list values: concatenate `a + b`, then remove exact duplicates while preserving order. Lists of mappings are not smart-merged by a logical key; mappings that differ remain separate entries.
 - For scalar values: `b` wins.
 
-This matches Helm's `deepCopy + merge` semantics, so the resulting overlay can be passed directly to `helm upgrade --reuse-values` without surprises.
+These are renderer-specific semantics, not a claim of exact Helm merge
+equivalence. Review list-valued chart settings in the composed overlay before
+the later `yq`/Helm apply handoff.
 
 ## Order of operations
 
-1. Run each child renderer (in parallel where possible).
+1. Run each enabled child renderer sequentially in the configured child order.
 2. Load each child's overlay files.
 3. Deep-merge children: `composite = merge(merge(merge({}, nexus), intersight), gpu)`.
 4. Render the umbrella's own additions (NIM/vLLM/Milvus/Trident/Portworx/Redfish + dual-pipeline + RBAC).
@@ -57,20 +59,13 @@ If any child returns non-zero, the umbrella aborts with the child's stderr surfa
 
 ## Token-scrub propagation
 
-Each child's renderer enforces its own token-scrub (no secrets in the rendered overlay). The umbrella does NOT re-scrub child output; instead it relies on each child's contract. When you write `tests/test_splunk_observability_cisco_ai_pod_integration.py`, you assert no secret-shaped strings appear in the composite, which catches any child that breaks its contract.
+Each child renderer enforces its own secret-safety contract. The umbrella's
+validator also scans the complete rendered output tree, including child
+renders, for inline token-shaped fields before accepting the bundle.
 
 ## Re-rendering after a child changes
 
 When you upgrade a child skill (e.g. nexus adds support for IOS-XR), re-run the umbrella's `setup.sh --render` to pick up the change. The child's rendered output is regenerated each time; there's no caching.
-
-## Testing
-
-The umbrella's `tests/test_splunk_observability_cisco_ai_pod_integration.py` includes:
-
-- `test_composition_invokes_all_three_children`: confirms subprocess invocation.
-- `test_composed_overlay_contains_all_child_blocks`: asserts cisco_os, OTLP, dcgm-cisco all appear in the final overlay.
-- `test_composed_overlay_is_valid_yaml`: asserts the merge produces parseable YAML.
-- `test_intersight_pipeline_merged`: regression for the bug where Intersight's overlay was silently dropped.
 
 ## Anti-patterns
 

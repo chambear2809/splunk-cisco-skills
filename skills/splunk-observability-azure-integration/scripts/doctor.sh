@@ -39,10 +39,10 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 if [[ -z "${REALM}" && -f "${OUTPUT_DIR}/coverage-report.json" ]]; then
-    REALM="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/coverage-report.json').read()).get('realm','unknown'))
-" 2>/dev/null || echo "unknown")"
+    REALM="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("realm", "unknown"))
+' "${OUTPUT_DIR}/coverage-report.json" 2>/dev/null || echo "unknown")"
 fi
 
 fails=()
@@ -51,7 +51,7 @@ infos=()
 
 # 1. rest/create.json exists and has expected shape.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    "${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/create.json" <<'PY'
+    if "${PYTHON_BIN}" - "${OUTPUT_DIR}/rest/create.json" <<'PY'
 import json, sys
 data = json.loads(open(sys.argv[1]).read())
 assert data.get('type') == 'Azure', 'type must be Azure'
@@ -60,8 +60,7 @@ assert 60000 <= poll_rate <= 600000, f'pollRate {poll_rate} outside 60000-600000
 subs = data.get('subscriptions', [])
 assert subs, 'subscriptions is empty'
 PY
-    # shellcheck disable=SC2181
-    if [[ $? -eq 0 ]]; then
+    then
         infos+=("rest/create.json: type=Azure, pollRate in range, subscriptions non-empty")
     else
         fails+=("rest/create.json: shape validation failed (type, pollRate, subscriptions)")
@@ -72,10 +71,10 @@ fi
 
 # 2. Poll rate check.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    poll_rate_ms="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('pollRate', 0))
-" 2>/dev/null || echo "0")"
+    poll_rate_ms="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("pollRate", 0))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "0")"
     if (( poll_rate_ms < 300000 )); then
         warns+=("pollRate=${poll_rate_ms}ms is below the recommended 300000ms (300s). Low poll rates increase Azure Monitor API costs.")
     else
@@ -85,10 +84,10 @@ fi
 
 # 3. namedToken ForceNew check.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    named_token="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('namedToken',''))
-" 2>/dev/null || echo "")"
+    named_token="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("namedToken", ""))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "")"
     if [[ -n "${named_token}" ]]; then
         warns+=("namedToken=${named_token} is set. Changing namedToken after apply destroys and re-creates the integration (ForceNew in Terraform). Confirm this is intentional.")
     fi
@@ -96,10 +95,10 @@ fi
 
 # 4. azureEnvironment GovCloud consistency.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    azure_env="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('azureEnvironment','AZURE'))
-" 2>/dev/null || echo "AZURE")"
+    azure_env="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("azureEnvironment", "AZURE"))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "AZURE")"
     if [[ "${azure_env}" == "AZURE_US_GOVERNMENT" ]]; then
         warns+=("azureEnvironment=AZURE_US_GOVERNMENT: confirm the realm (${REALM}) is a Splunk GovCloud org. Contact Splunk if not.")
     fi
@@ -107,11 +106,11 @@ fi
 
 # 5. Credential hash drift.
 if [[ -f "${OUTPUT_DIR}/state/credential-hashes.json" ]]; then
-    stored="$("${PYTHON_BIN}" -c "
-import json
-h = json.loads(open('${OUTPUT_DIR}/state/credential-hashes.json').read())
-print(h.get('app_id_sha256','') + '|' + h.get('secret_sha256',''))
-" 2>/dev/null || echo "|")"
+    stored="$("${PYTHON_BIN}" -c '
+import json, sys
+h = json.load(open(sys.argv[1], encoding="utf-8"))
+print(h.get("app_id_sha256", "") + "|" + h.get("secret_sha256", ""))
+' "${OUTPUT_DIR}/state/credential-hashes.json" 2>/dev/null || echo "|")"
     if [[ "${stored}" == "|" ]] || [[ "${stored}" == "" ]]; then
         warns+=("state/credential-hashes.json has no stored hashes. Apply has not been run yet, or hashes were not recorded.")
     else
@@ -121,13 +120,13 @@ fi
 
 # 6. services non-empty.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    has_services="$("${PYTHON_BIN}" -c "
-import json
-data = json.loads(open('${OUTPUT_DIR}/rest/create.json').read())
-svcs = data.get('services') or []
-additional = data.get('additionalServices') or []
-print('yes' if (svcs or additional) else 'no')
-" 2>/dev/null || echo "no")"
+    has_services="$("${PYTHON_BIN}" -c '
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+svcs = data.get("services") or []
+additional = data.get("additionalServices") or []
+print("yes" if (svcs or additional) else "no")
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "no")"
     if [[ "${has_services}" == "no" ]]; then
         warns+=("Neither services nor additionalServices is set. The integration will monitor ALL built-in Azure services (services.mode=all_built_in); confirm this is intended to avoid excess Azure Monitor API quota usage.")
     fi

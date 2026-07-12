@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -307,110 +308,203 @@ def dcgm_pod_labels_patch(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def dashboard_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def dashboard_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     if not (spec.get("dashboards") or {}).get("enabled", True):
         return {}
+    charts = [
+        ("GPU utilization", "DCGM_FI_DEV_GPU_UTIL"),
+        ("Memory copy utilization", "DCGM_FI_DEV_MEM_COPY_UTIL"),
+        ("FB used", "DCGM_FI_DEV_FB_USED"),
+        ("FB free", "DCGM_FI_DEV_FB_FREE"),
+        ("GPU temperature", "DCGM_FI_DEV_GPU_TEMP"),
+        ("Memory temperature", "DCGM_FI_DEV_MEMORY_TEMP"),
+        ("Power usage", "DCGM_FI_DEV_POWER_USAGE"),
+        ("Total energy consumption", "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION"),
+        ("SM clock", "DCGM_FI_DEV_SM_CLOCK"),
+        ("Memory clock", "DCGM_FI_DEV_MEM_CLOCK"),
+        ("PCIe RX bytes", "DCGM_FI_PROF_PCIE_RX_BYTES"),
+        ("PCIe TX bytes", "DCGM_FI_PROF_PCIE_TX_BYTES"),
+        ("Tensor pipe active", "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE"),
+        ("DRAM active", "DCGM_FI_PROF_DRAM_ACTIVE"),
+        ("Graphics engine active", "DCGM_FI_PROF_GR_ENGINE_ACTIVE"),
+    ]
     return {
         "nvidia-gpu-overview": {
-            "name": "NVIDIA GPU Overview",
-            "description": "Per-GPU utilization, memory, temp, power, clocks, PCIe, energy, profiling",
+            "api_version": "splunk-observability-dashboard-builder/v1",
+            "mode": "classic-api",
+            "realm": realm,
+            "dashboard_group": {
+                "name": "NVIDIA GPU Observability",
+                "description": f"NVIDIA GPU dashboards for cluster {cluster_name}.",
+            },
+            "dashboard": {
+                "name": "NVIDIA GPU Overview",
+                "description": (
+                    "Per-GPU utilization, memory, temperature, power, clocks, "
+                    "PCIe, energy, and profiling"
+                ),
+                "chart_density": "DEFAULT",
+                "filters": {
+                    "variables": [
+                        {
+                            "property": "k8s.cluster.name",
+                            "alias": "Cluster",
+                            "value": [cluster_name],
+                            "required": True,
+                            "restricted": True,
+                        }
+                    ]
+                },
+            },
             "charts": [
-                _chart("GPU utilization", "DCGM_FI_DEV_GPU_UTIL"),
-                _chart("Memory copy utilization", "DCGM_FI_DEV_MEM_COPY_UTIL"),
-                _chart("FB used", "DCGM_FI_DEV_FB_USED"),
-                _chart("FB free", "DCGM_FI_DEV_FB_FREE"),
-                _chart("GPU temperature", "DCGM_FI_DEV_GPU_TEMP"),
-                _chart("Memory temperature", "DCGM_FI_DEV_MEMORY_TEMP"),
-                _chart("Power usage", "DCGM_FI_DEV_POWER_USAGE"),
-                _chart("Total energy consumption", "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION"),
-                _chart("SM clock", "DCGM_FI_DEV_SM_CLOCK"),
-                _chart("Memory clock", "DCGM_FI_DEV_MEM_CLOCK"),
-                _chart("PCIe RX bytes", "DCGM_FI_PROF_PCIE_RX_BYTES"),
-                _chart("PCIe TX bytes", "DCGM_FI_PROF_PCIE_TX_BYTES"),
-                _chart("Tensor pipe active", "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE"),
-                _chart("DRAM active", "DCGM_FI_PROF_DRAM_ACTIVE"),
-                _chart("Graphics engine active", "DCGM_FI_PROF_GR_ENGINE_ACTIVE"),
+                _chart(name, metric, cluster_name, position)
+                for position, (name, metric) in enumerate(charts)
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
         }
     }
 
 
-def _chart(name: str, metric: str) -> dict[str, Any]:
+def _chart(name: str, metric: str, cluster_name: str, position: int) -> dict[str, Any]:
+    metric_literal = json.dumps(metric)
+    cluster_literal = json.dumps(cluster_name)
     return {
+        "id": re.sub(r"[^a-z0-9]+", "-", metric.lower()).strip("-") or "metric",
         "name": name,
         "description": f"{metric} from DCGM Exporter",
-        "program_text": f"data('{metric}', filter=filter('k8s.cluster.name', '${{CLUSTER_NAME}}')).publish(label='{metric}')",
+        "type": "TimeSeriesChart",
+        "plot_type": "LineChart",
+        "row": position // 2,
+        "column": 0 if position % 2 == 0 else 6,
+        "width": 6,
+        "height": 1,
+        "program_text": (
+            f"data({metric_literal}, filter=filter('k8s.cluster.name', {cluster_literal}))"
+            f".publish(label={metric_literal})"
+        ),
         "publish_label": metric,
     }
 
 
-def detector_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _detector_spec(
+    *,
+    realm: str,
+    cluster_name: str,
+    name: str,
+    metric: str,
+    direction: str,
+    threshold: int | float,
+    severity: str,
+    aggregation: str,
+    detect_label: str,
+) -> dict[str, Any]:
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise SpecError(f"Detector threshold for {name!r} must be numeric.")
+    transformations = {
+        "max": ".max()",
+        "min": ".min()",
+        "mean": ".mean()",
+        "delta": ".delta()",
+    }
+    comparators = {"above": ">", "below": "<"}
+    if aggregation not in transformations or direction not in comparators:
+        raise SpecError(
+            f"Unsupported detector aggregation/direction: {aggregation!r}/{direction!r}"
+        )
+    stream = (
+        f"data({json.dumps(metric)}, "
+        f"filter=filter('k8s.cluster.name', {json.dumps(cluster_name)}))"
+    )
+    signal_label = f"{detect_label}_signal"
+    program_text = (
+        f"signal = {stream}{transformations[aggregation]}"
+        f".publish(label={json.dumps(signal_label)})\n"
+        f"detect(when(signal {comparators[direction]} threshold({json.dumps(threshold)})))"
+        f".publish({json.dumps(detect_label)})"
+    )
+    return {
+        "api_version": "splunk-observability-native-ops/v1",
+        "realm": realm,
+        "detectors": [
+            {
+                "name": name,
+                "description": f"NVIDIA GPU {aggregation} detector for {metric}.",
+                "program_text": program_text,
+                "tags": ["nvidia-gpu", aggregation],
+                "rules": [
+                    {
+                        "detect_label": detect_label,
+                        "severity": severity,
+                        "description": f"{metric} is {direction} threshold {threshold}.",
+                        "notifications": [],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def detector_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     block = spec.get("detectors") or {}
     if not block.get("enabled", True):
         return {}
     thresholds = block.get("thresholds") or {}
-    detectors = {
+    definitions = {
         "gpu-temp-ceiling": {
-            "test_type": "nvidia-gpu",
-            "detectors": [
-                {
-                    "name": "GPU temperature ceiling",
-                    "metric": "DCGM_FI_DEV_GPU_TEMP",
-                    "direction": "above",
-                    "threshold": thresholds.get("gpu_temp_ceiling_celsius", 85),
-                    "severity": "Major",
-                    "aggregation": "max",
-                }
-            ],
+            "name": "GPU temperature ceiling",
+            "metric": "DCGM_FI_DEV_GPU_TEMP",
+            "direction": "above",
+            "threshold": thresholds.get("gpu_temp_ceiling_celsius", 85),
+            "severity": "Major",
+            "aggregation": "max",
+            "detect_label": "gpu_temp_ceiling",
         },
         "gpu-power-floor": {
-            "test_type": "nvidia-gpu",
-            "detectors": [
-                {
-                    "name": "GPU power floor (unexpected power loss)",
-                    "metric": "DCGM_FI_DEV_POWER_USAGE",
-                    "direction": "below",
-                    "threshold": thresholds.get("gpu_power_floor_watts", 50),
-                    "severity": "Warning",
-                    "aggregation": "min",
-                }
-            ],
+            "name": "GPU power floor (unexpected power loss)",
+            "metric": "DCGM_FI_DEV_POWER_USAGE",
+            "direction": "below",
+            "threshold": thresholds.get("gpu_power_floor_watts", 50),
+            "severity": "Warning",
+            "aggregation": "min",
+            "detect_label": "gpu_power_floor",
         },
         "gpu-utilization-low": {
-            "test_type": "nvidia-gpu",
-            "detectors": [
-                {
-                    "name": "GPU utilization regression (cost optimization)",
-                    "metric": "DCGM_FI_DEV_GPU_UTIL",
-                    "direction": "below",
-                    "threshold": thresholds.get("gpu_utilization_pct_floor", 10),
-                    "severity": "Info",
-                    "aggregation": "mean",
-                }
-            ],
+            "name": "GPU utilization regression (cost optimization)",
+            "metric": "DCGM_FI_DEV_GPU_UTIL",
+            "direction": "below",
+            "threshold": thresholds.get("gpu_utilization_pct_floor", 10),
+            "severity": "Info",
+            "aggregation": "mean",
+            "detect_label": "gpu_utilization_low",
         },
     }
     if thresholds.get("energy_consumption_joules_anomaly", 0) > 0:
-        detectors["energy-anomaly"] = {
-            "test_type": "nvidia-gpu",
-            "detectors": [
-                {
-                    "name": "GPU energy consumption anomaly",
-                    "metric": "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION",
-                    "direction": "above",
-                    "threshold": thresholds["energy_consumption_joules_anomaly"],
-                    "severity": "Info",
-                    "aggregation": "delta",
-                }
-            ],
+        definitions["energy-anomaly"] = {
+            "name": "GPU energy consumption anomaly",
+            "metric": "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION",
+            "direction": "above",
+            "threshold": thresholds["energy_consumption_joules_anomaly"],
+            "severity": "Info",
+            "aggregation": "delta",
+            "detect_label": "gpu_energy_anomaly",
         }
-    return detectors
+    return {
+        key: _detector_spec(realm=realm, cluster_name=cluster_name, **definition)
+        for key, definition in definitions.items()
+    }
 
 
-def render_handoffs(spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
+def render_handoffs(
+    spec: dict[str, Any], realm: str, cluster_name: str, distribution: str
+) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
+    realm_q = shlex.quote(str(realm))
+    cluster_name_q = shlex.quote(str(cluster_name))
+    distribution_q = shlex.quote(str(distribution))
     if handoffs.get("base_collector", True):
         helpers["handoff-base-collector.sh"] = (
             f"""#!/usr/bin/env bash
@@ -421,18 +515,27 @@ if ! command -v yq >/dev/null 2>&1; then
     exit 1
 fi
 
-OVERLAY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/splunk-otel-overlay/values.overlay.yaml"
+BUNDLE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="$BUNDLE_DIR/splunk-otel-overlay/values.overlay.yaml"
 BASE_OUTPUT_DIR="${{BASE_OUTPUT_DIR:-/tmp/splunk-observability-otel-rendered}}"
+REALM={realm_q}
+CLUSTER_NAME={cluster_name_q}
+DISTRIBUTION={distribution_q}
+printf -v BASE_OUTPUT_DIR_Q '%q' "$BASE_OUTPUT_DIR"
+printf -v OVERLAY_Q '%q' "$OVERLAY"
+printf -v REALM_Q '%q' "$REALM"
+printf -v CLUSTER_NAME_Q '%q' "$CLUSTER_NAME"
+printf -v DISTRIBUTION_Q '%q' "$DISTRIBUTION"
 
 echo "Step 1: Render base collector values."
 echo "    bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\\\"
-echo "      --render-k8s --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
-echo "      --output-dir ${{BASE_OUTPUT_DIR}}"
+echo "      --render-k8s --realm ${{REALM_Q}} --cluster-name ${{CLUSTER_NAME_Q}} --distribution ${{DISTRIBUTION_Q}} \\\\"
+echo "      --output-dir ${{BASE_OUTPUT_DIR_Q}}"
 echo
 echo "Step 2: Merge overlay."
 echo "    yq eval-all '. as \\$item ireduce ({{}}; . * \\$item)' \\\\"
-echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
-echo "      ${{OVERLAY}} \\\\"
+echo "      ${{BASE_OUTPUT_DIR_Q}}/k8s/values.yaml \\\\"
+echo "      ${{OVERLAY_Q}} \\\\"
 echo "      > /tmp/merged-values.yaml"
 echo
 echo "Step 3: Apply via helm."
@@ -447,10 +550,13 @@ echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
             f"""#!/usr/bin/env bash
 set -euo pipefail
 DASHBOARDS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/dashboards"
+REALM={realm_q}
+printf -v DASHBOARDS_DIR_Q '%q' "$DASHBOARDS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Import dashboards via splunk-observability-dashboard-builder:"
-echo "    for spec in ${{DASHBOARDS_DIR}}/*.signalflow.yaml; do"
+echo "    for spec in ${{DASHBOARDS_DIR_Q}}/*.signalflow.yaml; do"
 echo "      bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \\\\"
-echo "        --render --apply --realm {realm} --spec \\$spec --token-file \\$O11Y_API_TOKEN_FILE"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
 echo "    done"
 """
         )
@@ -459,9 +565,14 @@ echo "    done"
             f"""#!/usr/bin/env bash
 set -euo pipefail
 DETECTORS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/detectors"
+REALM={realm_q}
+printf -v DETECTORS_DIR_Q '%q' "$DETECTORS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Apply detectors via splunk-observability-native-ops:"
-echo "    bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
-echo "      --render --apply --realm {realm} --spec ${{DETECTORS_DIR}}/<detector>.yaml --token-file \\$O11Y_API_TOKEN_FILE"
+echo "    for spec in ${{DETECTORS_DIR_Q}}/*.yaml; do"
+echo "      bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
+echo "    done"
 """
         )
     return helpers
@@ -581,9 +692,9 @@ def main() -> int:
             executable=True,
         )
 
-    for name, payload in dashboard_specs(spec).items():
+    for name, payload in dashboard_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"dashboards/{name}.signalflow.yaml", payload)
-    for name, payload in detector_specs(spec).items():
+    for name, payload in detector_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"detectors/{name}.yaml", payload)
 
     for name, body in render_handoffs(spec, realm, cluster_name, distribution).items():

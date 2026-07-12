@@ -403,12 +403,429 @@ def test_kubernetes_values_enable_expected_all_signal_options(tmp_path: Path) ->
     assert '${instrumentation_name}-inst-hook' in status
     assert 'get instrumentation \\' in status
     assert '"${instrumentation_name}" >/dev/null' in status
-    assert '--max-log-requests="${pod_count}"' in status
+    assert '-l release="${release_name}"' in status
+    assert '-l app.kubernetes.io/instance="${release_name}"' in status
+    assert 'LC_ALL=C sort -u "${release_pods}" "${instance_pods}" > "${pod_list}"' in status
+    assert "failed to inventory primary Collector pods" in status
+    assert "failed to inventory auxiliary Collector pods" in status
+    assert "--field-selector=" not in status
+    assert "--verify-runtime-pod-json" in status
+    assert 'pod_membership=primary' in status
+    assert '<"${pod_json}" >/dev/null 2>&1' in status
+    assert 'logs "${pod}"' in status
+    assert 'pod_log="$(mktemp)"' in status
+    assert '>"${pod_log}" 2>&1' in status
+    assert 'cat "${pod_log}" >> "${log_file}"' in status
+    assert "command output suppressed" in status
+    assert "live Kubernetes workload image verification failed" in status
+    assert "verifier output suppressed" in status
+    assert '--verify-object-json' in status
+    assert 'redact-stream.py" < "${log_file}"' not in status
+    assert "dropping datapoint.*number of dimensions is larger than 36" in status
+    assert "fatal_count=" in status
+    assert "drop_count=" in status
+    assert "matched content suppressed" in status
+    assert "metric data-loss" in status
+    assert "outside the supported +/-1 minor skew" in status
     assert "failed to retrieve collector release logs" in status
     assert "expected_opamp" not in status
     assert "OpAMP registration" not in status
     assert "opamp_registration_enabled" not in metadata["kubernetes"]
     assert "built-in OpAMP registration" not in result.stdout
+
+
+def _render_collector_status_for_behavior(tmp_path: Path) -> tuple[Path, str]:
+    output_dir = tmp_path / "status-behavior"
+    result = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us1",
+        "--cluster-name",
+        "behavioral-gate",
+        "--output-dir",
+        str(output_dir),
+    )
+    assert result.returncode == 0, result.stdout
+    status_path = output_dir / "k8s/status.sh"
+    return status_path.parent, status_path.read_text(encoding="utf-8")
+
+
+def _write_status_kubectl_fixture(tmp_path: Path) -> Path:
+    fake_bin = tmp_path / "status-bin"
+    fake_bin.mkdir()
+    kubectl = fake_bin / "kubectl"
+    kubectl.write_text(
+        """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+if "version" in args:
+    print(os.environ["VERSION_JSON"])
+    raise SystemExit(0)
+if "get" in args and "pods" in args and "-o" in args:
+    output = args[args.index("-o") + 1]
+    if output == "name":
+        selector = args[args.index("-l") + 1]
+        if os.environ.get("FAIL_SELECTOR") and os.environ["FAIL_SELECTOR"] in selector:
+            print("SELECTOR_PRIVATE_MARKER", file=sys.stderr)
+            raise SystemExit(1)
+        if selector.startswith("release="):
+            print("pod/a-primary")
+            print("pod/m-shared")
+        else:
+            print("pod/m-shared")
+            print("pod/z-failing")
+            if os.environ.get("ADD_COMPLETED_JOB") == "true":
+                print("pod/completed-hook")
+        raise SystemExit(0)
+    if output == "json":
+        print(json.dumps({"items": []}))
+        raise SystemExit(0)
+if "get" in args and "pod" in args and "-o" in args:
+    name = args[args.index("pod") + 1]
+    image = "registry.example.test/fixture@sha256:" + "a" * 64
+    container_name = "fixture"
+    if name in {"a-primary", "m-shared"}:
+        container_name = "otel-collector"
+        image = (
+            "quay.io/signalfx/splunk-otel-collector@sha256:"
+            "b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"
+        )
+    if os.environ.get("BAD_IMAGE_POD") == name:
+        image = "registry.example.test/fixture:latest"
+    if os.environ.get("PRIVATE_BAD_IMAGE_POD") == name:
+        image = "registry.example.test/private-image-marker:latest"
+    phase = "Running"
+    ready = "True"
+    owner_references = []
+    if name in {"a-primary", "m-shared"}:
+        owner_references = [{
+            "apiVersion": "apps/v1",
+            "kind": "DaemonSet",
+            "name": "splunk-otel-collector-agent",
+            "controller": True,
+        }]
+    if os.environ.get("UNREADY_POD") == name:
+        ready = "False"
+    if os.environ.get("FAILED_POD") == name:
+        phase = "Failed"
+        ready = "False"
+    if name == "completed-hook":
+        phase = "Succeeded"
+        ready = "False"
+        owner_references = [{
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "completed-hook-job",
+            "controller": True,
+        }]
+    print(json.dumps({
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": name,
+            "namespace": "splunk-otel",
+            "ownerReferences": owner_references,
+        },
+        "spec": {"containers": [{"name": container_name, "image": image}]},
+        "status": {
+            "phase": phase,
+            "conditions": [{"type": "Ready", "status": ready}],
+        },
+    }))
+    raise SystemExit(0)
+if "logs" in args:
+    pod = args[args.index("logs") + 1]
+    with open(os.environ["CALL_LOG"], "a", encoding="utf-8") as handle:
+        handle.write(pod + "\\n")
+    if pod == "pod/z-failing" and os.environ.get("FAIL_LOG") == "true":
+        print("FAILURE_PRIVATE_MARKER", file=sys.stderr)
+        raise SystemExit(1)
+    if pod == "pod/a-primary" and os.environ.get("DATA_LOSS") == "true":
+        print(
+            "dropping datapoint CUSTOMER_DIMENSION_MARKER because the number of dimensions is larger than 36"
+        )
+    elif pod == "pod/a-primary":
+        print("PRIOR_PRIVATE_MARKER")
+    else:
+        print("collector info")
+    raise SystemExit(0)
+print("unexpected kubectl fixture command", file=sys.stderr)
+raise SystemExit(2)
+""",
+        encoding="utf-8",
+    )
+    kubectl.chmod(0o755)
+    return fake_bin
+
+
+def _status_log_harness(tmp_path: Path, script_dir: Path, status: str) -> Path:
+    start = status.index('log_file="$(mktemp)"')
+    harness = tmp_path / "status-log-harness.sh"
+    harness.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'namespace="splunk-otel"\n'
+        'release_name="splunk-otel-collector"\n'
+        f"script_dir={json.dumps(str(script_dir))}\n"
+        + status[start:],
+        encoding="utf-8",
+    )
+    harness.chmod(0o755)
+    return harness
+
+
+def test_status_log_gate_deduplicates_and_suppresses_arbitrary_log_content(
+    tmp_path: Path,
+) -> None:
+    script_dir, status = _render_collector_status_for_behavior(tmp_path)
+    fake_bin = _write_status_kubectl_fixture(tmp_path)
+    harness = _status_log_harness(tmp_path, script_dir, status)
+    call_log = tmp_path / "kubectl-log-calls"
+    base_env = os.environ.copy()
+    base_env.update(
+        {
+            "PATH": f"{fake_bin}{os.pathsep}{base_env['PATH']}",
+            "CALL_LOG": str(call_log),
+            "VERSION_JSON": json.dumps(
+                {
+                    "clientVersion": {"major": "1", "minor": "35"},
+                    "serverVersion": {"major": "1", "minor": "34"},
+                }
+            ),
+        }
+    )
+
+    failed_log_env = base_env | {"FAIL_LOG": "true"}
+    failed_log = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=failed_log_env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert failed_log.returncode != 0
+    assert "command output suppressed" in failed_log.stdout
+    for private_marker in ("PRIOR_PRIVATE_MARKER", "FAILURE_PRIVATE_MARKER"):
+        assert private_marker not in failed_log.stdout
+    calls = call_log.read_text(encoding="utf-8").splitlines()
+    assert calls.count("pod/m-shared") == 1
+
+    call_log.unlink()
+    selector_failure = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=base_env | {"FAIL_SELECTOR": "release="},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert selector_failure.returncode != 0
+    assert "failed to inventory primary Collector pods" in selector_failure.stdout
+    assert "SELECTOR_PRIVATE_MARKER" not in selector_failure.stdout
+
+    data_loss = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=base_env | {"DATA_LOSS": "true"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert data_loss.returncode != 0
+    assert "metric data-loss match(es)" in data_loss.stdout
+    assert "CUSTOMER_DIMENSION_MARKER" not in data_loss.stdout
+    assert "matched content suppressed" in data_loss.stdout
+
+    release_only_bad_image = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=base_env | {"BAD_IMAGE_POD": "a-primary"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert release_only_bad_image.returncode != 0
+    assert "readiness or image verification failed for pod/a-primary" in (
+        release_only_bad_image.stdout
+    )
+
+    private_image = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=base_env | {"PRIVATE_BAD_IMAGE_POD": "z-failing"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert private_image.returncode != 0
+    assert "verifier output suppressed" in private_image.stdout
+    assert "private-image-marker" not in private_image.stdout
+
+    for state_env in ({"UNREADY_POD": "z-failing"}, {"FAILED_POD": "z-failing"}):
+        unhealthy = subprocess.run(
+            ["bash", str(harness)],
+            cwd=REPO_ROOT,
+            env=base_env | state_env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        assert unhealthy.returncode != 0
+        assert "readiness or image verification failed for pod/z-failing" in (
+            unhealthy.stdout
+        )
+
+    if call_log.exists():
+        call_log.unlink()
+    completed_job = subprocess.run(
+        ["bash", str(harness)],
+        cwd=REPO_ROOT,
+        env=base_env | {"ADD_COMPLETED_JOB": "true"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert completed_job.returncode == 0, completed_job.stdout
+    assert "1 completed Job pod(s)" in completed_job.stdout
+    assert "pod/completed-hook" not in call_log.read_text(encoding="utf-8").splitlines()
+
+
+def test_status_version_skew_gate_executes_fail_closed(tmp_path: Path) -> None:
+    _, status = _render_collector_status_for_behavior(tmp_path)
+    marker = status.index("outside the supported +/-1 minor skew")
+    start = status.rfind("command -v python3", 0, marker)
+    end = status.index("\n\nstatus_release_record=", marker)
+    harness = tmp_path / "status-version-harness.sh"
+    harness.write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\n" + status[start:end] + "\n",
+        encoding="utf-8",
+    )
+    harness.chmod(0o755)
+    fake_bin = _write_status_kubectl_fixture(tmp_path)
+    base_env = os.environ.copy()
+    base_env["PATH"] = f"{fake_bin}{os.pathsep}{base_env['PATH']}"
+    base_env["CALL_LOG"] = str(tmp_path / "unused-call-log")
+
+    supported = subprocess.run(
+        ["bash", str(harness)],
+        env=base_env
+        | {
+            "VERSION_JSON": json.dumps(
+                {
+                    "clientVersion": {"major": "1", "minor": "35+"},
+                    "serverVersion": {"major": "1", "minor": "34"},
+                }
+            )
+        },
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert supported.returncode == 0, supported.stdout
+
+    unsupported = subprocess.run(
+        ["bash", str(harness)],
+        env=base_env
+        | {
+            "VERSION_JSON": json.dumps(
+                {
+                    "clientVersion": {"major": "1", "minor": "36"},
+                    "serverVersion": {"major": "1", "minor": "34"},
+                }
+            )
+        },
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert unsupported.returncode != 0
+    assert "outside the supported +/-1 minor skew" in unsupported.stdout
+
+    malformed = subprocess.run(
+        ["bash", str(harness)],
+        env=base_env
+        | {
+            "VERSION_JSON": json.dumps(
+                {
+                    "clientVersion": {"major": "1", "minor": "not-a-version"},
+                    "serverVersion": {"major": "1", "minor": "34"},
+                }
+            )
+        },
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert malformed.returncode != 0
+    assert "minor version is invalid" in malformed.stdout
+
+
+def test_status_helm_gate_streams_private_notes_and_fails_closed(tmp_path: Path) -> None:
+    _, status = _render_collector_status_for_behavior(tmp_path)
+    assert "helm_status_json" not in status
+    start = status.index("# Never retain the full Helm status document")
+    deployed_echo = 'echo "Helm status: deployed"'
+    end = status.index(deployed_echo, start) + len(deployed_echo)
+    harness = tmp_path / "status-helm-harness.sh"
+    harness.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'namespace="splunk-otel"\n'
+        'release_name="splunk-otel-collector"\n'
+        + status[start:end]
+        + "\n",
+        encoding="utf-8",
+    )
+    harness.chmod(0o755)
+
+    fake_bin = tmp_path / "helm-status-bin"
+    fake_bin.mkdir()
+    helm = fake_bin / "helm"
+    helm.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os,sys\n"
+        "sys.stdout.write(os.environ['HELM_STATUS_PAYLOAD'])\n",
+        encoding="utf-8",
+    )
+    helm.chmod(0o755)
+    base_env = os.environ.copy()
+    base_env["PATH"] = f"{fake_bin}{os.pathsep}{base_env['PATH']}"
+    sentinel = "HELM_PRIVATE_NOTES_MARKER"
+
+    cases = (
+        (json.dumps({"info": {"status": "deployed", "notes": sentinel}}), 0),
+        (json.dumps({"info": {"status": "failed", "notes": sentinel}}), 1),
+        (f'{{"info": {sentinel}', 1),
+    )
+    for payload, expected_failure in cases:
+        result = subprocess.run(
+            ["bash", "-x", str(harness)],
+            env=base_env | {"HELM_STATUS_PAYLOAD": payload},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        assert (result.returncode != 0) == bool(expected_failure), result.stdout
+        assert sentinel not in result.stdout
+        if expected_failure:
+            assert "command output suppressed" in result.stdout
+        else:
+            assert "Helm status: deployed" in result.stdout
 
 
 def test_kubernetes_extra_values_file_is_copied_and_used_by_helm(tmp_path: Path) -> None:
@@ -765,7 +1182,9 @@ def test_kubernetes_supply_chain_uses_verified_chart_and_digest_image_policy(tmp
     assert '--post-renderer "${script_dir}/k8s-image-post-renderer.py"' in preflight
     assert "Python 3.8 or newer" in preflight
     assert "the pinned chart requires Helm 3.9+ or Helm 4" in preflight
-    assert "--verify-object-list-json" in status
+    assert "--verify-runtime-pod-json" in status
+    assert "targets_for_primary_pod" in renderer_text
+    assert "verify_known_pod_container_names" not in renderer_text
     assert 'verifier="${script_dir}/verify-supply-chain.sh"' in status
     assert 'verifier="${script_dir}/verify-supply-chain.sh"' in (
         k8s / "create-secret.sh"
@@ -851,6 +1270,179 @@ spec:
         assert rejected.returncode != 0
         assert "image pin verification failed" in rejected.stdout
 
+    moved_core_pod = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": "collector-agent-review",
+            "namespace": "splunk-otel",
+            "ownerReferences": [
+                {
+                    "apiVersion": "apps/v1",
+                    "kind": "DaemonSet",
+                    "name": "splunk-otel-collector-agent",
+                    "controller": True,
+                }
+            ],
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "otel-collector",
+                    "image": "admission.invalid/replaced-core@sha256:" + "c" * 64,
+                },
+                {
+                    "name": "reviewed-auxiliary",
+                    "image": "registry.example.test/auxiliary@sha256:" + "d" * 64,
+                },
+            ]
+        },
+        "status": {
+            "phase": "Running",
+            "conditions": [{"type": "Ready", "status": "True"}],
+        },
+    }
+    rejected = subprocess.run(
+        [
+            "python3",
+            str(renderer),
+            "--verify-runtime-pod-json",
+            "collector-agent-review",
+            "primary",
+        ],
+        input=json.dumps(moved_core_pod),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "does not have exactly one" in rejected.stdout
+
+    accepted_pod = json.loads(json.dumps(moved_core_pod))
+    accepted_pod["spec"]["containers"][0]["image"] = standard_pin
+    accepted = subprocess.run(
+        [
+            "python3",
+            str(renderer),
+            "--verify-runtime-pod-json",
+            "collector-agent-review",
+            "primary",
+        ],
+        input=json.dumps(accepted_pod),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert accepted.returncode == 0, accepted.stdout
+
+    prefix_collision_auxiliary = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": "collector-operator-review",
+            "namespace": "splunk-otel",
+            "ownerReferences": [
+                {
+                    "apiVersion": "apps/v1",
+                    "kind": "ReplicaSet",
+                    "name": "splunk-otel-collector-operator-reviewhash",
+                    "controller": True,
+                }
+            ],
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "otel-collector",
+                    "image": "registry.example.test/operator@sha256:" + "e" * 64,
+                }
+            ]
+        },
+        "status": {
+            "phase": "Running",
+            "conditions": [{"type": "Ready", "status": "True"}],
+        },
+    }
+    auxiliary = subprocess.run(
+        [
+            "python3",
+            str(renderer),
+            "--verify-runtime-pod-json",
+            "collector-operator-review",
+            "auxiliary",
+        ],
+        input=json.dumps(prefix_collision_auxiliary),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert auxiliary.returncode == 0, auxiliary.stdout
+    misclassified_primary = subprocess.run(
+        [
+            "python3",
+            str(renderer),
+            "--verify-runtime-pod-json",
+            "collector-operator-review",
+            "primary",
+        ],
+        input=json.dumps(prefix_collision_auxiliary),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert misclassified_primary.returncode != 0
+    assert "exact rendered core controller" in misclassified_primary.stdout
+
+    renamed_deployment_core = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": "collector-receiver-review",
+            "namespace": "splunk-otel",
+            "labels": {"pod-template-hash": "reviewhash"},
+            "ownerReferences": [
+                {
+                    "apiVersion": "apps/v1",
+                    "kind": "ReplicaSet",
+                    "name": "splunk-otel-collector-k8s-cluster-receiver-reviewhash",
+                    "controller": True,
+                }
+            ],
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "renamed-core",
+                    "image": "registry.example.test/replaced@sha256:" + "f" * 64,
+                }
+            ]
+        },
+        "status": {
+            "phase": "Running",
+            "conditions": [{"type": "Ready", "status": "True"}],
+        },
+    }
+    renamed = subprocess.run(
+        [
+            "python3",
+            str(renderer),
+            "--verify-runtime-pod-json",
+            "collector-receiver-review",
+            "primary",
+        ],
+        input=json.dumps(renamed_deployment_core),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert renamed.returncode != 0
+    assert "does not have exactly one" in renamed.stdout
+
     metadata = json.loads((output_dir / "metadata.json").read_text(encoding="utf-8"))
     supply = metadata["kubernetes"]["image_supply_chain"]
     assert supply["collector_pins"][standard_source] == standard_pin
@@ -910,7 +1502,9 @@ def test_helm_release_guard_rejects_foreign_chart_status_and_revision(
     assert "--all " not in combined
     assert 'get all "${release_name}"' in combined
     assert '--revision "${revision}"' not in combined
-    assert install.index("install_release_record=") < install.index("upgrade --install")
+    assert install.index("query_helm_release allow-absent any deployed >/dev/null") < install.index(
+        "upgrade --install"
+    )
     assert uninstall.index("uninstall_release_record=") < uninstall.index(
         'uninstall "${release_name}"'
     )

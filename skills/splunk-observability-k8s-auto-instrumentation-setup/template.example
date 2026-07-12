@@ -25,7 +25,8 @@ deployment_environment: "prod"
 
 # Kubernetes distribution. One of:
 #   eks | eks/auto-mode | eks/fargate | gke | gke/autopilot | openshift | aks | generic
-# Several distributions auto-detect cluster_name; fargate requires --gateway-endpoint.
+# cluster_name is always explicit; this offline renderer never guesses it.
+# Fargate requires --gateway-endpoint.
 distribution: "generic"
 
 # Base Splunk OTel Collector binding. The Instrumentation CR must live in a
@@ -37,10 +38,10 @@ base:
 
 # ---- Instrumentation CRs ----------------------------------------------------
 
-# A list of one or more Instrumentation resources. When the list has more than
-# one entry, --multi-instrumentation MUST be set (preflight enforces). Each
-# workload annotation binds to an entry via `cr=<namespace>/<name>` (falls back
-# to the first entry when unset).
+# A list of one or more Instrumentation resources. Each workload annotation
+# binds to an entry via `cr=<namespace>/<name>` (falls back to the first entry
+# when unset). Operator installation/chart settings remain owned by the base
+# collector skill; this overlay does not claim to mutate them.
 instrumentation_crs:
   - name: "splunk-otel-auto-instrumentation"
     namespace: "splunk-otel"
@@ -99,13 +100,14 @@ instrumentation_crs:
     #   service.namespace: "payments"
     #   team: "platform"
 
-    # Per-language image overrides. Leave blank to use the Splunk defaults
-    # (ghcr.io/signalfx/splunk-otel-*). Required when mirroring to a private
-    # registry in an air-gapped environment.
+    # Per-language image overrides. Leave blank to use the repository-audited
+    # immutable defaults. Every override MUST include @sha256:<64 hex>; tags,
+    # including version tags, are rejected. Nginx has no audited default yet,
+    # so enabling nginx requires an explicit digest-pinned override.
     images: {}
     # images:
-    #   java: "internal-registry.example.com/splunk-otel-java:v2.12.0"
-    #   nodejs: "internal-registry.example.com/splunk-otel-js:v2.13.0"
+    #   java: "internal-registry.example.com/splunk-otel-java@sha256:<64-hex-digest>"
+    #   nginx: "internal-registry.example.com/autoinstrumentation-nginx@sha256:<64-hex-digest>"
 
     # Per-language extra env. Use for SPLUNK_TRACE_RESPONSE_HEADER_ENABLED,
     # SPLUNK_CONTEXT_SERVER_TIMING_ENABLED, and any OTEL_* override not covered
@@ -138,18 +140,6 @@ instrumentation_crs:
 #       type: parentbased_traceidratio
 #       argument: "0.1"
 
-# ---- Operator tuning --------------------------------------------------------
-
-operator:
-  # Namespaces the operator should watch. Empty = cluster-scoped.
-  watch_namespaces: []
-  # How the webhook certificate is provisioned. auto is the chart default.
-  webhook_cert_mode: "auto"      # auto | cert-manager | external
-  # Required on Helm v4 to avoid the webhook race. Default true.
-  installation_job_enabled: true
-  # Feature gate for multi-CR. Must be true when instrumentation_crs has >1 entry.
-  multi_instrumentation: false
-
 # ---- Image pull secret (optional) -------------------------------------------
 
 # Name of an existing Kubernetes Secret of type kubernetes.io/dockerconfigjson
@@ -178,19 +168,23 @@ namespace_annotations: {}
 #     go_target_exe: ""           # REQUIRED for language: go
 #     cr: ""                      # optional; <namespace>/<crname> for multi-CR binding
 #     disable: false              # explicit opt-out (emits inject-<lang>: "false")
-workload_annotations:
-  - kind: Deployment
-    namespace: prod
-    name: payments-api
-    language: java
-  - kind: Deployment
-    namespace: prod
-    name: checkout-web
-    language: nodejs
-  - kind: StatefulSet
-    namespace: prod
-    name: fraud-score
-    language: python
+# The shipped template is deliberately target-free. Uncomment and replace
+# examples only in your copied local spec; the default CLI path never loads
+# this file implicitly.
+workload_annotations: []
+# workload_annotations:
+#   - kind: Deployment
+#     namespace: prod
+#     name: payments-api
+#     language: java
+#   - kind: Deployment
+#     namespace: prod
+#     name: checkout-web
+#     language: nodejs
+#   - kind: StatefulSet
+#     namespace: prod
+#     name: fraud-score
+#     language: python
 
 # ---- OBI (eBPF) -------------------------------------------------------------
 
@@ -201,24 +195,15 @@ obi:
   exclude_namespaces:
     - "kube-system"
     - "kube-public"
+  # No audited default exists for this standalone DaemonSet contract. Required
+  # with enabled=true and must include @sha256:<64 lowercase hex>.
+  image: ""
+  # Legacy tag-only input; nonempty values fail closed. Use image instead.
   version: ""
   # OpenShift-only. SCC binding is auto-on when distribution=openshift AND
   # obi.enabled=true. Set false ONLY when you have installed a compatible SCC
   # externally (most operators will not need this).
   render_openshift_scc: true
-
-# ---- Vendor coexistence -----------------------------------------------------
-
-vendors:
-  # Scan the cluster for Datadog / New Relic / AppDynamics / Dynatrace mutating
-  # webhooks and warn if any target workload is also under vendor control.
-  detect: true
-  # Emit exclusion env snippets for the listed vendors. These are informational
-  # in --render; they do not modify the target workload specs.
-  exclude: []
-  # exclude:
-  #   - datadog
-  #   - newrelic
 
 # ---- Pod Security Standards overrides --------------------------------------
 

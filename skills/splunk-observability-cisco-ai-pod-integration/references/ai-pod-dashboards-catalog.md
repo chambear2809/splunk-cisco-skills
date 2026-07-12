@@ -4,116 +4,90 @@ The umbrella ships an aggregated dashboard set composed of the children's dashbo
 
 ## Composed children dashboards
 
-The umbrella's `dashboards/` directory contains:
-
-- `cisco-nexus-overview.signalflow.yaml` (from nexus child)
-- `cisco-intersight-overview.signalflow.yaml` (from intersight child)
-- `nvidia-gpu-overview.signalflow.yaml` (from gpu child)
-
-Each is identical to its child's version; the umbrella just collects them in one place for unified handoff.
+The Nexus, Intersight, and NVIDIA GPU dashboards remain under each child's
+`child-renders/<skill>/dashboards/` directory. The rendered
+`scripts/handoff-dashboards.sh` prints each child's dashboard handoff before it
+prints the commands for the umbrella-owned dashboards below; it does not copy
+the child dashboards into the umbrella's top-level `dashboards/` directory.
 
 ## AI-Pod-specific overview dashboards
 
 The umbrella adds:
 
-### `ai-pod-end-to-end-overview.signalflow.yaml`
+### `ai-pod-llm-inference.signalflow.yaml`
 
-A single-pane dashboard combining the most critical AI Pod metrics:
+NIM and vLLM inference telemetry, including active and waiting requests,
+time-to-first-token, time per output token, end-to-end request latency, prompt
+and generation tokens, vLLM KV-cache usage, and request success/failure counts.
 
-| Chart | Source |
-|-------|--------|
-| GPU utilization (avg) | DCGM (gpu child) |
-| GPU memory (used vs free) | DCGM (gpu child) |
-| NIM request rate | NIM scrape (umbrella) |
-| NIM token throughput | NIM scrape (umbrella) |
-| NIM p95 latency | NIM scrape (umbrella) |
-| vLLM KV cache usage | vLLM scrape (umbrella) |
-| Network errors (Nexus) | cisco_os (nexus child) |
-| Server power (Intersight) | Intersight (intersight child) |
+### `ai-pod-vector-db.signalflow.yaml`
 
-Filters: `k8s.cluster.name=${CLUSTER_NAME}`. Optional: `model_name=${MODEL_NAME}` to scope to a single model.
+Milvus proxy, QueryCoord, and RootCoord telemetry, including cache hits,
+request counts, collection and DDL activity, DML channels, and proxy queue
+latency.
 
-### `ai-pod-model-comparison.signalflow.yaml`
+### `ai-pod-storage.signalflow.yaml`
 
-Compares NIM models side-by-side:
+NetApp Trident and Pure Portworx storage telemetry, including volume count and
+allocated bytes, operation duration count, cluster CPU, online/offline nodes,
+and volume read/write latency.
 
-```python
-# Throughput per model
-data('nim_request_count').sum_by(['model_name']).rate('1m').publish('throughput')
-
-# Latency per model
-data('nim_request_duration_seconds_bucket')
-  .percentile(95)
-  .sum_by(['model_name'])
-  .publish('p95_latency')
-
-# Tokens per second per model
-(data('nim_token_count_output').rate('1s')).sum_by(['model_name']).publish('tps')
-```
-
-Useful for A/B comparing model variants (e.g. `llama-3.1-70b` vs `llama-3.1-405b`).
-
-### `ai-pod-storage-health.signalflow.yaml`
-
-Storage subsystem health:
-
-| Chart | Metric |
-|-------|--------|
-| Trident allocated capacity | `trident_volume_allocated_bytes` |
-| Trident operation latency | `trident_op_duration_seconds` |
-| Portworx cluster status | `px_cluster_status` |
-| Portworx volume IOPS | `px_volume_iops` |
-| Portworx volume latency | `px_volume_latency_us` |
-
-Only renders if at least one of `storage.trident.enabled` or `storage.portworx.enabled` is true.
-
-### `ai-pod-bmc-health.signalflow.yaml`
-
-Hardware health from Redfish:
-
-| Chart | Metric |
-|-------|--------|
-| Server temperature (avg/max) | `redfish_temperature_celsius` |
-| Fan RPM (per fan) | `redfish_fan_rpm` |
-| PSU input power | `redfish_psu_input_watts` |
-| Memory health | `redfish_memory_health` |
-| Drive health | `redfish_drive_health` |
-
-Only renders if `redfish.enabled` is true.
+All three dashboard specs are rendered. Each contains a dashboard variable and
+SignalFlow filter for the concrete `cluster_name` selected during the umbrella
+render; the handoff does not rely on placeholder substitution.
 
 ## Detector starters
 
-The umbrella ships a small detector pack:
+The umbrella ships these detector specs:
 
-- `detectors/gpu-temp-critical.yaml`: Critical when any GPU > 85°C for 5 minutes.
-- `detectors/nim-latency-elevated.yaml`: Major when NIM p95 latency > 500ms for 10 minutes.
-- `detectors/nim-error-rate.yaml`: Major when NIM error rate > 1% for 5 minutes.
-- `detectors/storage-volume-near-full.yaml`: Major when Trident volume allocation > 80%.
+- `detectors/vllm-error-rate.yaml`: Major when the rate of
+  `vllm:request_failure_total` exceeds 5.
+- `detectors/nim-ttft-regression.yaml`: Warning when p95
+  `time_to_first_token_seconds` exceeds 1 second.
+- `detectors/milvus-query-latency.yaml`: Major when p95
+  `milvus_proxy_req_in_queue_latency` exceeds 1000 ms.
+- `detectors/portworx-node-offline.yaml`: Critical when
+  `px_cluster_status_nodes_offline` is above zero.
+- `detectors/trident-allocation-pressure.yaml`: informational delta-based
+  baseline for `trident_volume_allocated_bytes`.
 
-Apply via `handoff-detectors.sh`.
+The rendered `scripts/handoff-detectors.sh` prints the child and umbrella
+commands for review; execute the printed commands to apply them.
 
 ## Dashboard apply
 
 ```bash
-bash scripts/handoff-dashboards.sh
-# Then manually:
-for spec in ./rendered/dashboards/*.signalflow.yaml; do
+bash splunk-observability-cisco-ai-pod-rendered/scripts/handoff-dashboards.sh
+
+# After reviewing the printed commands, apply the umbrella-owned specs:
+for spec in splunk-observability-cisco-ai-pod-rendered/dashboards/*.signalflow.yaml; do
     bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \
-      --render --apply --realm $REALM --spec $spec --token-file $O11Y_API_TOKEN_FILE
+      --render --apply --realm "$REALM" --spec "$spec" \
+      --token-file "$O11Y_API_TOKEN_FILE"
 done
 ```
 
-The dashboard-builder skill handles deduplication if you've already applied a dashboard before.
+Dashboard Builder creates a new dashboard group, charts, and dashboard on each
+default apply. Re-running the loop therefore creates duplicates. Updating an
+existing dashboard requires adding its `dashboard.id` and every chart's
+`chart_id` to the spec, then applying with `--update-existing`; it does not
+reconcile objects by name.
 
 ## Adding custom dashboards
 
-Drop a new YAML under `dashboards/<name>.signalflow.yaml` (in the umbrella's spec or after rendering). The handoff script picks up all files matching `*.signalflow.yaml`.
-
-If you want the new dashboard to ALSO be picked up on the next umbrella render, add it to a custom `dashboards_extra:` list in the spec; the renderer will copy it through. (Currently not supported; hand-copy after each render.)
+After rendering, place a reviewed custom spec under
+`splunk-observability-cisco-ai-pod-rendered/dashboards/<name>.signalflow.yaml`.
+The handoff script includes every `*.signalflow.yaml` in that directory. The
+current umbrella spec has no `dashboards_extra` input, so preserve custom files
+outside the generated tree and copy them in after each render.
 
 ## SignalFlow validation
 
-Each dashboard's SignalFlow program is validated by the dashboard-builder skill on `--render`. If a metric name is misspelled or the filter syntax is wrong, validation fails before any API call. This is a hard guarantee: the umbrella's render+validate pipeline will never produce a dashboard that fails to load in O11y.
+The umbrella validator checks the composed collector overlay, child renders,
+required files, and secret safety. It does not call the dashboard-builder for
+the top-level dashboard specs. The dashboard-builder performs its own
+validation when an operator runs the reviewed commands emitted by
+`scripts/handoff-dashboards.sh`; complete that step before applying a dashboard.
 
 ## Coordination with other skills
 

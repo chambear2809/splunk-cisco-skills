@@ -49,6 +49,64 @@ DIRECT_SECRET_FLAGS = {
     "--token",
 }
 
+EMBEDDED_PRIVATE_SECRET_READER = r'''def _read_private_secret(path_value: str, label: str) -> str:
+    """Read one stable UTF-8 line from an owner-only, non-symlink file."""
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise RuntimeError(
+            f"{label} cannot be read safely: O_NOFOLLOW/geteuid is unavailable"
+        )
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise RuntimeError(
+            f"{label} must be a readable, non-symlink regular file: {path}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError(f"{label} must be a single-link regular file: {path}")
+        if before.st_uid != os.geteuid():
+            raise RuntimeError(f"{label} must be owned by the current user: {path}")
+        if mode & 0o077:
+            raise RuntimeError(
+                f"{label} permissions must be 0600 or stricter: {path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= 65536:
+            raise RuntimeError(f"{label} size must be between 1 and 65536 bytes: {path}")
+        chunks = []
+        remaining = 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        before_fingerprint = (
+            before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_size,
+            before.st_mtime_ns, before.st_ctime_ns, before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev, after.st_ino, after.st_mode, after.st_uid, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns, after.st_nlink,
+        )
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise RuntimeError(f"{label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(f"{label} must contain UTF-8 text: {path}") from exc
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise RuntimeError(f"{label} must contain exactly one non-empty line: {path}")
+    return lines[0].strip()
+'''
+
 
 def reject_direct_secret_flags(argv: list[str]) -> None:
     for arg in argv:
@@ -567,18 +625,20 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import os
+import stat
 from pathlib import Path
 from urllib import parse
 
 import agent_control
 from agent_control import ControlViolationError, control
 
+{EMBEDDED_PRIVATE_SECRET_READER}
 
 def _read_secret_file(env_name: str) -> str:
     path = os.environ.get(env_name, "")
     if not path:
         raise RuntimeError(f"{{env_name}} is required")
-    return Path(path).read_text(encoding="utf-8").strip()
+    return _read_private_secret(path, env_name)
 
 
 def _normalize_agent_control_base_url(value: str) -> str:
@@ -725,6 +785,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Iterable
 from urllib import parse, request
@@ -732,12 +793,13 @@ from urllib import parse, request
 from agent_control import register_control_event_sink
 from agent_control_telemetry import BaseControlEventSink, SinkResult
 
+{EMBEDDED_PRIVATE_SECRET_READER}
 
 def _read_secret_file(env_name: str) -> str:
     path = os.environ.get(env_name, "")
     if not path:
         raise RuntimeError(f"{{env_name}} is required")
-    return Path(path).read_text(encoding="utf-8").strip()
+    return _read_private_secret(path, env_name)
 
 
 def _is_loopback_host(host: str) -> bool:

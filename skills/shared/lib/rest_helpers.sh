@@ -448,12 +448,16 @@ verify_search_api_connectivity() {
     _set_splunk_curl_tls_args || return 1
     local curl_stderr curl_rc
     curl_stderr=$(mktemp)
-    http_code=$(curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+    if http_code=$(curl -q -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         --connect-timeout 8 --max-time 15 -o /dev/null -w '%{http_code}' \
         "${uri}/services/auth/login" \
         ${_splunk_transport_curl_args[@]+"${_splunk_transport_curl_args[@]}"} \
-        2>"${curl_stderr}" || echo "000")
-    curl_rc=$?
+        2>"${curl_stderr}"); then
+        curl_rc=0
+    else
+        curl_rc=$?
+        http_code="${http_code:-000}"
+    fi
     case "${http_code}" in
         000)
             echo "ERROR: No HTTP response from ${uri} (TLS handshake or network failure)." >&2
@@ -1325,8 +1329,11 @@ app_restart_splunk_or_exit() {
     log "Restarting Splunk to complete ${operation}..."
     log "Waiting for the management API to cycle..."
 
-    restart_splunk_and_wait "${sk}" "${uri}"
-    rc=$?
+    if restart_splunk_and_wait "${sk}" "${uri}"; then
+        rc=0
+    else
+        rc=$?
+    fi
 
     case "${SPLUNK_RESTART_HTTP_CODE:-}" in
         000)

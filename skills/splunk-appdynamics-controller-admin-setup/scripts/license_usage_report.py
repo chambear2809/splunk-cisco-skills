@@ -11,7 +11,6 @@ import json
 import os
 import re
 import ssl
-import stat
 import sys
 import time
 from dataclasses import dataclass
@@ -19,6 +18,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
+
+SHARED_LIB_DIR = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(SHARED_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB_DIR))
+
+from secure_secret_file import (  # noqa: E402
+    SecureSecretFileError,
+    read_private_text_file,
+)
 
 
 SECRET_ARG_RE = re.compile(
@@ -162,30 +170,29 @@ def looks_like_inline_secret(value: str) -> bool:
     return bool(JWT_LIKE_RE.fullmatch(text) or UUID_LIKE_RE.fullmatch(text) or (len(text) >= 24 and re.search(r"[A-Za-z]", text) and re.search(r"\d", text)))
 
 
-def assert_secret_file(path: str, label: str) -> Path:
+def _load_private_secret(path: str, label: str) -> tuple[Path, str]:
     if not path:
         raise ConfigError(f"{label} is required")
     secret_path = Path(path).expanduser()
-    if not secret_path.is_file():
+    try:
+        value = read_private_text_file(secret_path, label=label)
+    except SecureSecretFileError as exc:
         if looks_like_inline_secret(path):
             raise ConfigError(
-                f"{label} must point at a chmod-600 file; received a value that looks like an inline secret. "
+                f"{label} must point at an owner-only file; received a value that looks like an inline secret. "
                 "Create a local secret file and pass its path."
-            )
-        raise ConfigError(f"{label} does not exist: {secret_path}")
-    if secret_path.stat().st_size == 0:
-        raise ConfigError(f"{label} is empty: {secret_path}")
-    mode = stat.S_IMODE(secret_path.stat().st_mode)
-    if mode != 0o600:
-        raise ConfigError(f"{label} must be chmod 600; found {mode:03o}: {secret_path}")
+            ) from exc
+        raise ConfigError(str(exc)) from exc
+    return secret_path, value
+
+
+def assert_secret_file(path: str, label: str) -> Path:
+    secret_path, _value = _load_private_secret(path, label)
     return secret_path
 
 
 def read_secret_file(path: str, label: str) -> str:
-    secret_path = assert_secret_file(path, label)
-    value = secret_path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise ConfigError(f"{label} is empty after trimming whitespace: {secret_path}")
+    _secret_path, value = _load_private_secret(path, label)
     return value
 
 

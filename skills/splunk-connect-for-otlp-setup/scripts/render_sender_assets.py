@@ -22,6 +22,46 @@ SECRET_FLAGS = {
     "--token",
 }
 
+EMBEDDED_SECRET_STDOUT = r'''import os
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]).expanduser()
+if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+    raise SystemExit("ERROR: token file cannot be read safely on this platform")
+flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+descriptor = os.open(path, flags)
+try:
+    before = os.fstat(descriptor)
+    mode = stat.S_IMODE(before.st_mode)
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+            or before.st_uid != os.geteuid() or mode & 0o077
+            or not 1 <= before.st_size <= 65536):
+        raise SystemExit("ERROR: token must be an owner-only, single-link regular file of at most 65536 bytes")
+    chunks, remaining = [], 65537
+    while remaining:
+        chunk = os.read(descriptor, min(remaining, 8192))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+    data = b"".join(chunks)
+    fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+    if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+        raise SystemExit("ERROR: token file changed while it was read")
+finally:
+    os.close(descriptor)
+try:
+    lines = data.decode("utf-8").splitlines()
+except UnicodeDecodeError as exc:
+    raise SystemExit(f"ERROR: token file must contain UTF-8 text: {exc}")
+if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+    raise SystemExit("ERROR: token file must contain exactly one non-empty line")
+sys.stdout.write(lines[0].strip())
+'''
+
 
 def reject_direct_secret_flags(argv: list[str]) -> None:
     for arg in argv:
@@ -239,13 +279,10 @@ if [[ ! "${{token_mode}}" =~ ^[0-7]*00$ ]]; then
   echo "ERROR: HEC token file must not have group/other permission bits: ${{SPLUNK_HEC_TOKEN_FILE}}" >&2
   return 1 2>/dev/null || exit 1
 fi
-token_value="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
-token_value="${{token_value#"${{token_value%%[![:space:]]*}}"}}"
-token_value="${{token_value%"${{token_value##*[![:space:]]}}"}}"
-if [[ -z "${{token_value}}" ]]; then
-  echo "ERROR: HEC token file is empty." >&2
-  return 1 2>/dev/null || exit 1
-fi
+token_value="$(python3 - "${{SPLUNK_HEC_TOKEN_FILE}}" <<'PY'
+{EMBEDDED_SECRET_STDOUT}
+PY
+)"
 export {token_env}="${{token_value}}"
 unset token_value
 export OTEL_EXPORTER_OTLP_ENDPOINT={shlex.quote(endpoint)}

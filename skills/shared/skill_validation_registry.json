@@ -26,8 +26,10 @@
     "cisco-ucs-ta-setup",
     "cisco-webex-setup",
     "galileo-agent-control-setup",
+    "galileo-lemonade-instrumentation-setup",
     "galileo-mcp-server-setup",
     "galileo-platform-setup",
+    "lemonade-splunk-otel",
     "splunk-admin-doctor",
     "splunk-agent-management-setup",
     "splunk-ai-assistant-setup",
@@ -183,6 +185,41 @@
         "notes": "Deployment readiness and health passed; an unauthenticated protected read was rejected and the same read succeeded with a file-sourced API key without retaining the response. Credential-bearing Agent Control and Splunk HEC URL/redirect regressions also passed. Mutating control and sink workflows were not invoked."
       }
     },
+    "galileo-lemonade-instrumentation-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Hardened client-side and server-side Galileo collector fan-out renderings validated with Splunk OpenTelemetry Collector 0.156.0"
+        ],
+        "last_verified": "2026-07-12",
+        "evidence": [
+          "skills/shared/references/galileo_lemonade_instrumentation_validation_evidence.json"
+        ],
+        "notes": "Client/server rendering, destination-bound persistent queues, terminal privacy/route guards, exact-origin proxy controls, four crash-durable transactions, schema-aware readback, distinct-revoker finalization, dual-401 revocation, and exact legacy no-DELETE reconciliation passed. Collector 0.156 validated production client fan-out under the service identity."
+      },
+      "live_read_only": {
+        "status": "pass",
+        "targets": [
+          "Hosted Galileo tenant health and documented OTLP route surfaces"
+        ],
+        "last_verified": "2026-07-12",
+        "evidence": [
+          "skills/shared/references/galileo_lemonade_instrumentation_validation_evidence.json"
+        ],
+        "notes": "Tenant health, live API schema, exact project and Log-stream lookup, runtime-key scope, and trace readback contracts passed. A signed-in Galileo Console observation independently confirmed the three-span canary and redacted input/output state."
+      },
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "AMD Ryzen AI Debian development system with Lemonade Server 10.10.0, Splunk OpenTelemetry Collector 0.156.0, and a hosted custom Galileo tenant"
+        ],
+        "last_verified": "2026-07-12",
+        "evidence": [
+          "skills/shared/references/galileo_lemonade_instrumentation_validation_evidence.json"
+        ],
+        "notes": "Queue, exact-origin proxy, five-file runtime, and Collector YAML transactions passed apply, reverse-order rollback, Splunk-only baseline readback, and reapply. A real privacy-safe caller trace produced Agent/LLM/Tool hierarchy with Galileo and same-trace Splunk backend readback, zero plaintext content fields, empty queues, and no exporter failures. A post-wake three-span canary again reached both backends with empty queues. The exposed bootstrap key reached 401 on both current-user and token issuance; the scoped runtime key was revalidated and the credential journal finalized."
+      }
+    },
     "galileo-mcp-server-setup": {
       "live_read_only": {
         "status": "pass",
@@ -229,6 +266,30 @@
           "skills/shared/references/galileo_platform_validation_evidence.json"
         ],
         "notes": "Disposable project, log-stream, dataset, prompt, experiment, experiment-group assignment and filtered readback, and exact ownership-ledger cleanup passed with zero residue, alongside synthetic trace lifecycle and protobuf ingest through both supported OTLP paths. AI Assistant and global-dashboard UI observation, large-dataset batched execution, Protect/Control mutation, and retained live Splunk event delivery remain unverified."
+      }
+    },
+    "lemonade-splunk-otel": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Hardened Lemonade-to-Splunk collector rendering and validation workflow using Splunk OpenTelemetry Collector 0.156.0"
+        ],
+        "last_verified": "2026-07-12",
+        "evidence": [
+          "skills/shared/references/lemonade_splunk_otel_validation_evidence.json"
+        ],
+        "notes": "Renderer ownership/idempotency, exact legacy migration, literal exporter-credential rejection, private Splunk token cutover, fail-closed validation, privacy, loopback, official Collector 0.156 validation, organization-bound all-segment backend readback, and schema-v2 apply/restore recovery regressions passed."
+      },
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "AMD Ryzen AI Debian development system with Lemonade Server 10.10.0 and Splunk OpenTelemetry Collector 0.156.0"
+        ],
+        "last_verified": "2026-07-12",
+        "evidence": [
+          "skills/shared/references/lemonade_splunk_otel_validation_evidence.json"
+        ],
+        "notes": "Official-latest Lemonade 10.10.0 and Collector health, exact-binary validation, durable organization-bound Splunk APM readback, content-sentinel privacy scan, coordinated rollback, restored-baseline backend readback, and reapply passed. Post-wake synthetic and native Lemonade telemetry again reached Splunk with empty queues. Status remains partial because the exposed combined ingest/API organization token requires authenticated org-admin replacement and AI Agent Monitoring histogram/UI evidence was not proven."
       }
     },
     "splunk-enterprise-kubernetes-setup": {

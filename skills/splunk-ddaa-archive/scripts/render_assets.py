@@ -19,6 +19,46 @@ BUNDLE_OWNER = "splunk-ddaa-archive"
 
 MAX_ARCHIVE_RETENTION_DAYS = 3650
 
+EMBEDDED_SECRET_STDOUT = r'''import os
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]).expanduser()
+if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+    raise SystemExit("ERROR: ACS token cannot be read safely on this platform")
+flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+descriptor = os.open(path, flags)
+try:
+    before = os.fstat(descriptor)
+    mode = stat.S_IMODE(before.st_mode)
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+            or before.st_uid != os.geteuid() or mode & 0o077
+            or not 1 <= before.st_size <= 65536):
+        raise SystemExit("ERROR: ACS token must be an owner-only, single-link regular file of at most 65536 bytes")
+    chunks, remaining = [], 65537
+    while remaining:
+        chunk = os.read(descriptor, min(remaining, 8192))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+    data = b"".join(chunks)
+    fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+    if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+        raise SystemExit("ERROR: ACS token file changed while it was read")
+finally:
+    os.close(descriptor)
+try:
+    lines = data.decode("utf-8").splitlines()
+except UnicodeDecodeError as exc:
+    raise SystemExit(f"ERROR: ACS token file must contain UTF-8 text: {exc}")
+if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip() or '"' in lines[0]:
+    raise SystemExit("ERROR: ACS token file must contain one non-empty line without quotes")
+sys.stdout.write(lines[0].strip())
+'''
+
 GENERATED_FILES = {
     "README.md",
     "metadata.json",
@@ -158,7 +198,10 @@ fi
 token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
 [[ "${{token_mode}}" == "600" || "${{token_mode}}" == "400" ]] \\
   || {{ echo "ERROR: ACS token file must have mode 0600 or 0400 (found ${{token_mode:-unknown}})." >&2; exit 1; }}
-token="$(cat "${{token_file}}")"
+token="$(python3 - "${{token_file}}" <<'PY'
+{EMBEDDED_SECRET_STDOUT}
+PY
+)"
 [[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
   || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
 token_escaped="${{token//\\\\/\\\\\\\\}}"
@@ -214,7 +257,10 @@ acs_curl() {{
 token_mode="$(stat -c '%a' "${{token_file}}" 2>/dev/null || true)"
 [[ "${{token_mode}}" == "600" || "${{token_mode}}" == "400" ]] \\
   || {{ echo "ERROR: ACS token file must have mode 0600 or 0400 (found ${{token_mode:-unknown}})." >&2; exit 1; }}
-token="$(cat "${{token_file}}")"
+token="$(python3 - "${{token_file}}" <<'PY'
+{EMBEDDED_SECRET_STDOUT}
+PY
+)"
 [[ -n "${{token}}" && "${{token}}" != *$'\\n'* && "${{token}}" != *$'\\r'* && "${{token}}" != *'"'* ]] \\
   || {{ echo "ERROR: ACS token file must contain one non-empty line without quotes." >&2; exit 1; }}
 token_escaped="${{token//\\\\/\\\\\\\\}}"

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import ssl
+import stat
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +28,7 @@ from typing import Any, Callable
 
 
 SUPPORTED_DATASET_SUFFIXES = {".csv", ".json", ".jsonl"}
+MAX_SECRET_FILE_BYTES = 64 * 1024
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -190,12 +192,77 @@ def merge_inputs(args: argparse.Namespace) -> dict[str, Any]:
 
 def read_secret_file(path: str) -> str:
     secret_path = Path(path).expanduser()
-    if not secret_path.is_file():
-        raise SystemExit(f"ERROR: Galileo API key file is not readable: {secret_path}")
-    value = secret_path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise SystemExit(f"ERROR: Galileo API key file is empty: {secret_path}")
-    return value
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit("ERROR: Galileo API key cannot be read safely on this platform")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(secret_path, flags)
+    except OSError as exc:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must be a readable, non-symlink regular file: {secret_path}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise SystemExit(
+                f"ERROR: Galileo API key file must be a single-link regular file: {secret_path}"
+            )
+        if before.st_uid != os.geteuid():
+            raise SystemExit(
+                f"ERROR: Galileo API key file must be owned by the current user: {secret_path}"
+            )
+        mode = stat.S_IMODE(before.st_mode)
+        if mode & 0o077:
+            raise SystemExit(
+                f"ERROR: Galileo API key file permissions must be 0600 or stricter: "
+                f"{secret_path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= MAX_SECRET_FILE_BYTES:
+            raise SystemExit(
+                f"ERROR: Galileo API key file size must be between 1 and "
+                f"{MAX_SECRET_FILE_BYTES} bytes: {secret_path}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_SECRET_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        data = b"".join(chunks)
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: Galileo API key file changed while it was read: {secret_path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must contain UTF-8 text: {secret_path}"
+        ) from exc
+    if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must contain exactly one non-empty line: {secret_path}"
+        )
+    return lines[0]
 
 
 def configure_environment(args: argparse.Namespace, config: dict[str, Any]) -> None:
@@ -1359,7 +1426,7 @@ def initialize_ownership_ledger(path: Path) -> dict[str, Any]:
         "api_version": "galileo-platform-setup/object-lifecycle-ownership/v1",
         "created_by": "galileo_object_lifecycle.py",
         "operation_id": str(uuid.uuid4()),
-        "created_at": dt.datetime.now(dt.UTC).isoformat(),
+        "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "secret_values_rendered": False,
         "status": "active",
         "created_objects": [],
@@ -1530,7 +1597,7 @@ def cleanup_created_objects(
             cleanup_status = "deleted_by_exact_id"
         entry["cleanup_status"] = cleanup_status
         entry["cleanup_source"] = deletion_source
-        entry["cleaned_at"] = dt.datetime.now(dt.UTC).isoformat()
+        entry["cleaned_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
         action_by_key[("dataset", object_id)]["status"] = cleanup_status
         action_by_key[("dataset", object_id)]["source"] = deletion_source
         _write_json_atomic(ledger_path, loaded, private=True)
@@ -1551,7 +1618,7 @@ def cleanup_created_objects(
             cleanup_status = "deleted_by_exact_id"
         entry["cleanup_status"] = cleanup_status
         entry["cleanup_source"] = "sdk"
-        entry["cleaned_at"] = dt.datetime.now(dt.UTC).isoformat()
+        entry["cleaned_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
         action_by_key[("prompt", object_id)]["status"] = cleanup_status
         action_by_key[("prompt", object_id)]["source"] = "sdk"
         _write_json_atomic(ledger_path, loaded, private=True)
@@ -1568,14 +1635,14 @@ def cleanup_created_objects(
         )
         entry["cleanup_status"] = project_cleanup_status
         entry["cleanup_source"] = deletion_source
-        entry["cleaned_at"] = dt.datetime.now(dt.UTC).isoformat()
+        entry["cleaned_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
         action_by_key[("project", project_id)]["status"] = project_cleanup_status
         action_by_key[("project", project_id)]["source"] = deletion_source
         for child in pending:
             if child["kind"] in {"project", "dataset", "prompt"} or child.get("project_id") != project_id:
                 continue
             child["cleanup_status"] = "covered_by_exact_project_delete"
-            child["cleaned_at"] = dt.datetime.now(dt.UTC).isoformat()
+            child["cleaned_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
             action_by_key[(str(child["kind"]), str(child["id"]))][
                 "status"
             ] = "covered_by_exact_project_delete"
@@ -1591,7 +1658,7 @@ def cleanup_created_objects(
             f"Cleanup left {len(remaining)} object(s) pending; ledger retained for reviewed recovery"
         )
     loaded["status"] = "cleaned"
-    loaded["cleaned_at"] = dt.datetime.now(dt.UTC).isoformat()
+    loaded["cleaned_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
     _write_json_atomic(ledger_path, loaded, private=True)
     return {
         "status": "cleaned",
@@ -1801,7 +1868,7 @@ def main(argv: list[str] | None = None) -> int:
     results["errors"] = errors
     if ledger is not None:
         ledger["status"] = "partial_error" if errors else "complete"
-        ledger["completed_at"] = dt.datetime.now(dt.UTC).isoformat()
+        ledger["completed_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
         _write_json_atomic(ledger_path, ledger, private=True)
 
     output = Path(args.output).expanduser()

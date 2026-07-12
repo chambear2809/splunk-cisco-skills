@@ -1,0 +1,2 @@
+# Example only: confirm the current vendor repository and signing key first.
+deb https://splunk.jfrog.io/splunk/otel-collector-deb release main

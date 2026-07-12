@@ -25,9 +25,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
+import shlex
+import shutil
+import stat
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 SHARED_LIB = Path(__file__).resolve().parents[3] / "skills" / "shared" / "lib"
 if str(SHARED_LIB) not in sys.path:
@@ -39,6 +45,12 @@ from yaml_compat import YamlCompatError, dump_yaml, load_yaml_or_json  # noqa: E
 SKILL_NAME = "splunk-observability-isovalent-integration"
 DEFAULT_TETRAGON_HOST_PATH = "/var/run/cilium/tetragon"
 DEFAULT_TETRAGON_FILENAME_PATTERN = "*.log"
+ALLOWED_REALMS = {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
+ALLOWED_DISTRIBUTIONS = {"openshift", "kubernetes", "eks", "gke"}
+ALLOWED_EXPORT_MODES = {"file", "stdout", "fluentd"}
+INDEX_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,127}$")
+SOURCETYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.-]{0,255}$")
+MAX_TOKEN_BYTES = 16 * 1024
 
 # Default metric allow-list. Curated from the production Gruve atl-ocp2
 # deployment values + the Isovalent_Splunk_o11y reference repo. The goal:
@@ -50,6 +62,7 @@ DEFAULT_METRIC_ALLOWLIST = [
     "cilium_bpf_map_ops_total",
     "cilium_endpoint_state",
     "cilium_errors_warnings_total",
+    "cilium_hive_status",
     "cilium_ip_addresses",
     "cilium_ipam_capacity",
     "cilium_kubernetes_events_total",
@@ -89,8 +102,126 @@ DEFAULT_METRIC_ALLOWLIST = [
     "k8s.namespace.phase",
 ]
 
+
 class SpecError(ValueError):
     pass
+
+
+def _mapping(value: Any, *, name: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise SpecError(f"{name} must be a mapping.")
+    return value
+
+
+def _nonempty_string(value: Any, *, name: str) -> str:
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise SpecError(
+            f"{name} must be a nonempty string without surrounding whitespace."
+        )
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise SpecError(f"{name} contains control characters.")
+    return value
+
+
+def validate_hec_url(value: str) -> str:
+    if not value:
+        return ""
+    value = _nonempty_string(value, name="Splunk Platform HEC URL")
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise SpecError("Splunk Platform HEC URL must be an absolute https:// URL.")
+    if parsed.username is not None or parsed.password is not None:
+        raise SpecError("Splunk Platform HEC URL must not contain user information.")
+    if parsed.query or parsed.fragment:
+        raise SpecError("Splunk Platform HEC URL must not contain a query or fragment.")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise SpecError("Splunk Platform HEC URL contains an invalid port.") from exc
+    return value.rstrip("/")
+
+
+def validate_token_file(
+    path_value: str, *, flag: str, allow_loose_permissions: bool = False
+) -> str:
+    """Validate a credential reference without reading or serializing its value."""
+
+    if not path_value:
+        return ""
+    path = Path(path_value).expanduser().absolute()
+    try:
+        info = os.lstat(path)
+    except OSError as exc:
+        raise SpecError(f"{flag} must reference an existing credential file.") from exc
+    if stat.S_ISLNK(info.st_mode):
+        raise SpecError(f"{flag} must not be a symbolic link.")
+    if not stat.S_ISREG(info.st_mode):
+        raise SpecError(f"{flag} must reference a regular file.")
+    if info.st_uid != os.geteuid():
+        raise SpecError(f"{flag} must be owned by the current user.")
+    if info.st_nlink != 1:
+        raise SpecError(f"{flag} must have exactly one hard link.")
+    if stat.S_IMODE(info.st_mode) != 0o600 and not allow_loose_permissions:
+        raise SpecError(f"{flag} must be mode 600.")
+    if info.st_size <= 0 or info.st_size > MAX_TOKEN_BYTES:
+        raise SpecError(f"{flag} has an invalid size.")
+    return str(path)
+
+
+def effective_scrape_jobs(spec: dict[str, Any]) -> list[str]:
+    scrape = _mapping(spec.get("scrape"), name="scrape")
+    job_flags = (
+        ("cilium_agent_9962", "prometheus/isovalent_cilium", True),
+        ("hubble_metrics_9965", "prometheus/isovalent_hubble", True),
+        ("cilium_envoy_9964", "prometheus/isovalent_envoy", True),
+        ("cilium_operator_9963", "prometheus/isovalent_operator", True),
+        ("tetragon_2112", "prometheus/isovalent_tetragon", True),
+        ("tetragon_operator_2113", "prometheus/isovalent_tetragon_operator", True),
+        ("cilium_dnsproxy", "prometheus/isovalent_dnsproxy", False),
+    )
+    jobs: list[str] = []
+    for key, receiver, default in job_flags:
+        enabled = scrape.get(key, default)
+        if not isinstance(enabled, bool):
+            raise SpecError(f"scrape.{key} must be true or false.")
+        if enabled:
+            jobs.append(receiver)
+    if not jobs:
+        raise SpecError("At least one Isovalent Prometheus scrape job must be enabled.")
+    return jobs
+
+
+def representative_signalflow_metrics(spec: dict[str, Any]) -> dict[str, str]:
+    validation = _mapping(spec.get("validation"), name="validation")
+    configured = _mapping(
+        validation.get("signalflow_metrics"),
+        name="validation.signalflow_metrics",
+    )
+    defaults = {
+        "cilium": "cilium_endpoint_state",
+        "hubble": "hubble_flows_processed_total",
+        "tetragon": "tetragon_dns_total",
+    }
+    unknown = sorted(set(configured) - set(defaults))
+    if unknown:
+        raise SpecError(
+            "validation.signalflow_metrics contains unsupported metric families."
+        )
+    result: dict[str, str] = {}
+    for family, default in defaults.items():
+        metric = configured.get(family, default)
+        if (
+            not isinstance(metric, str)
+            or not re.fullmatch(r"[A-Za-z_:][A-Za-z0-9_.:/-]{0,511}", metric)
+            or not metric.startswith(f"{family}_")
+        ):
+            raise SpecError(
+                f"validation.signalflow_metrics.{family} must be a {family}_* metric name."
+            )
+        result[family] = metric
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,6 +238,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--render-platform-hec-helper", default="false")
     parser.add_argument("--o11y-token-file", default="")
     parser.add_argument("--dashboards-source", default="")
+    parser.add_argument("--allow-loose-token-perms", default="false")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
@@ -129,6 +261,156 @@ def load_spec(path: Path) -> dict[str, Any]:
             f"Spec api_version must be '{SKILL_NAME}/v1'; got {data.get('api_version')!r}"
         )
     return data
+
+
+def normalize_configuration(
+    args: argparse.Namespace, spec: dict[str, Any]
+) -> dict[str, Any]:
+    for flag_name, value in (
+        ("--legacy-fluentd-hec", args.legacy_fluentd_hec),
+        ("--render-platform-hec-helper", args.render_platform_hec_helper),
+        ("--allow-loose-token-perms", args.allow_loose_token_perms),
+    ):
+        if str(value).lower() not in {"true", "false"}:
+            raise SpecError(f"{flag_name} must be true or false.")
+
+    realm = args.realm or spec.get("realm", "us0")
+    if not isinstance(realm, str) or realm not in ALLOWED_REALMS:
+        raise SpecError(
+            "realm must be one of: " + ", ".join(sorted(ALLOWED_REALMS)) + "."
+        )
+    cluster_name = _nonempty_string(
+        args.cluster_name or spec.get("cluster_name", "lab-cluster"),
+        name="cluster_name",
+    )
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,254}", cluster_name):
+        raise SpecError("cluster_name contains unsupported characters.")
+    distribution = args.distribution or spec.get("distribution", "kubernetes")
+    if not isinstance(distribution, str) or distribution not in ALLOWED_DISTRIBUTIONS:
+        raise SpecError(
+            "distribution must be one of: "
+            + ", ".join(sorted(ALLOWED_DISTRIBUTIONS))
+            + "."
+        )
+
+    tetragon_export = _mapping(spec.get("tetragon_export"), name="tetragon_export")
+    configured_export_mode = tetragon_export.get("mode", "file")
+    if not isinstance(configured_export_mode, str):
+        raise SpecError("tetragon_export.mode must be a string.")
+    export_mode = args.export_mode or configured_export_mode
+    if export_mode not in ALLOWED_EXPORT_MODES:
+        raise SpecError(
+            "export mode must be one of: "
+            + ", ".join(sorted(ALLOWED_EXPORT_MODES))
+            + "."
+        )
+    legacy_fluentd = bool_flag(args.legacy_fluentd_hec) or export_mode == "fluentd"
+    if bool_flag(args.legacy_fluentd_hec):
+        if args.export_mode and args.export_mode != "fluentd":
+            raise SpecError(
+                "--legacy-fluentd-hec cannot be combined with a non-fluentd --export-mode."
+            )
+        export_mode = "fluentd"
+
+    splunk_block = _mapping(spec.get("splunk_platform"), name="splunk_platform")
+    platform_enabled = splunk_block.get("enabled", True)
+    if not isinstance(platform_enabled, bool):
+        raise SpecError("splunk_platform.enabled must be true or false.")
+    index = splunk_block.get("index", "cisco_isovalent")
+    sourcetype = splunk_block.get("sourcetype", "cisco:isovalent")
+    if not isinstance(index, str) or not INDEX_RE.fullmatch(index):
+        raise SpecError("splunk_platform.index contains an invalid Splunk index name.")
+    if not isinstance(sourcetype, str) or not SOURCETYPE_RE.fullmatch(sourcetype):
+        raise SpecError("splunk_platform.sourcetype contains an invalid sourcetype.")
+
+    hec_url = validate_hec_url(
+        args.platform_hec_url or str(splunk_block.get("hec_url") or "")
+    )
+    allow_loose = bool_flag(args.allow_loose_token_perms)
+    o11y_token_file = validate_token_file(
+        args.o11y_token_file,
+        flag="--o11y-token-file",
+        allow_loose_permissions=allow_loose,
+    )
+    platform_hec_token_file = validate_token_file(
+        args.platform_hec_token_file,
+        flag="--platform-hec-token-file",
+        allow_loose_permissions=allow_loose,
+    )
+    render_hec_helper = bool_flag(args.render_platform_hec_helper)
+    if platform_hec_token_file and not hec_url:
+        raise SpecError(
+            "--platform-hec-token-file requires --platform-hec-url or splunk_platform.hec_url."
+        )
+    if not platform_enabled and (
+        hec_url or platform_hec_token_file or render_hec_helper
+    ):
+        raise SpecError(
+            "Splunk Platform HEC options require splunk_platform.enabled: true."
+        )
+
+    collector = _mapping(spec.get("collector"), name="collector")
+    collector_fields = {
+        "release": ("splunk-otel-collector", r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"),
+        "namespace": ("", r"[a-z0-9](?:[-a-z0-9.]{0,251}[a-z0-9])?"),
+        "chart_ref": (
+            "splunk-otel-collector-chart/splunk-otel-collector",
+            r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+",
+        ),
+        "chart_version": ("", r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"),
+    }
+    for key, (default, pattern) in collector_fields.items():
+        value = collector.get(key, default)
+        if not isinstance(value, str) or (value and not re.fullmatch(pattern, value)):
+            raise SpecError(f"collector.{key} contains unsupported characters.")
+    normalize_otlp = collector.get("normalize_legacy_otlphttp", "auto")
+    if str(normalize_otlp).lower() not in {"auto", "true", "false"}:
+        raise SpecError(
+            "collector.normalize_legacy_otlphttp must be auto, true, or false."
+        )
+    for key in ("disable_gateway", "disable_operator"):
+        if not isinstance(collector.get(key, False), bool):
+            raise SpecError(f"collector.{key} must be true or false.")
+
+    metric_allowlist = _mapping(spec.get("metric_allowlist"), name="metric_allowlist")
+    extra_metrics = metric_allowlist.get("extra", [])
+    if not isinstance(extra_metrics, list) or not all(
+        isinstance(metric, str)
+        and re.fullmatch(r"[A-Za-z_:][A-Za-z0-9_.:/-]{0,511}", metric)
+        for metric in extra_metrics
+    ):
+        raise SpecError("metric_allowlist.extra must contain valid metric names.")
+
+    if export_mode == "file" and platform_enabled:
+        host_path = tetragon_export.get("host_path", DEFAULT_TETRAGON_HOST_PATH)
+        pattern = tetragon_export.get(
+            "filename_pattern", DEFAULT_TETRAGON_FILENAME_PATTERN
+        )
+        if not isinstance(host_path, str) or not host_path.startswith("/"):
+            raise SpecError("tetragon_export.host_path must be an absolute path.")
+        if (
+            not isinstance(pattern, str)
+            or not pattern
+            or "/" in pattern
+            or ".." in pattern
+        ):
+            raise SpecError(
+                "tetragon_export.filename_pattern must be a nonempty basename glob."
+            )
+
+    effective_scrape_jobs(spec)
+    representative_signalflow_metrics(spec)
+    return {
+        "realm": realm,
+        "cluster_name": cluster_name,
+        "distribution": distribution,
+        "export_mode": export_mode,
+        "legacy_fluentd": legacy_fluentd,
+        "hec_url": hec_url,
+        "o11y_token_file": o11y_token_file,
+        "platform_hec_token_file": platform_hec_token_file,
+        "render_hec_helper": render_hec_helper,
+    }
 
 
 def write_text(path: Path, content: str, *, executable: bool = False) -> None:
@@ -162,6 +444,9 @@ def overlay_values(
     for name in extras:
         if name not in metric_allowlist:
             metric_allowlist.append(name)
+    for name in representative_signalflow_metrics(spec).values():
+        if name not in metric_allowlist:
+            metric_allowlist.append(name)
 
     receivers: dict[str, Any] = {}
     pipeline_receivers: list[str] = ["hostmetrics", "kubeletstats", "otlp"]
@@ -191,8 +476,8 @@ def overlay_values(
         )
         pipeline_receivers.append("prometheus/isovalent_tetragon")
     if scrape.get("tetragon_operator_2113", True):
-        receivers["prometheus/isovalent_tetragon_operator"] = _scrape_job_tetragon_operator(
-            "tetragon_operator_metrics_2113", 2113
+        receivers["prometheus/isovalent_tetragon_operator"] = (
+            _scrape_job_tetragon_operator("tetragon_operator_metrics_2113", 2113)
         )
         pipeline_receivers.append("prometheus/isovalent_tetragon_operator")
     if scrape.get("cilium_dnsproxy", False):
@@ -209,11 +494,20 @@ def overlay_values(
         "agent": {
             "config": {
                 "extensions": {
-                    "k8s_observer": {"auth_type": "serviceAccount", "observe_pods": True},
+                    "k8s_observer": {
+                        "auth_type": "serviceAccount",
+                        "observe_pods": True,
+                    },
                 },
-                "receivers": dict(receivers, **{
-                    "kubeletstats": {"collection_interval": "30s", "insecure_skip_verify": True},
-                }),
+                "receivers": dict(
+                    receivers,
+                    **{
+                        "kubeletstats": {
+                            "collection_interval": "30s",
+                            "insecure_skip_verify": True,
+                        },
+                    },
+                ),
                 "processors": {
                     "filter/includemetrics": {
                         "metrics": {
@@ -223,7 +517,10 @@ def overlay_values(
                             }
                         }
                     },
-                    "resourcedetection": {"detectors": ["system"], "system": {"hostname_sources": ["os"]}},
+                    "resourcedetection": {
+                        "detectors": ["system"],
+                        "system": {"hostname_sources": ["os"]},
+                    },
                 },
                 "service": {
                     "pipelines": {
@@ -250,15 +547,27 @@ def overlay_values(
         overlay["operatorcrds"] = {"installed": False}
 
     splunk_block = spec.get("splunk_platform") or {}
-    if splunk_block.get("enabled", True) and export_mode == "file" and not legacy_fluentd:
-        host_path = (spec.get("tetragon_export") or {}).get("host_path", DEFAULT_TETRAGON_HOST_PATH)
-        filename_pattern = (spec.get("tetragon_export") or {}).get("filename_pattern", DEFAULT_TETRAGON_FILENAME_PATTERN)
+    if (
+        splunk_block.get("enabled", True)
+        and export_mode == "file"
+        and not legacy_fluentd
+    ):
+        host_path = (spec.get("tetragon_export") or {}).get(
+            "host_path", DEFAULT_TETRAGON_HOST_PATH
+        )
+        filename_pattern = (spec.get("tetragon_export") or {}).get(
+            "filename_pattern", DEFAULT_TETRAGON_FILENAME_PATTERN
+        )
         index = splunk_block.get("index", "cisco_isovalent")
         sourcetype = splunk_block.get("sourcetype", "cisco:isovalent")
         # The hostPath mount + extraFileLogs.filelog/tetragon block is the
         # production-validated path (see references/tetragon-hostpath-coordination.md).
-        overlay["agent"]["extraVolumes"] = [{"name": "tetragon", "hostPath": {"path": host_path}}]
-        overlay["agent"]["extraVolumeMounts"] = [{"name": "tetragon", "mountPath": host_path}]
+        overlay["agent"]["extraVolumes"] = [
+            {"name": "tetragon", "hostPath": {"path": host_path}}
+        ]
+        overlay["agent"]["extraVolumeMounts"] = [
+            {"name": "tetragon", "mountPath": host_path}
+        ]
         # The filelog/tetragon receiver is declared once, below, via the chart's
         # logsCollection.extraFileLogs block (which both defines the receiver and
         # wires it into the logs pipeline). We deliberately do NOT also add a
@@ -282,13 +591,18 @@ def overlay_values(
                     "resource": {
                         "com.splunk.index": index,
                         "com.splunk.source": f"{host_path}/",
-                        "host.name": "EXPR(env(\"K8S_NODE_NAME\"))",
+                        "host.name": 'EXPR(env("K8S_NODE_NAME"))',
+                        "k8s.cluster.name": cluster_name,
                         "com.splunk.sourcetype": sourcetype,
                     },
                 }
             },
         }
-    elif splunk_block.get("enabled", True) and export_mode == "stdout" and not legacy_fluentd:
+    elif (
+        splunk_block.get("enabled", True)
+        and export_mode == "stdout"
+        and not legacy_fluentd
+    ):
         # stdout mode: rely on Splunk OTel collector's container log collection.
         # Tetragon's stdout already flows through the standard logsCollection
         # pipeline; we just need to enable splunkPlatform.logsEnabled.
@@ -317,7 +631,9 @@ def _scrape_job(name: str, app_label: str, port: int, label_key: str) -> dict[st
                     "kubernetes_sd_configs": [{"role": "pod"}],
                     "relabel_configs": [
                         {
-                            "source_labels": [f"__meta_kubernetes_pod_label_{label_key}"],
+                            "source_labels": [
+                                f"__meta_kubernetes_pod_label_{label_key}"
+                            ],
                             "action": "keep",
                             "regex": app_label,
                         },
@@ -352,7 +668,9 @@ def _scrape_job_operator(name: str, port: int) -> dict[str, Any]:
                     "kubernetes_sd_configs": [{"role": "pod"}],
                     "relabel_configs": [
                         {
-                            "source_labels": ["__meta_kubernetes_pod_label_io_cilium_app"],
+                            "source_labels": [
+                                "__meta_kubernetes_pod_label_io_cilium_app"
+                            ],
                             "action": "keep",
                             "regex": "operator",
                         },
@@ -382,7 +700,9 @@ def _scrape_job_tetragon(name: str, port: int) -> dict[str, Any]:
                     "kubernetes_sd_configs": [{"role": "pod"}],
                     "relabel_configs": [
                         {
-                            "source_labels": ["__meta_kubernetes_pod_label_app_kubernetes_io_name"],
+                            "source_labels": [
+                                "__meta_kubernetes_pod_label_app_kubernetes_io_name"
+                            ],
                             "action": "keep",
                             "regex": "tetragon",
                         },
@@ -412,7 +732,9 @@ def _scrape_job_tetragon_operator(name: str, port: int) -> dict[str, Any]:
                     "kubernetes_sd_configs": [{"role": "pod"}],
                     "relabel_configs": [
                         {
-                            "source_labels": ["__meta_kubernetes_pod_label_app_kubernetes_io_name"],
+                            "source_labels": [
+                                "__meta_kubernetes_pod_label_app_kubernetes_io_name"
+                            ],
                             "action": "keep",
                             "regex": "tetragon-operator",
                         },
@@ -433,9 +755,8 @@ def _scrape_job_tetragon_operator(name: str, port: int) -> dict[str, Any]:
 SCRUB_TOKEN_PY = '''#!/usr/bin/env python3
 """Token scrubber for dashboard JSON re-exports.
 
-Walks a JSON document and rewrites any value under access-token-shaped keys
-to a placeholder. Refuses to write the output if the input contained a
-plausibly-real token.
+Walks a JSON document and rewrites credential-shaped keys and values to a
+placeholder before the dashboard is published.
 """
 
 from __future__ import annotations
@@ -446,9 +767,17 @@ import sys
 from pathlib import Path
 
 
-SECRET_KEYS = {"accesstoken", "access_token", "apitoken", "api_token", "x_sf_token", "xsftoken"}
 PLACEHOLDER = "${REDACTED}"
-REAL_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]{20,}")
+SECRET_KEY_PARTS = ("token", "secret", "authorization", "bearer", "password", "credential", "hec")
+SECRET_VALUE_RE = re.compile(
+    r"(?i)(?:bearer|splunk)\\s+[A-Za-z0-9._+/=-]{8,}|"
+    r"(?:token|secret|authorization|bearer|hec)\\s*[:=]\\s*[A-Za-z0-9._+/=-]{8,}"
+)
+
+
+def secret_key(key):
+    normalized = "".join(character for character in str(key).lower() if character.isalnum())
+    return any(part in normalized for part in SECRET_KEY_PARTS)
 
 
 def walk(node):
@@ -456,14 +785,14 @@ def walk(node):
         return {k: _scrub(k, v) for k, v in node.items()}
     if isinstance(node, list):
         return [walk(item) for item in node]
+    if isinstance(node, str) and SECRET_VALUE_RE.search(node):
+        return PLACEHOLDER
     return node
 
 
 def _scrub(key, value):
-    normalized = "".join(c for c in str(key).lower() if c.isalnum() or c == "_")
-    if normalized in SECRET_KEYS:
-        if isinstance(value, str) and value and REAL_TOKEN_RE.fullmatch(value):
-            return PLACEHOLDER
+    if secret_key(key) and value not in (None, "", [], {}):
+        return PLACEHOLDER
     return walk(value)
 
 
@@ -475,12 +804,13 @@ def main(argv):
     dst = Path(argv[2])
     raw = json.loads(src.read_text(encoding="utf-8"))
     scrubbed = walk(raw)
-    # Defense in depth: re-scan the scrubbed text for any remaining patterns
-    # that look like a Bearer or X-SF-Token value.
+    # Defense in depth: re-scan all keys and free-form string values.
     text = json.dumps(scrubbed, indent=2, sort_keys=True)
-    leak_scan = re.compile(r'"(?:accessToken|access_token|X-SF-Token|apiToken)"\\s*:\\s*"[A-Za-z0-9._-]{20,}"')
-    if leak_scan.search(text):
-        print("ERROR: scrubbed JSON still contains a token-shaped value.", file=sys.stderr)
+    key_leak = re.compile(
+        r'(?i)"[^"\\n]*(?:token|secret|authorization|bearer|password|credential|hec)[^"\\n]*"\\s*:\\s*"(?!\\$\\{REDACTED\\})[^"\\n]+"'
+    )
+    if key_leak.search(text) or SECRET_VALUE_RE.search(text):
+        print("ERROR: scrubbed JSON still contains credential-shaped material.", file=sys.stderr)
         return 1
     dst.write_text(text + "\\n", encoding="utf-8")
     return 0
@@ -491,48 +821,115 @@ if __name__ == "__main__":
 '''
 
 
-def render_apply_overlay_script(spec: dict[str, Any]) -> str:
+def render_apply_overlay_script(
+    spec: dict[str, Any],
+    *,
+    o11y_token_file: str,
+    platform_hec_token_file: str,
+    platform_hec_url: str,
+    export_mode: str,
+) -> str:
     collector = spec.get("collector") or {}
     release = collector.get("release", "splunk-otel-collector")
     namespace = collector.get("namespace", "")
-    chart_ref = collector.get("chart_ref", "splunk-otel-collector-chart/splunk-otel-collector")
+    chart_ref = collector.get(
+        "chart_ref", "splunk-otel-collector-chart/splunk-otel-collector"
+    )
     chart_version = collector.get("chart_version", "")
-    normalize_legacy_otlphttp = str(collector.get("normalize_legacy_otlphttp", "auto")).lower()
-    return (
-        f"""#!/usr/bin/env bash
+    normalize_legacy_otlphttp = str(
+        collector.get("normalize_legacy_otlphttp", "auto")
+    ).lower()
+    o11y_token_default = shlex.quote(o11y_token_file)
+    platform_hec_token_default = shlex.quote(platform_hec_token_file)
+    platform_hec_url_default = shlex.quote(platform_hec_url)
+    splunk_platform = spec.get("splunk_platform") or {}
+    platform_enabled = splunk_platform.get("enabled", True)
+    platform_index = splunk_platform.get("index", "cisco_isovalent")
+    platform_sourcetype = splunk_platform.get("sourcetype", "cisco:isovalent")
+    return f"""#!/usr/bin/env bash
 set -euo pipefail
+umask 077
+
+# Helm status and Kubernetes objects can contain customer data. Refuse shell
+# tracing before any external command can read those objects; otherwise a
+# command substitution or later refactor could disclose them through bash -x.
+case $- in
+    *x*)
+        echo 'ERROR: shell xtrace is enabled; refusing before reading Helm or Kubernetes objects.' >&2
+        exit 1
+        ;;
+esac
 
 # Apply the Isovalent overlay to an existing Splunk OTel Collector helm release
 # by merging this overlay onto current values and running helm upgrade.
 # Honors K8S_APPLY_DRY_RUN=true (helm --dry-run).
 #
-# Required env: O11Y_TOKEN_FILE (path to Org access token, chmod 600).
-# Required tooling: helm, kubectl, yq.
+# Required env: O11Y_TOKEN_FILE (path to Org access token, chmod 600), unless
+# a default was supplied while rendering. PLATFORM_HEC_TOKEN_FILE and
+# PLATFORM_HEC_URL are required together when Splunk Platform export is used.
+# Required tooling: helm, kubectl, yq, python3.
 # Cilium/Hubble/Tetragon must already be installed in the cluster.
 
 if ! command -v helm >/dev/null 2>&1; then echo 'ERROR: helm required.' >&2; exit 1; fi
 if ! command -v kubectl >/dev/null 2>&1; then echo 'ERROR: kubectl required.' >&2; exit 1; fi
 if ! command -v yq >/dev/null 2>&1; then echo 'ERROR: yq required.' >&2; exit 1; fi
+if ! command -v python3 >/dev/null 2>&1; then echo 'ERROR: python3 required.' >&2; exit 1; fi
 
-if [[ -z "${{O11Y_TOKEN_FILE:-}}" || ! -r "${{O11Y_TOKEN_FILE}}" ]]; then
-    echo 'ERROR: O11Y_TOKEN_FILE must point to a readable token file (chmod 600).' >&2
+if [[ -z "${{EXPECTED_KUBE_CONTEXT:-}}" ]]; then
+    echo 'ERROR: EXPECTED_KUBE_CONTEXT is required; pass setup.sh --kube-context with the exact current context.' >&2
     exit 1
 fi
-TOKEN_MODE=""
-if TOKEN_MODE="$(stat -f '%A' "${{O11Y_TOKEN_FILE}}" 2>/dev/null)"; then
-    :
-elif TOKEN_MODE="$(stat -c '%a' "${{O11Y_TOKEN_FILE}}" 2>/dev/null)"; then
-    :
+CURRENT_KUBE_CONTEXT="$(kubectl config current-context 2>/dev/null)" || {{
+    echo 'ERROR: Could not determine the current Kubernetes context.' >&2
+    exit 1
+}}
+if [[ "${{CURRENT_KUBE_CONTEXT}}" != "${{EXPECTED_KUBE_CONTEXT}}" ]]; then
+    echo 'ERROR: Current Kubernetes context does not match EXPECTED_KUBE_CONTEXT.' >&2
+    exit 1
 fi
-if [[ "${{TOKEN_MODE}}" != "600" && "${{TOKEN_MODE}}" != "0600" ]]; then
-    echo "ERROR: O11Y_TOKEN_FILE must be mode 600; got ${{TOKEN_MODE:-unknown}}." >&2
+KUBECTL=(kubectl --context "${{EXPECTED_KUBE_CONTEXT}}")
+HELM=(helm --kube-context "${{EXPECTED_KUBE_CONTEXT}}")
+
+HELM_VERSION="$("${{HELM[@]}}" version --template '{{{{.Version}}}}' 2>/dev/null)" || {{
+    echo 'ERROR: Could not determine the Helm client version.' >&2
+    exit 1
+}}
+case "${{HELM_VERSION}}" in
+    v4.*) ;;
+    *)
+        echo 'ERROR: This apply helper requires Helm 4 because --force-conflicts is mandatory.' >&2
+        exit 1
+        ;;
+esac
+HELM_UPGRADE_HELP="$("${{HELM[@]}}" upgrade --help 2>/dev/null)" || {{
+    echo 'ERROR: Could not inspect Helm upgrade capabilities.' >&2
+    exit 1
+}}
+if ! grep -q -- '--force-conflicts' <<<"${{HELM_UPGRADE_HELP}}"; then
+    echo 'ERROR: Helm upgrade does not support required --force-conflicts.' >&2
+    exit 1
+fi
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]] && ! grep -q -- '--hide-secret' <<<"${{HELM_UPGRADE_HELP}}"; then
+    echo 'ERROR: Helm dry-run is refused because this client cannot --hide-secret.' >&2
+    exit 1
+fi
+
+if [[ -z "${{O11Y_TOKEN_FILE:-}}" ]]; then O11Y_TOKEN_FILE={o11y_token_default}; fi
+if [[ -z "${{PLATFORM_HEC_TOKEN_FILE:-}}" ]]; then PLATFORM_HEC_TOKEN_FILE={platform_hec_token_default}; fi
+if [[ -z "${{PLATFORM_HEC_URL:-}}" ]]; then PLATFORM_HEC_URL={platform_hec_url_default}; fi
+if [[ -z "${{O11Y_TOKEN_FILE}}" ]]; then
+    echo 'ERROR: O11Y_TOKEN_FILE must point to an owner-only regular token file.' >&2
+    exit 1
+fi
+if [[ -n "${{PLATFORM_HEC_TOKEN_FILE}}" && -z "${{PLATFORM_HEC_URL}}" ]]; then
+    echo 'ERROR: PLATFORM_HEC_TOKEN_FILE requires PLATFORM_HEC_URL.' >&2
     exit 1
 fi
 
 # Confirm Cilium / Tetragon presence; refuse to proceed if neither is found.
-if ! kubectl get ns cilium >/dev/null 2>&1 \\
-   && ! kubectl -n kube-system get ds cilium >/dev/null 2>&1 \\
-   && ! kubectl get ns isovalent-system >/dev/null 2>&1; then
+if ! "${{KUBECTL[@]}}" get ns cilium >/dev/null 2>&1 \\
+   && ! "${{KUBECTL[@]}}" -n kube-system get ds cilium >/dev/null 2>&1 \\
+   && ! "${{KUBECTL[@]}}" get ns isovalent-system >/dev/null 2>&1; then
     echo 'ERROR: Could not detect a Cilium/Tetragon installation (looked for ns cilium, ns isovalent-system, ds kube-system/cilium).' >&2
     echo '       Install the Isovalent platform first via skills/cisco-isovalent-platform-setup.' >&2
     exit 1
@@ -546,33 +943,232 @@ NAMESPACE="{namespace}"
 CHART_REF="{chart_ref}"
 CHART_VERSION="{chart_version}"
 NORMALIZE_OTLPHTTP="{normalize_legacy_otlphttp}"
-export RELEASE
-if [[ -z "${{NAMESPACE}}" ]]; then
-    NAMESPACE="$(helm list --all-namespaces --filter "^${{RELEASE}}$" -o json 2>/dev/null | yq -r '.[] | select(.name == env(RELEASE)) | .namespace' - | head -1)"
-fi
-if [[ -z "${{NAMESPACE}}" ]]; then
-    NAMESPACE="splunk-otel"
+PLATFORM_ENABLED="{str(platform_enabled).lower()}"
+EXPORT_MODE="{export_mode}"
+EXPECTED_PLATFORM_INDEX="{platform_index}"
+EXPECTED_PLATFORM_SOURCETYPE="{platform_sourcetype}"
+CHART_NAME="${{CHART_REF##*/}}"
+RELEASE_ROWS="$("${{HELM[@]}}" list --all-namespaces --filter "^${{RELEASE}}$" -o json 2>/dev/null)" || {{
+    echo 'ERROR: Could not list the expected collector Helm release.' >&2
+    exit 1
+}}
+NAMESPACE="$(RELEASE_ROWS_JSON="${{RELEASE_ROWS}}" python3 - "${{RELEASE}}" "${{NAMESPACE}}" <<'PY'
+import json
+import os
+import sys
+
+release, expected_namespace = sys.argv[1:]
+try:
+    rows = json.loads(os.environ["RELEASE_ROWS_JSON"])
+except (KeyError, json.JSONDecodeError):
+    raise SystemExit("ERROR: Helm list returned invalid JSON.")
+if not isinstance(rows, list):
+    raise SystemExit("ERROR: Helm list did not return a release list.")
+matches = [row for row in rows if isinstance(row, dict) and row.get("name") == release]
+if len(matches) == 0:
+    raise SystemExit("ERROR: The expected collector Helm release does not exist.")
+if len(matches) != 1:
+    raise SystemExit("ERROR: The collector Helm release name is ambiguous across namespaces.")
+row = matches[0]
+namespace = row.get("namespace")
+if not isinstance(namespace, str) or not namespace:
+    raise SystemExit("ERROR: Collector Helm release has no namespace.")
+if expected_namespace and namespace != expected_namespace:
+    raise SystemExit("ERROR: Collector Helm release namespace does not match the rendered specification.")
+print(namespace)
+PY
+)" || exit 1
+# Never retain a complete Helm release document in a shell variable. Stream
+# the current notes-free metadata into one strict parser so name, namespace,
+# exact chart version, and deployed status are authoritative in the same read.
+# Only the strictly validated chart-version scalar is retained so an unpinned
+# rendered packet can continue using the exact currently installed version.
+if ! CURRENT_CHART_VERSION="$("${{HELM[@]}}" get metadata "${{RELEASE}}" --namespace "${{NAMESPACE}}" -o json 2>/dev/null \
+    | python3 -c '
+import json
+import re
+import sys
+
+data = json.load(sys.stdin)
+release, namespace, chart, expected_version = sys.argv[1:]
+version = str(data.get("version") or "") if isinstance(data, dict) else ""
+valid = (
+    isinstance(data, dict)
+    and data.get("name") == release
+    and data.get("namespace") == namespace
+    and data.get("chart") == chart
+    and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{{0,127}}", version) is not None
+    and (not expected_version or version == expected_version)
+    and str(data.get("status") or "").lower() == "deployed"
+)
+if not valid:
+    raise SystemExit(1)
+print(version)
+' "${{RELEASE}}" "${{NAMESPACE}}" "${{CHART_NAME}}" "${{CHART_VERSION}}" 2>/dev/null)"; then
+    echo 'ERROR: Existing collector Helm release is unavailable or not deployed; command output suppressed.' >&2
+    exit 1
 fi
 if [[ -z "${{CHART_VERSION}}" ]]; then
-    CHART_NAME="${{CHART_REF##*/}}"
-    INSTALLED_CHART="$(helm list --namespace "${{NAMESPACE}}" --filter "^${{RELEASE}}$" -o json 2>/dev/null | yq -r '.[] | select(.name == env(RELEASE)) | .chart' - | head -1)"
-    if [[ "${{INSTALLED_CHART}}" == "${{CHART_NAME}}-"* ]]; then
-        CHART_VERSION="${{INSTALLED_CHART#${{CHART_NAME}}-}}"
-    fi
+    CHART_VERSION="${{CURRENT_CHART_VERSION}}"
 fi
 
 TMPDIR_LOCAL="$(mktemp -d)"
 trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
-helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
+
+secure_copy_token() {{
+    local source_path="${{1:?source token file required}}"
+    local destination_path="${{2:?destination token file required}}"
+    local label="${{3:?token label required}}"
+    python3 - "${{source_path}}" "${{destination_path}}" "${{label}}" "${{ALLOW_LOOSE_TOKEN_PERMS:-false}}" <<'PY'
+import os
+import stat
+import sys
+
+source, destination, label, allow_loose = sys.argv[1:]
+maximum = 16 * 1024
+try:
+    before = os.lstat(source)
+except OSError:
+    raise SystemExit(f"ERROR: {{label}} must reference an existing credential file.")
+if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+    raise SystemExit(f"ERROR: {{label}} must be a regular file, not a symbolic link.")
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+try:
+    descriptor = os.open(source, flags)
+except OSError:
+    raise SystemExit(f"ERROR: {{label}} could not be opened securely.")
+try:
+    info = os.fstat(descriptor)
+    raw = os.read(descriptor, maximum + 1)
+    after = os.fstat(descriptor)
+finally:
+    os.close(descriptor)
+if (before.st_dev, before.st_ino) != (info.st_dev, info.st_ino):
+    raise SystemExit(f"ERROR: {{label}} changed while it was opened.")
+if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_nlink != 1:
+    raise SystemExit(f"ERROR: {{label}} must be a current-user-owned regular file with one hard link.")
+if stat.S_IMODE(info.st_mode) != 0o600 and allow_loose != "true":
+    raise SystemExit(f"ERROR: {{label}} must be mode 600.")
+if (info.st_size, info.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+    raise SystemExit(f"ERROR: {{label}} changed while it was read.")
+if info.st_size <= 0 or info.st_size > maximum or len(raw) != info.st_size:
+    raise SystemExit(f"ERROR: {{label}} has an invalid size.")
+try:
+    text = raw.decode("utf-8", "strict")
+except UnicodeError:
+    raise SystemExit(f"ERROR: {{label}} is not valid UTF-8 text.")
+if text.endswith("\\r\\n"):
+    token = text[:-2]
+elif text.endswith("\\n"):
+    token = text[:-1]
+else:
+    token = text
+if not token or "\\x00" in token or any(character.isspace() for character in token):
+    raise SystemExit(f"ERROR: {{label}} must contain one token with at most one trailing newline.")
+payload = token.encode("utf-8")
+out_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+output = os.open(destination, out_flags, 0o600)
+try:
+    view = memoryview(payload)
+    while view:
+        written = os.write(output, view)
+        if written <= 0:
+            raise SystemExit(f"ERROR: {{label}} could not be copied completely.")
+        view = view[written:]
+finally:
+    os.close(output)
+PY
+}}
+
+O11Y_TOKEN_COPY="${{TMPDIR_LOCAL}}/o11y-token"
+secure_copy_token "${{O11Y_TOKEN_FILE}}" "${{O11Y_TOKEN_COPY}}" O11Y_TOKEN_FILE
+HELM_SECRET_FLAGS=(--set-file "splunkObservability.accessToken=${{O11Y_TOKEN_COPY}}")
+PLATFORM_FLAGS=()
+if [[ -n "${{PLATFORM_HEC_TOKEN_FILE}}" ]]; then
+    PLATFORM_HEC_TOKEN_COPY="${{TMPDIR_LOCAL}}/platform-hec-token"
+    secure_copy_token "${{PLATFORM_HEC_TOKEN_FILE}}" "${{PLATFORM_HEC_TOKEN_COPY}}" PLATFORM_HEC_TOKEN_FILE
+    HELM_SECRET_FLAGS+=(--set-file "splunkPlatform.token=${{PLATFORM_HEC_TOKEN_COPY}}")
+fi
+if [[ -n "${{PLATFORM_HEC_URL}}" ]]; then
+    PLATFORM_FLAGS+=(--set-string "splunkPlatform.endpoint=${{PLATFORM_HEC_URL}}")
+fi
+
+"${{HELM[@]}}" get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
+
+if [[ "${{PLATFORM_ENABLED}}" == "true" && "${{EXPORT_MODE}}" == "stdout" ]]; then
+    echo 'ERROR: Stdout export cannot prove the required Splunk index/sourcetype path; use file mode for production apply.' >&2
+    exit 1
+fi
+if [[ "${{PLATFORM_ENABLED}}" == "true" && "${{EXPORT_MODE}}" == "file" ]]; then
+    if ! yq eval -e '.splunkPlatform.logsEnabled == true' "${{OVERLAY}}" >/dev/null; then
+        echo 'ERROR: The rendered overlay does not enable Splunk Platform logs.' >&2
+        exit 1
+    fi
+    OVERLAY_INDEX="$(yq eval -r '.logsCollection.extraFileLogs."filelog/tetragon".resource."com.splunk.index" // ""' "${{OVERLAY}}")"
+    OVERLAY_SOURCETYPE="$(yq eval -r '.logsCollection.extraFileLogs."filelog/tetragon".resource."com.splunk.sourcetype" // ""' "${{OVERLAY}}")"
+    if [[ "${{OVERLAY_INDEX}}" != "${{EXPECTED_PLATFORM_INDEX}}" || "${{OVERLAY_SOURCETYPE}}" != "${{EXPECTED_PLATFORM_SOURCETYPE}}" ]]; then
+        echo 'ERROR: The rendered Splunk Platform index/sourcetype path is incomplete or drifted.' >&2
+        exit 1
+    fi
+
+    RENDERED_HEC_URL="$(yq eval -r '.splunkPlatform.endpoint // ""' "${{OVERLAY}}")"
+    INHERITED_HEC_URL="$(yq eval -r '.splunkPlatform.endpoint // ""' "${{TMPDIR_LOCAL}}/current-values.yaml")"
+    INHERITED_HEC_TOKEN=false
+    if yq eval -e '.splunkPlatform.token != null and .splunkPlatform.token != ""' "${{TMPDIR_LOCAL}}/current-values.yaml" >/dev/null; then
+        INHERITED_HEC_TOKEN=true
+    fi
+    if [[ -n "${{PLATFORM_HEC_TOKEN_FILE}}" ]]; then
+        if [[ -z "${{PLATFORM_HEC_URL}}" ]]; then
+            echo 'ERROR: A provided PLATFORM_HEC_TOKEN_FILE requires PLATFORM_HEC_URL.' >&2
+            exit 1
+        fi
+        if [[ -n "${{RENDERED_HEC_URL}}" && "${{PLATFORM_HEC_URL}}" != "${{RENDERED_HEC_URL}}" ]]; then
+            echo 'ERROR: Runtime PLATFORM_HEC_URL differs from the reviewed rendered endpoint; re-render first.' >&2
+            exit 1
+        fi
+        EFFECTIVE_HEC_URL="${{PLATFORM_HEC_URL}}"
+    else
+        if [[ "${{INHERITED_HEC_TOKEN}}" != "true" || -z "${{INHERITED_HEC_URL}}" ]]; then
+            echo 'ERROR: Splunk Platform logs require a provided HEC URL/token file pair or a complete inherited release pair.' >&2
+            exit 1
+        fi
+        if [[ -n "${{RENDERED_HEC_URL}}" && "${{RENDERED_HEC_URL}}" != "${{INHERITED_HEC_URL}}" ]]; then
+            echo 'ERROR: Rendered and inherited HEC endpoints differ; provide a reviewed token file pair.' >&2
+            exit 1
+        fi
+        EFFECTIVE_HEC_URL="${{INHERITED_HEC_URL}}"
+    fi
+    if ! python3 - "${{EFFECTIVE_HEC_URL}}" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+parsed = urlsplit(sys.argv[1])
+valid = (
+    parsed.scheme == "https"
+    and bool(parsed.hostname)
+    and parsed.username is None
+    and parsed.password is None
+    and not parsed.query
+    and not parsed.fragment
+)
+raise SystemExit(0 if valid else 1)
+PY
+    then
+        echo 'ERROR: Effective Splunk Platform HEC endpoint is not a safe HTTPS URL.' >&2
+        exit 1
+    fi
+fi
+
+# shellcheck disable=SC2016  # yq expression, not a shell expansion
 yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
-if kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" >/dev/null 2>&1; then
-    kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" -o jsonpath='{{.data.ebpf-instrument-config\\.yml}}' > "${{TMPDIR_LOCAL}}/obi-config.yaml"
+if "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" >/dev/null 2>&1; then
+    "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" -o jsonpath='{{.data.ebpf-instrument-config\\.yml}}' > "${{TMPDIR_LOCAL}}/obi-config.yaml"
     if [[ -s "${{TMPDIR_LOCAL}}/obi-config.yaml" ]]; then
         OBI_CONFIG_FILE="${{TMPDIR_LOCAL}}/obi-config.yaml" yq eval '.obi.config.data = load(strenv(OBI_CONFIG_FILE))' -i "${{TMPDIR_LOCAL}}/merged.yaml"
     fi
 fi
-if kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" >/dev/null 2>&1; then
-    kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" -o jsonpath='{{.data.relay}}' > "${{TMPDIR_LOCAL}}/gateway-relay.yaml"
+if "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" >/dev/null 2>&1; then
+    "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" -o jsonpath='{{.data.relay}}' > "${{TMPDIR_LOCAL}}/gateway-relay.yaml"
     if [[ -s "${{TMPDIR_LOCAL}}/gateway-relay.yaml" ]]; then
         GATEWAY_CONFIG_FILE="${{TMPDIR_LOCAL}}/gateway-relay.yaml" yq eval '.gateway.config = load(strenv(GATEWAY_CONFIG_FILE))' -i "${{TMPDIR_LOCAL}}/merged.yaml"
     fi
@@ -591,59 +1187,50 @@ if [[ "${{NORMALIZE_OTLPHTTP}}" == "true" ]]; then
     mv "${{TMPDIR_LOCAL}}/merged.normalized.yaml" "${{TMPDIR_LOCAL}}/merged.yaml"
 fi
 
-claim_configmap_for_helm() {{
-    local name="${{1:?configmap name required}}" manifest
-    if ! kubectl -n "${{NAMESPACE}}" get configmap "${{name}}" >/dev/null 2>&1; then
-        return 0
-    fi
-    manifest="${{TMPDIR_LOCAL}}/${{name}}.claim.yaml"
-    kubectl -n "${{NAMESPACE}}" get configmap "${{name}}" -o yaml | yq eval 'del(.metadata.managedFields, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.generation, .metadata.selfLink, .status)' - > "${{manifest}}"
-    kubectl apply --server-side --force-conflicts --field-manager=helm -f "${{manifest}}" >/dev/null
-}}
-
 DRY_RUN_FLAG=()
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
-    DRY_RUN_FLAG=(--dry-run)
-    echo "DRY-RUN MODE: passing --dry-run to helm"
-fi
-if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
-    claim_configmap_for_helm "${{RELEASE}}-obi"
-    claim_configmap_for_helm "${{RELEASE}}-otel-collector"
+    DRY_RUN_FLAG=(--dry-run --hide-secret)
+    echo "DRY-RUN MODE: passing --dry-run --hide-secret to helm"
 fi
 VERSION_FLAG=()
 if [[ -n "${{CHART_VERSION}}" ]]; then
     VERSION_FLAG=(--version "${{CHART_VERSION}}")
 fi
 
-helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
+"${{HELM[@]}}" upgrade "${{RELEASE}}" "${{CHART_REF}}" \\
     --namespace "${{NAMESPACE}}" \\
     "${{VERSION_FLAG[@]}}" \\
     --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
-    --set-file "splunkObservability.accessToken=${{O11Y_TOKEN_FILE}}" \\
+    "${{HELM_SECRET_FLAGS[@]}}" \\
+    "${{PLATFORM_FLAGS[@]}}" \\
     --force-conflicts \\
     --atomic \\
     --timeout 5m \\
     "${{DRY_RUN_FLAG[@]}}"
 
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
-    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s
-    if kubectl -n "${{NAMESPACE}}" get deployment/${{RELEASE}}-k8s-cluster-receiver >/dev/null 2>&1; then
-        kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s
+    "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s
+    if "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" get deployment/${{RELEASE}}-k8s-cluster-receiver >/dev/null 2>&1; then
+        "${{KUBECTL[@]}}" -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s
     else
         echo "INFO: optional k8s-cluster-receiver deployment is not present; agent rollout is healthy."
     fi
 fi
 """
-    )
 
 
-def render_handoffs(args: argparse.Namespace, spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
+def render_handoffs(
+    args: argparse.Namespace,
+    spec: dict[str, Any],
+    realm: str,
+    cluster_name: str,
+    distribution: str,
+) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
 
     if handoffs.get("base_collector", True):
-        helpers["handoff-base-collector.sh"] = (
-            f"""#!/usr/bin/env bash
+        helpers["handoff-base-collector.sh"] = f"""#!/usr/bin/env bash
 set -euo pipefail
 
 # Render the base Splunk OTel collector values, then merge our overlay.
@@ -675,11 +1262,11 @@ echo "  Run:"
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
+# shellcheck disable=SC2016  # printed instruction intentionally keeps the variable literal
 echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 """
-        )
 
-    if handoffs.get("hec_service", True):
+    if handoffs.get("hec_service", True) or bool_flag(args.render_platform_hec_helper):
         # splunk-hec-service-setup uses --token-name (not --hec-token-name) per
         # its setup.sh. Pin the platform to enterprise|cloud as required by
         # that skill's --platform flag.
@@ -696,6 +1283,9 @@ echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
             'echo "    --token-name isovalent_tetragon \\\\"\n'
             f'echo "    --default-index {index} \\\\"\n'
             f'echo "    --allowed-indexes {index}"\n'
+            "echo\n"
+            'echo "Then run apply-isovalent-overlay.sh with PLATFORM_HEC_URL and"\n'
+            'echo "PLATFORM_HEC_TOKEN_FILE set to the provisioned endpoint and token file."\n'
         )
 
     if handoffs.get("cisco_security_cloud", True):
@@ -806,25 +1396,48 @@ def render_detectors(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return detectors
 
 
-def render_metadata(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, Any]:
+def render_metadata(
+    args: argparse.Namespace, spec: dict[str, Any], config: dict[str, Any]
+) -> dict[str, Any]:
     splunk_block = spec.get("splunk_platform") or {}
+    collector = spec.get("collector") or {}
+    collector_chart_ref = collector.get(
+        "chart_ref", "splunk-otel-collector-chart/splunk-otel-collector"
+    )
     return {
         "skill": SKILL_NAME,
-        "realm": args.realm or spec.get("realm", ""),
-        "cluster_name": args.cluster_name or spec.get("cluster_name", ""),
-        "distribution": args.distribution or spec.get("distribution", ""),
-        "export_mode": args.export_mode or (spec.get("tetragon_export") or {}).get("mode", "file"),
+        "realm": config["realm"],
+        "cluster_name": config["cluster_name"],
+        "distribution": config["distribution"],
+        "export_mode": config["export_mode"],
+        "legacy_fluentd_hec": config["legacy_fluentd"],
         "splunk_platform_enabled": splunk_block.get("enabled", True),
         "splunk_platform_index": splunk_block.get("index", "cisco_isovalent"),
         "splunk_platform_sourcetype": splunk_block.get("sourcetype", "cisco:isovalent"),
-        "scrape_jobs": [k for k, v in (spec.get("scrape") or {}).items() if v],
+        "splunk_platform_hec_url": config["hec_url"],
+        "platform_hec_token_configured": bool(config["platform_hec_token_file"]),
+        "render_platform_hec_helper": config["render_hec_helper"],
+        "collector": {
+            "release": collector.get("release", "splunk-otel-collector"),
+            "namespace": collector.get("namespace", ""),
+            "chart_ref": collector_chart_ref,
+            "chart_name": collector_chart_ref.rsplit("/", 1)[-1],
+            "chart_version": collector.get("chart_version", ""),
+        },
+        "scrape_jobs": effective_scrape_jobs(spec),
+        "signalflow_metrics": representative_signalflow_metrics(spec),
         "warnings": warnings(args, spec),
     }
 
 
 def warnings(args: argparse.Namespace, spec: dict[str, Any]) -> list[str]:
     items: list[str] = []
-    if bool_flag(args.legacy_fluentd_hec):
+    spec_export_mode = (spec.get("tetragon_export") or {}).get("mode", "file")
+    if (
+        bool_flag(args.legacy_fluentd_hec)
+        or args.export_mode == "fluentd"
+        or (not args.export_mode and spec_export_mode == "fluentd")
+    ):
         items.append(
             "DEPRECATED: --legacy-fluentd-hec uses fluent-plugin-splunk-hec which "
             "was archived 2025-06-24. Plan to migrate to the file-based path "
@@ -847,15 +1460,16 @@ def main() -> int:
         return 1
     try:
         spec = load_spec(spec_path)
+        config = normalize_configuration(args, spec)
     except SpecError as exc:
         print(f"ERROR: {exc}", file=__import__("sys").stderr)
         return 1
 
-    realm = args.realm or spec.get("realm", "us0")
-    cluster_name = args.cluster_name or spec.get("cluster_name", "lab-cluster")
-    distribution = args.distribution or spec.get("distribution", "kubernetes")
-    export_mode = args.export_mode or (spec.get("tetragon_export") or {}).get("mode", "file")
-    legacy_fluentd = bool_flag(args.legacy_fluentd_hec)
+    realm = config["realm"]
+    cluster_name = config["cluster_name"]
+    distribution = config["distribution"]
+    export_mode = config["export_mode"]
+    legacy_fluentd = config["legacy_fluentd"]
 
     plan = {
         "skill": SKILL_NAME,
@@ -878,7 +1492,33 @@ def main() -> int:
         return 0
 
     out = Path(args.output_dir)
+    if out.is_symlink():
+        print("ERROR: --output-dir must not be a symbolic link.", file=sys.stderr)
+        return 1
     out.mkdir(parents=True, exist_ok=True)
+    if not out.is_dir():
+        print("ERROR: --output-dir must be a directory.", file=sys.stderr)
+        return 1
+    # Remove only this renderer's managed artifacts so changed specs cannot
+    # leave stale helpers, dashboards, detectors, or output settings behind.
+    for relative in (
+        "splunk-otel-overlay",
+        "dashboards",
+        "detectors",
+        "scripts",
+        "metadata.json",
+    ):
+        managed = out / relative
+        if managed.is_symlink():
+            print(
+                "ERROR: Managed output paths must not be symbolic links.",
+                file=sys.stderr,
+            )
+            return 1
+        if managed.is_dir():
+            shutil.rmtree(managed)
+        elif managed.exists():
+            managed.unlink()
 
     overlay = overlay_values(
         spec,
@@ -886,7 +1526,7 @@ def main() -> int:
         distribution=distribution,
         export_mode=export_mode,
         legacy_fluentd=legacy_fluentd,
-        platform_hec_url=args.platform_hec_url,
+        platform_hec_url=config["hec_url"],
     )
     write_yaml(out / "splunk-otel-overlay/values.overlay.yaml", overlay)
 
@@ -900,7 +1540,10 @@ def main() -> int:
     if dashboards_block.get("enabled", True) and source_dir:
         src = Path(source_dir)
         if not src.is_dir():
-            print(f"ERROR: --dashboards-source {source_dir} is not a directory.", file=__import__("sys").stderr)
+            print(
+                f"ERROR: --dashboards-source {source_dir} is not a directory.",
+                file=__import__("sys").stderr,
+            )
             return 1
         for json_file in sorted(src.glob("*.json")):
             target = dashboards_out / json_file.name
@@ -909,12 +1552,16 @@ def main() -> int:
             # validate.sh exercises also runs at render time.
             scrubber = out / "scripts" / "scrub-tokens.py"
             import subprocess
+
             result = subprocess.run(
                 ["python3", str(scrubber), str(json_file), str(target)],
                 check=False,
             )
             if result.returncode != 0:
-                print(f"ERROR: scrub-tokens refused {json_file}; remove the inline tokens before re-rendering.", file=__import__("sys").stderr)
+                print(
+                    f"ERROR: scrub-tokens refused {json_file}; remove the inline tokens before re-rendering.",
+                    file=__import__("sys").stderr,
+                )
                 return 1
     elif dashboards_block.get("enabled", True):
         write_text(
@@ -939,11 +1586,17 @@ def main() -> int:
 
     write_text(
         out / "scripts/apply-isovalent-overlay.sh",
-        render_apply_overlay_script(spec),
+        render_apply_overlay_script(
+            spec,
+            o11y_token_file=config["o11y_token_file"],
+            platform_hec_token_file=config["platform_hec_token_file"],
+            platform_hec_url=config["hec_url"],
+            export_mode=config["export_mode"],
+        ),
         executable=True,
     )
 
-    write_json(out / "metadata.json", render_metadata(args, spec))
+    write_json(out / "metadata.json", render_metadata(args, spec, config))
     return 0
 
 

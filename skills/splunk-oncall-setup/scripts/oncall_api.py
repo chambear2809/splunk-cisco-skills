@@ -17,7 +17,6 @@ import json
 import os
 import random
 import re
-import stat
 import sys
 import threading
 import time
@@ -26,6 +25,15 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+SHARED_LIB_DIR = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(SHARED_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB_DIR))
+
+from secure_secret_file import (  # noqa: E402
+    SecureSecretFileError,
+    read_private_text_file,
+)
 
 
 _RETRYABLE_STATUSES = {429, 502, 503, 504}
@@ -61,20 +69,10 @@ def _max_retries() -> int:
 
 
 def read_secret_file(path: Path, label: str) -> str:
-    if not path.is_file():
-        raise ApiError(f"{label} file does not exist: {path}")
     try:
-        mode = stat.S_IMODE(path.stat().st_mode)
-    except OSError as exc:
-        raise ApiError(f"Cannot stat {label} file {path}: {exc}") from exc
-    if mode & 0o077:
-        raise ApiError(
-            f"{label} file {path} has overly permissive mode {oct(mode)}; require 0600 (group/world bits cleared)."
-        )
-    value = path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise ApiError(f"{label} file is empty: {path}")
-    return value
+        return read_private_text_file(path, label=f"{label} file")
+    except SecureSecretFileError as exc:
+        raise ApiError(str(exc)) from exc
 
 
 def load_json(path: Path) -> dict[str, Any]:

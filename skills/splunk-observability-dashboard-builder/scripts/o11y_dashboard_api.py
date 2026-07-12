@@ -16,6 +16,15 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+SHARED_LIB_DIR = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(SHARED_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB_DIR))
+
+from secure_secret_file import (  # noqa: E402
+    SecureSecretFileError,
+    read_private_text_file,
+)
+
 
 # Maximum retry attempts for transient HTTP errors (429 / 502 / 503 / 504).
 # Override at test time via the O11Y_MAX_RETRIES env var.
@@ -38,10 +47,10 @@ class ApiError(Exception):
 
 
 def read_token(path: Path) -> str:
-    token = path.read_text(encoding="utf-8").strip()
-    if not token:
-        raise ApiError(f"Token file is empty: {path}")
-    return token
+    try:
+        return read_private_text_file(path, label="Observability token file")
+    except SecureSecretFileError as exc:
+        raise ApiError(str(exc)) from exc
 
 
 def _retry_after_seconds(exc: HTTPError, attempt: int) -> float:

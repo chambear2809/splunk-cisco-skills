@@ -1,0 +1,45 @@
+[Unit]
+Description=Dedicated exact-host egress proxy for Galileo OTLP
+Documentation=https://tinyproxy.github.io/
+Wants=network-online.target
+After=network-online.target
+Before=splunk-otel-collector.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tinyproxy -d -c /etc/tinyproxy/galileo.conf
+Restart=on-failure
+RestartSec=2s
+TimeoutStartSec=15s
+TimeoutStopSec=15s
+User=tinyproxy
+Group=tinyproxy
+RuntimeDirectory=tinyproxy-galileo
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+TasksMax=64
+LimitNOFILE=1024
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

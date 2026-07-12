@@ -11,7 +11,7 @@ spec:
   template:
     metadata:
       annotations:
-        instrumentation.opentelemetry.io/inject-java: "true"
+        instrumentation.opentelemetry.io/inject-java: "splunk-otel/splunk-otel-auto-instrumentation"
 ```
 
 For Namespaces, the operator inspects the Namespace annotations directly (Namespaces have no pod template). That path is simply:
@@ -19,7 +19,7 @@ For Namespaces, the operator inspects the Namespace annotations directly (Namesp
 ```yaml
 metadata:
   annotations:
-    instrumentation.opentelemetry.io/inject-java: "true"
+    instrumentation.opentelemetry.io/inject-java: "splunk-otel/splunk-otel-auto-instrumentation"
 ```
 
 ## The wrong path (common bug)
@@ -36,7 +36,7 @@ Placing the annotation at `metadata.annotations` on a Deployment does nothing â€
     "template": {
       "metadata": {
         "annotations": {
-          "instrumentation.opentelemetry.io/inject-java": "true"
+          "instrumentation.opentelemetry.io/inject-java": "splunk-otel/splunk-otel-auto-instrumentation"
         }
       }
     }
@@ -48,7 +48,11 @@ This is equivalent to `kubectl edit` adding just those annotation keys. Because 
 
 ## Backup ConfigMap
 
-Before any strategic-merge patch, the apply script checks whether the backup ConfigMap (default `splunk-otel-auto-instrumentation-annotations-backup` in the CR namespace) has a key for the target workload. If not, it writes the current `spec.template.metadata.annotations` JSON there:
+Before any strategic-merge patch, the reviewed backup helper reads and validates
+every selected workload. It captures only the rendered managed-key union into a
+versioned snapshot. Snapshot keys are collision-resistant hashes of the full
+workload identity, and each value records the target, complete managed-key list,
+and only previously present managed values:
 
 ```yaml
 apiVersion: v1
@@ -57,12 +61,14 @@ metadata:
   name: splunk-otel-auto-instrumentation-annotations-backup
   namespace: splunk-otel
 data:
-  deployment-prod-payments-api: '{"prometheus.io/scrape":"true"}'
-  deployment-prod-checkout-web: '{}'
-  statefulset-prod-fraud-score: '{}'
+  snapshot-0123456789abcdef0123: '{"apiVersion":"splunk-observability-k8s-auto-instrumentation-setup/annotation-snapshot/v1","target":"Deployment/prod/payments-api","managedKeys":["instrumentation.opentelemetry.io/inject-java"],"values":{}}'
 ```
 
-The key format is `<kind-lower>-<namespace>-<name>`. The value is the JSON-serialized pre-instrumentation annotation map. Uninstall reverses the patch using this ConfigMap.
+The helper creates or resourceVersion-replaces the owned ConfigMap, then reads
+it back and validates every selected snapshot before the first workload patch.
+Any kubectl failure, malformed JSON, ownership mismatch, incomplete snapshot,
+or key collision aborts with no workload mutation. Unrelated annotations are
+never copied into the ConfigMap.
 
 ## Rollout restart ordering
 
@@ -79,19 +85,23 @@ The `status` wait prevents cascading failure: if one rollout gets stuck (e.g. an
 
 `uninstall.sh` reverses the patch. For each target workload:
 
-1. Read the backup ConfigMap key.
-2. Build a strategic-merge patch that sets the inject-* annotations to `null` (which removes them under strategic-merge semantics). Also nulls `container-names`, `otel-dotnet-auto-runtime`, `otel-go-auto-target-exe` for safety.
-3. `kubectl rollout restart`.
+1. Validate every selected workload and the owned ConfigMap before patching.
+2. Require a versioned, correct-target, complete snapshot for every workload;
+   missing or corrupt snapshots fail closed.
+3. Build one patch containing only that workload's rendered managed keys.
+   Previously present values are restored; previously absent keys are `null`.
+4. `kubectl rollout restart` and wait.
 
-If the backup key is missing, the script falls back to a best-effort revert that strips only the inject-* annotations without attempting to restore other pre-existing annotations.
+There is no best-effort fallback. In particular, uninstall never guesses which
+keys to null and never includes unrelated annotations.
 
 ## Idempotency matrix
 
 | Scenario | Apply behavior | Uninstall behavior |
 |----------|----------------|--------------------|
 | First run | Writes backup, patches, rolls out | Reverses patch, rolls out |
-| Re-run after partial failure | Skips workloads already at desired state; picks up where it left off | Idempotent (missing keys are no-ops) |
-| Re-run after full success | No-op (no rollouts) | Same as first run if backup key exists |
+| Re-run after partial failure | Preserves verified original snapshots, then reapplies selected patches | Requires every selected snapshot before continuing |
+| Re-run after full success | Preserves verified original snapshots, then reapplies selected patches | Same as first run while complete snapshots remain |
 | After manual `kubectl patch` by operator | Next re-run may restart (if the manual patch drifted the state) | Uninstalls back to backup, not to the manual-patch state |
 
 ## Static validation

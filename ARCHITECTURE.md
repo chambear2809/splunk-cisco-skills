@@ -15,12 +15,19 @@ repo and the runtime deployment models those scripts target.
 | Path | Role |
 |------|------|
 | `skills/<skill>/` | Skill-specific docs and automation for install, setup, validation, and optional MCP loading |
+| `skills/shared/skill_product_registry.json` | Product-first navigation taxonomy; assigns every canonical skill to one primary product and capability without changing its path |
 | `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, account helpers, and host bootstrap helpers |
 | `skills/shared/scripts/` | Shared operational entrypoints such as credential setup and cloud batch install/uninstall |
 | `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, license-ack metadata, and role placement |
 | `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz`, `.tar.gz`, `.rpm`, `.deb`, or `.spl` archives |
 | `splunk-ta/_unpacked/` | Review-only extracted copies, not the normal deployment path |
 | `tests/` and `.github/workflows/ci.yml` | Regression coverage for helper libraries and first-party shell scripts |
+| `agent/splunk_cisco_skills_mcp/` | Repo-local MCP discovery, bounded stdio protocol handling, plan capabilities, and supervised execution gates |
+
+Canonical skill paths are intentionally flat. Product and capability
+organization is a catalog concern driven by `skill_product_registry.json`;
+nesting skill directories would break stable command paths, editor links, and
+immediate-child discovery used by the repo-local MCP server.
 
 ### Shared Helper Modules
 

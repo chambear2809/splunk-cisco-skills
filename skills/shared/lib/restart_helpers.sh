@@ -277,8 +277,11 @@ platform_restart_or_exit() {
             fi
         else
             log "Restarting Splunk with the systemd-managed CLI path to complete ${operation}..."
-            _platform_restart_cli "${execution_mode}" "${splunk_home}" true
-            rc=$?
+            if _platform_restart_cli "${execution_mode}" "${splunk_home}" true; then
+                rc=0
+            else
+                rc=$?
+            fi
             if (( rc != 0 )); then
                 log "ERROR: systemd-managed CLI restart failed."
                 return "${rc}"
@@ -295,8 +298,11 @@ platform_restart_or_exit() {
     if [[ "${restart_mode}" == "cli" || "${restart_mode}" == "auto" ]]; then
         if _platform_restart_capture "${execution_mode}" "$(hbs_shell_join test -x "${splunk_home%/}/bin/splunk")" >/dev/null 2>&1; then
             log "Restarting Splunk with the CLI path to complete ${operation}..."
-            _platform_restart_cli "${execution_mode}" "${splunk_home}" false
-            rc=$?
+            if _platform_restart_cli "${execution_mode}" "${splunk_home}" false; then
+                rc=0
+            else
+                rc=$?
+            fi
             if (( rc != 0 )); then
                 log "ERROR: Splunk CLI restart failed."
                 return "${rc}"
@@ -312,8 +318,11 @@ platform_restart_or_exit() {
 
     if _platform_restart_rest_fallback_allowed; then
         log "Restarting Splunk through explicit REST fallback to complete ${operation}..."
-        restart_splunk_and_wait "${sk}" "${uri}" 90 "${PLATFORM_RESTART_DEFAULT_TIMEOUT}"
-        rc=$?
+        if restart_splunk_and_wait "${sk}" "${uri}" 90 "${PLATFORM_RESTART_DEFAULT_TIMEOUT}"; then
+            rc=0
+        else
+            rc=$?
+        fi
         case "${rc}" in
             0)
                 log "SUCCESS: REST restart completed and the management API is responding again."

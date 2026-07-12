@@ -4,7 +4,7 @@ Kubernetes distributions have meaningfully different networking, RBAC, and secur
 
 ## EKS (vanilla)
 
-- `--cluster-name` auto-detects from EKS cluster metadata; you may still override it.
+- `--cluster-name` is mandatory and explicit; the offline renderer does not query EKS metadata.
 - Cilium-based EKS clusters: when Cilium is NOT in ENI mode, the operator webhook on port 9443 is blocked because the pod network does not route to the EKS control plane. The preflight warns; the fix is either Cilium `--eni-mode` or setting `operator.hostNetwork: true` in the base collector chart values.
 
 ## EKS Fargate
@@ -20,7 +20,7 @@ Kubernetes distributions have meaningfully different networking, RBAC, and secur
 
 ## GKE Autopilot
 
-- Autopilot restricts some securityContexts the operator installation Job requires. The base collector chart renders a Job-mode install that works around this; this skill enforces `--installation-job-enabled=true` on Helm v4.
+- Autopilot restricts some securityContexts used by operator installation Jobs. Configure and validate that base-chart concern with `splunk-observability-otel-collector-setup`; this overlay does not mutate it.
 - Autopilot private clusters: port 9443 firewall rule required. Preflight warns.
 
 ## GKE Private Cluster (any variant)
@@ -42,7 +42,7 @@ Kubernetes distributions have meaningfully different networking, RBAC, and secur
 
 ## Helm v3 vs v4
 
-- Helm v4 requires `installation-job-enabled: true` for the operator to install correctly (webhook race). This skill defaults to `true` and preflight warns if the spec overrides it to `false`.
+- Helm/operator installation-job behavior belongs to the base collector chart workflow. Legacy installation-job inputs to this overlay fail closed.
 
 ## Architecture and OS matrix
 

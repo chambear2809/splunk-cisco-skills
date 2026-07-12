@@ -1347,24 +1347,135 @@ def verify_json_images(value: object) -> None:
             verify_json_images(child)
 
 
-def verify_object_json(text: str, kind: str, name: str) -> None:
+def controller_owner(payload: dict):
+    """Return one complete controller owner reference, if present."""
+
+    metadata = payload.get("metadata") or {}
+    references = metadata.get("ownerReferences") or []
+    controllers = [
+        item
+        for item in references
+        if isinstance(item, dict) and item.get("controller") is True
+    ]
+    if len(controllers) > 1:
+        fail("live Pod has multiple controller owner references")
+    if not controllers:
+        return None
+    owner = controllers[0]
+    kind = str(owner.get("kind") or "")
+    name = str(owner.get("name") or "")
+    if not kind or not name:
+        fail("live Pod controller owner reference is incomplete")
+    return kind, name
+
+
+def targets_for_primary_pod(payload: dict) -> list[dict[str, str]]:
+    """Resolve an exact primary Pod controller to rendered core targets."""
+
+    owner = controller_owner(payload)
+    if owner is None:
+        return []
+    kind, name = owner
+    if kind == "ReplicaSet":
+        metadata = payload.get("metadata") or {}
+        labels = metadata.get("labels") or {}
+        pod_template_hash = labels.get("pod-template-hash")
+        if not isinstance(pod_template_hash, str) or not re.fullmatch(
+            r"[a-z0-9]+", pod_template_hash
+        ):
+            return []
+        deployment_names = {
+            target["name"]
+            for target in TARGETS
+            if target["kind"] == "Deployment"
+            and name == f"{target['name']}-{pod_template_hash}"
+        }
+        if not deployment_names:
+            return []
+        if len(deployment_names) != 1:
+            fail("live Pod ReplicaSet owner ambiguously matches rendered Deployments")
+        resolved_kind = "Deployment"
+        resolved_name = next(iter(deployment_names))
+    else:
+        resolved_kind = kind
+        resolved_name = name
+    return [
+        target
+        for target in TARGETS
+        if (target["kind"], target["name"]) == (resolved_kind, resolved_name)
+    ]
+
+
+def verify_target_containers(
+    pod_spec: dict,
+    object_targets: list[dict[str, str]],
+    identity: str,
+) -> None:
+    for target in object_targets:
+        containers = pod_spec.get(target["section"], [])
+        matches = [
+            item
+            for item in containers
+            if isinstance(item, dict) and item.get("name") == target["container"]
+        ]
+        if len(matches) != 1 or matches[0].get("image") != target["pinned"]:
+            fail(
+                f"live {identity} does not have exactly one {target['container']!r} "
+                f"container pinned to {target['pinned']!r}"
+            )
+
+
+def verify_pod_payload(payload: dict, *, primary: bool) -> None:
+    owner_targets = targets_for_primary_pod(payload)
+    if primary and not owner_targets:
+        fail("primary live Pod is not owned by an exact rendered core controller")
+    if owner_targets:
+        name = str((payload.get("metadata") or {}).get("name") or "<unknown>")
+        verify_target_containers(payload.get("spec") or {}, owner_targets, f"Pod/{name}")
+
+
+def completed_job(payload: dict) -> bool:
+    owner = controller_owner(payload)
+    return str((payload.get("status") or {}).get("phase") or "") == "Succeeded" and (
+        owner is not None and owner[0] == "Job"
+    )
+
+
+def verify_active_pod(payload: dict) -> None:
+    metadata = payload.get("metadata") or {}
+    status = payload.get("status") or {}
+    phase = str(status.get("phase") or "")
+    ready = any(
+        isinstance(row, dict)
+        and row.get("type") == "Ready"
+        and row.get("status") == "True"
+        for row in (status.get("conditions") or [])
+    )
+    if phase != "Running" or not ready or metadata.get("deletionTimestamp"):
+        fail("live Pod is not active, Running, Ready, and non-terminating")
+
+
+def parse_object_json(text: str, kind: str, name: str) -> dict:
     try:
         payload = json.loads(text)
     except (TypeError, ValueError) as exc:
         fail(f"live object JSON is invalid: {exc}")
     if payload.get("kind") != kind or payload.get("metadata", {}).get("name") != name:
         fail(f"live object is not {kind}/{name}")
+    return payload
+
+
+def verify_object_json(text: str, kind: str, name: str) -> None:
+    payload = parse_object_json(text, kind, name)
     verify_json_images(payload)
-    object_targets = [target for target in TARGETS if (target["kind"], target["name"]) == (kind, name)]
+    if kind == "Pod":
+        verify_pod_payload(payload, primary=False)
+        return
+    object_targets = [
+        target for target in TARGETS if (target["kind"], target["name"]) == (kind, name)
+    ]
     pod_spec = payload.get("spec", {}).get("template", {}).get("spec", {})
-    for target in object_targets:
-        containers = pod_spec.get(target["section"], [])
-        matches = [item for item in containers if item.get("name") == target["container"]]
-        if len(matches) != 1 or matches[0].get("image") != target["pinned"]:
-            fail(
-                f"live {kind}/{name} does not have exactly one {target['container']!r} "
-                f"container pinned to {target['pinned']!r}"
-            )
+    verify_target_containers(pod_spec, object_targets, f"{kind}/{name}")
 
 
 def verify_object_list_json(text: str) -> None:
@@ -1376,6 +1487,19 @@ def verify_object_list_json(text: str) -> None:
         fail("live object-list JSON has no items array")
     for item in payload["items"]:
         verify_json_images(item)
+        if isinstance(item, dict) and item.get("kind") == "Pod":
+            verify_pod_payload(item, primary=False)
+
+
+def verify_runtime_pod_json(text: str, name: str, membership: str) -> None:
+    if membership not in {"primary", "auxiliary"}:
+        fail("live Pod membership must be primary or auxiliary")
+    payload = parse_object_json(text, "Pod", name)
+    verify_json_images(payload)
+    if completed_job(payload):
+        raise SystemExit(10)
+    verify_pod_payload(payload, primary=membership == "primary")
+    verify_active_pod(payload)
 
 
 def main() -> None:
@@ -1388,10 +1512,16 @@ def main() -> None:
     if len(sys.argv) == 4 and sys.argv[1] == "--verify-object-json":
         verify_object_json(sys.stdin.read(), sys.argv[2], sys.argv[3])
         return
+    if len(sys.argv) == 4 and sys.argv[1] == "--verify-runtime-pod-json":
+        verify_runtime_pod_json(sys.stdin.read(), sys.argv[2], sys.argv[3])
+        return
     if len(sys.argv) == 2 and sys.argv[1] == "--verify-object-list-json":
         verify_object_list_json(sys.stdin.read())
         return
-    fail("usage: post-render stdin, --verify MANIFEST, --verify-object-json KIND NAME, or --verify-object-list-json")
+    fail(
+        "usage: post-render stdin, --verify MANIFEST, --verify-object-json KIND NAME, "
+        "--verify-runtime-pod-json NAME MEMBERSHIP, or --verify-object-list-json"
+    )
 
 
 if __name__ == "__main__":
@@ -5167,6 +5297,12 @@ python3 "${{script_dir}}/{instrumentation_guard_name}" --verify-owned \
 helm_mutation_committed=true
 """
 
+    install_release_query = (
+        'install_release_record="$(query_helm_release allow-absent any deployed)"'
+        if job_owned_instrumentation
+        else "query_helm_release allow-absent any deployed >/dev/null"
+    )
+
     write_text(
         k8s_dir / "helm-install.sh",
         f"""#!/usr/bin/env bash
@@ -5181,7 +5317,7 @@ release_name={shell_quote(args.release_name)}
 
 bash "${{script_dir}}/verify-overlays.sh"
 chart_archive="$(bash "${{script_dir}}/fetch-chart.sh")"
-install_release_record="$(query_helm_release allow-absent any deployed)"
+{install_release_query}
 {instrumentation_install_guard}
 "${{helm_command[@]}}" upgrade --install "${{release_name}}" "${{chart_archive}}" \\
     --namespace "${{namespace}}" \\
@@ -5204,8 +5340,13 @@ install_release_record="$(query_helm_release allow-absent any deployed)"
     target_allocator_resource_name = f"{target_allocator_fullname(args.release_name)}-ta"
     obi_resource_name = obi_fullname(args.release_name)
     cluster_receiver_fullname = cluster_receiver_name(collector_fullname, args.distribution)
+    instrumentation_status_variables = ""
     instrumentation_check = ""
     if str_bool(args.enable_autoinstrumentation):
+        instrumentation_status_variables = (
+            f"operator_name={shell_quote(operator_resource_name)}\n"
+            f"instrumentation_name={shell_quote(collector_fullname)}"
+        )
         instrumentation_check = f"""
 kubectl {status_context}-n "${{namespace}}" rollout status \\
     "deployment/${{operator_name}}" --timeout=180s
@@ -5242,13 +5383,21 @@ kubectl {status_context}-n "${{namespace}}" rollout status \\
             continue
         checked_image_objects.add(identity_key)
         image_status_checks += f"""
-kubectl {status_context}-n "${{namespace}}" get {target['kind'].lower()} {shell_quote(target['name'])} -o json | \\
-    python3 "${{script_dir}}/{fargate_post_renderer_name}" --verify-object-json {shell_quote(target['kind'])} {shell_quote(target['name'])}
+if ! kubectl {status_context}-n "${{namespace}}" get {target['kind'].lower()} {shell_quote(target['name'])} -o json 2>/dev/null | \\
+    python3 "${{script_dir}}/{fargate_post_renderer_name}" --verify-object-json {shell_quote(target['kind'])} {shell_quote(target['name'])} \\
+        >/dev/null 2>&1; then
+    echo "ERROR: live Kubernetes workload image verification failed; verifier output suppressed." >&2
+    exit 1
+fi
 """
     if str_bool(args.enable_autoinstrumentation):
         image_status_checks += f"""
-kubectl {status_context}-n "${{namespace}}" get instrumentation "${{instrumentation_name}}" -o json | \\
-    python3 "${{script_dir}}/{fargate_post_renderer_name}" --verify-object-json Instrumentation "${{instrumentation_name}}"
+if ! kubectl {status_context}-n "${{namespace}}" get instrumentation "${{instrumentation_name}}" -o json 2>/dev/null | \\
+    python3 "${{script_dir}}/{fargate_post_renderer_name}" --verify-object-json Instrumentation "${{instrumentation_name}}" \\
+        >/dev/null 2>&1; then
+    echo "ERROR: live Kubernetes workload image verification failed; verifier output suppressed." >&2
+    exit 1
+fi
 """
     write_text(
         k8s_dir / "status.sh",
@@ -5260,18 +5409,49 @@ release_name={shell_quote(args.release_name)}
 collector_name={shell_quote(collector_fullname)}
 script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 cluster_receiver_name={shell_quote(cluster_receiver_fullname)}
-operator_name={shell_quote(operator_resource_name)}
-instrumentation_name={shell_quote(collector_fullname)}
+{instrumentation_status_variables}
 helm_command=(helm)
 {helm_release_query_function}
 {supply_chain_guard}
 
+command -v python3 >/dev/null 2>&1 || {{
+    echo "ERROR: python3 is required to validate kubectl version skew." >&2
+    exit 1
+}}
+kubectl {status_context}version -o json | python3 -c '
+import json, re, sys
+payload = json.load(sys.stdin)
+def component(value, label):
+    if str(value.get("major")) != "1":
+        raise SystemExit("ERROR: %s major version is not Kubernetes 1.x" % label)
+    match = re.match(r"^[0-9]+", str(value.get("minor") or ""))
+    if not match:
+        raise SystemExit("ERROR: %s minor version is invalid" % label)
+    return int(match.group())
+client_minor = component(payload.get("clientVersion") or {{}}, "kubectl")
+server_minor = component(payload.get("serverVersion") or {{}}, "kube-apiserver")
+if abs(client_minor - server_minor) > 1:
+    raise SystemExit(
+        "ERROR: kubectl 1.%d is outside the supported +/-1 minor skew for kube-apiserver 1.%d"
+        % (client_minor, server_minor)
+    )
+'
+
 status_release_record="$(query_helm_release require-present any deployed)"
 echo "Helm release ownership status: ${{status_release_record}}"
-helm status "${{release_name}}" --namespace "${{namespace}}"{helm_status_context}
-kubectl {status_context}-n "${{namespace}}" get pods -l release="${{release_name}}"
-kubectl {status_context}-n "${{namespace}}" wait --for=condition=Ready pod \\
-    -l release="${{release_name}}" --timeout=180s
+# Never retain the full Helm status document in a shell variable. Release notes
+# can contain customer data and would otherwise be exposed by `bash -x`.
+if ! helm status "${{release_name}}" --namespace "${{namespace}}"{helm_status_context} --output json 2>/dev/null | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+status = str(((payload.get("info") or {{}}).get("status") or "")).lower()
+if status != "deployed":
+    raise SystemExit("ERROR: Helm status is not deployed")
+' >/dev/null 2>&1; then
+    echo "ERROR: Helm status is not a valid deployed release; command output suppressed." >&2
+    exit 1
+fi
+echo "Helm status: deployed"
 expected_agent={shell_quote('true' if agent_enabled else 'false')}
 expected_gateway={shell_quote('true' if gateway_enabled else 'false')}
 expected_cluster_receiver={shell_quote('true' if effective_cluster_receiver_enabled(args) else 'false')}
@@ -5292,26 +5472,96 @@ fi
 {instrumentation_check}
 {optional_component_checks}
 log_file="$(mktemp)"
-cleanup() {{ rm -f "${{log_file}}"; }}
+pod_list="$(mktemp)"
+pod_log="$(mktemp)"
+pod_json="$(mktemp)"
+release_pods="$(mktemp)"
+instance_pods="$(mktemp)"
+cleanup() {{ rm -f "${{log_file}}" "${{pod_list}}" "${{pod_log}}" "${{pod_json}}" "${{release_pods}}" "${{instance_pods}}"; }}
 trap cleanup EXIT
-pod_count="$(kubectl {status_context}-n "${{namespace}}" get pods \\
-    -l app.kubernetes.io/instance="${{release_name}}" -o name | wc -l | tr -d '[:space:]')"
+
+# Primary Collector workloads use the legacy release label, while operator,
+# cert-manager, and OBI auxiliaries use app.kubernetes.io/instance. Query both
+# selectors without a phase filter so Failed auxiliary Pods cannot disappear
+# from the production gate. Successful Job Pods are verified, then excluded
+# from active readiness and log checks by the bounded per-Pod verifier.
+if ! kubectl {status_context}-n "${{namespace}}" get pods \\
+    -l release="${{release_name}}" \\
+    -o name \\
+    >"${{release_pods}}" 2>/dev/null; then
+    echo "ERROR: failed to inventory primary Collector pods; command output suppressed." >&2
+    exit 1
+fi
+if ! kubectl {status_context}-n "${{namespace}}" get pods \\
+    -l app.kubernetes.io/instance="${{release_name}}" \\
+    -o name \\
+    >"${{instance_pods}}" 2>/dev/null; then
+    echo "ERROR: failed to inventory auxiliary Collector pods; command output suppressed." >&2
+    exit 1
+fi
+LC_ALL=C sort -u "${{release_pods}}" "${{instance_pods}}" > "${{pod_list}}"
+pod_count="$(wc -l < "${{pod_list}}" | tr -d '[:space:]')"
 if ! [[ "${{pod_count}}" =~ ^[1-9][0-9]*$ ]]; then
     echo "ERROR: no collector release pods were found for log validation." >&2
     exit 1
 fi
-kubectl {status_context}-n "${{namespace}}" get pods \\
-    -l app.kubernetes.io/instance="${{release_name}}" -o json | \\
-    python3 "${{script_dir}}/{fargate_post_renderer_name}" --verify-object-list-json
-if ! kubectl {status_context}-n "${{namespace}}" logs -l app.kubernetes.io/instance="${{release_name}}" \\
-    --all-containers --prefix --tail=200 --max-log-requests="${{pod_count}}" >"${{log_file}}" 2>&1; then
-    python3 "${{script_dir}}/redact-stream.py" < "${{log_file}}" >&2
-    echo "ERROR: failed to retrieve collector release logs." >&2
+active_pod_count=0
+completed_job_count=0
+while IFS= read -r pod; do
+    [[ -n "${{pod}}" ]] || continue
+    pod_name="${{pod#pod/}}"
+    if [[ "${{pod_name}}" == "${{pod}}" || -z "${{pod_name}}" ]]; then
+        echo "ERROR: Collector pod inventory returned an invalid object name." >&2
+        exit 1
+    fi
+    if grep -Fqx -- "${{pod}}" "${{release_pods}}"; then
+        pod_membership=primary
+    else
+        pod_membership=auxiliary
+    fi
+    : > "${{pod_json}}"
+    if ! kubectl {status_context}-n "${{namespace}}" get pod "${{pod_name}}" -o json \\
+        >"${{pod_json}}" 2>/dev/null; then
+        echo "ERROR: failed to fetch ${{pod}} for validation; command output suppressed." >&2
+        exit 1
+    fi
+    if python3 "${{script_dir}}/{fargate_post_renderer_name}" \\
+        --verify-runtime-pod-json "${{pod_name}}" "${{pod_membership}}" \\
+        <"${{pod_json}}" >/dev/null 2>&1; then
+        active_pod_count=$((active_pod_count + 1))
+    else
+        pod_verify_rc=$?
+        if [[ "${{pod_verify_rc}}" -eq 10 ]]; then
+            completed_job_count=$((completed_job_count + 1))
+            continue
+        fi
+        echo "ERROR: Collector pod readiness or image verification failed for ${{pod}}; verifier output suppressed." >&2
+        exit 1
+    fi
+    : > "${{pod_log}}"
+    if ! kubectl {status_context}-n "${{namespace}}" logs "${{pod}}" \\
+        --all-containers --prefix --tail=200 >"${{pod_log}}" 2>&1; then
+        # kubectl may mix arbitrary container output into its failure stream.
+        # Never echo it: a general-purpose redactor cannot prove that workload
+        # data, signed URLs, or URI userinfo are absent.
+        echo "ERROR: failed to retrieve collector release logs for ${{pod}}; command output suppressed." >&2
+        exit 1
+    fi
+    cat "${{pod_log}}" >> "${{log_file}}"
+done < "${{pod_list}}"
+if ! [[ "${{active_pod_count}}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: no active Collector pods remained after excluding successful Job pods." >&2
     exit 1
 fi
+echo "Collector pod validation: ${{active_pod_count}} active, ${{completed_job_count}} completed Job pod(s)"
 if grep -Eiq '(^|[^a-z])(panic|fatal|exporting failed|permanent error)([^a-z]|$)' "${{log_file}}"; then
-    python3 "${{script_dir}}/redact-stream.py" < "${{log_file}}" >&2
-    echo "ERROR: collector logs contain fatal/export pipeline errors." >&2
+    fatal_count="$(grep -Eic '(^|[^a-z])(panic|fatal|exporting failed|permanent error)([^a-z]|$)' "${{log_file}}" || true)"
+    echo "ERROR: collector logs contain ${{fatal_count}} fatal/export pipeline match(es); matched content suppressed." >&2
+    exit 1
+fi
+if grep -Eiq 'dropping datapoint.*number of dimensions is larger than 36' "${{log_file}}"; then
+    drop_count="$(grep -Eic 'dropping datapoint.*number of dimensions is larger than 36' "${{log_file}}" || true)"
+    echo "ERROR: collector logs confirm ${{drop_count}} metric data-loss match(es) because datapoints exceed the 36-dimension limit; matched content suppressed." >&2
     exit 1
 fi
 """,
@@ -5393,6 +5643,12 @@ trap - EXIT HUP INT TERM
 cleanup_instrumentation_state
 """
 
+    instrumentation_uninstall_variable = (
+        f"instrumentation_name={shell_quote(collector_fullname)}"
+        if job_owned_instrumentation
+        else ""
+    )
+
     write_text(
         k8s_dir / "uninstall.sh",
         f"""#!/usr/bin/env bash
@@ -5400,7 +5656,7 @@ set -euo pipefail
 
 namespace={shell_quote(args.namespace)}
 release_name={shell_quote(args.release_name)}
-instrumentation_name={shell_quote(collector_fullname)}
+{instrumentation_uninstall_variable}
 script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 helm_command=(helm)
 {helm_release_query_function}

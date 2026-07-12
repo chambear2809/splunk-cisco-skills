@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lemonade Splunk OpenTelemetry"
+  short_description: "Operate Lemonade telemetry with the Splunk OTel Collector"
+  default_prompt: "Use $lemonade-splunk-otel to upgrade Lemonade and configure privacy-safe OpenTelemetry export through the Splunk OTel Collector."

@@ -169,6 +169,52 @@ validate_choice() {
     exit 1
 }
 
+validate_hec_base_url() {
+    python3 - "${1:-}" <<'PY'
+import ipaddress
+import re
+import sys
+from urllib.parse import urlsplit
+
+raw = sys.argv[1]
+try:
+    parsed = urlsplit(raw)
+    port = parsed.port
+except ValueError:
+    raise SystemExit(1)
+if (
+    parsed.scheme != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.query
+    or parsed.fragment
+    or any(character.isspace() or ord(character) < 0x20 for character in raw)
+    or parsed.path
+    not in {
+        "",
+        "/",
+        "/services/collector/event",
+        "/services/collector/event/",
+        "/services/collector/raw",
+        "/services/collector/raw/",
+    }
+    or (port is not None and not 1 <= port <= 65535)
+):
+    raise SystemExit(1)
+host = parsed.hostname
+try:
+    ipaddress.ip_address(host)
+except ValueError:
+    labels = host.split(".")
+    if any(
+        not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+        for label in labels
+    ):
+        raise SystemExit(1)
+PY
+}
+
 resolve_abs_path() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -277,6 +323,39 @@ validate_args() {
     fi
 
     validate_choice "${COMPOSE_RUNTIME}" docker podman
+
+    if (( ${#NAMESPACE} > 63 )) || [[ ! "${NAMESPACE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+        log "ERROR: --namespace must be a lowercase Kubernetes DNS label of at most 63 characters."
+        exit 1
+    fi
+    if (( ${#RELEASE_NAME} > 53 )) || [[ ! "${RELEASE_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+        log "ERROR: --release-name must be a lowercase Helm release name of at most 53 characters."
+        exit 1
+    fi
+    if [[ ! "${SC4SNMP_IMAGE}" =~ ^[A-Za-z0-9][A-Za-z0-9._/:-]*$ ]]; then
+        log "ERROR: --container-image contains unsupported container-reference characters."
+        exit 1
+    fi
+    if [[ -n "${HEC_URL}" ]] && ! validate_hec_base_url "${HEC_URL}"; then
+        log "ERROR: --hec-url must be a credential-free HTTPS HEC base, /event, or /raw URL."
+        exit 1
+    fi
+    if [[ -n "${DNS_SERVER}" ]] && ! python3 - "${DNS_SERVER}" <<'PY'
+import ipaddress, sys
+ipaddress.ip_address(sys.argv[1])
+PY
+    then
+        log "ERROR: --dns-server must be an IPv4 or IPv6 address."
+        exit 1
+    fi
+    if [[ -n "${TRAP_LISTENER_IP}" ]] && ! python3 - "${TRAP_LISTENER_IP}" <<'PY'
+import ipaddress, sys
+ipaddress.ip_address(sys.argv[1])
+PY
+    then
+        log "ERROR: --trap-listener-ip must be an IPv4 or IPv6 address."
+        exit 1
+    fi
 
     if [[ ! "${TRAP_PORT}" =~ ^[0-9]+$ ]] || (( TRAP_PORT < 1 || TRAP_PORT > 65535 )); then
         log "ERROR: --trap-port must be between 1 and 65535."
@@ -520,12 +599,18 @@ PY
 }
 
 image_repository() {
-    printf '%s' "${SC4SNMP_IMAGE%:*}"
+    local last_component="${SC4SNMP_IMAGE##*/}"
+    if [[ "${last_component}" == *:* ]]; then
+        printf '%s' "${SC4SNMP_IMAGE%:*}"
+    else
+        printf '%s' "${SC4SNMP_IMAGE}"
+    fi
 }
 
 image_tag() {
-    if [[ "${SC4SNMP_IMAGE}" == *:* ]]; then
-        printf '%s' "${SC4SNMP_IMAGE##*:}"
+    local last_component="${SC4SNMP_IMAGE##*/}"
+    if [[ "${last_component}" == *:* ]]; then
+        printf '%s' "${last_component##*:}"
     else
         printf '%s' "latest"
     fi
@@ -1156,6 +1241,10 @@ render_compose_assets() {
     compose_dir="${OUTPUT_DIR}/compose"
     template_dir="${SCRIPT_DIR}/../templates/compose"
     hec_base="$(detect_hec_base_url)"
+    if ! validate_hec_base_url "${hec_base}"; then
+        log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC base, /event, or /raw URL: ${hec_base}"
+        return 1
+    fi
     hec_event_url="$(hec_event_url_from_base "${hec_base}")"
     hec_protocol="$(parse_url_field "${hec_base}" "scheme")"
     hec_host="$(parse_url_field "${hec_base}" "host")"
@@ -1244,7 +1333,9 @@ EOF
 }
 
 render_helm_helper() {
-    local k8s_dir="$1"
+    local k8s_dir="$1" release_name_q namespace_q
+    printf -v release_name_q '%q' "${RELEASE_NAME}"
+    printf -v namespace_q '%q' "${NAMESPACE}"
     write_text_file "${k8s_dir}/helm-install.sh" "$(cat <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -1253,7 +1344,7 @@ if ! helm repo add splunk-connect-for-snmp https://splunk.github.io/splunk-conne
   echo "WARN: helm repo add failed (may already exist). Continuing." >&2
 fi
 helm repo update
-cmd=(helm upgrade --install "${RELEASE_NAME}" splunk-connect-for-snmp/splunk-connect-for-snmp --namespace "${NAMESPACE}" --create-namespace -f values.yaml)
+cmd=(helm upgrade --install ${release_name_q} splunk-connect-for-snmp/splunk-connect-for-snmp --namespace ${namespace_q} --create-namespace -f values.yaml)
 if [[ -f values.secret.yaml ]]; then
   cmd+=(-f values.secret.yaml)
 fi
@@ -1273,6 +1364,10 @@ render_k8s_assets() {
     mkdir -p "${k8s_dir}"
 
     hec_base="$(detect_hec_base_url)"
+    if ! validate_hec_base_url "${hec_base}"; then
+        log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC base, /event, or /raw URL: ${hec_base}"
+        return 1
+    fi
     hec_event_url="$(hec_event_url_from_base "${hec_base}")"
     hec_protocol="$(parse_url_field "${hec_base}" "scheme")"
     hec_host="$(parse_url_field "${hec_base}" "host")"

@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "products": [
+    {
+      "id": "splunk-platform",
+      "name": "Splunk Platform",
+      "description": "Capabilities shared by Splunk Cloud Platform and Splunk Enterprise, including applications, data management, collection, and data-source integrations.",
+      "capabilities": [
+        {
+          "id": "administration-and-applications",
+          "name": "Administration and Applications",
+          "skills": [
+            "splunk-admin-doctor",
+            "splunk-ai-assistant-setup",
+            "splunk-ai-ml-toolkit-setup",
+            "splunk-app-install",
+            "splunk-mcp-server-setup",
+            "splunk-platform-restart-orchestrator",
+            "splunk-platform-sizing",
+            "splunk-secure-gateway",
+            "splunk-secure-gateway-setup"
+          ]
+        },
+        {
+          "id": "collection-and-forwarding",
+          "name": "Collection and Forwarding",
+          "skills": [
+            "splunk-amazon-kinesis-firehose-setup",
+            "splunk-connect-for-otlp-setup",
+            "splunk-connect-for-snmp-setup",
+            "splunk-connect-for-syslog-setup",
+            "splunk-hec-service-setup",
+            "splunk-stream-setup",
+            "splunk-supported-addons-setup",
+            "splunk-universal-forwarder-setup"
+          ]
+        },
+        {
+          "id": "data-management-search-and-governance",
+          "name": "Data Management, Search, and Governance",
+          "skills": [
+            "splunk-cim-data-model",
+            "splunk-cim-data-model-setup",
+            "splunk-dashboard-studio",
+            "splunk-dashboard-studio-setup",
+            "splunk-db-connect-setup",
+            "splunk-edge-processor-setup",
+            "splunk-federated-search-setup",
+            "splunk-ingest-actions",
+            "splunk-ingest-actions-setup",
+            "splunk-knowledge-objects",
+            "splunk-knowledge-objects-setup",
+            "splunk-lookup-file-editing-setup",
+            "splunk-spl2-pipeline-kit"
+          ]
+        },
+        {
+          "id": "cisco-integrations",
+          "name": "Cisco Integrations",
+          "skills": [
+            "cisco-appdynamics-setup",
+            "cisco-asa-ta-setup",
+            "cisco-catalyst-enhanced-netflow-setup",
+            "cisco-catalyst-ta-setup",
+            "cisco-dc-networking-setup",
+            "cisco-enterprise-networking-setup",
+            "cisco-intersight-setup",
+            "cisco-meraki-ta-setup",
+            "cisco-scan-setup",
+            "cisco-secure-access-setup",
+            "cisco-secure-email-web-gateway-setup",
+            "cisco-security-cloud-setup",
+            "cisco-spaces-setup",
+            "cisco-thousandeyes-setup",
+            "cisco-ucs-ta-setup",
+            "cisco-webex-setup"
+          ]
+        },
+        {
+          "id": "third-party-data-source-addons",
+          "name": "Third-Party Data-Source Add-ons",
+          "skills": [
+            "splunk-aws-ta-setup",
+            "splunk-box-ta-setup",
+            "splunk-cyberark-ta-setup",
+            "splunk-database-ta-setup",
+            "splunk-gcp-ta-setup",
+            "splunk-github-ta-setup",
+            "splunk-google-workspace-ta-setup",
+            "splunk-microsoft-cloud-setup",
+            "splunk-microsoft-exchange-ta-setup",
+            "splunk-microsoft-scom-ta-setup",
+            "splunk-microsoft-security-ta-setup",
+            "splunk-netapp-ontap-ta-setup",
+            "splunk-okta-ta-setup",
+            "splunk-rsa-securid-ta-setup",
+            "splunk-salesforce-ta-setup",
+            "splunk-security-appliance-ta-setup",
+            "splunk-servicenow-ta-setup",
+            "splunk-syslog-web-proxy-ta-setup",
+            "splunk-sysmon-ta-setup",
+            "splunk-vmware-ta-setup",
+            "splunk-windows-ta-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-cloud-platform",
+      "name": "Splunk Cloud Platform",
+      "description": "Cloud-only administration, archive, onboarding, and ingest-processing capabilities for Splunk Cloud Platform.",
+      "capabilities": [
+        {
+          "id": "cloud-administration-and-archive",
+          "name": "Cloud Administration and Archive",
+          "skills": [
+            "splunk-cloud-acs-admin-setup",
+            "splunk-cloud-acs-allowlist-setup",
+            "splunk-ddaa-archive",
+            "splunk-ddaa-archive-setup"
+          ]
+        },
+        {
+          "id": "cloud-data-management",
+          "name": "Cloud Data Management",
+          "skills": [
+            "splunk-cloud-data-manager-setup",
+            "splunk-ingest-processor-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-enterprise",
+      "name": "Splunk Enterprise",
+      "description": "Self-managed Splunk Enterprise runtime, topology, storage, security, and operational administration.",
+      "capabilities": [
+        {
+          "id": "fleet-runtime-and-topology",
+          "name": "Fleet, Runtime, and Topology",
+          "skills": [
+            "splunk-agent-management-setup",
+            "splunk-deployment-server-setup",
+            "splunk-enterprise-host-setup",
+            "splunk-enterprise-kubernetes-setup",
+            "splunk-indexer-cluster-setup",
+            "splunk-search-head-cluster-setup"
+          ]
+        },
+        {
+          "id": "administration-storage-and-security",
+          "name": "Administration, Storage, and Security",
+          "skills": [
+            "splunk-enterprise-public-exposure-hardening",
+            "splunk-index-lifecycle-smartstore-setup",
+            "splunk-kvstore-admin",
+            "splunk-kvstore-admin-setup",
+            "splunk-license-manager-setup",
+            "splunk-monitoring-console-setup",
+            "splunk-platform-pki-setup",
+            "splunk-workload-management-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-enterprise-security",
+      "name": "Splunk Enterprise Security and Security Portfolio",
+      "description": "Splunk Enterprise Security lifecycle, security content, adjacent security products, and security-specific integrations.",
+      "capabilities": [
+        {
+          "id": "enterprise-security-core",
+          "name": "Enterprise Security Core",
+          "skills": [
+            "splunk-enterprise-security-config",
+            "splunk-enterprise-security-install",
+            "splunk-security-content-update-setup"
+          ]
+        },
+        {
+          "id": "security-products-and-applications",
+          "name": "Security Products and Applications",
+          "skills": [
+            "splunk-asset-risk-intelligence-setup",
+            "splunk-attack-analyzer-setup",
+            "splunk-fraud-analytics-setup",
+            "splunk-infosec-app-setup",
+            "splunk-pci-compliance-setup",
+            "splunk-security-essentials-setup",
+            "splunk-uba-setup"
+          ]
+        },
+        {
+          "id": "security-integrations-and-routing",
+          "name": "Security Integrations and Routing",
+          "skills": [
+            "cisco-talos-intelligence-setup",
+            "splunk-security-portfolio-setup",
+            "widefield-splunk-siem-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-itsi",
+      "name": "Splunk IT Service Intelligence",
+      "description": "Installation, configuration, service modeling, KPIs, and content-pack operations for Splunk IT Service Intelligence.",
+      "capabilities": [
+        {
+          "id": "lifecycle-and-configuration",
+          "name": "Lifecycle and Configuration",
+          "skills": [
+            "splunk-itsi-config",
+            "splunk-itsi-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-observability-cloud",
+      "name": "Splunk Observability Cloud",
+      "description": "Instrumentation, integrations, AI evaluation telemetry, monitoring, dashboards, and native operations for Splunk Observability Cloud.",
+      "capabilities": [
+        {
+          "id": "collection-and-instrumentation",
+          "name": "Collection and Instrumentation",
+          "skills": [
+            "lemonade-splunk-otel",
+            "splunk-observability-ai-agent-monitoring-setup",
+            "splunk-observability-aws-lambda-apm-setup",
+            "splunk-observability-browser-rum-setup",
+            "splunk-observability-claude-code-instrumentation-setup",
+            "splunk-observability-codex-instrumentation-setup",
+            "splunk-observability-coding-agent-instrumentation-setup",
+            "splunk-observability-database-monitoring-setup",
+            "splunk-observability-k8s-auto-instrumentation-setup",
+            "splunk-observability-k8s-frontend-rum-setup",
+            "splunk-observability-mobile-rum-setup",
+            "splunk-observability-otel-collector-setup"
+          ]
+        },
+        {
+          "id": "galileo-ai-observability",
+          "name": "Galileo AI Observability",
+          "skills": [
+            "galileo-agent-control-setup",
+            "galileo-lemonade-instrumentation-setup",
+            "galileo-mcp-server-setup",
+            "galileo-platform-setup"
+          ]
+        },
+        {
+          "id": "cloud-infrastructure-and-cisco-integrations",
+          "name": "Cloud, Infrastructure, and Cisco Integrations",
+          "skills": [
+            "splunk-observability-aws-integration",
+            "splunk-observability-azure-integration",
+            "splunk-observability-cisco-ai-pod-integration",
+            "splunk-observability-cisco-intersight-integration",
+            "splunk-observability-cisco-nexus-integration",
+            "splunk-observability-cloud-integration-setup",
+            "splunk-observability-gcp-integration",
+            "splunk-observability-isovalent-integration",
+            "splunk-observability-nvidia-gpu-integration",
+            "splunk-observability-thousandeyes-integration"
+          ]
+        },
+        {
+          "id": "dashboards-and-native-operations",
+          "name": "Dashboards and Native Operations",
+          "skills": [
+            "splunk-observability-dashboard-builder",
+            "splunk-observability-deep-native-workflows",
+            "splunk-observability-metrics-pipeline-setup",
+            "splunk-observability-native-ops",
+            "splunk-observability-slo-setup",
+            "splunk-observability-synthetics-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-soar",
+      "name": "Splunk SOAR",
+      "description": "Deployment and lifecycle management for Splunk SOAR on-premises, cloud, clustering, and Automation Broker workflows.",
+      "capabilities": [
+        {
+          "id": "deployment-and-lifecycle",
+          "name": "Deployment and Lifecycle",
+          "skills": [
+            "splunk-soar-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-on-call",
+      "name": "Splunk On-Call",
+      "description": "Teams, routing, escalation, integrations, and incident-response lifecycle management for Splunk On-Call.",
+      "capabilities": [
+        {
+          "id": "incident-response-lifecycle",
+          "name": "Incident Response Lifecycle",
+          "skills": [
+            "splunk-oncall-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "appdynamics",
+      "name": "AppDynamics",
+      "description": "Direct AppDynamics platform administration, agents, application monitoring, content, security, and integrations.",
+      "capabilities": [
+        {
+          "id": "administration-and-platform",
+          "name": "Administration and Platform",
+          "skills": [
+            "splunk-appdynamics-agent-management-setup",
+            "splunk-appdynamics-controller-admin-setup",
+            "splunk-appdynamics-platform-setup",
+            "splunk-appdynamics-setup"
+          ]
+        },
+        {
+          "id": "application-and-infrastructure-monitoring",
+          "name": "Application and Infrastructure Monitoring",
+          "skills": [
+            "splunk-appdynamics-analytics-setup",
+            "splunk-appdynamics-apm-setup",
+            "splunk-appdynamics-database-visibility-setup",
+            "splunk-appdynamics-dual-agent-setup",
+            "splunk-appdynamics-eum-setup",
+            "splunk-appdynamics-infrastructure-visibility-setup",
+            "splunk-appdynamics-k8s-cluster-agent-setup",
+            "splunk-appdynamics-machine-agent-otel-collector-setup",
+            "splunk-appdynamics-sap-agent-setup",
+            "splunk-appdynamics-synthetic-monitoring-setup"
+          ]
+        },
+        {
+          "id": "content-security-and-integrations",
+          "name": "Content, Security, and Integrations",
+          "skills": [
+            "splunk-appdynamics-alerting-content-setup",
+            "splunk-appdynamics-dashboards-reports-setup",
+            "splunk-appdynamics-log-observer-connect-setup",
+            "splunk-appdynamics-security-ai-setup",
+            "splunk-appdynamics-tags-extensions-setup",
+            "splunk-appdynamics-thousandeyes-integration-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cisco-and-partner-ecosystem",
+      "name": "Cisco and Partner Ecosystem",
+      "description": "Cisco-native and partner-product workflows that do not have one primary Splunk product as their target.",
+      "capabilities": [
+        {
+          "id": "cisco-native-products",
+          "name": "Cisco-Native Products",
+          "skills": [
+            "cisco-isovalent-platform-setup",
+            "cisco-meraki-aam-thousandeyes-setup",
+            "cisco-thousandeyes-mcp-setup"
+          ]
+        },
+        {
+          "id": "widefield",
+          "name": "WideField",
+          "skills": [
+            "widefield-google-secops-setup",
+            "widefield-identity-threat-doctor",
+            "widefield-okta-integration-setup",
+            "widefield-saviynt-integration-setup",
+            "widefield-security-setup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shared-and-cross-product",
+      "name": "Shared and Cross-Product",
+      "description": "Routers and readiness workflows that deliberately span multiple Splunk or Cisco product families.",
+      "capabilities": [
+        {
+          "id": "cisco-cross-product-routing",
+          "name": "Cisco Cross-Product Routing",
+          "skills": [
+            "cisco-cloud-control-setup",
+            "cisco-data-fabric-setup",
+            "cisco-product-setup"
+          ]
+        },
+        {
+          "id": "cross-product-readiness",
+          "name": "Cross-Product Readiness",
+          "skills": [
+            "splunk-data-source-readiness-doctor"
+          ]
+        }
+      ]
+    }
+  ]
+}

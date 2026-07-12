@@ -4,7 +4,9 @@ Most operators running Splunk APM are moving off or coexisting with one of: Data
 
 ## Detection
 
-`--detect-vendors` scans the target cluster for mutating webhooks matching known vendor prefixes:
+This overlay does not scan or mutate third-party vendor installations. Perform
+the following read-only checks manually (or in a separately reviewed workflow)
+before selecting targets; legacy `--detect-vendors` input fails closed:
 
 | Vendor | Webhook name pattern |
 |--------|----------------------|
@@ -30,7 +32,9 @@ If a vendor agent is still injected via the Pod spec (not just via a webhook), t
 
 ## Exclusion
 
-`--exclude-vendor datadog` emits migration guidance in `migration-guide.md` with the exact removal steps per vendor:
+Use `migration-guide.md` and the vendor's supported removal procedure; legacy
+`--exclude-vendor` input fails closed because this overlay cannot prove or apply
+those changes:
 
 ### Datadog
 
@@ -59,7 +63,7 @@ If a vendor agent is still injected via the Pod spec (not just via a webhook), t
 
 ## Same-cluster coexistence
 
-Running Splunk on some workloads and (say) Datadog on others in the same cluster is fine. Vendor mutating webhooks are namespace-scoped or label-selector-scoped in most cases. `--detect-vendors` specifically flags *per-workload* overlap, not cluster-wide presence.
+Running Splunk on some workloads and (say) Datadog on others in the same cluster is fine. Vendor mutating webhooks are namespace-scoped or label-selector-scoped in most cases. Audit *per-workload* overlap, not merely cluster-wide presence.
 
 ## Migration advisory
 

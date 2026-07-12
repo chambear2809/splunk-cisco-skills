@@ -71,17 +71,18 @@ done
 
 # Validate rest/create.json shape: must have type=Azure.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    if ! "${PYTHON_BIN}" -c "
+    if ! "${PYTHON_BIN}" -c '
 import json, sys
-data = json.loads(open('${OUTPUT_DIR}/rest/create.json').read())
-assert data.get('type') == 'Azure', f'expected type=Azure, got {data.get(\"type\")!r}'
-assert 'tenantId' in data, 'tenantId missing'
-assert 'subscriptions' in data, 'subscriptions missing'
-assert isinstance(data['subscriptions'], list), 'subscriptions must be list'
-assert len(data['subscriptions']) >= 1, 'subscriptions must be non-empty'
-poll_rate = data.get('pollRate', 0)
-assert 60000 <= poll_rate <= 600000, f'pollRate must be 60000-600000 ms, got {poll_rate}'
-" >/dev/null 2>&1; then
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+actual_type = data.get("type")
+assert actual_type == "Azure", f"expected type=Azure, got {actual_type!r}"
+assert "tenantId" in data, "tenantId missing"
+assert "subscriptions" in data, "subscriptions missing"
+assert isinstance(data["subscriptions"], list), "subscriptions must be list"
+assert len(data["subscriptions"]) >= 1, "subscriptions must be non-empty"
+poll_rate = data.get("pollRate", 0)
+assert 60000 <= poll_rate <= 600000, f"pollRate must be 60000-600000 ms, got {poll_rate}"
+' "${OUTPUT_DIR}/rest/create.json" >/dev/null 2>&1; then
         failures+=("rest/create.json failed shape validation (type, tenantId, subscriptions, pollRate)")
     else
         infos+=("rest/create.json: type=Azure, shape OK")
@@ -116,7 +117,7 @@ if [[ "${LIVE}" == "true" ]]; then
     if [[ -z "${REALM}" ]]; then
         # Try to read realm from coverage-report.json.
         if [[ -f "${OUTPUT_DIR}/coverage-report.json" ]]; then
-            REALM="$("${PYTHON_BIN}" -c "import json; print(json.loads(open('${OUTPUT_DIR}/coverage-report.json').read()).get('realm',''))" 2>/dev/null || echo "")"
+            REALM="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("realm", ""))' "${OUTPUT_DIR}/coverage-report.json" 2>/dev/null || echo "")"
         fi
     fi
     TF="${TOKEN_FILE:-${SPLUNK_O11Y_TOKEN_FILE:-}}"

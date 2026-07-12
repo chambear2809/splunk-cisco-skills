@@ -38,7 +38,7 @@ rbac:
 
 Re-run `helm upgrade`. Metrics appear within ~1 scrape cycle.
 
-**Prevention**: The umbrella now emits `rbac.customRules` automatically when `nim_scrape_mode: endpoints` (the default). See `endpoints-rbac-patch.md`.
+**Prevention**: The umbrella emits `rbac.customRules` automatically when `nim_scrape_mode: endpoints` is selected. The default is `receiver_creator`, which does not need this endpoint-discovery RBAC. See `endpoints-rbac-patch.md`.
 
 ## Issue 2: Receiver_creator collision with chart autodetection
 
@@ -55,9 +55,9 @@ oc -n splunk-otel get cm <release>-splunk-otel-collector-agent -o jsonpath='{.da
 # Found both.
 ```
 
-**Fix**: Either disable the chart's auto-discovery for nvidia, OR accept the duplication. The umbrella chose to keep both and let SignalFlow deduplicate by `_otel_pipeline` filter when needed. See `receiver-creator-naming.md`.
+**Fix**: Remove or disable the colliding `receiver_creator/nvidia` block and retain the skill-owned `receiver_creator/dcgm-cisco` block. The existing-collector apply path removes stale `receiver_creator/nvidia` values, and validation rejects that component name in the composed overlay. See the NVIDIA GPU child skill's [receiver-creator naming reference](../../splunk-observability-nvidia-gpu-integration/references/receiver-creator-naming.md).
 
-**Prevention**: The umbrella's renderer always uses the unique name `receiver_creator/dcgm-cisco`, never `nvidia`. A regression test (`test_receiver_creator_name_is_never_nvidia`) prevents accidental rename.
+**Prevention**: The umbrella's renderer always uses the unique name `receiver_creator/dcgm-cisco`, never `nvidia`. The NVIDIA child regressions `test_render_uses_dcgm_cisco_receiver_creator_not_nvidia` and `test_renderer_rejects_receiver_creator_named_nvidia` cover the rendered default and rejected override.
 
 ## Issue 3: Tetragon logs missing from Splunk Platform
 
@@ -77,14 +77,14 @@ export:
 
 ```yaml
 # Splunk OTel collector overlay
-logsCollection:
+agent:
   extraVolumes:
-    - name: tetragon-logs
-      hostPath: { path: /var/run/cilium/tetragon, type: Directory }
+    - name: tetragon
+      hostPath: { path: /var/run/cilium/tetragon }
   extraVolumeMounts:
-    - name: tetragon-logs
+    - name: tetragon
       mountPath: /var/run/cilium/tetragon
-      readOnly: true
+logsCollection:
   extraFileLogs:
     filelog/tetragon:
       include: [/var/run/cilium/tetragon/*.log]
@@ -109,7 +109,7 @@ agent:
         insecure_skip_verify: true
 ```
 
-**Prevention**: The umbrella's renderer auto-applies this when `--target-platform openshift`. Vanilla Kubernetes doesn't need it.
+**Prevention**: The umbrella's renderer applies this when `--distribution openshift`. Vanilla Kubernetes does not receive this override.
 
 ## Issue 5: Helm token in plaintext on disk
 
@@ -140,7 +140,7 @@ clusterReceiver:
     limits: { memory: 800Mi }
 ```
 
-**Prevention**: The umbrella's renderer sets reasonable defaults (300Mi/800Mi) for the cluster-receiver. For larger Nexus fleets (>10 devices, >1000 interfaces total), bump to 500Mi/1.5Gi.
+**Prevention**: The umbrella does not currently render cluster-receiver resource defaults. Add reviewed `clusterReceiver.resources` overrides to the base collector values after sizing the Nexus workload; the 300Mi request and 800Mi limit above are the values used in this incident, not automatic skill defaults.
 
 ## Issue 7: cert-manager conflict on cluster-receiver
 
@@ -155,7 +155,7 @@ certmanager:
   enabled: false
 ```
 
-**Prevention**: The umbrella's renderer auto-applies this when `--target-platform openshift` (atl-ocp2 was OpenShift; OpenShift typically has cert-manager pre-installed in production).
+**Prevention**: The umbrella's renderer applies this when `--distribution openshift` (atl-ocp2 was OpenShift; OpenShift commonly has an existing certificate-management path that must be reviewed).
 
 ## Issue 8: cloudProvider auto-detection wrong for bare-metal
 
@@ -169,7 +169,7 @@ certmanager:
 cloudProvider: ""
 ```
 
-**Prevention**: The umbrella's renderer auto-applies this when `--target-platform openshift-baremetal`.
+**Prevention**: The umbrella's renderer applies this when `--distribution openshift`; there is no `openshift-baremetal` distribution value.
 
 ## Summary of atl-ocp2 lessons codified in the umbrella
 
@@ -179,11 +179,14 @@ cloudProvider: ""
 | RBAC for endpoints    | `--nim-scrape-mode endpoints` triggers `rbac.customRules`        |
 | Receiver collision    | Hardcoded `receiver_creator/dcgm-cisco` (never `nvidia`)         |
 | Tetragon logs         | File-based via splunk-observability-isovalent-integration        |
-| kubeletStats TLS      | `--target-platform openshift` sets `insecure_skip_verify: true`  |
-| Helm token plaintext  | validate.sh + handoff scripts use `--set ... $(cat $TOKEN_FILE)` |
-| cluster-receiver OOM  | Defaults bumped to 300Mi/800Mi                                   |
+| kubeletStats TLS      | `--distribution openshift` sets `insecure_skip_verify: true`     |
+| Helm token plaintext  | validation rejects rendered tokens; handoffs use `--set-file`    |
+| cluster-receiver OOM  | reviewed base-values resource override; no automatic default     |
 | cert-manager conflict | OpenShift target sets `certmanager.enabled: false`               |
 | cloud provider        | OpenShift target sets `cloudProvider: ""`                        |
 
 
-Each lesson has at least one regression test in `tests/test_splunk_observability_cisco_ai_pod_integration.py` to ensure it doesn't recur.
+The regression module covers key rendered contracts such as endpoint RBAC,
+receiver naming, OpenShift kubelet TLS, and secret-safe handoffs. Operational
+lessons such as Tetragon deployment behavior and cluster-receiver sizing remain
+reviewed runbook evidence rather than automated regression coverage.

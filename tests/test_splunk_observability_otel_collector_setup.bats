@@ -43,8 +43,16 @@ fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"auth can-i"* ]]; then
   printf 'yes\n'
 fi
+if [[ "${cmd_name}" == "kubectl" && "$*" == *"version -o json"* ]]; then
+  printf '%s\n' '{"clientVersion":{"major":"1","minor":"34"},"serverVersion":{"major":"1","minor":"34"}}'
+fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get pods"* && "$*" == *"-o name"* ]]; then
   printf 'pod/mock-collector\n'
+fi
+if [[ "${cmd_name}" == "kubectl" && "$*" == *"get pod mock-collector -o json"* ]]; then
+  cat <<'JSON'
+{"apiVersion":"v1","kind":"Pod","metadata":{"name":"mock-collector","ownerReferences":[{"apiVersion":"apps/v1","kind":"DaemonSet","name":"splunk-otel-collector-agent","controller":true}]},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"}]},"status":{"phase":"Running","conditions":[{"type":"Ready","status":"True"}]}}
+JSON
 fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get daemonset splunk-otel-collector-agent -o json"* ]]; then
   cat <<'JSON'
@@ -110,6 +118,9 @@ JSON
 fi
 if [[ "${cmd_name}" == "helm" && "${1:-}" == "get" && "${2:-}" == "all" ]]; then
   printf 'splunk-otel-collector\tsplunk-otel\t1\tdeployed\tsplunk-otel-collector\t0.154.0\n'
+fi
+if [[ "${cmd_name}" == "helm" && "${1:-}" == "status" ]]; then
+  printf '%s\n' '{"info":{"status":"deployed"}}'
 fi
 
 if [[ "${cmd_name}" == "sha256sum" ]]; then

@@ -206,6 +206,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${MODE_VALIDATE}" == "true" && "${DRY_RUN}" == "true" ]]; then
+    log "ERROR: --validate cannot be combined with --dry-run; validation must execute and return real evidence."
+    exit 1
+fi
+
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 
 normalize_step() {

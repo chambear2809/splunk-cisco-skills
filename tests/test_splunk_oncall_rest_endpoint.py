@@ -149,7 +149,7 @@ def test_secret_file_rejects_world_readable(tmp_path, mod) -> None:
     path = tmp_path / "key"
     path.write_text("k", encoding="utf-8")
     path.chmod(0o644)
-    with pytest.raises(mod.RestEndpointError, match="overly permissive"):
+    with pytest.raises(mod.RestEndpointError, match="permissions must be 0600"):
         mod.read_secret_file(path, "REST endpoint integration key")
 
 

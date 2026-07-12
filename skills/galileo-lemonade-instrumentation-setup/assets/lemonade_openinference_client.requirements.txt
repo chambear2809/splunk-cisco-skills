@@ -1,0 +1,13 @@
+# Runtime dependencies for lemonade_openinference_client.py.
+# Pin updates must be exercised with the skill's privacy and transport tests.
+httpx==0.28.1
+openai==2.45.0
+openinference-instrumentation==0.1.54
+openinference-instrumentation-openai[instruments]==0.1.52
+openinference-semantic-conventions==0.1.30
+opentelemetry-api==1.43.0
+opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-instrumentation==0.64b0
+opentelemetry-semantic-conventions==0.64b0
+opentelemetry-sdk==1.43.0
+requests==2.34.2

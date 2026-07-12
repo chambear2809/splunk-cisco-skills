@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 try:
     import yaml
@@ -17,10 +19,12 @@ except ModuleNotFoundError:  # pragma: no cover - local fallback
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / "skills"
 OUTPUT_PATH = REPO_ROOT / "SKILL_UX_CATALOG.md"
+PRODUCT_REGISTRY_PATH = SKILLS_DIR / "shared" / "skill_product_registry.json"
 
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
 GENERATED_BANNER = (
-    "_Generated from `skills/*/SKILL.md` and local skill files by "
+    "_Generated from `skills/*/SKILL.md`, local skill files, and "
+    "`skills/shared/skill_product_registry.json` by "
     "`skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._"
 )
 
@@ -164,24 +168,110 @@ def first_sentence(value: str, limit: int = 150) -> str:
     return sentence[: limit - 3].rsplit(" ", 1)[0].rstrip(".,;:") + "..."
 
 
-def category_for(skill_name: str) -> str:
-    if skill_name.startswith("cisco-"):
-        return "Cisco Product And App Setup"
-    if skill_name.startswith("splunk-observability"):
-        return "Splunk Observability"
-    security_markers = (
-        "security",
-        "soar",
-        "uba",
-        "oncall",
-        "attack-analyzer",
-        "asset-risk",
-    )
-    if any(marker in skill_name for marker in security_markers):
-        return "Security And Response"
-    if any(marker in skill_name for marker in ("connect-for", "stream", "forwarder")):
-        return "Collectors And Forwarders"
-    return "Splunk Platform Operations"
+def load_product_registry() -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(PRODUCT_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"missing product registry: {PRODUCT_REGISTRY_PATH}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid product registry JSON: {exc}") from exc
+
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise ValueError("product registry must be an object with schema_version 1")
+    products = payload.get("products")
+    if not isinstance(products, list) or not products:
+        raise ValueError("product registry products must be a non-empty list")
+
+    product_ids: set[str] = set()
+    product_names: set[str] = set()
+    classified: dict[str, str] = {}
+    for product_index, product in enumerate(products):
+        location = f"products[{product_index}]"
+        if not isinstance(product, dict):
+            raise ValueError(f"{location} must be an object")
+        product_id = product.get("id")
+        product_name = product.get("name")
+        description = product.get("description")
+        capabilities = product.get("capabilities")
+        if not isinstance(product_id, str) or not re.fullmatch(
+            r"[a-z0-9]+(?:-[a-z0-9]+)*", product_id
+        ):
+            raise ValueError(f"{location}.id must be a lowercase hyphenated identifier")
+        if not isinstance(product_name, str) or not product_name.strip():
+            raise ValueError(f"{location}.name must be a non-empty string")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError(f"{location}.description must be a non-empty string")
+        if product_id in product_ids:
+            raise ValueError(f"duplicate product id: {product_id}")
+        if product_name in product_names:
+            raise ValueError(f"duplicate product name: {product_name}")
+        product_ids.add(product_id)
+        product_names.add(product_name)
+        if not isinstance(capabilities, list) or not capabilities:
+            raise ValueError(f"{location}.capabilities must be a non-empty list")
+
+        capability_ids: set[str] = set()
+        capability_names: set[str] = set()
+        for capability_index, capability in enumerate(capabilities):
+            capability_location = f"{location}.capabilities[{capability_index}]"
+            if not isinstance(capability, dict):
+                raise ValueError(f"{capability_location} must be an object")
+            capability_id = capability.get("id")
+            capability_name = capability.get("name")
+            names = capability.get("skills")
+            if not isinstance(capability_id, str) or not re.fullmatch(
+                r"[a-z0-9]+(?:-[a-z0-9]+)*", capability_id
+            ):
+                raise ValueError(
+                    f"{capability_location}.id must be a lowercase hyphenated identifier"
+                )
+            if not isinstance(capability_name, str) or not capability_name.strip():
+                raise ValueError(
+                    f"{capability_location}.name must be a non-empty string"
+                )
+            if capability_id in capability_ids:
+                raise ValueError(
+                    f"duplicate capability id {capability_id!r} in product {product_id!r}"
+                )
+            if capability_name in capability_names:
+                raise ValueError(
+                    f"duplicate capability name {capability_name!r} in product {product_id!r}"
+                )
+            capability_ids.add(capability_id)
+            capability_names.add(capability_name)
+            if not isinstance(names, list) or not names:
+                raise ValueError(
+                    f"{capability_location}.skills must be a non-empty list"
+                )
+            if names != sorted(names):
+                raise ValueError(f"{capability_location}.skills must be alphabetized")
+            for skill_name in names:
+                if not isinstance(skill_name, str) or not skill_name:
+                    raise ValueError(
+                        f"{capability_location}.skills must contain non-empty strings"
+                    )
+                owner = f"{product_name} / {capability_name}"
+                if skill_name in classified:
+                    raise ValueError(
+                        f"skill {skill_name!r} is classified more than once: "
+                        f"{classified[skill_name]} and {owner}"
+                    )
+                classified[skill_name] = owner
+
+    on_disk = {path.name for path in skill_dirs()}
+    missing = sorted(on_disk - set(classified))
+    unknown = sorted(set(classified) - on_disk)
+    if missing or unknown:
+        details: list[str] = []
+        if missing:
+            details.append("unclassified skills: " + ", ".join(missing))
+        if unknown:
+            details.append("unknown skills: " + ", ".join(unknown))
+        raise ValueError(
+            "product registry does not match skills/: " + "; ".join(details)
+        )
+
+    return products
 
 
 def command_for(skill_name: str, script_names: list[str], preferred: str | None = None) -> str:
@@ -242,7 +332,7 @@ def markdown_table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join(lines)
 
 
-def skill_row(skill_dir: Path) -> tuple[str, list[str]]:
+def skill_row(skill_dir: Path) -> list[str]:
     skill_md = skill_dir / "SKILL.md"
     metadata = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
     name = metadata.get("name") or skill_dir.name
@@ -261,7 +351,7 @@ def skill_row(skill_dir: Path) -> tuple[str, list[str]]:
     if use_when:
         start = f"{start}. {first_sentence(use_when, 110)}"
 
-    return category_for(name), [
+    return [
         f"`{name}`",
         first_sentence(description),
         first_sentence(compatibility),
@@ -273,19 +363,21 @@ def skill_row(skill_dir: Path) -> tuple[str, list[str]]:
 
 
 def render_catalog() -> str:
-    rows_by_category: dict[str, list[list[str]]] = {}
+    products = load_product_registry()
+    rows_by_skill: dict[str, list[str]] = {}
     for skill_dir in skill_dirs():
-        category, row = skill_row(skill_dir)
-        rows_by_category.setdefault(category, []).append(row)
+        rows_by_skill[skill_dir.name] = skill_row(skill_dir)
 
     lines = [
         "# Skill UX Catalog",
         "",
         GENERATED_BANNER,
         "",
-        "This catalog is the user-facing entry point for choosing and consuming a skill.",
-        "Every row gives an operator the smallest safe path into that skill before",
-        "they open the longer instructions.",
+        "This product-first catalog is the user-facing entry point for choosing and",
+        "consuming a skill. Canonical skill directories remain flat at",
+        "`skills/<skill-name>/` so commands, editor integrations, and automation keep",
+        "stable paths. Every skill has one primary product and capability here; use the",
+        "skill summary to identify cross-product handoffs.",
         "",
         "## How To Use This Catalog",
         "",
@@ -295,7 +387,27 @@ def render_catalog() -> str:
         "4. Keep all credentials in local files; never paste secrets into chat or argv.",
         "5. Run the validation command after setup, or use it first to inspect existing state.",
         "",
+        "## Product Index",
+        "",
     ]
+
+    product_index_rows: list[list[str]] = []
+    for product in products:
+        count = sum(len(capability["skills"]) for capability in product["capabilities"])
+        anchor = re.sub(r"[^a-z0-9]+", "-", product["name"].lower()).strip("-")
+        product_index_rows.append(
+            [
+                f"[{product['name']}](#{anchor})",
+                product["description"],
+                str(count),
+            ]
+        )
+    lines.extend(
+        [
+            markdown_table(["Product", "Scope", "Skills"], product_index_rows),
+            "",
+        ]
+    )
 
     headers = [
         "Skill",
@@ -306,21 +418,28 @@ def render_catalog() -> str:
         "Validation",
         "Deeper docs",
     ]
-    for category in sorted(rows_by_category):
-        lines.extend(
-            [
-                f"## {category}",
-                "",
-                markdown_table(headers, rows_by_category[category]),
-                "",
-            ]
-        )
+    for product in products:
+        lines.extend([f"## {product['name']}", "", product["description"], ""])
+        for capability in product["capabilities"]:
+            rows = [rows_by_skill[name] for name in capability["skills"]]
+            lines.extend(
+                [
+                    f"### {capability['name']}",
+                    "",
+                    markdown_table(headers, rows),
+                    "",
+                ]
+            )
     return "\n".join(lines).rstrip() + "\n"
 
 
 def main() -> int:
     args = parse_args()
-    rendered = render_catalog()
+    try:
+        rendered = render_catalog()
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     if args.write:
         OUTPUT_PATH.write_text(rendered, encoding="utf-8")
         return 0

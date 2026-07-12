@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "skill": "galileo-lemonade-instrumentation-setup",
+  "sanitization": "No host or network identifiers, Galileo tenant, project, log-stream, trace, service endpoint, credentials, tokens, telemetry payload content, personal data, local credential paths, or repository paths are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-11-galileo-lemonade-instrumentation-readiness",
+      "date": "2026-07-11",
+      "environment": {
+        "runtime": "offline render and validation plus read-only hosted Galileo service checks",
+        "collector": "Splunk Distribution of the OpenTelemetry Collector 0.156.0",
+        "galileo": "hosted-service tenant surface",
+        "write_data_policy": "no Galileo telemetry or tenant-object writes"
+      },
+      "targets": [
+        "Hardened client-side and server-side Galileo collector fan-out renderings",
+        "Official collector binary validation surface",
+        "Hosted Galileo tenant health and documented OTLP route surfaces"
+      ],
+      "result": "partial",
+      "evidence": {
+        "integration_mock": {
+          "client_mode_render_and_validation_passed": true,
+          "server_mode_render_and_validation_passed": true,
+          "idempotent_render_regression_passed": true,
+          "privacy_and_content_deletion_regressions_passed": true,
+          "persistent_queue_regressions_passed": true,
+          "official_collector_client_config_validation_passed": true,
+          "official_collector_server_config_validation_passed": true,
+          "official_collector_production_client_and_server_validation_passed": true,
+          "official_collector_persistent_runtime_smoke_passed": true,
+          "persistent_queue_private_mode_checks_passed": true,
+          "persistent_queue_destination_binding_regressions_passed": true,
+          "client_service_identity_after_resource_detection_passed": true,
+          "galileo_route_override_probe_removal_passed": true,
+          "content_sentinel_absence_and_non_content_semantic_retention_passed": true,
+          "duplicate_route_and_exact_prior_cleanup_regressions_passed": true,
+          "terminal_privacy_and_route_guard_order_regressions_passed": true,
+          "schema_aware_backend_readback_privacy_regressions_passed": true,
+          "redirect_control_and_queue_preflight_regressions_passed": true,
+          "custom_collector_descriptor_bound_execution_regressions_passed": true,
+          "reference_client_dependency_preflight_passed": true,
+          "reference_client_dependency_audit_known_vulnerabilities": 0
+        },
+        "live_read_only": {
+          "tenant_health_passed": true,
+          "documented_otlp_route_reachability_passed": true,
+          "official_ingest_and_read_api_contracts_reviewed": true,
+          "tenant_mutations_performed": 0,
+          "tenant_telemetry_writes_performed": 0,
+          "provided_api_key_used": false
+        }
+      },
+      "limitations": [
+        "A credential provided through the conversation was treated as exposed and was not used; it must be rotated and a replacement must be provisioned through an approved secret channel before activation.",
+        "Project and log-stream selectors were not resolved, no Galileo exporter was activated, and no trace was written or read back from the Galileo backend.",
+        "The inactive configuration staged on the development system predates the final queue, privacy, and redirect hardening; it must be discarded and rerendered before any activation.",
+        "The stock collector's authenticated redirect behavior requires an independently enforced and evidenced egress or no-redirect control before production use; the skill validates that evidence but does not install the external network control.",
+        "The loopback client receiver is an exclusive single-host trust boundary and is not authenticated.",
+        "The YAML transaction does not cover the runtime wrapper, routing environment, redirect evidence, or systemd drop-in; those files require the documented second exact backup-and-rollback transaction.",
+        "No live apply/E2E result is recorded for this skill."
+      ],
+      "cleanup": {
+        "temporary_galileo_objects_remaining": 0,
+        "galileo_configuration_activated": false,
+        "galileo_telemetry_writes_performed": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_local_artifacts_remaining": 0
+      }
+    },
+    {
+      "id": "2026-07-12-galileo-lemonade-production-cutover",
+      "date": "2026-07-12",
+      "environment": {
+        "runtime": "AMD Ryzen AI development system running Debian",
+        "collector": "Splunk Distribution of the OpenTelemetry Collector 0.156.0",
+        "galileo": "hosted custom Galileo tenant",
+        "write_data_policy": "privacy-safe synthetic Agent, LLM, and Tool spans plus one non-sensitive real completion"
+      },
+      "targets": [
+        "Destination-bound persistent queue and dedicated exact-origin egress proxy",
+        "Collector runtime and full-YAML coordinated transactions",
+        "Galileo API hierarchy/privacy readback and unchanged Splunk backend readback",
+        "Bootstrap-to-project-scoped runtime credential finalization"
+      ],
+      "result": "pass",
+      "evidence": {
+        "integration_mock": {
+          "combined_production_regression_suite_passed": true,
+          "queue_proxy_runtime_and_yaml_transaction_regressions_passed": true,
+          "distinct_revoker_and_dual_401_regressions_passed": true,
+          "exact_legacy_no_delete_reconciliation_regressions_passed": true,
+          "privacy_readback_false_positive_regressions_passed": true,
+          "skill_structure_validation_passed": true
+        },
+        "live_apply_e2e": {
+          "queue_apply_restore_quarantine_and_reapply_passed": true,
+          "proxy_allow_and_deny_connect_probes_passed": true,
+          "generic_proxy_disabled_and_inactive": true,
+          "runtime_bundle_apply_restore_and_reapply_passed": true,
+          "collector_yaml_apply_restore_and_reapply_passed": true,
+          "production_validation_under_collector_identity_passed": true,
+          "collector_health_http_status": 200,
+          "receiver_accepted_span_delta": 3,
+          "receiver_failed_span_delta": 0,
+          "receiver_refused_span_delta": 0,
+          "galileo_exporter_sent_span_delta": 3,
+          "splunk_exporter_sent_span_delta": 4,
+          "galileo_exporter_queue_size": 0,
+          "splunk_exporter_queue_size": 0,
+          "galileo_api_trace_readback_passed": true,
+          "galileo_complete_span_count": 3,
+          "galileo_agent_llm_tool_hierarchy_passed": true,
+          "galileo_console_signed_in_observation_passed": true,
+          "galileo_console_trace_span_count": 3,
+          "galileo_console_input_output_redaction_observed": true,
+          "galileo_plaintext_content_fields": 0,
+          "galileo_redacted_content_fields": 6,
+          "protected_content_sentinel_checks_passed": 2,
+          "same_trace_splunk_backend_readback_passed": true,
+          "post_wake_receiver_accepted_span_delta": 3,
+          "post_wake_receiver_refused_span_delta": 0,
+          "post_wake_galileo_exporter_sent_span_delta": 3,
+          "post_wake_splunk_exporter_sent_span_delta": 3,
+          "post_wake_trace_exporter_queues_empty": true,
+          "old_bootstrap_current_user_status": 401,
+          "old_bootstrap_token_mint_status": 401,
+          "runtime_key_revalidated_after_revocation": true,
+          "credential_transaction_finalized": true
+        }
+      },
+      "limitations": [
+        "The loopback client receiver is an exclusive single-host trust boundary and is not authenticated.",
+        "No sustained-load, host-reboot, or long-duration queue-recovery test was performed."
+      ],
+      "cleanup": {
+        "temporary_remote_staging_secrets_remaining": 0,
+        "temporary_local_plaintext_secret_files_remaining": 0,
+        "revoked_bootstrap_keychain_items_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_sleep_inhibitors_remaining": 0,
+        "desired_galileo_configuration_intentionally_remained_active": true,
+        "rollback_drill_performed": true
+      }
+    }
+  ]
+}

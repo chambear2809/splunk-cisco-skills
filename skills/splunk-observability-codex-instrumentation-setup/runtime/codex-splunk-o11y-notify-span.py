@@ -22,7 +22,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 from urllib.parse import urlsplit
 
@@ -239,8 +239,11 @@ def _parse_timestamp(value: Any) -> float | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
-    except ValueError:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except (OverflowError, ValueError):
         return None
 
 
@@ -343,7 +346,7 @@ def configured_model() -> str:
         with (_codex_home() / "config.toml").open("rb") as handle:
             value = tomllib.load(handle).get("model")
         return value if isinstance(value, str) and value else "unknown"
-    except (OSError, ValueError):
+    except (ImportError, OSError, ValueError):
         return "unknown"
 
 

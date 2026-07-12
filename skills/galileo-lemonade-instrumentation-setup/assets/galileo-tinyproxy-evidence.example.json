@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "control": "tinyproxy-exact-connect-allowlist",
+  "proxy_url": "http://127.0.0.1:18888",
+  "allowed_connect_host": "api.demo-v2.galileocloud.io",
+  "allowed_connect_port": 443,
+  "binary": {
+    "path": "/usr/bin/tinyproxy",
+    "device": 0,
+    "inode": 0,
+    "size": 0,
+    "mtime_ns": 0,
+    "uid": 0,
+    "mode": 493,
+    "sha256": "REPLACE_WITH_LOWERCASE_SHA256"
+  },
+  "config": {
+    "path": "/etc/tinyproxy/galileo.conf",
+    "device": 0,
+    "inode": 0,
+    "size": 0,
+    "mtime_ns": 0,
+    "uid": 0,
+    "mode": 420,
+    "sha256": "REPLACE_WITH_LOWERCASE_SHA256"
+  },
+  "filter": {
+    "path": "/etc/tinyproxy/galileo.filter",
+    "device": 0,
+    "inode": 0,
+    "size": 0,
+    "mtime_ns": 0,
+    "uid": 0,
+    "mode": 420,
+    "sha256": "REPLACE_WITH_LOWERCASE_SHA256"
+  }
+}

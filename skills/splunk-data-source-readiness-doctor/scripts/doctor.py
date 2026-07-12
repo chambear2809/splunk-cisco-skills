@@ -18,6 +18,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+SHARED_LIB_DIR = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(SHARED_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB_DIR))
+
+from secure_secret_file import (  # noqa: E402
+    SecureSecretFileError,
+    read_private_text_file,
+)
+
 
 SKILL_NAME = "splunk-data-source-readiness-doctor"
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -2838,14 +2847,10 @@ def normalize_splunk_uri(value: str) -> str:
 
 def read_session_key_file(path_value: str) -> str:
     path = Path(path_value).expanduser()
-    if not path.exists():
-        die(f"--session-key-file does not exist: {path}")
-    if path.stat().st_mode & 0o077:
-        die(f"--session-key-file must not be group/world readable: {path}")
-    session_key = path.read_text(encoding="utf-8").strip()
-    if not session_key:
-        die("--session-key-file is empty")
-    return session_key
+    try:
+        return read_private_text_file(path, label="--session-key-file")
+    except SecureSecretFileError as exc:
+        die(str(exc))
 
 
 def parse_export_json_lines(payload: bytes, max_rows: int) -> list[dict[str, Any]]:

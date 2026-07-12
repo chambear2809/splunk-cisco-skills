@@ -64,8 +64,9 @@ def command(kubectl: list[str], args: list[str]) -> dict[str, Any]:
         timeout=90,
     )
     if proc.returncode != 0:
-        detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
-        raise ValidationError(f"kubectl {' '.join(args[:5])} failed: {detail}")
+        raise ValidationError(
+            f"kubectl {' '.join(args[:5])} failed; command output suppressed"
+        )
     try:
         payload = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
@@ -104,30 +105,87 @@ def controller_ready(obj: dict[str, Any]) -> None:
         raise ValidationError(f"{identity} is not fully rolled out and Ready")
 
 
-def pods_ready(payload: dict[str, Any], namespace: str, release: str) -> int:
+def controller_owner(pod: dict[str, Any]) -> tuple[str, str] | None:
+    metadata = pod.get("metadata") or {}
+    references = metadata.get("ownerReferences") or []
+    controllers = [
+        item
+        for item in references
+        if isinstance(item, dict) and item.get("controller") is True
+    ]
+    if len(controllers) > 1:
+        raise ValidationError("Collector Pod has multiple controller owner references")
+    if not controllers:
+        return None
+    kind = str(controllers[0].get("kind") or "")
+    name = str(controllers[0].get("name") or "")
+    if not kind or not name:
+        raise ValidationError("Collector Pod controller owner reference is incomplete")
+    return kind, name
+
+
+def pod_runtime_state(pod: dict[str, Any], namespace: str) -> str:
+    meta = pod.get("metadata") or {}
+    status = pod.get("status") or {}
+    name = str(meta.get("name") or "<unknown>")
+    phase = str(status.get("phase") or "")
+    owner = controller_owner(pod)
+    if phase == "Succeeded" and owner is not None and owner[0] == "Job":
+        return "completed-job"
+    ready = any(
+        isinstance(row, dict)
+        and row.get("type") == "Ready"
+        and row.get("status") == "True"
+        for row in (status.get("conditions") or [])
+    )
+    if phase != "Running" or not ready or meta.get("deletionTimestamp"):
+        raise ValidationError(f"Pod/{namespace}/{name} is not active, Running, and Ready")
+    return "active"
+
+
+def pods_ready(
+    payload: dict[str, Any], namespace: str, release: str
+) -> tuple[int, int]:
     items = payload.get("items")
     if not isinstance(items, list) or not items:
         raise ValidationError(
-            f"no Collector pods found in {namespace} for app.kubernetes.io/instance={release}"
+            f"no Collector pods found in {namespace} for release identity {release}"
         )
     active = 0
+    completed_jobs = 0
     for pod in items:
-        meta = pod.get("metadata") or {}
-        status = pod.get("status") or {}
-        name = str(meta.get("name") or "<unknown>")
-        phase = str(status.get("phase") or "")
-        if phase == "Succeeded":
-            continue
-        active += 1
-        ready = any(
-            row.get("type") == "Ready" and row.get("status") == "True"
-            for row in (status.get("conditions") or [])
-        )
-        if phase != "Running" or not ready or meta.get("deletionTimestamp"):
-            raise ValidationError(f"Pod/{namespace}/{name} is not active, Running, and Ready")
+        if not isinstance(pod, dict):
+            raise ValidationError("Collector pod query returned a non-Pod object")
+        if pod_runtime_state(pod, namespace) == "completed-job":
+            completed_jobs += 1
+        else:
+            active += 1
     if active == 0:
-        raise ValidationError("Collector pod query returned only completed Job pods")
-    return active
+        raise ValidationError("Collector pod query returned no active workload pods")
+    return active, completed_jobs
+
+
+def pod_memberships(
+    primary: dict[str, Any], auxiliary: dict[str, Any], namespace: str
+) -> dict[str, str]:
+    """Union Pod identities while retaining primary versus auxiliary scope."""
+
+    memberships: dict[str, str] = {}
+    for membership, payload in (("primary", primary), ("auxiliary", auxiliary)):
+        items = payload.get("items")
+        if not isinstance(items, list):
+            raise ValidationError("Collector pod query returned no items array")
+        for pod in items:
+            if not isinstance(pod, dict) or pod.get("kind") != "Pod":
+                raise ValidationError("Collector pod query returned a non-Pod object")
+            meta = pod.get("metadata") or {}
+            name = str(meta.get("name") or "")
+            pod_namespace = str(meta.get("namespace") or "")
+            if not name or pod_namespace != namespace:
+                raise ValidationError("Collector pod query returned an object outside the expected scope")
+            if membership == "primary" or name not in memberships:
+                memberships[name] = membership
+    return dict(sorted(memberships.items()))
 
 
 def verify_images(verifier: Path, payload: dict[str, Any]) -> None:
@@ -142,7 +200,33 @@ def verify_images(verifier: Path, payload: dict[str, Any]) -> None:
         timeout=60,
     )
     if proc.returncode != 0:
-        raise ValidationError(proc.stderr.strip() or proc.stdout.strip() or "live image validation failed")
+        raise ValidationError("live image validation failed; verifier output suppressed")
+
+
+def verify_runtime_pod(
+    verifier: Path, payload: dict[str, Any], name: str, membership: str
+) -> int:
+    if not verifier.is_file() or verifier.is_symlink():
+        raise ValidationError(f"image verifier is missing or a symlink: {verifier}")
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(verifier),
+            "--verify-runtime-pod-json",
+            name,
+            membership,
+        ],
+        input=json.dumps(payload),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if proc.returncode not in {0, 10}:
+        raise ValidationError(
+            f"Pod/{name} readiness or image validation failed; verifier output suppressed"
+        )
+    return proc.returncode
 
 
 def parse_args() -> argparse.Namespace:
@@ -182,23 +266,68 @@ def main() -> int:
             controller_ready(obj)
             print(f"  {kind}/{namespace}/{name}: Ready")
 
-        pods = command(
-            kubectl,
-            [
-                "-n",
-                namespace,
-                "get",
-                "pods",
-                "-l",
-                f"app.kubernetes.io/instance={release}",
-                "-o",
-                "json",
-                "--request-timeout=30s",
-            ],
+        pod_payloads: dict[str, dict[str, Any]] = {}
+        for selector in (f"release={release}", f"app.kubernetes.io/instance={release}"):
+            membership = "primary" if selector.startswith("release=") else "auxiliary"
+            pod_payloads[membership] = command(
+                kubectl,
+                [
+                    "-n",
+                    namespace,
+                    "get",
+                    "pods",
+                    "-l",
+                    selector,
+                    "-o",
+                    "json",
+                    "--request-timeout=30s",
+                ],
+            )
+        memberships = pod_memberships(
+            pod_payloads["primary"], pod_payloads["auxiliary"], namespace
         )
-        count = pods_ready(pods, namespace, release)
-        verify_images(Path(args.image_verifier), pods)
-        print(f"  {count} active Collector pod(s): Ready with audited image digests")
+        fresh_pods: list[tuple[str, dict[str, Any]]] = []
+        for pod_name, membership in memberships.items():
+            pod = command(
+                kubectl,
+                [
+                    "-n",
+                    namespace,
+                    "get",
+                    "pod",
+                    pod_name,
+                    "-o",
+                    "json",
+                    "--request-timeout=30s",
+                ],
+            )
+            pod_meta = pod.get("metadata") or {}
+            if (
+                pod.get("kind") != "Pod"
+                or pod_meta.get("name") != pod_name
+                or pod_meta.get("namespace") != namespace
+            ):
+                raise ValidationError(f"Kubernetes returned the wrong object for Pod/{pod_name}")
+            fresh_pods.append((membership, pod))
+        pods = {
+            "apiVersion": "v1",
+            "kind": "List",
+            "items": [pod for _, pod in fresh_pods],
+        }
+        count, completed_jobs = pods_ready(pods, namespace, release)
+        verifier = Path(args.image_verifier)
+        for membership, pod in fresh_pods:
+            pod_name = str((pod.get("metadata") or {}).get("name") or "")
+            expected_rc = 10 if pod_runtime_state(pod, namespace) == "completed-job" else 0
+            actual_rc = verify_runtime_pod(verifier, pod, pod_name, membership)
+            if actual_rc != expected_rc:
+                raise ValidationError(
+                    f"Pod/{pod_name} runtime classification disagreed with the local gate"
+                )
+        print(
+            f"  {count} active Collector pod(s): Ready with audited image digests; "
+            f"{completed_jobs} completed Job pod(s) excluded"
+        )
 
         if k8s.get("operator_enabled"):
             name = collector_name(release)

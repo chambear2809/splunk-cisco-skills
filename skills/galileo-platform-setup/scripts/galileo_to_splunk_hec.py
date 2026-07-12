@@ -13,6 +13,7 @@ import io
 import json
 import os
 import ssl
+import stat
 import sys
 import time
 import urllib.error
@@ -74,6 +75,7 @@ MULTIMODAL_METRIC_KEYS = {
     "visual_fidelity",
     "visual_quality",
 }
+MAX_SECRET_FILE_BYTES = 64 * 1024
 
 
 def reject_direct_secret_flags(argv: list[str]) -> None:
@@ -143,7 +145,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--include-raw", action="store_true", help="Include raw input/output fields. Use only after approval.")
     parser.add_argument("--print-export-request", action="store_true", help="Print the export_records request JSON and exit.")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--insecure", action="store_true", help="Disable TLS verification for Splunk HEC.")
+    parser.add_argument(
+        "--accept-insecure-hec-tls",
+        action="store_true",
+        help=(
+            "Explicitly accept disabling certificate and hostname verification for "
+            "an HTTPS Splunk HEC endpoint."
+        ),
+    )
     parser.add_argument(
         "--allow-insecure-hec-http",
         action="store_true",
@@ -174,23 +183,87 @@ def read_secret_file(path: str, label: str) -> str:
     if not path:
         raise SystemExit(f"ERROR: {label} file path is required.")
     secret_path = Path(path).expanduser()
-    if not secret_path.is_file():
-        raise SystemExit(f"ERROR: {label} file is missing: {secret_path}")
-    value = secret_path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise SystemExit(f"ERROR: {label} file is empty: {secret_path}")
-    return value
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit(f"ERROR: {label} cannot be read safely on this platform.")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(secret_path, flags)
+    except OSError as exc:
+        raise SystemExit(
+            f"ERROR: {label} file must be a readable, non-symlink regular file: {secret_path}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise SystemExit(f"ERROR: {label} file must be a single-link regular file: {secret_path}")
+        if before.st_uid != os.geteuid():
+            raise SystemExit(f"ERROR: {label} file must be owned by the current user: {secret_path}")
+        mode = stat.S_IMODE(before.st_mode)
+        if mode & 0o077:
+            raise SystemExit(
+                f"ERROR: {label} file permissions must be 0600 or stricter: "
+                f"{secret_path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= MAX_SECRET_FILE_BYTES:
+            raise SystemExit(
+                f"ERROR: {label} file size must be between 1 and "
+                f"{MAX_SECRET_FILE_BYTES} bytes: {secret_path}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_SECRET_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        data = b"".join(chunks)
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: {label} file changed while it was read: {secret_path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"ERROR: {label} file must contain UTF-8 text: {secret_path}") from exc
+    if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+        raise SystemExit(
+            f"ERROR: {label} file must contain exactly one non-empty line: {secret_path}"
+        )
+    return lines[0]
 
 
 def iso_to_epoch(value: Any) -> float | None:
     if not isinstance(value, str) or not value:
         return None
-    text = value
+    text = value.strip()
+    if not text:
+        return None
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
     try:
-        return datetime.fromisoformat(text).timestamp()
-    except ValueError:
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except (OverflowError, ValueError):
         return None
 
 
@@ -1093,7 +1166,13 @@ def send_to_splunk(args: argparse.Namespace, envelopes: list[dict[str, Any]]) ->
         args.splunk_hec_url,
         allow_insecure_http=getattr(args, "allow_insecure_hec_http", False),
     )
-    context = ssl._create_unverified_context() if args.insecure else None
+    accept_insecure_tls = bool(getattr(args, "accept_insecure_hec_tls", False))
+    if accept_insecure_tls and urllib.parse.urlsplit(url).scheme.lower() != "https":
+        raise RuntimeError(
+            "--accept-insecure-hec-tls applies only to HTTPS; use the separate "
+            "--allow-insecure-hec-http acceptance for a reviewed plaintext endpoint"
+        )
+    context = ssl._create_unverified_context() if accept_insecure_tls else None
     response = request_json("POST", url, splunk_headers(args), envelopes, context)
     if not isinstance(response, dict) or response.get("code") != 0:
         raise RuntimeError(f"Splunk HEC rejected batch: {response}")
@@ -1145,7 +1224,11 @@ def max_timestamp(records: list[dict[str, Any]], field: str) -> str | None:
     values = [value for value in (record.get(field) for record in records) if isinstance(value, str)]
     if not values:
         return None
-    return max(normalize_iso(value) for value in values)
+    normalized = [normalize_iso(value) for value in values]
+    return max(
+        normalized,
+        key=lambda value: datetime.fromisoformat(value.removesuffix("Z") + "+00:00"),
+    )
 
 
 def main() -> int:

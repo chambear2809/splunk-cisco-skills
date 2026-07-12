@@ -11,6 +11,11 @@
 #   - Functions that perform actions (rest_create_index, rest_set_conf, etc.)
 #     return non-zero on failure and print an error message to stderr.
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to load credential helpers because expanded secrets and session keys could be logged." >&2
+    return 1 2>/dev/null || exit 1
+fi
+
 [[ -n "${_CRED_HELPERS_LOADED:-}" ]] && return 0
 _CRED_HELPERS_LOADED=true
 

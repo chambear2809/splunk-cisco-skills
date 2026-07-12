@@ -72,6 +72,7 @@ Render default artifacts first:
 ```bash
 bash skills/galileo-agent-control-setup/scripts/setup.sh \
   --render \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
   --output-dir galileo-agent-control-rendered
 ```
 
@@ -91,6 +92,7 @@ Apply only explicit sections:
 ```bash
 bash skills/galileo-agent-control-setup/scripts/setup.sh \
   --apply splunk-hec,otel-collector,dashboards,detectors \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
   --realm "$SPLUNK_O11Y_REALM" \
   --splunk-hec-url "$SPLUNK_HEC_URL" \
   --splunk-hec-token-file /tmp/splunk_hec_token \

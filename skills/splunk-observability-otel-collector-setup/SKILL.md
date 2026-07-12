@@ -315,6 +315,17 @@ bash skills/splunk-observability-otel-collector-setup/scripts/validate.sh \
   --k8s-workloads-only --kube-context CONTEXT
 ```
 
+Full live status additionally enforces supported kubectl/API-server version
+skew and scans both primary Collector pods and auxiliary chart pods. Confirmed
+SignalFx conversion drops caused by the 36-dimension limit fail the gate as
+telemetry loss. Log-retrieval failures and matched log bodies are suppressed;
+only rule counts are reported. Both live paths require rendered core container
+names/controllers to retain their exact audited image pins while allowing
+unrelated auxiliary containers only when their images are digest-pinned. The
+workload-only path unions both label inventories by Pod identity, then fetches
+each Pod once for a coherent readiness/image snapshot. It intentionally does
+not read logs and therefore cannot provide log-loss evidence.
+
 The repository-wide AWS/EKS/O11y staging gate composes this secret-free mode
 with AWS identity, EKS endpoint, auto-instrumentation, APM, and AWS integration
 checks. See [`../../scripts/staging/README.md`](../../scripts/staging/README.md).

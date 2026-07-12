@@ -123,7 +123,8 @@ release section when cutting a release.
   setup, and a two-stage commit (plan + confirm) execution flow. It is
   plan-only by default; local execution requires
   `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`, and generic script execution also
-  requires `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`.
+  requires `SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1` and
+  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`.
 
 ### Removed
 
@@ -136,6 +137,16 @@ release section when cutting a release.
   fully validated, and MCP-registered.
 
 ### Changed
+
+- Hardened the repo-local skills MCP server for an execution-enabled,
+  mutation-off registration: added product-first paginated discovery,
+  subprocess-free Cisco resolution, curated no-follow resource reads, strict
+  value-safe tool/prompt validation, a bounded strict-UTF-8 stdio transport,
+  standard protocol errors, supervised process queues/groups, isolated Python
+  startup, sanitized child environments, interpreter and secret-file
+  attestation, cancellation-safe plan creation, stable dry-run snapshots, and
+  an independent generic-execution gate. Committed client registrations now
+  explicitly set execution to `1` and both generic/mutation gates to `0`.
 
 - Updated every Galileo workflow for the July 7, 2026 release. The platform
   skill now renders AI Assistant beta and cross-project global-dashboard
@@ -281,15 +292,12 @@ release section when cutting a release.
 
 ### Agent / MCP
 
-- Extended `READ_ONLY_PHASE_SCRIPTS` in `agent/splunk_cisco_skills_mcp/core.py`
-  to cover the new render-first skills so MCP-driven runs of read-only phases
-  (`render`, `preflight`, `status`, `audit`, `validate`, `bundle-validate`,
-  `bundle-status`, `cloud-onboard`) do not require the mutation gate. Any
-  `--apply` invocation is still classified as mutating.
-- Added `READ_ONLY_UNLESS_APPLY_SCRIPTS` for flag-based skills
-  (`splunk-observability-native-ops`, `splunk-observability-dashboard-builder`)
-  that gate live mutations behind an explicit `--apply` rather than a
-  `--phase` argument.
+- Replaced script-name/flag read-only heuristics with a fail-closed rule: every
+  generic skill-script and typed product execution plan is potentially mutating.
+  Product dry-runs require only the execution gate; executing any resulting
+  plan also requires the mutation gate, and generic plans require all three.
+- Added a product/capability registry-backed discovery contract with opaque
+  pagination, bounded file reads, curated entrypoints, and resource revisions.
 
 ### Security
 

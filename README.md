@@ -60,9 +60,12 @@ Run commands from the repository root.
      SKILL_UX_CATALOG.md skills/*/SKILL.md
    ```
 
-   The main chooser is [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It lists
-   every skill, its purpose, Splunk 10.5 status, the first file to open, a safe
-   `--help` command, validation, and deeper docs.
+   The main chooser is [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It groups
+   every skill by its primary product or cross-product family and capability,
+   then shows its purpose, Splunk 10.5 status, first file to open, safe `--help`
+   command, validation, and deeper docs. Skill directories intentionally remain
+   at the stable `skills/<skill-name>/` paths used by scripts and editor
+   integrations.
 
 3. Open the skill entry point:
 
@@ -297,7 +300,10 @@ pre-commit run --all-files
 The repo includes a local MCP server named `splunk-cisco-skills`. It exposes
 skill discovery, skill instructions, templates, Cisco product resolution,
 dry-run planning, and explicitly gated script execution to MCP-capable clients.
-It is discovery-and-plan-only by default.
+The code-level execution default is off. The committed Claude Code/Cursor
+registrations and the Codex registration helper explicitly enable typed
+subprocess planning with `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`, while keeping
+generic script execution and mutation disabled.
 
 Set up its Python environment:
 
@@ -313,26 +319,32 @@ Codex stores MCP servers in user config, so register this repo once:
 bash agent/register-codex-splunk-cisco-skills-mcp.sh
 ```
 
-Any local subprocess requires an operator to start the server with the
-execution gate enabled:
+Direct server starts remain execution-off unless the gate is supplied:
 
 ```bash
 SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 \
-  python3 agent/run-splunk-cisco-skills-mcp.py
+  python3 -I agent/run-splunk-cisco-skills-mcp.py
 ```
 
 Generic skill-script execution is always treated as mutating and requires both
-server-side gates:
+additional server-side gates (all three gates total):
 
 ```bash
 SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 \
+SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1 \
 SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 \
-  python3 agent/run-splunk-cisco-skills-mcp.py
+  python3 -I agent/run-splunk-cisco-skills-mcp.py
 ```
 
-Tool inputs use strict schemas. Every execution also requires a random,
+Product resolution and product/capability/file discovery are pure read-only
+operations and do not need the subprocess gate. Tool and prompt inputs use
+strict, value-safe validation. Every execution also requires a random,
 single-use `plan_hash`, `confirm=true`, and an unchanged executable SHA-256
 digest plus an unchanged snapshot of the complete `skills/` dependency tree.
+Inbound stdio frames, resource inventories, file reads, subprocess queues,
+runtimes, and returned output are bounded. Python starts in isolated mode, and
+child processes receive a sanitized environment with absolute, attested
+interpreters.
 See [`SECURITY.md`](SECURITY.md) for the complete trust model.
 
 ### Official Splunk MCP Server App And Client Bridge
@@ -366,7 +378,7 @@ bash skills/splunk-mcp-server-setup/scripts/validate.sh \
 
 ```text
 README.md                         # operator-facing entry point
-SKILL_UX_CATALOG.md                # generated skill chooser and safe commands
+SKILL_UX_CATALOG.md                # generated product-first skill chooser
 SKILL_REQUIREMENTS.md              # generated local-tool and live-access matrix
 DEPLOYMENT_ROLE_MATRIX.md          # where apps and workflows belong
 CLOUD_DEPLOYMENT_MATRIX.md         # Splunk Cloud install/config behavior
@@ -377,7 +389,8 @@ skills/<skill>/SKILL.md            # skill trigger, instructions, and workflow
 skills/<skill>/reference.md        # longer skill-specific reference when present
 skills/<skill>/template.example    # non-secret intake worksheet when present
 skills/<skill>/scripts/            # shell and Python automation
-skills/shared/                     # shared registry, helpers, and generators
+skills/shared/skill_product_registry.json # product/capability taxonomy
+skills/shared/                     # shared registries, helpers, and generators
 splunk-ta/                         # local package cache; binaries ignored
 tests/                             # Python and Bats regression coverage
 rules/credential-handling.mdc      # secret-handling rule
@@ -387,7 +400,7 @@ rules/credential-handling.mdc      # secret-handling rule
 
 | Question | Read |
 |----------|------|
-| Which skill should I use first? | [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md) |
+| Which product and skill should I use first? | [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md) |
 | What tools and access does a skill need? | [`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md) |
 | Where should this app or workflow run? | [`DEPLOYMENT_ROLE_MATRIX.md`](DEPLOYMENT_ROLE_MATRIX.md) |
 | How does Splunk Cloud differ from Enterprise? | [`CLOUD_DEPLOYMENT_MATRIX.md`](CLOUD_DEPLOYMENT_MATRIX.md) |

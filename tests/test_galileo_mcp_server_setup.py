@@ -589,7 +589,7 @@ def test_generated_stdio_bridge_supports_streamable_http_end_to_end(tmp_path: Pa
                 },
             )
             assert permission_result.returncode != 0
-            assert "refusing non-owner-only .env.galileo-mcp" in permission_result.stderr
+            assert ".env.galileo-mcp must be owner-only" in permission_result.stderr
             assert secret not in permission_result.stderr
         env_file.chmod(0o600)
 

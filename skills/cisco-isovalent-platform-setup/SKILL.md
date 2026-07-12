@@ -69,6 +69,27 @@ Scoped Cilium feature sections render their own values overlays under `helm/cili
 - **EKS BYOCNI**: Cilium on EKS requires the cluster created with `--network-plugin none`. Renderer emits a preflight warning + `eksctl` example.
 - **CNI conflict**: Cilium fails if the AWS VPC CNI is still installed. Renderer warns.
 
+All namespace fields must be Kubernetes DNS-1123 labels. The kernel minimum
+must be numeric `major.minor` or `major.minor.patch`; both contracts are
+validated before executable assets are rendered.
+
+## Audited chart versions
+
+- Cilium OSS: `1.18.10`; Cilium Enterprise: `1.18.8`; EKS OCI mirror: separately classified `1.18.8`.
+- Tetragon OSS: `1.7.0`; Tetragon Enterprise: `1.18.1`.
+- Cilium DNSProxy, Hubble Enterprise, and Hubble Timescape: `1.18.8`.
+
+Generated Helm scripts verify and install the exact version with atomic,
+wait/timeout-bound transactions. `metadata.json` and `apply-plan.json` record
+the complete chart contract. The repository does not contain independently
+audited chart archives, signatures, or checksums, and private Hubble chart
+origin remains entitlement-dependent; this provenance gap is recorded
+explicitly rather than represented by an invented digest.
+
+When an Enterprise license file is supplied to a Helm dry-run, the generated
+script first proves that `helm upgrade --hide-secret` is supported and adds the
+flag. It fails before rendering if that capability is unavailable.
+
 ## Tetragon export defaults
 
 Tetragon Helm values default to:
@@ -167,9 +188,15 @@ bash skills/cisco-isovalent-platform-setup/scripts/validate.sh
 
 Static checks confirm rendered values and catalog reports exist. With `--live --kube-context CTX`:
 
-- `helm status` for every owned release.
-- Pod-IP scrape probes for Cilium 9962, Hubble 9965, Cilium Envoy 9964, Cilium operator 9963, Tetragon 2112 (uses `kubectl get --raw` for Tetragon, NOT `kubectl exec`).
-- Tetragon log file presence check on a node (`/var/run/cilium/tetragon/*.log`).
-- Basic smoke (`cilium status`, `kubectl get crd | grep cilium`, `kubectl get tracingpolicy`).
+- Fail-closed Helm inventory and a fresh structured `helm status` read for required Cilium and Tetragon releases. The status document is streamed into a strict deployed-state parser and never retained or echoed, because release NOTES can contain customer data. Inventory uses explicit deployed/failed/pending/uninstalling/superseded/uninstalled flags common to Helm 3 and Helm 4; it does not use Helm 3-only `helm list --all`. Duplicate same-name releases across namespaces, an unexpected release namespace, a wrong chart identity, exact-version drift, or a post-inventory status transition fails validation. Enterprise add-on releases are required only when enabled in the rendered metadata; an absent disabled add-on remains optional.
+- Ready-pod checks for the Cilium and Tetragon agents on Helm-owned/BYOCNI profiles. Enabled Hubble Enterprise uses its exact Helm-instance label; Cilium DNSProxy uses the chart's real `k8s-app=cilium-dnsproxy` label. Each requires at least one pod and all matched pods/containers Ready in its own rendered add-on namespace.
+- On Helm-owned/BYOCNI profiles, Kubernetes service API-proxy metric probes for Cilium 9962, Hubble 9965, Cilium Envoy 9964, and Cilium operator 9963. Tetragon 2112 and Tetragon operator 2113 are probed on every supported profile. Cilium DNSProxy 9967 is required only when that add-on is enabled. A no-pipe parser recognizes Prometheus/OpenMetrics numeric, timestamp, and exemplar syntax without `pipefail`/SIGPIPE false failures on large responses. Unreachable or sample-free required endpoints fail validation. Wherever a required Cilium/DNSProxy response exposes `cilium_hive_status`, any positive `status="degraded"` or `status="failed"` sample fails with a controlled metric/rule/count summary; `stopped` does not fail without source-backed unhealthy semantics.
+- Tetragon pod-log checks through the Kubernetes pod log API use a bounded 20-line tail per agent pod. Panic, fatal, runtime-error, and export-failure patterns fail validation; diagnostics include rule identifiers only and never echo matched log content. Validation does not execute commands inside pods, directly request Kubernetes Secret payloads, or retrieve installed Helm values that could contain license material. File/stdout/fluentd export structure is validated statically from the rendered Tetragon values; fluentd requires the complete `splunk_hec` directive set and retains a placeholder token only.
+- Hubble Timescape discovery supports both a standalone `hubble-timescape` Helm release and a Timescape StatefulSet bundled into the `cilium` Helm release. Acceptance requires observed generation convergence, desired/current/updated/ready replica equality, and matching current/update revisions; `readyReplicas` alone is insufficient.
+- Live validation rejects kubectl clients outside the supported +/-1 minor skew from the Kubernetes API server. Static validation recursively parses rendered YAML/JSON and rejects inline license/token/password/API-key/private-key material without printing values.
+
+Live validation aggregates all required failures and exits nonzero if any are present. It does not create debug pods or otherwise mutate the cluster.
+
+`aks-managed-cilium` and `gke-dataplane-v2` are provider-owned dataplanes whose internal pod labels and metric Service names are not a stable interface owned by this skill. Live validation skips the Helm-specific Cilium pod/service probes, continues validating Tetragon, records an explicit unsupported-evidence failure, and exits nonzero so the result cannot be mistaken for complete production acceptance. A provider-approved dataplane evidence packet is required separately.
 
 See `reference.md` for option details and the `references/` annexes for OSS-vs-Enterprise charts, EKS BYOCNI, kernel prerequisites, TracingPolicy cookbook, Tetragon export modes, and troubleshooting.

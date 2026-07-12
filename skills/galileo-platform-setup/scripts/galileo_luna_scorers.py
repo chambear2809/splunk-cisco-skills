@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -22,6 +24,7 @@ DEFAULT_REPLACEMENTS = [
     {"from": "tool_error_rate", "to": "tool_error_rate_luna"},
     {"from": "agent_efficiency", "to": "agent_efficiency_luna"},
 ]
+MAX_SECRET_FILE_BYTES = 64 * 1024
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -43,12 +46,77 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def read_secret_file(path: str) -> str:
     secret_path = Path(path).expanduser()
-    if not secret_path.is_file():
-        raise SystemExit(f"ERROR: Galileo API key file is not readable: {secret_path}")
-    value = secret_path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise SystemExit(f"ERROR: Galileo API key file is empty: {secret_path}")
-    return value
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit("ERROR: Galileo API key cannot be read safely on this platform")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(secret_path, flags)
+    except OSError as exc:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must be a readable, non-symlink regular file: {secret_path}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise SystemExit(
+                f"ERROR: Galileo API key file must be a single-link regular file: {secret_path}"
+            )
+        if before.st_uid != os.geteuid():
+            raise SystemExit(
+                f"ERROR: Galileo API key file must be owned by the current user: {secret_path}"
+            )
+        mode = stat.S_IMODE(before.st_mode)
+        if mode & 0o077:
+            raise SystemExit(
+                f"ERROR: Galileo API key file permissions must be 0600 or stricter: "
+                f"{secret_path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= MAX_SECRET_FILE_BYTES:
+            raise SystemExit(
+                f"ERROR: Galileo API key file size must be between 1 and "
+                f"{MAX_SECRET_FILE_BYTES} bytes: {secret_path}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_SECRET_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        data = b"".join(chunks)
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: Galileo API key file changed while it was read: {secret_path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must contain UTF-8 text: {secret_path}"
+        ) from exc
+    if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+        raise SystemExit(
+            f"ERROR: Galileo API key file must contain exactly one non-empty line: {secret_path}"
+        )
+    return lines[0]
 
 
 def load_json_file(path: str) -> dict[str, Any]:

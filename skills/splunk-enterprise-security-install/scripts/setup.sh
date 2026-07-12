@@ -735,7 +735,7 @@ validate_cluster_bundle_on_cm() {
     splunk_home="$(deployment_run_with_profile "${cm_profile}" printf '%s' "${SPLUNK_HOME:-/opt/splunk}")"
     script="$(cat <<EOF
 set -euo pipefail
-"${splunk_home}/bin/splunk" validate cluster-bundle
+$(printf '%q' "${splunk_home}/bin/splunk") validate cluster-bundle
 EOF
 )"
     if deployment_run_with_profile "${cm_profile}" \
@@ -826,7 +826,7 @@ backup_kvstore() {
     splunk_home="$(deployment_run_with_profile "${profile}" printf '%s' "${SPLUNK_HOME:-/opt/splunk}")"
     script="$(cat <<EOF
 set -euo pipefail
-"${splunk_home}/bin/splunk" backup kvstore -archiveName $(printf '%q' "${archive_name}")
+$(printf '%q' "${splunk_home}/bin/splunk") backup kvstore -archiveName $(printf '%q' "${archive_name}")
 EOF
 )"
     if deployment_run_with_profile "${profile}" \

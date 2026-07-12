@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "skill": "lemonade-splunk-otel",
+  "sanitization": "No host or network identifiers, service endpoints, credentials, tokens, collector environment values, telemetry payload content, personal data, local credential paths, or repository paths are recorded.",
+  "runs": [
+    {
+      "id": "2026-07-11-ryzen-ai-lemonade-splunk-otel",
+      "date": "2026-07-11",
+      "environment": {
+        "runtime": "AMD Ryzen AI development system running Debian",
+        "lemonade": "Lemonade Server 10.10.0",
+        "collector": "Splunk Distribution of the OpenTelemetry Collector 0.156.0",
+        "destination": "Hosted Splunk Observability ingest path",
+        "write_data_policy": "one non-sensitive synthetic chat request"
+      },
+      "targets": [
+        "Hardened Lemonade-to-Splunk collector rendering and validation workflow",
+        "Live Lemonade Server and Splunk OpenTelemetry Collector services",
+        "Collector-side trace receiver and exporter evidence"
+      ],
+      "result": "partial",
+      "evidence": {
+        "integration_mock": {
+          "renderer_and_validator_regressions_passed": true,
+          "managed_component_collision_and_idempotency_regressions_passed": true,
+          "privacy_transform_invariant_passed": true,
+          "loopback_receiver_invariant_passed": true,
+          "official_collector_config_validation_passed": true,
+          "transactional_apply_restore_and_automatic_rollback_regressions_passed": true,
+          "transaction_schema_v2_generation_and_power_loss_recovery_regressions_passed": true,
+          "systemd_state_exactness_and_disagreement_regressions_passed": true,
+          "package_binary_and_unit_mutation_boundary_race_regressions_passed": true,
+          "config_only_recovery_required_and_resumption_regressions_passed": true
+        },
+        "live_apply_e2e": {
+          "lemonade_service_active_and_enabled": true,
+          "collector_service_active_and_enabled": true,
+          "service_restart_count": 0,
+          "lemonade_health_passed": true,
+          "collector_health_passed": true,
+          "active_config_validated_by_installed_collector": true,
+          "synthetic_chat_http_status": 200,
+          "receiver_accepted_spans_delta": 1,
+          "receiver_refused_spans_delta": 0,
+          "exporter_sent_spans_delta": 1
+        }
+      },
+      "limitations": [
+        "Collector counters prove that the receiver accepted the synthetic span and that the configured exporter reported it sent; no Splunk backend API or UI readback was performed, so durable destination-side receipt is unverified.",
+        "The production rollback workflow and schema-v2 recovery path passed isolated regression tests but were not exercised against the live system.",
+        "No failure-injection, sustained-load, persistent-queue recovery, or host-reboot test was performed."
+      ],
+      "cleanup": {
+        "synthetic_validation_requests_sent": 1,
+        "temporary_local_artifacts_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "desired_collector_configuration_intentionally_remained_active": true,
+        "rollback_drill_performed": false
+      }
+    },
+    {
+      "id": "2026-07-12-ryzen-ai-lemonade-splunk-backend-readback",
+      "date": "2026-07-12",
+      "environment": {
+        "runtime": "AMD Ryzen AI development system running Debian",
+        "lemonade": "Lemonade Server 10.10.0",
+        "collector": "Splunk Distribution of the OpenTelemetry Collector 0.156.0",
+        "destination": "Hosted Splunk Observability APM",
+        "write_data_policy": "privacy-safe synthetic traces and one non-sensitive real completion"
+      },
+      "targets": [
+        "Live Lemonade and Collector health plus exact-binary configuration validation",
+        "Durable organization-bound Splunk APM trace readback",
+        "Crash-durable apply, exact rollback, baseline readback, and reapply workflow"
+      ],
+      "result": "partial",
+      "evidence": {
+        "integration_mock": {
+          "targeted_production_regression_suite_passed": true,
+          "transaction_failure_and_recovery_regressions_passed": true,
+      "organization_bound_all_segment_readback_regressions_passed": true,
+      "literal_exporter_credential_rejection_regressions_passed": true,
+      "private_splunk_token_cutover_transaction_regressions_passed": true,
+      "skill_structure_validation_passed": true
+        },
+    "live_apply_e2e": {
+      "official_latest_release_verified": "v10.10.0",
+      "lemonade_service_healthy": true,
+      "collector_service_active_and_enabled": true,
+      "collector_health_http_status": 200,
+      "active_config_validated_by_exact_installed_collector": true,
+      "signalfx_send_otlp_histograms_enabled": true,
+      "genai_histogram_backend_evidence_passed": false,
+      "ai_agent_monitoring_signed_in_ui_observed": false,
+      "splunk_only_baseline_backend_readback_passed": true,
+          "post_rollback_splunk_backend_readback_passed": true,
+          "post_reapply_same_trace_backend_readback_passed": true,
+          "persisted_same_trace_span_count": 3,
+          "persisted_content_sentinel_scan_passed": true,
+          "collector_yaml_rollback_drill_passed": true,
+          "coordinated_runtime_proxy_queue_rollback_drill_passed": true,
+          "final_splunk_exporter_sent_span_delta": 4,
+          "final_receiver_accepted_span_delta": 3,
+      "final_receiver_failed_span_delta": 0,
+      "final_receiver_refused_span_delta": 0,
+      "final_exporter_queue_size": 0,
+      "post_wake_receiver_accepted_span_delta": 3,
+      "post_wake_receiver_refused_span_delta": 0,
+      "post_wake_splunk_exporter_sent_span_delta": 3,
+      "post_wake_exporter_queue_size": 0,
+      "post_wake_real_completion_http_status": 200,
+      "post_wake_telemetry_flush_http_status": 200,
+      "post_wake_native_receiver_accepted_span_delta": 1,
+      "post_wake_native_receiver_refused_span_delta": 0,
+      "post_wake_native_splunk_exporter_sent_span_delta": 1
+        }
+      },
+      "limitations": [
+        "The available Splunk organization token combines ingest and API privileges and was exposed during validation. It remains active because rotation requires an authenticated organization-admin user session; production security completion is blocked until that token is replaced and the Collector plus readback path are updated.",
+        "APM API trace persistence is proven, but the signed-in AI Agent Monitoring UI and required GenAI histogram experience were not observed.",
+        "No sustained-load, host-reboot, or long-duration queue-recovery test was performed."
+      ],
+      "cleanup": {
+        "temporary_remote_staging_secrets_remaining": 0,
+        "temporary_local_plaintext_secret_files_remaining": 0,
+        "temporary_background_processes_remaining": 0,
+        "temporary_sleep_inhibitors_remaining": 0,
+        "desired_collector_configuration_intentionally_remained_active": true,
+        "rollback_drill_performed": true
+      }
+    }
+  ]
+}

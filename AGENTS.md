@@ -172,6 +172,8 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `splunk-observability-thousandeyes-integration` | ThousandEyes -> Splunk Observability Cloud | Render and apply the full TE -> O11y wiring: Integration 1.0 OpenTelemetry stream (`POST /v7/streams` to ingest.<realm>.signalfx.com/v2/datapoint/otlp), Integrations 2.0 Splunk Observability APM connector, full TE asset lifecycle (tests, alert rules, labels, tags, TE-side dashboards, Templates with Handlebars-only credential placeholders); per-test-type SignalFlow dashboards + detectors handed off to `splunk-observability-dashboard-builder` and `splunk-observability-native-ops` |
 | `galileo-mcp-server-setup` | Official Galileo MCP Server (`https://api.galileo.ai/mcp/http/mcp`) | Render, validate, probe, deep-audit, and document safe Galileo MCP client setup for Cursor, VS Code, Codex, Claude Code, and AWS Kiro; inventories the live MCP tool catalog, fingerprints schemas, audits Galileo docs/product coverage, gates dataset/prompt write-generation tools behind explicit review, emits MCP tool-span logging handoffs, and routes full Galileo platform, Agent Control, Splunk HEC/OTLP, dashboard, and detector work to the dedicated skills |
 | `galileo-platform-setup` | Galileo SaaS/Enterprise platform -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply Galileo readiness and object lifecycle; supports the July 7, 2026 release with AI Assistant beta readiness, cross-project global-dashboard handoffs, generic alert webhook v1.0 relay to Splunk HEC, SDK experiment groups, and large-dataset batched-processing readiness/handoffs; also covers Agent Observability Controls, REST/custom deployments, SSO/RBAC, Luna-2, scorers, workflows, multimodal observability and metrics, tags/metadata, retention/privacy, Agent Graph, MCP tool calls, async jobs, `export_records`, OpenTelemetry/OpenInference, legacy Protect, Evaluate, Splunk HEC/OTLP/Collector, dashboards, detectors, and `--o11y-only` mode |
+| `galileo-lemonade-instrumentation-setup` | Lemonade Server and OpenAI-compatible callers -> Galileo + Splunk Observability | Choose native metadata-only or caller-side agent instrumentation, render an exact privacy-safe collector fan-out, prevent duplicate Galileo LLM records, and prove Galileo/Splunk delivery with canaries and backend readback |
+| `lemonade-splunk-otel` | Lemonade Server -> Splunk OTel Collector | Upgrade and operate Lemonade on Debian or AMD Ryzen AI hosts, enable privacy-safe native OTLP traces, render one full loopback collector config, validate delivery, and preserve rollback |
 | `galileo-agent-control-setup` | Agent Control -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply standalone Agent Control server readiness, file-backed auth templates, controls, Python/TypeScript runtime snippets, OTel sink config, custom Splunk HEC event sink, Splunk HEC/OTel Collector handoffs, and Observability dashboard/detector handoffs |
 | `splunk-observability-isovalent-integration` | Isovalent (Cilium / Hubble / Tetragon) -> Splunk Observability Cloud + Splunk Platform | Render the Splunk OTel collector overlay (seven `prometheus/isovalent_*` scrape jobs + `filter/includemetrics` + cilium-dnsproxy fix); Splunk Platform logs DEFAULT via OTel filelog receiver + hostPath mount + `extraFileLogs.filelog/tetragon` (production-validated); legacy fluentd splunk_hec behind `--legacy-fluentd-hec` (DEPRECATED); hands off Tetragon log ingestion to `cisco-security-cloud-setup` (`PRODUCT=isovalent`, sourcetype `cisco:isovalent`, index `cisco_isovalent`) |
 | `splunk-observability-cisco-nexus-integration` | Cisco Nexus 9000 fabric -> Splunk Observability Cloud | Standalone reusable: clusterReceiver `cisco_os` overlay (PR #45562 multi-device + global-scrapers format, contrib v0.149.0+) with K8s Secret manifest stub for SSH credentials, dashboards (port utilization, errors, drops, CPU/memory) and detectors (interface down, packet drop rate, CPU/memory pressure). Companion to `cisco-dc-networking-setup` (Splunk Platform TA path). |
@@ -194,8 +196,6 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
 | `splunk-license-manager-setup` | Splunk Enterprise license manager / peers / pools / groups / messages | Install licenses, switch groups, configure peers, allocate pools, audit usage and violations, validate version compatibility |
 | `splunk-soar-setup` | `splunk_soar-unpriv` (single + cluster) + `splunk_app_soar` (6361) + Splunk App for SOAR Export (3411) + Splunk SOAR Automation Broker | Install SOAR On-prem (single + cluster with external PG/GlusterFS/Elasticsearch), help with SOAR Cloud onboarding, install Automation Broker on Docker/Podman, install Splunk-side SOAR apps, ready ES integration, backup/restore |
-| `splunk-spl2-pipeline-kit` | Shared SPL2 pipeline authoring for IP and EP | Render and lint reusable SPL2 templates for routing, redact, sample, metrics, OCSF, decrypt, stats, S3, custom templates, SPL-to-SPL2 review, and PCRE2 compatibility across Ingest Processor and Edge Processor |
-| `splunk-ingest-processor-setup` | Splunk Cloud Platform Ingest Processor | Render, doctor, status-check, and validate Ingest Processor readiness, source types, destinations, SPL2 pipelines, lifecycle handoffs, monitoring, queues, Usage Summary, S3 archive, OCSF, decrypt, metrics, and downstream data-readiness handoffs without private API CRUD claims |
 | `splunk-edge-processor-setup` | Splunk Edge Processor instances + cloud / Enterprise control plane | Add EP control-plane object, install instances on Linux (systemd or not), scale to multi-instance, manage source types / destinations / SPL2 pipelines, apply pipelines, validate health |
 | `splunk-indexer-cluster-setup` | Splunk Enterprise indexer cluster (single-site, multisite, redundant managers) | Bootstrap manager(s) / peers / SHs, manage cluster bundle (validate / apply / rollback), rolling restart (default / searchable / forced), peer offline (fast / enforce-counts), maintenance mode, single-site to multisite migration, manager replacement |
 | `splunk-search-head-cluster-setup` | Splunk Enterprise Search Head Cluster | Plan, render, bootstrap, and operate an SHC: deployer config push, member `server.conf` generation, sequenced bootstrap, rolling restarts (searchable / default / forced), captain transfer, KV Store replication monitoring and reset, member add / decommission / remove, standalone-to-SHC migration, deployer replacement, ES placement on SHC, and failure mode runbooks |
@@ -235,12 +235,15 @@ exists, so Claude Code and Cursor do not need to inherit an activated shell.
 Claude Code reads `.mcp.json`; Cursor reads `.cursor/mcp.json`; Codex needs a
 one-time registration with `bash agent/register-codex-splunk-cisco-skills-mcp.sh`.
 
-This server is discovery-and-plan-only by default. Every local subprocess,
-including product resolution and dry-run planning, requires the MCP server
-process to start with `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`. Generic script
-execution is always mutation-gated and additionally requires
-`SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; all execution tools require a matching
-plan hash and explicit confirmation.
+The code-level execution default is off, while the committed Claude
+Code/Cursor registrations and Codex helper explicitly set
+`SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`. Pure-Python product resolution and
+bounded skill discovery never launch subprocesses. Dry-run planning does.
+Generic script execution is always mutation-gated and additionally requires
+both `SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1` and
+`SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; committed registrations explicitly keep
+both at `0`. All execution tools require a matching plan hash and literal
+Boolean confirmation.
 
 Plans are also bound to the complete `skills/` dependency-tree snapshot and
 revalidated after the execution lock is acquired. Changes to shared helpers,
@@ -251,6 +254,8 @@ is consumed when it executes, and the entire plan store is lost if the server
 restarts. If a plan hash is rejected as unknown, re-run the plan step to get a
 fresh hash. `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1` is a server-wide toggle — it
 enables mutating execution for all clients connected to that server process.
+Do not enable it on the normal shared registration; start a separately reviewed
+single-operator server when mutation is intentionally required.
 
 ## Credentials
 

@@ -65,8 +65,16 @@ operator-supplied digest is rejected and cannot create an executable packet.
   the CR. A concurrent revision fails closed and leaves a mode-600 recovery
   snapshot instead of rolling back another operator's change.
 - `status.sh`: exact agent/gateway/cluster-receiver rollout checks, pod readiness,
-  optional Operator/Instrumentation/Target Allocator/OBI checks, and a redacted
-  recent fatal/export error scan.
+  optional Operator/Instrumentation/Target Allocator/OBI checks, and a
+  rule/count-only recent fatal/export/data-loss scan. Matched log content and
+  failed log-command output are suppressed rather than emitted. The log gate covers both chart-primary
+  `release`-labeled pods and `app.kubernetes.io/instance`-labeled auxiliary
+  pods. Rendered core Pod container names and controller ownership bind to the
+  exact audited pins; unrelated auxiliary containers may use reviewed custom
+  digest pins without being mistaken for core workloads. The gate fails when
+  SignalFx conversion drops datapoints for exceeding the 36-dimension limit.
+  Status also rejects a local kubectl client outside the supported one-minor
+  skew from the API server.
 - `uninstall.sh`: requires `SPLUNK_OTEL_CONFIRM_K8S_UNINSTALL=yes`, proves the
   target context and owned chart identity, and verifies Instrumentation and
   hook-Job ownership before mutation. It removes the Helm release first, then

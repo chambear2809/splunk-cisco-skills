@@ -1,0 +1,11 @@
+# Render only. Review before any privileged apply.
+bash skills/lemonade-splunk-otel/scripts/setup.sh \
+  --base /etc/otel/collector/agent_config.yaml \
+  --output /tmp/lemonade-agent_config.yaml \
+  --deployment-environment lemonade-dev \
+  --service-name lemonade-server
+
+bash skills/lemonade-splunk-otel/scripts/validate.sh \
+  --collector-config /tmp/lemonade-agent_config.yaml \
+  --collector-binary /usr/bin/otelcol \
+  --production

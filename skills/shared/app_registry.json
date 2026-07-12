@@ -2352,6 +2352,34 @@
       "notes": "Galileo SaaS/Enterprise readiness and object lifecycle, including SDK experiment-group assignment, large-dataset batching readiness/handoffs, AI Assistant beta readiness, cross-project global-dashboard handoffs, and a generic-alert Bearer-to-Splunk-HEC relay; also covers REST/custom deployments, SSO/RBAC, Luna-2, scorers, metadata/privacy, Agent Graph, MCP, async jobs, export_records, OpenTelemetry/OpenInference, legacy Protect, Evaluate, Splunk Connect for OTLP, Splunk OTel Collector, dashboards, and detectors. Use --o11y-only for Splunk Observability Cloud-only mode."
     },
     {
+      "skill": "galileo-lemonade-instrumentation-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Lemonade-to-Galileo inference and caller-side agent instrumentation workflow. Renders privacy-safe native or dedicated-client trace fan-out through an existing external Splunk OTel Collector, prevents duplicate Galileo observations, and validates backend readback without Splunk Platform tier placement."
+    },
+    {
+      "skill": "lemonade-splunk-otel",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Lemonade Server host and native OpenTelemetry foundation for Debian and AMD Ryzen AI systems. Owns upgrade safety, privacy controls, loopback OTLP, full-config rendering, validation, and rollback through an external Splunk OTel Collector."
+    },
+    {
       "skill": "galileo-agent-control-setup",
       "role_support": {
         "search-tier": "none",

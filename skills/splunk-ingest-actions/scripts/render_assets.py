@@ -28,6 +28,45 @@ GENERATED_FILES = {
     "status.sh",
 }
 
+EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit(f"ERROR: {label} cannot be read safely on this platform")
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot securely open {label} {path}: {exc}")
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_uid != os.geteuid() or mode & 0o077
+                or not 1 <= before.st_size <= 65536):
+            raise SystemExit(f"ERROR: {label} must be an owner-only, single-link regular file of at most 65536 bytes: {path}")
+        chunks, remaining = [], 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+        if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: {label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"ERROR: {label} must contain UTF-8 text: {path}: {exc}")
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise SystemExit(f"ERROR: {label} must contain exactly one non-empty line: {path}")
+    return lines[0].strip()
+'''
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk Ingest Actions assets.")
@@ -357,18 +396,46 @@ if [[ "${{has_dest}}" == "true" ]]; then
     [[ -s "${{secret_key_file}}" ]] || {{ echo "ERROR: S3 secret key file missing/empty: ${{secret_key_file}}" >&2; exit 1; }}
     python3 - "${{out}}" outputs.conf "${{access_key_file}}" "${{secret_key_file}}" <<'PY'
 from pathlib import Path
+import os
+import stat
 import sys
+import tempfile
+
+{EMBEDDED_PRIVATE_SECRET_READER}
+
 target, template, akf, skf = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 text = Path(template).read_text(encoding="utf-8")
-ak = Path(akf).read_text(encoding="utf-8").strip()
-sk = Path(skf).read_text(encoding="utf-8").strip()
-if not ak or not sk:
-    raise SystemExit("ERROR: S3 credential files must not be empty.")
+ak = read_private_secret(akf, "S3 access-key file")
+sk = read_private_secret(skf, "S3 secret-key file")
 text = text.replace("__INGEST_ACTIONS_S3_ACCESS_KEY_FROM_FILE__", ak)
 text = text.replace("__INGEST_ACTIONS_S3_SECRET_KEY_FROM_FILE__", sk)
-Path(target).write_text(text, encoding="utf-8")
+target_path = Path(target)
+old_umask = os.umask(0o077)
+descriptor = -1
+temporary_path = None
+try:
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{{target_path.name}}.", dir=target_path.parent
+    )
+    temporary_path = Path(temporary_name)
+    os.fchmod(descriptor, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        descriptor = -1
+        stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary_path, target_path)
+    temporary_path = None
+finally:
+    if descriptor >= 0:
+        os.close(descriptor)
+    if temporary_path is not None:
+        try:
+            temporary_path.unlink()
+        except FileNotFoundError:
+            pass
+    os.umask(old_umask)
 PY
-    chmod 600 "${{out}}"
   else
     cp outputs.conf "${{out}}"
   fi

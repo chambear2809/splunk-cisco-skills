@@ -34,7 +34,7 @@ And adds **AI-Pod-specific bits** documented in the configuration guide and prod
 - Cisco AI PODs Splunk Observability dashboard pipeline (`metrics/cisco-ai-pods`, unfiltered).
 - NIM dashboard pipeline (`metrics/nvidianim-metrics`, unfiltered).
 - `k8s_attributes/nim` processor for `app -> model_name` extraction.
-- OpenShift SCC helper, workshop-multi-tenant.sh, dual-pipeline filtering pattern.
+- OpenShift SCC helper, `workshop/multi-tenant.sh`, and dual-pipeline filtering pattern.
 
 ## Critical production lessons encoded
 
@@ -53,7 +53,7 @@ These are the **silent failure traps** the umbrella prevents:
 When you run `--render`, the umbrella:
 
 1. Invokes each child skill's renderer to produce its overlay under a sub-directory.
-2. Merges the child overlays into a unified `splunk-otel-overlay/values.overlay.yaml` via `yq` deep-merge.
+2. Merges the child overlays into a unified `splunk-otel-overlay/values.overlay.yaml` with the renderer's deterministic Python deep-merge. The rendered base-collector handoff uses `yq` later to merge that reviewed overlay with base collector values.
 3. Adds AI-Pod-specific blocks on top of the merged overlay.
 4. Renders unified handoff scripts.
 
@@ -66,16 +66,14 @@ When you run `--apply-existing-collector`, the umbrella applies its rendered ove
 - `intersight-integration/` — from the Intersight child.
 - `secrets/cisco-nexus-ssh-secret.yaml` — from the Nexus child.
 - `dcgm-pod-labels-patch/` — from the GPU child when `--enable-dcgm-pod-labels`.
-- `nim-vllm-milvus-scrapes/` — AI-Pod-specific scrape configs for NIM, vLLM, Milvus.
-- `storage-scrapes/` — Trident + Portworx scrape configs.
-- `redfish-scrape/` — Redfish exporter scrape config.
+- NIM, vLLM, Milvus, Trident, Portworx, and Redfish scrape configuration embedded in `splunk-otel-overlay/values.overlay.yaml`.
 - `openshift/scc.sh` — OpenShift SCC helper script.
 - `workshop/multi-tenant.sh` — Workshop multi-tenant deploy script (when `--workshop-mode`).
-- `dashboards/` — AI-Pod-specific dashboards (NIM/vLLM inference, Milvus, storage allocation, RAG pipeline trace).
+- `dashboards/` — AI-Pod-specific dashboards for NIM/vLLM inference, Milvus, and Trident/Portworx storage.
 - `detectors/` — AI-Pod-specific detectors (vLLM error rate, NIM TTFT regression, Milvus query latency, Portworx node offline, Trident volume allocation).
 - `scripts/handoff-base-collector.sh` — emits the base collector + merge command with `--distribution openshift` (default).
 - `scripts/handoff-hec-token.sh` — for K8s container log shipping to Splunk Platform.
-- `scripts/handoff-dashboards.sh`, `handoff-detectors.sh` — composed dashboard + detector application across all four skills.
+- `scripts/handoff-dashboards.sh`, `handoff-detectors.sh` — emit reviewed dashboard and detector commands across all four skills.
 - `scripts/explain-composition.sh` — prints the per-child contribution summary.
 - `metadata.json`.
 
@@ -146,7 +144,7 @@ When you run `--apply-existing-collector`, the umbrella applies its rendered ove
 bash skills/splunk-observability-cisco-ai-pod-integration/scripts/validate.sh
 ```
 
-Runs each child skill's `validate.sh` recursively, then adds AI-Pod-specific checks: `oc get deployment -n intersight-otel`, log tail for `<release>-splunk-otel-collector-k8s-cluster-receiver`, RBAC patch presence when endpoint-SD is used, optional SignalFlow probes for `num_requests_running`, `milvus_proxy_req_count`, `vllm:e2e_request_latency_seconds`.
+Runs each child skill's `validate.sh` recursively, then checks the composed overlay, endpoint-discovery RBAC, OpenShift kubelet settings, and rendered secret safety. With `--live`, it probes collector and Intersight resources and logs plus the live collector ConfigMap. The umbrella validator does not make direct SignalFlow API probes for NIM, Milvus, or vLLM metrics.
 
 With `--live`, validation prefers `oc`, falls back to `kubectl`, passes `--live` through to child validators, and fails on Intersight OTLP export errors such as `unknown service opentelemetry.proto.collector.metrics.v1.MetricsService`.
 

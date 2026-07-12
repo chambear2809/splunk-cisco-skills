@@ -33,6 +33,10 @@ from skills.shared.lib.yaml_compat import (  # noqa: E402
     dump_yaml,
     load_yaml_or_json,
 )
+from skills.shared.lib.secure_secret_file import (  # noqa: E402
+    SecureSecretFileError,
+    read_private_text_file,
+)
 
 
 SKILL_NAME = "splunk-observability-k8s-frontend-rum-setup"
@@ -84,6 +88,39 @@ TOKEN_SHAPED_RE = re.compile(
     r"(?i)(access[_-]?token|api[_-]?token|bearer[_-]?token|hec[_-]?token|sf[_-]?token|rum[_-]?token)"
     r"\s*[:=]\s*[A-Za-z0-9._-]{20,}"
 )
+
+EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise ValueError(f"{label} cannot be read safely on this platform")
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_uid != os.geteuid() or mode & 0o077
+                or not 1 <= before.st_size <= 65536):
+            raise ValueError(f"{label} must be an owner-only, single-link regular file of at most 65536 bytes: {path}")
+        chunks, remaining = [], 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+        if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+            raise ValueError(f"{label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    lines = data.decode("utf-8").splitlines()
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise ValueError(f"{label} must contain exactly one non-empty UTF-8 line: {path}")
+    return lines[0].strip()
+'''
 
 
 class SpecError(ValueError):
@@ -959,7 +996,10 @@ def read_rum_token(spec: dict[str, Any]) -> str:
     p = Path(path).expanduser()
     if not p.exists():
         return "<<rum-token>>"
-    return p.read_text(encoding="utf-8").strip() or "<<rum-token>>"
+    try:
+        return read_private_text_file(p, label="RUM token file")
+    except SecureSecretFileError as exc:
+        raise SpecError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1664,25 +1704,21 @@ def render_sourcemap_upload_script(spec: dict[str, Any]) -> str:
         "    echo \"ERROR: TARGET_DIR ${TARGET_DIR} does not exist\" >&2\n"
         "    exit 2\n"
         "fi\n"
-        "if [[ -L \"${SPLUNK_O11Y_TOKEN_FILE}\" || ! -f \"${SPLUNK_O11Y_TOKEN_FILE}\" || ! -s \"${SPLUNK_O11Y_TOKEN_FILE}\" ]]; then\n"
-        "    echo 'ERROR: SPLUNK_O11Y_TOKEN_FILE must be a non-empty regular, non-symlink file' >&2\n"
-        "    exit 2\n"
-        "fi\n"
-        "token_mode=\"$(stat -c '%a' \"${SPLUNK_O11Y_TOKEN_FILE}\" 2>/dev/null || stat -f '%Lp' \"${SPLUNK_O11Y_TOKEN_FILE}\")\"\n"
-        "[[ \"${token_mode}\" == \"600\" ]] || { echo \"ERROR: token file must have mode 600 (found ${token_mode})\" >&2; exit 2; }\n"
-        "[[ \"$(awk 'END {print NR}' \"${SPLUNK_O11Y_TOKEN_FILE}\")\" == \"1\" ]] || { echo 'ERROR: token file must contain exactly one line' >&2; exit 2; }\n"
-        "TOKEN=\"$(cat \"${SPLUNK_O11Y_TOKEN_FILE}\")\"\n"
-        "[[ -n \"${TOKEN}\" && \"${TOKEN}\" != *$'\\r'* ]] || { echo 'ERROR: token line is empty or contains CR' >&2; exit 2; }\n"
-        "cleanup_token() { unset TOKEN SPLUNK_ACCESS_TOKEN; }\n"
-        "trap cleanup_token EXIT\n"
-        "echo 'Injecting sourceMapId into minified files ...'\n"
-        "splunk-rum sourcemaps inject --path \"${TARGET_DIR}\"\n"
-        "echo 'Uploading source maps ...'\n"
-        "export SPLUNK_REALM=\"${SPLUNK_O11Y_REALM}\" SPLUNK_ACCESS_TOKEN=\"${TOKEN}\"\n"
-        "splunk-rum sourcemaps upload \\\n"
-        "    --app-name \"${APP_NAME}\" \\\n"
-        "    --app-version \"${APP_VERSION}\" \\\n"
-        "    --path \"${TARGET_DIR}\"\n"
+        "python3 - \"${SPLUNK_O11Y_TOKEN_FILE}\" \"${TARGET_DIR}\" \"${APP_NAME}\" \"${APP_VERSION}\" <<'PY'\n"
+        "import os\nimport stat\nimport subprocess\nimport sys\nfrom pathlib import Path\n\n"
+        f"{EMBEDDED_PRIVATE_SECRET_READER}\n"
+        "try:\n    token = read_private_secret(sys.argv[1], 'SPLUNK_O11Y_TOKEN_FILE')\n"
+        "except (OSError, UnicodeError, ValueError) as exc:\n    raise SystemExit(f'ERROR: {exc}')\n"
+        "print('Injecting sourceMapId into minified files ...')\n"
+        "inject = subprocess.run(['splunk-rum', 'sourcemaps', 'inject', '--path', sys.argv[2]], check=False)\n"
+        "if inject.returncode != 0:\n    raise SystemExit(inject.returncode)\n"
+        "print('Uploading source maps ...')\n"
+        "environment = os.environ.copy()\n"
+        "environment['SPLUNK_REALM'] = environment['SPLUNK_O11Y_REALM']\n"
+        "environment['SPLUNK_ACCESS_TOKEN'] = token\n"
+        "command = ['splunk-rum', 'sourcemaps', 'upload', '--app-name', sys.argv[3], '--app-version', sys.argv[4], '--path', sys.argv[2]]\n"
+        "raise SystemExit(subprocess.run(command, env=environment, check=False).returncode)\n"
+        "PY\n"
         "echo 'Done.'\n"
     )
 

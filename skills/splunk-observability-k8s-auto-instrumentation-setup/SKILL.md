@@ -6,7 +6,7 @@ description: >-
   OTel Collector skill has installed the operator and CRDs. Emits language
   Instrumentation CRs, workload and namespace annotations, backup ConfigMaps,
   Splunk OBI eBPF assets, profiling/runtime metric env vars, sampler settings,
-  Fargate gateway paths, vendor-coexistence checks, GitOps YAML, and clean
+  Fargate gateway paths, GitOps YAML, transactional rollback snapshots, and clean
   uninstall scripts. Use when wiring zero-code Java, Node.js, Python, .NET, Go,
   Apache, or Nginx instrumentation into Splunk Observability Cloud APM,
   adding AlwaysOn Profiling, discovering workloads, or reverting
@@ -28,30 +28,39 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
 - `k8s-instrumentation/instrumentation-cr.yaml` — one or more `Instrumentation` resources (multi-CR when the spec lists multiple).
 - `k8s-instrumentation/workload-annotations.yaml` — strategic-merge patches against `spec.template.metadata.annotations` (NEVER top-level `metadata.annotations`) for each target `Deployment` / `StatefulSet` / `DaemonSet`.
 - `k8s-instrumentation/namespace-annotations.yaml` — namespace-level `inject-<lang>` annotations for namespace-wide opt-in.
-- `k8s-instrumentation/annotation-backup-configmap.yaml` — template ConfigMap that `apply-annotations.sh` populates with the pre-instrumentation state of each workload for clean revert.
-- `k8s-instrumentation/obi-daemonset.yaml` — only when `--enable-obi`. Splunk OBI (eBPF) DaemonSet with namespace include/exclude selectors.
+- `k8s-instrumentation/annotation-backup-configmap.yaml` — owned template ConfigMap for versioned, managed-key-only rollback snapshots.
+- `k8s-instrumentation/annotation-backup.py` — reviewed transactional capture/verify/restore planner; it fails before workload mutation on kubectl, JSON, ownership, or completeness errors.
+- `k8s-instrumentation/obi-daemonset.yaml` — only when `--enable-obi`. Owned ServiceAccount plus digest-pinned Splunk OBI (eBPF) DaemonSet with namespace include/exclude selectors.
+- `k8s-instrumentation/obi-lifecycle.py` — exact OBI ownership/config, rollout, node/kernel coverage, bounded-log validation, and safe purge helper.
+- `k8s-instrumentation/managed-resource-lifecycle.py` — preflights every rendered Instrumentation/OBI/SCC identity before the first mutation, rejects foreign same-name objects, and uses UID/resourceVersion-bound replace/delete operations.
 - `k8s-instrumentation/openshift-scc-obi.yaml` — only when `--distribution openshift` and `--enable-obi`. SCC binding for the OBI service account.
 - `k8s-instrumentation/apply-instrumentation.sh` — CRD preflight, SCC then CR then DaemonSet apply, webhook readiness wait.
-- `k8s-instrumentation/apply-annotations.sh` — resolve targets, snapshot backup, strategic-merge-patch, rollout restart per target.
-- `k8s-instrumentation/uninstall.sh` — reverse patches from backup, rollout restart, delete CR (ordered before any chart removal).
-- `k8s-instrumentation/verify-injection.sh` — deep check for specific workload (init container + env).
+- `k8s-instrumentation/apply-annotations.sh` — resolve and merge multi-language targets, transactionally snapshot every managed key, verify the committed backup, then strategic-merge-patch and restart.
+- `k8s-instrumentation/uninstall.sh` — refuse missing/corrupt/incomplete snapshots, restore only rendered managed keys, restart, and optionally purge owned OBI resources and CRs.
+- `k8s-instrumentation/injection-audit.py` — standalone fail-closed audit engine shared by rendered diagnostics.
+- `k8s-instrumentation/verify-injection.sh` — deep check for one or all rendered workloads (exact managed annotations, CR binding, init/sidecar evidence, OTLP env, and language hook).
 - `k8s-instrumentation/status.sh` — one-shot snapshot of CRs, MutatingWebhookConfiguration, operator pod.
-- `k8s-instrumentation/list-instrumented.sh` — drift audit: annotated workloads vs pods actually carrying the init container.
+- `k8s-instrumentation/list-instrumented.sh` — runs the same deep drift audit for every rendered target before printing the inventory.
 - `k8s-instrumentation/preflight-report.md` — human-readable preflight verdict.
 - `discovery/workloads.yaml` and `discovery/base-collector-probe.json` — only when `--discover-workloads`.
 - `runbook.md` — ordered operator workflow from render through verify and optional uninstall.
 - `handoff-collector.sh` — guidance to run `splunk-observability-otel-collector-setup` first if CRDs are absent.
 - `handoff-native-ops.spec.yaml` — starter APM detectors spec for `splunk-observability-native-ops`.
 - `handoff-dashboard-builder.spec.yaml` — APM topology dashboard spec for `splunk-observability-dashboard-builder`.
-- `metadata.json` — spec digest, preflight verdicts, warning list, rendered file list, target workload list (consumed by `--target-all` on apply/uninstall).
+- `metadata.json` — spec digest, preflight verdicts, warning list, rendered file list, target workload list, and namespace-level injection contracts. Workload targets are consumed by `--target-all` on apply/uninstall; workload and namespace targets are consumed by the deep live auditor.
 
 ## Safety Rules
 
-- Never ask for a Splunk Observability access token or any other credential in conversation. This skill does not take or store tokens directly; the OpenTelemetry Operator resolves the ingest endpoint through the `$(SPLUNK_OTEL_AGENT)` env var injected by the base chart, and the chart already carries the ingest token in a Kubernetes Secret.
-- Reject direct token flags such as `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`, `--hec-token`, `--platform-hec-token`, `--api-key`. Any token file handling delegates to the base collector skill via the rendered `handoff-collector.sh`.
+- Never ask for a Splunk Observability access token or any other credential in conversation. This skill does not accept credentials on argv or render them. The OpenTelemetry Operator resolves ingest through the `$(SPLUNK_OTEL_AGENT)` env var injected by the base chart. The optional APM API validation reads a separate mode-0600 User API access-token file through `SPLUNK_O11Y_TOKEN_FILE`; an ingest-only Org token is not sufficient for that read API.
+- Reject direct token flags such as `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`, `--hec-token`, `--platform-hec-token`, `--api-key`. Ingest-token handling delegates to the base collector; the read-only APM probe accepts only the dedicated file path from `SPLUNK_O11Y_TOKEN_FILE`.
+- Reject secret-like keys or values in specs, `--extra-env`, resource attributes, headers, and endpoints (`token`, `HEC`, `Bearer`, `Authorization`, password, API-key, or Secret material). OTLP URLs must be credential-free HTTP(S) URLs with an explicit port and no userinfo, query, or fragment.
 - Image-pull secrets for private registries mirroring `ghcr.io/signalfx/*` are passed by **name** (`--image-pull-secret <name>`); the operator creates the Kubernetes Secret itself and this skill never touches that material.
-- Mutating operations are gated: `--apply-annotations` and `--uninstall-instrumentation` require `--accept-auto-instrumentation` (because both force pod restarts). `--apply-instrumentation` with `--enable-obi` requires `--accept-obi-privileged`.
-- All rendered scripts are idempotent and refuse to run when expected preconditions (helm release present, CRDs installed, backup ConfigMap populated) are not met.
+- Mutating operations are gated: `--apply-instrumentation`, `--apply-annotations`, and `--uninstall-instrumentation` require `--accept-auto-instrumentation`; CR changes can affect already-annotated workloads on their next restart, while annotation apply/uninstall forces restarts immediately. `--apply-instrumentation` with `--enable-obi` also requires `--accept-obi-privileged`.
+- Every live validation or mutation requires `--kube-context <name>`. Operators who intentionally use kubectl's current context must say so with `--allow-current-context`; the two flags are mutually exclusive. Non-mutating `--dry-run` previews do not require either acknowledgement.
+- Cluster name is always explicit. This offline renderer never guesses an EKS/GKE/OpenShift identity.
+- Operator installation controls (watch namespaces, certificate mode, installation job, or a purported multi-instrumentation feature gate) and vendor webhook detection are not implemented by this overlay. Supplying those legacy inputs fails closed; configure/audit them in the base collector workflow.
+- Rendered mutations are repeatable and fail closed on missing preconditions (helm release, CRDs, or an owned complete backup). Annotation apply/uninstall intentionally triggers a new rollout on every invocation and is therefore operationally disruptive even when the annotation values are unchanged.
+- Same-name Instrumentation, OBI ServiceAccount/DaemonSet, and OpenShift SCC objects are never adopted implicitly. Apply preflights the full set before its first write; existing objects must carry the exact skill ownership labels, and replacements/deletes are bound to the live UID and resourceVersion. Backup purge requires `--target-all`, exact snapshot-key coverage, and a UID/resourceVersion-bound ConfigMap delete.
 
 ## Primary Workflow
 
@@ -69,6 +78,10 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
    Then edit `splunk-observability-k8s-auto-instrumentation-rendered/discovery/workloads.yaml` to mark each workload with its language.
 
 3. Render the overlay assets:
+
+   The CLI-only path is the default; `template.example` is loaded only when
+   explicitly passed with `--spec`. This prevents example workloads or policy
+   settings from contaminating an operator's CLI render.
 
    ```bash
    bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/setup.sh \
@@ -94,7 +107,9 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
 
    ```bash
    bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/setup.sh \
-     --apply-instrumentation
+     --apply-instrumentation \
+     --accept-auto-instrumentation \
+     --kube-context prod-cluster-admin
    ```
 
 6. Apply annotations + rollout restart:
@@ -103,6 +118,7 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
    bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/setup.sh \
      --apply-annotations \
      --accept-auto-instrumentation \
+     --kube-context prod-cluster-admin \
      --target-all
    ```
 
@@ -110,7 +126,8 @@ It is an overlay on top of [splunk-observability-otel-collector-setup](../splunk
 
    ```bash
    bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/validate.sh \
-     --check-injection
+     --check-injection \
+     --kube-context prod-cluster-admin
    ```
 
 ## Annotation Model
@@ -128,15 +145,44 @@ Supported annotations:
 
 See [references/annotation-catalog.md](references/annotation-catalog.md) for the full surface, [references/annotation-surgery.md](references/annotation-surgery.md) for the patching mechanics, and [references/instrumentation-cr-reference.md](references/instrumentation-cr-reference.md) for CR field semantics.
 
+### Namespace-level live contract
+
+For each rendered namespace target, live validation requires the Namespace's
+managed annotations to match metadata exactly. Every non-terminating pod whose
+phase is not `Succeeded` or `Failed` remains in scope and must be Running,
+Ready, and carry the expected language evidence. A pod-level
+`inject-<language>: "false"` is the only exclusion and is itself audited for
+stale injection artifacts. A pod-level explicit CR value remains in scope and
+is validated against that rendered CR. Terminal and deleting pods are reported
+as excluded. A namespace with no active pods fails closed because it provides
+no production evidence.
+
+`namespace-annotations.yaml` is declarative input for GitOps or a separately
+reviewed `kubectl apply`; the imperative `apply-annotations.sh` target selector
+continues to mutate only explicitly rendered workloads.
+
 ## OBI Behavior
 
-`--enable-obi` emits a Splunk OpenTelemetry Zero-code (OBI) DaemonSet with `privileged: true`, `hostPath` mounts for `/sys/kernel/security` and `/sys/fs/cgroup`, and a kernel-≥5.8 requirement. OBI is eBPF-based and instruments compiled binaries (Go, C, Rust) without code or annotation changes. Apply requires `--accept-obi-privileged`. On OpenShift, `openshift-scc-obi.yaml` renders automatically to bind the `privileged` SCC to the OBI ServiceAccount.
+`--enable-obi` emits an owned ServiceAccount and Splunk OpenTelemetry Zero-code (OBI) DaemonSet with `privileged: true`, `hostPath` mounts for `/sys/kernel/security` and `/sys/fs/cgroup`, Linux-node selection, and a kernel-≥5.8 requirement. OBI is eBPF-based and instruments compiled binaries (Go, C, Rust) without code or annotation changes. Apply requires `--accept-obi-privileged`. Because this repository has no audited default for the standalone OBI container contract, render also requires `--obi-image ...@sha256:<digest>`; tag-only `--obi-version` input fails closed. On OpenShift, `openshift-scc-obi.yaml` renders automatically. `--check-obi` proves the exact digest/config, controller rollout, one Ready OBI pod on every supported Ready schedulable Linux node, and a bounded 10-minute/200-line fatal-rule log window. `uninstall.sh --purge-obi` verifies exact ownership/config before deleting DaemonSet, optional SCC, then ServiceAccount.
 
 See [references/obi-ebpf.md](references/obi-ebpf.md).
 
 ## Multi-CR / Multi-Environment
 
-When the spec lists more than one `Instrumentation` CR (e.g. different samplers for dev vs prod), `--multi-instrumentation` MUST be passed. The operator chart turns on the corresponding feature gate. Each workload annotation then binds to a specific CR via `cr=<ns>/<crname>`. The preflight catalog refuses to render multiple CRs without the feature gate.
+When the spec lists more than one `Instrumentation` CR (e.g. different samplers for dev vs prod), each workload annotation binds to a specific CR via `cr=<ns>/<crname>`. The OpenTelemetry Operator supports distinct named resources; this overlay does not claim or mutate a separate chart feature gate. Multiple language rows for one workload are intentionally merged into one manifest; duplicate workload/language rows or conflicting shared annotations fail closed.
+
+This skill always renders an explicit `<namespace>/<crname>` value, including
+for the default CR, so cross-namespace workloads never depend on the ambiguous
+bare `"true"` lookup. `--namespace` overrides every rendered CR namespace;
+`--instrumentation-cr-name` is accepted only for a single-CR render.
+
+## Instrumentation image policy
+
+Java, Node.js, Python, .NET, Go, and Apache HTTPD defaults are immutable
+`@sha256` pins copied from the base Collector skill's chart-0.154.0 audited
+image ledger. Custom image overrides must also be digest-pinned. This
+repository has no audited Nginx default image, so Nginx fails closed until the
+operator supplies a reviewed `--nginx-image ...@sha256:<digest>` override.
 
 ## Hand-offs
 
@@ -168,21 +214,27 @@ Static checks cover:
 - No `.NET Framework` references anywhere.
 - Rendered scripts do not echo secrets.
 - CR name uniqueness.
+- Every Instrumentation language image is pinned by `@sha256` and the JSON
+  injection contract exactly matches `instrumentation-cr.yaml`.
+- The rendered backup and OBI helpers byte-match their reviewed source; the OBI
+  metadata contract exactly matches the rendered ServiceAccount/DaemonSet/SCC.
 
 `--live --check-apm <service>` runs the complete production gate. It enables
-webhook, Instrumentation CR, injection, backup, and scoped APM checks. A caller
+webhook, Instrumentation CR, injection, backup, optional OBI, and scoped APM checks. A caller
 may explicitly omit only the APM or backup gate with `--skip-apm-check` or
 `--skip-backup-check`; those named skips are valid only with `--live`. Individual
 `--check-*` flags remain available as narrow diagnostics.
 
 - `--check-webhook` — exact pinned pod-admission webhook policy/route, CA bundle,
-  Service and ready 9443/TCP Endpoints, Ready Operator pods, and recent webhook
+  Service and ready 9443/TCP EndpointSlice (with a legacy Endpoints fallback
+  only when EndpointSlice is unavailable or empty), Ready Operator pods, and recent webhook
   error log scan. This proves Kubernetes routing state but does not synthesize
   an admission request or perform a separate TLS handshake.
 - `--check-instrumentation` — `kubectl get otelinst -A` shows the rendered CRs with expected fields.
-- `--check-injection` — iterate annotated workloads, assert each has a Pod carrying the `opentelemetry-auto-instrumentation` init container and the expected `OTEL_*` env.
-- `--check-apm <service>` — scoped probe of `api.<realm>.observability.splunkcloud.com/v2/apm/topology` for the workload's `service.name`, deployment environment, and Kubernetes cluster.
-- `--check-backup` — annotation backup ConfigMap exists and is non-empty.
+- `--check-injection` — iterate annotated workloads and namespace contracts. Workload controllers must have observed their current generation and completed rollout; all intended active pods must be Running and Ready with exact language injection evidence, the exact rendered `@sha256` init/sidecar image, and expected `OTEL_*` env. Namespace opt-outs and terminal/deleting exclusions follow the contract above.
+- `--check-obi` — prove the owned OBI manifest contract, digest/config identity, DaemonSet rollout, supported kernel/architecture coverage, Ready pods, and bounded fatal-rule recent logs.
+- `--check-apm <service>` — allow only a service/realm pair bound to a rendered workload in `metadata.json`, then probe the scoped topology for that service, deployment environment, and Kubernetes cluster.
+- `--check-backup` — every rendered workload has a versioned, owned, structurally complete managed-key snapshot.
 
 Every requested live check is fail-closed: a missing tool, credential,
 resource, injected pod, backup, API response, or exact APM service is a

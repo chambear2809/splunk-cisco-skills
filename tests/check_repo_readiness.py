@@ -20,6 +20,7 @@ REQUIRED_TOP_LEVEL = [
     "SPLUNK_10_5_COMPATIBILITY.md",
     "SKILL_VALIDATION_MATRIX.md",
     "SKILL_REQUIREMENTS.md",
+    "skills/shared/skill_product_registry.json",
     ".gitattributes",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
@@ -651,7 +652,10 @@ def check_local_mcp_server_config(errors: list[str]) -> None:
                 f"{rel}: splunk-cisco-skills server must use a python3 command, got {command!r}"
             )
         args = local.get("args") or []
-        if not args or "run-splunk-cisco-skills-mcp.py" not in str(args[0]):
+        if not args or not any(
+            "run-splunk-cisco-skills-mcp.py" in str(argument)
+            for argument in args
+        ):
             errors.append(
                 f"{rel}: splunk-cisco-skills server must reference run-splunk-cisco-skills-mcp.py"
             )

@@ -2,12 +2,64 @@
 """Run the repo-local Splunk Cisco skills MCP server over stdio."""
 
 import os
+import stat
 import sys
 from pathlib import Path
 
 RUNNER_PATH = Path(__file__).resolve()
 REPO_ROOT = RUNNER_PATH.parents[1]
 AGENT_DIR = RUNNER_PATH.parent
+
+
+def _require_isolated_python() -> None:
+    if not sys.flags.isolated:
+        print(
+            "Refusing non-isolated Python startup. Run: python3 -I "
+            "agent/run-splunk-cisco-skills-mcp.py",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+
+def _trusted_repo_venv(venv_dir: Path, candidate: Path) -> Path | None:
+    """Return a checked venv launcher whose parent chain is not shared-writable."""
+    if not hasattr(os, "geteuid"):
+        try:
+            return candidate
+        except OSError:
+            return None  # Windows ACL validation is outside this POSIX launcher.
+    owner = os.geteuid()
+    for directory in (REPO_ROOT, venv_dir, venv_dir / "bin"):
+        try:
+            metadata = directory.lstat()
+        except OSError:
+            return None
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != owner
+            or metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+        ):
+            return None
+
+    try:
+        link_metadata = candidate.lstat()
+        resolved = candidate.resolve(strict=True)
+        target_metadata = resolved.stat()
+    except OSError:
+        return None
+    if link_metadata.st_uid != owner:
+        return None
+    trusted = (
+        stat.S_ISREG(target_metadata.st_mode)
+        and target_metadata.st_uid in {0, owner}
+        and not target_metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+        and os.access(resolved, os.X_OK)
+    )
+    # Execute through the venv launcher rather than its resolved base-Python
+    # target so Python still discovers pyvenv.cfg and venv site-packages. The
+    # checked parent chain prevents another OS user from swapping the launcher;
+    # the repository owner is already inside this server's trust boundary.
+    return candidate if trusted else None
 
 
 def _maybe_reexec_repo_venv() -> None:
@@ -25,19 +77,39 @@ def _maybe_reexec_repo_venv() -> None:
         venv_dir / "bin" / "python3",
         venv_dir / "bin" / "python",
     ]
+    saw_candidate = False
     for candidate in candidates:
         if not candidate.is_file() or not os.access(candidate, os.X_OK):
             continue
-        os.environ["SPLUNK_CISCO_SKILLS_MCP_REEXECED"] = "1"
+        saw_candidate = True
+        trusted_interpreter = _trusted_repo_venv(venv_dir, candidate)
+        if trusted_interpreter is None:
+            continue
+        child_env = os.environ.copy()
+        child_env["SPLUNK_CISCO_SKILLS_MCP_REEXECED"] = "1"
         # Re-exec alone does not activate a virtual environment. Prepending its
         # bin directory ensures Python helpers launched by Bash skill scripts
         # resolve the same dependency set as this MCP process.
         bin_dir = str(venv_dir / "bin")
-        current_path = os.environ.get("PATH", "")
-        os.environ["PATH"] = bin_dir if not current_path else f"{bin_dir}{os.pathsep}{current_path}"
-        os.execv(str(candidate), [str(candidate), str(RUNNER_PATH), *sys.argv[1:]])
+        current_path = child_env.get("PATH", "")
+        child_env["PATH"] = (
+            bin_dir if not current_path else f"{bin_dir}{os.pathsep}{current_path}"
+        )
+        os.execve(
+            str(trusted_interpreter),
+            [str(trusted_interpreter), "-I", str(RUNNER_PATH), *sys.argv[1:]],
+            child_env,
+        )
+    if saw_candidate:
+        print(
+            "Refusing untrusted repo .venv: it must be owned by the current user "
+            "and not writable by group or others.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 
+_require_isolated_python()
 _maybe_reexec_repo_venv()
 
 sys.path.insert(0, str(AGENT_DIR))

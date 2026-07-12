@@ -8,6 +8,37 @@
 - AWS EKS Hybrid Nodes Cilium build (mirror): `oci://public.ecr.aws/eks/cilium/cilium`.
 - Cisco Isovalent acquisition: completed 2024-04-12 (per `investor.cisco.com/news/news-details/2024/...`).
 
+## Audited chart contract
+
+| Release | Chart | Exact version |
+|---|---|---:|
+| OSS Cilium | `cilium/cilium` | `1.18.10` |
+| Enterprise Cilium | `isovalent/cilium-enterprise` | `1.18.8` |
+| EKS OCI Cilium mirror | `oci://public.ecr.aws/eks/cilium/cilium` | `1.18.8` |
+| OSS Tetragon | `cilium/tetragon` | `1.7.0` |
+| Enterprise Tetragon | `isovalent/tetragon` | `1.18.1` |
+| Cilium DNSProxy | `isovalent/cilium-dnsproxy` | `1.18.8` |
+| Hubble Enterprise | `isovalent/hubble-enterprise` | `1.18.8` |
+| Hubble Timescape | `isovalent/hubble-timescape` | `1.18.8` |
+
+Every generated Helm command runs `helm show chart --version`, then uses the
+same exact `--version` with `--atomic --wait --timeout 10m --history-max 10`.
+Live validation requires the matching Chart.yaml identity and exact version.
+The versions and accepted identities are recorded under `helm_charts` in both
+`metadata.json` and `apply-plan.json`.
+
+Provenance limitation: this repository does not redistribute the upstream
+chart archives, `.prov` signatures, or independently audited SHA-256 values.
+The private Hubble charts additionally require entitled repository access.
+Consequently, exact version resolution is fail-closed, but origin/archive
+integrity remains an explicit review gap rather than a fabricated checksum.
+
+OSS and Enterprise pins are intentionally separate. Upstream Cilium `1.18.10`
+is the current 1.18 maintenance baseline; the skill does not reuse the
+cluster-validated Enterprise `1.18.8` pin for public GKE installs because that
+upstream version has a documented GKE regression. Enterprise and EKS-mirror
+versions remain separate evidence contracts rather than inferred upgrades.
+
 ## Rendered layout
 
 By default, assets are written under `cisco-isovalent-platform-rendered/`:
@@ -55,6 +86,17 @@ By default, assets are written under `cisco-isovalent-platform-rendered/`:
 
 Live commands require `--kube-context CTX` unless `--allow-current-context` is explicitly set. Mutating `--apply` requires `--accept-k8s-apply`; disruptive dataplane/security sections also require `--accept-isovalent-disruptive-change`.
 
+Enterprise Helm dry-runs that receive a license file require
+`helm upgrade --hide-secret`; generated scripts capability-check the flag and
+stop before rendering when it is unavailable. Live Helm status documents are
+streamed into a deployed-state parser so NOTES are neither retained nor echoed.
+
+Namespace intake is restricted to Kubernetes DNS-1123 labels, and the kernel
+minimum accepts only numeric `major.minor` or `major.minor.patch`. These values
+are emitted through validated shell variables rather than interpolated command
+text. Static validation recursively parses rendered YAML/JSON and rejects
+inline license/token/password/key material without printing the value.
+
 Scoped Cilium sections render dedicated overlays under `helm/cilium-section-<section>-values.yaml` so an apply request changes the requested feature instead of replaying the base chart values. `clustermesh` is intentionally CLI-backed (`cilium clustermesh ...`) because it depends on participating cluster contexts.
 
 ## Edition flags
@@ -69,6 +111,23 @@ Scoped Cilium sections render dedicated overlays under `helm/cilium-section-<sec
 Supported `--distribution` values are `generic`, `kubeadm`, `kind`, `minikube`, `kops`, `eks`, `eks-byocni`, `eks-hybrid`, `aks-byocni`, `aks-managed-cilium`, `gke`, `gke-dataplane-v2`, `openshift`, `rke2`, `rancher`, `k3s`, `k0s`, `talos`, `vmware-vsphere`, and `alibaba-ack`.
 
 Each profile defines preflight checks, install path, CNI conflicts, kube-proxy handling, IPAM constraints, required privileges, SCC/PSA/RBAC requirements, kernel/eBPF requirements, LB/IPAM limitations, and not-applicable features. The OpenShift profile renders SCC assets instead of relying on stale cross-skill claims.
+
+For `aks-managed-cilium` and `gke-dataplane-v2`, `--validate --live` does not assume the Helm chart's `k8s-app=cilium` pod label or Cilium/Hubble metric Service names. Those provider-owned internals are not a stable contract of this skill. The validator skips those probes, validates the Tetragon portion, emits an explicit unsupported-evidence failure, and returns nonzero until provider-approved dataplane evidence is supplied separately.
+
+All other live runs reject kubectl clients outside the supported one-minor
+skew from the API server. Enabled Hubble Enterprise and Cilium DNSProxy releases
+must be in their rendered namespaces and every release-labeled pod must be
+Running with all declared containers Ready; DNSProxy must also expose samples
+on its required metrics endpoint.
+
+Helm inventory uses explicit status flags supported by Helm 3 and Helm 4, not
+`helm list --all`. Metrics are parsed in-process from the captured response so
+large bodies cannot false-fail through `grep -q`/`pipefail` SIGPIPE behavior.
+For required Cilium and enabled DNSProxy responses, positive
+`cilium_hive_status` samples with status `degraded` or `failed` fail closed.
+Output reports only the metric name, rule identifier, and aggregate positive
+count; label content is not echoed. Positive `stopped` is recorded as ordinary
+sample evidence and is not treated as unhealthy without documented semantics.
 
 ## Tetragon export modes
 

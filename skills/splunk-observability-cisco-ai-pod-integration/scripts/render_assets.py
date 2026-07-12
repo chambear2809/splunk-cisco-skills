@@ -514,6 +514,8 @@ def workshop_multi_tenant_script(spec: dict[str, Any]) -> str:
         f'[[ -n "${{PREFIX}}" ]] || PREFIX={prefix_q}\n'
         'COUNT="${2:-}"\n'
         f'[[ -n "${{COUNT}}" ]] || COUNT={count_q}\n'
+        '(( ${#PREFIX} <= 50 )) && [[ "${PREFIX}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || '
+        '{ echo "ERROR: PREFIX must be a lowercase Kubernetes name prefix of at most 50 characters" >&2; exit 2; }\n'
         '[[ "${COUNT}" =~ ^[0-9]+$ ]] && (( COUNT >= 1 && COUNT <= 1000 )) || { echo "ERROR: COUNT must be 1..1000" >&2; exit 2; }\n'
         '\n'
         'missing=0\n'
@@ -551,140 +553,242 @@ def workshop_multi_tenant_script(spec: dict[str, Any]) -> str:
     )
 
 
-def ai_pod_dashboard_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {
-        "ai-pod-llm-inference": {
-            "name": "AI Pod LLM Inference",
-            "description": "NIM + vLLM inference latency / throughput / cache",
-            "charts": [
-                _chart("Active requests (NIM)", "num_requests_running"),
-                _chart("Waiting requests", "num_requests_waiting"),
-                _chart("TTFT (NIM)", "time_to_first_token_seconds"),
-                _chart("Time per output token", "time_per_output_token_seconds"),
-                _chart("E2E request latency", "e2e_request_latency_seconds"),
-                _chart("Prompt tokens", "prompt_tokens_total"),
-                _chart("Generation tokens", "generation_tokens_total"),
-                _chart("vLLM E2E latency", "vllm:e2e_request_latency_seconds"),
-                _chart("vLLM KV cache usage", "vllm:kv_cache_usage_perc"),
-                _chart("vLLM request failures", "vllm:request_failure_total"),
-                _chart("vLLM request successes", "vllm:request_success_total"),
-                _chart("Request finish total", "request_finish_total"),
+def ai_pod_dashboard_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
+    del spec  # Reserved for future dashboard customization.
+    dashboard_definitions = {
+        "ai-pod-llm-inference": (
+            "AI Pod LLM Inference",
+            "NIM + vLLM inference latency / throughput / cache",
+            [
+                ("Active requests (NIM)", "num_requests_running"),
+                ("Waiting requests", "num_requests_waiting"),
+                ("TTFT (NIM)", "time_to_first_token_seconds"),
+                ("Time per output token", "time_per_output_token_seconds"),
+                ("E2E request latency", "e2e_request_latency_seconds"),
+                ("Prompt tokens", "prompt_tokens_total"),
+                ("Generation tokens", "generation_tokens_total"),
+                ("vLLM E2E latency", "vllm:e2e_request_latency_seconds"),
+                ("vLLM KV cache usage", "vllm:kv_cache_usage_perc"),
+                ("vLLM request failures", "vllm:request_failure_total"),
+                ("vLLM request successes", "vllm:request_success_total"),
+                ("Request finish total", "request_finish_total"),
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
-        },
-        "ai-pod-vector-db": {
-            "name": "AI Pod Vector DB (Milvus)",
-            "description": "Milvus query/proxy/rootcoord performance",
-            "charts": [
-                _chart("Proxy cache hit", "milvus_proxy_cache_hit_count"),
-                _chart("Proxy req count", "milvus_proxy_req_count"),
-                _chart("QueryCoord collections", "milvus_querycoord_collection_num"),
-                _chart("RootCoord DDL req", "milvus_rootcoord_ddl_req_count"),
-                _chart("RootCoord DML channels", "milvus_rootcoord_dml_channel_num"),
-                _chart("Proxy req queue latency", "milvus_proxy_req_in_queue_latency"),
+        ),
+        "ai-pod-vector-db": (
+            "AI Pod Vector DB (Milvus)",
+            "Milvus query/proxy/rootcoord performance",
+            [
+                ("Proxy cache hit", "milvus_proxy_cache_hit_count"),
+                ("Proxy req count", "milvus_proxy_req_count"),
+                ("QueryCoord collections", "milvus_querycoord_collection_num"),
+                ("RootCoord DDL req", "milvus_rootcoord_ddl_req_count"),
+                ("RootCoord DML channels", "milvus_rootcoord_dml_channel_num"),
+                ("Proxy req queue latency", "milvus_proxy_req_in_queue_latency"),
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
-        },
-        "ai-pod-storage": {
-            "name": "AI Pod Storage (Trident + Portworx)",
-            "description": "NetApp Trident + Pure Portworx volume + cluster health",
-            "charts": [
-                _chart("Trident volume count", "trident_volume_count"),
-                _chart("Trident volume allocated bytes", "trident_volume_allocated_bytes"),
-                _chart("Trident operation duration (count)", "trident_operation_duration_milliseconds_count"),
-                _chart("Portworx CPU %", "px_cluster_cpu_percent"),
-                _chart("Portworx nodes online", "px_cluster_status_nodes_online"),
-                _chart("Portworx nodes offline", "px_cluster_status_nodes_offline"),
-                _chart("Portworx volume read latency", "px_volume_read_latency_seconds"),
-                _chart("Portworx volume write latency", "px_volume_write_latency_seconds"),
+        ),
+        "ai-pod-storage": (
+            "AI Pod Storage (Trident + Portworx)",
+            "NetApp Trident + Pure Portworx volume + cluster health",
+            [
+                ("Trident volume count", "trident_volume_count"),
+                ("Trident volume allocated bytes", "trident_volume_allocated_bytes"),
+                ("Trident operation duration (count)", "trident_operation_duration_milliseconds_count"),
+                ("Portworx CPU %", "px_cluster_cpu_percent"),
+                ("Portworx nodes online", "px_cluster_status_nodes_online"),
+                ("Portworx nodes offline", "px_cluster_status_nodes_offline"),
+                ("Portworx volume read latency", "px_volume_read_latency_seconds"),
+                ("Portworx volume write latency", "px_volume_write_latency_seconds"),
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
-        },
+        ),
     }
+    rendered: dict[str, dict[str, Any]] = {}
+    for key, (title, description, chart_definitions) in dashboard_definitions.items():
+        rendered[key] = {
+            "api_version": "splunk-observability-dashboard-builder/v1",
+            "mode": "classic-api",
+            "realm": realm,
+            "dashboard_group": {
+                "name": f"Cisco AI Pod - {title}",
+                "description": f"Cisco AI Pod dashboards for cluster {cluster_name}.",
+            },
+            "dashboard": {
+                "name": title,
+                "description": description,
+                "chart_density": "DEFAULT",
+                "filters": {
+                    "variables": [
+                        {
+                            "property": "k8s.cluster.name",
+                            "alias": "Cluster",
+                            "value": [cluster_name],
+                            "required": True,
+                            "restricted": True,
+                        }
+                    ]
+                },
+            },
+            "charts": [
+                _chart(name, metric, cluster_name, position)
+                for position, (name, metric) in enumerate(chart_definitions)
+            ],
+        }
+    return rendered
 
 
-def _chart(name: str, metric: str) -> dict[str, Any]:
+def _chart(name: str, metric: str, cluster_name: str, position: int) -> dict[str, Any]:
+    chart_id = re.sub(r"[^a-z0-9]+", "-", metric.lower()).strip("-") or "metric"
+    metric_literal = json.dumps(metric)
+    cluster_literal = json.dumps(cluster_name)
     return {
+        "id": chart_id,
         "name": name,
-        "description": f"{metric}",
-        "program_text": f"data('{metric}', filter=filter('k8s.cluster.name', '${{CLUSTER_NAME}}')).publish(label='{metric}')",
+        "description": metric,
+        "type": "TimeSeriesChart",
+        "plot_type": "LineChart",
+        "row": position // 2,
+        "column": 0 if position % 2 == 0 else 6,
+        "width": 6,
+        "height": 1,
+        "program_text": (
+            f"data({metric_literal}, filter=filter('k8s.cluster.name', {cluster_literal}))"
+            f".publish(label={metric_literal})"
+        ),
         "publish_label": metric,
     }
 
 
-def ai_pod_detector_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _detector_spec(
+    *,
+    realm: str,
+    cluster_name: str,
+    name: str,
+    metric: str,
+    aggregation: str,
+    direction: str,
+    threshold: int | float,
+    severity: str,
+    detect_label: str,
+) -> dict[str, Any]:
+    metric_literal = json.dumps(metric)
+    cluster_literal = json.dumps(cluster_name)
+    stream = f"data({metric_literal}, filter=filter('k8s.cluster.name', {cluster_literal}))"
+    transformations = {
+        "rate": ".rate()",
+        "p95": ".percentile(95)",
+        "max": ".max()",
+        "delta": ".delta()",
+    }
+    comparators = {"above": ">", "below": "<"}
+    if aggregation not in transformations or direction not in comparators:
+        raise SpecError(
+            f"Unsupported detector aggregation/direction: {aggregation!r}/{direction!r}"
+        )
+    signal_label = f"{detect_label}_signal"
+    signal_label_literal = json.dumps(signal_label)
+    detect_label_literal = json.dumps(detect_label)
+    threshold_literal = json.dumps(threshold)
+    program_text = (
+        f"signal = {stream}{transformations[aggregation]}.publish(label={signal_label_literal})\n"
+        f"detect(when(signal {comparators[direction]} threshold({threshold_literal})))"
+        f".publish({detect_label_literal})"
+    )
     return {
-        "vllm-error-rate": {
-            "test_type": "ai-pod-vllm",
-            "detectors": [
-                {
-                    "name": "vLLM error rate spike",
-                    "metric": "vllm:request_failure_total",
-                    "direction": "above",
-                    "threshold": 5,
-                    "severity": "Major",
-                    "aggregation": "rate",
-                }
-            ],
-        },
-        "nim-ttft-regression": {
-            "test_type": "ai-pod-nim",
-            "detectors": [
-                {
-                    "name": "NIM time-to-first-token regression",
-                    "metric": "time_to_first_token_seconds",
-                    "direction": "above",
-                    "threshold": 1.0,
-                    "severity": "Warning",
-                    "aggregation": "p95",
-                }
-            ],
-        },
-        "milvus-query-latency": {
-            "test_type": "ai-pod-milvus",
-            "detectors": [
-                {
-                    "name": "Milvus proxy req queue latency anomaly",
-                    "metric": "milvus_proxy_req_in_queue_latency",
-                    "direction": "above",
-                    "threshold": 1000,  # ms
-                    "severity": "Major",
-                    "aggregation": "p95",
-                }
-            ],
-        },
-        "portworx-node-offline": {
-            "test_type": "ai-pod-portworx",
-            "detectors": [
-                {
-                    "name": "Portworx node offline",
-                    "metric": "px_cluster_status_nodes_offline",
-                    "direction": "above",
-                    "threshold": 0,
-                    "severity": "Critical",
-                    "aggregation": "max",
-                }
-            ],
-        },
-        "trident-allocation-pressure": {
-            "test_type": "ai-pod-trident",
-            "detectors": [
-                {
-                    "name": "NetApp Trident volume allocation pressure",
-                    "metric": "trident_volume_allocated_bytes",
-                    "direction": "above",
-                    "threshold": 0,  # Set baseline; no default
-                    "severity": "Info",
-                    "aggregation": "delta",
-                }
-            ],
-        },
+        "api_version": "splunk-observability-native-ops/v1",
+        "realm": realm,
+        "detectors": [
+            {
+                "name": name,
+                "description": (
+                    f"Cisco AI Pod {aggregation} detector for {metric} in cluster {cluster_name}."
+                ),
+                "program_text": program_text,
+                "tags": ["cisco-ai-pod", aggregation],
+                "rules": [
+                    {
+                        "detect_label": detect_label,
+                        "severity": severity,
+                        "description": (
+                            f"{metric} is {direction} the reviewed threshold {threshold}."
+                        ),
+                        "notifications": [],
+                    }
+                ],
+            }
+        ],
     }
 
 
-def render_handoffs(spec: dict[str, Any], realm: str, cluster_name: str, distribution: str, hec_enabled: bool) -> dict[str, str]:
+def ai_pod_detector_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
+    del spec  # Reserved for future detector customization.
+    definitions = {
+        "vllm-error-rate": {
+            "name": "vLLM error rate spike",
+            "metric": "vllm:request_failure_total",
+            "direction": "above",
+            "threshold": 5,
+            "severity": "Major",
+            "aggregation": "rate",
+            "detect_label": "vllm_error_rate_spike",
+        },
+        "nim-ttft-regression": {
+            "name": "NIM time-to-first-token regression",
+            "metric": "time_to_first_token_seconds",
+            "direction": "above",
+            "threshold": 1.0,
+            "severity": "Warning",
+            "aggregation": "p95",
+            "detect_label": "nim_ttft_regression",
+        },
+        "milvus-query-latency": {
+            "name": "Milvus proxy req queue latency anomaly",
+            "metric": "milvus_proxy_req_in_queue_latency",
+            "direction": "above",
+            "threshold": 1000,
+            "severity": "Major",
+            "aggregation": "p95",
+            "detect_label": "milvus_query_latency",
+        },
+        "portworx-node-offline": {
+            "name": "Portworx node offline",
+            "metric": "px_cluster_status_nodes_offline",
+            "direction": "above",
+            "threshold": 0,
+            "severity": "Critical",
+            "aggregation": "max",
+            "detect_label": "portworx_node_offline",
+        },
+        "trident-allocation-pressure": {
+            "name": "NetApp Trident volume allocation pressure",
+            "metric": "trident_volume_allocated_bytes",
+            "direction": "above",
+            "threshold": 0,
+            "severity": "Info",
+            "aggregation": "delta",
+            "detect_label": "trident_allocation_pressure",
+        },
+    }
+    return {
+        key: _detector_spec(realm=realm, cluster_name=cluster_name, **definition)
+        for key, definition in definitions.items()
+    }
+
+
+def render_handoffs(
+    spec: dict[str, Any],
+    realm: str,
+    cluster_name: str,
+    distribution: str,
+    hec_enabled: bool,
+) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
+    realm_q = shlex.quote(str(realm))
+    cluster_name_q = shlex.quote(str(cluster_name))
+    distribution_q = shlex.quote(str(distribution))
     if handoffs.get("base_collector", True):
         helpers["handoff-base-collector.sh"] = (
             f"""#!/usr/bin/env bash
@@ -695,38 +799,48 @@ if ! command -v yq >/dev/null 2>&1; then
     exit 1
 fi
 
-OVERLAY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/splunk-otel-overlay/values.overlay.yaml"
+BUNDLE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="$BUNDLE_DIR/splunk-otel-overlay/values.overlay.yaml"
 BASE_OUTPUT_DIR="${{BASE_OUTPUT_DIR:-/tmp/splunk-observability-otel-rendered}}"
+REALM={realm_q}
+CLUSTER_NAME={cluster_name_q}
+DISTRIBUTION={distribution_q}
+printf -v BASE_OUTPUT_DIR_Q '%q' "$BASE_OUTPUT_DIR"
+printf -v BUNDLE_DIR_Q '%q' "$BUNDLE_DIR"
+printf -v OVERLAY_Q '%q' "$OVERLAY"
+printf -v REALM_Q '%q' "$REALM"
+printf -v CLUSTER_NAME_Q '%q' "$CLUSTER_NAME"
+printf -v DISTRIBUTION_Q '%q' "$DISTRIBUTION"
 
 echo "Step 1: Render base collector values."
 echo "    bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\\\"
-echo "      --render-k8s --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
-echo "      --output-dir ${{BASE_OUTPUT_DIR}}"
+echo "      --render-k8s --realm ${{REALM_Q}} --cluster-name ${{CLUSTER_NAME_Q}} --distribution ${{DISTRIBUTION_Q}} \\\\"
+echo "      --output-dir ${{BASE_OUTPUT_DIR_Q}}"
 echo
 echo "Step 2: Apply child manifests (Intersight namespace + manifests, optional DCGM patch)."
-echo "    bash $(dirname \\${{BASH_SOURCE[0]}})/../child-renders/splunk-observability-cisco-intersight-integration/scripts/apply-intersight-manifests.sh"
+echo "    bash ${{BUNDLE_DIR_Q}}/child-renders/splunk-observability-cisco-intersight-integration/scripts/apply-intersight-manifests.sh"
 echo "    # If DCGM patch enabled:"
-echo "    bash $(dirname \\${{BASH_SOURCE[0]}})/../child-renders/splunk-observability-nvidia-gpu-integration/scripts/apply-dcgm-pod-labels-patch.sh"
+echo "    bash ${{BUNDLE_DIR_Q}}/child-renders/splunk-observability-nvidia-gpu-integration/scripts/apply-dcgm-pod-labels-patch.sh"
 echo
 echo "Step 3: Merge overlay."
 echo "    yq eval-all '. as \\$item ireduce ({{}}; . * \\$item)' \\\\"
-echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
-echo "      ${{OVERLAY}} \\\\"
+echo "      ${{BASE_OUTPUT_DIR_Q}}/k8s/values.yaml \\\\"
+echo "      ${{OVERLAY_Q}} \\\\"
 echo "      > /tmp/merged-values.yaml"
 echo
 echo "Step 4: Apply via helm using --reuse-values --set-file token pattern (keeps the token off argv)."
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
-echo '      --set-file splunkObservability.accessToken=$O11Y_TOKEN_FILE'
+echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 echo
 echo "Step 5: OpenShift SCC (if applicable)."
-echo "    bash $(dirname \\${{BASH_SOURCE[0]}})/../openshift/scc.sh"
+echo "    bash ${{BUNDLE_DIR_Q}}/openshift/scc.sh"
 echo
 echo "For an existing Splunk OTel release, prefer the skill-owned apply path:"
 echo "    bash skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh \\\\"
 echo "      --render --apply-existing-collector --validate --live \\\\"
-echo "      --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
+echo "      --realm ${{REALM_Q}} --cluster-name ${{CLUSTER_NAME_Q}} --distribution ${{DISTRIBUTION_Q}} \\\\"
 echo "      --collector-release splunk-otel-collector --collector-namespace splunk-otel \\\\"
 echo '      --o11y-token-file "$O11Y_TOKEN_FILE"'
 echo "This removes stale receiver_creator/nvidia values and wires OTLP metrics before Helm upgrade."
@@ -734,6 +848,10 @@ echo "This removes stale receiver_creator/nvidia values and wires OTLP metrics b
         )
     if handoffs.get("hec_service", True) and hec_enabled:
         platform_logs = spec.get("splunk_platform_logs") or {}
+        hec_token_name_q = shlex.quote(
+            str(platform_logs.get("hec_token_name", "splunk_otel_ai_pod_logs"))
+        )
+        hec_index_q = shlex.quote(str(platform_logs.get("hec_index", "cisco_ai_pod")))
         # splunk-hec-service-setup uses --token-name (not --hec-token-name) and
         # requires --platform enterprise|cloud. Defaults assume Splunk Cloud
         # (Cisco AI Pod is typically deployed on OpenShift talking to a Splunk
@@ -745,12 +863,21 @@ set -euo pipefail
 # Provision the K8s container logs HEC token via splunk-hec-service-setup.
 # Set PLATFORM=enterprise or PLATFORM=cloud before running.
 PLATFORM="${{PLATFORM:-cloud}}"
+case "$PLATFORM" in
+    enterprise|cloud) ;;
+    *) echo "ERROR: PLATFORM must be enterprise or cloud." >&2; exit 2 ;;
+esac
+HEC_TOKEN_NAME={hec_token_name_q}
+HEC_INDEX={hec_index_q}
+printf -v PLATFORM_Q '%q' "$PLATFORM"
+printf -v HEC_TOKEN_NAME_Q '%q' "$HEC_TOKEN_NAME"
+printf -v HEC_INDEX_Q '%q' "$HEC_INDEX"
 echo "Run:"
 echo "    bash skills/splunk-hec-service-setup/scripts/setup.sh \\\\"
-echo "      --platform ${{PLATFORM}} --phase render \\\\"
-echo "      --token-name {platform_logs.get('hec_token_name', 'splunk_otel_ai_pod_logs')} \\\\"
-echo "      --default-index {platform_logs.get('hec_index', 'cisco_ai_pod')} \\\\"
-echo "      --allowed-indexes {platform_logs.get('hec_index', 'cisco_ai_pod')}"
+echo "      --platform ${{PLATFORM_Q}} --phase render \\\\"
+echo "      --token-name ${{HEC_TOKEN_NAME_Q}} \\\\"
+echo "      --default-index ${{HEC_INDEX_Q}} \\\\"
+echo "      --allowed-indexes ${{HEC_INDEX_Q}}"
 """
         )
     if handoffs.get("dashboard_builder", True):
@@ -759,15 +886,19 @@ echo "      --allowed-indexes {platform_logs.get('hec_index', 'cisco_ai_pod')}"
 set -euo pipefail
 DASHBOARDS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/dashboards"
 CHILD_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/child-renders"
+REALM={realm_q}
+printf -v REALM_Q '%q' "$REALM"
+printf -v DASHBOARDS_DIR_Q '%q' "$DASHBOARDS_DIR"
+printf -v CHILD_DIR_Q '%q' "$CHILD_DIR"
 echo "Import dashboards via splunk-observability-dashboard-builder:"
 echo "    # Component dashboards:"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-cisco-nexus-integration/scripts/handoff-dashboards.sh"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-cisco-intersight-integration/scripts/handoff-dashboards.sh"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-nvidia-gpu-integration/scripts/handoff-dashboards.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-cisco-nexus-integration/scripts/handoff-dashboards.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-cisco-intersight-integration/scripts/handoff-dashboards.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-nvidia-gpu-integration/scripts/handoff-dashboards.sh"
 echo "    # AI-Pod-specific dashboards:"
-echo "    for spec in \\${{DASHBOARDS_DIR}}/*.signalflow.yaml; do"
+echo "    for spec in ${{DASHBOARDS_DIR_Q}}/*.signalflow.yaml; do"
 echo "      bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \\\\"
-echo "        --render --apply --realm {realm} --spec \\$spec --token-file \\$O11Y_API_TOKEN_FILE"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
 echo "    done"
 """
         )
@@ -777,15 +908,19 @@ echo "    done"
 set -euo pipefail
 DETECTORS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/detectors"
 CHILD_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/child-renders"
+REALM={realm_q}
+printf -v REALM_Q '%q' "$REALM"
+printf -v DETECTORS_DIR_Q '%q' "$DETECTORS_DIR"
+printf -v CHILD_DIR_Q '%q' "$CHILD_DIR"
 echo "Apply detectors via splunk-observability-native-ops:"
 echo "    # Component detectors:"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-cisco-nexus-integration/scripts/handoff-detectors.sh"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-cisco-intersight-integration/scripts/handoff-detectors.sh"
-echo "    bash \\${{CHILD_DIR}}/splunk-observability-nvidia-gpu-integration/scripts/handoff-detectors.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-cisco-nexus-integration/scripts/handoff-detectors.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-cisco-intersight-integration/scripts/handoff-detectors.sh"
+echo "    bash ${{CHILD_DIR_Q}}/splunk-observability-nvidia-gpu-integration/scripts/handoff-detectors.sh"
 echo "    # AI-Pod-specific detectors:"
-echo "    for spec in \\${{DETECTORS_DIR}}/*.yaml; do"
+echo "    for spec in ${{DETECTORS_DIR_Q}}/*.yaml; do"
 echo "      bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
-echo "        --render --apply --realm {realm} --spec \\$spec --token-file \\$O11Y_API_TOKEN_FILE"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
 echo "    done"
 """
         )
@@ -967,9 +1102,9 @@ def main() -> int:
         write_text(out / "workshop/multi-tenant.sh", workshop_multi_tenant_script(spec), executable=True)
 
     # AI-Pod-specific dashboards + detectors.
-    for name, payload in ai_pod_dashboard_specs(spec).items():
+    for name, payload in ai_pod_dashboard_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"dashboards/{name}.signalflow.yaml", payload)
-    for name, payload in ai_pod_detector_specs(spec).items():
+    for name, payload in ai_pod_detector_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"detectors/{name}.yaml", payload)
 
     # Hand-off scripts.

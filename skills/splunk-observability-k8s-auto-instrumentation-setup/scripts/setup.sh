@@ -10,7 +10,6 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-k8s-auto-instrumentation-rendered"
-DEFAULT_SPEC="${SKILL_DIR}/template.example"
 
 usage() {
     cat <<'EOF'
@@ -31,7 +30,7 @@ Modes (pick one; render is default):
   --gitops-mode                   Render YAML only; skip apply helper scripts
 
 Identity:
-  --spec PATH                     YAML/JSON spec (default: template.example)
+  --spec PATH                     YAML/JSON spec (optional; CLI-only by default)
   --output-dir DIR                Rendered output directory
   --realm REALM                   Splunk O11y realm
   --cluster-name NAME             Cluster identity
@@ -44,13 +43,13 @@ Identity:
 
 Languages + CR config:
   --languages csv                 java,nodejs,python,dotnet,go,apache-httpd,nginx
-  --java-image URI                Override ghcr.io/signalfx/splunk-otel-java
-  --nodejs-image URI              Override ghcr.io/signalfx/splunk-otel-js
-  --python-image URI              Override ghcr.io/signalfx/splunk-otel-python
-  --dotnet-image URI              Override ghcr.io/signalfx/splunk-otel-dotnet
-  --go-image URI                  Override ghcr.io/signalfx/splunk-otel-go
-  --apache-httpd-image URI        Override apache-httpd instrumentation image
-  --nginx-image URI               Override nginx instrumentation image
+  --java-image URI                Digest-pinned Java image override
+  --nodejs-image URI              Digest-pinned Node.js image override
+  --python-image URI              Digest-pinned Python image override
+  --dotnet-image URI              Digest-pinned .NET image override
+  --go-image URI                  Digest-pinned Go image override
+  --apache-httpd-image URI        Digest-pinned Apache HTTPD image override
+  --nginx-image URI               Required digest-pinned Nginx image
   --extra-env LANG=KEY=VAL        Per-language extra env (repeatable)
   --resource-limits LANG=cpu=X,memory=Y  Per-language init container limits (repeatable)
 
@@ -63,7 +62,6 @@ Trace + runtime:
   --profiler-call-stack-interval-ms MS
   --runtime-metrics-enabled       SPLUNK_METRICS_ENABLED=true (Java + Node only)
   --use-labels-for-resource-attributes
-  --multi-instrumentation         Operator feature gate (required for >1 CR)
   --extra-resource-attr KEY=VAL   Repeatable
 
 Endpoint:
@@ -71,21 +69,17 @@ Endpoint:
   --gateway-endpoint URL          Required for eks/fargate
   --per-language-endpoint L=URL   Per-language HTTP OTLP override (repeatable)
 
-Operator + OBI:
-  --operator-watch-namespaces csv
-  --webhook-cert-mode MODE        auto | cert-manager | external
-  --installation-job-enabled BOOL
+OBI:
   --enable-obi
   --obi-namespaces csv
   --obi-exclude-namespaces csv
-  --obi-version VERSION
+  --obi-version VERSION           Rejected legacy tag-only input
+  --obi-image URI                 Required reviewed @sha256 OBI image
   --accept-obi-privileged
   --render-openshift-scc BOOL
 
-Image pull + vendor:
+Image pull:
   --image-pull-secret NAME
-  --detect-vendors                Scan for Datadog/New Relic/AppD/Dynatrace
-  --exclude-vendor csv
 
 Annotations:
   --annotate-namespace NS=csv     Namespace-level inject-<lang> (repeatable)
@@ -96,15 +90,16 @@ Target filter (apply/uninstall):
   --target Kind/NS/NAME           Repeatable
   --target-all                    Apply/uninstall all recorded workloads
   --purge-crs                     Uninstall: also delete every rendered CR
+  --purge-obi                     Uninstall: verify ownership then delete OBI resources
   --purge-backup                  Uninstall: delete backup ConfigMap
 
 Apply gates:
-  --accept-auto-instrumentation   Required for apply-annotations + uninstall
+  --accept-auto-instrumentation   Required for live CR/annotation apply + uninstall
   --kube-context CTX
+  --allow-current-context         Explicitly acknowledge kubectl's current context
 
 Backup:
   --backup-configmap NAME
-  --restore-from-backup
 
   --help                          Show this help
 
@@ -126,6 +121,15 @@ PY
 }
 
 # Mode flags
+RENDER_INPUT_PROVIDED="false"
+for token in "$@"; do
+    case "${token}" in
+        --spec|--realm|--cluster-name|--deployment-environment|--namespace|--instrumentation-cr-name|--distribution|--base-release|--base-namespace|--languages|--java-image|--nodejs-image|--python-image|--dotnet-image|--go-image|--apache-httpd-image|--nginx-image|--extra-env|--resource-limits|--propagators|--sampler|--sampler-argument|--profiling-enabled|--profiling-memory-enabled|--profiler-call-stack-interval-ms|--runtime-metrics-enabled|--use-labels-for-resource-attributes|--multi-instrumentation|--extra-resource-attr|--agent-endpoint|--gateway-endpoint|--per-language-endpoint|--operator-watch-namespaces|--webhook-cert-mode|--installation-job-enabled|--enable-obi|--obi-namespaces|--obi-exclude-namespaces|--obi-version|--obi-image|--render-openshift-scc|--image-pull-secret|--detect-vendors|--exclude-vendor|--annotate-namespace|--annotate-workload|--inventory-file|--backup-configmap|--restore-from-backup|--gitops-mode)
+            RENDER_INPUT_PROVIDED="true"
+            ;;
+    esac
+done
+
 MODE="render"
 DRY_RUN="false"
 JSON_OUTPUT="false"
@@ -133,13 +137,14 @@ EXPLAIN="false"
 GITOPS_MODE="false"
 DISCOVER_WORKLOADS="false"
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
-SPEC="${DEFAULT_SPEC}"
+SPEC=""
 
 # Flag pass-throughs collected into an array for render_assets.py.
 RENDER_ARGS=()
 ACCEPT_AUTO_INSTRUMENTATION="false"
 ACCEPT_OBI_PRIVILEGED="false"
 KUBE_CONTEXT=""
+ALLOW_CURRENT_CONTEXT="false"
 
 # Track --target / --target-all / --purge-* separately so the apply / uninstall
 # dispatch can forward them to the rendered scripts. They still flow to
@@ -147,6 +152,7 @@ KUBE_CONTEXT=""
 TARGET_ARGS=()
 TARGET_ALL="false"
 PURGE_CRS="false"
+PURGE_OBI="false"
 PURGE_BACKUP="false"
 
 # Accept the named flag and push straight to render args.
@@ -207,6 +213,7 @@ while [[ $# -gt 0 ]]; do
         --obi-namespaces) require_arg "$1" "$#" || exit 1; _pass --obi-namespaces "$2"; shift 2 ;;
         --obi-exclude-namespaces) require_arg "$1" "$#" || exit 1; _pass --obi-exclude-namespaces "$2"; shift 2 ;;
         --obi-version) require_arg "$1" "$#" || exit 1; _pass --obi-version "$2"; shift 2 ;;
+        --obi-image) require_arg "$1" "$#" || exit 1; _pass --obi-image "$2"; shift 2 ;;
         --accept-obi-privileged) ACCEPT_OBI_PRIVILEGED="true"; RENDER_ARGS+=(--accept-obi-privileged); shift ;;
         --render-openshift-scc) require_arg "$1" "$#" || exit 1; _pass --render-openshift-scc "$2"; shift 2 ;;
         --image-pull-secret) require_arg "$1" "$#" || exit 1; _pass --image-pull-secret "$2"; shift 2 ;;
@@ -218,13 +225,19 @@ while [[ $# -gt 0 ]]; do
         --target) require_arg "$1" "$#" || exit 1; RENDER_ARGS+=(--target "$2"); TARGET_ARGS+=(--target "$2"); shift 2 ;;
         --target-all) RENDER_ARGS+=(--target-all); TARGET_ALL="true"; shift ;;
         --purge-crs) RENDER_ARGS+=(--purge-crs); PURGE_CRS="true"; shift ;;
+        --purge-obi) RENDER_ARGS+=(--purge-obi); PURGE_OBI="true"; shift ;;
         --purge-backup) RENDER_ARGS+=(--purge-backup); PURGE_BACKUP="true"; shift ;;
         --accept-auto-instrumentation) ACCEPT_AUTO_INSTRUMENTATION="true"; RENDER_ARGS+=(--accept-auto-instrumentation); shift ;;
         --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; _pass --kube-context "$2"; shift 2 ;;
+        --allow-current-context) ALLOW_CURRENT_CONTEXT="true"; RENDER_ARGS+=(--allow-current-context); shift ;;
         --backup-configmap) require_arg "$1" "$#" || exit 1; _pass --backup-configmap "$2"; shift 2 ;;
         --restore-from-backup) RENDER_ARGS+=(--restore-from-backup); shift ;;
         --access-token|--token|--bearer-token|--api-token|--o11y-token|--sf-token|--hec-token|--platform-hec-token|--org-token|--api-key)
             reject_secret_arg "$1" "(this skill does not take tokens on argv; base collector owns ingest-token handling)"
+            exit 1
+            ;;
+        --access-token=*|--token=*|--bearer-token=*|--api-token=*|--o11y-token=*|--sf-token=*|--hec-token=*|--platform-hec-token=*|--org-token=*|--api-key=*)
+            reject_secret_arg "${1%%=*}" "(this skill does not take tokens on argv; base collector owns ingest-token handling)"
             exit 1
             ;;
         --help|-h) usage; exit 0 ;;
@@ -233,7 +246,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
-RENDER_ARGS=(--spec "${SPEC}" --output-dir "${OUTPUT_DIR}" --mode "${MODE}" "${RENDER_ARGS[@]}")
+RENDER_ARGS=(--output-dir "${OUTPUT_DIR}" --mode "${MODE}" "${RENDER_ARGS[@]}")
+if [[ -n "${SPEC}" ]]; then
+    RENDER_ARGS=(--spec "${SPEC}" "${RENDER_ARGS[@]}")
+fi
 if [[ "${DISCOVER_WORKLOADS}" == "true" ]]; then
     RENDER_ARGS+=(--discover-workloads)
 fi
@@ -246,6 +262,8 @@ fi
 # helper script.
 if [[ "${DRY_RUN}" == "true" && "${MODE}" == "render" ]]; then
     RENDER_ARGS+=(--dry-run)
+elif [[ "${DRY_RUN}" == "true" ]]; then
+    RENDER_ARGS+=(--operation-dry-run)
 fi
 if [[ "${JSON_OUTPUT}" == "true" ]]; then
     RENDER_ARGS+=(--json)
@@ -273,7 +291,17 @@ if [[ "${DISCOVER_WORKLOADS}" == "true" ]]; then
     exit 0
 fi
 
-"${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
+REUSE_RENDERED_PACKET="false"
+if [[ "${MODE}" != "render" && "${RENDER_INPUT_PROVIDED}" != "true" ]]; then
+    if [[ ! -f "${OUTPUT_DIR}/metadata.json" ]]; then
+        log "ERROR: No rendered packet exists at ${OUTPUT_DIR}; pass render inputs or run --render first."
+        exit 1
+    fi
+    REUSE_RENDERED_PACKET="true"
+fi
+if [[ "${REUSE_RENDERED_PACKET}" != "true" ]]; then
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
+fi
 
 # Render-only modes finish here. For apply / uninstall modes --dry-run flows
 # through to the rendered scripts so the operator can preview the cluster
@@ -286,6 +314,9 @@ fi
 COMMON_ARGS=()
 if [[ -n "${KUBE_CONTEXT}" ]]; then
     COMMON_ARGS+=(--kube-context "${KUBE_CONTEXT}")
+fi
+if [[ "${ALLOW_CURRENT_CONTEXT}" == "true" ]]; then
+    COMMON_ARGS+=(--allow-current-context)
 fi
 if [[ "${DRY_RUN}" == "true" ]]; then
     COMMON_ARGS+=(--dry-run)
@@ -302,6 +333,9 @@ case "${MODE}" in
             exit 1
         fi
         APPLY_ARGS=("${COMMON_ARGS[@]+"${COMMON_ARGS[@]}"}")
+        if [[ "${ACCEPT_AUTO_INSTRUMENTATION}" == "true" ]]; then
+            APPLY_ARGS+=(--accept-auto-instrumentation)
+        fi
         if [[ "${ACCEPT_OBI_PRIVILEGED}" == "true" ]]; then
             APPLY_ARGS+=(--accept-obi-privileged)
         fi
@@ -324,7 +358,8 @@ case "${MODE}" in
         fi
         if [[ "${TARGET_ALL}" == "true" ]]; then
             APPLY_ARGS+=(--target-all)
-        elif [[ ${#TARGET_ARGS[@]} -eq 0 ]]; then
+        elif [[ ${#TARGET_ARGS[@]} -eq 0 && "${PURGE_CRS}" != "true" \
+            && "${PURGE_OBI}" != "true" && "${PURGE_BACKUP}" != "true" ]]; then
             APPLY_ARGS+=(--target-all)
         fi
         bash "${SCRIPT}" "${APPLY_ARGS[@]}"
@@ -349,6 +384,9 @@ case "${MODE}" in
         fi
         if [[ "${PURGE_CRS}" == "true" ]]; then
             APPLY_ARGS+=(--purge-crs)
+        fi
+        if [[ "${PURGE_OBI}" == "true" ]]; then
+            APPLY_ARGS+=(--purge-obi)
         fi
         if [[ "${PURGE_BACKUP}" == "true" ]]; then
             APPLY_ARGS+=(--purge-backup)

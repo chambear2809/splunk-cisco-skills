@@ -445,7 +445,7 @@ def test_license_usage_report_rejects_bad_secret_file_permissions(tmp_path: Path
     )
 
     assert result.returncode == 2
-    assert "must be chmod 600" in result.stderr
+    assert "permissions must be 0600 or stricter" in result.stderr
 
 
 def test_license_usage_report_rejects_secret_value_as_file_path() -> None:
@@ -463,7 +463,7 @@ def test_license_usage_report_rejects_secret_value_as_file_path() -> None:
     )
 
     assert result.returncode == 2
-    assert "must point at a chmod-600 file" in result.stderr
+    assert "must point at an owner-only file" in result.stderr
     assert "inline secret" in result.stderr
 
 

@@ -24,6 +24,67 @@ GENERATED_FILES = {
     "status-cloud-acs.sh",
 }
 
+EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit(
+            f"ERROR: {label} cannot be read safely: O_NOFOLLOW/geteuid is unavailable"
+        )
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise SystemExit(
+            f"ERROR: {label} must be a readable, non-symlink regular file: {path}: {exc}"
+        )
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise SystemExit(f"ERROR: {label} must be a single-link regular file: {path}")
+        if before.st_uid != os.geteuid():
+            raise SystemExit(f"ERROR: {label} must be owned by the current user: {path}")
+        if mode & 0o077:
+            raise SystemExit(
+                f"ERROR: {label} permissions must be 0600 or stricter: {path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= 65536:
+            raise SystemExit(
+                f"ERROR: {label} size must be between 1 and 65536 bytes: {path}"
+            )
+        chunks = []
+        remaining = 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        before_fingerprint = (
+            before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_size,
+            before.st_mtime_ns, before.st_ctime_ns, before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev, after.st_ino, after.st_mode, after.st_uid, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns, after.st_nlink,
+        )
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: {label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"ERROR: {label} must contain UTF-8 text: {path}: {exc}")
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise SystemExit(
+            f"ERROR: {label} must contain exactly one non-empty line: {path}"
+        )
+    return lines[0].strip()
+'''
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk HEC service assets.")
@@ -303,26 +364,28 @@ case "${{target_role}}" in
     ;;
 esac
 
-if [[ -L "${{token_file}}" ]]; then
-  echo "ERROR: Refusing symlink HEC token file: ${{token_file}}" >&2
-  exit 1
-fi
-if [[ ! -s "${{token_file}}" ]]; then
-  mkdir -p "$(dirname "${{token_file}}")"
-  previous_umask="$(umask)"
-  umask 077
-  python3 - <<'PY' > "${{token_file}}"
+mkdir -p "$(dirname "${{token_file}}")"
+python3 - "${{token_file}}" <<'PY'
+import os
+import sys
 import uuid
-print(uuid.uuid4(), end="")
-PY
-  umask "${{previous_umask}}"
-fi
 
-if [[ ! -s "${{token_file}}" ]]; then
-  echo "ERROR: HEC token file is empty: ${{token_file}}" >&2
-  exit 1
-fi
-chmod 600 "${{token_file}}"
+path = os.path.expanduser(sys.argv[1])
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: cannot create the HEC token safely: O_NOFOLLOW is unavailable")
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+try:
+    descriptor = os.open(path, flags, 0o600)
+except FileExistsError:
+    raise SystemExit(0)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot create HEC token file {{path}}: {{exc}}")
+try:
+    os.write(descriptor, str(uuid.uuid4()).encode("ascii"))
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
 
 target_dir="${{splunk_home}}/etc/apps/${{app_name}}/local"
 target_file="${{target_dir}}/inputs.conf"
@@ -337,15 +400,16 @@ python3 - "${{token_file}}" inputs.conf.template "${{target_file}}" <<'PY'
 from pathlib import Path
 import os
 import re
+import stat
 import sys
 import tempfile
 
-token_path = Path(sys.argv[1])
+{EMBEDDED_PRIVATE_SECRET_READER}
+
+token_path = Path(sys.argv[1]).expanduser()
 template_path = Path(sys.argv[2])
 target_path = Path(sys.argv[3])
-token = token_path.read_text(encoding="utf-8").strip()
-if not token:
-    raise SystemExit(f"ERROR: token file is empty: {{token_path}}")
+token = read_private_secret(token_path, "HEC token file")
 try:
     import uuid
     uuid.UUID(token)

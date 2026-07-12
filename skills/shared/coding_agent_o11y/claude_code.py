@@ -79,6 +79,39 @@ GENAI_TOKEN_HISTOGRAM_BUCKETS = (
     67108864,
 )
 
+EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise ValueError(f"{label} cannot be read safely on this platform")
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_uid != os.geteuid() or mode & 0o077
+                or not 1 <= before.st_size <= 65536):
+            raise ValueError(f"{label} must be an owner-only, single-link regular file of at most 65536 bytes: {path}")
+        chunks, remaining = [], 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+        if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+            raise ValueError(f"{label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    lines = data.decode("utf-8").splitlines()
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise ValueError(f"{label} must contain exactly one non-empty UTF-8 line: {path}")
+    return lines[0].strip()
+'''
+
 MANAGED_ENV_PREFIXES = ("CLAUDE_CODE_", "OTEL_")
 # Managed env keys that do not share the CLAUDE_CODE_/OTEL_ prefixes but are still
 # owned by this skill (detailed beta tracing). Tracked explicitly so merge_settings_file
@@ -1663,12 +1696,16 @@ fi
 
 python3 - "${token_file}" <<'PY'
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 
+__PRIVATE_SECRET_READER__
+
 try:
-    header_value = Path(sys.argv[1]).read_text(encoding="utf-8").strip()
-except OSError:
+    header_value = read_private_secret(sys.argv[1], "Splunk Observability token file")
+except (OSError, UnicodeError, ValueError):
     print("{}")
     raise SystemExit(0)
 
@@ -1678,7 +1715,7 @@ if not header_value:
 
 print(json.dumps({"X-SF-TOKEN": header_value}))
 PY
-"""
+""".replace("__PRIVATE_SECRET_READER__", EMBEDDED_PRIVATE_SECRET_READER.rstrip())
 
 
 def render_galileo_handoff(config: dict[str, Any]) -> str:

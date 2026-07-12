@@ -106,6 +106,12 @@ python3 tests/check_skill_frontmatter.py
 python3 tests/check_repo_readiness.py
 ```
 
+For MCP changes, also run the focused contract suites:
+
+```bash
+pytest -q tests/test_agent_mcp_core.py tests/test_agent_mcp_discovery.py tests/test_agent_mcp_protocol.py
+```
+
 If the SCAN package is not present in your local `splunk-ta/` cache, the catalog
 freshness check may not be meaningful. In that case, say so in the pull request.
 
@@ -137,6 +143,9 @@ Also update:
 
 - `SKILL_UX_CATALOG.md` through its generator, plus `AGENTS.md` and
   `CLAUDE.md` skill catalogs
+- `skills/shared/skill_product_registry.json` with exactly one primary product
+  and capability assignment for the skill; keep each capability's skill list
+  alphabetized
 - `README.md` only when the operator entry flow, routing table, or repo-level
   docs links change
 - `.cursor/skills/<skill-name>` symlink

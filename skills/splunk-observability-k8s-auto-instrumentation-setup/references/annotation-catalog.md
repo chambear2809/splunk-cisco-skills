@@ -16,6 +16,10 @@ Every annotation below is placed at `spec.template.metadata.annotations` on a `D
 | `instrumentation.opentelemetry.io/inject-apache-httpd` | same shape | Apache HTTPD (`mod_otel_apache.so`) |
 | `instrumentation.opentelemetry.io/inject-nginx` | same shape | Nginx (`otel_ngx_module.so`) |
 
+The Operator accepts `"true"`, but this skill renders `<ns>/<crname>` even for
+the default CR. Explicit binding prevents a cross-namespace workload from
+silently searching its own namespace for a CR that lives in `splunk-otel`.
+
 ## Container selection
 
 | Annotation | Value |
@@ -39,8 +43,14 @@ kind: Namespace
 metadata:
   name: dev-java-services
   annotations:
-    instrumentation.opentelemetry.io/inject-java: "true"
+    instrumentation.opentelemetry.io/inject-java: "splunk-otel/splunk-otel-auto-instrumentation"
 ```
+
+Live validation treats every non-deleting, non-terminal pod as intended. A
+pod-level `"false"` is the only exclusion for that language and must have no
+stale injection artifacts. Another explicit pod-level CR binding overrides the
+namespace binding but remains in scope. `Succeeded`, `Failed`, and deleting
+pods are reported as excluded; a namespace with no active pods fails closed.
 
 ## Ordering and precedence
 
@@ -52,5 +62,5 @@ metadata:
 
 ## Opt-out recipes
 
-- Instrument every pod in a namespace except one: namespace annotation `inject-java: "true"` + the target pod's workload template annotation `inject-java: "false"`.
+- Instrument every pod in a namespace except one: namespace annotation `inject-java: "<ns>/<crname>"` + the target pod's workload template annotation `inject-java: "false"`.
 - Temporarily disable instrumentation for debugging: patch the pod template with `"false"`, `kubectl rollout restart`, then re-patch with `"true"` when done.

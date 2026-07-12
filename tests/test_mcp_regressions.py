@@ -1862,7 +1862,12 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                     "splunk-cisco-skills": {
                         "type": "stdio",
                         "command": "python3",
-                        "args": ["${workspaceFolder}/agent/run-splunk-cisco-skills-mcp.py"],
+                        "args": ["-I", "${workspaceFolder}/agent/run-splunk-cisco-skills-mcp.py"],
+                        "env": {
+                            "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION": "1",
+                            "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION": "0",
+                            "SPLUNK_SKILLS_MCP_ALLOW_MUTATION": "0",
+                        },
                     }
                 }
             },
@@ -2008,7 +2013,12 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                     "splunk-cisco-skills": {
                         "type": "stdio",
                         "command": "python3",
-                        "args": ["./agent/run-splunk-cisco-skills-mcp.py"],
+                        "args": ["-I", "./agent/run-splunk-cisco-skills-mcp.py"],
+                        "env": {
+                            "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION": "1",
+                            "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION": "0",
+                            "SPLUNK_SKILLS_MCP_ALLOW_MUTATION": "0",
+                        },
                     }
                 }
             },
