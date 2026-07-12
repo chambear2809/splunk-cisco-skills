@@ -111,6 +111,8 @@ ROUTING_FIXED_KEYS = frozenset(
         "GALILEO_TINYPROXY_EVIDENCE_FILE",
         "GALILEO_DESTINATION_FINGERPRINT",
         "GALILEO_QUEUE_STORAGE_DIRECTORY",
+        "GALILEO_COLLECTOR_BINARY",
+        "GALILEO_COLLECTOR_BINARY_SHA256",
     }
 )
 ROUTING_ID_KEYS = frozenset({"GALILEO_PROJECT_ID", "GALILEO_LOG_STREAM_ID"})
@@ -419,6 +421,10 @@ def validate_routing_environment_contract(
         environment["GALILEO_API_KEY_FILE"] != key["target"]
         or environment["GALILEO_TINYPROXY_EVIDENCE_FILE"] != evidence["target"]
         or environment["GALILEO_PROXY_URL"] != GALILEO_PROXY_URL
+        or environment["GALILEO_COLLECTOR_BINARY"]
+        != request["provenance"]["collector_binary"]
+        or environment["GALILEO_COLLECTOR_BINARY_SHA256"]
+        != request["provenance"]["collector_binary_sha256"]
     ):
         raise TransactionError(
             "invalid_routing_env", "routing environment paths are not bound"

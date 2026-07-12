@@ -202,6 +202,8 @@ def make_case(
                 f"GALILEO_TINYPROXY_EVIDENCE_FILE={config / 'galileo-evidence.json'}\n"
                 f"GALILEO_DESTINATION_FINGERPRINT={fingerprint}\n"
                 f"GALILEO_QUEUE_STORAGE_DIRECTORY={queue_base / fingerprint}\n"
+                f"GALILEO_COLLECTOR_BINARY={tx.COLLECTOR_BINARY_PATH}\n"
+                "GALILEO_COLLECTOR_BINARY_SHA256=" + "2" * 64 + "\n"
                 f"GALILEO_PROJECT_ID={project_id}\n"
                 f"GALILEO_LOG_STREAM_ID={log_stream_id}\n"
             ).encode(),
@@ -524,6 +526,8 @@ def test_routing_environment_rejects_unknown_loader_inline_key_and_comment(
         "wrong_evidence_path",
         "wrong_origin",
         "wrong_fingerprint",
+        "wrong_collector_binary",
+        "wrong_collector_sha256",
     ),
 )
 def test_routing_environment_rejects_noncanonical_or_unbound_values(
@@ -573,6 +577,16 @@ def test_routing_environment_rejects_noncanonical_or_unbound_values(
         text = text.replace(
             "GALILEO_EXPECTED_ORIGIN=https://api.example.invalid",
             "GALILEO_EXPECTED_ORIGIN=https://other.example.invalid",
+        )
+    elif mutation == "wrong_collector_binary":
+        text = text.replace(
+            f"GALILEO_COLLECTOR_BINARY={tx.COLLECTOR_BINARY_PATH}",
+            "GALILEO_COLLECTOR_BINARY=/usr/bin/alternate-otelcol",
+        )
+    elif mutation == "wrong_collector_sha256":
+        text = text.replace(
+            "GALILEO_COLLECTOR_BINARY_SHA256=" + "2" * 64,
+            "GALILEO_COLLECTOR_BINARY_SHA256=" + "0" * 64,
         )
     else:
         text = text.replace(fingerprint, "0" * 64, 1)

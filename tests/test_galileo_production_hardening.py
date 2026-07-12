@@ -369,6 +369,29 @@ def test_custom_collector_provenance_rejects_replacement(
         )
 
 
+def test_pinned_collector_command_opens_only_the_reviewed_binary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = load_module(
+        "galileo_wrapper_pinned_command_test",
+        SKILL / "scripts/collector_runtime_wrapper.py",
+    )
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.setattr(module, "descriptor_exec_supported", lambda: True)
+    binary = tmp_path / "collector"
+    binary.write_bytes(b"reviewed collector")
+    binary.chmod(0o700)
+    digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+    environment = {
+        "GALILEO_COLLECTOR_BINARY": str(binary),
+        "GALILEO_COLLECTOR_BINARY_SHA256": digest,
+    }
+    descriptor = module.open_pinned_collector_command([str(binary)], environment)
+    os.close(descriptor)
+    with pytest.raises(ValueError, match="does not match"):
+        module.open_pinned_collector_command(["/usr/bin/other"], environment)
+
+
 def test_linux_custom_collector_requires_trusted_path_chain(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

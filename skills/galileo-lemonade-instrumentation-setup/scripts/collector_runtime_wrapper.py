@@ -518,6 +518,30 @@ def descriptor_exec(
     raise ValueError("custom collector execution is unsupported on this platform")
 
 
+def open_pinned_collector_command(
+    command: list[str], environment: dict[str, str]
+) -> int:
+    """Open the one reviewed collector command that may receive the API key."""
+
+    if not command:
+        raise ValueError("a collector command is required")
+    raw_path = environment.get("GALILEO_COLLECTOR_BINARY", "")
+    expected_sha256 = environment.get("GALILEO_COLLECTOR_BINARY_SHA256", "")
+    if not raw_path or raw_path != raw_path.strip():
+        raise ValueError("GALILEO_COLLECTOR_BINARY is required")
+    if not SHA256.fullmatch(expected_sha256):
+        raise ValueError(
+            "GALILEO_COLLECTOR_BINARY_SHA256 must be a lowercase SHA-256 digest"
+        )
+    expected_path = trusted_executable_path(Path(raw_path))
+    if command[0] != str(expected_path):
+        raise ValueError("collector command does not match the reviewed binary")
+    if not descriptor_exec_supported():
+        raise ValueError("reviewed collector descriptor cannot be executed safely")
+    descriptor, _ = open_trusted_executable(expected_path, expected_sha256)
+    return descriptor
+
+
 def validate_galileo_proxy_url(value: str) -> tuple[str, str, int]:
     """Return the one supported exporter-local proxy URL and socket address."""
 
@@ -978,6 +1002,11 @@ def main() -> None:
     args = parser.parse_args()
 
     environment = dict(os.environ)
+    command = list(args.command)
+    if command and command[0] == "--":
+        command.pop(0)
+    if not (args.check or args.print_destination_fingerprint) and not command:
+        parser.error("a collector command is required after --")
     endpoint_raw = environment.get("GALILEO_OTLP_TRACES_ENDPOINT", "")
     key_path_raw = environment.get("GALILEO_API_KEY_FILE", "")
     endpoint = endpoint_raw.strip()
@@ -1014,6 +1043,9 @@ def main() -> None:
             environment.get("GALILEO_QUEUE_STORAGE_DIRECTORY", ""),
             declared_fingerprint,
         )
+        collector_descriptor = -1
+        if not args.check:
+            collector_descriptor = open_pinned_collector_command(command, environment)
         api_key = read_secret(Path(key_path))
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
@@ -1021,18 +1053,16 @@ def main() -> None:
     if args.check:
         print("Galileo collector runtime environment passed protected-file validation")
         return
-    command = list(args.command)
-    if command and command[0] == "--":
-        command.pop(0)
-    if not command:
-        parser.error("a collector command is required after --")
     environment = restricted_transport_environment(environment)
     environment["GALILEO_API_KEY"] = api_key
     environment.pop("GALILEO_API_KEY_FILE", None)
     try:
-        os.execvpe(command[0], command, environment)
+        descriptor_exec(collector_descriptor, command, environment)
     except Exception:
         raise SystemExit("ERROR: collector command could not be executed") from None
+    finally:
+        if collector_descriptor >= 0:
+            os.close(collector_descriptor)
 
 
 if __name__ == "__main__":

@@ -173,29 +173,117 @@ def preflight(
     return [(document, fetch(kube, document)) for document in documents]
 
 
-def apply_resources(
-    kube: list[str], states: list[tuple[dict[str, Any], dict[str, Any] | None]]
+def delete_with_preconditions(
+    kube: list[str], desired: dict[str, Any], metadata: dict[str, Any]
 ) -> None:
-    for desired, live in states:
-        payload = copy.deepcopy(desired)
-        if live is None:
-            run(
-                kube,
-                ["create", "-f", "-"],
-                stdin=json.dumps(payload, separators=(",", ":")),
-                allow_empty=True,
-            )
+    options = {
+        "apiVersion": "v1",
+        "kind": "DeleteOptions",
+        "preconditions": {
+            "uid": metadata["uid"],
+            "resourceVersion": metadata["resourceVersion"],
+        },
+        "propagationPolicy": "Foreground",
+    }
+    run(
+        kube,
+        ["delete", "--raw", raw_resource_path(desired), "-f", "-"],
+        stdin=json.dumps(options, separators=(",", ":")),
+        allow_empty=True,
+    )
+
+
+def rollback_replace_payload(
+    original: dict[str, Any], current_metadata: dict[str, Any]
+) -> dict[str, Any]:
+    """Return a replace-safe desired state for one exact pre-apply object."""
+
+    payload = copy.deepcopy(original)
+    payload.pop("status", None)
+    metadata = payload.setdefault("metadata", {})
+    for name in (
+        "creationTimestamp",
+        "deletionGracePeriodSeconds",
+        "deletionTimestamp",
+        "generation",
+        "managedFields",
+        "resourceVersion",
+        "selfLink",
+        "uid",
+    ):
+        metadata.pop(name, None)
+    metadata["uid"] = current_metadata["uid"]
+    metadata["resourceVersion"] = current_metadata["resourceVersion"]
+    return payload
+
+
+def rollback_applied_resources(
+    kube: list[str],
+    applied: list[tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any]]],
+) -> None:
+    """Undo only objects still at the UID/resourceVersion we just wrote."""
+
+    for desired, original, applied_live in reversed(applied):
+        current = fetch(kube, desired)
+        if current is None:
+            fail("managed resource disappeared before apply rollback")
+        current_metadata = current["metadata"]
+        applied_metadata = applied_live["metadata"]
+        if (
+            current_metadata["uid"] != applied_metadata["uid"]
+            or current_metadata["resourceVersion"]
+            != applied_metadata["resourceVersion"]
+        ):
+            fail("managed resource changed before apply rollback")
+        if original is None:
+            delete_with_preconditions(kube, desired, current_metadata)
+            if fetch(kube, desired) is not None:
+                fail("created managed resource remains after apply rollback")
             continue
-        live_metadata = live["metadata"]
-        payload_metadata = payload.setdefault("metadata", {})
-        payload_metadata["uid"] = live_metadata["uid"]
-        payload_metadata["resourceVersion"] = live_metadata["resourceVersion"]
+        payload = rollback_replace_payload(original, current_metadata)
         run(
             kube,
             ["replace", "-f", "-"],
             stdin=json.dumps(payload, separators=(",", ":")),
             allow_empty=True,
         )
+
+
+def apply_resources(
+    kube: list[str], states: list[tuple[dict[str, Any], dict[str, Any] | None]]
+) -> None:
+    applied: list[tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any]]] = []
+    try:
+        for desired, live in states:
+            payload = copy.deepcopy(desired)
+            if live is None:
+                run(
+                    kube,
+                    ["create", "-f", "-"],
+                    stdin=json.dumps(payload, separators=(",", ":")),
+                    allow_empty=True,
+                )
+            else:
+                live_metadata = live["metadata"]
+                payload_metadata = payload.setdefault("metadata", {})
+                payload_metadata["uid"] = live_metadata["uid"]
+                payload_metadata["resourceVersion"] = live_metadata["resourceVersion"]
+                run(
+                    kube,
+                    ["replace", "-f", "-"],
+                    stdin=json.dumps(payload, separators=(",", ":")),
+                    allow_empty=True,
+                )
+            observed = fetch(kube, desired)
+            if observed is None:
+                fail("managed resource is unavailable after apply")
+            applied.append((desired, live, observed))
+    except LifecycleError:
+        try:
+            rollback_applied_resources(kube, applied)
+        except LifecycleError:
+            fail("managed resource apply failed and rollback could not complete")
+        raise
 
 
 def raw_resource_path(document: dict[str, Any]) -> str:
@@ -221,21 +309,7 @@ def delete_resources(
         if live is None:
             continue
         metadata = live["metadata"]
-        options = {
-            "apiVersion": "v1",
-            "kind": "DeleteOptions",
-            "preconditions": {
-                "uid": metadata["uid"],
-                "resourceVersion": metadata["resourceVersion"],
-            },
-            "propagationPolicy": "Foreground",
-        }
-        run(
-            kube,
-            ["delete", "--raw", raw_resource_path(desired), "-f", "-"],
-            stdin=json.dumps(options, separators=(",", ":")),
-            allow_empty=True,
-        )
+        delete_with_preconditions(kube, desired, metadata)
 
     for desired, live in states:
         if live is None:
