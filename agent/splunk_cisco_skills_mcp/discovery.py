@@ -22,7 +22,9 @@ import stat
 import threading
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 import yaml
 
