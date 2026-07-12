@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -39,11 +40,8 @@ def run_setup(*args: str, cwd: Path | None = None) -> subprocess.CompletedProces
 
 
 def run_render(*args: str) -> subprocess.CompletedProcess[str]:
-    python = REPO_ROOT / ".venv/bin/python3"
-    if not python.exists():
-        python = Path("python3")
     return subprocess.run(
-        [str(python), str(RENDER), *args],
+        [sys.executable, str(RENDER), *args],
         cwd=REPO_ROOT,
         env=os.environ.copy(),
         text=True,
@@ -835,7 +833,7 @@ def test_obi_live_gate_and_safe_purge_contract(tmp_path: Path) -> None:
     env["OBI_DELETE_LOG"] = str(delete_log)
     helper = out / "k8s-instrumentation/obi-lifecycle.py"
     command = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(helper),
         "--mode",
         "validate",
@@ -2386,7 +2384,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     helper = out / "k8s-instrumentation/annotation-backup.py"
     capture = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "capture",
@@ -2413,7 +2411,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
 
     restore = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "restore-plan",
@@ -2442,7 +2440,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     (state / "configmap.json").write_text(json.dumps(configmap), encoding="utf-8")
     corrupt = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "restore-plan",
@@ -2464,7 +2462,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     (state / "workload.json").write_text("{broken", encoding="utf-8")
     invalid_workload = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "capture",
@@ -2699,7 +2697,7 @@ def test_managed_resource_apply_preflights_all_foreign_names_before_mutation(
     )
     kubectl.chmod(0o755)
     command = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(out / "k8s-instrumentation/managed-resource-lifecycle.py"),
         "--mode",
         "apply",
@@ -2755,7 +2753,7 @@ def test_managed_resource_replace_and_delete_use_uid_rv_preconditions(
     )
     kubectl.chmod(0o755)
     base = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(out / "k8s-instrumentation/managed-resource-lifecycle.py"),
         "--manifest",
         str(manifest),
@@ -2847,7 +2845,7 @@ def test_backup_purge_requires_exact_target_all_key_coverage(tmp_path: Path) -> 
     kubectl.chmod(0o755)
     helper = out / "k8s-instrumentation/annotation-backup.py"
     base = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(helper),
         "--mode",
         "purge",

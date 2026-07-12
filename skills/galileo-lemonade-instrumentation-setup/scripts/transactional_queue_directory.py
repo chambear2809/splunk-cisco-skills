@@ -177,7 +177,20 @@ def assert_trusted_path(
             raise TransactionError(
                 "unsafe_path", f"{label} ancestor is not a directory"
             )
-        if info.st_uid not in {0, owner_uid} or stat.S_IMODE(info.st_mode) & 0o022:
+        mode = stat.S_IMODE(info.st_mode)
+        # A root-owned sticky directory such as /tmp is safe solely as an
+        # already-existing traversal ancestor: sticky semantics prevent an
+        # untrusted principal from replacing another owner's descendant.
+        sticky_root_ancestor = (
+            index < last
+            and stat.S_ISDIR(info.st_mode)
+            and info.st_uid == 0
+            and bool(info.st_mode & stat.S_ISVTX)
+        )
+        if (
+            not sticky_root_ancestor
+            and (info.st_uid not in {0, owner_uid} or mode & 0o022)
+        ):
             raise TransactionError(
                 "unsafe_path",
                 f"{label} ancestors must be trusted and not writable by group/other",
