@@ -987,15 +987,16 @@ def load_manifest(path: Path, *, owner_uid: int) -> tuple[dict[str, Any], bytes]
 
 
 def validate_queue_identity(value: Any, fingerprint: str) -> dict[str, Any]:
-    keys = {"device", "inode", "uid", "gid", "mode", "fingerprint"}
+    required_keys = {"device", "inode", "uid", "gid", "mode", "fingerprint"}
+    current_keys = required_keys | {"ctime_ns"}
     if (
         not isinstance(value, dict)
-        or set(value) != keys
+        or (set(value) != required_keys and set(value) != current_keys)
         or value.get("fingerprint") != fingerprint
     ):
         raise TransactionError("invalid_state", "created queue identity is invalid")
     result: dict[str, Any] = {"fingerprint": fingerprint}
-    for key in keys - {"fingerprint"}:
+    for key in set(value) - {"fingerprint"}:
         item = value[key]
         if isinstance(item, bool) or not isinstance(item, int) or item < 0:
             raise TransactionError("invalid_state", "created queue identity is invalid")
@@ -1200,6 +1201,7 @@ def queue_identity(path: Path, fingerprint: str) -> dict[str, Any]:
         "uid": info.st_uid,
         "gid": info.st_gid,
         "mode": stat.S_IMODE(info.st_mode),
+        "ctime_ns": info.st_ctime_ns,
         "fingerprint": fingerprint,
     }
 
@@ -1259,6 +1261,7 @@ def create_queue(
             "uid": info.st_uid,
             "gid": info.st_gid,
             "mode": stat.S_IMODE(info.st_mode),
+            "ctime_ns": info.st_ctime_ns,
             "fingerprint": fingerprint,
         }
     except FileExistsError as exc:
@@ -1296,6 +1299,8 @@ def exact_created_queue(path: Path, expected: Mapping[str, Any]) -> bool:
         and info.st_uid == expected["uid"]
         and info.st_gid == expected["gid"]
         and stat.S_IMODE(info.st_mode) == expected["mode"] == 0o700
+        and isinstance(expected.get("ctime_ns"), int)
+        and info.st_ctime_ns == expected["ctime_ns"]
         and path.name == expected["fingerprint"]
     )
 
@@ -1316,6 +1321,8 @@ def queue_is_empty_and_stable(path: Path, expected: Mapping[str, Any]) -> bool:
             or before.st_uid != expected["uid"]
             or before.st_gid != expected["gid"]
             or stat.S_IMODE(before.st_mode) != 0o700
+            or not isinstance(expected.get("ctime_ns"), int)
+            or before.st_ctime_ns != expected["ctime_ns"]
         ):
             return False
         entries = os.listdir(descriptor)
@@ -1326,12 +1333,14 @@ def queue_is_empty_and_stable(path: Path, expected: Mapping[str, Any]) -> bool:
             before.st_uid,
             before.st_gid,
             stat.S_IMODE(before.st_mode),
+            before.st_ctime_ns,
         ) == (
             after.st_dev,
             after.st_ino,
             after.st_uid,
             after.st_gid,
             stat.S_IMODE(after.st_mode),
+            after.st_ctime_ns,
         )
     finally:
         os.close(descriptor)

@@ -173,6 +173,7 @@ def test_apply_creates_exact_destination_bound_private_queue(
         "uid": info.st_uid,
         "gid": info.st_gid,
         "mode": 0o700,
+        "ctime_ns": info.st_ctime_ns,
         "fingerprint": FINGERPRINT,
     }
 
