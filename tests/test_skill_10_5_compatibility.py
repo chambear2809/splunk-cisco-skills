@@ -24,12 +24,12 @@ def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
     payload = load_audit_module().audit()
     assert payload["ok"], payload["findings"]
     assert payload["target"] == "10.5.2605"
-    assert payload["skill_count"] == 168
+    assert payload["skill_count"] == 169
     assert payload["status_counts"] == {
         "blocked": 0,
         "conditional": 95,
         "delegated": 5,
-        "not-applicable": 55,
+        "not-applicable": 56,
         "self-managed-10.4": 10,
         "supported": 3,
     }

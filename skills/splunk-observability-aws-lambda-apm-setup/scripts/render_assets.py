@@ -1117,7 +1117,7 @@ def fingerprint(info: os.stat_result) -> tuple[int, ...]:
 def read_bounded(descriptor: int) -> bytes:
     chunks: list[bytes] = []
     total = 0
-    while True:
+    while total <= MAX_SECRET_BYTES:
         chunk = os.read(descriptor, min(8192, MAX_SECRET_BYTES + 1 - total))
         if not chunk:
             return b"".join(chunks)
@@ -1125,6 +1125,7 @@ def read_bounded(descriptor: int) -> bytes:
         total += len(chunk)
         if total > MAX_SECRET_BYTES:
             fail(f"exceeds the {MAX_SECRET_BYTES}-byte limit")
+    fail(f"exceeds the {MAX_SECRET_BYTES}-byte limit")
 
 
 if not hasattr(os, "O_NOFOLLOW"):

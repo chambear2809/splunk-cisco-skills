@@ -1,17 +1,13 @@
 ---
 name: splunk-microsoft-cloud-setup
-description: >-
-  Install, render, configure, and validate the Splunk add-ons for Microsoft
-  cloud telemetry: the Splunk Add-on for Microsoft Office 365 (splunk_ta_o365,
-  Splunkbase 4055) and the Splunk Add-on for Microsoft Cloud Services
-  (Splunk_TA_microsoft-cloudservices, Splunkbase 3110). Renders real
-  inputs.conf stanzas for Office 365 Management Activity (Entra/Azure AD,
-  Exchange, SharePoint, General, DLP), Microsoft Graph Entra ID metadata, and
-  Azure audit, emits an Entra app-registration account runbook, creates the
-  o365 and azure indexes, maps source types to CIM, and validates ingestion.
-  Use when the user asks about Splunk_TA_o365, Office 365, Microsoft 365, Entra
-  ID, Azure AD audit/sign-in, Microsoft Graph, Splunk Add-on for Microsoft
-  Cloud Services, or Microsoft cloud log onboarding in Splunk.
+description: "Use when the user asks about Splunk_TA_o365, Office 365, Microsoft 365, Entra ID, Azure AD audit/sign-
+  in, Microsoft Graph, Splunk Add-on for Microsoft Cloud Services, or Microsoft cloud log onboarding in
+  Splunk. Install, render, configure, and validate the Splunk add-ons for Microsoft cloud telemetry: the
+  Splunk Add-on for Microsoft Office 365 (splunk_ta_o365, Splunkbase 4055) and the Splunk Add-on for
+  Microsoft Cloud Services (Splunk_TA_microsoft-cloudservices, Splunkbase 3110). Renders real inputs.conf
+  stanzas for Office 365 Management Activity (Entra/Azure AD, Exchange, SharePoint, General, DLP),
+  Microsoft Graph Entra ID metadata, and Azure audit, emits an Entra app-registration account runbook,
+  creates the o365 and azure indexes, maps source types to CIM, and validates ingestion."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -19,6 +15,64 @@ metadata:
 ---
 
 # Microsoft Cloud Add-ons Setup (Office 365, Entra ID, Graph)
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Splunk_TA_o365, Office 365, Microsoft 365, Entra ID, Azure AD audit/sign-in, Microsoft Graph, Splunk Add-on for
+  Microsoft Cloud Services, or Microsoft cloud log onboarding in Splunk.
+- Preview and review the splunk microsoft cloud setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-microsoft-cloud-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-microsoft-cloud-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## TA Completion Gate
 

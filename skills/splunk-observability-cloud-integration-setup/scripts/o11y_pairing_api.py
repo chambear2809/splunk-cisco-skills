@@ -285,22 +285,30 @@ def _poll_pairing_status(
     if timeout_seconds <= 0 or interval_seconds <= 0:
         raise ValueError("pairing poll timeout and interval must be positive")
     deadline = time.monotonic() + timeout_seconds
-    while True:
+    current = status(
+        pairing_id=pairing_id,
+        admin_token_file=admin_token_file,
+        splunk_cloud_stack=splunk_cloud_stack,
+        splunk_cloud_admin_jwt_file=splunk_cloud_admin_jwt_file,
+    )
+    while (
+        current["pairing_status"] == "IN_PROGRESS"
+        and time.monotonic() < deadline
+    ):
+        time.sleep(min(interval_seconds, max(0.0, deadline - time.monotonic())))
         current = status(
             pairing_id=pairing_id,
             admin_token_file=admin_token_file,
             splunk_cloud_stack=splunk_cloud_stack,
             splunk_cloud_admin_jwt_file=splunk_cloud_admin_jwt_file,
         )
-        if current["pairing_status"] in {"SUCCESS", "FAILED"}:
-            return current
-        if time.monotonic() >= deadline:
-            return {
-                **current,
-                "pairing_status": "IN_PROGRESS",
-                "timed_out": True,
-            }
-        time.sleep(min(interval_seconds, max(0.0, deadline - time.monotonic())))
+    if current["pairing_status"] in {"SUCCESS", "FAILED"}:
+        return current
+    return {
+        **current,
+        "pairing_status": "IN_PROGRESS",
+        "timed_out": True,
+    }
 
 
 def status(

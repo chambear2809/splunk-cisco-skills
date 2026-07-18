@@ -1,15 +1,12 @@
 ---
 name: splunk-microsoft-security-ta-setup
-description: >-
-  Install, render, configure, and validate the Splunk Add-on for Microsoft
-  Security (Splunk_TA_MS_Security, Splunkbase 6207). Renders package-backed
-  Defender incidents, endpoint alerts, machines, simulations, Event Hub /
-  Advanced Hunting, and Threat Intelligence inputs; emits Entra app account
-  runbooks, Splunk Cloud UI-only and Event Hub egress caveats, macros for
-  package dashboards/searches, migration notes, and validation SPL. Use for
-  Microsoft 365 Defender, Defender for Endpoint, Microsoft Security, or
-  Splunk_TA_MS_Security onboarding. Use when the user asks to onboard,
-  configure, render, or validate Microsoft Security / Defender data in Splunk.
+description: "Use when the user asks to onboard, configure, render, or validate Microsoft Security / Defender data in
+  Splunk. Install, render, configure, and validate the Splunk Add-on for Microsoft Security
+  (Splunk_TA_MS_Security, Splunkbase 6207). Renders package-backed Defender incidents, endpoint alerts,
+  machines, simulations, Event Hub / Advanced Hunting, and Threat Intelligence inputs; emits Entra app
+  account runbooks, Splunk Cloud UI-only and Event Hub egress caveats, macros for package
+  dashboards/searches, migration notes, and validation SPL. Use for Microsoft 365 Defender, Defender for
+  Endpoint, Microsoft Security, or Splunk_TA_MS_Security onboarding."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -17,6 +14,63 @@ metadata:
 ---
 
 # Splunk Add-on for Microsoft Security Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Onboard, configure, render, or validate Microsoft Security / Defender data in Splunk.
+- Preview and review the splunk microsoft security ta setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-microsoft-security-ta-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-microsoft-security-ta-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## TA Completion Gate
 

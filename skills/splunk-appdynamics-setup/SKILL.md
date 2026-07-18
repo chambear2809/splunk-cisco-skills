@@ -1,18 +1,14 @@
 ---
 name: splunk-appdynamics-setup
-description: >-
-  Coverage-first parent router for the Splunk AppDynamics skill suite. Resolves
-  AppDynamics SaaS, On-Premises, Virtual Appliance, SAP Agent, APM, agents,
-  Smart Agent, Cluster Agent, Infrastructure Visibility, Database Visibility,
-  Analytics, EUM, Synthetic Monitoring, Log Observer Connect, Controller/admin,
-  alerting, dashboards/reports, ThousandEyes integration, tags, extensions,
-  Sensitive Data Collection and Security, release notes and references, product
-  announcements, AIML, GPU Monitoring, Splunk AppDynamics for OpenTelemetry,
-  Secure Application, Observability for AI, and Splunk Platform integration
-  requests to the owning child skill, then emits a machine-readable coverage
-  report from the checked-in taxonomy. Use when the user asks for AppDynamics
-  setup, AppDynamics coverage, AppDynamics product routing, or a full
-  AppDynamics doctor/gap report.
+description: "Use when the user asks for AppDynamics setup, AppDynamics coverage, AppDynamics product routing, or a
+  full AppDynamics doctor/gap report. Coverage-first parent router for the Splunk AppDynamics skill suite.
+  Resolves AppDynamics SaaS, On-Premises, Virtual Appliance, SAP Agent, APM, agents, Smart Agent, Cluster
+  Agent, Infrastructure Visibility, Database Visibility, Analytics, EUM, Synthetic Monitoring, Log
+  Observer Connect, Controller/admin, alerting, dashboards/reports, ThousandEyes integration, tags,
+  extensions, Sensitive Data Collection and Security, release notes and references, product announcements,
+  AIML, GPU Monitoring, Splunk AppDynamics for OpenTelemetry, Secure Application, Observability for AI,
+  and Splunk Platform integration requests to the owning child skill, then emits a machine-readable
+  coverage report from the checked-in taxonomy."
 compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
 metadata:
   splunk_cloud_10_5: "delegated"
@@ -20,6 +16,64 @@ metadata:
 ---
 
 # Splunk AppDynamics Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- The user asks for AppDynamics setup, AppDynamics coverage, AppDynamics product routing, or a full AppDynamics
+  doctor/gap report.
+- Preview and review the splunk appdynamics setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-appdynamics-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-appdynamics-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This is the parent router for the AppDynamics suite. It does not mutate a
 Controller, Kubernetes cluster, host, SAP system, or Splunk deployment directly.

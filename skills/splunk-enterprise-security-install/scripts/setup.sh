@@ -773,9 +773,9 @@ deploy_ta_for_indexers() {
     if [[ -z "${cm_profile}" ]]; then
         log "  FAIL: SPLUNK_CLUSTER_MANAGER_PROFILE is not configured in the credentials file."
         log "        Manual handoff (not executed):"
-        log "          1. scp <generated>.spl <cm-host>:\$SPLUNK_HOME/etc/manager-apps/"
-        log "          2. ssh <cm-host> 'cd \$SPLUNK_HOME/etc/manager-apps && tar -xzf <package> && rm <package>'"
-        log "          3. ssh <cm-host> '\$SPLUNK_HOME/bin/splunk apply cluster-bundle --answer-yes'"
+        log "          1. Generate and inspect Splunk_TA_ForIndexers with --generate-ta-for-indexers DIR."
+        log "          2. Stage the verified Splunk_TA_ForIndexers directory under \$SPLUNK_HOME/etc/manager-apps/."
+        log "          3. Validate, then apply the cluster bundle through the cluster-manager workflow."
         return 2
     fi
     # Reject silent target mismatch: CM_URI host must match the profile's host.

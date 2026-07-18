@@ -166,8 +166,8 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         rule_ids = [item["id"] for item in doctor.RULE_CATALOG]
         self.assertEqual(rule_ids, sorted(set(rule_ids)))
         self.assertTrue(set(LEGACY_RULE_IDS).issubset(rule_ids))
-        self.assertEqual(validation["repository_skill_count"], 168)
-        self.assertEqual(validation["routed_repository_skill_count"], 168)
+        self.assertEqual(validation["repository_skill_count"], 169)
+        self.assertEqual(validation["routed_repository_skill_count"], 169)
         self.assertEqual(validation["unmapped_skills"], [])
         self.assertTrue(
             {

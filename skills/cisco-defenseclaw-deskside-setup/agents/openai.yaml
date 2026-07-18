@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cisco DefenseClaw Deskside"
+  short_description: "Deploy DefenseClaw on Lemonade desksides"
+  default_prompt: "Use $cisco-defenseclaw-deskside-setup to deploy and verify DefenseClaw on a Lemonade deskside."

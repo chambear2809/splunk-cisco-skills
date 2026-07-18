@@ -1,15 +1,12 @@
 ---
 name: splunk-observability-database-monitoring-setup
-description: >-
-  Render, validate, apply, verify, and roll back production Splunk
-  Observability Cloud Database Monitoring configurations for Microsoft SQL
-  Server, MySQL, MariaDB, Oracle Database, and PostgreSQL through the Splunk
-  Distribution of OpenTelemetry Collector. Covers Kubernetes, Linux, and
-  Windows outputs; query samples and top queries; infrastructure metrics;
-  product UI validation; APM query correlation handoffs; and DBMon query AI
-  Assistant readiness. Use when handling DBMon receiver setup, database query analysis,
-  explain-plan readiness, or database collector lifecycle work, including
-  version-aware MySQL and MariaDB feature gaps.
+description: "Use when handling DBMon receiver setup, database query analysis, explain-plan readiness, or database
+  collector lifecycle work, including version-aware MySQL and MariaDB feature gaps. Render, validate,
+  apply, verify, and roll back production Splunk Observability Cloud Database Monitoring configurations
+  for Microsoft SQL Server, MySQL, MariaDB, Oracle Database, and PostgreSQL through the Splunk
+  Distribution of OpenTelemetry Collector. Covers Kubernetes, Linux, and Windows outputs; query samples
+  and top queries; infrastructure metrics; product UI validation; APM query correlation handoffs; and
+  DBMon query AI Assistant readiness."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -19,6 +16,64 @@ metadata:
 ---
 
 # Splunk Observability Database Monitoring Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Handling DBMon receiver setup, database query analysis, explain-plan readiness, or database collector lifecycle
+  work, including version-aware MySQL and MariaDB feature gaps.
+- Preview and review the splunk observability database monitoring setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 Use this skill to take DBMon from a reviewed target specification through a
 validated collector deployment and product evidence. Render first. Apply only

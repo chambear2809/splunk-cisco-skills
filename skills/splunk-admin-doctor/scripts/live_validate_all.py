@@ -934,7 +934,7 @@ def run_command(
         _terminate_process(process, force=False)
 
     try:
-        while True:
+        while process.poll() is None or selector.get_map():
             now = time.monotonic()
             if _stop_requested():
                 begin_termination("interrupted")
@@ -976,7 +976,9 @@ def run_command(
             events = selector.select(wait_for)
             for key, _mask in events:
                 stream = key.fileobj
-                while True:
+                # Bound each drain pass so a continuously writing child cannot
+                # starve timeout and interrupt checks in the outer loop.
+                for _read_attempt in range(16):
                     try:
                         chunk = os.read(stream.fileno(), 65536)
                     except BlockingIOError:

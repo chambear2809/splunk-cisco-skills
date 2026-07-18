@@ -1,18 +1,14 @@
 ---
 name: splunk-observability-aws-integration
-description: >-
-  Render, preflight, apply, validate, discover, and diagnose the Splunk
-  Observability Cloud AWSCloudWatch integration across polling, Splunk-managed
-  Metric Streams, AWS-managed Metric Streams, and Terraform paths. Covers IAM
-  trust and policy stubs, External ID and SecurityToken auth, CloudFormation
-  and StackSets assets, Terraform payloads, field conflict checks, recommended
-  stats, namespace sync rules, PrivateLink ingest stubs, drift adoption, and
-  troubleshooting. Use when the user asks to connect AWS to Splunk Observability
-  Cloud, configure CloudWatch Metric Streams, render IAM policies, manage the
-  AWSCloudWatch REST/Terraform object, monitor Bedrock metrics, set up
-  multi-account AWS Organizations onboarding, audit drift, or migrate polling
-  to Metric Streams. Hand off Lambda APM, AWS logs, dashboards, detectors, and
-  EC2/EKS host telemetry to their owning skills.
+description: "Use when the user asks to connect AWS to Splunk Observability Cloud, configure CloudWatch Metric
+  Streams, render IAM policies, manage the AWSCloudWatch REST/Terraform object, monitor Bedrock metrics,
+  set up multi-account AWS Organizations onboarding, audit drift, or migrate polling to Metric Streams.
+  Hand off Lambda APM, AWS logs, dashboards, detectors, and EC2/EKS host telemetry to their owning skills.
+  Render, preflight, apply, validate, discover, and diagnose the Splunk Observability Cloud AWSCloudWatch
+  integration across polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform
+  paths. Covers IAM trust and policy stubs, External ID and SecurityToken auth, CloudFormation and
+  StackSets assets, Terraform payloads, field conflict checks, recommended stats, namespace sync rules,
+  PrivateLink ingest stubs, drift adoption, and troubleshooting."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -20,6 +16,65 @@ metadata:
 ---
 
 # Splunk Observability Cloud <-> AWS Integration
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Connect AWS to Splunk Observability Cloud, configure CloudWatch Metric Streams, render IAM policies, manage the
+  AWSCloudWatch REST/Terraform object, monitor Bedrock metrics, set up multi-account AWS Organizations onboarding,
+  audit drift,.
+- Preview and review the splunk observability aws integration workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-aws-integration/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-aws-integration/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 Render-first skill that owns the entire `AWSCloudWatch` integration object in
 Splunk Observability Cloud. The skill is **standalone reusable** and does not

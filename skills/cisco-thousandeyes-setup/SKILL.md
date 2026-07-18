@@ -1,19 +1,73 @@
 ---
 name: cisco-thousandeyes-setup
-description: >-
-  Automate Cisco ThousandEyes App for Splunk (ta_cisco_thousandeyes) setup and
-  configuration. Handles OAuth 2.0 device code authentication, HEC token
-  management, index creation, streaming and polling data inputs, and optional
-  ITSI integration. Use when the user asks about ThousandEyes, network
-  monitoring, path visualization, CEA tests, endpoint tests, or
-  ta_cisco_thousandeyes.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring ThousandEyes OAuth, HEC, streaming or polling inputs, dashboards, or ITSI in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco ThousandEyes App Setup Automation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Create indexes, HEC, accounts, and inputs | Confirm search-tier REST access |
+| ThousandEyes account-group access | Authorize OAuth and selected test data | Record the numeric account-group ID |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌────────────────────┐
+│ Preflight │ → │ Configure auth │ → │ Enable data path │ → │ Validate dashboards │
+└───────────┘   └────────────────┘   └──────────────────┘   └────────────────────┘
+```
+
+## When to Activate
+
+- Configure ThousandEyes OAuth, HEC streaming, or API polling in Splunk.
+- Onboard cloud, enterprise-agent, or endpoint test results.
+- Diagnose missing path data, empty dashboards, or optional ITSI readiness.
+
+## Scope
+
+This skill configures the Splunk application and its data paths. It does not
+create ThousandEyes tests, expose OAuth or HEC tokens in chat, or enable both
+streaming and polling for the same data without duplicate-ingest review.
+
+## Examples
+
+Run preflight diagnostics before authentication:
+
+```bash
+bash skills/cisco-thousandeyes-setup/scripts/validate.sh
+```
+
+Expected output: package, local tools, Splunk access, and account prerequisites
+are reported without creating tokens or inputs.
+
+Run strict completion checks after enabling the selected path:
+
+```bash
+bash skills/cisco-thousandeyes-setup/scripts/validate.sh --completion
+```
+
+Expected output: account, HEC or polling input, index, source type, recent data,
+and dashboard evidence report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Device flow expires | Approval timed out | Restart and approve promptly |
+| No HEC events | Token, endpoint, or index is wrong | Verify without printing token |
+| Duplicate test events | Streaming and polling overlap | Keep one path per dataset |
+| Empty dashboards/ITSI | Index, macro, or type is wrong | Validate events first |
 
 ## TA Completion Gate
 

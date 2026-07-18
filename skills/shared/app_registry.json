@@ -2380,6 +2380,18 @@
       "notes": "Lemonade Server host and native OpenTelemetry foundation for Debian and AMD Ryzen AI systems. Owns upgrade safety, privacy controls, loopback OTLP, full-config rendering, validation, and rollback through an external Splunk OTel Collector."
     },
     {
+      "skill": "cisco-defenseclaw-deskside-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "DefenseClaw lifecycle for a self-managed Linux Lemonade deskside. Installs signed Cisco releases, selects a loopback local model, configures Codex hooks and guardrails, and validates the gateway without Splunk Platform tier placement."
+    },
+    {
       "skill": "galileo-agent-control-setup",
       "role_support": {
         "search-tier": "none",

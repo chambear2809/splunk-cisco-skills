@@ -1,20 +1,15 @@
 ---
 name: splunk-observability-thousandeyes-integration
-description: >-
-  Render and (optionally) apply a guarded ThousandEyes -> Splunk Observability
-  Cloud integration end-to-end: Integration 1.0 OpenTelemetry metric stream
-  (POST /v7/streams to ingest.<realm>.signalfx.com/v2/datapoint/otlp),
-  Integrations 2.0 Splunk Observability APM connector (generic connector +
-  splunk-observability-apm operation), plus verified create/readback flows for
-  tests, alert rules, and TE Templates. Renders labels, tags, and TE-side
-  dashboards as reviewable handoffs until authoritative API ID/readback
-  schemas are encoded. Covers the canonical TE
-  OpenTelemetry Data Model v2 taxonomy. Generates SignalFlow dashboard specs
-  and starter detectors for hand-off to splunk-observability-dashboard-builder
-  and splunk-observability-native-ops. Use when the user asks to wire
-  ThousandEyes telemetry into Splunk Observability Cloud, configure
-  Integrations 2.0 APM trace linking, manage TE tests/alert rules/templates
-  for an O11y integration, or produce the per-test-type O11y dashboards.
+description: "Use when the user asks to wire ThousandEyes telemetry into Splunk Observability Cloud, configure
+  Integrations 2.0 APM trace linking, manage TE tests/alert rules/templates for an O11y integration, or
+  produce the per-test-type O11y dashboards. Render and (optionally) apply a guarded ThousandEyes ->
+  Splunk Observability Cloud integration end-to-end: Integration 1.0 OpenTelemetry metric stream (POST
+  /v7/streams to ingest.<realm>.signalfx.com/v2/datapoint/otlp), Integrations 2.0 Splunk Observability APM
+  connector (generic connector + splunk-observability-apm operation), plus verified create/readback flows
+  for tests, alert rules, and TE Templates. Renders labels, tags, and TE-side dashboards as reviewable
+  handoffs until authoritative API ID/readback schemas are encoded. Covers the canonical TE OpenTelemetry
+  Data Model v2 taxonomy. Generates SignalFlow dashboard specs and starter detectors for hand-off to
+  splunk-observability-dashboard-builder and splunk-observability-native-ops."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -22,6 +17,64 @@ metadata:
 ---
 
 # Splunk Observability ThousandEyes Integration
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Wire ThousandEyes telemetry into Splunk Observability Cloud, configure Integrations 2.0 APM trace linking, manage
+  TE tests/alert rules/templates for an O11y integration, or produce the per-test-type O11y dashboards.
+- Preview and review the splunk observability thousandeyes integration workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-thousandeyes-integration/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-thousandeyes-integration/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to any one demo. A private RTSP/UDP/RTP demo repo was used during initial development to validate the TE Streams API + Integrations 2.0 mechanics; that demo's test taxonomy is demo-specific and is NOT carried into this skill. Source of truth: the public **ThousandEyes for OpenTelemetry Data Model v2** (`docs.thousandeyes.com/.../opentelemetry/data-model/data-model-v2/metrics`) and the **TE API v7** schemas (`developer.cisco.com/docs/thousandeyes/`).
 

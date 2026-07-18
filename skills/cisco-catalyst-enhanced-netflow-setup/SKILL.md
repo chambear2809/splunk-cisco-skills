@@ -1,17 +1,73 @@
 ---
 name: cisco-catalyst-enhanced-netflow-setup
-description: >-
-  Install and validate the Cisco Catalyst Enhanced Netflow Add-on for Splunk
-  (splunk_app_stream_ipfix_cisco_hsl). Use when the user asks about the
-  optional Enhanced Netflow add-on, Cisco HSL/IPFIX mappings, app ID 6872, or
-  extra Cisco Enterprise Networking NetFlow dashboards.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when installing or validating Cisco HSL/IPFIX mappings and Enhanced NetFlow dashboards in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Catalyst Enhanced Netflow Add-on Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run setup, receiver planning, and validation | `bash --version && python3 --version` |
+| Splunk admin access | Install app ID 6872 | Confirm target-tier access |
+| Flow receiver owner | Supply decoded HSL/IPFIX | Name the Stream, SC4S, or external owner |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Plan receiver │ → │ Install add-on │ → │ Validate data │
+└───────────┘   └───────────────┘   └────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Install Splunk app ID 6872 for Cisco enhanced NetFlow mappings.
+- Map Cisco High Speed Logging (HSL) or IPFIX fields for companion dashboards.
+- Diagnose empty enhanced NetFlow panels after the base Cisco app is installed.
+
+## Scope
+
+This skill installs and validates mapping content. It does not create device
+export policies or silently replace the existing flow receiver. Keep exporter
+and receiver changes with their current owners.
+
+## Examples
+
+Preview the receiver planner before installation:
+
+```bash
+python3 skills/cisco-catalyst-enhanced-netflow-setup/scripts/stream_receiver_plan.py --help
+```
+
+Expected output: supported receiver and mapping options are listed without
+changing Splunk or network devices.
+
+Run the completion gate after mapped flow data is available:
+
+```bash
+bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/validate.sh --completion
+```
+
+Expected output: app, source type, mapped-field, and dashboard evidence checks
+report `[PASS]`; missing flow evidence exits nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Empty dashboards | No compatible flow events | Validate exporter and receiver first |
+| Missing mapped fields | Unsupported source type | Align with the receiver plan |
+| Duplicate flows | Multiple receiver paths | Keep one ingest owner |
+| Installation fails | Package access or topology is unresolved | Use the rendered manual handoff and retry validation |
 
 ## TA Completion Gate
 

@@ -1,18 +1,73 @@
 ---
 name: cisco-meraki-ta-setup
-description: >-
-  Automate Cisco Meraki Add-on for Splunk (Splunk_TA_cisco_meraki) setup and
-  configuration. Creates indexes, configures Meraki organization accounts via
-  REST API, enables data inputs, stores credentials securely, and validates the
-  deployment. Use when the user asks about Cisco Meraki TA setup, Meraki
-  dashboard, Meraki API, or Splunk_TA_cisco_meraki.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring Cisco Meraki organization accounts, API inputs, or dashboards in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Meraki TA Setup Automation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Create the index, account, inputs, and macros | Confirm search-tier REST access |
+| Meraki Dashboard API key | Poll the selected organization | Store the key in a protected file |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Install TA │ → │ Configure inputs │ → │ Validate data │
+└───────────┘   └────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard a Meraki Dashboard organization through `Splunk_TA_cisco_meraki`.
+- Configure Meraki API accounts, polling inputs, indexes, or dashboard macros.
+- Diagnose missing Meraki data or empty companion dashboards.
+
+## Scope
+
+This skill configures Splunk collection and dashboard prerequisites. It does
+not request API keys in chat, modify Meraki network configuration, or enable
+every polling input without reviewing rate and volume impact.
+
+## Examples
+
+Run the diagnostic validator before account creation:
+
+```bash
+bash skills/cisco-meraki-ta-setup/scripts/validate.sh
+```
+
+Expected output: package, Splunk access, account prerequisites, and local tools
+are reported without changing the Meraki organization or Splunk inputs.
+
+Run the completion gate after enabling selected inputs:
+
+```bash
+bash skills/cisco-meraki-ta-setup/scripts/validate.sh --completion
+```
+
+Expected output: account, enabled inputs, events, source types, macros, and
+dashboard evidence report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| API returns 401 | API key is invalid | Replace the protected key file |
+| API returns 429 | Polling exceeds limits | Reduce scope or increase intervals |
+| No events | Organization or scope is wrong | Verify it and inspect logs |
+| Empty dashboards | Macro/source type is wrong | Validate events, then align settings |
 
 ## TA Completion Gate
 
@@ -90,7 +145,8 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ## Splunk Authentication
 
-Scripts read Splunk credentials from the project-root `credentials` file (falls back to `~/.splunk/credentials`) automatically.
+Scripts read Splunk credentials from the project-root `credentials` file. They
+fall back to `~/.splunk/credentials` automatically.
 No environment variables or command-line password arguments are needed:
 
 ```bash
@@ -256,7 +312,8 @@ See [reference.md](reference.md) for the full sourcetype catalog (35+).
 
 ## MCP Server Integration
 
-Load custom tools into the MCP Server (credentials read from the project-root `credentials` file, falls back to `~/.splunk/credentials`):
+Load custom tools into the MCP Server. Credentials come from the project-root
+`credentials` file or the `~/.splunk/credentials` fallback:
 
 ```bash
 bash skills/cisco-meraki-ta-setup/scripts/load_mcp_tools.sh

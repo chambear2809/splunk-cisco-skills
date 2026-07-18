@@ -1,16 +1,12 @@
 ---
 name: splunk-observability-k8s-auto-instrumentation-setup
-description: >-
-  Render, apply, verify, and uninstall Splunk/OpenTelemetry Operator
-  auto-instrumentation overlays for Kubernetes workloads after the base Splunk
-  OTel Collector skill has installed the operator and CRDs. Emits language
-  Instrumentation CRs, workload and namespace annotations, backup ConfigMaps,
-  Splunk OBI eBPF assets, profiling/runtime metric env vars, sampler settings,
-  Fargate gateway paths, GitOps YAML, transactional rollback snapshots, and clean
-  uninstall scripts. Use when wiring zero-code Java, Node.js, Python, .NET, Go,
-  Apache, or Nginx instrumentation into Splunk Observability Cloud APM,
-  adding AlwaysOn Profiling, discovering workloads, or reverting
-  operator-managed instrumentation.
+description: "Use when wiring zero-code Java, Node.js, Python, .NET, Go, Apache, or Nginx instrumentation into Splunk
+  Observability Cloud APM, adding AlwaysOn Profiling, discovering workloads, or reverting operator-managed
+  instrumentation. Render, apply, verify, and uninstall Splunk/OpenTelemetry Operator auto-instrumentation
+  overlays for Kubernetes workloads after the base Splunk OTel Collector skill has installed the operator
+  and CRDs. Emits language Instrumentation CRs, workload and namespace annotations, backup ConfigMaps,
+  Splunk OBI eBPF assets, profiling/runtime metric env vars, sampler settings, Fargate gateway paths,
+  GitOps YAML, transactional rollback snapshots, and clean uninstall scripts."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -18,6 +14,64 @@ metadata:
 ---
 
 # Splunk Observability Kubernetes Auto-Instrumentation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Wiring zero-code Java, Node.js, Python, .NET, Go, Apache, or Nginx instrumentation into Splunk Observability Cloud
+  APM, adding AlwaysOn Profiling, discovering workloads, or reverting operator-managed instrumentation.
+- Preview and review the splunk observability k8s auto instrumentation setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill configures operator-driven, zero-code application auto-instrumentation for Kubernetes workloads that send traces, metrics, and profiling to Splunk Observability Cloud.
 

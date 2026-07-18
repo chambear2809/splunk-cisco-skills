@@ -3188,7 +3188,7 @@ def run_local_command(argv: list[str], timeout: int = 20) -> dict[str, Any]:
     hard_deadline: float | None = None
     exit_drain_deadline: float | None = None
     try:
-        while True:
+        while process.poll() is None or selector.get_map():
             now = time.monotonic()
             returncode = process.poll()
             if returncode is not None and exit_drain_deadline is None:
@@ -3905,11 +3905,13 @@ def artifact_metadata(path: Path) -> dict[str, Any]:
         ):
             raise PermissionError(f"doctor artifact is not a private, single-link regular file: {path}")
         digest = hashlib.sha256()
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
+        remaining = before.st_size
+        while remaining > 0:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
             if not chunk:
                 break
             digest.update(chunk)
+            remaining -= len(chunk)
         after = os.fstat(descriptor)
         if (
             after.st_dev != before.st_dev

@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Run the repo-local Splunk Cisco skills MCP server over stdio."""
 
+# Defer annotation evaluation so this launcher parses on the entry interpreter
+# (e.g. macOS system Python 3.9 used by GUI clients) before it re-execs into the
+# repo .venv. Without this, PEP 604 unions like ``Path | None`` raise TypeError
+# at import time on Python < 3.10.
+from __future__ import annotations
+
 import os
 import stat
 import sys

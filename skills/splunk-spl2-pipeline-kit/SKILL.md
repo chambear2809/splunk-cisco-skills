@@ -1,14 +1,11 @@
 ---
 name: splunk-spl2-pipeline-kit
-description: >-
-  Render and lint reusable SPL2 pipeline templates for Cisco Data Fabric,
-  Splunk Ingest Processor, and Edge Processor, including routing, redaction,
-  sampling, lookups, metrics, OCSF, decrypt, stats, custom templates,
-  SPL-to-SPL2 compatibility, and PCRE2 migration checks. Use when the user needs
-  SPL2 pipeline authoring, conversion review, compatibility linting, or shared
-  templates for Ingest Processor or Edge Processor workflows, including Cisco
-  Data Fabric or telemetry pipeline management requests that need reusable SPL2
-  pipeline logic.
+description: "Use when the user needs SPL2 pipeline authoring, conversion review, compatibility linting, or shared
+  templates for Ingest Processor or Edge Processor workflows, including Cisco Data Fabric or telemetry
+  pipeline management requests that need reusable SPL2 pipeline logic. Render and lint reusable SPL2
+  pipeline templates for Cisco Data Fabric, Splunk Ingest Processor, and Edge Processor, including
+  routing, redaction, sampling, lookups, metrics, OCSF, decrypt, stats, custom templates, SPL-to-SPL2
+  compatibility, and PCRE2 migration checks."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -16,6 +13,65 @@ metadata:
 ---
 
 # Splunk SPL2 Pipeline Kit
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- The user needs SPL2 pipeline authoring, conversion review, compatibility linting, or shared templates for Ingest
+  Processor or Edge Processor workflows, including Cisco Data Fabric or telemetry pipeline management requests that
+  need.
+- Preview and review the splunk spl2 pipeline kit workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-spl2-pipeline-kit/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-spl2-pipeline-kit/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill is the shared SPL2 authoring and validation surface for
 `splunk-ingest-processor-setup` and `splunk-edge-processor-setup`. It is

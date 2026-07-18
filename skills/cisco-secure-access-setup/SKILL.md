@@ -1,19 +1,74 @@
 ---
 name: cisco-secure-access-setup
-description: >-
-  Install and configure the Cisco Secure Access App for Splunk
-  (cisco-cloud-security) and required event Add-on
-  (TA-cisco-cloud-security-addon). Supports org account creation, investigate
-  index, private app index, and app discovery index provisioning. Use when the
-  user asks about Cisco Secure Access, app IDs 5558/7569, cisco-cloud-security,
-  or Secure Access dashboards.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring Cisco Secure Access accounts, event collection, indexes, or Splunk dashboards.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Secure Access Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Install app IDs 5558/7569 and configure indexes | Confirm target-tier access |
+| Secure Access access | Configure the event flow | Record the organization ID |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌──────────────────┐   ┌───────────────────┐   ┌────────────────────┐
+│ Preflight │ → │ Install app + TA │ → │ Configure account │ → │ Validate dashboards │
+└───────────┘   └──────────────────┘   └───────────────────┘   └────────────────────┘
+```
+
+## When to Activate
+
+- Install or configure the Cisco Secure Access Splunk app and event add-on.
+- Provision investigate, private-app, or app-discovery indexes.
+- Diagnose missing Secure Access events or empty dashboards.
+
+## Scope
+
+This skill configures documented Splunk app and account surfaces. It does not
+change Secure Access policy, collect credentials in chat, or claim completion
+until event ingestion and shipped dashboards are validated.
+
+## Examples
+
+Install the app and required event add-on:
+
+```bash
+bash skills/cisco-secure-access-setup/scripts/setup.sh --install
+```
+
+Expected output: the reviewed package and index plan is applied or a clear
+manual handoff is emitted for the target Splunk topology.
+
+Validate a configured organization account:
+
+```bash
+bash skills/cisco-secure-access-setup/scripts/validate.sh \
+  --completion --org-id example-org-id
+```
+
+Expected output: package, account, index, event, macro, and dashboard checks
+report `[PASS]`; incomplete collection exits nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Required add-on is absent | Only the visualization app was installed | Install and validate both package IDs |
+| Account fails | ID or authorization is invalid | Verify ID and credential file |
+| Events land in the wrong index | App settings and input differ | Align the input with the rendered index plan |
+| Dashboards are empty | Events or package macros are missing | Validate ingestion before adjusting dashboard settings |
 
 ## TA Completion Gate
 

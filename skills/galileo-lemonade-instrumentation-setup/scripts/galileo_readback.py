@@ -755,7 +755,9 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
     deadline = time.monotonic() + args.timeout
-    while True:
+    attempted = False
+    while not attempted or time.monotonic() < deadline:
+        attempted = True
         try:
             record = search(args, api_key)
         except RuntimeError as exc:
@@ -783,6 +785,7 @@ def main() -> None:
                 "ERROR: expected Galileo trace was not found before timeout"
             )
         time.sleep(min(args.poll_interval, remaining))
+    raise SystemExit("ERROR: expected Galileo trace was not found before timeout")
 
 
 if __name__ == "__main__":

@@ -1,17 +1,13 @@
 ---
 name: splunk-observability-claude-code-instrumentation-setup
-description: >-
-  Render, validate, and safely apply Claude Code CLI OpenTelemetry
-  instrumentation to Splunk Observability Cloud and Galileo. Use when
-  instrumenting Claude Code to emit metrics, log events, and distributed
-  traces (beta) to Splunk Observability Cloud via a local OTel Collector
-  fan-out, with optional Galileo OTLP trace ingestion for AI observability;
-  covers all three destination modes (local-collector, splunk-direct,
-  external-collector), env-block and settings.json rendering, collector
-  overlay with dual fan-out, otelHeadersHelper for secret-safe direct-mode
-  auth, Galileo project/log-stream handoffs, detailed beta tracing for Galileo
-  Luna span scorers, non-public Galileo tenant support, and content-capture
-  gating.
+description: "Use when instrumenting Claude Code to emit metrics, log events, and distributed traces (beta) to Splunk
+  Observability Cloud via a local OTel Collector fan-out, with optional Galileo OTLP trace ingestion for
+  AI observability; covers all three destination modes (local-collector, splunk-direct, external-
+  collector), env-block and settings.json rendering, collector overlay with dual fan-out,
+  otelHeadersHelper for secret-safe direct-mode auth, Galileo project/log-stream handoffs, detailed beta
+  tracing for Galileo Luna span scorers, non-public Galileo tenant support, and content-capture gating.
+  Render, validate, and safely apply Claude Code CLI OpenTelemetry instrumentation to Splunk Observability
+  Cloud and Galileo."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -19,6 +15,65 @@ metadata:
 ---
 
 # Splunk Observability Claude Code Instrumentation Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Instrumenting Claude Code to emit metrics, log events, and distributed traces (beta) to Splunk Observability Cloud
+  via a local OTel Collector fan-out, with optional Galileo OTLP trace ingestion for AI observability; covers all
+  three.
+- Preview and review the splunk observability claude code instrumentation setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-claude-code-instrumentation-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-claude-code-instrumentation-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## Overview
 
@@ -149,30 +204,13 @@ Code emits `claude_code.llm_request` and `claude_code.tool` under base beta trac
 detailed tracing adds `claude_code.hook` and experimental content-bearing span
 attributes. Interactive detailed tracing can require Anthropic allowlisting.
 
-### Detailed beta tracing
+### Detailed Tracing and Galileo Ingest
 
-When explicitly enabled, the skill renders both detailed-tracing variables for
-hook spans and the richest available trace shape:
-
-- `ENABLE_BETA_TRACING_DETAILED=1`
-- `BETA_TRACING_ENDPOINT=<trace destination>` — a **separate** endpoint from
-  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`. The skill points it at the same target
-  the traces go to (the local collector for `local-collector`, the Splunk trace
-  ingest URL for `splunk-direct`).
-
-Do not diagnose missing `llm_request` or `tool` spans solely by the absence of
-detailed tracing on current Claude Code releases. First verify base trace beta,
-the trace endpoint, the collector route, and the installed Claude Code version.
-
-### Galileo GenAI-attribute ingest requirement
-
-Galileo's `/otel/traces` endpoint only ingests spans carrying OpenTelemetry
-**GenAI semantic-convention attributes** (`gen_ai.*`). Spans without them are
-rejected with `partialSuccess` and the message
-"No GenAI patterns detected in spans." Claude Code's
-`claude_code.llm_request` spans carry `gen_ai.system`, `gen_ai.request.model`,
-and related attributes, so they satisfy this filter. Detailed tracing enriches
-the path but is not the source of base LLM/tool child spans on current releases.
+Detailed tracing requires its separate endpoint variable and explicit content
+acceptance; base beta tracing still owns current LLM and tool spans. Galileo
+accepts only spans carrying `gen_ai.*` attributes. Use the exact variables,
+diagnostic order, and ingest contract in [reference.md](reference.md#traces-beta-catalog)
+and [reference.md](reference.md#galileo-integration).
 
 ## Safety Rules
 
@@ -212,7 +250,7 @@ the path but is not the source of base LLM/tool child spans on current releases.
 | `local-collector` (default) | metrics + logs + traces | traces | Claude Code emits OTLP to a local collector; the rendered collector overlay fans out to Splunk (SignalFx + OTLP + logs) and optionally to Galileo Observe. |
 | `splunk-direct` | metrics + logs + traces | not supported | Direct OTLP/HTTP to Splunk ingest with a single `X-SF-TOKEN` header from `otelHeadersHelper`. |
 | `external-collector` | via operator collector | via operator collector | Operator-specified OTLP endpoint(s); no overlay rendered. |
-| `all` | ✓ | ✓ | Renders `local-collector` and `splunk-direct` side by side so the operator can choose which settings profile to apply. |
+| `all` | yes | yes | Renders both profiles so the operator can choose which one to apply. |
 
 ## Primary Workflow
 
@@ -369,16 +407,9 @@ for the July 7, 2026 Galileo release.
 
 ## Provider And Model Normalization
 
-The collector infers `aws.bedrock` from Bedrock ARNs and Bedrock model IDs and
-otherwise defaults `gen_ai.provider.name` to `anthropic`. Use
-`--provider-name` when Claude runs through Vertex AI, Foundry, or a gateway
-whose provider cannot be inferred from the model string.
-
-Bedrock application inference-profile ARNs do not contain the underlying model
-name. Supply repeatable `--model-alias SOURCE_MODEL=DISPLAY_MODEL` values (or
-the `model_aliases` spec object) when normalized model grouping and Splunk cost
-estimation are required. Aliases are applied consistently to transformed spans
-and derived token metrics; no tenant-specific profile IDs are built in.
+The collector infers common Anthropic and Bedrock identities. Use explicit
+provider and model aliases for gateways or opaque inference-profile ARNs; see
+[collector fan-out](reference.md#collector-fan-out) for normalization behavior.
 
 ## Content Capture Gating
 
@@ -421,20 +452,9 @@ that were not present on the LLM span.
 
 ## Cardinality Flags
 
-Claude Code cardinality flags map directly to metric attributes:
-
-- `OTEL_METRICS_INCLUDE_SESSION_ID` (default `true`): include the session ID
-  on every metric. High cardinality; disable in large fleets.
-- `OTEL_METRICS_INCLUDE_VERSION` (default `false`): include Claude Code
-  version on every metric.
-- `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` (default `true`): include account UUID.
-- `OTEL_METRICS_INCLUDE_ENTRYPOINT` (default `false`): include entry-point
-  attribute (interactive, exec, etc.).
-- `OTEL_METRICS_INCLUDE_RESOURCE_ATTRIBUTES` (default `true`): stamp the keys
-  from `OTEL_RESOURCE_ATTRIBUTES` (including the skill's custom
-  `resource_attributes`) onto every datapoint. Set the spec field
-  `metrics_include_resource_attributes: false` to keep them in the OTLP resource
-  block only and cut per-datapoint cardinality.
+Session and account attributes are enabled by default and can be high-cardinality
+in large fleets. Review every default and the resource-attribute opt-out in
+[reference.md](reference.md#metric-cardinality-controls).
 
 ## Apply Sections
 

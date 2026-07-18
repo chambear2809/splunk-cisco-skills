@@ -1,19 +1,73 @@
 ---
 name: cisco-catalyst-ta-setup
-description: >-
-  Automate Cisco Catalyst Add-on for Splunk (TA_cisco_catalyst) setup and
-  configuration. Creates indexes, configures Catalyst Center/ISE/SD-WAN/Cyber
-  Vision accounts via REST API, enables data inputs, stores credentials
-  securely, and validates the deployment. Use when the user asks about Cisco
-  Catalyst Center, DNA Center, DNAC, ISE, SD-WAN, Cyber Vision TA setup,
-  or TA_cisco_catalyst.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring or validating Catalyst Center, ISE, SD-WAN, or Cyber Vision with TA_cisco_catalyst.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Catalyst TA Setup Automation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Create indexes, accounts, and modular inputs | Confirm search-tier REST access |
+| Cisco product account | Authorize the selected product API | Store its secret in a protected file |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Install TA │ → │ Configure inputs │ → │ Validate data │
+└───────────┘   └────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard Catalyst Center or legacy DNA Center data.
+- Configure Cisco ISE, SD-WAN, or Cyber Vision modular inputs.
+- Diagnose a `TA_cisco_catalyst` account, input, or dashboard readiness failure.
+
+## Scope
+
+This skill owns Splunk account and input configuration for supported products.
+It does not ask for secrets in chat, alter Cisco appliance policy, or enable
+unreviewed inputs. Keep credentials file-backed and review polling load first.
+
+## Examples
+
+Run the diagnostic preflight without requiring completed ingestion:
+
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh
+```
+
+Expected output: package, command, credential, and connectivity readiness is
+reported; unresolved prerequisites are identified without mutation.
+
+Run the strict gate after configuring and enabling inputs:
+
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh --completion
+```
+
+Expected output: configured accounts, enabled inputs, expected source types,
+events, and dashboard evidence report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| REST returns 401/403 | Splunk or Cisco authorization is incomplete | Verify the account and secret-file permissions |
+| Enabled input is idle | URL, scope, or reachability is wrong | Validate and inspect input logs |
+| Duplicate events | Inputs overlap | Confirm ownership, then disable one |
+| Empty dashboards | Macro/index is misaligned | Run data-source readiness checks |
 
 ## TA Completion Gate
 
@@ -104,7 +158,8 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ## Splunk Authentication
 
-Scripts read Splunk credentials from the project-root `credentials` file (falls back to `~/.splunk/credentials`) automatically.
+Scripts read Splunk credentials from the project-root `credentials` file. They
+fall back to `~/.splunk/credentials` automatically.
 No environment variables or command-line password arguments are needed:
 
 ```bash
@@ -190,10 +245,14 @@ bash skills/cisco-catalyst-ta-setup/scripts/setup.sh --enable-inputs \
 
 | Input Type | Inputs Enabled | Index | Account Field |
 |------------|---------------|-------|---------------|
-| `catalyst_center` | 9 (clienthealth, devicehealth, compliance, issue, networkhealth, securityadvisory, client, audit_logs, site_topology) | `catalyst` | `cisco_dna_center_account` |
+| `catalyst_center` | 9 | `catalyst` | `cisco_dna_center_account` |
 | `ise` | 1 (administrative_input with 3 data_types) | `ise` | `ise_account` |
 | `sdwan` | 2 (health, site_and_tunnel_health) | `sdwan` | `sdwan_account` |
-| `cybervision` | 6 (activities, components, devices, events, flows, vulnerabilities) | `cybervision` | `cyber_vision_account` |
+| `cybervision` | 6 | `cybervision` | `cyber_vision_account` |
+
+The Catalyst Center inputs cover client/device/network health, compliance,
+issues, advisories, clients, audit logs, and site topology. Cyber Vision covers
+activities, components, devices, events, flows, and vulnerabilities.
 
 ### Step 4: Restart If Required
 

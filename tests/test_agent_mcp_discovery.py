@@ -73,7 +73,7 @@ class DiscoveryRepositoryTests(unittest.TestCase):
     def test_search_is_product_first_bounded_and_paginated(self) -> None:
         first = discovery.search_skills(limit=7)
 
-        self.assertEqual(first["total"], 168)
+        self.assertEqual(first["total"], 169)
         self.assertEqual(len(first["skills"]), 7)
         self.assertRegex(first["revision"], r"^[0-9a-f]{64}$")
         self.assertIsNotNone(first["next_cursor"])

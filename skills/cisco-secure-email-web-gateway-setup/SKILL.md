@@ -1,18 +1,75 @@
 ---
 name: cisco-secure-email-web-gateway-setup
-description: >-
-  Install, configure, and validate the Splunk-supported Cisco ESA and WSA
-  add-ons. Covers ESA/WSA indexes, macros, parser placement, SC4S/file-monitor
-  ingestion handoffs, source/sourcetype coverage, and CIM validation. Use when
-  the user asks about Cisco Secure Email Gateway, ESA, WSA, IronPort, email
-  security, web security, or Cisco ESA/WSA Splunk add-ons.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when onboarding Cisco ESA or WSA logs through supported Splunk add-ons and managed ingestion.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Secure Email/Web Gateway Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash | Render package, index, macro, and transport assets | `bash --version` |
+| Splunk administrative access | Install ESA/WSA add-ons and run searches | Confirm target-tier access |
+| SC4S or file-monitor owner | Deliver ESA/WSA events to the parsing tier | Confirm one transport owner per source |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌─────────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Render packages │ → │ Configure ingest │ → │ Validate data │
+└───────────┘   └─────────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard Cisco Email Security Appliance (ESA) or Web Security Appliance (WSA) logs.
+- Configure email/netproxy indexes, macros, parser placement, or transport ownership.
+- Diagnose missing source types, CIM fields, or dashboard evidence.
+
+## Scope
+
+This skill renders and validates Splunk-side ESA/WSA onboarding. It does not
+configure appliance policy or silently create competing syslog and file-monitor
+paths. Select one transport owner and preserve parser placement.
+
+## Examples
+
+Render both product paths for SC4S ownership:
+
+```bash
+bash skills/cisco-secure-email-web-gateway-setup/scripts/setup.sh \
+  --product both --transport sc4s
+```
+
+Expected output: reviewable package, index, macro, parser, transport, and
+validation assets are written without changing an appliance.
+
+Run strict validation after events arrive:
+
+```bash
+bash skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh \
+  --completion --product both
+```
+
+Expected output: ESA and WSA package, source type, event, CIM, and dashboard
+handoff checks report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Events are duplicated | SC4S and file monitoring both collect the source | Keep one transport owner |
+| Fields are missing | Parsing add-on is placed on the wrong tier | Correct parser placement and retest new events |
+| Wrong dashboard index | Macros differ from inputs | Align macros with the index plan |
+| One product passes | Only ESA or WSA transport is active | Validate each selected product independently |
 
 ## TA Completion Gate
 

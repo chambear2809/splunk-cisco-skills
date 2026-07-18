@@ -36,6 +36,10 @@ MAX_TRACE_SEGMENTS = 10_000
 MAX_SPANS_PER_SEGMENT = 10_000
 MAX_TOTAL_SPANS = 20_000
 MAX_SCAN_NODES = 250_000
+# The public deadline is capped at 900 seconds and every unstable segment
+# index incurs a one-second pause. Keep an independent iteration ceiling for
+# test clients and future callers whose pause implementation does not track time.
+MAX_SEGMENT_STABILITY_ATTEMPTS = 901
 RETRYABLE_HTTP_STATUSES = {429, 502, 503, 504}
 TRACE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 SPAN_ID_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -223,10 +227,8 @@ class SplunkApiClient:
             raise ReadbackError("internal API path validation failed")
         url = f"{self.origin}{path}"
         attempt = 0
-        while True:
+        while self.remaining() > 0:
             remaining = self.remaining()
-            if remaining <= 0:
-                raise ReadbackError("Splunk API readback deadline expired")
             request = urllib.request.Request(
                 url,
                 headers={
@@ -291,6 +293,7 @@ class SplunkApiClient:
                 RecursionError,
             ) as exc:
                 raise ReadbackError("Splunk API returned invalid JSON") from exc
+        raise ReadbackError("Splunk API readback deadline expired")
 
 
 def parse_segments(document: Any) -> tuple[int, ...]:
@@ -334,7 +337,7 @@ def retrieve_all_segments(
 ) -> tuple[tuple[int, ...], list[dict[str, Any]]]:
     """Read all segments and require a stable segment index across the read."""
 
-    while True:
+    for _stability_attempt in range(MAX_SEGMENT_STABILITY_ATTEMPTS):
         first_document = client.get_json(
             f"/v2/apm/trace/{trace_id}/segments", retry_not_found=True
         )
@@ -365,6 +368,8 @@ def retrieve_all_segments(
         if first == second:
             break
         client.pause(1.0, "Splunk trace segments did not stabilize before the deadline")
+    else:
+        raise ReadbackError("Splunk trace segments did not stabilize before the deadline")
 
     span_ids = [str(span["spanId"]).lower() for span in spans]
     if len(set(span_ids)) != len(span_ids):
