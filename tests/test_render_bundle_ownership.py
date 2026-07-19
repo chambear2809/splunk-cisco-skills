@@ -1,220 +1,255 @@
-#!/usr/bin/env python3
-"""Regression tests for incompatible legacy/current render-bundle ownership."""
+"""Canonical renderer safety around bundles made by retired aliases."""
 
 from __future__ import annotations
 
-import ast
 import json
 import subprocess
-import tempfile
-import unittest
-from dataclasses import dataclass
+import sys
+from dataclasses import replace
 from pathlib import Path
 
-from tests.regression_helpers import REPO_ROOT
-from skills.shared.render_bundle_ownership import bundle_contract
+import pytest
 
-MARKER = ".splunk-skill-bundle.json"
-
-
-@dataclass(frozen=True)
-class Renderer:
-    skill: str
-    child: str
-    args: tuple[str, ...]
-
-    @property
-    def script(self) -> Path:
-        return REPO_ROOT / "skills" / self.skill / "scripts" / "render_assets.py"
-
-
-PAIRS = (
-    (
-        Renderer("splunk-cim-data-model", "cim", ()),
-        Renderer("splunk-cim-data-model-setup", "cim", ("--datamodel", "Authentication")),
-    ),
-    (
-        Renderer(
-            "splunk-dashboard-studio",
-            "dashboard-studio",
-            ("--title", "Ownership test", "--panel", "Count::single::index=_internal | stats count"),
-        ),
-        Renderer(
-            "splunk-dashboard-studio-setup",
-            "dashboard-studio",
-            ("--dashboard-name", "ownership_test", "--search", "index=_internal | stats count"),
-        ),
-    ),
-    (
-        Renderer(
-            "splunk-ddaa-archive",
-            "ddaa",
-            (
-                "--stack",
-                "test",
-                "--index",
-                "main",
-                "--searchable-days",
-                "30",
-                "--archival-retention-days",
-                "90",
-            ),
-        ),
-        Renderer(
-            "splunk-ddaa-archive-setup",
-            "ddaa",
-            ("--index", "main", "--searchable-days", "30", "--archival-retention-days", "90"),
-        ),
-    ),
-    (
-        Renderer("splunk-ingest-actions", "ingest-actions", ()),
-        Renderer(
-            "splunk-ingest-actions-setup",
-            "ingest-actions",
-            (
-                "--ruleset-sourcetype",
-                "test",
-                "--ruleset-name",
-                "drop_debug",
-                "--rule-type",
-                "drop",
-                "--drop-regex",
-                "debug",
-            ),
-        ),
-    ),
-    (
-        Renderer("splunk-knowledge-objects", "knowledge-objects", ()),
-        Renderer(
-            "splunk-knowledge-objects-setup",
-            "knowledge-objects",
-            ("--object-kind", "macro", "--name", "ownership_test", "--definition", "index=main"),
-        ),
-    ),
-    (
-        Renderer("splunk-kvstore-admin", "kvstore", ()),
-        Renderer("splunk-kvstore-admin-setup", "kvstore", ()),
-    ),
-    (
-        Renderer("splunk-secure-gateway", "secure-gateway", ()),
-        Renderer("splunk-secure-gateway-setup", "secure-gateway", ()),
-    ),
+from skills.shared.render_bundle_ownership import (
+    MARKER_NAME,
+    _BUNDLE_COMPATIBILITY,
+    _build_compatibility_contracts,
+    _write_marker,
+    compatibility_contract,
 )
+from skills.shared.skill_catalog import CatalogError, load_catalog
 
 
-class RenderBundleOwnershipTests(unittest.TestCase):
-    def run_renderer(self, renderer: Renderer, output_dir: Path) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["python3", str(renderer.script), "--output-dir", str(output_dir), *renderer.args],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=60,
+REPO_ROOT = Path(__file__).resolve().parents[1]
+RENDERERS = {
+    "splunk-cim-data-model-setup": (
+        "cim",
+        ("--datamodel", "Authentication"),
+    ),
+    "splunk-dashboard-studio-setup": (
+        "dashboard-studio",
+        (
+            "--dashboard-name",
+            "ownership_test",
+            "--search",
+            "index=_internal | stats count",
+        ),
+    ),
+    "splunk-ddaa-archive-setup": (
+        "ddaa",
+        (
+            "--index",
+            "main",
+            "--searchable-days",
+            "30",
+            "--archival-retention-days",
+            "90",
+        ),
+    ),
+    "splunk-ingest-actions-setup": (
+        "ingest-actions",
+        (
+            "--ruleset-sourcetype",
+            "test",
+            "--ruleset-name",
+            "drop_debug",
+            "--rule-type",
+            "drop",
+            "--drop-regex",
+            "debug",
+        ),
+    ),
+    "splunk-knowledge-objects-setup": (
+        "knowledge-objects",
+        (
+            "--object-kind",
+            "macro",
+            "--name",
+            "ownership_test",
+            "--definition",
+            "index=main",
+        ),
+    ),
+    "splunk-kvstore-admin-setup": ("kvstore", ()),
+    "splunk-secure-gateway-setup": ("secure-gateway", ()),
+}
+
+
+def _run_renderer(canonical: str, output_dir: Path) -> subprocess.CompletedProcess[str]:
+    _, args = RENDERERS[canonical]
+    return subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "skills" / canonical / "scripts/render_assets.py"),
+            "--output-dir",
+            str(output_dir),
+            *args,
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+
+def test_compatibility_extension_is_canonical_only_and_manifest_validated() -> None:
+    catalog = load_catalog()
+    contracts = _build_compatibility_contracts()
+
+    assert set(contracts) == set(RENDERERS)
+    assert set(contracts) == set(_BUNDLE_COMPATIBILITY)
+    for canonical, contract in contracts.items():
+        assert catalog.aliases[contract.retired_alias] == canonical
+        assert contract.canonical == canonical
+
+
+def test_unrelated_future_thin_alias_needs_no_bundle_contract() -> None:
+    catalog = load_catalog()
+    target = catalog.by_name["cisco-product-setup"]
+    thin_alias = replace(
+        target,
+        name="unrelated-thin-alias",
+        path="skills/unrelated-thin-alias/SKILL.md",
+        status="deprecated",
+        replaced_by=target.name,
+    )
+    extended = replace(catalog, skills=(*catalog.skills, thin_alias))
+
+    contracts = _build_compatibility_contracts(extended)
+
+    assert set(contracts) == set(RENDERERS)
+    assert "cisco-product-setup" not in contracts
+
+
+@pytest.mark.parametrize(
+    "extension, message",
+    [
+        (
+            {"cisco-product-setup": {"canonical_files": {"a"}, "retired_alias_files": {"b"}}},
+            "exactly one manifest alias",
+        ),
+        (
+            {"splunk-cim-data-model-setup": {"canonical_files": {"a"}}},
+            "contain exactly",
+        ),
+        (
+            {
+                "splunk-cim-data-model-setup": {
+                    "canonical_files": set(),
+                    "retired_alias_files": {"b"},
+                }
+            },
+            "half/empty",
+        ),
+    ],
+)
+def test_orphan_or_half_compatibility_contract_fails_closed(
+    extension: dict[str, dict[str, set[str]]],
+    message: str,
+) -> None:
+    with pytest.raises(CatalogError, match=message):
+        _build_compatibility_contracts(extension=extension)
+
+
+def test_marker_writer_retries_short_writes_and_publishes_complete_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = compatibility_contract("splunk-cim-data-model-setup")
+    marker = tmp_path / MARKER_NAME
+    real_write = __import__("os").write
+    write_calls = 0
+
+    def short_write(descriptor: int, data: bytes) -> int:
+        nonlocal write_calls
+        write_calls += 1
+        return real_write(descriptor, data[: max(1, len(data) // 3)])
+
+    monkeypatch.setattr("skills.shared.render_bundle_ownership.os.write", short_write)
+
+    _write_marker(marker, contract)
+
+    assert write_calls > 1
+    assert json.loads(marker.read_text(encoding="utf-8")) == {
+        "canonical_owner": contract.canonical,
+        "retired_alias": contract.retired_alias,
+        "schema": 2,
+    }
+    assert not list(tmp_path.glob(f".{MARKER_NAME}.*.tmp"))
+
+
+def test_marker_writer_failure_leaves_no_marker_or_temporary_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = compatibility_contract("splunk-cim-data-model-setup")
+    marker = tmp_path / MARKER_NAME
+
+    def fail_write(descriptor: int, data: bytes) -> int:
+        del descriptor, data
+        raise OSError("injected write failure")
+
+    monkeypatch.setattr("skills.shared.render_bundle_ownership.os.write", fail_write)
+
+    with pytest.raises(OSError, match="injected write failure"):
+        _write_marker(marker, contract)
+
+    assert not marker.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("canonical", sorted(RENDERERS))
+def test_canonical_renderer_rejects_legacy_owned_marker_without_deleting(
+    tmp_path: Path,
+    canonical: str,
+) -> None:
+    child, _ = RENDERERS[canonical]
+    contract = compatibility_contract(canonical)
+    render_dir = tmp_path / child
+    render_dir.mkdir()
+    sentinel = render_dir / "operator-note.txt"
+    sentinel.write_text("preserve\n", encoding="utf-8")
+    marker = render_dir / MARKER_NAME
+    marker.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "owner": contract.retired_alias,
+                "incompatible_peer": canonical,
+            }
         )
+        + "\n",
+        encoding="utf-8",
+    )
 
-    def test_each_owner_can_rerender_but_incompatible_peer_is_rejected(self) -> None:
-        for pair in PAIRS:
-            for first, second in (pair, tuple(reversed(pair))):
-                with self.subTest(first=first.skill, second=second.skill), tempfile.TemporaryDirectory() as tmp:
-                    output_dir = Path(tmp)
-                    initial = self.run_renderer(first, output_dir)
-                    self.assertEqual(initial.returncode, 0, msg=initial.stdout + initial.stderr)
+    result = _run_renderer(canonical, tmp_path)
+    output = result.stdout + result.stderr
 
-                    marker = output_dir / first.child / MARKER
-                    payload = json.loads(marker.read_text(encoding="utf-8"))
-                    self.assertEqual(payload["schema"], 1)
-                    self.assertEqual(payload["owner"], first.skill)
-                    self.assertEqual(payload["incompatible_peer"], second.skill)
-
-                    rerender = self.run_renderer(first, output_dir)
-                    self.assertEqual(rerender.returncode, 0, msg=rerender.stdout + rerender.stderr)
-
-                    rejected = self.run_renderer(second, output_dir)
-                    output = rejected.stdout + rejected.stderr
-                    self.assertNotEqual(rejected.returncode, 0, msg=output)
-                    self.assertIn(f"owned by '{first.skill}'", output)
-                    self.assertIn("different --output-dir", output)
-
-    def test_registered_file_contracts_match_every_renderer(self) -> None:
-        for first, second in PAIRS:
-            for renderer, peer in ((first, second), (second, first)):
-                with self.subTest(skill=renderer.skill):
-                    tree = ast.parse(renderer.script.read_text(encoding="utf-8"))
-                    generated_node = next(
-                        node.value
-                        for node in tree.body
-                        if isinstance(node, ast.Assign)
-                        and any(
-                            isinstance(target, ast.Name) and target.id == "GENERATED_FILES"
-                            for target in node.targets
-                        )
-                    )
-                    generated_files = frozenset(ast.literal_eval(generated_node))
-                    registered_peer, registered_files = bundle_contract(renderer.skill)
-                    self.assertEqual(registered_peer, peer.skill)
-                    self.assertEqual(registered_files, generated_files)
-
-    def test_unmarked_legacy_mixed_bundle_is_rejected_without_deleting_files(self) -> None:
-        first, second = PAIRS[0]
-        with tempfile.TemporaryDirectory() as tmp:
-            output_dir = Path(tmp)
-            render_dir = output_dir / first.child
-            render_dir.mkdir()
-            own_file = render_dir / "apply.sh"
-            peer_file = render_dir / "validate-tstats.sh"
-            own_file.write_text("own\n", encoding="utf-8")
-            peer_file.write_text("peer\n", encoding="utf-8")
-
-            rejected = self.run_renderer(first, output_dir)
-            output = rejected.stdout + rejected.stderr
-            self.assertNotEqual(rejected.returncode, 0, msg=output)
-            self.assertIn("unowned render bundle", output)
-            self.assertIn(second.skill, output)
-            self.assertEqual(own_file.read_text(encoding="utf-8"), "own\n")
-            self.assertEqual(peer_file.read_text(encoding="utf-8"), "peer\n")
-            self.assertFalse((render_dir / MARKER).exists())
-
-    def test_unmarked_bundle_from_same_owner_is_adopted_for_compatibility(self) -> None:
-        owner, _ = PAIRS[0]
-        with tempfile.TemporaryDirectory() as tmp:
-            output_dir = Path(tmp)
-            render_dir = output_dir / owner.child
-            render_dir.mkdir()
-            (render_dir / "apply.sh").write_text("old generated content\n", encoding="utf-8")
-
-            adopted = self.run_renderer(owner, output_dir)
-            self.assertEqual(adopted.returncode, 0, msg=adopted.stdout + adopted.stderr)
-            payload = json.loads((render_dir / MARKER).read_text(encoding="utf-8"))
-            self.assertEqual(payload["owner"], owner.skill)
-
-    def test_valid_owner_marker_does_not_hide_stale_peer_artifacts(self) -> None:
-        owner, peer = PAIRS[0]
-        with tempfile.TemporaryDirectory() as tmp:
-            output_dir = Path(tmp)
-            initial = self.run_renderer(owner, output_dir)
-            self.assertEqual(initial.returncode, 0, msg=initial.stdout + initial.stderr)
-
-            render_dir = output_dir / owner.child
-            peer_file = render_dir / "validate-tstats.sh"
-            peer_file.write_text("stale peer artifact\n", encoding="utf-8")
-
-            rejected = self.run_renderer(owner, output_dir)
-            output = rejected.stdout + rejected.stderr
-            self.assertNotEqual(rejected.returncode, 0, msg=output)
-            self.assertIn(f"unique to '{peer.skill}'", output)
-            self.assertEqual(peer_file.read_text(encoding="utf-8"), "stale peer artifact\n")
-
-    def test_dry_run_does_not_claim_an_empty_bundle(self) -> None:
-        owner, _ = PAIRS[0]
-        with tempfile.TemporaryDirectory() as tmp:
-            output_dir = Path(tmp) / "rendered"
-            result = self.run_renderer(
-                Renderer(owner.skill, owner.child, (*owner.args, "--dry-run")), output_dir
-            )
-            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertFalse(output_dir.exists())
+    assert result.returncode != 0
+    assert f"retired alias '{contract.retired_alias}'" in output
+    assert sentinel.read_text(encoding="utf-8") == "preserve\n"
+    assert marker.exists()
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("canonical", sorted(RENDERERS))
+def test_canonical_renderer_rejects_mixed_legacy_artifacts_without_deleting(
+    tmp_path: Path,
+    canonical: str,
+) -> None:
+    child, _ = RENDERERS[canonical]
+    contract = compatibility_contract(canonical)
+    render_dir = tmp_path / child
+    render_dir.mkdir()
+    retired_file = render_dir / sorted(contract.retired_only_files)[0]
+    retired_file.write_text("legacy\n", encoding="utf-8")
+    sentinel = render_dir / "operator-note.txt"
+    sentinel.write_text("preserve\n", encoding="utf-8")
+
+    result = _run_renderer(canonical, tmp_path)
+    output = result.stdout + result.stderr
+
+    assert result.returncode != 0
+    assert f"retired alias '{contract.retired_alias}'" in output
+    assert retired_file.read_text(encoding="utf-8") == "legacy\n"
+    assert sentinel.read_text(encoding="utf-8") == "preserve\n"

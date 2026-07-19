@@ -10,6 +10,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import SkillCatalog, load_catalog  # noqa: E402
+
+
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
 CLOUD_DOC_PATH = REPO_ROOT / "CLOUD_DEPLOYMENT_MATRIX.md"
 ROLE_DOC_PATH = REPO_ROOT / "DEPLOYMENT_ROLE_MATRIX.md"
@@ -27,12 +33,6 @@ PAIRING_LABELS = {
     "universal-forwarder": "UF",
     "external-collector": "External collector",
 }
-
-GENERATED_BANNER = (
-    "_Generated from `skills/shared/app_registry.json` by "
-    "`skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._"
-)
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -86,14 +86,63 @@ def support_label(value: str) -> str:
     return SUPPORT_LABELS[value]
 
 
-def validate_registry(registry: dict) -> None:
+def lifecycle_label(catalog: SkillCatalog, skill: str) -> str:
+    record = catalog.by_name[skill]
+    if record.deprecated:
+        return f"**Deprecated** -> `{record.replaced_by}`"
+    return "Canonical"
+
+
+def validate_registry(registry: dict, catalog: SkillCatalog | None = None) -> None:
+    manifest = catalog or load_catalog()
+    expected_skills = set(manifest.by_name)
     roles = registry.get("deployment_roles", [])
     role_descriptions = registry.get("deployment_role_descriptions", {})
     if set(roles) != set(role_descriptions):
         raise ValueError("deployment_role_descriptions must cover every deployment role.")
 
     apps_by_name = {app["app_name"]: app for app in registry.get("apps", [])}
-    known_skills = {entry["skill"] for entry in registry.get("skill_topologies", [])}
+    topology_skills = [
+        entry["skill"]
+        for entry in registry.get("skill_topologies", [])
+        if isinstance(entry, dict) and entry.get("skill")
+    ]
+    known_skills = set(topology_skills)
+    if len(topology_skills) != len(known_skills):
+        raise ValueError("skill_topologies must not contain duplicate skill identities.")
+    if known_skills != expected_skills:
+        missing = sorted(expected_skills - known_skills)
+        unknown = sorted(known_skills - expected_skills)
+        details = []
+        if missing:
+            details.append("missing: " + ", ".join(missing))
+        if unknown:
+            details.append("unknown: " + ", ".join(unknown))
+        raise ValueError(
+            "skill_topologies must be a complete validated extension of "
+            "skills/catalog.yaml (" + "; ".join(details) + ")."
+        )
+    topology_by_skill = {
+        entry["skill"]: entry for entry in registry.get("skill_topologies", [])
+    }
+    no_roles = {role: "none" for role in roles}
+    for alias, replacement in manifest.aliases.items():
+        topology = topology_by_skill[alias]
+        if topology.get("role_support") != no_roles:
+            raise ValueError(
+                f"Deprecated alias {alias} must have no deployment role; "
+                f"runtime placement belongs to {replacement}."
+            )
+        if topology.get("cloud_pairing") != []:
+            raise ValueError(
+                f"Deprecated alias {alias} must have empty cloud_pairing."
+            )
+    for index, app in enumerate(registry.get("apps", [])):
+        if not isinstance(app, dict):
+            raise ValueError(f"apps[{index}] must be an object.")
+        skill = app.get("skill")
+        if skill and skill not in expected_skills:
+            raise ValueError(f"apps[{index}] references unknown skill: {skill}")
 
     for row in registry.get("documentation", {}).get("cloud_matrix_rows", []):
         for key in ("kind", "label", "cloud_install_path", "cloud_config_path", "notes"):
@@ -114,7 +163,20 @@ def validate_registry(registry: dict) -> None:
             raise ValueError(f"Unknown cloud matrix row kind: {kind}")
 
 
-def render_cloud_matrix(registry: dict) -> str:
+def _generated_banner(catalog: SkillCatalog) -> str:
+    return (
+        "_Generated from the validated extension "
+        "`skills/shared/app_registry.json` against `skills/catalog.yaml` "
+        f"(SHA-256 `{catalog.checksum}`) by "
+        "`skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._"
+    )
+
+
+def render_cloud_matrix(
+    registry: dict,
+    catalog: SkillCatalog | None = None,
+) -> str:
+    manifest = catalog or load_catalog()
     apps_by_name = {app["app_name"]: app for app in registry.get("apps", [])}
     rows = []
     for row in registry.get("documentation", {}).get("cloud_matrix_rows", []):
@@ -141,7 +203,7 @@ def render_cloud_matrix(registry: dict) -> str:
         [
             "# Cloud Deployment Matrix",
             "",
-            GENERATED_BANNER,
+            _generated_banner(manifest),
             "",
             "This document defines the normal Splunk Cloud deployment model for the",
             "repo's cloud-supported apps and workflows.",
@@ -284,7 +346,11 @@ def render_cloud_matrix(registry: dict) -> str:
     )
 
 
-def render_role_matrix(registry: dict) -> str:
+def render_role_matrix(
+    registry: dict,
+    catalog: SkillCatalog | None = None,
+) -> str:
+    manifest = catalog or load_catalog()
     role_rows = [
         [f"`{role}`", registry["deployment_role_descriptions"][role]]
         for role in registry["deployment_roles"]
@@ -296,6 +362,7 @@ def render_role_matrix(registry: dict) -> str:
         skill_rows.append(
             [
                 f"`{entry['skill']}`",
+                lifecycle_label(manifest, entry["skill"]),
                 support_label(role_support["search-tier"]),
                 support_label(role_support["indexer"]),
                 support_label(role_support["heavy-forwarder"]),
@@ -313,6 +380,7 @@ def render_role_matrix(registry: dict) -> str:
             [
                 f"`{app['app_name']}`",
                 f"`{app['skill']}`",
+                lifecycle_label(manifest, app["skill"]),
                 support_label(role_support["search-tier"]),
                 support_label(role_support["indexer"]),
                 support_label(role_support["heavy-forwarder"]),
@@ -325,7 +393,7 @@ def render_role_matrix(registry: dict) -> str:
         [
             "# Deployment Role Matrix",
             "",
-            GENERATED_BANNER,
+            _generated_banner(manifest),
             "",
             "This document defines the repo's role-based placement model across all",
             "supported Splunk deployment topologies.",
@@ -353,6 +421,7 @@ def render_role_matrix(registry: dict) -> str:
             markdown_table(
                 [
                     "Skill",
+                    "Lifecycle",
                     "Search Tier",
                     "Indexer",
                     "Heavy Forwarder",
@@ -370,6 +439,7 @@ def render_role_matrix(registry: dict) -> str:
                 [
                     "App / Package",
                     "Skill",
+                    "Lifecycle",
                     "Search Tier",
                     "Indexer",
                     "Heavy Forwarder",
@@ -414,12 +484,13 @@ def write_or_check(path: Path, content: str, check: bool) -> bool:
 def main() -> int:
     args = parse_args()
     check = not args.write
+    catalog = load_catalog()
     registry = load_registry()
-    validate_registry(registry)
+    validate_registry(registry, catalog)
 
     outputs = {
-        CLOUD_DOC_PATH: render_cloud_matrix(registry),
-        ROLE_DOC_PATH: render_role_matrix(registry),
+        CLOUD_DOC_PATH: render_cloud_matrix(registry, catalog),
+        ROLE_DOC_PATH: render_role_matrix(registry, catalog),
     }
 
     success = True

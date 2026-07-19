@@ -1118,7 +1118,9 @@ print_install_apps() {
 
 print_command_plan() {
     echo "Planned phases:"
-    if [[ "${AUTOMATION_STATE}" == "partial" ]]; then
+    if [[ "${ROUTE_TYPE}" == "gap_handoff" ]]; then
+        echo "  - non-executable evidence gap handoff"
+    elif [[ "${AUTOMATION_STATE}" == "partial" ]]; then
         echo "  - handoff preview"
     elif ${INSTALL_ONLY}; then
         echo "  - install only"
@@ -1163,6 +1165,15 @@ print_command_plan() {
                     [[ -n "${script_path}" ]] && echo "  - ${script_path}"
                 done < <(product_list route.workflow_scripts)
             fi
+            ;;
+        collaboration)
+            echo "Workflow scripts (render/validate only):"
+            echo "  - skills/cisco-collaboration-setup/scripts/setup.sh"
+            echo "  - skills/cisco-collaboration-setup/scripts/validate.sh"
+            ;;
+        gap_handoff)
+            echo "Workflow scripts:"
+            echo "  - none (documentation/evidence gap handoff only)"
             ;;
         dc_networking)
             echo "Workflow scripts:"
@@ -1379,7 +1390,9 @@ default_keys = split_env("JSON_DEFAULT_KEYS")
 default_values = split_env("JSON_DEFAULT_VALUES")
 defaults = dict(zip(default_keys, default_values))
 
-if product.get("automation_state") == "partial":
+if route_type == "gap_handoff":
+    phases = ["gap_handoff"]
+elif product.get("automation_state") == "partial":
     phases = ["handoff"]
 elif env_bool("JSON_INSTALL_ONLY"):
     phases = ["install"]
@@ -1474,7 +1487,7 @@ workflow_scripts_by_route = {
     ],
 }
 workflow_scripts = workflow_scripts_by_route.get(route_type, [])
-if route_type == "workflow_handoff":
+if route_type in {"workflow_handoff", "collaboration", "gap_handoff"}:
     workflow_scripts = product.get("route", {}).get("workflow_scripts", []) or workflow_scripts
 
 install_apps = []
@@ -1519,6 +1532,14 @@ payload = {
         "defaults": defaults,
         "handoff": product.get("route", {}).get("handoff", ""),
         "sourcetypes": product.get("route", {}).get("sourcetypes", []),
+        "coverage_status": product.get("route", {}).get("coverage_status", ""),
+        "collection_executable_status": product.get("route", {}).get("collection_executable_status", ""),
+        "render_only": product.get("route", {}).get("render_only", False),
+        "live_verified": product.get("route", {}).get("live_verified", False),
+        "apply_capable": product.get("route", {}).get("apply_capable", False),
+        "device_mutation_capable": product.get("route", {}).get("device_mutation_capable", False),
+        "handoff_targets": product.get("route", {}).get("handoff_targets", []),
+        "documentation_paths": product.get("route", {}).get("documentation_paths", []),
     },
     "dashboards": product.get("dashboards", []) or [],
     "template_paths": product.get("template_paths", []) or [],
@@ -2228,7 +2249,7 @@ main() {
         else
             emit_summary
         fi
-        if [[ "${AUTOMATION_STATE}" == "partial" && "${DRY_RUN}" == "true" ]]; then
+        if [[ "${DRY_RUN}" == "true" && ( "${AUTOMATION_STATE}" == "partial" || "${ROUTE_TYPE}" == "gap_handoff" ) ]]; then
             exit 0
         fi
         exit 1

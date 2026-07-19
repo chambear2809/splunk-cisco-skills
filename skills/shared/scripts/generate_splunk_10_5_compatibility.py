@@ -7,18 +7,17 @@ import argparse
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+for import_root in (REPO_ROOT, SCRIPT_DIR):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
-from audit_skill_compatibility import COMPATIBILITY_TEXT, REPO_ROOT, audit  # noqa: E402
+from audit_skill_compatibility import COMPATIBILITY_TEXT, audit  # noqa: E402
+from skills.shared.skill_catalog import load_catalog  # noqa: E402
 
 
 OUTPUT_PATH = REPO_ROOT / "SPLUNK_10_5_COMPATIBILITY.md"
-GENERATED_BANNER = (
-    "_Generated from `skills/*/SKILL.md`, `skills/shared/app_registry.json`, and "
-    "`skills/shared/references/splunk_platform_versions.json`; do not edit manually._"
-)
 STATUS_LABELS = {
     "supported": "Supported",
     "conditional": "Conditional",
@@ -67,10 +66,17 @@ def render() -> str:
     if not payload["ok"]:
         raise RuntimeError("skill compatibility audit failed; fix findings first")
 
+    catalog = load_catalog()
     lines = [
         "# Splunk 10.5 Skill Compatibility",
         "",
-        GENERATED_BANNER,
+        (
+            "_Generated from `skills/catalog.yaml` "
+            f"(SHA-256 `{payload['catalog_sha256']}`), its SKILL.md paths, the "
+            "validated `skills/shared/app_registry.json` extension, and "
+            "`skills/shared/references/splunk_platform_versions.json`; "
+            "do not edit manually._"
+        ),
         "",
         "This matrix classifies every repository skill against Splunk Cloud Platform",
         "`10.5.2605`. It does not invent a self-managed Splunk Enterprise 10.5 runtime:",
@@ -98,8 +104,8 @@ def render() -> str:
             "",
             "## Complete Matrix",
             "",
-            "| Skill | Status | Splunkbase package evidence | Compatibility contract |",
-            "| --- | --- | --- | --- |",
+            "| Skill | Lifecycle | Status | Splunkbase package evidence | Compatibility contract |",
+            "| --- | --- | --- | --- | --- |",
         ]
     )
     for row in payload["skills"]:
@@ -107,8 +113,15 @@ def render() -> str:
         app_text = ", ".join(package_evidence(app) for app in apps) or (
             "No direct Splunkbase package"
         )
+        record = catalog.by_name[row["skill"]]
+        lifecycle = (
+            f"**Deprecated** -> `{record.replaced_by}`"
+            if record.deprecated
+            else "Canonical"
+        )
         lines.append(
-            f"| `{row['skill']}` | {STATUS_LABELS.get(row['status'], row['status'])} "
+            f"| `{row['skill']}` | {lifecycle} "
+            f"| {STATUS_LABELS.get(row['status'], row['status'])} "
             f"| {escape(app_text)} | {escape(row['compatibility'])} |"
         )
     return "\n".join(lines).rstrip() + "\n"

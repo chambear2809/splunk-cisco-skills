@@ -1,12 +1,10 @@
 ---
 name: splunk-secure-gateway-setup
-description: "Use when the user asks to set up Splunk Secure Gateway, connect the Splunk mobile apps (Connected
-  Experiences), configure Spacebridge or Private Spacebridge, enable or disable Secure Gateway, register
-  devices, or prepare MDM distribution. Render, validate, and apply Splunk Secure Gateway (Spacebridge)
-  setup: enable or disable the splunk_secure_gateway app on Splunk Enterprise, Spacebridge outbound egress
-  preflight, deployment settings and app-visibility runbooks, MDM instance-ID configuration, Private
-  Spacebridge endpoint config, and mobile device registration runbooks. Splunk Cloud targets are routed to
-  the managed readiness workflow without app-state mutation."
+description: "Use when the user asks about Splunk Secure Gateway, Connected Experiences, Spacebridge, Private
+  Spacebridge, or mobile distribution. Apply only splunk_secure_gateway app enable/disable on an explicit
+  Splunk Enterprise target. Render an Enterprise egress check, endpoint and instance-ID placeholder
+  skeletons, and Splunk Web/MDM/device-registration operator runbooks; configure has no live API. Splunk
+  Cloud permits plain render/support handoff only, with no local probe, session authentication, or live REST."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -84,11 +82,12 @@ Enabling Secure Gateway opens outbound 443 to the Spacebridge host and refuses
 to proceed without `--accept-spacebridge-egress`. Device registration uses auth
 codes or QR codes and is inherently interactive (rendered as a runbook).
 
-App-state mutation is limited to Splunk Enterprise. Before apply, `--platform
-auto` resolves the configured target; managed Splunk Cloud returns exit `2`
-without enabling, disabling, or configuring `splunk_secure_gateway`. For Splunk
-Cloud Platform 10.5.2605, use `splunk-secure-gateway --platform cloud` to render
-the managed-service readiness and operator handoff bundle.
+App-state mutation is limited to Splunk Enterprise. `--platform auto` resolves
+the configured target before rendering. Managed Splunk Cloud preflight, status,
+apply, all, and render-with-apply requests return exit `2` before artifacts,
+probes, authentication, or live requests. Plain Cloud render emits review-only
+instance-ID skeletons and operator runbooks plus an exit-2 egress handoff; local
+egress is not valid Cloud evidence.
 
 ## Quick Start
 

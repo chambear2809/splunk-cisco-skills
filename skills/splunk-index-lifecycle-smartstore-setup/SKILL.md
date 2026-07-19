@@ -197,7 +197,7 @@ The default output directory is `splunk-smartstore-rendered/smartstore/`.
 
 Use `splunk-data-source-readiness-doctor` when evidence must prove whether
 dashboards, saved searches, ES, ITSI, ARI, CIM, HEC tokens, or macros still
-depend on an index. Use `splunk-ddaa-archive` for Splunk Cloud DDAA archive
+depend on an index. Use `splunk-ddaa-archive-setup` for Splunk Cloud DDAA archive
 enable/update and restore auditing.
 
 Read `reference.md` before changing lifecycle safety gates, destructive apply

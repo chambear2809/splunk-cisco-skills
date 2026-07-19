@@ -8,41 +8,29 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import SkillCatalog, load_catalog  # noqa: E402
+from skills.shared.skill_validation import (  # noqa: E402
+    EVIDENCE_DIMENSIONS,
+    EVIDENCE_STATUSES,
+    normalize_evidence_record,
+)
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 TESTS_DIR = REPO_ROOT / "tests"
 REGISTRY_PATH = SKILLS_DIR / "shared" / "skill_validation_registry.json"
 
 SCHEMA_VERSION = 1
-EVIDENCE_DIMENSIONS = (
-    "integration_mock",
-    "live_read_only",
-    "live_apply_e2e",
-)
-EVIDENCE_STATUSES = {
-    "not-recorded",
-    "pass",
-    "partial",
-    "fail",
-    "blocked",
-    "not-applicable",
-}
-EVIDENCE_FIELDS = {
-    "status",
-    "targets",
-    "last_verified",
-    "evidence",
-    "notes",
-}
-RECORDED_RESULT_STATUSES = {"pass", "partial", "fail"}
 FLAG_RE = re.compile(r"(?<![\w-])--[a-z][a-z0-9-]*", re.IGNORECASE)
-CALENDAR_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,15 +43,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def skill_dirs() -> list[Path]:
-    return sorted(
-        path
-        for path in SKILLS_DIR.iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    )
+def skill_dirs(catalog: SkillCatalog | None = None) -> list[Path]:
+    manifest = catalog or load_catalog()
+    return sorted((REPO_ROOT / record.path).parent for record in manifest.skills)
 
 
 def test_files() -> list[Path]:
@@ -76,32 +58,6 @@ def test_files() -> list[Path]:
     )
 
 
-def _string_list(
-    value: object,
-    *,
-    field: str,
-    context: str,
-    findings: list[str],
-) -> list[str]:
-    if not isinstance(value, list) or any(
-        not isinstance(item, str) or not item.strip() for item in value
-    ):
-        findings.append(f"{context}.{field}: must be a list of non-empty strings")
-        return []
-    return [item.strip() for item in value]
-
-
-def _evidence_reference_is_valid(reference: str) -> bool:
-    if reference.startswith(("https://", "http://")):
-        return True
-    path = Path(reference)
-    return (
-        not path.is_absolute()
-        and ".." not in path.parts
-        and (REPO_ROOT / path).is_file()
-    )
-
-
 def _validate_evidence_record(
     *,
     skill: str,
@@ -109,86 +65,18 @@ def _validate_evidence_record(
     value: object,
     findings: list[str],
 ) -> dict[str, object]:
-    context = f"evidence.{skill}.{dimension}"
-    if not isinstance(value, dict):
-        findings.append(f"{context}: must be an object")
-        return {"status": "not-recorded"}
-
-    unknown_fields = sorted(set(value) - EVIDENCE_FIELDS)
-    if unknown_fields:
-        findings.append(
-            f"{context}: unknown fields: {', '.join(unknown_fields)}"
-        )
-
-    status = value.get("status")
-    if not isinstance(status, str) or status not in EVIDENCE_STATUSES:
-        findings.append(
-            f"{context}.status: expected one of {', '.join(sorted(EVIDENCE_STATUSES))}"
-        )
-        status = "not-recorded"
-
-    targets = _string_list(
-        value.get("targets", []),
-        field="targets",
-        context=context,
-        findings=findings,
+    normalized, record_findings = normalize_evidence_record(
+        skill=skill,
+        dimension=dimension,
+        value=value,
+        repo_root=REPO_ROOT,
     )
-    evidence = _string_list(
-        value.get("evidence", []),
-        field="evidence",
-        context=context,
-        findings=findings,
-    )
-    for reference in evidence:
-        if not _evidence_reference_is_valid(reference):
-            findings.append(
-                f"{context}.evidence: {reference!r} must be an HTTP(S) URL or an "
-                "existing repository-relative file"
-            )
-
-    last_verified = value.get("last_verified")
-    if last_verified is not None and not isinstance(last_verified, str):
-        findings.append(f"{context}.last_verified: must be an ISO date or null")
-        last_verified = None
-    if isinstance(last_verified, str):
-        try:
-            parsed_date = date.fromisoformat(last_verified)
-        except ValueError:
-            parsed_date = None
-        if (
-            not CALENDAR_DATE_RE.fullmatch(last_verified)
-            or parsed_date is None
-            or parsed_date.isoformat() != last_verified
-        ):
-            findings.append(f"{context}.last_verified: must use YYYY-MM-DD")
-
-    notes = value.get("notes", "")
-    if not isinstance(notes, str):
-        findings.append(f"{context}.notes: must be a string")
-        notes = ""
-    notes = notes.strip()
-
-    if status in RECORDED_RESULT_STATUSES:
-        if not targets:
-            findings.append(f"{context}: {status} requires at least one target")
-        if not evidence:
-            findings.append(f"{context}: {status} requires sanitized evidence")
-        if not last_verified:
-            findings.append(f"{context}: {status} requires last_verified")
-    if status in {"blocked", "not-applicable"} and not notes:
-        findings.append(f"{context}: {status} requires notes")
-
-    return {
-        "status": status,
-        "targets": targets,
-        "last_verified": last_verified,
-        "evidence": evidence,
-        "notes": notes,
-    }
+    findings.extend(record_findings)
+    return normalized
 
 
 def load_registry(
-    actual_skills: list[str], findings: list[str]
+    actual_skills: list[str], findings: list[str], catalog: SkillCatalog
 ) -> dict[str, dict[str, dict[str, object]]]:
     try:
         registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
@@ -202,6 +90,16 @@ def load_registry(
     if registry.get("schema_version") != SCHEMA_VERSION:
         findings.append(
             f"skill validation registry schema_version must be {SCHEMA_VERSION}"
+        )
+    expected_provenance = {
+        "path": "skills/catalog.yaml",
+        "schema_version": catalog.schema_version,
+        "sha256": catalog.checksum,
+    }
+    if registry.get("generated_from") != expected_provenance:
+        findings.append(
+            "skill validation registry generated_from does not match "
+            "skills/catalog.yaml"
         )
 
     catalog = registry.get("skills")
@@ -323,9 +221,10 @@ def _default_evidence() -> dict[str, object]:
 @lru_cache(maxsize=1)
 def audit() -> dict[str, Any]:
     findings: list[str] = []
-    directories = skill_dirs()
+    catalog = load_catalog()
+    directories = skill_dirs(catalog)
     names = [path.name for path in directories]
-    recorded_evidence = load_registry(names, findings)
+    recorded_evidence = load_registry(names, findings, catalog)
     corpus = [
         (path, path.read_text(encoding="utf-8", errors="replace"))
         for path in test_files()
@@ -412,6 +311,7 @@ def audit() -> dict[str, Any]:
     }
     return {
         "schema_version": SCHEMA_VERSION,
+        "catalog_sha256": catalog.checksum,
         "ok": not findings,
         "findings": findings,
         "summary": summary,

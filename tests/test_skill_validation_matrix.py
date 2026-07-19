@@ -15,20 +15,14 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import audit_skill_validation as validation_audit  # noqa: E402
 import generate_skill_validation_matrix as matrix_generator  # noqa: E402
+from skills.shared.skill_catalog import load_catalog  # noqa: E402
 
 
 MATRIX_PATH = REPO_ROOT / "SKILL_VALIDATION_MATRIX.md"
 
 
 def repository_skills() -> set[str]:
-    return {
-        path.name
-        for path in (REPO_ROOT / "skills").iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    }
+    return set(load_catalog().by_name)
 
 
 def test_validation_audit_covers_every_skill_and_passes() -> None:
@@ -65,6 +59,23 @@ def test_matrix_does_not_promote_interface_checks_to_feature_results() -> None:
     assert "it is never" in text
     assert "availability is not a pass result" in text
     assert "Gitignored local live-run reports are not promoted" in text
+
+
+def test_alias_rows_are_help_only_and_delegate_validation() -> None:
+    catalog = load_catalog()
+    text = MATRIX_PATH.read_text(encoding="utf-8")
+
+    for legacy, canonical in catalog.aliases.items():
+        row = next(
+            line
+            for line in text.splitlines()
+            if line.startswith(f"| [`{legacy}`](skills/{legacy}/SKILL.md) |")
+        )
+        assert f"**Deprecated** -> `{canonical}`" in row
+        assert "Help-only alias; no independent validation" in row
+        assert f"skills/{canonical}/SKILL.md" in row
+        assert "test_deprecated_skill_aliases.py" in row
+        assert "default path only" not in row
 
 
 def test_recorded_results_require_target_date_and_sanitized_evidence() -> None:

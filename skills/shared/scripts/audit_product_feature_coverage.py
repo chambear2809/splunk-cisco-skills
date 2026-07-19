@@ -12,6 +12,16 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import (  # noqa: E402
+    CatalogError,
+    load_catalog,
+    parse_requirement_skill_rows,
+)
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 REGISTRY_PATH = SKILLS_DIR / "shared" / "app_registry.json"
 EVIDENCE_PATH = SKILLS_DIR / "shared" / "references" / "splunkbase_registry_evidence.json"
@@ -55,24 +65,23 @@ def load_json(path: Path) -> Any:
 
 
 def skill_names() -> set[str]:
-    return {
-        path.name
-        for path in SKILLS_DIR.iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    }
+    return set(load_catalog().by_name)
 
 
 def catalog_skills(path: Path) -> set[str]:
     text = path.read_text(encoding="utf-8")
+    if path.name == "SKILL_REQUIREMENTS.md":
+        return set(parse_requirement_skill_rows(text, load_catalog()))
     return set(re.findall(r"^\| `([^`]+)` \|", text, flags=re.MULTILINE))
 
 
 def check_catalogs(skills: set[str], errors: list[str], summary: dict[str, Any]) -> None:
     for rel_path in CATALOG_DOCS:
-        actual = catalog_skills(REPO_ROOT / rel_path)
+        try:
+            actual = catalog_skills(REPO_ROOT / rel_path)
+        except CatalogError as exc:
+            errors.append(f"{rel_path}: {exc}")
+            actual = set()
         missing = sorted(skills - actual)
         extra = sorted(actual - skills)
         summary[f"{rel_path}:skills"] = len(actual)
@@ -85,7 +94,10 @@ def check_catalogs(skills: set[str], errors: list[str], summary: dict[str, Any])
     ux_rows = set(re.findall(r"^\| `([^`]+)` \|", ux_text, flags=re.MULTILINE))
     summary["SKILL_UX_CATALOG.md:skills"] = len(ux_rows)
     if ux_rows != skills:
-        errors.append("SKILL_UX_CATALOG.md: generated catalog is not in sync with skills/")
+        errors.append(
+            "SKILL_UX_CATALOG.md: generated catalog is not in sync with "
+            "skills/catalog.yaml"
+        )
 
 
 def check_registry(skills: set[str], errors: list[str], summary: dict[str, Any]) -> None:
@@ -175,7 +187,7 @@ def main() -> int:
     errors: list[str] = []
     summary: dict[str, Any] = {}
     skills = skill_names()
-    summary["skills:on_disk"] = len(skills)
+    summary["skills:manifest"] = len(skills)
 
     check_catalogs(skills, errors, summary)
     check_registry(skills, errors, summary)

@@ -104,6 +104,7 @@ Run commands from the repository root.
 | Goal | Start with | First useful command |
 |------|------------|----------------------|
 | I know a Cisco product but not the Splunk app or TA | [`cisco-product-setup`](skills/cisco-product-setup/) | `bash skills/cisco-product-setup/scripts/setup.sh --product "Cisco ACI" --dry-run` |
+| I need a render-only CUCM, Expressway, CMS, or Meeting Management plan | [`cisco-collaboration-setup`](skills/cisco-collaboration-setup/) | `bash skills/cisco-collaboration-setup/scripts/setup.sh --dry-run --json` |
 | I need Cisco Cloud Control, AgenticOps, AI Canvas, or Cloud Control Studio readiness | [`cisco-cloud-control-setup`](skills/cisco-cloud-control-setup/) | `bash skills/cisco-cloud-control-setup/scripts/setup.sh --render --validate --spec skills/cisco-cloud-control-setup/template.example` |
 | I already know the Splunkbase app or local package | [`splunk-app-install`](skills/splunk-app-install/) | `bash skills/splunk-app-install/scripts/setup.sh --help` |
 | I need Enterprise Security, ES native SOAR, Security AI Assistant, Federated Analytics, SOAR, ARI, Attack Analyzer, UBA, or security routing | [`splunk-security-portfolio-setup`](skills/splunk-security-portfolio-setup/) | `bash skills/splunk-security-portfolio-setup/scripts/setup.sh --help` |
@@ -300,6 +301,10 @@ pre-commit run --all-files
 The repo includes a local MCP server named `splunk-cisco-skills`. It exposes
 skill discovery, skill instructions, templates, Cisco product resolution,
 dry-run planning, and explicitly gated script execution to MCP-capable clients.
+Discovery pagination traverses canonical skills only. Exact deprecated names
+remain resolvable as compatibility records with `status` and `replaced_by`, so
+the paginated canonical result count is intentionally smaller than the full
+manifest identity count.
 The code-level execution default is off. The committed Claude Code/Cursor
 registrations and the Codex registration helper explicitly enable typed
 subprocess planning with `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`, while keeping
@@ -389,12 +394,23 @@ skills/<skill>/SKILL.md            # skill trigger, instructions, and workflow
 skills/<skill>/reference.md        # longer skill-specific reference when present
 skills/<skill>/template.example    # non-secret intake worksheet when present
 skills/<skill>/scripts/            # shell and Python automation
-skills/shared/skill_product_registry.json # product/capability taxonomy
+skills/catalog.yaml                # canonical skill identity, taxonomy, purpose, and alias manifest
+skills/shared/deprecated_skill_aliases.md # generated alias migration/omission boundaries
+skills/shared/skill_product_registry.json # generated product/capability projection
 skills/shared/                     # shared registries, helpers, and generators
 splunk-ta/                         # local package cache; binaries ignored
 tests/                             # Python and Bats regression coverage
 rules/credential-handling.mdc      # secret-handling rule
 ```
+
+Maintain skill identity only in `skills/catalog.yaml`. Run
+`python3 skills/shared/scripts/generate_skill_catalog.py --write` to render the
+AGENTS/CLAUDE catalogs, Claude commands, Cursor links, product registry, and
+validation identity list; never edit those generated surfaces by hand.
+The generated
+[`skills/shared/deprecated_skill_aliases.md`](skills/shared/deprecated_skill_aliases.md)
+maps every help-only legacy name to its supported replacement and records
+capabilities that are intentionally not forwarded.
 
 ## What To Read Next
 
@@ -405,6 +421,7 @@ rules/credential-handling.mdc      # secret-handling rule
 | Where should this app or workflow run? | [`DEPLOYMENT_ROLE_MATRIX.md`](DEPLOYMENT_ROLE_MATRIX.md) |
 | How does Splunk Cloud differ from Enterprise? | [`CLOUD_DEPLOYMENT_MATRIX.md`](CLOUD_DEPLOYMENT_MATRIX.md) |
 | How is the repo organized internally? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| What changed for a deprecated skill name? | [`skills/shared/deprecated_skill_aliases.md`](skills/shared/deprecated_skill_aliases.md) |
 | How do I demo the workflows? | [`DEMO_SCRIPTS.md`](DEMO_SCRIPTS.md) |
 | How do I contribute safely? | [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md) |
 

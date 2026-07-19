@@ -19,6 +19,12 @@ except ModuleNotFoundError:  # Keep the standalone audit usable before dev deps 
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import SkillCatalog, load_catalog  # noqa: E402
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
 PLATFORM_VERSIONS_PATH = (
@@ -58,8 +64,8 @@ COMPATIBILITY_TEXT = {
     ),
     "delegated": (
         "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by "
-        "the selected child skill; this router does not install a runtime or package "
-        "itself."
+        "the canonical replacement or selected child skill; this compatibility alias "
+        "or router does not own a runtime or package."
     ),
 }
 
@@ -72,12 +78,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def skill_files() -> list[Path]:
-    return sorted(
-        path
-        for path in SKILLS_DIR.glob("*/SKILL.md")
-        if path.parent.name != "shared" and not path.parent.name.startswith(".")
-    )
+def skill_files(catalog: SkillCatalog | None = None) -> list[Path]:
+    manifest = catalog or load_catalog()
+    return sorted(REPO_ROOT / record.path for record in manifest.skills)
 
 
 def load_frontmatter(path: Path) -> dict[str, Any]:
@@ -129,6 +132,7 @@ def registry_apps_by_skill() -> dict[str, list[dict[str, Any]]]:
 
 
 def audit() -> dict[str, Any]:
+    catalog = load_catalog()
     registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
     versions = json.loads(PLATFORM_VERSIONS_PATH.read_text(encoding="utf-8"))
     expected_target = str(
@@ -137,6 +141,28 @@ def audit() -> dict[str, Any]:
     findings: list[dict[str, str]] = []
     rows: list[dict[str, Any]] = []
     apps_by_skill = registry_apps_by_skill()
+    expected_skills = set(catalog.by_name)
+    topology_skills = [
+        str(entry.get("skill", ""))
+        for entry in registry.get("skill_topologies", [])
+        if isinstance(entry, dict) and entry.get("skill")
+    ]
+    if len(topology_skills) != len(set(topology_skills)):
+        findings.append(
+            {
+                "skill": "shared-contract",
+                "field": "registry.skill_topologies",
+                "message": "duplicate skill identities",
+            }
+        )
+    if set(topology_skills) != expected_skills:
+        findings.append(
+            {
+                "skill": "shared-contract",
+                "field": "registry.skill_topologies",
+                "message": "identities do not match skills/catalog.yaml",
+            }
+        )
 
     for app in registry.get("apps", []):
         app_id = str(app.get("splunkbase_id", "")).strip()
@@ -180,7 +206,7 @@ def audit() -> dict[str, Any]:
             }
         )
 
-    for path in skill_files():
+    for path in skill_files(catalog):
         skill = path.parent.name
         metadata = load_frontmatter(path)
         status_metadata = metadata.get("metadata")
@@ -317,6 +343,7 @@ def audit() -> dict[str, Any]:
 
     counts = Counter(row["status"] for row in rows)
     return {
+        "catalog_sha256": catalog.checksum,
         "target": "10.5.2605",
         "verified": VERIFIED_DATE,
         "skill_count": len(rows),

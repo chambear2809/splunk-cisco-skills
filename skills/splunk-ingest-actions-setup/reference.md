@@ -44,7 +44,7 @@ REST mutation, and exits `2`.
 
 Use the following Cloud routes:
 
-- `splunk-ingest-actions --platform cloud --phase render` for an Ingest Actions
+- `splunk-ingest-actions-setup --platform cloud --phase render` for an Ingest Actions
   ruleset specification and Splunk Web `/services/data/ingest/rulesets` handoff.
 - `splunk-ingest-processor-setup` for Splunk Cloud control-plane pipelines.
 - `splunk-edge-processor-setup` for transformations on Edge Processors.

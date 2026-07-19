@@ -1,7 +1,7 @@
 interface:
   display_name: "Splunk Secure Gateway Setup"
-  short_description: "Enable Secure Gateway, Spacebridge egress, and mobile MDM"
+  short_description: "Apply Enterprise app state; render Gateway runbooks"
   default_prompt: >-
-    Use $splunk-secure-gateway-setup to enable or disable the Splunk Secure
-    Gateway app, validate Spacebridge outbound egress, and render deployment,
-    Private Spacebridge, MDM, and device registration runbooks.
+    Use $splunk-secure-gateway-setup to apply only Enterprise app enable/disable
+    and render the Enterprise egress check, endpoint/instance-ID skeleton, and
+    MDM/registration runbooks. Cloud is no-probe, no-REST render/support only.

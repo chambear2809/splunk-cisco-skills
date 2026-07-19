@@ -1,162 +1,48 @@
 ---
 name: splunk-ingest-actions
-description: "Use when the user asks to filter, mask, redact, or route data at ingest time, set up Splunk Ingest
-  Actions rulesets, configure an S3 or filesystem RFS destination, route events to an alternate index or
-  to S3, drop noisy events before indexing, or audit existing ingest rulesets on Splunk Cloud Platform or
-  Splunk Enterprise. Render, preflight, and validate Splunk Ingest Actions assets: RFS (Remote File
-  System) S3 and filesystem destinations in outputs.conf, a ruleset specification for filter/mask/set-
-  index/route rules, a manual heavy-forwarder props.conf/transforms.conf preview, and ruleset status
-  checks."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-ingest-actions-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "conditional"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-ingest-actions-setup"
 ---
 
-# Splunk Ingest Actions
+# Splunk Ingest Actions (Deprecated Compatibility Alias)
 
-## Prerequisites
+> [!WARNING]
+> `splunk-ingest-actions` is deprecated and replaced by
+> [`splunk-ingest-actions-setup`](../splunk-ingest-actions-setup/SKILL.md). Use the canonical skill for all work.
 
-| Tool or access | Purpose | Verify |
-|---|---|---|
-| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
-| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
-| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+## Fail-Closed Compatibility Contract
 
-## Workflow Overview
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-ingest-actions-setup` as `replaced_by`.
 
-```text
-┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
-│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
-└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
-```
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-## When to Activate
-
-- Filter, mask, redact, or route data at ingest time, set up Splunk Ingest Actions rulesets, configure an S3 or
-  filesystem RFS destination, route events to an alternate index or to S3, drop noisy events before indexing, or
-  audit existing.
-- Preview and review the splunk ingest actions workflow before any live apply phase.
-- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
-
-## Scope
-
-Follow the documented read-only or render-first path whenever it is available.
-This skill does not imply permission to mutate live systems. Require explicit
-apply flags, protected credentials, and operator review for state changes.
-
-## Examples
-
-Inspect the supported setup modes before selecting one:
+## Safe Compatibility Checks
 
 ```bash
 bash skills/splunk-ingest-actions/scripts/setup.sh --help
-```
-
-Expected output: usage, supported modes, and required arguments are displayed
-without changing the target environment.
-
-Inspect validation modes before running completion checks:
-
-```bash
 bash skills/splunk-ingest-actions/scripts/validate.sh --help
+python3 skills/splunk-ingest-actions/scripts/render_assets.py --help
 ```
 
-Expected output: offline, live, and completion options are displayed when the
-skill supports them; help exits without mutation.
-
-## Troubleshooting
-
-| Issue | Cause | Resolution |
-|---|---|---|
-| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
-| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
-| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
-| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
-
-This skill renders Splunk Ingest Actions assets: RFS (Remote File System)
-destinations (`outputs.conf [rfs:<name>]`), a structured ruleset specification
-for filter / mask / set-index / route rules, an optional manual
-heavy-forwarder `props.conf`/`transforms.conf` preview, and live ruleset status
-checks. It is render-first because ingest-time rules permanently change or drop
-data before it is indexed.
-
-## Important: How Rulesets Are Managed
-
-Per Splunk, create and modify **rulesets** only through the Ingest Actions page
-(**Settings > Ingest Actions**) or the REST endpoint
-`/services/data/ingest/rulesets` — not by hand-editing the underlying
-`transforms.conf`. This skill therefore:
-
-- Renders **RFS destinations** in `outputs.conf` (documented as directly
-  editable for advanced configuration).
-- Renders a **ruleset specification** (`ruleset.json`) and a UI/REST handoff for
-  creating the ruleset the supported way.
-- Renders an optional **manual heavy-forwarder preview** (`props.conf` +
-  `transforms.conf`) for classic pre-index filtering/masking outside the Ingest
-  Actions UI, clearly labeled as the manual path.
-
-## Agent Behavior
-
-Never ask for S3 access keys in chat. Prefer IAM roles or existing credential
-files. If static S3 keys are unavoidable, use local-only files:
+For supported behavior, begin here:
 
 ```bash
-bash skills/shared/scripts/write_secret_file.sh /tmp/ingest_actions_s3_access_key
-bash skills/shared/scripts/write_secret_file.sh /tmp/ingest_actions_s3_secret_key
+bash skills/splunk-ingest-actions-setup/scripts/setup.sh --help
+bash skills/splunk-ingest-actions-setup/scripts/validate.sh --help
 ```
 
-Use `template.example` for non-secret values: destination type and path,
-partitioning, format, source type, and rule definitions.
-
-## Quick Start
-
-Render an S3 RFS destination plus a filter+mask ruleset spec:
-
-```bash
-bash skills/splunk-ingest-actions/scripts/setup.sh \
-  --destination-type s3 \
-  --destination-name archive_s3 \
-  --s3-path s3://splunk-ingest-archive/prod \
-  --s3-auth-region us-east-1 \
-  --sourcetype cisco:asa \
-  --rules filter,mask \
-  --filter-regex 'DEBUG' \
-  --mask-regex '\d{16}' --mask-replacement 'XXXXXXXXXXXXXXXX'
-```
-
-Audit existing rulesets and destinations (read-only):
-
-```bash
-bash skills/splunk-ingest-actions/scripts/validate.sh --live
-```
-
-## What It Renders
-
-- `outputs.conf` — `[rfs:<name>]` S3 or filesystem destination with partitioning,
-  format, compression, and upload-error handling
-- `ruleset.json` — structured ruleset spec for the Ingest Actions UI / REST
-- `props_transforms_preview.conf` — manual heavy-forwarder preview (filter to
-  nullQueue, mask via INGEST_EVAL/SEDCMD)
-- `apply.sh` — on an Enterprise/customer-managed target, stage the RFS
-  destination into `splunk_ingest_actions/local`, print the ruleset UI/REST
-  handoff, and exit nonzero until that ruleset is authored and verified; a
-  Cloud-rendered script exits `2` before any local runtime write
-- `status.sh` — list rulesets and surface RFS upload errors from `_internal`
-- `README.md` / `metadata.json` — review context
-
-## Operating Notes
-
-- A source type can have only one ruleset; rules run in order.
-- If a ruleset routes to a destination that does not exist or is invalid, Splunk
-  blocks queues and pipelines rather than dropping data. Create destinations
-  first.
-- On managed Splunk Cloud, create destinations and rulesets through Splunk Web
-  or the supported REST/control-plane workflow. `--platform cloud --phase
-  apply` exits `2` before rendering or writing a local `$SPLUNK_HOME` path.
-- On Victoria, rulesets deploy automatically; on Classic and on indexer
-  clusters you must deploy explicitly.
-- On heavy forwarders managed by a deployment server, configure S3 destinations
-  on each forwarder individually.
-
-Read `reference.md` before deploying filter rules (data loss) or routing to S3.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

@@ -1,3 +1,5 @@
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 3cfe68af5eb8862b5521b1f00aa0da2f43b3d2571bfaa890341e265c4da2587f. -->
+
 Send Cisco Nexus 9000 (and any cisco_os receiver-supported NX-OS / IOS-XE / IOS-XR device) metrics to Splunk Observability Cloud via the OTel cisco_os receiver in the multi-device + global-scrapers format (PR #45562, contrib v0.149.0+). Renders the cluster-receiver overlay, the K8s Secret manifest stub for SSH credentials, dashboards, and starter detectors. Standalone and reusable; composed by the AI Pod umbrella.
 
 Read and follow the instructions in skills/splunk-observability-cisco-nexus-integration/SKILL.md to help the user. If more detail is needed, also read skills/splunk-observability-cisco-nexus-integration/reference.md.

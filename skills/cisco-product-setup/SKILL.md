@@ -4,7 +4,7 @@ description: "Use when the user asks to set up Splunk for a Cisco product such a
   ThousandEyes, ASA, or FTD, including choosing the dedicated ASA syslog TA versus Cisco Security Cloud
   API or eStreamer collection. Resolve a Cisco product name from the SCAN catalog and route installation,
   configuration, and validation through the correct existing setup skill."
-compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
   splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
@@ -89,6 +89,11 @@ Provides one product-aware entrypoint for Cisco setup requests.
   this repo.
 - For partial products, returns a concrete collector or app-install handoff
   path without claiming full product automation.
+- For CUCM, Expressway, Meeting Server, and Meeting Management, delegates only
+  render/validate planning to `cisco-collaboration-setup`; all four remain
+  `partial`. BroadWorks and RoomOS collaboration hardware retain
+  `unsupported_roadmap` through a non-executable `gap_handoff` to the same
+  evidence router.
 - For ASA and FTD, treats the collection path as part of product identity:
   syslog or `Splunk_TA_cisco-asa` intent routes to `cisco-asa-ta-setup`, while
   API and eStreamer intent routes to `cisco-security-cloud-setup`. Bare ASA/FTD

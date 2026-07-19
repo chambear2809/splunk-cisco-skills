@@ -4,8 +4,9 @@ description: "Use when the user asks to create or govern saved searches, schedul
   eventtypes, tags, or to set knowledge-object permissions, ownership, or app sharing. Not for Enterprise
   Security detections, which live in splunk-enterprise-security-config. Render, validate, and apply
   governance for Splunk knowledge objects: saved searches and alerts, search macros, CSV and KV Store
-  lookups (with automatic lookup binding), eventtypes, tags, and field knowledge, plus sharing and
-  ownership (ACL) governance across user, app, and global scopes."
+  lookups (with automatic lookup binding), eventtypes, and tags, plus sharing and ownership (ACL)
+  governance across user, app, and global scopes. This does not implement fields.conf, field extractions,
+  FIELDALIAS, calculated fields, bulk inventory, or arbitrary ACL endpoints."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -146,7 +147,8 @@ directory, explicit reviewed recovery guidance, and
 pre-transaction state, reconciliation records that no failed mutation remains.
 
 Transactional REST apply fails closed for SHC deployer-bundle delivery because
-a member REST ACL update cannot be atomic with a deployer file write. For that
-topology, use `splunk-knowledge-objects` to render content plus `local.meta` and
-push one reviewed deployer bundle. CSV lookup content remains a separate file:
+a member REST ACL update cannot be atomic with a deployer file write. This
+skill does not render `local.meta` or a bulk SHC bundle; prepare and review a
+deployer-owned app bundle through a supported SHC deployment workflow. CSV
+lookup content remains a separate file:
 place it in the app `lookups/` directory or upload it through the lookup editor.

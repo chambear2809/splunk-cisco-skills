@@ -83,8 +83,9 @@ alone is not success; validate applicable ingest, macros, and shipped
 dashboards against data.
 
 Render-first skill that owns the complete lifecycle of the Splunk O11y GCP
-integration. The workflow is render-first by default. The Splunk O11y REST API
-is only called when the operator explicitly runs `--apply`.
+integration. Rendering and rollback-plan review are network-free. Mutations
+require explicit `--apply`; `--discover`, `--quickstart-from-live`, and
+`--validate --live` are the explicit read-only modes that call the live API.
 
 ## Splunk Platform Add-on Verification Boundary
 
@@ -107,7 +108,7 @@ change the Observability Cloud GCP metrics REST integration owned by this skill.
 | Official `gcp_wif_config.json` validation and REST delivery | `api_apply` / `api_validate` |
 | Drift detection (hash-based) | `api_validate` |
 | Conflict matrix enforcement | `api_validate` |
-| `projectKey` redacted on GET | `api_validate` |
+| `projectKey` omitted on GET and reconstructed for PUT | `api_validate` |
 | Services enum validation | `api_validate` |
 | `namedToken` ForceNew warning | `api_validate` |
 | Cross-skill handoffs | `handoff` / `not_applicable` |
@@ -116,9 +117,10 @@ change the Observability Cloud GCP metrics REST integration owned by this skill.
 
 - Never ask for the GCP Service Account JSON key (`projectKey`) in conversation.
 - Never pass `projectKey` as a CLI argument or env-var prefix.
-- Use `--key-file` (chmod 600) for file-based delivery. Repeat it exactly once
-  per `project_service_keys` entry, in the same order; the CLI refuses count
-  mismatches rather than reusing one credential across projects.
+- Use `--key-file` (chmod 600) for file-based delivery. Each JSON file is
+  securely parsed and mapped by its own `project_id`, independent of flag
+  order. Missing, extra, duplicate, or mismatched project coverage fails before
+  any live request; a credential is never reused for another project.
 - In WIF mode, use only Splunk's official generated file named
   `gcp_wif_config.json`, stored unchanged as a regular mode-600 file. Pass its
   path through `--wif-config-file`; never paste its contents into the spec.
@@ -128,11 +130,13 @@ change the Observability Cloud GCP metrics REST integration owned by this skill.
 - Use `write_secret_file.sh` to create secret files without shell-history exposure.
 - Reject direct-secret flags: `--secret`, `--password`, `--api-key`,
   `--project-key`, `--token`, `--wif-config`.
-- `projectKey` is redacted on `GET /v2/integration/<id>`.
+- `projectKey` is not returned by `GET /v2/integration/<id>`.
   The skill compares local file hashes to `state/credential-hashes.json`
   rather than server state.
-- Every payload includes `projects.syncMode`; `SELECTED` also includes the
-  reviewed project ID list.
+- Newly rendered provisioning payloads include `projects.syncMode`; `SELECTED`
+  also includes the reviewed project ID list. Rollback preserves a valid
+  service-account live object that omits `projects`, while WIF requires a
+  validated projects contract.
 
 ## Five-mode UX
 
@@ -171,9 +175,7 @@ chmod 600 /tmp/gcp-sa-key.json
 bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
   --render \
   --spec my-gcp-spec.yaml \
-  --realm us1 \
-  --key-file /tmp/gcp-sa-key.json \
-  --token-file /tmp/splunk_o11y_token
+  --realm us1
 ```
 
 ### 4. Review the plan
@@ -186,7 +188,7 @@ splunk-observability-gcp-integration-rendered/
   rest/wif-config-file-manifest.json # file path only; no WIF contents
   gcloud-cli/create-sa.sh  # gcloud iam sa create (review)
   gcloud-cli/bind-roles.sh # role bindings
-  terraform/main.tf       # SA-key resource, or explicit WIF non-support notice
+  terraform/main.tf       # SA-key resource; WIF intentionally uses the REST path
   terraform/variables.tf  # variable declarations
   handoffs/               # cross-skill handoff drivers
   state/                  # populated on apply
@@ -228,15 +230,63 @@ and WIF file existence, JSON integrity, filename, regular-file status, and mode.
 
 ## Rollback
 
+Rollback is a three-step snapshot, offline review, and exact-plan apply
+workflow. It never resolves a mutation target by name.
+
+### 1. Capture a read-only observed snapshot
+
 ```bash
 bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
-  --rollback integration \
+  --discover \
   --realm us1 \
-  --token-file /tmp/splunk_o11y_token
+  --token-file /secure/splunk_o11y_token \
+  --output-dir gcp-live
 ```
 
-Disables the integration in Splunk O11y (sets `enabled: false`). Use
-`--rollback delete` to remove it entirely.
+### 2. Render and review a disable plan offline
+
+```bash
+bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
+  --rollback disable \
+  --realm us1 \
+  --integration-id SERVER_ASSIGNED_ID \
+  --integration-name EXACT_NAME \
+  --observed-state-file gcp-live/state/current-state.json \
+  --key-file /secure/project-a.json \
+  --key-file /secure/project-b.json \
+  --plan-file gcp-live/state/disable-plan.json
+```
+
+For WIF, replace every `--key-file` with one
+`--wif-config-file /secure/gcp_wif_config.json`. The renderer reads credentials
+only to validate them and bind secret-free SHA-256 metadata; it makes no
+network request. Review the exact JSON and printed hash.
+
+### 3. Apply that exact reviewed plan
+
+```bash
+bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
+  --rollback disable --apply \
+  --realm us1 \
+  --integration-id SERVER_ASSIGNED_ID \
+  --plan-file gcp-live/state/disable-plan.json \
+  --plan-hash REVIEWED_SHA256 \
+  --accept-disable-integration SERVER_ASSIGNED_ID \
+  --token-file /secure/splunk_o11y_admin_token \
+  --key-file /secure/project-a.json \
+  --key-file /secure/project-b.json
+```
+
+Disable is only an enabled-to-disabled transition and reconstructs the live
+authentication shape from the reviewed credential mode. Delete requires a
+separately rendered `--rollback delete` plan and
+`--accept-delete-integration SERVER_ASSIGNED_ID`; it rejects all key and WIF
+files. Never use delete as a workaround when disable is blocked. Bare
+`--rollback` renders a disable plan but cannot be applied, and
+`--rollback integration` remains only as a deprecated disable alias.
+
+See [reference.md](reference.md#reviewed-rollback-contract) for plan schema,
+locking, replay, reconciliation, compatibility, and remote-race behavior.
 
 ## Workload Identity Federation
 
@@ -261,9 +311,10 @@ bash skills/splunk-observability-gcp-integration/scripts/setup.sh \
 
 The live request uses `authMethod: WORKLOAD_IDENTITY_FEDERATION` and injects
 the complete document as compact/stringified JSON in
-`workloadIdentityFederationConfig`. Terraform WIF arguments and gcloud
-pool/provider scripts are intentionally not rendered because this skill has no
-verified provider contract for that opaque configuration.
+`workloadIdentityFederationConfig`. The upstream SignalFx Terraform provider
+supports WIF and projects arguments. This skill intentionally keeps WIF on its
+reviewed REST path and does not currently generate the Terraform WIF resource
+or gcloud pool/provider scripts.
 
 ## Hand-offs
 

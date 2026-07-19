@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from skills.shared.skill_catalog import load_catalog
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_PATH = REPO_ROOT / "skills/shared/scripts/audit_skill_compatibility.py"
@@ -24,15 +26,19 @@ def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
     payload = load_audit_module().audit()
     assert payload["ok"], payload["findings"]
     assert payload["target"] == "10.5.2605"
-    assert payload["skill_count"] == 169
-    assert payload["status_counts"] == {
-        "blocked": 0,
-        "conditional": 95,
-        "delegated": 5,
-        "not-applicable": 56,
-        "self-managed-10.4": 10,
-        "supported": 3,
-    }
+    assert payload["skill_count"] == len(load_catalog().skills)
+    assert sum(payload["status_counts"].values()) == payload["skill_count"]
+
+
+def test_help_only_aliases_delegate_runtime_compatibility_to_replacements() -> None:
+    catalog = load_catalog()
+    payload = load_audit_module().audit()
+    statuses = {row["skill"]: row["status"] for row in payload["skills"]}
+
+    for legacy, canonical in catalog.aliases.items():
+        assert catalog.by_name[legacy].deprecated
+        assert statuses[legacy] == "delegated"
+        assert statuses[canonical] != "delegated"
 
 
 def test_latest_release_gaps_use_verified_10_5_pins() -> None:

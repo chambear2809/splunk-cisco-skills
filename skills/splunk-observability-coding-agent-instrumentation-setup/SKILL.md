@@ -3,7 +3,7 @@ name: splunk-observability-coding-agent-instrumentation-setup
 description: "Use when planning Splunk Observability instrumentation for Codex or future coding agents without
   applying agent-specific config. Route coding-agent telemetry requests to the right child skill and
   render a non-mutating orchestration plan."
-compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
   splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"

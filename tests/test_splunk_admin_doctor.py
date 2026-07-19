@@ -17,6 +17,7 @@ from pathlib import Path
 from unittest import mock
 
 from agent.splunk_cisco_skills_mcp import core
+from skills.shared.skill_catalog import load_catalog
 from tests.regression_helpers import REPO_ROOT
 
 
@@ -71,6 +72,22 @@ LEGACY_RULE_IDS = [
 
 
 class SplunkAdminDoctorTests(unittest.TestCase):
+    def test_compatibility_routes_derive_aliases_plus_one_canonical_override(self) -> None:
+        catalog = load_catalog()
+        expected_override = {
+            "splunk-cloud-acs-allowlist-setup": "splunk-cloud-acs-admin-setup"
+        }
+
+        self.assertEqual(doctor.DEPRECATED_SKILL_ALIASES, dict(catalog.aliases))
+        self.assertEqual(doctor.CANONICAL_ROUTING_OVERRIDES, expected_override)
+        self.assertEqual(
+            doctor.CANONICAL_SKILL_ALIASES,
+            {**dict(catalog.aliases), **expected_override},
+        )
+        for source, target in expected_override.items():
+            self.assertFalse(catalog.by_name[source].deprecated)
+            self.assertFalse(catalog.by_name[target].deprecated)
+
     def test_direct_cli_help_documents_strict_platform_uri_status_and_exit_contracts(self) -> None:
         help_result = self.run_doctor("--help")
         self.assertEqual(help_result.returncode, 0, msg=help_result.stderr)
@@ -166,8 +183,9 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         rule_ids = [item["id"] for item in doctor.RULE_CATALOG]
         self.assertEqual(rule_ids, sorted(set(rule_ids)))
         self.assertTrue(set(LEGACY_RULE_IDS).issubset(rule_ids))
-        self.assertEqual(validation["repository_skill_count"], 169)
-        self.assertEqual(validation["routed_repository_skill_count"], 169)
+        expected_skill_count = len(load_catalog().skills)
+        self.assertEqual(validation["repository_skill_count"], expected_skill_count)
+        self.assertEqual(validation["routed_repository_skill_count"], expected_skill_count)
         self.assertEqual(validation["unmapped_skills"], [])
         self.assertTrue(
             {

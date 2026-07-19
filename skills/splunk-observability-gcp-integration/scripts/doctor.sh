@@ -63,13 +63,15 @@ auth = data.get('authMethod')
 assert auth in ('SERVICE_ACCOUNT_KEY', 'WORKLOAD_IDENTITY_FEDERATION'), 'invalid authMethod'
 projects = data.get('projects')
 assert isinstance(projects, dict), 'projects must be an object'
-assert projects.get('syncMode') in ('ALL', 'SELECTED'), 'projects.syncMode missing or invalid'
-project_ids = projects.get('projectIds', [])
-assert isinstance(project_ids, list) and all(isinstance(item, str) and item for item in project_ids), 'projects.projectIds must be a string list'
-if projects['syncMode'] == 'ALL':
-    assert not project_ids, 'projects.projectIds must be empty for ALL'
+assert projects.get('syncMode') in ('ALL_REACHABLE', 'SELECTED'), 'projects.syncMode missing or invalid'
+assert 'projectIds' not in projects, 'legacy projects.projectIds must not be emitted'
+selected_project_ids_present = 'selectedProjectIds' in projects
+if projects['syncMode'] == 'ALL_REACHABLE':
+    assert not selected_project_ids_present, 'projects.selectedProjectIds must be absent for ALL_REACHABLE'
 else:
-    assert project_ids, 'projects.projectIds is required for SELECTED'
+    assert selected_project_ids_present, 'projects.selectedProjectIds is required for SELECTED'
+    project_ids = projects['selectedProjectIds']
+    assert isinstance(project_ids, list) and project_ids and all(isinstance(item, str) and item for item in project_ids), 'projects.selectedProjectIds must be a non-empty string list for SELECTED'
 if auth == 'WORKLOAD_IDENTITY_FEDERATION':
     value = data.get('workloadIdentityFederationConfig')
     assert isinstance(value, str) and value, 'workloadIdentityFederationConfig missing'

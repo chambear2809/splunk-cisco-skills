@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from skills.shared.skill_catalog import load_catalog
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = REPO_ROOT / "skills"
@@ -19,14 +21,7 @@ PRODUCT_REGISTRY = SKILLS_DIR / "shared" / "skill_product_registry.json"
 
 
 def skill_names() -> set[str]:
-    return {
-        path.name
-        for path in SKILLS_DIR.iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    }
+    return set(load_catalog().by_name)
 
 
 def product_registry() -> dict[str, Any]:
@@ -117,6 +112,15 @@ class SkillUXCatalogTests(unittest.TestCase):
         self.assertIn("Validation", text)
         self.assertIn("never paste secrets into chat or argv", text)
         self.assertIn("Canonical skill directories remain flat", text)
+
+    def test_deprecated_aliases_are_visibly_labeled_from_manifest(self) -> None:
+        text = CATALOG_PATH.read_text(encoding="utf-8")
+        for legacy, canonical in load_catalog().aliases.items():
+            pattern = (
+                rf"^\| `{re.escape(legacy)}` \| \*\*Deprecated\*\* -> "
+                rf"`{re.escape(canonical)}` \|"
+            )
+            self.assertRegex(text, re.compile(pattern, flags=re.MULTILINE))
 
 
 if __name__ == "__main__":

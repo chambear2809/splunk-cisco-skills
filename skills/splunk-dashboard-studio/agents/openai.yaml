@@ -1,7 +1,6 @@
 interface:
   display_name: "Splunk Platform Dashboard Studio"
-  short_description: "Build version=2 dashboards as code and publish via REST"
-  default_prompt: >-
-    Use $splunk-dashboard-studio to render and validate a Splunk Platform
-    Dashboard Studio version=2 dashboard (JSON definition + data/ui/views source
-    XML) from SPL panels, then publish it via the data/ui/views REST endpoint.
+  short_description: "Deprecated alias for Dashboard Studio"
+  default_prompt: "Use $splunk-dashboard-studio only for compatibility; route new work to $splunk-dashboard-studio-setup."
+policy:
+  allow_implicit_invocation: false

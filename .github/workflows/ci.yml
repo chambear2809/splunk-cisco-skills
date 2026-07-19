@@ -226,6 +226,9 @@ jobs:
       - name: Check catalog freshness
         run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
 
+      - name: Check canonical skill manifest surfaces
+        run: python3 skills/shared/scripts/generate_skill_catalog.py --check
+
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check
 

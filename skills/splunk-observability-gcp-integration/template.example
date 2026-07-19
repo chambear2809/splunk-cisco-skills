@@ -44,7 +44,7 @@ connection:
 
 # ── Projects ─────────────────────────────────────────────────────────────────
 projects:
-  sync_mode: ALL               # ALL | SELECTED
+  sync_mode: ALL_REACHABLE     # ALL_REACHABLE | SELECTED
   selected_project_ids: []     # GCP project IDs when sync_mode=SELECTED
 
 # ── Services ──────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ services:
 custom_metric_type_domains: []
 
 # ── GCE label exclusion ───────────────────────────────────────────────────────
-# Exclude GCE instances with these label key=value pairs.
+# Exclude GCE instances by label key (no gcp_label_ prefix and no values).
 exclude_gce_instances_with_labels: []
 
 # ── Named token ───────────────────────────────────────────────────────────────
@@ -67,9 +67,10 @@ exclude_gce_instances_with_labels: []
 # WARNING: Changing named_token destroys and re-creates the integration (ForceNew in Terraform).
 named_token: ""
 
-# ── Terraform provider (service_account_key only) ────────────────────────────
-# WIF is applied through the REST path. This skill intentionally does not claim
-# unsupported pool/provider Terraform arguments for the opaque WIF config.
+# ── Terraform output (generated for service_account_key only) ────────────────
+# The current upstream provider supports WIF/projects. This skill intentionally
+# generates WIF through its reviewed REST path and does not currently generate
+# the Terraform WIF resource.
 terraform_provider:
   source: splunk-terraform/signalfx
   version: "~> 9.0"

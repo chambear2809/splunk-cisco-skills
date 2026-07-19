@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
+from skills.shared.skill_catalog import load_catalog
+
 try:
     from mcp import ClientSession, StdioServerParameters, types as mcp_types
     from mcp.client.stdio import stdio_client
@@ -162,6 +164,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         search = tools["search_skills"].inputSchema["properties"]
         self.assertEqual(search["limit"]["minimum"], 1)
         self.assertEqual(search["limit"]["maximum"], 100)
+        self.assertIn("canonical", tools["search_skills"].description)
+        self.assertIn("exact legacy name", tools["search_skills"].description)
+        self.assertIn("canonical", tools["list_skills"].description)
         read = tools["read_skill_file"].inputSchema["properties"]
         self.assertEqual(read["offset"]["minimum"], 0)
         self.assertEqual(read["max_bytes"]["minimum"], 1)
@@ -345,6 +350,24 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("path", traversal.content[0].text.lower())
         self.assertTrue(script_read.isError)
         self.assertIn("curated", script_read.content[0].text.lower())
+
+    async def test_legacy_catalog_view_describes_canonical_only_traversal(self) -> None:
+        catalog = load_catalog()
+        canonical_count = sum(not record.deprecated for record in catalog.skills)
+        async with self.session() as client:
+            result = await client.call_tool("list_skills", {})
+
+        self.assertFalse(result.isError)
+        payload = result.structuredContent
+        note = payload["compatibility_note"]
+        self.assertEqual(payload["total"], canonical_count)
+        self.assertEqual(
+            len(catalog.skills) - payload["total"], len(catalog.aliases)
+        )
+        self.assertIn("canonical skills", note)
+        self.assertIn("exact legacy-name search", note)
+        self.assertIn("not the complete manifest identity set", note)
+        self.assertNotIn("complete traversal", note)
 
     async def test_prompts_are_advertised_and_reinforce_approval_boundaries(
         self,

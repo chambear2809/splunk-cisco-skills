@@ -241,7 +241,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
     }
     coverage["authentication.sp_credentials"] = {
         "status": "api_apply",
-        "notes": "appId + secretKey via file-based delivery; redacted on GET",
+        "notes": "appId + secretKey via file-based delivery; omitted on GET",
     }
 
     env = spec["azure_environment"]
@@ -334,7 +334,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     coverage["validation.live_get"] = {
         "status": "api_validate",
-        "notes": "GET /v2/integration/{id} round-trip; drift check for non-redacted fields",
+        "notes": "GET /v2/integration/{id} round-trip; drift check for visible fields",
     }
     coverage["validation.credential_hash"] = {
         "status": "api_validate",

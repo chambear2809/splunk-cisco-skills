@@ -83,8 +83,9 @@ alone is not success; validate applicable ingest, macros, and shipped
 dashboards against data.
 
 Render-first skill that owns the complete lifecycle of the Splunk O11y Azure
-integration. The workflow is render-first by default. The Splunk O11y REST API
-is only called when the operator explicitly runs `--apply`.
+integration. Rendering and rollback-plan review are network-free. Mutations
+require explicit `--apply`; `--discover`, `--quickstart-from-live`, and
+`--validate --live` are the explicit read-only modes that call the live API.
 
 ## Coverage Model
 
@@ -97,7 +98,7 @@ is only called when the operator explicitly runs `--apply`.
 | Drift detection (hash-based) | `api_validate` |
 | Conflict matrix enforcement | `api_validate` |
 | GovCloud realm guard | `api_validate` |
-| `appId` / `secretKey` redacted on GET | `api_validate` |
+| `appId` / `secretKey` omitted on GET and reconstructed for PUT | `api_validate` |
 | Services enum validation | `api_validate` |
 | `namedToken` ForceNew warning | `api_validate` |
 | Cross-skill handoffs | `handoff` / `not_applicable` |
@@ -110,7 +111,7 @@ is only called when the operator explicitly runs `--apply`.
 - Use `write_secret_file.sh` to create secret files without shell-history exposure.
 - Reject direct-secret flags: `--secret`, `--client-secret`, `--token`,
   `--password`, `--app-secret`.
-- `appId` and `secretKey` are redacted on `GET /v2/integration/<id>`.
+- `appId` and `secretKey` are omitted from `GET /v2/integration/<id>`.
   The skill compares local file hashes to `state/credential-hashes.json`
   rather than server state.
 
@@ -161,10 +162,7 @@ rm /tmp/azure-sp.json
 bash skills/splunk-observability-azure-integration/scripts/setup.sh \
   --render \
   --spec my-azure-spec.yaml \
-  --realm us1 \
-  --app-id-file /tmp/azure-app-id.txt \
-  --secret-file /tmp/azure-secret.txt \
-  --token-file /tmp/splunk_o11y_token
+  --realm us1
 ```
 
 ### 4. Review the plan
@@ -217,19 +215,66 @@ bash skills/splunk-observability-azure-integration/scripts/setup.sh \
 
 Doctor checks: services non-empty, poll-rate 60–600, namedToken ForceNew
 warning, `AZURE_US_GOVERNMENT` + non-GovCloud realm mismatch, credential-hash
-freshness, and `appId`/`secretKey` redaction notice.
+freshness, and the `appId`/`secretKey` GET-omission/reinjection notice.
 
 ## Rollback
 
+Rollback is a three-step snapshot, offline review, and exact-plan apply
+workflow. It never resolves a mutation target by name.
+
+### 1. Capture a read-only observed snapshot
+
 ```bash
 bash skills/splunk-observability-azure-integration/scripts/setup.sh \
-  --rollback integration \
+  --discover \
   --realm us1 \
-  --token-file /tmp/splunk_o11y_token
+  --token-file /secure/splunk_o11y_token \
+  --output-dir azure-live
 ```
 
-Disables the integration in Splunk O11y (sets `enabled: false`). Use
-`--rollback delete` to remove it entirely.
+### 2. Render and review a disable plan offline
+
+```bash
+bash skills/splunk-observability-azure-integration/scripts/setup.sh \
+  --rollback disable \
+  --realm us1 \
+  --integration-id SERVER_ASSIGNED_ID \
+  --integration-name EXACT_NAME \
+  --observed-state-file azure-live/state/current-state.json \
+  --app-id-file /secure/azure-app-id \
+  --secret-file /secure/azure-secret \
+  --plan-file azure-live/state/disable-plan.json
+```
+
+The renderer reads the local credential files only to bind their SHA-256
+digests; the plan contains no credential values or paths and makes no network
+request. Review the exact JSON and printed hash.
+
+### 3. Apply that exact reviewed plan
+
+```bash
+bash skills/splunk-observability-azure-integration/scripts/setup.sh \
+  --rollback disable --apply \
+  --realm us1 \
+  --integration-id SERVER_ASSIGNED_ID \
+  --plan-file azure-live/state/disable-plan.json \
+  --plan-hash REVIEWED_SHA256 \
+  --accept-disable-integration SERVER_ASSIGNED_ID \
+  --token-file /secure/splunk_o11y_admin_token \
+  --app-id-file /secure/azure-app-id \
+  --secret-file /secure/azure-secret
+```
+
+Disable is only an enabled-to-disabled transition and reconstructs the
+write-only `appId` and `secretKey` fields from the same reviewed files. Delete
+requires a separately rendered `--rollback delete` plan and
+`--accept-delete-integration SERVER_ASSIGNED_ID`; it rejects all Azure
+credential-file flags. Never use delete as a workaround when disable is
+blocked. Bare `--rollback` renders a disable plan but cannot be applied, and
+`--rollback integration` remains only as a deprecated disable alias.
+
+See [reference.md](reference.md#reviewed-rollback-contract) for plan schema,
+locking, replay, reconciliation, and remote-race behavior.
 
 ## Hand-offs
 

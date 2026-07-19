@@ -27,6 +27,11 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 SKILL_NAME = "splunk-admin-doctor"
 SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import load_catalog  # noqa: E402
+
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-admin-doctor-rendered"
 
 FIX_KINDS = {
@@ -411,7 +416,7 @@ PRODUCT_ROUTE_CATALOG = [
         ],
         "covered_skill_names": [
             "splunk-cloud-data-manager-setup", "splunk-edge-processor-setup",
-            "splunk-ingest-actions", "splunk-ingest-actions-setup",
+            "splunk-ingest-actions-setup",
             "splunk-ingest-processor-setup", "splunk-spl2-pipeline-kit",
         ],
         "covered_skill_prefixes": [],
@@ -502,15 +507,24 @@ PRODUCT_ROUTE_CATALOG = [
 ]
 
 
-CANONICAL_SKILL_ALIASES = {
-    "splunk-cim-data-model": "splunk-cim-data-model-setup",
+_ADMIN_DOCTOR_CATALOG = load_catalog()
+DEPRECATED_SKILL_ALIASES = dict(_ADMIN_DOCTOR_CATALOG.aliases)
+CANONICAL_ROUTING_OVERRIDES = {
     "splunk-cloud-acs-allowlist-setup": "splunk-cloud-acs-admin-setup",
-    "splunk-dashboard-studio": "splunk-dashboard-studio-setup",
-    "splunk-ddaa-archive": "splunk-ddaa-archive-setup",
-    "splunk-ingest-actions": "splunk-ingest-actions-setup",
-    "splunk-knowledge-objects": "splunk-knowledge-objects-setup",
-    "splunk-kvstore-admin": "splunk-kvstore-admin-setup",
-    "splunk-secure-gateway": "splunk-secure-gateway-setup",
+}
+_CATALOG_SKILLS = _ADMIN_DOCTOR_CATALOG.by_name
+for _source, _target in CANONICAL_ROUTING_OVERRIDES.items():
+    if _source not in _CATALOG_SKILLS or _target not in _CATALOG_SKILLS:
+        raise RuntimeError(
+            f"Admin Doctor routing override references unknown skill: {_source} -> {_target}"
+        )
+    if _CATALOG_SKILLS[_source].deprecated or _CATALOG_SKILLS[_target].deprecated:
+        raise RuntimeError(
+            f"Admin Doctor routing override must connect canonical skills: {_source} -> {_target}"
+        )
+CANONICAL_SKILL_ALIASES = {
+    **DEPRECATED_SKILL_ALIASES,
+    **CANONICAL_ROUTING_OVERRIDES,
 }
 
 

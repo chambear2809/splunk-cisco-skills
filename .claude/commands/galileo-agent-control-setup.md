@@ -1,3 +1,5 @@
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: a7bbaceecf6b8203c912b381fb090207571bc87fd1a30c89020b4dec3de4efa6. -->
+
 Render, validate, and optionally apply Agent Control server/auth/control/runtime/sink assets plus Splunk Platform and Splunk Observability handoffs.
 
 Read and follow the instructions in skills/galileo-agent-control-setup/SKILL.md to help the user. If more detail is needed, also read skills/galileo-agent-control-setup/reference.md.

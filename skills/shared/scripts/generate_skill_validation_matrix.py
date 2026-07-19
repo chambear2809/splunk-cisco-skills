@@ -9,25 +9,21 @@ from pathlib import Path
 from typing import Any
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+for import_root in (REPO_ROOT, SCRIPT_DIR):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
-from audit_skill_validation import (  # noqa: E402
+from audit_skill_validation import audit  # noqa: E402
+from skills.shared.skill_validation import (  # noqa: E402
     EVIDENCE_DIMENSIONS,
     RECORDED_RESULT_STATUSES,
-    REPO_ROOT,
-    audit,
 )
+from skills.shared.skill_catalog import load_catalog  # noqa: E402
 
 
 OUTPUT_PATH = REPO_ROOT / "SKILL_VALIDATION_MATRIX.md"
-GENERATED_BANNER = (
-    "_Generated from the checked-in skill/test surfaces and "
-    "`skills/shared/skill_validation_registry.json` by "
-    "`skills/shared/scripts/generate_skill_validation_matrix.py`; "
-    "do not edit manually._"
-)
 STATUS_LABELS = {
     "not-recorded": "Not recorded",
     "pass": "Pass",
@@ -135,6 +131,7 @@ def render() -> str:
         raise RuntimeError(
             "skill validation audit failed:\n- " + "\n- ".join(payload["findings"])
         )
+    catalog = load_catalog()
     summary = payload["summary"]
     recorded_counts = {
         dimension: sum(
@@ -147,7 +144,14 @@ def render() -> str:
     lines = [
         "# Skill Validation Matrix",
         "",
-        GENERATED_BANNER,
+        (
+            "_Generated from `skills/catalog.yaml` "
+            f"(SHA-256 `{payload['catalog_sha256']}`), checked-in skill/test "
+            "surfaces, and the manifest-generated identity plus maintained evidence "
+            "in `skills/shared/skill_validation_registry.json` by "
+            "`skills/shared/scripts/generate_skill_validation_matrix.py`; "
+            "do not edit manually._"
+        ),
         "",
         "This matrix separates checked-in validation capability from observed target",
         "results. A working `--help` interface is an interface contract; it is never",
@@ -224,15 +228,40 @@ def render() -> str:
         "",
         "## Complete Matrix",
         "",
-        "| Skill | Validator / advertised modes | Direct test references | Offline smoke "
+        "| Skill | Lifecycle | Validator / advertised modes | Direct test references | Offline smoke "
         "| TA completion gate | Integration/mock | Live read-only | Live apply/E2E |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
 
     for row in payload["skills"]:
         skill = row["skill"]
+        record = catalog.by_name[skill]
+        lifecycle = (
+            f"**Deprecated** -> `{record.replaced_by}`"
+            if record.deprecated
+            else "Canonical"
+        )
         skill_link = f"[`{skill}`](skills/{skill}/SKILL.md)"
-        smoke = link(row["offline_smoke"]) if row["offline_smoke"] else "Not provided"
+        if record.deprecated:
+            validation = (
+                "Help-only alias; no independent validation. "
+                f"Validate with [`{record.replaced_by}`]"
+                f"(skills/{record.replaced_by}/SKILL.md)."
+            )
+            alias_test = "tests/test_deprecated_skill_aliases.py"
+            direct_tests = [
+                alias_test,
+                *sorted(
+                    reference
+                    for reference in set(row["direct_test_files"])
+                    if reference != alias_test
+                ),
+            ]
+            smoke = "Not applicable (help-only)"
+        else:
+            validation = validation_surface(row)
+            direct_tests = row["direct_test_files"]
+            smoke = link(row["offline_smoke"]) if row["offline_smoke"] else "Not provided"
         gate = (
             "[Required](skills/shared/ta_completion_gate.md)"
             if row["ta_completion_gate"]
@@ -240,8 +269,8 @@ def render() -> str:
         )
         recorded = row["recorded_evidence"]
         lines.append(
-            f"| {skill_link} | {validation_surface(row)} "
-            f"| {compact_references(row['direct_test_files'])} | {smoke} | {gate} "
+            f"| {skill_link} | {lifecycle} | {validation} "
+            f"| {compact_references(direct_tests)} | {smoke} | {gate} "
             f"| {evidence_cell(recorded['integration_mock'])} "
             f"| {evidence_cell(recorded['live_read_only'])} "
             f"| {evidence_cell(recorded['live_apply_e2e'])} |"
@@ -252,8 +281,8 @@ def render() -> str:
             "",
             "## Maintenance",
             "",
-            "When a skill is added, add its name to the sorted `skills` array in",
-            "`skills/shared/skill_validation_registry.json`; catalog parity is fail-closed.",
+            "When a skill is added, add it once to `skills/catalog.yaml`; the sorted",
+            "validation identity list is generated and catalog parity is fail-closed.",
             "Test references, offline smoke scripts, validator modes, and completion-gate",
             "references are discovered automatically. Record only sanitized, reviewable",
             "environment evidence under the relevant skill and dimension, then regenerate:",

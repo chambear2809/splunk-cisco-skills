@@ -5,7 +5,7 @@ description: "Use when a user asks for total Splunk security portfolio coverage,
   Federated Analytics, SOAR, Security Essentials, UBA, Attack Analyzer, ARI, Mission Control, PCI,
   InfoSec, CIM, or related security apps. Resolve Splunk security products and associated security
   offerings to the correct local setup skill, install-only path, ES bundled workflow, or manual handoff."
-compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the selected child skill; this router does not install a runtime or package itself."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
   splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
