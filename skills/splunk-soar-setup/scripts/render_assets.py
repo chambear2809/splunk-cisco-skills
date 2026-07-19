@@ -17,6 +17,49 @@ VALID_FIPS = ("auto", "require", "disable")
 VALID_RUNTIMES = ("docker", "podman")
 VALID_IMAGE_SOURCES = ("dockerhub", "tarball")
 
+EMBEDDED_SECRET_STDOUT = r'''import os
+import stat
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]).expanduser()
+if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+    raise SystemExit("ERROR: secret file cannot be read safely on this platform")
+flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+try:
+    descriptor = os.open(path, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot securely open secret file {path}: {exc}")
+try:
+    before = os.fstat(descriptor)
+    mode = stat.S_IMODE(before.st_mode)
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+            or before.st_uid != os.geteuid() or mode & 0o077
+            or not 1 <= before.st_size <= 65536):
+        raise SystemExit("ERROR: secret must be an owner-only, single-link regular file of at most 65536 bytes")
+    chunks, remaining = [], 65537
+    while remaining:
+        chunk = os.read(descriptor, min(remaining, 8192))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+    data = b"".join(chunks)
+    fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+    if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+        raise SystemExit("ERROR: secret file changed while it was read")
+finally:
+    os.close(descriptor)
+try:
+    lines = data.decode("utf-8").splitlines()
+except UnicodeDecodeError as exc:
+    raise SystemExit(f"ERROR: secret file must contain UTF-8 text: {exc}")
+if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+    raise SystemExit("ERROR: secret file must contain exactly one non-empty line")
+sys.stdout.write(lines[0].strip())
+'''
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Render Splunk SOAR assets.")
@@ -303,8 +346,8 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
     # which means the LOCAL shell does not expand $1/$2 — the values are only
     # bound on the remote side after ssh has handed them through argv. This
     # avoids the previous pattern that interpolated $BACKUP_PATH into a
-    # double-quoted ssh argument, where a value like `; rm -rf /` would have
-    # been executed remotely.
+    # double-quoted ssh argument, where shell metacharacters in a path could
+    # have been interpreted remotely.
     backup_body = (
         f"SOAR_HOME={soar_home}\n"
         f'PRIMARY_HOST="{primary}"\n'
@@ -645,7 +688,9 @@ def render_automation_broker(args: argparse.Namespace) -> dict:
         '  echo "ERROR: token file missing: ${TOKEN_FILE}" >&2\n'
         '  exit 1\n'
         'fi\n'
-        'SOAR_AUTOMATION_TOKEN="$(cat "${TOKEN_FILE}")"\n'
+        'SOAR_AUTOMATION_TOKEN="$(python3 - "${TOKEN_FILE}" <<\'PY\'\n'
+        + EMBEDDED_SECRET_STDOUT
+        + '\nPY\n)"\n'
         'export SOAR_AUTOMATION_TOKEN\n'
         'export SOAR_TENANT_URL\n\n'
         "mkdir -p broker_data trusted_cas\n\n"

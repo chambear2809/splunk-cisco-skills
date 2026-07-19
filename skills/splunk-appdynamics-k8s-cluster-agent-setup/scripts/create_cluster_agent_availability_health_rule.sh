@@ -2,6 +2,11 @@
 set -euo pipefail
 umask 077
 
+if [[ "$-" == *x* ]]; then
+    echo "FAIL: shell xtrace is enabled; refusing a workflow that handles AppDynamics access tokens." >&2
+    exit 2
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 

@@ -284,7 +284,7 @@ PY
         offset=$((offset + count))
     done
 
-    ACS_APPS_STATE_FILE="${tmp_file}" python3 - <<'PY'
+    if ACS_APPS_STATE_FILE="${tmp_file}" python3 - <<'PY'
 import json
 import os
 import sys
@@ -302,7 +302,11 @@ if not isinstance(apps, list):
 
 json.dump({"apps": apps}, sys.stdout)
 PY
-    rc=$?
+    then
+        rc=0
+    else
+        rc=$?
+    fi
     rm -f "${tmp_file}"
     return "${rc}"
 }
@@ -495,10 +499,10 @@ cloud_restart_if_required() {
         return 0
     fi
 
-    if ! restart_output=$(acs_command restart current-stack 2>&1); then
-        rc=$?
-    else
+    if restart_output=$(acs_command restart current-stack 2>&1); then
         rc=0
+    else
+        rc=$?
     fi
 
     if (( rc != 0 )) && [[ "${restart_output}" != *"another restart is already in progress"* ]]; then

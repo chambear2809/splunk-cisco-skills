@@ -38,9 +38,8 @@ links into the related references.
 - [ ] **Encrypted backups** for `$SPLUNK_HOME/etc` and indexes; test
   restore.
 - [ ] **`splunk.secret` backup** stored separately from data.
-- [ ] **SOC alerting** wired up. See
-  [`handoff/soc-alerting-runbook.md`](operator-handoff-checklist.md)
-  (rendered into the output dir).
+- [ ] **SOC alerting** wired up. See the rendered
+  `handoff/soc-alerting-runbook.md` in the output directory.
 - [ ] **Run `bash preflight.sh`** — must exit 0.
 
 ## Cutover (T-0)

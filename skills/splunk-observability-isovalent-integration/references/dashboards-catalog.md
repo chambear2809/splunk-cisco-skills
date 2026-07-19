@@ -4,14 +4,18 @@ The skill ships token-scrubbed re-exports of the canonical Cilium and Hubble das
 
 ## Source dashboards
 
-The reference repo at `/Users/alecchamberlain/Documents/GitHub/Isovalent_Splunk_o11y/examples/` ships:
+The [`examples/` directory in the reference repository](https://github.com/chambear2809/isovalent_splunk_o11y/tree/main/examples) ships:
 
 - `Cilium by Isovalent.json` — Cilium agent + Hubble metrics dashboard.
 - `Hubble by Isovalent.json` — Hubble flow metrics dashboard (DNS, HTTP, drops).
 
-Pass `--dashboards-source /Users/alecchamberlain/Documents/GitHub/Isovalent_Splunk_o11y/examples/` to the skill to copy + scrub these into the rendered output.
+Clone the reference repository locally, then pass
+`--dashboards-source "$ISOVALENT_SPLUNK_O11Y_DIR/examples"` to the skill to
+copy and scrub these files into the rendered output.
 
-**Do NOT** copy from `/Users/alecchamberlain/Documents/GitHub/Isovalent_Splunk_o11y/values/*.yaml`. The explore subagent confirmed these files have contained plaintext `accessToken` material; even if they don't right now, they're the wrong source for dashboard JSON anyway.
+**Do not** copy from `$ISOVALENT_SPLUNK_O11Y_DIR/values/*.yaml`. Treat those
+deployment values as potentially secret-bearing; they are not dashboard JSON
+sources.
 
 ## Cilium dashboard expectations
 

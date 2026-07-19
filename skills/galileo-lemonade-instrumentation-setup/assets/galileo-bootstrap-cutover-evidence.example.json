@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "transaction_id": "TRANSACTION_UUID",
+  "api_base": "https://api.example.invalid",
+  "project_id": "PROJECT_UUID",
+  "log_stream_id": "LOG_STREAM_UUID",
+  "runtime_key_id": "RUNTIME_KEY_UUID",
+  "observed_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "host_proof": {
+    "runtime_key_installed": false,
+    "collector_config_validated": false,
+    "collector_service_active": false,
+    "rollback_tested": false
+  },
+  "galileo_proof": {
+    "otlp_write": false,
+    "api_trace_readback": false,
+    "api_hierarchy": false,
+    "privacy_assertions": false
+  },
+  "console_review": {
+    "status": "not_observed"
+  },
+  "splunk_proof": {
+    "backend_readback_unchanged": false
+  }
+}

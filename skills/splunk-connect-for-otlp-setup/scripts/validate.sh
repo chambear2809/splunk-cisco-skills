@@ -261,13 +261,16 @@ check_bound_ports() {
         return 0
     fi
 
-    ssh_host="${SPLUNK_SSH_HOST:-${SPLUNK_HOST:-$(splunk_host_from_uri "${SPLUNK_URI}")}}"
+    ssh_host="${SPLUNK_SSH_HOST:-}"
     ssh_user="${SPLUNK_SSH_USER:-splunk}"
     ssh_port="${SPLUNK_SSH_PORT:-22}"
-    if [[ -n "${ssh_host}" && -n "${ssh_user}" ]] && command -v ssh >/dev/null 2>&1; then
-        listeners="$(ssh -o BatchMode=yes -o ConnectTimeout=5 -p "${ssh_port}" "${ssh_user}@${ssh_host}" \
+    if [[ -n "${ssh_host}" && -n "${ssh_user}" ]] && command -v ssh >/dev/null 2>&1 \
+        && hbs_prepare_ssh_trust false >/dev/null 2>&1; then
+        listeners="$(ssh -o BatchMode=yes -o ConnectTimeout=5 -p "${ssh_port}" \
+            ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} "${ssh_user}@${ssh_host}" \
             'if command -v ss >/dev/null 2>&1; then ss -ltn; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; else exit 3; fi' \
             2>/dev/null || true)"
+        hbs_cleanup_ssh_trust
         if [[ -n "${listeners}" ]]; then
             listener_source="ssh"
         fi

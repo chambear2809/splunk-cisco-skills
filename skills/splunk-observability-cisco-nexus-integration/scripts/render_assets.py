@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -303,96 +305,187 @@ def secret_manifest_stub(ssh_secret: dict[str, Any]) -> str:
     )
 
 
-def dashboard_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def dashboard_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     if not (spec.get("dashboards") or {}).get("enabled", True):
         return {}
+    charts = [
+        ("Device up", "cisco.device.up"),
+        ("CPU utilization", "system.cpu.utilization"),
+        ("Memory utilization", "system.memory.utilization"),
+        ("Interface status", "system.network.interface.status"),
+        ("Network throughput", "system.network.io"),
+        ("Network errors", "system.network.errors"),
+        ("Packet drops", "system.network.packet.dropped"),
+    ]
     return {
         "cisco-nexus-overview": {
-            "name": "Cisco Nexus Overview",
-            "description": "Nexus device + interface health overview",
+            "api_version": "splunk-observability-dashboard-builder/v1",
+            "mode": "classic-api",
+            "realm": realm,
+            "dashboard_group": {
+                "name": "Cisco Nexus Observability",
+                "description": f"Cisco Nexus dashboards for cluster {cluster_name}.",
+            },
+            "dashboard": {
+                "name": "Cisco Nexus Overview",
+                "description": "Nexus device + interface health overview",
+                "chart_density": "DEFAULT",
+                "filters": {
+                    "variables": [
+                        {
+                            "property": "k8s.cluster.name",
+                            "alias": "Cluster",
+                            "value": [cluster_name],
+                            "required": True,
+                            "restricted": True,
+                        }
+                    ]
+                },
+            },
             "charts": [
-                _chart("Device up", "cisco.device.up"),
-                _chart("CPU utilization", "system.cpu.utilization"),
-                _chart("Memory utilization", "system.memory.utilization"),
-                _chart("Interface status", "system.network.interface.status"),
-                _chart("Network throughput", "system.network.io"),
-                _chart("Network errors", "system.network.errors"),
-                _chart("Packet drops", "system.network.packet.dropped"),
+                _chart(name, metric, cluster_name, position)
+                for position, (name, metric) in enumerate(charts)
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
         }
     }
 
 
-def _chart(name: str, metric: str) -> dict[str, Any]:
+def _chart(name: str, metric: str, cluster_name: str, position: int) -> dict[str, Any]:
+    metric_literal = json.dumps(metric)
+    cluster_literal = json.dumps(cluster_name)
     return {
+        "id": re.sub(r"[^a-z0-9]+", "-", metric.lower()).strip("-") or "metric",
         "name": name,
         "description": f"{metric} from cisco_os receiver",
-        "program_text": f"data('{metric}', filter=filter('k8s.cluster.name', '${{CLUSTER_NAME}}')).publish(label='{metric}')",
+        "type": "TimeSeriesChart",
+        "plot_type": "LineChart",
+        "row": position // 2,
+        "column": 0 if position % 2 == 0 else 6,
+        "width": 6,
+        "height": 1,
+        "program_text": (
+            f"data({metric_literal}, filter=filter('k8s.cluster.name', {cluster_literal}))"
+            f".publish(label={metric_literal})"
+        ),
         "publish_label": metric,
     }
 
 
-def detector_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _detector_spec(
+    *,
+    realm: str,
+    cluster_name: str,
+    name: str,
+    metric: str,
+    direction: str,
+    threshold: int | float,
+    severity: str,
+    aggregation: str,
+    detect_label: str,
+) -> dict[str, Any]:
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise SpecError(f"Detector threshold for {name!r} must be numeric.")
+    transformations = {
+        "min": ".min()",
+        "rate": ".rate()",
+        "mean": ".mean()",
+    }
+    comparators = {"above": ">", "below": "<", "at_or_below": "<="}
+    direction_text = {
+        "above": "above",
+        "below": "below",
+        "at_or_below": "at or below",
+    }
+    if aggregation not in transformations or direction not in comparators:
+        raise SpecError(
+            f"Unsupported detector aggregation/direction: {aggregation!r}/{direction!r}"
+        )
+    stream = (
+        f"data({json.dumps(metric)}, "
+        f"filter=filter('k8s.cluster.name', {json.dumps(cluster_name)}))"
+    )
+    signal_label = f"{detect_label}_signal"
+    program_text = (
+        f"signal = {stream}{transformations[aggregation]}"
+        f".publish(label={json.dumps(signal_label)})\n"
+        f"detect(when(signal {comparators[direction]} threshold({json.dumps(threshold)})))"
+        f".publish({json.dumps(detect_label)})"
+    )
+    return {
+        "api_version": "splunk-observability-native-ops/v1",
+        "realm": realm,
+        "detectors": [
+            {
+                "name": name,
+                "description": f"Cisco Nexus {aggregation} detector for {metric}.",
+                "program_text": program_text,
+                "tags": ["cisco-nexus", aggregation],
+                "rules": [
+                    {
+                        "detect_label": detect_label,
+                        "severity": severity,
+                        "description": (
+                            f"{metric} is {direction_text[direction]} threshold {threshold}."
+                        ),
+                        "notifications": [],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def detector_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     block = spec.get("detectors") or {}
     if not block.get("enabled", True):
         return {}
     thresholds = block.get("thresholds") or {}
-    detectors = {
+    definitions = {
         "interface-status-down": {
-            "test_type": "cisco-nexus",
-            "detectors": [
-                {
-                    "name": "Cisco Nexus interface down",
-                    "metric": "system.network.interface.status",
-                    "direction": "below",
-                    "threshold": thresholds.get("interface_status_down_count_max", 0),
-                    "severity": "Critical",
-                    "aggregation": "min",
-                }
-            ],
+            "name": "Cisco Nexus interface down",
+            "metric": "system.network.interface.status",
+            "direction": "at_or_below",
+            "threshold": thresholds.get("interface_status_down_count_max", 0),
+            "severity": "Critical",
+            "aggregation": "min",
+            "detect_label": "cisco_nexus_interface_down",
         },
         "packet-drops": {
-            "test_type": "cisco-nexus",
-            "detectors": [
-                {
-                    "name": "Cisco Nexus packet drop rate",
-                    "metric": "system.network.packet.dropped",
-                    "direction": "above",
-                    "threshold": thresholds.get("packet_drop_rate_per_min_max", 100),
-                    "severity": "Major",
-                    "aggregation": "rate",
-                }
-            ],
+            "name": "Cisco Nexus packet drop rate",
+            "metric": "system.network.packet.dropped",
+            "direction": "above",
+            "threshold": thresholds.get("packet_drop_rate_per_min_max", 100),
+            "severity": "Major",
+            "aggregation": "rate",
+            "detect_label": "cisco_nexus_packet_drops",
         },
         "cpu-pressure": {
-            "test_type": "cisco-nexus",
-            "detectors": [
-                {
-                    "name": "Cisco Nexus CPU pressure",
-                    "metric": "system.cpu.utilization",
-                    "direction": "above",
-                    "threshold": thresholds.get("cpu_utilization_pct_max", 85),
-                    "severity": "Warning",
-                    "aggregation": "mean",
-                }
-            ],
+            "name": "Cisco Nexus CPU pressure",
+            "metric": "system.cpu.utilization",
+            "direction": "above",
+            "threshold": thresholds.get("cpu_utilization_pct_max", 85),
+            "severity": "Warning",
+            "aggregation": "mean",
+            "detect_label": "cisco_nexus_cpu_pressure",
         },
         "memory-pressure": {
-            "test_type": "cisco-nexus",
-            "detectors": [
-                {
-                    "name": "Cisco Nexus memory pressure",
-                    "metric": "system.memory.utilization",
-                    "direction": "above",
-                    "threshold": thresholds.get("memory_utilization_pct_max", 85),
-                    "severity": "Warning",
-                    "aggregation": "mean",
-                }
-            ],
+            "name": "Cisco Nexus memory pressure",
+            "metric": "system.memory.utilization",
+            "direction": "above",
+            "threshold": thresholds.get("memory_utilization_pct_max", 85),
+            "severity": "Warning",
+            "aggregation": "mean",
+            "detect_label": "cisco_nexus_memory_pressure",
         },
     }
-    return detectors
+    return {
+        key: _detector_spec(realm=realm, cluster_name=cluster_name, **definition)
+        for key, definition in definitions.items()
+    }
 
 
 def render_apply_overlay_script(spec: dict[str, Any]) -> str:
@@ -480,9 +573,14 @@ fi
     )
 
 
-def render_handoffs(spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
+def render_handoffs(
+    spec: dict[str, Any], realm: str, cluster_name: str, distribution: str
+) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
+    realm_q = shlex.quote(str(realm))
+    cluster_name_q = shlex.quote(str(cluster_name))
+    distribution_q = shlex.quote(str(distribution))
     if handoffs.get("base_collector", True):
         helpers["handoff-base-collector.sh"] = (
             f"""#!/usr/bin/env bash
@@ -494,18 +592,27 @@ if ! command -v yq >/dev/null 2>&1; then
     exit 1
 fi
 
-OVERLAY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/splunk-otel-overlay/values.overlay.yaml"
+BUNDLE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="$BUNDLE_DIR/splunk-otel-overlay/values.overlay.yaml"
 BASE_OUTPUT_DIR="${{BASE_OUTPUT_DIR:-/tmp/splunk-observability-otel-rendered}}"
+REALM={realm_q}
+CLUSTER_NAME={cluster_name_q}
+DISTRIBUTION={distribution_q}
+printf -v BASE_OUTPUT_DIR_Q '%q' "$BASE_OUTPUT_DIR"
+printf -v OVERLAY_Q '%q' "$OVERLAY"
+printf -v REALM_Q '%q' "$REALM"
+printf -v CLUSTER_NAME_Q '%q' "$CLUSTER_NAME"
+printf -v DISTRIBUTION_Q '%q' "$DISTRIBUTION"
 
 echo "Step 1: Render base collector values."
 echo "    bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\\\"
-echo "      --render-k8s --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
-echo "      --output-dir ${{BASE_OUTPUT_DIR}}"
+echo "      --render-k8s --realm ${{REALM_Q}} --cluster-name ${{CLUSTER_NAME_Q}} --distribution ${{DISTRIBUTION_Q}} \\\\"
+echo "      --output-dir ${{BASE_OUTPUT_DIR_Q}}"
 echo
 echo "Step 2: Merge overlay."
 echo "    yq eval-all '. as \\$item ireduce ({{}}; . * \\$item)' \\\\"
-echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
-echo "      ${{OVERLAY}} \\\\"
+echo "      ${{BASE_OUTPUT_DIR_Q}}/k8s/values.yaml \\\\"
+echo "      ${{OVERLAY_Q}} \\\\"
 echo "      > /tmp/merged-values.yaml"
 echo
 echo "Step 3: Apply via helm."
@@ -521,12 +628,15 @@ echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 set -euo pipefail
 
 DASHBOARDS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/dashboards"
+REALM={realm_q}
+printf -v DASHBOARDS_DIR_Q '%q' "$DASHBOARDS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Import dashboards via splunk-observability-dashboard-builder:"
-echo "    for spec in ${{DASHBOARDS_DIR}}/*.signalflow.yaml; do"
+echo "    for spec in ${{DASHBOARDS_DIR_Q}}/*.signalflow.yaml; do"
 echo "      bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \\\\"
-echo "        --render --apply --realm {realm} \\\\"
-echo "        --spec \\$spec \\\\"
-echo "        --token-file \\$O11Y_API_TOKEN_FILE"
+echo "        --render --apply --realm ${{REALM_Q}} \\\\"
+echo "        --spec \\\"\\$spec\\\" \\\\"
+echo "        --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
 echo "    done"
 """
         )
@@ -536,11 +646,16 @@ echo "    done"
 set -euo pipefail
 
 DETECTORS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/detectors"
+REALM={realm_q}
+printf -v DETECTORS_DIR_Q '%q' "$DETECTORS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Apply detectors via splunk-observability-native-ops:"
-echo "    bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
-echo "      --render --apply --realm {realm} \\\\"
-echo "      --spec ${{DETECTORS_DIR}}/<detector>.yaml \\\\"
-echo "      --token-file \\$O11Y_API_TOKEN_FILE"
+echo "    for spec in ${{DETECTORS_DIR_Q}}/*.yaml; do"
+echo "      bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
+echo "        --render --apply --realm ${{REALM_Q}} \\\\"
+echo "        --spec \\\"\\$spec\\\" \\\\"
+echo "        --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
+echo "    done"
 """
         )
     return helpers
@@ -614,9 +729,9 @@ def main() -> int:
     write_yaml(out / "splunk-otel-overlay/values.overlay.yaml", overlay)
     write_text(out / "secrets/cisco-nexus-ssh-secret.yaml", secret_manifest_stub(ssh_secret))
 
-    for name, payload in dashboard_specs(spec).items():
+    for name, payload in dashboard_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"dashboards/{name}.signalflow.yaml", payload)
-    for name, payload in detector_specs(spec).items():
+    for name, payload in detector_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"detectors/{name}.yaml", payload)
 
     for name, body in render_handoffs(spec, realm, cluster_name, distribution).items():

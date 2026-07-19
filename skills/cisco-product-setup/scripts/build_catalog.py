@@ -45,6 +45,7 @@ TEMPLATE_PATHS = {
     "secure_email_web_gateway": "skills/cisco-secure-email-web-gateway-setup/template.example",
     "talos_intelligence": "skills/cisco-talos-intelligence-setup/template.example",
     "asa_ta": "skills/cisco-asa-ta-setup/template.example",
+    "collaboration": "skills/cisco-collaboration-setup/template.example",
 }
 
 DC_ACCOUNT_TEMPLATE_SECTION = {
@@ -957,6 +958,62 @@ def build_workflow_handoff_route(product: dict, override: dict) -> dict:
     }
 
 
+def build_collaboration_route(product: dict, override: dict, *, gap_handoff: bool) -> dict:
+    workflow_scripts = [] if gap_handoff else [
+        "skills/cisco-collaboration-setup/scripts/setup.sh",
+        "skills/cisco-collaboration-setup/scripts/validate.sh",
+    ]
+    # Product-router collaboration routes are preview-only handoffs.  The
+    # orchestrator does not forward child renderer arguments, so accepting
+    # --set values here would silently ignore path/replacement intent.
+    optional: list[str] = []
+    coverage_status = "unsupported_roadmap" if gap_handoff else "partial"
+    collection_status = "gap" if gap_handoff else "handoff_only"
+    if override.get("coverage_status") != coverage_status:
+        raise ValueError(f"{product['id']} collaboration coverage_status must remain {coverage_status}")
+    if override.get("collection_executable_status") != collection_status:
+        raise ValueError(
+            f"{product['id']} collection_executable_status must remain {collection_status}"
+        )
+    return {
+        "route_type": "gap_handoff" if gap_handoff else "collaboration",
+        "primary_skill": "cisco-collaboration-setup",
+        "companion_skills": [],
+        "install_apps": [],
+        "template_paths": [TEMPLATE_PATHS["collaboration"]],
+        "template_checks": {
+            "contains": [
+                "api_version: cisco-collaboration-setup/v1",
+                "status: unsupported_roadmap",
+                "mode: handoff_only",
+            ]
+        },
+        "required_non_secret_keys": [],
+        "optional_non_secret_keys": optional,
+        "accepted_non_secret_keys": optional,
+        "secret_keys": [],
+        "required_secret_keys": [],
+        "conditional_required_secret_rules": [],
+        "route": {
+            "product_id": product["id"],
+            "coverage_status": coverage_status,
+            "collection_executable_status": collection_status,
+            "render_only": True,
+            "live_verified": False,
+            "apply_capable": False,
+            "device_mutation_capable": False,
+            "workflow_scripts": workflow_scripts,
+            "documentation_paths": [
+                "skills/cisco-collaboration-setup/SKILL.md",
+                "skills/cisco-collaboration-setup/reference.md",
+            ],
+            "sourcetypes": unique_ordered(list(product.get("sourcetypes", []))),
+            "handoff_targets": list(override.get("handoff_targets", [])),
+            "handoff": override["handoff"],
+        },
+    }
+
+
 def build_dc_networking_route(override: dict) -> dict:
     account_type = override["account_type"]
     required = ["name", "username", "device_ip" if account_type == "nexus9k" else "hostname"]
@@ -1379,6 +1436,10 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_app_install_only_route(product, override)
     if route_type == "workflow_handoff":
         return build_workflow_handoff_route(product, override)
+    if route_type == "collaboration":
+        return build_collaboration_route(product, override, gap_handoff=False)
+    if route_type == "gap_handoff":
+        return build_collaboration_route(product, override, gap_handoff=True)
     if route_type == "dc_networking":
         return build_dc_networking_route(override)
     if route_type == "catalyst_stack":
@@ -1471,7 +1532,8 @@ def build_catalog(scan_package: Path | None = None) -> dict:
             "manual_gap_reason": "",
         }
 
-        if automation_state in {"automated", "partial"} and "route_type" in override:
+        routed_gap = automation_state == "unsupported_roadmap" and override.get("route_type") == "gap_handoff"
+        if (automation_state in {"automated", "partial"} and "route_type" in override) or routed_gap:
             route_meta = build_route(product, override, security_products)
             entry.update(
                 {
@@ -1492,7 +1554,7 @@ def build_catalog(scan_package: Path | None = None) -> dict:
                     "route": route_meta["route"],
                 }
             )
-        elif automation_state == "manual_gap":
+        if automation_state == "manual_gap":
             entry["manual_gap_reason"] = override.get(
                 "manual_gap_reason", generic_manual_gap_reason(product)
             )

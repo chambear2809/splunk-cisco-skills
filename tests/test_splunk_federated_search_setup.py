@@ -813,7 +813,9 @@ def test_rendered_apply_fails_loudly_when_password_file_missing(tmp_path: Path) 
         check=False,
     )
     assert apply_result.returncode != 0
-    assert "password_file missing" in apply_result.stderr or "password_file missing" in apply_result.stdout
+    combined_output = apply_result.stdout + apply_result.stderr
+    assert "password_file for provider alpha" in combined_output
+    assert "readable, non-symlink regular file" in combined_output
 
 
 # ---------------------------------------------------------------------------

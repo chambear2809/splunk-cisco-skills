@@ -48,7 +48,7 @@ def test_secret_file_rejects_world_or_group_readable(tmp_path, mod) -> None:
     path = tmp_path / "secret"
     path.write_text("S3CRET", encoding="utf-8")
     path.chmod(0o644)  # world-readable
-    with pytest.raises(mod.ApiError, match="overly permissive"):
+    with pytest.raises(mod.ApiError, match="permissions must be 0600"):
         mod.read_secret_file(path, "API key")
 
 

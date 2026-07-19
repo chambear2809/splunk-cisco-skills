@@ -1,19 +1,73 @@
 ---
 name: cisco-spaces-setup
-description: >-
-  Automate Cisco Spaces Add-on for Splunk (ta_cisco_spaces) setup and
-  configuration. Creates indexes, configures Cisco Spaces meta stream
-  accounts via REST API, enables firehose data inputs, stores activation
-  tokens securely, and validates the deployment. Use when the user asks
-  about Cisco Spaces, Spaces firehose, indoor location analytics,
-  ta_cisco_spaces, or Spaces setup in Splunk.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring or validating Cisco Spaces meta stream accounts, firehose inputs, and data in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Spaces TA Setup Automation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Create the index, account, and firehose input | Confirm search-tier REST access |
+| Cisco Spaces activation token | Authorize the selected meta stream | Store the token in a protected file |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Install TA │ → │ Configure stream │ → │ Validate data │
+└───────────┘   └────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard a Cisco Spaces meta stream or firehose into Splunk.
+- Configure `ta_cisco_spaces` accounts, indexes, or modular inputs.
+- Diagnose activation, stream, source-type, or ingestion failures.
+
+## Scope
+
+This skill configures the Splunk side of a documented Spaces stream. It does
+not request activation tokens in chat, change location policy, or enable an
+unreviewed firehose without considering event volume.
+
+## Examples
+
+Run diagnostic checks before account creation:
+
+```bash
+bash skills/cisco-spaces-setup/scripts/validate.sh
+```
+
+Expected output: tools, package, Splunk connectivity, and account prerequisites
+are reported without changing Spaces or Splunk inputs.
+
+Run completion validation after enabling a firehose:
+
+```bash
+bash skills/cisco-spaces-setup/scripts/validate.sh --completion
+```
+
+Expected output: account, input, index, source type, and recent event evidence
+report `[PASS]`; an idle or unauthorized stream exits nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Activation fails | Token is expired, scoped incorrectly, or unreadable | Replace the protected token file and retry |
+| Connected but idle | Wrong stream/no activity | Verify the selected stream |
+| Wrong index | Input differs from plan | Correct it and rerun checks |
+| Reconnect loop | Network is unstable | Inspect logs and outbound access |
 
 ## TA Completion Gate
 
@@ -91,7 +145,8 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ## Splunk Authentication
 
-Scripts read Splunk credentials from the project-root `credentials` file (falls back to `~/.splunk/credentials`) automatically.
+Scripts read Splunk credentials from the project-root `credentials` file. They
+fall back to `~/.splunk/credentials` automatically.
 No environment variables or command-line password arguments are needed:
 
 ```bash

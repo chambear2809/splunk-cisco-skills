@@ -1,0 +1,175 @@
+api_version: cisco-collaboration-setup/v1
+
+project:
+  name: example-collaboration
+  environment: production
+  owner: collaboration-operations
+  splunk_platform_version: 10.5.2605
+  sc4s_deployment: host
+
+privacy:
+  dashboard_mode: masked
+  mask_phone_numbers: true
+  mask_user_ids: true
+  retention_reviewed: false
+  restricted_role: collaboration_analytics
+
+products:
+  cucm:
+    syslog:
+      enabled: true
+      scope: remote_audit_logging
+      transport: tls
+      receiver_port: 6514
+      tls_authentication: unidirectional_x509
+      trust_requirements_reviewed: true
+      index: ucm
+      sourcetype: cisco:ucm
+    cdr:
+      enabled: false
+      collection: sftp_billing_server
+      index: cucm_cdr
+      sourcetype: ''
+      evidence:
+        file_type: cdr
+        header_rows: 2
+        sample_path: ''
+        sha256: ''
+        record_count: 0
+        observed_fields: []
+        export_path: ''
+        receiver_owner: ''
+        collection_evidence: ''
+        source_type_origin: ''
+    cmr:
+      enabled: false
+      collection: sftp_billing_server
+      index: cucm_cmr
+      sourcetype: ''
+      evidence:
+        file_type: cmr
+        header_rows: 2
+        sample_path: ''
+        sha256: ''
+        record_count: 0
+        observed_fields: []
+        export_path: ''
+        receiver_owner: ''
+        collection_evidence: ''
+        source_type_origin: ''
+    axl:
+      enabled: false
+      purpose: configuration_enrichment_only
+      endpoint_path: /axl/
+      operator_metadata:
+        qualifying_search: ''
+        asserted_fields: []
+        observation_note: ''
+  expressway:
+    syslog:
+      enabled: true
+      transport: tls
+      format: ietf
+      port: 6514
+      trust_requirements_reviewed: true
+      index: main
+      sourcetype: cisco:tvcs
+    cdr_readiness:
+      enabled: false
+      mode: syslog_info
+      operator_metadata:
+        qualifying_search: ''
+        asserted_fields: []
+        observation_note: ''
+    media_readiness:
+      enabled: false
+      facility: local2
+      operator_metadata:
+        qualifying_search: ''
+        asserted_fields: []
+        observation_note: ''
+  cms:
+    syslog:
+      enabled: true
+      wire_protocol: tls
+      tls_server_prefix: true
+      index: netops
+      sourcetype: cisco:ms
+      classifier:
+        mode: dedicated_port
+        value: 1514
+    xml_cdr_receiver:
+      status: gap
+      enabled: false
+      transport: https
+      receiver_implementation: UNKNOWN
+  meeting_management:
+    classifier:
+      mode: dedicated_port
+      value: 1515
+    system_syslog:
+      enabled: true
+      wire_protocol: tls
+      tls_version: TLS1.2
+      receiver_max_bytes: 8192
+      planned_server_count: 1
+      index: netops
+      sourcetype: 'cisco:mm:system:*'
+      evidence_path: ''
+      evidence_sha256: ''
+    audit_syslog:
+      enabled: true
+      wire_protocol: tls
+      tls_version: TLS1.2
+      receiver_max_bytes: 8192
+      planned_server_count: 1
+      index: netops
+      sourcetype: cisco:mm:audit
+      evidence_path: ''
+      evidence_sha256: ''
+  roomos:
+    status: unsupported_roadmap
+    emit_webex_handoff: true
+    emit_thousandeyes_handoff: true
+  broadworks:
+    status: unsupported_roadmap
+    vendor_url: https://developer.cisco.com/docs/broadworks/getting-started/
+  uccx_ucce:
+    status: UNKNOWN
+
+cim:
+  authentication:
+    enabled: false
+    qualifying_search: ''
+    verified_fields: []
+    evidence_path: ''
+    evidence_sha256: ''
+  change:
+    enabled: false
+    qualifying_search: ''
+    verified_fields: []
+    evidence_path: ''
+    evidence_sha256: ''
+
+partner_packages:
+  mode: disabled
+  selections: []
+
+delegation:
+  mode: handoff_only
+  sections:
+    -
+      name: collaboration-syslog
+      disposition: handoff_only
+    -
+      name: cdr-cmr-collection
+      disposition: handoff_only
+    -
+      name: roomos-webex
+      disposition: handoff_only
+    -
+      name: roomos-thousandeyes
+      disposition: handoff_only
+    -
+      name: downstream-readiness
+      disposition: handoff_only

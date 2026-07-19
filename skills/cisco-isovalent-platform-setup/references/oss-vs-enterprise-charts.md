@@ -4,10 +4,10 @@ Cisco completed the Isovalent acquisition on 2024-04-12. The chart story split i
 
 ## OSS charts (`--edition oss`, default)
 
-| Component | Helm repo | Chart name | License |
-|-----------|-----------|------------|---------|
-| Cilium (CNI) | `https://helm.cilium.io` (`helm repo add cilium https://helm.cilium.io`) | `cilium/cilium` | Apache 2.0 |
-| Tetragon (eBPF runtime security) | `https://helm.cilium.io` | `cilium/tetragon` | Apache 2.0 |
+| Component | Helm repo | Chart name | Exact version | License |
+|-----------|-----------|------------|---:|---------|
+| Cilium (CNI) | `https://helm.cilium.io` (`helm repo add cilium https://helm.cilium.io`) | `cilium/cilium` | `1.18.10` | Apache 2.0 |
+| Tetragon (eBPF runtime security) | `https://helm.cilium.io` | `cilium/tetragon` | `1.7.0` | Apache 2.0 |
 
 The OSS charts are publicly accessible; no license required. They cover the foundational CNI + runtime security functionality that pairs with `splunk-observability-isovalent-integration` for metrics scraping.
 
@@ -29,13 +29,26 @@ What you do NOT get with OSS:
 
 ## Enterprise charts (`--edition enterprise`)
 
-| Component | Helm repo | Chart name | Notes |
-|-----------|-----------|------------|-------|
-| Cilium Enterprise | `https://helm.isovalent.com` (`helm repo add isovalent https://helm.isovalent.com`) | `isovalent/cilium-enterprise` | License + optional pull secret |
-| Tetragon Enterprise | `https://helm.isovalent.com` | `isovalent/tetragon` | Enterprise variant; same chart name |
-| cilium-dnsproxy (DNS HA) | `https://helm.isovalent.com` | `isovalent/cilium-dnsproxy` | License required |
-| **Hubble Enterprise** | `https://helm.isovalent.com` | `isovalent/hubble-enterprise` | **Private chart** — contact Isovalent for chart access |
-| Hubble Timescape | `https://helm.isovalent.com` | `isovalent/hubble-timescape` | License required |
+| Component | Helm repo | Chart name | Exact version | Notes |
+|-----------|-----------|------------|---:|-------|
+| Cilium Enterprise | `https://helm.isovalent.com` (`helm repo add isovalent https://helm.isovalent.com`) | `isovalent/cilium-enterprise` | `1.18.8` | License + optional pull secret |
+| Tetragon Enterprise | `https://helm.isovalent.com` | `isovalent/tetragon` | `1.18.1` | Enterprise variant; same chart name |
+| cilium-dnsproxy (DNS HA) | `https://helm.isovalent.com` | `isovalent/cilium-dnsproxy` | `1.18.8` | License required |
+| **Hubble Enterprise** | `https://helm.isovalent.com` | `isovalent/hubble-enterprise` | `1.18.8` | **Private chart** — contact Isovalent for chart access |
+| Hubble Timescape | `https://helm.isovalent.com` | `isovalent/hubble-timescape` | `1.18.8` | License required |
+
+All installs resolve and apply these exact versions with atomic, wait-bound
+Helm transactions. The repository does not ship upstream chart archives,
+signatures, or independently audited SHA-256 values; private chart resolution
+also depends on customer entitlement. Treat that as an explicit provenance gap,
+not as checksum-backed supply-chain verification.
+
+The public and Enterprise version lines are not interchangeable. Cilium OSS
+uses the upstream `1.18.10` maintenance release and avoids the documented GKE
+regression in upstream `1.18.8`; Enterprise remains pinned to the exact
+`1.18.8` evidence validated on `isovalent-demo`. Tetragon likewise uses OSS
+`1.7.0` while the Enterprise chart retains the cluster-validated `1.18.1`
+product version.
 
 Enterprise unlocks:
 
@@ -52,7 +65,7 @@ For EKS Hybrid Nodes, AWS publishes a Cilium build via the OCI registry:
 oci://public.ecr.aws/eks/cilium/cilium
 ```
 
-This mirror is supported by AWS for the EKS Hybrid Nodes use case. The skill's `install-cilium.sh` installs from this OCI URL when `--eks-mirror` is set, instead of `cilium/cilium` from `helm.cilium.io`. AWS guarantees support for the AWS-published build only; if you want the upstream OSS build, omit `--eks-mirror`.
+This mirror is supported by AWS for the EKS Hybrid Nodes use case. The skill's `install-cilium.sh` installs exact version `1.18.8` from this OCI URL when `--eks-mirror` is set, instead of `cilium/cilium` from `helm.cilium.io`. AWS guarantees support for the AWS-published build only; if you want the upstream OSS build, omit `--eks-mirror`.
 
 Caveats:
 

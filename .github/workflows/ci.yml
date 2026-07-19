@@ -31,7 +31,36 @@ jobs:
           python -m pip install -r requirements-dev.txt -r requirements-agent.txt
 
       - name: Run Python tests
-        run: pytest tests/ -v
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Security-sensitive runtime tests reject writable checkout ancestors
+          # and interpreters. GitHub's hosted tool cache and work directory are
+          # group-writable, so exercise the suite from owner-only sibling paths.
+          # Keep pytest's interpreter and temporary files outside the checkout:
+          # several tests intentionally reject secret-bearing output under a
+          # repository root. A secondary repo-local venv supports tests that
+          # explicitly exercise that conventional path without running pytest
+          # through it.
+          trusted_root="$(mktemp -d "${HOME}/splunk-cisco-skills-ci.XXXXXX")"
+          trusted_workspace="${trusted_root}/workspace"
+          trusted_venv="${trusted_root}/runner-venv"
+          trusted_tmp="${trusted_root}/tmp"
+          install -d -m 700 "${trusted_workspace}" "${trusted_tmp}"
+          cp -a "${GITHUB_WORKSPACE}/." "${trusted_workspace}/"
+          chmod go-w "${HOME}" "${trusted_root}" "${trusted_workspace}"
+          python -m venv --copies --system-site-packages "${trusted_venv}"
+          python -m venv --copies --system-site-packages "${trusted_workspace}/.venv"
+          trusted_python="$(readlink -f "${trusted_venv}/bin/python")"
+          chmod go-w \
+            "${trusted_python}" \
+            "$(readlink -f "${trusted_workspace}/.venv/bin/python3")"
+
+          cd "${trusted_workspace}"
+          PATH="${trusted_venv}/bin:${PATH}" \
+            TMPDIR="${trusted_tmp}" \
+            "${trusted_python}" -m pytest tests/ -v
 
       - name: Import local MCP agent server
         run: python3 -c "import agent.splunk_cisco_skills_mcp.server; print('local MCP agent import ok')"
@@ -196,6 +225,9 @@ jobs:
 
       - name: Check catalog freshness
         run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
+
+      - name: Check canonical skill manifest surfaces
+        run: python3 skills/shared/scripts/generate_skill_catalog.py --check
 
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check

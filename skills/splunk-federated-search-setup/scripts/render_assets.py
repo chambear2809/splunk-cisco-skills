@@ -66,6 +66,66 @@ GENERATED_FILES = {
 S2S_DATASET_TYPES = ("index", "metricindex", "savedsearch", "lastjob", "datamodel")
 FSS3_DATASET_TYPES = ("glue_table",)
 ALL_DATASET_TYPES = S2S_DATASET_TYPES + FSS3_DATASET_TYPES
+EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise SystemExit(
+            f"ERROR: {label} cannot be read safely: O_NOFOLLOW/geteuid is unavailable"
+        )
+    path = Path(path_value).expanduser()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise SystemExit(
+            f"ERROR: {label} must be a readable, non-symlink regular file: {path}: {exc}"
+        )
+    try:
+        before = os.fstat(descriptor)
+        mode = stat.S_IMODE(before.st_mode)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise SystemExit(f"ERROR: {label} must be a single-link regular file: {path}")
+        if before.st_uid != os.geteuid():
+            raise SystemExit(f"ERROR: {label} must be owned by the current user: {path}")
+        if mode & 0o077:
+            raise SystemExit(
+                f"ERROR: {label} permissions must be 0600 or stricter: {path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= 65536:
+            raise SystemExit(
+                f"ERROR: {label} size must be between 1 and 65536 bytes: {path}"
+            )
+        chunks = []
+        remaining = 65537
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        data = b"".join(chunks)
+        before_fingerprint = (
+            before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_size,
+            before.st_mtime_ns, before.st_ctime_ns, before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev, after.st_ino, after.st_mode, after.st_uid, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns, after.st_nlink,
+        )
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise SystemExit(f"ERROR: {label} changed while it was read: {path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"ERROR: {label} must contain UTF-8 text: {path}: {exc}")
+    if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+        raise SystemExit(
+            f"ERROR: {label} must contain exactly one non-empty line: {path}"
+        )
+    return lines[0].strip()
+'''
 FEDERATED_SEARCH_OVERVIEW_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform"
 AMAZON_S3_OVERVIEW_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/run-federated-searches-over-amazon-s3-datasets/overview-of-federated-search-for-amazon-s3"
 AMAZON_SECURITY_LAKE_URL = "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets/about-federated-analytics"
@@ -1240,9 +1300,13 @@ def _password_substitution_python_block(spec: Spec) -> str:
     mapping_block = "\n".join(mapping_lines)
     return (
         'python3 - "${target_dir}/federated.conf" <<\'PY\'\n'
+        "import os\n"
+        "import stat\n"
         "import sys\n"
+        "import tempfile\n"
         "from pathlib import Path\n"
         "\n"
+        f"{EMBEDDED_PRIVATE_SECRET_READER}\n"
         "target = Path(sys.argv[1])\n"
         "text = Path('federated.conf.template').read_text(encoding='utf-8')\n"
         "mapping = [\n"
@@ -1253,16 +1317,25 @@ def _password_substitution_python_block(spec: Spec) -> str:
         "        continue\n"
         "    if not password_file:\n"
         "        raise SystemExit(f'ERROR: provider {provider_name} requires a password_file but none was set.')\n"
-        "    pw_path = Path(password_file)\n"
-        "    if not pw_path.is_file():\n"
-        "        raise SystemExit(f'ERROR: password_file missing for provider {provider_name}: {pw_path}')\n"
-        "    if pw_path.stat().st_mode & 0o077:\n"
-        "        raise SystemExit(f'ERROR: password_file permissions must be 0600/0400 for provider {provider_name}: {pw_path}')\n"
-        "    pw = pw_path.read_text(encoding='utf-8').strip()\n"
-        "    if not pw:\n"
-        "        raise SystemExit(f'ERROR: password_file is empty for provider {provider_name}: {pw_path}')\n"
+        "    pw = read_private_secret(password_file, f'password_file for provider {provider_name}')\n"
         "    text = text.replace(token, pw)\n"
-        "target.write_text(text, encoding='utf-8')\n"
+        "descriptor, temporary_name = tempfile.mkstemp(prefix=f'.{target.name}.', dir=target.parent)\n"
+        "temporary = Path(temporary_name)\n"
+        "try:\n"
+        "    os.fchmod(descriptor, 0o600)\n"
+        "    with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:\n"
+        "        descriptor = -1\n"
+        "        stream.write(text)\n"
+        "        stream.flush()\n"
+        "        os.fsync(stream.fileno())\n"
+        "    os.replace(temporary, target)\n"
+        "finally:\n"
+        "    if descriptor >= 0:\n"
+        "        os.close(descriptor)\n"
+        "    try:\n"
+        "        temporary.unlink()\n"
+        "    except FileNotFoundError:\n"
+        "        pass\n"
         "PY\n"
         'chmod 600 "${target_dir}/federated.conf"\n'
     )
@@ -1359,6 +1432,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "python3 - <<'PY'\n"
         "import json\n"
         "import os\n"
+        "import stat\n"
         "import sys\n"
         "import urllib.error\n"
         "import urllib.parse\n"
@@ -1366,6 +1440,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "import ssl\n"
         "from pathlib import Path\n"
         "\n"
+        f"{EMBEDDED_PRIVATE_SECRET_READER}\n"
         "splunk_uri = os.environ.get('SPLUNK_REST_URI', '').rstrip('/')\n"
         "splunk_user = os.environ.get('SPLUNK_REST_USER', '')\n"
         "splunk_pw_file = os.environ.get('SPLUNK_REST_PASSWORD_FILE', '')\n"
@@ -1394,14 +1469,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "    raise SystemExit('ERROR: REST apply refuses plaintext HTTP. Use HTTPS, or set SPLUNK_ALLOW_INSECURE_HTTP=true only for an isolated short-lived lab.')\n"
         "if scheme == 'http':\n"
         "    print('WARNING: LAB ONLY: SPLUNK_ALLOW_INSECURE_HTTP=true sends Splunk credentials and provider passwords over plaintext HTTP.', file=sys.stderr)\n"
-        "splunk_pw_path = Path(splunk_pw_file)\n"
-        "if not splunk_pw_path.is_file():\n"
-        "    raise SystemExit(f'ERROR: SPLUNK_REST_PASSWORD_FILE does not exist: {splunk_pw_path}')\n"
-        "if splunk_pw_path.stat().st_mode & 0o077:\n"
-        "    raise SystemExit('ERROR: SPLUNK_REST_PASSWORD_FILE permissions must be 0600 or 0400.')\n"
-        "splunk_pw = splunk_pw_path.read_text(encoding='utf-8').strip()\n"
-        "if not splunk_pw:\n"
-        "    raise SystemExit('ERROR: SPLUNK_REST_PASSWORD_FILE is empty.')\n"
+        "splunk_pw = read_private_secret(splunk_pw_file, 'SPLUNK_REST_PASSWORD_FILE')\n"
         "ctx = None if verify_ssl else ssl._create_unverified_context()\n"
         "class NoRedirectHandler(urllib.request.HTTPRedirectHandler):\n"
         "    def redirect_request(self, req, fp, code, msg, headers, newurl):\n"
@@ -1444,12 +1512,7 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "    pw_file = entry.pop('_password_file')\n"
         "    if not pw_file:\n"
         "        raise SystemExit(f\"ERROR: provider {entry['name']} requires a password_file in the spec.\")\n"
-        "    pw_path = Path(pw_file)\n"
-        "    if not pw_path.is_file():\n"
-        "        raise SystemExit(f\"ERROR: password_file missing for provider {entry['name']}: {pw_path}\")\n"
-        "    entry['password'] = pw_path.read_text(encoding='utf-8').strip()\n"
-        "    if not entry['password']:\n"
-        "        raise SystemExit(f\"ERROR: password_file is empty for provider {entry['name']}: {pw_path}\")\n"
+        "    entry['password'] = read_private_secret(pw_file, f\"password_file for provider {entry['name']}\")\n"
         "    if entry['mode'] == 'transparent':\n"
         "        # Splunk forces useFSHKnowledgeObjects=1 for transparent and ignores appContext.\n"
         "        entry.pop('appContext', None)\n"

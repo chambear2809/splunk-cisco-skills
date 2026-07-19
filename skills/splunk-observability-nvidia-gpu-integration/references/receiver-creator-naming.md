@@ -77,4 +77,7 @@ If duplication bothers you, the safest way to deduplicate is to suppress the cha
 
 ## Test coverage
 
-`tests/test_splunk_observability_nvidia_gpu_integration.py::test_receiver_creator_name_is_never_nvidia` enforces the no-`nvidia` rule on every render. If anyone changes the renderer to use `receiver_creator/nvidia`, the test fails.
+`tests/test_splunk_observability_nvidia_gpu_integration.py` covers this rule with
+`test_render_uses_dcgm_cisco_receiver_creator_not_nvidia` and
+`test_renderer_rejects_receiver_creator_named_nvidia`. Together they check the
+rendered default and reject an explicit `nvidia` override.

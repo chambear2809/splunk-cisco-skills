@@ -183,6 +183,20 @@ def test_round_trip_via_fallback(yaml_compat, force_no_pyyaml) -> None:
     assert reparsed == payload
 
 
+def test_fallback_dump_indents_nested_multiline_scalars(yaml_compat, force_no_pyyaml) -> None:
+    payload = {
+        "outer": {"output": "first line\nsecond line\n"},
+        "items": ["alpha\nbeta"],
+    }
+
+    text = yaml_compat.dump_yaml(payload)
+    reparsed = yaml_compat.load_yaml_or_json(text)
+
+    assert "    first line" in text
+    assert reparsed["outer"]["output"] == "first line\nsecond line"
+    assert reparsed["items"][0] == "alpha\nbeta"
+
+
 # ---------------------------------------------------------------------------
 # Real templates render through the fallback intact
 # ---------------------------------------------------------------------------

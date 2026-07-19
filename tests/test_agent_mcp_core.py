@@ -24,6 +24,7 @@ class AgentMCPCoreTests(unittest.TestCase):
         self._env_patcher.start()
         self.addCleanup(self._env_patcher.stop)
         os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+        os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION", None)
         os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
 
     def test_list_skills_includes_catalog_and_script_metadata(self) -> None:
@@ -39,7 +40,9 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertIn("SKILL_UX_CATALOG.md", readme)
 
         catalog = (core.REPO_ROOT / "SKILL_UX_CATALOG.md").read_text(encoding="utf-8")
-        catalog_doc_skills = set(re.findall(r"^\| `([^`]+)` \|", catalog, flags=re.MULTILINE))
+        catalog_doc_skills = set(
+            re.findall(r"^\| `([^`]+)` \|", catalog, flags=re.MULTILINE)
+        )
         catalog_skills = {item["name"] for item in core.list_skills()["skills"]}
 
         self.assertEqual(catalog_doc_skills, catalog_skills)
@@ -58,7 +61,9 @@ class AgentMCPCoreTests(unittest.TestCase):
                 "references/coverage.md",
             ],
         )
-        reference_text = core.read_skill_file("splunk-observability-dashboard-builder", "reference")
+        reference_text = core.read_skill_file(
+            "splunk-observability-dashboard-builder", "reference"
+        )
         self.assertIn("# reference.md", reference_text)
         self.assertIn("# references/classic-api.md", reference_text)
         self.assertIn("# references/coverage.md", reference_text)
@@ -92,7 +97,9 @@ class AgentMCPCoreTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(plan["dry_run"]["resolved_product"]["id"], "cisco_thousandeyes")
+        self.assertEqual(
+            plan["dry_run"]["resolved_product"]["id"], "cisco_thousandeyes"
+        )
         self.assertEqual(plan["dry_run"]["missing_values_for_configure"], [])
 
     def test_cisco_product_plan_rejects_secret_like_set_values(self) -> None:
@@ -167,7 +174,9 @@ class AgentMCPCoreTests(unittest.TestCase):
                 "Cisco ACI",
                 set_values=["hostname", "apic1.example.local"],  # type: ignore[arg-type]
             )
-        with self.assertRaisesRegex(core.SkillMCPError, "secret_files must be an object"):
+        with self.assertRaisesRegex(
+            core.SkillMCPError, "secret_files must be an object"
+        ):
             core.plan_cisco_product_setup(
                 "Cisco ACI",
                 secret_files=["password", "/tmp/p"],  # type: ignore[arg-type]
@@ -194,19 +203,49 @@ class AgentMCPCoreTests(unittest.TestCase):
 
     def test_generic_script_plan_rejects_newer_direct_secret_flags(self) -> None:
         cases = [
-            ("splunk-observability-aws-integration", ["--aws-access-key-id", "AKIA..."]),
-            ("splunk-observability-aws-integration", ["--aws-secret-access-key=secret-value"]),
-            ("splunk-observability-aws-integration", ["--aws-secret-key", "secret-value"]),
-            ("splunk-observability-aws-integration", ["--external-id", "sensitive-external-id"]),
-            ("splunk-observability-database-monitoring-setup", ["--db-password", "secret-value"]),
-            ("splunk-observability-database-monitoring-setup", ["--connection-string=postgres://user:pass@db"]),
-            ("splunk-observability-database-monitoring-setup", ["--datasource", "postgres://user:pass@db"]),
-            ("splunk-observability-k8s-frontend-rum-setup", ["--rum-token", "secret-value"]),
+            (
+                "splunk-observability-aws-integration",
+                ["--aws-access-key-id", "AKIA..."],
+            ),
+            (
+                "splunk-observability-aws-integration",
+                ["--aws-secret-access-key=secret-value"],
+            ),
+            (
+                "splunk-observability-aws-integration",
+                ["--aws-secret-key", "secret-value"],
+            ),
+            (
+                "splunk-observability-aws-integration",
+                ["--external-id", "sensitive-external-id"],
+            ),
+            (
+                "splunk-observability-database-monitoring-setup",
+                ["--db-password", "secret-value"],
+            ),
+            (
+                "splunk-observability-database-monitoring-setup",
+                ["--connection-string=postgres://user:pass@db"],
+            ),
+            (
+                "splunk-observability-database-monitoring-setup",
+                ["--datasource", "postgres://user:pass@db"],
+            ),
+            (
+                "splunk-observability-k8s-frontend-rum-setup",
+                ["--rum-token", "secret-value"],
+            ),
             ("galileo-platform-setup", ["--galileo-api-key", "secret-value"]),
             ("galileo-platform-setup", ["--splunk-hec-token=secret-value"]),
-            ("galileo-agent-control-setup", ["--agent-control-api-key", "secret-value"]),
+            (
+                "galileo-agent-control-setup",
+                ["--agent-control-api-key", "secret-value"],
+            ),
             ("galileo-agent-control-setup", ["--agent-control-admin-key=secret-value"]),
-            ("splunk-appdynamics-controller-admin-setup", ["--controller-password", "secret-value"]),
+            (
+                "splunk-appdynamics-controller-admin-setup",
+                ["--controller-password", "secret-value"],
+            ),
             ("splunk-appdynamics-analytics-setup", ["--events-api-key=secret-value"]),
         ]
         for skill, args in cases:
@@ -258,9 +297,11 @@ class AgentMCPCoreTests(unittest.TestCase):
                 if not scripts_dir.is_dir():
                     continue
                 for path in scripts_dir.iterdir():
-                    supported = path.suffix.lower() in {".sh", ".py", ".rb"} or os.access(
-                        path, os.X_OK
-                    )
+                    supported = path.suffix.lower() in {
+                        ".sh",
+                        ".py",
+                        ".rb",
+                    } or os.access(path, os.X_OK)
                     if not path.is_file() or not supported:
                         continue
                     with self.subTest(skill=skill_dir.name, script=path.name):
@@ -305,11 +346,17 @@ class AgentMCPCoreTests(unittest.TestCase):
                 "/tmp/x; touch /tmp/agent_review_injected_password",
             ],
         )
-        self.assertIn("'/tmp/x; touch /tmp/agent_review_injected_password'", command["command"])
+        self.assertIn(
+            "'/tmp/x; touch /tmp/agent_review_injected_password'", command["command"]
+        )
 
     def test_generic_script_plan_uses_script_interpreter(self) -> None:
-        python_plan = core.plan_skill_script("cisco-product-setup", "build_catalog.py", ["--check"])
-        ruby_plan = core.plan_skill_script("splunk-itsi-config", "spec_to_json.rb", ["--help"])
+        python_plan = core.plan_skill_script(
+            "cisco-product-setup", "build_catalog.py", ["--check"]
+        )
+        ruby_plan = core.plan_skill_script(
+            "splunk-itsi-config", "spec_to_json.rb", ["--help"]
+        )
 
         self.assertEqual(python_plan["command"][0], sys.executable)
         self.assertEqual(ruby_plan["command"][0], "ruby")
@@ -328,7 +375,9 @@ class AgentMCPCoreTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION", None)
             os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
-            with self.assertRaisesRegex(core.SkillMCPError, "Subprocess execution is disabled"):
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "Subprocess execution is disabled"
+            ):
                 core.execute_plan(plan["plan_hash"], confirm=True)
 
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
@@ -337,21 +386,48 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertEqual(result["returncode"], 0)
         self.assertIn("Usage:", result["stdout"] + result["stderr"])
 
-    def test_product_validate_only_plan_is_read_only(self) -> None:
+    def test_product_validate_only_plan_remains_mutation_gated(self) -> None:
         plan = core.plan_cisco_product_setup("Cisco ACI", phase="validate")
 
-        self.assertTrue(plan["read_only"])
+        self.assertFalse(plan["read_only"])
+        with self.assertRaisesRegex(
+            core.SkillMCPError, "Mutating execution is disabled"
+        ):
+            core.execute_plan(
+                plan["plan_hash"],
+                confirm=True,
+                expected_kind="cisco_product_setup",
+            )
 
     def test_execute_mutating_plan_requires_mutation_gate(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
                 "configure_account.sh",
                 [],
             )
-            with self.assertRaisesRegex(core.SkillMCPError, "Mutating execution is disabled"):
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "Mutating execution is disabled"
+            ):
+                core.execute_plan(plan["plan_hash"], confirm=True)
+
+    def test_generic_plan_requires_its_separate_execution_gate(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION", None)
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
+            plan = core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                ["--help"],
+            )
+            with self.assertRaisesRegex(
+                core.SkillMCPError,
+                "Generic skill-script execution is disabled",
+            ):
                 core.execute_plan(plan["plan_hash"], confirm=True)
 
     def test_execute_mutating_plan_runs_when_gate_is_open(self) -> None:
@@ -363,6 +439,7 @@ class AgentMCPCoreTests(unittest.TestCase):
         # — what we are asserting is that the gate did NOT block execution.
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
@@ -379,7 +456,7 @@ class AgentMCPCoreTests(unittest.TestCase):
 
     def test_runner_reports_missing_mcp_dependency_without_traceback(self) -> None:
         result = subprocess.run(
-            [sys.executable, "agent/run-splunk-cisco-skills-mcp.py"],
+            [sys.executable, "-I", "agent/run-splunk-cisco-skills-mcp.py"],
             cwd=core.REPO_ROOT,
             capture_output=True,
             text=True,
@@ -394,10 +471,26 @@ class AgentMCPCoreTests(unittest.TestCase):
     def test_mcp_configs_include_local_agent_server(self) -> None:
         for rel_path in [".mcp.json", ".cursor/mcp.json"]:
             with self.subTest(path=rel_path):
-                payload = json.loads((core.REPO_ROOT / rel_path).read_text(encoding="utf-8"))
+                payload = json.loads(
+                    (core.REPO_ROOT / rel_path).read_text(encoding="utf-8")
+                )
                 server = payload["mcpServers"]["splunk-cisco-skills"]
                 self.assertRegex(server["command"], r"python3?(\b|$)")
-                self.assertIn("run-splunk-cisco-skills-mcp.py", server["args"][0])
+                self.assertIn("-I", server["args"])
+                self.assertTrue(
+                    any(
+                        "run-splunk-cisco-skills-mcp.py" in argument
+                        for argument in server["args"]
+                    )
+                )
+                self.assertEqual(
+                    server["env"],
+                    {
+                        "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION": "1",
+                        "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION": "0",
+                        "SPLUNK_SKILLS_MCP_ALLOW_MUTATION": "0",
+                    },
+                )
 
     def test_codex_registration_helper_points_at_local_agent_server(self) -> None:
         script = core.REPO_ROOT / "agent/register-codex-splunk-cisco-skills-mcp.sh"
@@ -406,7 +499,8 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(os.access(script, os.X_OK))
         self.assertIn("codex mcp add", text)
         self.assertIn("run-splunk-cisco-skills-mcp.py", text)
-        self.assertIn("-- python3", text)
+        self.assertIn("PYTHON_BIN", text)
+        self.assertIn('"${PYTHON_BIN}" -I', text)
 
     def test_list_cisco_products_rejects_invalid_state(self) -> None:
         with self.assertRaisesRegex(core.SkillMCPError, "Invalid state"):
@@ -421,7 +515,10 @@ class AgentMCPCoreTests(unittest.TestCase):
     def test_list_cisco_products_accepts_unsupported_catalog_states(self) -> None:
         self.assertIn(
             "unsupported_legacy",
-            {product["automation_state"] for product in core.list_cisco_products()["products"]},
+            {
+                product["automation_state"]
+                for product in core.list_cisco_products()["products"]
+            },
         )
         self.assertIn("unsupported_roadmap", core._VALID_PRODUCT_STATES)
 
@@ -436,6 +533,7 @@ class AgentMCPCoreTests(unittest.TestCase):
     def test_execute_plan_consumes_plan_on_success(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-product-setup",
@@ -450,6 +548,7 @@ class AgentMCPCoreTests(unittest.TestCase):
     def test_execute_plan_keeps_plan_when_confirm_missing(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-product-setup",
@@ -466,6 +565,7 @@ class AgentMCPCoreTests(unittest.TestCase):
     def test_execute_plan_keeps_plan_when_mutation_gate_blocks(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ.pop("SPLUNK_SKILLS_MCP_ALLOW_MUTATION", None)
             plan = core.plan_skill_script(
                 "cisco-catalyst-ta-setup",
@@ -473,11 +573,15 @@ class AgentMCPCoreTests(unittest.TestCase):
                 [],
             )
             plan_hash = plan["plan_hash"]
-            with self.assertRaisesRegex(core.SkillMCPError, "Mutating execution is disabled"):
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "Mutating execution is disabled"
+            ):
                 core.execute_plan(plan_hash, confirm=True)
             # A blocked mutation should not destroy the plan; the operator
             # can fix the env var and retry.
-            with self.assertRaisesRegex(core.SkillMCPError, "Mutating execution is disabled"):
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "Mutating execution is disabled"
+            ):
                 core.execute_plan(plan_hash, confirm=True)
 
     def test_execute_plan_rejects_malformed_hash(self) -> None:
@@ -487,7 +591,9 @@ class AgentMCPCoreTests(unittest.TestCase):
             core.execute_plan("A" * 64, confirm=True)
 
     def test_timeout_rejects_bool(self) -> None:
-        with self.assertRaisesRegex(core.SkillMCPError, "timeout_seconds must be an integer"):
+        with self.assertRaisesRegex(
+            core.SkillMCPError, "timeout_seconds must be an integer"
+        ):
             core.plan_skill_script(
                 "cisco-product-setup",
                 "resolve_product.sh",
@@ -563,6 +669,7 @@ class AgentMCPCoreTests(unittest.TestCase):
             mock.patch.object(core, "_file_sha256", return_value="0" * 64),
         ):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             with self.assertRaisesRegex(core.SkillMCPError, "changed after review"):
                 core.execute_plan(plan_hash, confirm=True)
@@ -577,10 +684,12 @@ class AgentMCPCoreTests(unittest.TestCase):
         )
         plan_hash = plan["plan_hash"]
 
-        with mock.patch.dict(os.environ, {}, clear=False), mock.patch.object(
-            core, "_skills_snapshot_sha256", return_value="0" * 64
+        with (
+            mock.patch.dict(os.environ, {}, clear=False),
+            mock.patch.object(core, "_skills_snapshot_sha256", return_value="0" * 64),
         ):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             with self.assertRaisesRegex(core.SkillMCPError, "repository changed"):
                 core.execute_plan(plan_hash, confirm=True)
@@ -629,7 +738,10 @@ class AgentMCPCoreTests(unittest.TestCase):
         with self.assertRaisesRegex(core.SkillMCPError, "more than"):
             core.plan_cisco_product_setup(
                 "Cisco ACI",
-                set_values={f"key_{index}": "value" for index in range(core.MAX_MAPPING_ENTRIES + 1)},
+                set_values={
+                    f"key_{index}": "value"
+                    for index in range(core.MAX_MAPPING_ENTRIES + 1)
+                },
             )
         with self.assertRaisesRegex(core.SkillMCPError, "character limit"):
             core.plan_cisco_product_setup(
@@ -676,12 +788,15 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(text.strip())
 
     def test_read_skill_template_raises_when_neither_form_present(self) -> None:
-        with self.assertRaisesRegex(core.SkillMCPError, "template.example or templates"):
+        with self.assertRaisesRegex(
+            core.SkillMCPError, "template.example or templates"
+        ):
             core.read_skill_file("cisco-product-setup", "template")
 
     def test_execute_plan_keeps_plan_when_kind_mismatches(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ["SPLUNK_SKILLS_MCP_ENABLE_EXECUTION"] = "1"
+            os.environ["SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION"] = "1"
             os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = "1"
             plan = core.plan_skill_script(
                 "cisco-product-setup",
@@ -712,7 +827,9 @@ class AgentMCPCoreTests(unittest.TestCase):
                 return 0
 
         fake_proc = FakeProc()
-        with mock.patch.object(core.subprocess, "Popen", return_value=fake_proc) as popen:
+        with mock.patch.object(
+            core.subprocess, "Popen", return_value=fake_proc
+        ) as popen:
             result = core._run_command(["fake"], timeout_seconds=1)
 
         self.assertEqual(result.returncode, 0)
@@ -720,6 +837,92 @@ class AgentMCPCoreTests(unittest.TestCase):
         kwargs = popen.call_args.kwargs
         self.assertEqual(kwargs["stdin"], core.subprocess.DEVNULL)
         self.assertTrue(kwargs["start_new_session"])
+
+    def test_child_environment_removes_code_injection_hooks_and_unsafe_path(
+        self,
+    ) -> None:
+        hostile = {
+            "BASH_ENV": "/tmp/bash-env",
+            "PYTHONPATH": "/tmp/python",
+            "PYTHONWARNINGS": "all:evil:Warning:evil",
+            "RUBYOPT": "-revil",
+            "NODE_OPTIONS": "--require=/tmp/evil.js",
+            "JAVA_TOOL_OPTIONS": "-javaagent:/tmp/evil.jar",
+            "LD_PRELOAD": "/tmp/evil.so",
+            "DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib",
+            "PROMPT_COMMAND": "touch /tmp/evil",
+            "PS4": "$(touch /tmp/evil)",
+            "SPLUNK_SKILLS_MCP_ALLOW_MUTATION": "1",
+            "BASH_FUNC_evil%%": "() { :; }",
+            "PATH": f"/tmp{os.pathsep}/usr/bin",
+        }
+        with mock.patch.dict(os.environ, hostile, clear=False):
+            child = core._child_environment()
+
+        for key in hostile:
+            if key != "PATH":
+                self.assertNotIn(key, child)
+        self.assertNotIn("/tmp", child["PATH"].split(os.pathsep))
+        self.assertTrue(
+            all(Path(item).is_absolute() for item in child["PATH"].split(os.pathsep))
+        )
+
+    def test_cancelled_plan_creation_cannot_leave_an_undisclosed_plan(self) -> None:
+        cancellation = core.CommandCancellation()
+        entered_snapshot = threading.Event()
+        release_snapshot = threading.Event()
+        initial_plans = set(core._PLANS)
+        outcome: dict[str, object] = {}
+
+        def delayed_snapshot() -> str:
+            entered_snapshot.set()
+            self.assertTrue(release_snapshot.wait(timeout=5))
+            return "1" * 64
+
+        def create_plan() -> None:
+            try:
+                outcome["plan"] = core.plan_skill_script(
+                    "cisco-product-setup",
+                    "resolve_product.sh",
+                    ["--help"],
+                    cancellation=cancellation,
+                )
+            except Exception as exc:  # noqa: BLE001 - captured for thread assertion
+                outcome["error"] = exc
+
+        with mock.patch.object(core, "_skills_snapshot_sha256", delayed_snapshot):
+            worker = threading.Thread(target=create_plan, daemon=True)
+            worker.start()
+            self.assertTrue(entered_snapshot.wait(timeout=5))
+            cancellation.cancel()
+            release_snapshot.set()
+            worker.join(timeout=10)
+
+        self.assertFalse(worker.is_alive())
+        self.assertIsInstance(outcome.get("error"), core.SkillMCPError)
+        self.assertNotIn("plan", outcome)
+        self.assertEqual(set(core._PLANS), initial_plans)
+
+    def test_credential_status_rejects_symlink_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "credentials.target"
+            target.write_text("SPLUNK_PASSWORD=not-read-by-test\n", encoding="utf-8")
+            target.chmod(0o600)
+            linked = Path(tmpdir) / "credentials"
+            linked.symlink_to(target)
+            with mock.patch.dict(
+                os.environ,
+                {"SPLUNK_CREDENTIALS_FILE": str(linked)},
+                clear=False,
+            ):
+                payload = core.credential_status()
+
+        entry = payload["candidates"][0]
+        self.assertTrue(entry["exists"])
+        self.assertFalse(entry["regular_file"])
+        self.assertFalse(entry["secure_mode"])
+        self.assertIn("symbolic link", entry["reasons"])
+        self.assertIsNot(payload["active"], entry)
 
     def test_run_command_returns_structured_error_when_spawn_fails(self) -> None:
         with mock.patch.object(
@@ -738,7 +941,9 @@ class AgentMCPCoreTests(unittest.TestCase):
             mock.patch.object(core.subprocess, "Popen") as popen,
         ):
             os.environ.pop("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION", None)
-            with self.assertRaisesRegex(core.SkillMCPError, "Subprocess execution is disabled"):
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "Subprocess execution is disabled"
+            ):
                 core._run_command(["never-started"], timeout_seconds=1)
         popen.assert_not_called()
 
@@ -809,7 +1014,9 @@ class AgentMCPCoreTests(unittest.TestCase):
             worker.join(timeout=5)
             elapsed = time.monotonic() - started
 
-        self.assertFalse(worker.is_alive(), "SIGTERM-ignoring child survived cancellation")
+        self.assertFalse(
+            worker.is_alive(), "SIGTERM-ignoring child survived cancellation"
+        )
         self.assertLess(elapsed, 3)
         result = outcome["result"]
         self.assertIsInstance(result, core._BoundedResult)
@@ -848,11 +1055,15 @@ class AgentMCPCoreTests(unittest.TestCase):
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline and not ready.exists():
                 time.sleep(0.01)
-            self.assertTrue(ready.exists(), "descendant never installed its SIGTERM handler")
+            self.assertTrue(
+                ready.exists(), "descendant never installed its SIGTERM handler"
+            )
 
             cancellation.cancel()
             worker.join(timeout=5)
-            self.assertFalse(worker.is_alive(), "cancelled process group did not terminate")
+            self.assertFalse(
+                worker.is_alive(), "cancelled process group did not terminate"
+            )
             time.sleep(1.25)
             self.assertFalse(
                 survived.exists(),
@@ -908,9 +1119,7 @@ class AgentMCPCoreTests(unittest.TestCase):
             for key in keys:
                 if not isinstance(key, str):
                     continue
-                normalized = (
-                    core.re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower()
-                )
+                normalized = core.re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower()
                 if normalized in core.NON_SECRET_VALUE_KEYS:
                     continue
                 if core._looks_secret_key(key):

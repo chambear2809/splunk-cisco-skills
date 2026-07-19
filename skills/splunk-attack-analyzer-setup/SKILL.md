@@ -1,12 +1,10 @@
 ---
 name: splunk-attack-analyzer-setup
-description: >-
-  Install, configure readiness, and validate Splunk Attack Analyzer platform
-  integration using Splunk Add-on for Splunk Attack Analyzer
-  (`Splunk_TA_SAA`, app 6999) and Splunk App for Splunk Attack Analyzer
-  (`Splunk_App_SAA`, app 7000). Use when a user asks for Attack Analyzer, SAA,
-  phishing and malware analysis data ingestion, the `saa` index, `saa_indexes`
-  macro, or Enterprise Security adaptive response readiness.
+description: "Use when a user asks for Attack Analyzer, SAA, phishing and malware analysis data ingestion, the `saa`
+  index, `saa_indexes` macro, or Enterprise Security adaptive response readiness. Install, configure
+  readiness, and validate Splunk Attack Analyzer platform integration using Splunk Add-on for Splunk
+  Attack Analyzer (`Splunk_TA_SAA`, app 6999) and Splunk App for Splunk Attack Analyzer (`Splunk_App_SAA`,
+  app 7000)."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -14,6 +12,56 @@ metadata:
 ---
 
 # Splunk Attack Analyzer Setup
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- A user asks for Attack Analyzer, SAA, phishing and malware analysis data ingestion, the `saa` index, `saa_indexes`
+  macro, or Enterprise Security adaptive response readiness.
+- Preview and review the splunk attack analyzer setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-attack-analyzer-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-attack-analyzer-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## TA Completion Gate
 

@@ -1,0 +1,540 @@
+{
+  "schema_version": 1,
+  "skill": "cisco-collaboration-setup",
+  "research_checked_date": "2026-07-19",
+  "repository_base_commit": "4c4712a136c9cd770440c85f25063e4fe61f2ce3",
+  "sc4s_upstream_commit": "f878a6e8031b07ae8777e97738b27afe735f118d",
+  "source_policy": "Primary public sources only. Commit-addressed source is immutable; human documentation pages are mutable and labeled with their checked date. UNKNOWN means the cited public evidence did not confirm the claim.",
+  "sources": [
+    {
+      "claim_id": "sideview-669",
+      "title": "Cisco CDR Reporting and Analytics",
+      "url": "https://splunkbase.splunk.com/app/669",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "669",
+      "version": "8.4.2",
+      "source_date": "2026-05-19",
+      "entitlement": "commercial",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sideview-4434",
+      "title": "Cisco CDR and CMR index-time TA",
+      "url": "https://splunkbase.splunk.com/app/4434",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "4434",
+      "version": "8.3.1",
+      "source_date": "2026-02-09",
+      "placement": "universal-forwarder or heavy-forwarder; full app 669 on a standalone indexer",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sideview-4640",
+      "title": "Cisco AXL supporting app",
+      "url": "https://splunkbase.splunk.com/app/4640",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "4640",
+      "version": "1.2.9",
+      "source_date": "2026-06-24",
+      "entitlement": "separate trial/license",
+      "verified_platform_max": "10.4",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sideview-8413",
+      "title": "Cisco Meeting Server CDR support",
+      "url": "https://splunkbase.splunk.com/app/8413",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "8413",
+      "version": "0.6.1",
+      "source_date": "2026-06-09",
+      "receiver_implementation": "UNKNOWN",
+      "placement": "UNKNOWN",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sideview-8592",
+      "title": "Cisco Expressway CDR index-time add-on",
+      "url": "https://splunkbase.splunk.com/app/8592",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "8592",
+      "version": "0.5.0",
+      "source_date": "2026-03-25",
+      "placement": "indexer or heavy-forwarder when producing cooked data",
+      "active_sourcetype": "UNKNOWN; listing describes CSV/JSON source types as under development",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sideview-8593",
+      "title": "Cisco Expressway CDR search-side app",
+      "url": "https://splunkbase.splunk.com/app/8593",
+      "publisher": "Sideview",
+      "ownership": "partner-built; not a Splunk-owned official TA",
+      "support": "developer-supported",
+      "splunkbase_id": "8593",
+      "version": "0.5.3",
+      "source_date": "2026-06-09",
+      "placement": "search tier; requires app 8592 on the indexing tier and is designed with app 669",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15",
+      "title": "CUCM 15 Reporting and Billing Administration Guide",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "UNKNOWN",
+      "claim": "Overview of CUCM CDR/CMR reporting and billing. Other current CUCM 15 sections establish the split file types, SFTP delivery, billing setup, and formats; this skill encodes no maximum billing-server count because current Cisco pages conflict.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-billing-setup",
+      "title": "CUCM 15 Reporting and Billing Administration - billing server setup",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01011.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "UNKNOWN",
+      "claim": "Current billing-server setup evidence. Cisco CUCM 15 pages conflict on the supported maximum, so the router records no maximum.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-export-distinction",
+      "title": "CUCM 15 Reporting and Billing Administration - export and CDR/CMR distinction",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_0101.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "CDR and CMR are distinct SFTP-delivered file types and must be collected and evidenced independently.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-export-cdr-type-mapping",
+      "title": "CUCM 15 Export CDRs and CMRs - exported CDR type-row mapping",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_0101.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "The current exported CDR type row maps callingPartyNumber and finalCalledPartyNumber to VARCHAR(50).",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-export-cmr-type-mapping",
+      "title": "CUCM 15 Call Management Records - corresponding sample CMR type-row mapping",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01100.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "Corresponding Sample CMRs maps globalCallID_callId to INTEGER and directoryNum to VARCHAR(50). This is the only exported CMR pair eligible for locally_evidence_qualified in this router.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-record-format",
+      "title": "CUCM 15 Reporting and Billing Administration - record and file format",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01000.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "Current CDR/CMR record and file format evidence: line 1 contains unique field names, line 2 contains equally wide nonempty field types, and lines 3 onward contain equally wide data records. CDR and CMR files remain distinct.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-cdr-fields",
+      "title": "CUCM 15 CDR field descriptions",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01010.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "The cdrRecordType field is always 1 for CDR records. Current CDR field naming uses globalCallID_callManagerId and globalCallID_callId. Cisco declares the manager ID, call ID, and origLegCallIdentifier as Positive Integer; other fields declared Integer receive no invented bounds.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-15-cmr-fields",
+      "title": "CUCM 15 CMR field descriptions",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/callReportingBillingAdmin/15/cucm_b_reporting-billing-administration-guide-15/cucm_b_reporting-and-billing-administration-guide_chapter_01101.html",
+      "publisher": "Cisco",
+      "source_version": "15",
+      "source_date": "2026-04-09",
+      "claim": "The cdrRecordType field is always 2 for CMR records. globalCallId_callId with directoryNumber is field-description compatibility only; globalCallID_callManagerId is stable. Cisco declares the manager ID, documented call-ID field, nodeId, and callIdentifier as Positive Integer; jitter is unsigned; numberPacketsLost may be negative; date/time and latency remain ordinary Integer fields without invented bounds.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-cdr-cli",
+      "title": "CUCM CLI reference for the CDR repository",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/cli_ref/12_5_1SU7/cucm_b_cli_reference-guide_release1251SU7/cucm_b_cli_reference_guide_release_1401_chapter_011.html",
+      "publisher": "Cisco",
+      "source_version": "12.5(1)SU7 / 14.0(1) CLI namespace",
+      "source_date": "UNKNOWN",
+      "claim": "cm/cdr_repository and cm/cdr_repository/processed/<date> are diagnostic CLI paths, not the external billing export contract.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cucm-15-remote-audit-syslog",
+      "title": "CUCM 15 Administration Guide - remote audit log transfer protocol",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/admin/15/adminGd/cucm_b_administration-guide-15/cucm_b_test-adminguide_chapter_010100.html",
+      "publisher": "Cisco",
+      "source_version": "15 and SUs",
+      "source_date": "2025-10-31",
+      "claim": "This authority applies specifically to CUCM remote audit logging. Its normal-mode default protocol is UDP and utils remotesyslog set protocol can select UDP, TCP, or TLS. TLS supports unidirectional or bidirectional x.509 authentication and certificate trust requirements. The page does not establish a receiver-port default or transport support for every generic CUCM service-syslog path, so this router requires an explicit operator-selected port and makes no broader device-transport claim.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-axl-guide",
+      "title": "AXL Developer Guide",
+      "url": "https://developer.cisco.com/docs/axl/axl-developer-guide/",
+      "publisher": "Cisco",
+      "source_version": "mutable developer documentation",
+      "source_date": "UNKNOWN",
+      "claim": "AXL is a throttled provisioning/configuration SOAP/XML API using HTTPS POST to the CUCM publisher, normally /axl/ on port 8443; it is not a realtime CDR collection API.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-axl-wsdl",
+      "title": "Download the AXL WSDL",
+      "url": "https://developer.cisco.com/docs/axl/download-the-axl-wsdl/",
+      "publisher": "Cisco",
+      "source_version": "mutable developer documentation",
+      "source_date": "UNKNOWN",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-expressway-x15-5",
+      "title": "Cisco Expressway Administrator Guide X15.5 - serviceability, logging, monitoring, and metrics",
+      "url": "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/expressway/admin_guide/X15-5/exwy_b_cisco-expressway-administrator-guide-x155/exwy_m_serviceability-logging-monitoring-and-metrics.html",
+      "publisher": "Cisco",
+      "source_version": "X15.5",
+      "source_date": "2026-02-09",
+      "claim": "Expressway remote syslog wire modes are legacy BSD or IETF over UDP port 514, or IETF over TLS port 6514 with trust requirements. CDR is off by default and can emit INFO records to syslog; media statistics use local2. SC4S listener capabilities are a separate contract.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cms-product-3-13",
+      "title": "Cisco Meeting Server 3.13 product and support page",
+      "url": "https://www.cisco.com/c/en/us/support/conferencing/meeting-server/series.html",
+      "publisher": "Cisco",
+      "source_version": "3.13 current product series",
+      "source_date": "UNKNOWN",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cms-mmp-3-13",
+      "title": "Cisco Meeting Server MMP Command Reference 3.13",
+      "url": "https://www.cisco.com/c/dam/en/us/td/docs/conferencing/ciscoMeetingServer/Reference_Guides/Version-3-13/Cisco-Meeting-Server-MMP-Command-Reference-3-13.pdf",
+      "publisher": "Cisco",
+      "source_version": "3.13",
+      "source_date": "UNKNOWN",
+      "claim": "CMS 3.13 remote syslog uses TCP, not UDP. Prefixing the server with tls: enables the optional TLS form; this device contract is separate from SC4S listener and certificate readiness.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cms-cdr-3-11-current",
+      "title": "Cisco Meeting Server CDR Guide 3.11 and later",
+      "url": "https://www.cisco.com/c/dam/en/us/td/docs/conferencing/ciscoMeetingServer/Reference_Guides/Version-3-11/Cisco-Meeting-Server-CDR-Guide-3-11-and-later.pdf",
+      "publisher": "Cisco",
+      "source_version": "3.11 and later",
+      "source_date": "UNKNOWN",
+      "claim": "Current CDR authority: CMS sends XML CDR records to external HTTP(S) receivers and does not retain them as a long-term internal store.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cms-cdr-3-10-historical",
+      "title": "Cisco Meeting Server CDR Guide 3.7 and later, version 3.10 copy",
+      "url": "https://www.cisco.com/c/dam/en/us/td/docs/conferencing/ciscoMeetingServer/Reference_Guides/Version-3-10/Cisco-Meeting-Server-CDR-Guide-3-7-and-later.pdf",
+      "publisher": "Cisco",
+      "source_version": "3.10 historical evidence",
+      "source_date": "UNKNOWN",
+      "authority": "historical only; not current authority",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-cmm-3-13-current",
+      "title": "Cisco Meeting Management 3.13 Installation and Configuration Guide",
+      "url": "https://www.cisco.com/c/dam/en/us/td/docs/conferencing/Cisco-Meeting-Management/Installation/Cisco-Meeting-Management-3-13-Installation-and-Configuration-Guide.pdf",
+      "publisher": "Cisco",
+      "source_version": "3.13",
+      "source_date": "UNKNOWN",
+      "claim": "CMM 3.13 configures system and audit log servers independently, with up to five of each. It supports UDP, TCP, and TLS; TLS uses TLS 1.2, and receivers must accept messages up to 8192 bytes. This router models explicit TCP or TLS sender profiles, defaults the privacy-safe example to TLS, and keeps SC4S TLS listener/certificate readiness unresolved without claiming live configuration.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-ucm-doc",
+      "title": "SC4S Cisco UCM human documentation",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/main/sources/vendor/Cisco/cisco_ucm/",
+      "publisher": "Splunk",
+      "source_version": "mutable main documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Documents source type cisco:ucm and default index ucm.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-custom-port-source-current",
+      "title": "SC4S sources and custom product-port mapping",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/main/sources/",
+      "publisher": "Splunk",
+      "source_version": "mutable main documentation",
+      "source_date": "UNKNOWN",
+      "claim": "SC4S custom mappings use SC4S_LISTEN_{VENDOR}_{PRODUCT}_{PROTOCOL}_PORT and require a port dedicated exclusively to that device/product mapping. A bare child render without the exact reviewed port binding does not establish listener readiness.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-custom-port-troubleshooting-3-29",
+      "title": "SC4S 3.29 custom port troubleshooting",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/3.29.0/troubleshooting/troubleshoot_SC4S_server/",
+      "publisher": "Splunk",
+      "source_version": "3.29.0 documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Versioned SC4S troubleshooting evidence reiterates the vendor/product/protocol listener-port pattern and exclusive-port requirement; it does not prove that this router's bare CUCM child argv opens an operator-selected port.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-tvcs-doc",
+      "title": "SC4S Cisco TVCS human documentation",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/main/sources/vendor/Cisco/cisco_tvcs/",
+      "publisher": "Splunk",
+      "source_version": "mutable main documentation",
+      "source_date": "UNKNOWN",
+      "claim": "The mutable source-type table says cisco:vcs while the configuration table says cisco:tvcs; default index main. Commit-pinned parser and test evidence resolve the implemented value to cisco:tvcs.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cms-doc",
+      "title": "SC4S Cisco Meeting Server human documentation",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/main/sources/vendor/Cisco/cisco_ms/",
+      "publisher": "Splunk",
+      "source_version": "mutable main documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Documents cisco:ms, default index netops, and vendor-product-by-source mapping.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cmm-doc",
+      "title": "SC4S Cisco Meeting Management human documentation",
+      "url": "https://splunk.github.io/splunk-connect-for-syslog/main/sources/vendor/Cisco/cisco_mm/",
+      "publisher": "Splunk",
+      "source_version": "mutable main documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Documents cisco:mm:system:*, cisco:mm:audit, default index netops, and vendor-product-by-source mapping.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-ucm-parser-source",
+      "title": "SC4S Cisco UCM parser source",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco/app-cisco-cisco_ucm.conf",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "claim": "Implemented parser evidence sets vendor cisco, product ucm, source type cisco:ucm, and detects %UC_/%CCM_ messages.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-ucm-parser-test",
+      "title": "SC4S Cisco UCM parser test",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/tests/test_cisco_ucm.py",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-tvcs-parser-source",
+      "title": "SC4S Cisco TVCS parser source",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco/app-syslog-cisco_tvcs.conf",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "claim": "Implemented parser evidence explicitly sets source type cisco:tvcs; this resolves the mutable human-documentation table typo in favor of implemented behavior.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-tvcs-parser-test",
+      "title": "SC4S Cisco TVCS parser test",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/tests/test_cisco_tvcs.py",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "claim": "Pinned test evidence searches the exact implemented source type cisco:tvcs.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cms-parser-source",
+      "title": "SC4S Cisco Meeting Server parser source",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco/app-netsource-cisco_ms.conf",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cmm-classifier-source",
+      "title": "SC4S Cisco Meeting Management netsource classifier source",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco/app-netsource-cisco_mm.conf",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cmm-parser-source",
+      "title": "SC4S Cisco Meeting Management syslog parser source",
+      "url": "https://raw.githubusercontent.com/splunk/splunk-connect-for-syslog/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco/app-syslog-cisco_mm.conf",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "sc4s-cisco-source-index",
+      "title": "SC4S Cisco parser source index",
+      "url": "https://github.com/splunk/splunk-connect-for-syslog/tree/f878a6e8031b07ae8777e97738b27afe735f118d/package/shared/addons/cisco",
+      "publisher": "Splunk",
+      "source_version": "f878a6e8031b07ae8777e97738b27afe735f118d",
+      "source_date": "2026-07-19",
+      "pin_type": "git commit",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-cim-model-list-8-5",
+      "title": "CIM 8.5 data-model reference tables",
+      "url": "https://help.splunk.com/en/data-management/common-information-model/8.5/data-models/how-to-use-the-cim-data-model-reference-tables",
+      "publisher": "Splunk",
+      "source_version": "8.5",
+      "source_date": "2026-04-02",
+      "claim": "The current official model list does not establish a Telephony or VoIP data model.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-cim-authentication-8-5",
+      "title": "CIM 8.5 Authentication data model",
+      "url": "https://help.splunk.com/en/data-management/common-information-model/8.5/data-models/authentication",
+      "publisher": "Splunk",
+      "source_version": "8.5",
+      "source_date": "2026-04-02",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-cim-change-8-5",
+      "title": "CIM 8.5 Change data model",
+      "url": "https://help.splunk.com/en/data-management/common-information-model/8.5/data-models/change",
+      "publisher": "Splunk",
+      "source_version": "8.5",
+      "source_date": "2026-04-02",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-cim-network-traffic-8-5",
+      "title": "CIM 8.5 Network Traffic data model",
+      "url": "https://help.splunk.com/en/data-management/common-information-model/8.5/data-models/network-traffic",
+      "publisher": "Splunk",
+      "source_version": "8.5",
+      "source_date": "2026-04-02",
+      "claim": "Network Traffic is not inferred for product call records merely because addresses or media fields are present.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-fields-command-10-5-2605",
+      "title": "Splunk Cloud Platform 10.5.2605 fields command",
+      "url": "https://help.splunk.com/en/splunk-cloud-platform/search/search-reference/10.5.2605/search-commands/fields",
+      "publisher": "Splunk",
+      "source_version": "10.5.2605",
+      "source_date": "UNKNOWN",
+      "claim": "Official fields-command authority: inclusion form retains the internal _raw and _time fields unless they are explicitly removed, while timechart requires _time. The privacy search therefore projects _time and collaboration_route, explicitly removes _raw as the final pre-aggregation step, and then runs timechart.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "splunk-dashboard-studio-current",
+      "title": "Splunk Dashboard Studio documentation",
+      "url": "https://help.splunk.com/en/splunk-cloud-platform/create-dashboards-and-reports/dashboard-studio",
+      "publisher": "Splunk",
+      "source_version": "mutable current documentation",
+      "source_date": "UNKNOWN",
+      "claim": "General Dashboard Studio authority only. This router emits a privacy-bounded starter SPL search and does not claim or install a Dashboard Studio definition.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-roomos-26-2-api",
+      "title": "RoomOS 26.2 API Reference Guide",
+      "url": "https://www.cisco.com/c/dam/en/us/td/docs/telepresence/endpoint/roomos-2602/api-reference-guide-roomos-2602.pdf",
+      "publisher": "Cisco",
+      "source_version": "26.2",
+      "source_date": "UNKNOWN",
+      "claim": "Device API capability evidence only; it does not establish a verified Splunk parser or collector.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-webex-xapi",
+      "title": "Webex xAPI",
+      "url": "https://developer.webex.com/docs/api/v1/xapi",
+      "publisher": "Cisco",
+      "source_version": "mutable developer documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Webex xAPI capability evidence justifies a distinct Webex handoff but does not establish local Splunk collection readiness.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-roomos-environmental-sensors",
+      "title": "RoomOS environmental sensors use case",
+      "url": "https://roomos.cisco.com/doc/UseCases/EnvironmentalSensors",
+      "publisher": "Cisco",
+      "source_version": "mutable RoomOS documentation",
+      "source_date": "UNKNOWN",
+      "claim": "RoomOS sensor capability evidence only; no verified local Splunk parser or collector is inferred.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-roomos-people-presence",
+      "title": "RoomOS PeoplePresence status",
+      "url": "https://roomos.cisco.com/xapi/Status.RoomAnalytics.PeoplePresence/",
+      "publisher": "Cisco",
+      "source_version": "mutable RoomOS documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Room analytics capability evidence only; it does not upgrade RoomOS beyond unsupported_roadmap.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-roomos-thousandeyes-handoff",
+      "title": "Configure ThousandEyes on a RoomOS device",
+      "url": "https://www.cisco.com/c/en/us/support/docs/cloud-systems-management/thousandeyes-end-user-monitoring/222777-configure-thousand-eye-on-room-os-device.html",
+      "publisher": "Cisco",
+      "source_version": "mutable support documentation",
+      "source_date": "UNKNOWN",
+      "claim": "ThousandEyes-on-RoomOS capability evidence justifies a distinct ThousandEyes handoff; it does not establish a Splunk parser or collector.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-broadworks-primary-interface",
+      "title": "Cisco BroadWorks developer getting started",
+      "url": "https://developer.cisco.com/docs/broadworks/getting-started/",
+      "publisher": "Cisco",
+      "source_version": "mutable developer documentation",
+      "source_date": "UNKNOWN",
+      "claim": "Primary BroadWorks interface evidence. Collection executable status remains a gap; no verified Splunk package, parser, source type, or collector is established by this ledger.",
+      "checked_date": "2026-07-19"
+    },
+    {
+      "claim_id": "cisco-broadworks-release-notes",
+      "title": "Cisco BroadWorks release notes landing page",
+      "url": "https://www.cisco.com/c/en/us/support/unified-communications/broadworks/products-release-notes-list.html",
+      "publisher": "Cisco",
+      "source_version": "mutable supporting documentation",
+      "source_date": "UNKNOWN",
+      "authority": "supporting source; developer getting-started page is primary interface evidence",
+      "checked_date": "2026-07-19"
+    }
+  ]
+}

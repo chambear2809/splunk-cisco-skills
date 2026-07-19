@@ -22,7 +22,7 @@ EOF
 reject_secret_arg() {
   case "$1" in
     --token|--access-token|--api-token|--password|--client-secret|--secret|--aws-secret-access-key|--aws-secret-key|--private-key)
-      echo "Refusing secret argument $1. Use a *_file option in the spec instead." >&2
+      echo "Inline credential option $1 is not accepted. Use its *_file field in the spec." >&2
       exit 2
       ;;
   esac

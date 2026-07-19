@@ -128,11 +128,11 @@ kubectl get tracingpolicy
 kubectl describe tracingpolicy network-monitoring
 ```
 
-To see live events from a Tetragon pod:
+To verify the live Tetragon metrics surface without executing a command in a pod:
 
 ```bash
 # Use the API server proxy (preferred over exec):
 kubectl get --raw /api/v1/namespaces/tetragon/services/tetragon:2112/proxy/metrics | head -50
 ```
 
-(The skill's validation explicitly avoids `kubectl exec` patterns; the API server proxy works for metrics; for live event tailing use `tetra getevents` from the Tetragon CLI image rather than execing into the DaemonSet pod.)
+(The API server proxy works for metrics. Live validation reads ordinary Tetragon container logs through the pod log API; for decoded event streaming, use `tetra getevents` from a separately installed Tetragon CLI rather than executing it inside the DaemonSet pod.)

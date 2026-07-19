@@ -1,17 +1,13 @@
 ---
 name: splunk-enterprise-public-exposure-hardening
-description: >-
-  Render, preflight, apply, and validate hardening of an on-prem Splunk
-  Enterprise deployment for public-internet exposure across all four edge
-  surfaces (Splunk Web on 8000, HEC on 8088, Splunk-to-Splunk on 9997,
-  splunkd REST on 8089) plus reference reverse-proxy / WAF / firewall
-  templates and a structured operator handoff. Use when the user asks to
-  expose Splunk Enterprise on the public internet, harden a Splunk search
-  head against internet exposure, configure TLS / HSTS / CSP / mTLS /
-  per-IP rate limit / DMZ heavy forwarder, lock down splunkd or the KV
-  store, fix splunk.secret / pass4SymmKey defaults, evaluate against the
-  latest SVD floor (10.4.0 / 10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx /
-  HAProxy / WAF reference configs in front of Splunk.
+description: "Use when the user asks to expose Splunk Enterprise on the public internet, harden a Splunk search head
+  against internet exposure, configure TLS / HSTS / CSP / mTLS / per-IP rate limit / DMZ heavy forwarder,
+  lock down splunkd or the KV store, fix splunk.secret / pass4SymmKey defaults, evaluate against the
+  latest SVD floor (10.4.0 / 10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx / HAProxy / WAF reference
+  configs in front of Splunk. Render, preflight, apply, and validate hardening of an on-prem Splunk
+  Enterprise deployment for public-internet exposure across all four edge surfaces (Splunk Web on 8000,
+  HEC on 8088, Splunk-to-Splunk on 9997, splunkd REST on 8089) plus reference reverse-proxy / WAF /
+  firewall templates and a structured operator handoff."
 compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "self-managed-10.4"
@@ -19,6 +15,65 @@ metadata:
 ---
 
 # Splunk Enterprise Public Internet Exposure Hardening
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Expose Splunk Enterprise on the public internet, harden a Splunk search head against internet exposure, configure
+  TLS / HSTS / CSP / mTLS / per-IP rate limit / DMZ heavy forwarder, lock down splunkd or the KV store, fix
+  splunk.secret /.
+- Preview and review the splunk enterprise public exposure hardening workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-enterprise-public-exposure-hardening/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-enterprise-public-exposure-hardening/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill prepares an **on-prem Splunk Enterprise** deployment for
 public-internet exposure with **defense in depth across the Splunk node, the

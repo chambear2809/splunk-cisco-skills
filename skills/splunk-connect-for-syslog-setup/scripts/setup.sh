@@ -195,6 +195,52 @@ validate_choice() {
     exit 1
 }
 
+validate_hec_base_url() {
+    python3 - "${1:-}" <<'PY'
+import ipaddress
+import re
+import sys
+from urllib.parse import urlsplit
+
+raw = sys.argv[1]
+try:
+    parsed = urlsplit(raw)
+    port = parsed.port
+except ValueError:
+    raise SystemExit(1)
+if (
+    parsed.scheme != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.query
+    or parsed.fragment
+    or any(character.isspace() or ord(character) < 0x20 for character in raw)
+    or parsed.path
+    not in {
+        "",
+        "/",
+        "/services/collector/event",
+        "/services/collector/event/",
+        "/services/collector/raw",
+        "/services/collector/raw/",
+    }
+    or (port is not None and not 1 <= port <= 65535)
+):
+    raise SystemExit(1)
+host = parsed.hostname
+try:
+    ipaddress.ip_address(host)
+except ValueError:
+    labels = host.split(".")
+    if any(
+        not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+        for label in labels
+    ):
+        raise SystemExit(1)
+PY
+}
+
 resolve_abs_path() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -342,6 +388,39 @@ validate_args() {
         else
             RUNTIME="docker"
         fi
+    fi
+
+    if (( ${#NAMESPACE} > 63 )) || [[ ! "${NAMESPACE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+        log "ERROR: --namespace must be a lowercase Kubernetes DNS label of at most 63 characters."
+        exit 1
+    fi
+    if (( ${#RELEASE_NAME} > 53 )) || [[ ! "${RELEASE_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+        log "ERROR: --release-name must be a lowercase Helm release name of at most 53 characters."
+        exit 1
+    fi
+    if [[ ! "${SC4S_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${SC4S_ROOT}" == *//* || "/${SC4S_ROOT#/}/" == */../* || "/${SC4S_ROOT#/}/" == */./* ]]; then
+        log "ERROR: --sc4s-root must be a normalized absolute path using letters, numbers, dot, underscore, dash, and slash."
+        exit 1
+    fi
+    if [[ ! "${SC4S_IMAGE}" =~ ^[A-Za-z0-9][A-Za-z0-9._/@:-]*$ ]]; then
+        log "ERROR: --container-image contains unsupported container-reference characters."
+        exit 1
+    fi
+    if [[ ! "${SC4S_PERSIST_VOLUME}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: --persist-volume must be a valid named container volume."
+        exit 1
+    fi
+    if [[ -n "${CONTAINER_HOST_NAME}" && ! "${CONTAINER_HOST_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        log "ERROR: --container-host contains unsupported hostname characters."
+        exit 1
+    fi
+    if [[ -n "${EXISTING_CERT}" ]] && { (( ${#EXISTING_CERT} > 253 )) || [[ ! "${EXISTING_CERT}" =~ ^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$ ]]; }; then
+        log "ERROR: --existing-cert must be a lowercase Kubernetes DNS subdomain."
+        exit 1
+    fi
+    if [[ -n "${HEC_URL}" ]] && ! validate_hec_base_url "${HEC_URL}"; then
+        log "ERROR: --hec-url must be a credential-free HTTPS HEC base, /event, or /raw URL."
+        exit 1
     fi
 
     if [[ ! "${SC4S_ROOT}" =~ ^/ ]]; then
@@ -1367,12 +1446,13 @@ EOF
 }
 
 render_systemd_helper() {
-    local host_dir="$1"
+    local host_dir="$1" target_root_q
+    printf -v target_root_q '%q' "${SC4S_ROOT}"
     cat > "${host_dir}/systemd-install.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 cd "\$(dirname "\${BASH_SOURCE[0]}")"
-target_root="${SC4S_ROOT}"
+target_root=${target_root_q}
 unit_dir="\${SC4S_SYSTEMD_UNIT_DIR:-/etc/systemd/system}"
 use_sudo="\${SC4S_SYSTEMD_USE_SUDO:-auto}"
 systemctl_bin="\${SC4S_SYSTEMCTL_BIN:-systemctl}"
@@ -1421,6 +1501,10 @@ render_host_assets() {
     host_dir="${OUTPUT_DIR}/host"
     template_dir="${SCRIPT_DIR}/../templates/host"
     hec_base_url="$(detect_hec_base_url)"
+    if ! validate_hec_base_url "${hec_base_url}"; then
+        log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC base, /event, or /raw URL: ${hec_base_url}"
+        return 1
+    fi
     if [[ -n "${HEC_TOKEN_FILE}" ]]; then
         assert_secret_output_dir_is_safe "${host_dir}"
         if ! hec_token_value="$(read_hec_token_value "${HEC_TOKEN_FILE}")"; then
@@ -1559,7 +1643,9 @@ EOF
 }
 
 render_helm_helper() {
-    local k8s_dir="$1"
+    local k8s_dir="$1" release_name_q namespace_q
+    printf -v release_name_q '%q' "${RELEASE_NAME}"
+    printf -v namespace_q '%q' "${NAMESPACE}"
     cat > "${k8s_dir}/helm-install.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -1568,7 +1654,7 @@ if ! helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-con
   echo "WARN: helm repo add returned non-zero (repo may already exist); continuing." >&2
 fi
 helm repo update
-cmd=(helm upgrade --install "${RELEASE_NAME}" splunk-connect-for-syslog/splunk-connect-for-syslog --namespace "${NAMESPACE}" --create-namespace -f values.yaml)
+cmd=(helm upgrade --install ${release_name_q} splunk-connect-for-syslog/splunk-connect-for-syslog --namespace ${namespace_q} --create-namespace -f values.yaml)
 if [[ -f values.secret.yaml ]]; then
   cmd+=(-f values.secret.yaml)
 fi
@@ -1583,6 +1669,10 @@ render_k8s_assets() {
     k8s_dir="${OUTPUT_DIR}/k8s"
     template_dir="${SCRIPT_DIR}/../templates/kubernetes"
     hec_event_url="$(hec_event_url_from_base "$(detect_hec_base_url)")"
+    if ! validate_hec_base_url "${hec_event_url}"; then
+        log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC event URL: ${hec_event_url}"
+        return 1
+    fi
     mkdir -p "${k8s_dir}"
 
     if [[ -n "${EXISTING_CERT}" ]]; then

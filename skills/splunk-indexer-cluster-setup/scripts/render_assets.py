@@ -307,18 +307,62 @@ push_conf() {{
   if ! ssh "${{HBS_SSH_TRUST_ARGS[@]}}" -o BatchMode=yes "${{user}}@${{host}}" bash -s <<REMOTE_EOF
 set -euo pipefail
 cleanup_secret() {{
-  shred -u /tmp/${{secret_basename}} 2>/dev/null || rm -f /tmp/${{secret_basename}}
+  staged_secret="/tmp/${{secret_basename}}"
+  if command -v shred >/dev/null 2>&1; then
+    shred --remove -- "${{staged_secret}}" 2>/dev/null || rm -f -- "${{staged_secret}}"
+  else
+    rm -f -- "${{staged_secret}}"
+  fi
 }}
 trap cleanup_secret EXIT
 target_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster/local
 sudo install -d -o splunk -g splunk -m 750 "\\${{target_dir}}"
-sudo python3 - /tmp/${{conf_basename}} /tmp/${{secret_basename}} "\\${{target_dir}}/server.conf" <<'PY_REMOTE'
+expected_secret_uid="\\$(id -u)"
+sudo python3 - /tmp/${{conf_basename}} /tmp/${{secret_basename}} "\\${{target_dir}}/server.conf" "\\${{expected_secret_uid}}" <<'PY_REMOTE'
+import os
+import stat
 from pathlib import Path
 import sys
-source, secret_file, target = map(Path, sys.argv[1:])
-secret = secret_file.read_text(encoding="utf-8").strip()
-if not secret:
-    raise SystemExit("ERROR: indexer cluster secret file is empty")
+source, secret_file, target = map(Path, sys.argv[1:4])
+expected_secret_uid = int(sys.argv[4])
+if not hasattr(os, "O_NOFOLLOW"):
+    raise SystemExit("ERROR: cannot read the indexer-cluster secret safely: O_NOFOLLOW is unavailable")
+flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+try:
+    descriptor = os.open(secret_file, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot securely open indexer-cluster secret file: {{exc}}")
+try:
+    before = os.fstat(descriptor)
+    mode = stat.S_IMODE(before.st_mode)
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+            or before.st_uid != expected_secret_uid or mode & 0o077
+            or not 1 <= before.st_size <= 65536):
+        raise SystemExit(
+            "ERROR: indexer-cluster secret must be an owner-only, single-link "
+            "regular file owned by the SSH user and no larger than 65536 bytes"
+        )
+    chunks, remaining = [], 65537
+    while remaining:
+        chunk = os.read(descriptor, min(remaining, 8192))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+    data = b"".join(chunks)
+    fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+    if tuple(getattr(before, item) for item in fields) != tuple(getattr(after, item) for item in fields) or len(data) != before.st_size:
+        raise SystemExit("ERROR: indexer-cluster secret changed while it was read")
+finally:
+    os.close(descriptor)
+try:
+    lines = data.decode("utf-8").splitlines()
+except UnicodeDecodeError as exc:
+    raise SystemExit(f"ERROR: indexer-cluster secret must be UTF-8 text: {{exc}}")
+if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+    raise SystemExit("ERROR: indexer-cluster secret file must contain exactly one non-empty line")
+secret = lines[0].strip()
 text = source.read_text(encoding="utf-8").replace("$" + "IDXC_SECRET", secret)
 target.write_text(text, encoding="utf-8")
 target.chmod(0o600)

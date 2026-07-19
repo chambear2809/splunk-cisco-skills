@@ -152,6 +152,21 @@ else
     echo "--list-services: OK"
 fi
 
+# Assert the public reviewed-rollback surface stays exact and offline-safe.
+help_output="$(bash "${SKILL_DIR}/scripts/setup.sh" --help)"
+for required_flag in --observed-state-file --plan-hash \
+    --accept-disable-integration --accept-delete-integration; do
+    if ! grep -q -- "${required_flag}" <<<"${help_output}"; then
+        failures+=("setup help is missing ${required_flag}")
+    fi
+done
+for forbidden_flag in --rollback-action --plan-sha256 --acknowledge; do
+    if grep -q -- "${forbidden_flag}" <<<"${help_output}"; then
+        failures+=("setup help exposes unapproved flag ${forbidden_flag}")
+    fi
+done
+echo "setup rollback help: reviewed public flags OK"
+
 echo ""
 if [[ ${#failures[@]} -eq 0 ]]; then
     echo "smoke_offline: ALL ASSERTIONS PASSED"

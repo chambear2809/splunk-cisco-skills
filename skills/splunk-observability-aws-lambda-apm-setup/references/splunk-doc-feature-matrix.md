@@ -8,7 +8,7 @@ Layer ARN registry: https://github.com/signalfx/lambda-layer-versions
 
 ## Layer publisher
 
-AWS account: `254067382080`  
+AWS account: `254067382080`
 Layers: `splunk-apm` (x86_64), `splunk-apm-arm` (arm64)
 
 ## Supported runtimes

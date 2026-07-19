@@ -1,86 +1,48 @@
 ---
 name: splunk-secure-gateway
-description: >-
-  Render, preflight, and validate Splunk Secure Gateway and Splunk Connected
-  Experiences (Splunk Mobile, Splunk TV, Splunk AR) readiness: Spacebridge
-  outbound connectivity checks, splunk_secure_gateway app enablement, token
-  (JWT) authentication readiness, device registration handoff, and an MDM
-  AppConfig template. Use when the user asks to set up Splunk Mobile or Connected
-  Experiences, enable or troubleshoot Splunk Secure Gateway, verify Spacebridge
-  connectivity, register mobile devices, configure MDM for Splunk Mobile, or
-  check mobile alert/dashboard delivery readiness.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-secure-gateway-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "conditional"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-secure-gateway-setup"
 ---
 
-# Splunk Secure Gateway / Mobile
+# Splunk Secure Gateway / Mobile (Deprecated Compatibility Alias)
 
-This skill renders Splunk Secure Gateway (`splunk_secure_gateway`) and Connected
-Experiences (Splunk Mobile, Splunk TV, Splunk AR) readiness assets: Spacebridge
-outbound connectivity preflight, app enablement, token (JWT) authentication
-readiness, device registration handoff, and an MDM AppConfig template. It is
-render-first because Secure Gateway depends on outbound Spacebridge connectivity
-and token auth that must be verified before users can register devices.
+> [!WARNING]
+> `splunk-secure-gateway` is deprecated and replaced by
+> [`splunk-secure-gateway-setup`](../splunk-secure-gateway-setup/SKILL.md). Use the canonical skill for all work.
 
-## How It Works
+## Fail-Closed Compatibility Contract
 
-Secure Gateway routes encrypted traffic through **Spacebridge**, a Splunk-hosted
-relay. There are **no inbound** firewall rules; you only need **outbound 443**
-to `prod.spacebridge.spl.mobi` (WebSocket). Devices register via an in-app
-authentication code or via MDM. Token (JWT) authentication must be enabled for
-the Connected Experiences apps to work.
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-secure-gateway-setup` as `replaced_by`.
 
-## Agent Behavior
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-This skill does not handle secrets in chat. Token authentication is enabled in
-Splunk (Settings > Tokens) by an admin; this skill checks readiness and hands
-off, it does not mint tokens. Use `template.example` for non-secret values:
-region, deployment name, platform, and MDM toggle.
-
-## Quick Start
-
-Render and run the Spacebridge connectivity preflight:
+## Safe Compatibility Checks
 
 ```bash
-bash skills/splunk-secure-gateway/scripts/setup.sh --region default --phase preflight
+bash skills/splunk-secure-gateway/scripts/setup.sh --help
+bash skills/splunk-secure-gateway/scripts/validate.sh --help
+python3 skills/splunk-secure-gateway/scripts/render_assets.py --help
 ```
 
-Render the full readiness bundle (connectivity + enable + registration + MDM):
+For supported behavior, begin here:
 
 ```bash
-bash skills/splunk-secure-gateway/scripts/setup.sh \
-  --region us-east-1 --deployment-name "Prod SH" --mdm true
+bash skills/splunk-secure-gateway-setup/scripts/setup.sh --help
+bash skills/splunk-secure-gateway-setup/scripts/validate.sh --help
 ```
 
-Validate rendered assets and check status live:
-
-```bash
-bash skills/splunk-secure-gateway/scripts/validate.sh --live
-```
-
-## What It Renders
-
-- `connectivity-preflight.sh` — Spacebridge `health_check` (primary + regional)
-  and the WebSocket upgrade test on outbound 443
-- `enable.sh` — enable `splunk_secure_gateway` and check token-auth readiness
-- `register.sh` — device registration handoff (in-app auth code) and prerequisites
-- `mdm-appconfig.xml` — Managed App Configuration template for Splunk Mobile MDM
-- `status.sh` — app state, token-auth state, and connectivity recheck
-- `README.md` / `metadata.json` — review context
-
-## Operating Notes
-
-- Outbound 443 to `prod.spacebridge.spl.mobi` is required; no inbound ports.
-- If a proxy does SSL decryption, it must support WebSockets or exempt
-  `prod.spacebridge.spl.mobi`.
-- Token (JWT) authentication must be enabled or device registration fails;
-  changing a user's credentials unregisters their device.
-- On Splunk Cloud, Secure Gateway is managed for you and connectivity originates
-  from the Splunk-managed search head. `--platform cloud` local `preflight`,
-  `enable`, and `status` phases exit `2` with a managed-service handoff; local
-  curl or `$SPLUNK_HOME` checks are not accepted as Cloud evidence. On
-  Enterprise, verify egress from the search head.
-
-Read `reference.md` before enabling token auth broadly or rolling out MDM.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

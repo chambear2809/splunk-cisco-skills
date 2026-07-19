@@ -562,7 +562,8 @@ capture_preflight_state() {
     local allow_bundle="${4:-false}" code context_json
     if [[ "${allow_bundle}" != "true" ]] && deployment_should_manage_search_config_via_bundle; then
         log "ERROR: Transactional content+ACL apply is not supported through an SHC deployer bundle."
-        log "       Render local.meta with splunk-knowledge-objects and push one reviewed bundle instead."
+        log "       This skill does not render local.meta or a bulk SHC bundle."
+        log "HANDOFF: prepare a reviewed, deployer-owned app bundle through a supported SHC deployment workflow."
         record_event "delivery-plane" "failed" "Bundle-managed target refused before mutation because REST ACL governance cannot be atomic with a deployer write."
         return 1
     fi

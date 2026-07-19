@@ -1,12 +1,10 @@
 ---
 name: splunk-universal-forwarder-setup
-description: >-
-  Bootstrap Splunk Universal Forwarder runtimes on Linux, macOS, and Windows,
-  resolve official UF downloads, render first-class enrollment assets for
-  deployment servers, static Enterprise indexers, or Splunk Cloud credentials
-  packages, and validate installed forwarders. Use when the user asks to
-  install, upgrade, enroll, or check Universal Forwarders separately from full
-  Splunk Enterprise host bootstrap or Agent Management server-class work.
+description: "Use when the user asks to install, upgrade, enroll, or check Universal Forwarders separately from full
+  Splunk Enterprise host bootstrap or Agent Management server-class work. Bootstrap Splunk Universal
+  Forwarder runtimes on Linux, macOS, and Windows, resolve official UF downloads, render first-class
+  enrollment assets for deployment servers, static Enterprise indexers, or Splunk Cloud credentials
+  packages, and validate installed forwarders."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -14,6 +12,38 @@ metadata:
 ---
 
 # Splunk Universal Forwarder Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Install, upgrade, enroll, or check Universal Forwarders separately from full Splunk Enterprise host bootstrap or
+  Agent Management server-class work.
+- Preview and review the splunk universal forwarder setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 Bootstraps **Universal Forwarder runtime clients**. Use this skill for endpoint
 or server forwarders that should run the lightweight UF package, not a full

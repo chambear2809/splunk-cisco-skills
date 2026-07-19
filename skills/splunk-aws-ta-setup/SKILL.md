@@ -1,15 +1,12 @@
 ---
 name: splunk-aws-ta-setup
-description: >-
-  Install, render, configure, and validate the Splunk Add-on for AWS
-  (Splunk_TA_aws, Splunkbase 1876) as the manual TA path that complements
-  splunk-cloud-data-manager-setup. Renders real inputs.conf stanzas for
-  CloudTrail and GuardDuty via the SQS-based S3 input and AWS Config via the
-  aws_config input, emits an IAM-role or access-key account-setup runbook,
-  creates the aws index, maps source types to CIM, and validates ingestion.
-  Use when the user asks about Splunk_TA_aws, the Splunk Add-on for AWS,
-  CloudTrail, AWS Config, or GuardDuty log ingestion, SQS-based S3 inputs, or a
-  manual AWS TA configuration alternative to Data Manager.
+description: "Use when the user asks about Splunk_TA_aws, the Splunk Add-on for AWS, CloudTrail, AWS Config, or
+  GuardDuty log ingestion, SQS-based S3 inputs, or a manual AWS TA configuration alternative to Data
+  Manager. Install, render, configure, and validate the Splunk Add-on for AWS (Splunk_TA_aws, Splunkbase
+  1876) as the manual TA path that complements splunk-cloud-data-manager-setup. Renders real inputs.conf
+  stanzas for CloudTrail and GuardDuty via the SQS-based S3 input and AWS Config via the aws_config input,
+  emits an IAM-role or access-key account-setup runbook, creates the aws index, maps source types to CIM,
+  and validates ingestion."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -17,6 +14,64 @@ metadata:
 ---
 
 # Splunk Add-on for AWS Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Splunk_TA_aws, the Splunk Add-on for AWS, CloudTrail, AWS Config, or GuardDuty log ingestion, SQS-based S3 inputs,
+  or a manual AWS TA configuration alternative to Data Manager.
+- Preview and review the splunk aws ta setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-aws-ta-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-aws-ta-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## TA Completion Gate
 

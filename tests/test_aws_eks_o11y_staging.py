@@ -542,7 +542,18 @@ exit 0
     assert "[REDACTED]" in result.stderr
 
 
-def _write_fake_kubectl(path: Path, log_path: Path, *, unready: bool = False) -> None:
+def _write_fake_kubectl(
+    path: Path,
+    log_path: Path,
+    *,
+    unready: bool = False,
+    bad_release_only_image: bool = False,
+    fail_selector: str = "",
+    dual_label_churn: bool = False,
+    unready_auxiliary: bool = False,
+    failed_auxiliary: bool = False,
+    completed_job_auxiliary: bool = False,
+) -> None:
     path.write_text(
         f"""#!/usr/bin/env python3
 import json, sys
@@ -553,13 +564,56 @@ name = args[args.index('get') + 2]
 resource = args[args.index('get') + 1]
 namespace = args[args.index('-n') + 1]
 ready = {str(not unready)}
-if resource == 'pods':
-    payload = {{'apiVersion': 'v1', 'kind': 'List', 'items': [{{
+def pod_payload(pod_name, resource_version):
+    image = 'example.test/collector@sha256:' + ('b' if pod_name == 'collector-primary' else 'a') * 64
+    if pod_name == 'collector-primary' and {bad_release_only_image!r}:
+        image = 'example.test/collector:latest'
+    phase = 'Running'
+    condition = 'True' if ready else 'False'
+    owner_references = []
+    if pod_name == 'collector-auxiliary' and {unready_auxiliary!r}:
+        condition = 'False'
+    if pod_name == 'collector-auxiliary' and {failed_auxiliary!r}:
+        phase = 'Failed'
+        condition = 'False'
+    if pod_name == 'collector-auxiliary' and {completed_job_auxiliary!r}:
+        phase = 'Succeeded'
+        condition = 'False'
+        owner_references = [{{
+            'apiVersion': 'batch/v1',
+            'kind': 'Job',
+            'name': 'collector-completed-hook',
+            'controller': True,
+        }}]
+    return {{
         'apiVersion': 'v1', 'kind': 'Pod',
-        'metadata': {{'name': 'collector-0', 'namespace': namespace}},
-        'spec': {{'containers': [{{'name': 'collector', 'image': 'example.test/collector@sha256:' + 'a' * 64}}]}},
-        'status': {{'phase': 'Running', 'conditions': [{{'type': 'Ready', 'status': 'True' if ready else 'False'}}]}}
-    }}]}}
+        'metadata': {{
+            'name': pod_name,
+            'namespace': namespace,
+            'resourceVersion': resource_version,
+            'ownerReferences': owner_references,
+        }},
+        'spec': {{'containers': [{{'name': 'collector', 'image': image}}]}},
+        'status': {{
+            'phase': phase,
+            'conditions': [{{'type': 'Ready', 'status': condition}}],
+        }},
+    }}
+if resource == 'pods':
+    selector = args[args.index('-l') + 1]
+    if {fail_selector!r} and selector == {fail_selector!r}:
+        print('SELECTOR_PRIVATE_MARKER', file=sys.stderr)
+        raise SystemExit(1)
+    shared_version = '2' if {dual_label_churn!r} and not selector.startswith('release=') else '1'
+    shared = pod_payload('collector-shared', shared_version)
+    items = [shared]
+    if selector.startswith('release='):
+        items.insert(0, pod_payload('collector-primary', '1'))
+    elif {bool(unready_auxiliary or failed_auxiliary or completed_job_auxiliary)!r}:
+        items.append(pod_payload('collector-auxiliary', '1'))
+    payload = {{'apiVersion': 'v1', 'kind': 'List', 'items': items}}
+elif resource == 'pod':
+    payload = pod_payload(name, '3')
 else:
     kinds = {{'daemonset': 'DaemonSet', 'deployment': 'Deployment', 'statefulset': 'StatefulSet', 'instrumentation': 'Instrumentation'}}
     kind = kinds[resource]
@@ -572,6 +626,31 @@ print(json.dumps(payload))
         encoding="utf-8",
     )
     path.chmod(0o755)
+
+
+def _write_fake_runtime_verifier(
+    path: Path, *, log_path: Path | None = None, fail_with_private_marker: bool = False
+) -> None:
+    log_literal = repr(str(log_path) if log_path is not None else "")
+    path.write_text(
+        "import json,sys\n"
+        "from pathlib import Path\n"
+        f"log_path = {log_literal}\n"
+        "payload=json.load(sys.stdin)\n"
+        "if log_path:\n"
+        "    Path(log_path).open('a', encoding='utf-8').write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        f"if {fail_with_private_marker!r}:\n"
+        "    print('VERIFIER_PRIVATE_MARKER', file=sys.stderr)\n"
+        "    raise SystemExit(7)\n"
+        "for container in payload.get('spec', {}).get('containers', []):\n"
+        "    assert '@sha256:' in container['image']\n"
+        "owners = [row for row in payload.get('metadata', {}).get('ownerReferences', []) "
+        "if row.get('controller') is True]\n"
+        "if payload.get('status', {}).get('phase') == 'Succeeded' "
+        "and len(owners) == 1 and owners[0].get('kind') == 'Job':\n"
+        "    raise SystemExit(10)\n",
+        encoding="utf-8",
+    )
 
 
 def test_secret_free_collector_workload_validator_never_reads_k8s_secrets(tmp_path: Path) -> None:
@@ -599,10 +678,7 @@ def test_secret_free_collector_workload_validator_never_reads_k8s_secrets(tmp_pa
     kubectl = tmp_path / "kubectl"
     _write_fake_kubectl(kubectl, log)
     verifier = tmp_path / "verify.py"
-    verifier.write_text(
-        "import json,sys\np=json.load(sys.stdin)\nassert all('@sha256:' in c['image'] for i in p['items'] for c in i.get('spec',{}).get('containers',[]))\n",
-        encoding="utf-8",
-    )
+    _write_fake_runtime_verifier(verifier)
     result = subprocess.run(
         [
             sys.executable,
@@ -625,6 +701,57 @@ def test_secret_free_collector_workload_validator_never_reads_k8s_secrets(tmp_pa
     assert calls
     assert all("secret" not in " ".join(call).lower() for call in calls)
     assert "audited image digests" in result.stdout
+
+
+def test_secret_free_collector_validator_unions_churning_dual_label_pods_then_fetches_once(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    log = tmp_path / "kubectl.log"
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(kubectl, log, dual_label_churn=True)
+    verifier = tmp_path / "verify.py"
+    _write_fake_runtime_verifier(verifier)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    fresh_pod_names = [
+        call[call.index("get") + 2]
+        for call in calls
+        if "get" in call and call[call.index("get") + 1] == "pod"
+    ]
+    assert fresh_pod_names.count("collector-shared") == 1
+    assert fresh_pod_names.count("collector-primary") == 1
 
 
 def test_secret_free_collector_workload_validator_fails_unready(tmp_path: Path) -> None:
@@ -664,6 +791,238 @@ def test_secret_free_collector_workload_validator_fails_unready(tmp_path: Path) 
     )
     assert result.returncode != 0
     assert "not fully rolled out and Ready" in result.stderr
+
+
+def test_secret_free_collector_validator_checks_release_only_pod_images(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    log = tmp_path / "kubectl.log"
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(kubectl, log, bad_release_only_image=True)
+    verifier = tmp_path / "verify.py"
+    _write_fake_runtime_verifier(verifier)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    calls = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    selectors = {call[call.index("-l") + 1] for call in calls if "-l" in call}
+    assert selectors == {"release=staging", "app.kubernetes.io/instance=staging"}
+
+
+def test_secret_free_collector_validator_fails_on_either_selector_error(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(
+        kubectl,
+        tmp_path / "kubectl.log",
+        fail_selector="app.kubernetes.io/instance=staging",
+    )
+    verifier = tmp_path / "verify.py"
+    verifier.write_text("import sys\n", encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "SELECTOR_PRIVATE_MARKER" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("state", ["unready", "failed"])
+def test_secret_free_collector_validator_rejects_unhealthy_auxiliary_union_pod(
+    tmp_path: Path, state: str
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(
+        kubectl,
+        tmp_path / "kubectl.log",
+        unready_auxiliary=state == "unready",
+        failed_auxiliary=state == "failed",
+    )
+    verifier = tmp_path / "verify.py"
+    _write_fake_runtime_verifier(verifier)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "collector-auxiliary is not active, Running, and Ready" in result.stderr
+
+
+def test_secret_free_collector_validator_excludes_only_completed_job_pods(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    kubectl_log = tmp_path / "kubectl.log"
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(
+        kubectl,
+        kubectl_log,
+        completed_job_auxiliary=True,
+    )
+    verifier_log = tmp_path / "verifier.log"
+    verifier = tmp_path / "verify.py"
+    _write_fake_runtime_verifier(verifier, log_path=verifier_log)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 completed Job pod(s) excluded" in result.stdout
+    verifier_calls = [
+        json.loads(line) for line in verifier_log.read_text(encoding="utf-8").splitlines()
+    ]
+    assert ["--verify-runtime-pod-json", "collector-primary", "primary"] in verifier_calls
+    assert ["--verify-runtime-pod-json", "collector-auxiliary", "auxiliary"] in (
+        verifier_calls
+    )
+
+
+def test_secret_free_collector_validator_suppresses_verifier_failure_output(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "kubernetes": {
+                    "rendered": True,
+                    "namespace": "splunk-otel",
+                    "release_name": "staging",
+                    "distribution": "eks",
+                    "agent_enabled": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    kubectl = tmp_path / "kubectl"
+    _write_fake_kubectl(kubectl, tmp_path / "kubectl.log")
+    verifier = tmp_path / "verify.py"
+    _write_fake_runtime_verifier(verifier, fail_with_private_marker=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WORKLOAD_VALIDATOR),
+            "--metadata",
+            str(metadata),
+            "--image-verifier",
+            str(verifier),
+            "--kubectl-bin",
+            str(kubectl),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "verifier output suppressed" in result.stderr
+    assert "VERIFIER_PRIVATE_MARKER" not in result.stdout + result.stderr
 
 
 def _render_auto(tmp_path: Path) -> Path:
@@ -758,7 +1117,14 @@ def test_auto_static_validation_rejects_errored_or_malformed_metadata(tmp_path: 
 def test_auto_live_is_complete_and_requires_named_skips(tmp_path: Path) -> None:
     out = _render_auto(tmp_path)
     missing_apm = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--live"],
+        [
+            "bash",
+            str(AUTO_VALIDATE),
+            "--output-dir",
+            str(out),
+            "--live",
+            "--allow-current-context",
+        ],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -777,6 +1143,7 @@ def test_auto_live_is_complete_and_requires_named_skips(tmp_path: Path) -> None:
             "--live",
             "--skip-apm-check",
             "--skip-backup-check",
+            "--allow-current-context",
         ],
         cwd=REPO_ROOT,
         env=env,
@@ -885,7 +1252,7 @@ def test_auto_webhook_check_requires_exact_route_ready_pinned_contract(tmp_path:
     out = _render_auto(tmp_path)
     success_env = _auto_env_with_kubectl(tmp_path / "success", _webhook_kubectl_body())
     success = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=success_env,
         capture_output=True,
@@ -899,7 +1266,7 @@ def test_auto_webhook_check_requires_exact_route_ready_pinned_contract(tmp_path:
         tmp_path / "wrong-port", _webhook_kubectl_body(endpoint_port=9444)
     )
     wrong_port = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=wrong_port_env,
         capture_output=True,
@@ -913,7 +1280,7 @@ def test_auto_webhook_check_requires_exact_route_ready_pinned_contract(tmp_path:
         tmp_path / "wrong-policy", _webhook_kubectl_body(failure_policy="Fail")
     )
     wrong_policy = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-webhook", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=wrong_policy_env,
         capture_output=True,
@@ -940,7 +1307,7 @@ def test_auto_instrumentation_live_check_ignores_only_server_metadata_and_status
     body = "import json\nprint(json.dumps(json.loads(" + repr(json.dumps(live)) + ")))\n"
     env = _auto_env_with_kubectl(tmp_path, body)
     result = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-instrumentation"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-instrumentation", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -958,7 +1325,7 @@ def test_auto_instrumentation_live_check_rejects_managed_spec_drift(tmp_path: Pa
     body = "import json\nprint(json.dumps(json.loads(" + repr(json.dumps(live)) + ")))\n"
     env = _auto_env_with_kubectl(tmp_path, body)
     result = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-instrumentation"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-instrumentation", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -980,7 +1347,9 @@ def _injection_kubectl_body(
     template_annotations = dict(expected_annotations)
     if extra_template_annotation:
         template_annotations["instrumentation.opentelemetry.io/inject-nodejs"] = "true"
-    endpoint = _instrumentation_document(out)["spec"]["java"]["env"][0]["value"]
+    java_spec = _instrumentation_document(out)["spec"]["java"]
+    endpoint = java_spec["env"][0]["value"]
+    java_image = java_spec["image"]
     env = [{"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": endpoint}]
     if include_java_hook:
         env.append(
@@ -991,9 +1360,18 @@ def _injection_kubectl_body(
         )
     workload = {
         "kind": "Deployment",
+        "metadata": {"generation": 3},
         "spec": {
+            "replicas": 1,
             "selector": {"matchLabels": {"app": "checkout"}},
             "template": {"metadata": {"annotations": template_annotations}},
+        },
+        "status": {
+            "observedGeneration": 3,
+            "replicas": 1,
+            "readyReplicas": 1,
+            "updatedReplicas": 1,
+            "availableReplicas": 1,
         },
     }
     pods = {
@@ -1008,9 +1386,16 @@ def _injection_kubectl_body(
                 },
                 "spec": {
                     "initContainers": [
-                        {"name": "opentelemetry-auto-instrumentation-java"}
+                        {
+                            "name": "opentelemetry-auto-instrumentation-java",
+                            "image": java_image,
+                        }
                     ],
                     "containers": [{"name": "app", "env": env}],
+                },
+                "status": {
+                    "phase": "Running",
+                    "conditions": [{"type": "Ready", "status": "True"}],
                 },
             }
         ],
@@ -1028,7 +1413,7 @@ def test_auto_injection_requires_exact_annotations_and_java_evidence(tmp_path: P
     out = _render_auto(tmp_path)
     success_env = _auto_env_with_kubectl(tmp_path / "success", _injection_kubectl_body(out))
     success = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=success_env,
         capture_output=True,
@@ -1043,7 +1428,7 @@ def test_auto_injection_requires_exact_annotations_and_java_evidence(tmp_path: P
         _injection_kubectl_body(out, extra_template_annotation=True),
     )
     annotation_drift = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=annotation_env,
         capture_output=True,
@@ -1058,7 +1443,7 @@ def test_auto_injection_requires_exact_annotations_and_java_evidence(tmp_path: P
         _injection_kubectl_body(out, include_java_hook=False),
     )
     missing_hook = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=hook_env,
         capture_output=True,
@@ -1076,7 +1461,7 @@ def test_auto_apm_check_fails_when_auth_prerequisites_are_absent(tmp_path: Path)
     env.pop("SPLUNK_O11Y_TOKEN_FILE", None)
     env["SPLUNK_CREDENTIALS_FILE"] = str(tmp_path / "no-credentials")
     result = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -1123,7 +1508,7 @@ Path(args[args.index('-o') + 1]).write_text(json.dumps({'nodes':[{'serviceName':
     env["SPLUNK_O11Y_TOKEN_FILE"] = str(token)
     env["SPLUNK_CREDENTIALS_FILE"] = str(tmp_path / "no-credentials")
     result = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -1162,7 +1547,7 @@ Path(args[args.index('-o') + 1]).write_text(json.dumps({{'nodes':[{{'serviceName
     env["SPLUNK_O11Y_TOKEN_FILE"] = str(token)
     env["SPLUNK_CREDENTIALS_FILE"] = str(tmp_path / "no-credentials")
     result = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-apm", "checkout-api", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -1200,14 +1585,32 @@ def test_auto_injection_and_backup_checks_fail_on_missing_state(tmp_path: Path) 
 import json, sys
 args = sys.argv[1:]
 if 'deployment' in args:
-    print(json.dumps({'kind':'Deployment','spec':{
+    print(json.dumps({'kind':'Deployment',
+        'metadata':{'generation':1},
+        'spec':{
+        'replicas':1,
         'selector':{'matchLabels':{'app':'checkout'}},
         'template':{'metadata':{'annotations':{
             'instrumentation.opentelemetry.io/inject-java':'splunk-otel/splunk-otel-auto-instrumentation'
         }}}
-    }}))
+    },
+        'status':{'observedGeneration':1,'replicas':1,'readyReplicas':1,'updatedReplicas':1,'availableReplicas':1}
+    }))
 elif 'configmap' in args:
-    print(json.dumps({'kind':'ConfigMap','data':{}}))
+    print(json.dumps({
+        'apiVersion':'v1',
+        'kind':'ConfigMap',
+        'metadata':{
+            'name':'splunk-otel-auto-instrumentation-annotations-backup',
+            'namespace':'splunk-otel',
+            'labels':{
+                'app.kubernetes.io/name':'splunk-otel-auto-instrumentation',
+                'app.kubernetes.io/managed-by':'splunk-observability-k8s-auto-instrumentation-setup',
+                'splunk.com/ttl':'7d'
+            }
+        },
+        'data':{}
+    }))
 else:
     print(json.dumps({'kind':'List','items':[]}))
 """,
@@ -1217,7 +1620,7 @@ else:
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}:{env['PATH']}"
     injection = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-injection", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -1227,7 +1630,7 @@ else:
     assert injection.returncode != 0
     assert "no active pods" in injection.stdout + injection.stderr
     backup = subprocess.run(
-        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-backup"],
+        ["bash", str(AUTO_VALIDATE), "--output-dir", str(out), "--check-backup", "--allow-current-context"],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -1235,7 +1638,7 @@ else:
         check=False,
     )
     assert backup.returncode != 0
-    assert "has no snapshot for Deployment/staging/checkout-api" in backup.stdout + backup.stderr
+    assert "backup snapshot for Deployment/staging/checkout-api is missing" in backup.stdout + backup.stderr
 
 
 def test_scoped_live_validators_fail_when_prerequisites_are_absent(tmp_path: Path) -> None:

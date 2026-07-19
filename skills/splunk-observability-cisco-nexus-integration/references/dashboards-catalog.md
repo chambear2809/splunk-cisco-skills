@@ -4,17 +4,22 @@ The skill ships one starter SignalFlow dashboard spec at `dashboards/cisco-nexus
 
 ## Default dashboard: Cisco Nexus Overview
 
-| Chart | Metric | Aggregation |
-|-------|--------|-------------|
-| Device up | `cisco.device.up` | min over time |
-| CPU utilization | `system.cpu.utilization` | mean over time |
-| Memory utilization | `system.memory.utilization` | mean over time |
-| Interface status | `system.network.interface.status` | min over time (0 = down) |
-| Network throughput | `system.network.io` | rate per interface |
-| Network errors | `system.network.errors` | rate per interface |
-| Packet drops | `system.network.packet.dropped` | rate per interface |
+| Chart | Metric |
+|-------|--------|
+| Device up | `cisco.device.up` |
+| CPU utilization | `system.cpu.utilization` |
+| Memory utilization | `system.memory.utilization` |
+| Interface status | `system.network.interface.status` |
+| Network throughput | `system.network.io` |
+| Network errors | `system.network.errors` |
+| Packet drops | `system.network.packet.dropped` |
 
-All charts filter by `k8s.cluster.name=${CLUSTER_NAME}` so the dashboard scopes cleanly across multi-cluster O11y orgs. To restrict to a specific Nexus device, add a `device.name` filter via the dashboard-builder skill.
+The renderer writes a complete
+`splunk-observability-dashboard-builder/v1` spec. Every chart contains a
+SignalFlow filter for the concrete `cluster_name` selected at render time, and
+the dashboard includes the same value as a restricted cluster variable. To
+restrict a copy to a specific device, add a verified device dimension to the
+SignalFlow programs and dashboard variables.
 
 ## Common per-fabric extensions
 
@@ -62,28 +67,18 @@ data('system.network.io', filter=filter('direction', 'transmit'))
 
 ## Cross-referencing alarms
 
-The starter detector spec at `detectors/interface-status-down.yaml` triggers Critical when any interface status drops to 0. The dashboard shows the status chart; clicking the chart in O11y UI navigates to the related detector.
+The starter detector spec at `detectors/interface-status-down.yaml` triggers
+Critical when the minimum interface status is at or below zero. Dashboard and
+detector objects are separate; the skill does not create an automatic
+chart-to-detector link.
 
 ## Adding charts
 
-Drop a custom YAML file under `dashboards/<name>.signalflow.yaml`:
-
-```yaml
-name: "Custom chart name"
-description: "..."
-charts:
-  - name: "Chart title"
-    description: "..."
-    program_text: |
-      data('metric.name', filter=filter('k8s.cluster.name', '${CLUSTER_NAME}'))
-        .publish(label='metric.name')
-    publish_label: metric.name
-filters:
-  - property: k8s.cluster.name
-    value: ${CLUSTER_NAME}
-```
-
-The handoff-dashboards.sh script picks up every `*.signalflow.yaml` under `dashboards/` and feeds it to `splunk-observability-dashboard-builder`.
+Start from the rendered v1 spec or the Dashboard Builder's
+`templates/dashboard.example.yaml`, preserve the required `api_version`,
+`dashboard_group`, `dashboard`, and `charts` mappings, and add a chart with a
+non-overlapping row/column layout. The handoff script includes every
+`*.signalflow.yaml` under `dashboards/`.
 
 ## Coordinating with cisco-dc-networking-setup
 
@@ -92,4 +87,6 @@ The companion skill `cisco-dc-networking-setup` ingests Nexus / ACI / Nexus Dash
 - Use this skill (`splunk-observability-cisco-nexus-integration`) for **time-series metrics** in O11y dashboards/detectors.
 - Use `cisco-dc-networking-setup` for **events / config / syslog** in Splunk Platform searches.
 
-Cross-link: the Splunk O11y dashboards can deeplink into Splunk Platform searches by adding a `link` field to the chart spec.
+Cross-product deep links require a separately reviewed dashboard capability;
+the current classic Dashboard Builder renderer does not accept a generic
+`link` field on chart specs.

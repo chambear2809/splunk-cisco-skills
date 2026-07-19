@@ -1,19 +1,73 @@
 ---
 name: cisco-webex-setup
-description: >-
-  Install, configure, and validate the Webex Add-on for Splunk and companion
-  Webex App dashboards. Covers Webex REST OAuth accounts, meetings, admin and
-  security audit, meeting qualities, detailed call history, generic endpoints,
-  and Webex Contact Center search inputs. Use when the user asks about Cisco
-  Webex, Webex Meetings, Webex Calling, Webex Contact Center, or Webex Splunk
-  dashboard readiness.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring Webex OAuth, meetings, audit, calling, quality, or Contact Center data in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Webex Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Install the add-on/app and configure inputs | Confirm search-tier REST access |
+| Webex OAuth application | Authorize selected organizations and endpoints | Store client material in protected files |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌────────────────────┐
+│ Preflight │ → │ Install add-on │ → │ Configure inputs │ → │ Validate dashboards │
+└───────────┘   └────────────────┘   └──────────────────┘   └────────────────────┘
+```
+
+## When to Activate
+
+- Onboard Webex Meetings, administrative audit, quality, or calling data.
+- Configure generic Webex REST or Contact Center search inputs.
+- Diagnose OAuth, index, source-type, macro, or dashboard failures.
+
+## Scope
+
+This skill configures documented Webex collection and dashboard prerequisites.
+It does not create OAuth applications, expose tokens in chat, or enable every
+endpoint without reviewing scope, privacy, rate limits, and event volume.
+
+## Examples
+
+Install the Webex add-on and companion app:
+
+```bash
+bash skills/cisco-webex-setup/scripts/setup.sh --install
+```
+
+Expected output: required packages and index/macro prerequisites are installed
+or a topology-specific manual handoff is emitted.
+
+Run strict completion checks after configuring selected inputs:
+
+```bash
+bash skills/cisco-webex-setup/scripts/validate.sh --completion
+```
+
+Expected output: package, OAuth account, enabled input, event, macro, and
+dashboard evidence report `[PASS]`; incomplete coverage exits nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| OAuth returns 401/403 | Grant/scope is wrong | Correct app and credential files |
+| API returns 429 | Input scope or interval exceeds rate limits | Reduce endpoints or increase polling intervals |
+| One dataset is absent | Its dedicated input is disabled or unauthorized | Validate each selected input independently |
+| Empty dashboards | Macro/source type is wrong | Validate events before dashboards |
 
 ## TA Completion Gate
 

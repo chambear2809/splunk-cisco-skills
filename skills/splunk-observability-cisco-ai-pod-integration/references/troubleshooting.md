@@ -12,19 +12,29 @@ This is the umbrella's general troubleshooting reference. For specific deep-dive
 
 ## Children renders fail
 
-If `setup.sh --render` fails with `child renderer returned non-zero`:
+If `setup.sh --render` reports that a child render failed, rerun the same
+reviewed command and inspect the child process output printed immediately
+before the failure. There is no `--verbose` option on the umbrella wrapper.
 
 ```bash
-# Re-run with verbose to see which child failed
 bash skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh \
-  --render --verbose --output-dir /tmp/ai-pod-debug
+  --render --output-dir /tmp/ai-pod-debug
 ```
 
-The verbose flag surfaces each child's stdout/stderr. Common child failures:
+Common child configuration issues:
 
-- **GPU child fails on `--enable-dcgm-pod-labels`**: GPU Operator not installed; the renderer can detect this when `--gpu-operator-namespace` is set (auto-detection). Without auto-detection, just renders the patch; you apply it later.
-- **Intersight child fails on missing `--namespace`**: Intersight requires the `intersight-otel` namespace name to render Deployment manifests. Default `intersight-otel`; override via spec.
-- **Nexus child fails on missing `--ssh-secret-name`**: Nexus requires SSH secret coordinates. Default `cisco-nexus-ssh`; override via spec.
+- **GPU pod-label patch coordinates**: `--enable-dcgm-pod-labels` renders a
+  patch; it does not discover a GPU Operator installation during render. Set
+  `dcgm_namespace`, `dcgm_service_account`, and `dcgm_daemonset` in a reviewed
+  NVIDIA GPU child spec and point `children.nvidia_gpu.spec_override` at it.
+- **Intersight namespaces**: the child defaults `intersight_otel.namespace` to
+  `intersight-otel` and `collector.namespace` to `splunk-otel`. Override them
+  in a reviewed Intersight child spec selected through
+  `children.intersight.spec_override`.
+- **Nexus SSH Secret coordinates**: the child defaults `ssh_secret.name` to
+  `cisco-nexus-ssh` in namespace `splunk-otel`. Override the `ssh_secret`
+  mapping in a reviewed Nexus child spec selected through
+  `children.nexus.spec_override`.
 
 ## Composed overlay missing pieces
 
@@ -39,7 +49,8 @@ Look for:
 - `cisco_os` receiver block (from nexus child)
 - `otlp` receiver protocols block (from intersight child) — should be in agent.config.receivers.otlp
 - `receiver_creator/dcgm-cisco` (from gpu child)
-- `receiver_creator/nim` (from umbrella)
+- `receiver_creator/nim-<model>` in receiver-creator mode, or
+  `prometheus/nim` in endpoint-discovery mode (from the umbrella)
 - `rbac.customRules` (from umbrella, when nim_scrape_mode=endpoints)
 
 If any are missing, the child render didn't produce the expected overlay file. Check the child's render output:
@@ -168,7 +179,7 @@ Add to the AI Pods pipelines.
 
 If after these steps you still can't get metrics flowing, gather:
 
-1. Output of `setup.sh --render --verbose`.
+1. Complete stdout and stderr from the reviewed `setup.sh --render` command.
 2. Output of `helm get values splunk-otel-collector -n splunk-otel`.
 3. Output of `kubectl -n splunk-otel logs --tail=500 daemonset/<release>-splunk-otel-collector-agent`.
 4. Output of `kubectl get clusterrole splunk-otel-collector -o yaml`.

@@ -12,9 +12,9 @@ render-first plan tree under ``--output-dir``:
 - ``coverage-report.json``
 - ``apply-plan.json``
 
-The renderer never accepts or writes any secret value. ``projectKey``, the
-official Splunk-generated ``gcp_wif_config.json``, and the Splunk O11y token
-are referenced as file paths only.
+The renderer never emits secret values. Secure service-account files may be
+read only to map their ``project_id`` to the correct manifest entry;
+``projectKey`` content and the Splunk O11y token are never rendered.
 """
 
 from __future__ import annotations
@@ -31,7 +31,10 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "skills" / "shared" / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from yaml_compat import YamlCompatError, load_yaml_or_json  # noqa: E402
+from gcp_integration_api import ApiError as GCPApiError  # noqa: E402
+from gcp_integration_api import load_gcp_service_account_key  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants.
@@ -148,24 +151,49 @@ def validate_spec(
                 "authentication.mode=service_account_key but workload_identity_federation "
                 "block is populated. Remove the WIF block or change mode."
             )
-        # Apply repeated key-file overrides one-to-one in project spec order.
-        if key_file_overrides:
-            if len(key_file_overrides) != len(psk):
-                raise RenderError(
-                    f"received {len(key_file_overrides)} --key-file value(s) for "
-                    f"{len(psk)} project_service_keys entries; supply exactly one per project"
-                )
-            for entry, key_file in zip(psk, key_file_overrides):
-                if isinstance(entry, dict):
-                    entry["key_file"] = key_file
         if not psk:
             raise RenderError(
                 "authentication.project_service_keys is required when mode=service_account_key. "
                 "Add at least one {project_id, key_file} entry."
             )
+        project_ids: list[str] = []
         for entry in psk:
-            if not isinstance(entry, dict) or not entry.get("project_id"):
+            if (
+                not isinstance(entry, dict)
+                or not isinstance(entry.get("project_id"), str)
+                or not entry["project_id"]
+            ):
                 raise RenderError("each project_service_keys entry must have a project_id")
+            project_ids.append(entry["project_id"])
+        if len(set(project_ids)) != len(project_ids):
+            raise RenderError("project_service_keys contains duplicate project_id values")
+
+        # Map each secure key by its own project_id. Repeated flag order cannot
+        # alter manifest associations, and coverage must be exact.
+        if key_file_overrides:
+            key_files_by_project: dict[str, str] = {}
+            for key_file in key_file_overrides:
+                try:
+                    key_document = load_gcp_service_account_key(key_file)
+                except (GCPApiError, OSError, PermissionError, ValueError) as exc:
+                    raise RenderError(
+                        f"--key-file failed secure service-account validation: {key_file}"
+                    ) from exc
+                project_id = key_document["project_id"]
+                if project_id in key_files_by_project:
+                    raise RenderError(
+                        f"--key-file values contain duplicate project_id {project_id!r}"
+                    )
+                key_files_by_project[project_id] = key_file
+            missing = sorted(set(project_ids) - set(key_files_by_project))
+            extra = sorted(set(key_files_by_project) - set(project_ids))
+            if missing or extra:
+                raise RenderError(
+                    "--key-file project_id coverage mismatch: "
+                    f"missing={missing} extra={extra}"
+                )
+            for entry in psk:
+                entry["key_file"] = key_files_by_project[entry["project_id"]]
     elif auth_mode == "workload_identity_federation":
         if key_file_overrides:
             raise RenderError("--key-file cannot be used with workload_identity_federation")
@@ -213,10 +241,16 @@ def validate_spec(
         )
 
     projects = spec.setdefault("projects", {})
-    projects.setdefault("sync_mode", "ALL")
-    if projects["sync_mode"] not in ("ALL", "SELECTED"):
+    projects.setdefault("sync_mode", "ALL_REACHABLE")
+    if projects["sync_mode"] == "ALL":
+        spec.setdefault("_warnings", []).append(
+            "projects.sync_mode=ALL is deprecated compatibility input; emitting ALL_REACHABLE."
+        )
+        projects["sync_mode"] = "ALL_REACHABLE"
+    if projects["sync_mode"] not in ("ALL_REACHABLE", "SELECTED"):
         raise RenderError(
-            f"projects.sync_mode must be ALL or SELECTED, got {projects['sync_mode']!r}"
+            "projects.sync_mode must be ALL_REACHABLE or SELECTED, "
+            f"got {projects['sync_mode']!r}"
         )
     projects.setdefault("selected_project_ids", [])
     selected_project_ids = projects["selected_project_ids"]
@@ -226,9 +260,9 @@ def validate_spec(
     ):
         raise RenderError("projects.selected_project_ids must be a list of non-empty strings")
     projects["selected_project_ids"] = list(dict.fromkeys(selected_project_ids))
-    if projects["sync_mode"] == "ALL" and projects["selected_project_ids"]:
+    if projects["sync_mode"] == "ALL_REACHABLE" and projects["selected_project_ids"]:
         raise RenderError(
-            "projects.selected_project_ids must be empty when projects.sync_mode=ALL"
+            "projects.selected_project_ids must be empty when projects.sync_mode=ALL_REACHABLE"
         )
     if projects["sync_mode"] == "SELECTED" and not projects["selected_project_ids"]:
         raise RenderError(
@@ -259,6 +293,19 @@ def validate_spec(
 
     spec.setdefault("custom_metric_type_domains", [])
     spec.setdefault("exclude_gce_instances_with_labels", [])
+    exclusions = spec["exclude_gce_instances_with_labels"]
+    if not isinstance(exclusions, list) or not all(
+        isinstance(label, str)
+        and re.fullmatch(r"[a-z][a-z0-9_-]{0,62}", label)
+        and not label.startswith("gcp_label_")
+        for label in exclusions
+    ):
+        raise RenderError(
+            "exclude_gce_instances_with_labels must contain unique GCP label keys "
+            "without gcp_label_ prefixes or values"
+        )
+    if len(set(exclusions)) != len(exclusions):
+        raise RenderError("exclude_gce_instances_with_labels must not contain duplicates")
     spec.setdefault("named_token", "")
 
     tf = spec.setdefault("terraform_provider", {})
@@ -306,7 +353,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         psk = auth.get("project_service_keys") or []
         coverage["authentication.project_service_keys"] = {
             "status": "api_apply",
-            "notes": f"{len(psk)} project(s); projectKey write-only, redacted on GET",
+            "notes": f"{len(psk)} project(s); projectKey write-only, not returned on GET",
         }
         coverage["authentication.wif"] = {"status": "not_applicable", "notes": "SA key mode"}
     else:
@@ -381,8 +428,9 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         coverage["terraform.resource"] = {
             "status": "not_applicable",
             "notes": (
-                "No Terraform WIF resource is claimed; use the REST apply path with the "
-                "official generated gcp_wif_config.json"
+                "The upstream provider supports WIF/projects; this skill intentionally "
+                "generates WIF through its reviewed REST path and does not currently "
+                "generate the Terraform WIF resource"
             ),
         }
 
@@ -409,7 +457,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     coverage["validation.live_get"] = {
         "status": "api_validate",
-        "notes": "GET /v2/integration/{id} round-trip; drift check for non-redacted fields",
+        "notes": "GET /v2/integration/{id} round-trip; drift check for visible fields",
     }
     coverage["validation.credential_hash"] = {
         "status": "api_validate",
@@ -455,7 +503,9 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
         },
     }
     if spec["projects"]["sync_mode"] == "SELECTED":
-        payload["projects"]["projectIds"] = list(spec["projects"]["selected_project_ids"])
+        payload["projects"]["selectedProjectIds"] = list(
+            spec["projects"]["selected_project_ids"]
+        )
 
     if auth_mode == "service_account_key":
         payload["authMethod"] = "SERVICE_ACCOUNT_KEY"
@@ -481,7 +531,7 @@ def render_rest_payload(spec: dict[str, Any], integration_id: str | None = None)
         payload["customMetricTypeDomains"] = list(spec["custom_metric_type_domains"])
 
     if spec["exclude_gce_instances_with_labels"]:
-        payload["excludeGceInstancesWithLabels"] = list(spec["exclude_gce_instances_with_labels"])
+        payload["excludeGCEInstancesWithLabels"] = list(spec["exclude_gce_instances_with_labels"])
 
     if spec["named_token"]:
         payload["namedToken"] = spec["named_token"]
@@ -506,10 +556,10 @@ def render_terraform_main(spec: dict[str, Any]) -> str:
 
     if auth_mode == "workload_identity_federation":
         return """# Workload Identity Federation is intentionally not rendered as a
-# signalfx_gcp_integration Terraform resource here. The supported contract uses
-# authMethod=WORKLOAD_IDENTITY_FEDERATION and a compact JSON string loaded from
-# Splunk's official generated gcp_wif_config.json. This skill does not claim
-# provider arguments for that opaque file.
+# signalfx_gcp_integration Terraform resource by this skill. The current upstream
+# provider supports workload_identity_federation_config and projects blocks;
+# this skill intentionally generates WIF through its reviewed REST path and does
+# not currently generate the Terraform WIF resource.
 #
 # Apply WIF through scripts/setup.sh --apply --wif-config-file
 # /secure/path/gcp_wif_config.json after reviewing rest/create.json.
@@ -575,7 +625,8 @@ def render_terraform_variables(spec: dict[str, Any]) -> str:
 """
     else:
         return """# No Terraform variables are rendered for Workload Identity Federation.
-# Use the REST apply path with the official generated gcp_wif_config.json.
+# The upstream provider supports WIF, but this skill intentionally uses its REST
+# path with the official generated gcp_wif_config.json.
 """
 
 

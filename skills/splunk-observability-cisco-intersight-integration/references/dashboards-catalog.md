@@ -4,54 +4,64 @@ The skill ships one starter SignalFlow dashboard at `dashboards/cisco-intersight
 
 ## Default dashboard: Cisco Intersight Overview
 
-| Chart | Metric | Aggregation |
-|-------|--------|-------------|
-| Server power state | `intersight.server.power_state` | min over time |
-| Server CPU temperature | `intersight.server.temperature.cpu` | mean over time |
-| Server inlet temperature | `intersight.server.temperature.inlet` | mean over time |
-| Disk health | `intersight.disk.health` | min over time (0 = critical) |
-| Memory health | `intersight.memory.health` | min over time |
-| Fan health | `intersight.fan.health` | min over time |
-| Power supply health | `intersight.psu.health` | min over time |
+| Chart | Metric |
+|-------|--------|
+| Host power | `intersight.ucs.host.power` |
+| Host temperature | `intersight.ucs.host.temperature` |
+| Fan speed | `intersight.ucs.fan.speed` |
+| Network receive rate | `intersight.ucs.network.receive.rate` |
+| Network transmit rate | `intersight.ucs.network.transmit.rate` |
+| Network utilization | `intersight.ucs.network.utilization.average` |
+| Active alarms | `intersight.alarms.count` |
+| Security advisories | `intersight.advisories.security.count` |
+| Non-security advisory objects | `intersight.advisories.nonsecurity.affected_objects` |
+| VM inventory | `intersight.vm_count` |
 
-All charts filter by `intersight.org.id=${ORG_ID}` so multi-org Intersight tenants can create one dashboard per org.
+The renderer writes a complete
+`splunk-observability-dashboard-builder/v1` spec. Every chart filters on the
+concrete `k8s.cluster.name` selected during render, and the dashboard includes
+the same value as a restricted cluster variable.
 
 ## Per-server vs per-rack views
 
-The Intersight receiver emits metrics at the **server** granularity (one set per chassis-mount). For per-rack rollups, group by `intersight.rack.id`:
+If live metric metadata confirms a rack dimension, create a reviewed copy and
+group a known emitted metric by that dimension. Do not assume an
+`intersight.rack.id` dimension without discovery.
 
 ```python
-data('intersight.server.power_state')
+data('intersight.ucs.host.power')
   .sum_by(['intersight.rack.id'])
   .publish('rack_power')
 ```
-
-For per-domain rollups (Intersight Domain == UCS domain), group by `intersight.domain.id`.
 
 ## Common per-fabric extensions
 
 ### Hardware lifecycle dashboard
 
-Track `intersight.server.lifecycle_state` to surface servers that are in `decommissioned`, `pending_decommission`, or `unsupported` states:
+Lifecycle, firmware, and capacity extensions require metrics or dimensions
+confirmed through live metadata discovery. They are not emitted or claimed by
+the starter dashboard.
 
 ```python
-data('intersight.server.lifecycle_state')
-  .filter(filter('intersight.org.id', '${ORG_ID}'))
+data('verified.lifecycle.metric')
   .top(n=20)
   .publish('lifecycle_states')
 ```
 
 ### Firmware drift
 
-Group `intersight.server.firmware_version` by `intersight.firmware.target_version` and alert when count of mismatches exceeds threshold.
+After discovery, group a verified firmware metric by its documented target
+dimension and alert on mismatches.
 
 ### Compute capacity
 
-Sum `intersight.server.cpu.cores_total` across all servers in the org to track total compute capacity. Useful for capacity planning.
+After discovery, sum a verified CPU-capacity metric for capacity planning.
 
 ## Adding charts
 
-Drop a new YAML file under `dashboards/<name>.signalflow.yaml`. The handoff-dashboards.sh script picks up every `*.signalflow.yaml` and feeds it to `splunk-observability-dashboard-builder`.
+Start from the rendered v1 spec or the Dashboard Builder example, preserve the
+required group/dashboard/chart structure, and use a non-overlapping chart
+layout. The handoff script includes every `*.signalflow.yaml` in the directory.
 
 ## Coordination with cisco-intersight-setup
 
@@ -60,4 +70,6 @@ The companion skill `cisco-intersight-setup` ingests Intersight audit + alarm + 
 - This skill (`splunk-observability-cisco-intersight-integration`) for **time-series metrics** in O11y dashboards/detectors.
 - `cisco-intersight-setup` for **events, audit, alarms, inventory** in Splunk Platform searches.
 
-Cross-link: the Splunk O11y dashboards can deeplink into Splunk Platform searches (e.g. when an alarm fires, link the rendered chart to a search by `event.subject=<server-id>`).
+Cross-product deep links require a separately reviewed dashboard capability;
+the current classic Dashboard Builder renderer does not accept a generic chart
+link field.

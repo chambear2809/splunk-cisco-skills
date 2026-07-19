@@ -16,9 +16,11 @@ CHECK_INSTRUMENTATION=false
 CHECK_INJECTION=false
 CHECK_APM=""
 CHECK_BACKUP=false
+CHECK_OBI=false
 SKIP_APM_CHECK=false
 SKIP_BACKUP_CHECK=false
 KUBE_CONTEXT=""
+ALLOW_CURRENT_CONTEXT=false
 
 usage() {
     cat <<'EOF'
@@ -33,11 +35,13 @@ Options:
   --check-webhook          Operator MutatingWebhookConfiguration + log scan
   --check-instrumentation  kubectl get otelinst matches rendered CRs
   --check-injection        Assert exact managed annotations + language injection evidence
+  --check-obi              Prove rendered OBI ownership/config, rollout, node coverage, logs
   --check-apm SERVICE      Probe api.<realm>.observability.splunkcloud.com/v2/apm/topology
   --check-backup           Every rendered target has a valid rollback snapshot
   --skip-apm-check         With --live only, explicitly omit the APM telemetry gate
   --skip-backup-check      With --live only, explicitly omit rollback-snapshot validation
   --kube-context CTX       Propagate to kubectl invocations
+  --allow-current-context  Explicitly acknowledge kubectl's current context
   --help                   Show this help
 EOF
 }
@@ -49,11 +53,21 @@ while [[ $# -gt 0 ]]; do
         --check-webhook) CHECK_WEBHOOK=true; LIVE=true; shift ;;
         --check-instrumentation) CHECK_INSTRUMENTATION=true; LIVE=true; shift ;;
         --check-injection) CHECK_INJECTION=true; LIVE=true; shift ;;
+        --check-obi) CHECK_OBI=true; LIVE=true; shift ;;
         --check-apm) require_arg "$1" "$#" || exit 1; CHECK_APM="$2"; LIVE=true; shift 2 ;;
         --check-backup) CHECK_BACKUP=true; LIVE=true; shift ;;
         --skip-apm-check) SKIP_APM_CHECK=true; shift ;;
         --skip-backup-check) SKIP_BACKUP_CHECK=true; shift ;;
         --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
+        --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
+        --access-token|--token|--bearer-token|--api-token|--o11y-token|--sf-token|--hec-token|--platform-hec-token|--org-token|--api-key)
+            reject_secret_arg "$1" "(this validator does not take credentials on argv)"
+            exit 1
+            ;;
+        --access-token=*|--token=*|--bearer-token=*|--api-token=*|--o11y-token=*|--sf-token=*|--hec-token=*|--platform-hec-token=*|--org-token=*|--api-key=*)
+            reject_secret_arg "${1%%=*}" "(this validator does not take credentials on argv)"
+            exit 1
+            ;;
         --help|-h) usage; exit 0 ;;
         *) log "ERROR: Unknown option: $1"; usage; exit 1 ;;
     esac
@@ -97,9 +111,14 @@ check_file() { [[ -f "$1" ]] || { log "ERROR: Missing $1"; exit 1; }; }
 
 check_file "${OUTPUT_DIR}/metadata.json"
 check_file "${OUTPUT_DIR}/k8s-instrumentation/instrumentation-cr.yaml"
+check_file "${OUTPUT_DIR}/k8s-instrumentation/namespace-annotations.yaml"
 check_file "${OUTPUT_DIR}/k8s-instrumentation/workload-annotations.yaml"
 check_file "${OUTPUT_DIR}/k8s-instrumentation/annotation-backup-configmap.yaml"
 check_file "${OUTPUT_DIR}/k8s-instrumentation/preflight-report.md"
+check_file "${OUTPUT_DIR}/k8s-instrumentation/injection-audit.py"
+check_file "${OUTPUT_DIR}/k8s-instrumentation/annotation-backup.py"
+check_file "${OUTPUT_DIR}/k8s-instrumentation/obi-lifecycle.py"
+check_file "${OUTPUT_DIR}/k8s-instrumentation/managed-resource-lifecycle.py"
 check_file "${OUTPUT_DIR}/runbook.md"
 
 # Prefer repo-local venv python.
@@ -110,8 +129,12 @@ else
 fi
 
 log "Static: verifying YAML well-formedness and patch-target invariant."
-"${PYTHON_BIN}" - "${OUTPUT_DIR}" <<'PY'
+"${PYTHON_BIN}" - "${OUTPUT_DIR}" "${SCRIPT_DIR}/injection_audit.py" \
+    "${SCRIPT_DIR}/annotation_backup.py" "${SCRIPT_DIR}/obi_lifecycle.py" \
+    "${SCRIPT_DIR}/managed_resource_lifecycle.py" <<'PY'
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -122,6 +145,10 @@ except ModuleNotFoundError:
     raise SystemExit(1)
 
 root = Path(sys.argv[1])
+audit_source = Path(sys.argv[2])
+backup_source = Path(sys.argv[3])
+obi_source = Path(sys.argv[4])
+resource_lifecycle_source = Path(sys.argv[5])
 errors = []
 
 
@@ -136,6 +163,8 @@ cr_docs = load_all(cr_path)
 if not cr_docs:
     errors.append(f"{cr_path}: no Instrumentation documents found.")
 seen = set()
+language_blocks = {"java", "nodejs", "python", "dotnet", "go", "apacheHttpd", "nginx"}
+digest_image = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
 for doc in cr_docs:
     if not isinstance(doc, dict):
         errors.append(f"{cr_path}: non-mapping document.")
@@ -151,16 +180,67 @@ for doc in cr_docs:
     if key in seen:
         errors.append(f"{cr_path}: duplicate CR {key}.")
     seen.add(key)
+    spec = doc.get("spec") or {}
+    labels = meta.get("labels") or {}
+    if (
+        labels.get("app.kubernetes.io/name") != "splunk-otel-auto-instrumentation"
+        or labels.get("app.kubernetes.io/managed-by")
+        != "splunk-observability-k8s-auto-instrumentation-setup"
+    ):
+        errors.append(f"{cr_path}: {key} is missing the exact ownership labels.")
+    for language in sorted(language_blocks & set(spec)):
+        block = spec.get(language) or {}
+        image = block.get("image") if isinstance(block, dict) else None
+        if not isinstance(image, str) or not digest_image.fullmatch(image):
+            errors.append(
+                f"{cr_path}: {key} {language} image is not pinned by an immutable @sha256 digest."
+            )
+
+obi_path = root / "k8s-instrumentation/obi-daemonset.yaml"
+if obi_path.exists():
+    for document in load_all(obi_path):
+        containers = (
+            document.get("spec", {}).get("template", {}).get("spec", {}).get("containers") or []
+        )
+        for container in containers:
+            image = container.get("image") if isinstance(container, dict) else None
+            if not isinstance(image, str) or not digest_image.fullmatch(image):
+                errors.append(f"{obi_path}: OBI image is not pinned by an immutable @sha256 digest.")
+
+rendered_audit = root / "k8s-instrumentation/injection-audit.py"
+try:
+    if rendered_audit.read_bytes() != audit_source.read_bytes():
+        errors.append(
+            f"{rendered_audit}: rendered injection auditor differs from the reviewed skill source."
+        )
+except OSError as exc:
+    errors.append(f"{rendered_audit}: could not compare reviewed injection auditor ({exc}).")
+for rendered_helper, reviewed_source, label in (
+    (root / "k8s-instrumentation/annotation-backup.py", backup_source, "annotation backup helper"),
+    (root / "k8s-instrumentation/obi-lifecycle.py", obi_source, "OBI lifecycle helper"),
+    (
+        root / "k8s-instrumentation/managed-resource-lifecycle.py",
+        resource_lifecycle_source,
+        "managed-resource lifecycle helper",
+    ),
+):
+    try:
+        if rendered_helper.read_bytes() != reviewed_source.read_bytes():
+            errors.append(f"{rendered_helper}: rendered {label} differs from the reviewed skill source.")
+    except OSError as exc:
+        errors.append(f"{rendered_helper}: could not compare reviewed {label} ({exc}).")
 
 # Workload annotations must target spec.template.metadata.annotations, not
 # top-level metadata.annotations. This is the single most common authoring
 # bug in operator-driven auto-instrumentation; the static check enforces it.
 wl_path = root / "k8s-instrumentation/workload-annotations.yaml"
+workload_docs = []
 for doc in load_all(wl_path):
     if not isinstance(doc, dict):
         continue
     if doc.get("kind") not in {"Deployment", "StatefulSet", "DaemonSet"}:
         continue
+    workload_docs.append(doc)
     annotations = doc.get("metadata", {}).get("annotations") or {}
     template_annotations = (
         doc.get("spec", {}).get("template", {}).get("metadata", {}).get("annotations") or {}
@@ -196,16 +276,68 @@ for p in root.rglob("*"):
     if ".NET Framework" in body or "dotnet framework" in body.lower():
         errors.append(f"{p}: manifest references .NET Framework (unsupported).")
 
-# Scrub: no token-shaped strings in rendered scripts.
-import re
+# Scrub: no credential assignments or credential-bearing headers in any
+# rendered file, not only shell scripts.
 token_re = re.compile(
-    r"(?i)(access[_-]?token|api[_-]?token|bearer[_-]?token|hec[_-]?token|sf[_-]?token)"
-    r"\s*[:=]\s*[A-Za-z0-9._-]{20,}"
+    r"(?i)(access[_-]?token|api[_-]?key|api[_-]?token|authorization|bearer(?:[_-]?token)?|"
+    r"hec[_-]?token|org[_-]?token|password|passwd|secret|sf[_-]?token|x-sf-token)"
+    r"\s*[:=]\s*[^\s,;}]{4,}"
 )
-for p in root.rglob("*.sh"):
-    body = p.read_text(encoding="utf-8")
-    if token_re.search(body):
-        errors.append(f"{p}: rendered script appears to embed a token-shaped value.")
+env_secret_re = re.compile(
+    r'''(?is)(?:"name"\s*:\s*"|name\s*:\s*)
+    (?:[^\n"]*(?:api[_-]?key|authorization|bearer|hec|password|secret|token)[^\n"]*)
+    (?:"?\s*,?\s*(?:"value"\s*:\s*"|value\s*:\s*))(?!["']?\s*$)''',
+    re.VERBOSE,
+)
+bearer_value_re = re.compile(r'''(?i)(?:"value"\s*:\s*"|value\s*:\s*)\s*(?:Bearer|X-SF-Token)\b''')
+secret_key_re = re.compile(
+    r"(?i)(access[_-]?token|api[_-]?key|api[_-]?token|authorization|bearer|credential|"
+    r"hec(?:[_-]?token)?|org[_-]?token|password|passwd|secret|sf[_-]?token|token)"
+)
+safe_secret_reference_keys = {"image_pull_secret", "imagePullSecret", "imagePullSecrets"}
+
+
+def scan_structured_secrets(value, path):
+    if isinstance(value, dict):
+        env_name = value.get("name")
+        if (
+            isinstance(env_name, str)
+            and secret_key_re.search(env_name)
+            and value.get("value") not in (None, "")
+        ):
+            errors.append(f"{path}: environment entry {env_name!r} contains credential material.")
+        for key, child in value.items():
+            key_text = str(key)
+            if (
+                key_text not in safe_secret_reference_keys
+                and secret_key_re.search(key_text)
+                and child not in (None, "", [], {})
+            ):
+                errors.append(f"{path}.{key_text}: secret-like key has a rendered value.")
+            scan_structured_secrets(child, f"{path}.{key_text}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            scan_structured_secrets(child, f"{path}[{index}]")
+
+
+for p in root.rglob("*"):
+    if not p.is_file():
+        continue
+    body = p.read_text(encoding="utf-8", errors="replace")
+    if token_re.search(body) or env_secret_re.search(body) or bearer_value_re.search(body):
+        errors.append(f"{p}: rendered file appears to embed credential material.")
+    if p.suffix in {".yaml", ".yml", ".json"}:
+        try:
+            structured_docs = (
+                [json.loads(body)]
+                if p.suffix == ".json"
+                else [doc for doc in yaml.safe_load_all(body) if doc is not None]
+            )
+        except (json.JSONDecodeError, yaml.YAMLError):
+            # Dedicated syntax checks report the primary parsing error.
+            structured_docs = []
+        for index, document in enumerate(structured_docs):
+            scan_structured_secrets(document, f"{p} document[{index}]")
 
 # metadata.json must parse and have the expected top-level keys.
 meta_path = root / "metadata.json"
@@ -220,12 +352,134 @@ for key in (
     "preflight",
     "rendered_files",
     "targets",
+    "namespace_targets",
     "operator_resources",
+    "instrumentation_documents",
+    "obi_contract",
+    "apm_services",
 ):
     if key not in meta:
         errors.append(f"{meta_path}: missing required key '{key}'.")
 if meta.get("skill") != "splunk-observability-k8s-auto-instrumentation-setup":
     errors.append(f"{meta_path}: unexpected skill identity {meta.get('skill')!r}.")
+if meta.get("instrumentation_documents") != cr_docs:
+    errors.append(
+        f"{meta_path}: instrumentation_documents do not exactly match instrumentation-cr.yaml."
+    )
+obi_contract = meta.get("obi_contract")
+if not isinstance(obi_contract, dict) or not isinstance(obi_contract.get("documents"), list) or not isinstance(obi_contract.get("scc_documents"), list):
+    errors.append(f"{meta_path}: obi_contract is malformed.")
+else:
+    obi_docs = load_all(obi_path) if obi_path.exists() else []
+    scc_path = root / "k8s-instrumentation/openshift-scc-obi.yaml"
+    scc_docs = load_all(scc_path) if scc_path.exists() else []
+    if obi_docs != obi_contract["documents"] or scc_docs != obi_contract["scc_documents"]:
+        errors.append(f"{meta_path}: OBI document contract does not exactly match rendered manifests.")
+    if bool(obi_contract.get("enabled")) != bool(obi_docs):
+        errors.append(f"{meta_path}: OBI enabled state does not match rendered manifests.")
+namespace_path = root / "k8s-instrumentation/namespace-annotations.yaml"
+actual_namespaces = {}
+for document in load_all(namespace_path):
+    metadata = document.get("metadata") or {}
+    namespace = str(metadata.get("name") or "")
+    if document.get("kind") != "Namespace" or not namespace or namespace in actual_namespaces:
+        errors.append(f"{namespace_path}: missing, duplicate, or invalid Namespace identity.")
+        continue
+    actual_namespaces[namespace] = metadata.get("annotations") or {}
+expected_namespaces = {}
+namespace_targets = meta.get("namespace_targets")
+if not isinstance(namespace_targets, list):
+    errors.append(f"{meta_path}: namespace_targets must be a list.")
+else:
+    for row in namespace_targets:
+        if not isinstance(row, dict):
+            errors.append(f"{meta_path}: namespace_targets contains a non-object row.")
+            continue
+        namespace = str(row.get("namespace") or "")
+        target = str(row.get("target") or "")
+        annotations = row.get("annotations")
+        if (
+            not namespace
+            or target != f"Namespace/{namespace}"
+            or not isinstance(annotations, dict)
+            or namespace in expected_namespaces
+        ):
+            errors.append(f"{meta_path}: namespace_targets contains an invalid or duplicate row.")
+            continue
+        expected_namespaces[namespace] = annotations
+if actual_namespaces != expected_namespaces:
+    errors.append(
+        f"{meta_path}: namespace_targets do not exactly match namespace-annotations.yaml."
+    )
+
+# Workload metadata is the live audit's allow-list. Derive its grouped contract
+# from workload-annotations.yaml so deleting or altering a metadata row cannot
+# silently omit a rendered workload/language from the complete live gate.
+metadata_targets = meta.get("targets")
+if not isinstance(metadata_targets, list) or any(
+    not isinstance(row, dict) for row in metadata_targets
+):
+    errors.append(f"{meta_path}: targets must be a list of objects.")
+else:
+    metadata_groups = {}
+    seen_rows = set()
+    for row in metadata_targets:
+        kind = str(row.get("kind") or "")
+        namespace = str(row.get("namespace") or "")
+        name = str(row.get("name") or "")
+        language = str(row.get("language") or "")
+        target = f"{kind}/{namespace}/{name}"
+        annotations = row.get("annotations")
+        inject_key = f"instrumentation.opentelemetry.io/inject-{language}"
+        expected_key = f"snapshot-{hashlib.sha256(target.encode('utf-8')).hexdigest()[:20]}"
+        identity = (kind, namespace, name)
+        row_identity = (*identity, language)
+        if (
+            not all(row_identity)
+            or row.get("target") != target
+            or row.get("key") != expected_key
+            or row_identity in seen_rows
+            or not isinstance(annotations, dict)
+            or inject_key not in annotations
+            or any(
+                not str(key).startswith("instrumentation.opentelemetry.io/")
+                for key in annotations
+            )
+            or any(
+                str(key).startswith("instrumentation.opentelemetry.io/inject-")
+                and key != inject_key
+                for key in annotations
+            )
+            or row.get("cr")
+            != ("" if annotations.get(inject_key) == "false" else annotations.get(inject_key))
+        ):
+            errors.append(f"{meta_path}: targets contains an invalid or duplicate row.")
+            continue
+        seen_rows.add(row_identity)
+        group = metadata_groups.setdefault(identity, {})
+        for key, value in annotations.items():
+            if key in group and group[key] != value:
+                errors.append(f"{meta_path}: targets contains conflicting annotations for {target}.")
+            group[key] = value
+
+    manifest_groups = {}
+    for document in workload_docs:
+        document_meta = document.get("metadata") or {}
+        identity = (
+            str(document.get("kind") or ""),
+            str(document_meta.get("namespace") or ""),
+            str(document_meta.get("name") or ""),
+        )
+        annotations = (
+            (((document.get("spec") or {}).get("template") or {}).get("metadata") or {})
+            .get("annotations")
+        )
+        if not all(identity) or identity in manifest_groups or not isinstance(annotations, dict):
+            errors.append(f"{wl_path}: missing, duplicate, or invalid workload identity.")
+            continue
+        manifest_groups[identity] = annotations
+    if metadata_groups != manifest_groups:
+        errors.append(f"{meta_path}: targets do not exactly match workload-annotations.yaml.")
 preflight = meta.get("preflight")
 if not isinstance(preflight, dict):
     errors.append(f"{meta_path}: preflight must be an object.")
@@ -254,13 +508,37 @@ if [[ "${LIVE}" != "true" ]]; then
     exit 0
 fi
 
+OBI_ENABLED="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/metadata.json" <<'PY'
+import json, sys
+metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+print("true" if metadata.get("obi_enabled") is True else "false")
+PY
+)"
+if [[ "${LIVE_EXPLICIT}" == "true" && "${OBI_ENABLED}" == "true" ]]; then
+    CHECK_OBI=true
+fi
+if [[ "${CHECK_OBI}" == "true" && "${OBI_ENABLED}" != "true" ]]; then
+    log "ERROR: --check-obi was requested, but metadata.json does not enable OBI."
+    exit 1
+fi
+
+if [[ -n "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" == "true" ]]; then
+    log "ERROR: --kube-context conflicts with --allow-current-context."
+    exit 1
+fi
+if [[ -z "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" != "true" ]]; then
+    log "ERROR: live validation requires --kube-context CTX or the explicit --allow-current-context acknowledgement."
+    exit 1
+fi
+
 KUBECTL=(kubectl)
 if [[ -n "${KUBE_CONTEXT}" ]]; then KUBECTL+=(--context "${KUBE_CONTEXT}"); fi
 
 if [[ "${CHECK_WEBHOOK}" == "true" \
     || "${CHECK_INSTRUMENTATION}" == "true" \
     || "${CHECK_INJECTION}" == "true" \
-    || "${CHECK_BACKUP}" == "true" ]]; then
+    || "${CHECK_BACKUP}" == "true" \
+    || "${CHECK_OBI}" == "true" ]]; then
     command -v kubectl >/dev/null 2>&1 || {
         log "ERROR: kubectl is required for the requested live cluster checks."
         exit 1
@@ -327,15 +605,46 @@ PY
         log "ERROR: Kubernetes API failed while reading webhook Service ${operator_namespace}/${expected_webhook_service}."
         exit 1
     fi
-    if ! "${KUBECTL[@]}" -n "${operator_namespace}" get endpoints \
-        "${expected_webhook_service}" -o json >"${webhook_state_dir}/endpoints.json"; then
-        log "ERROR: Kubernetes API failed while reading webhook Endpoints ${operator_namespace}/${expected_webhook_service}."
-        exit 1
+    route_kind="endpointslice"
+    route_file="${webhook_state_dir}/endpointslices.json"
+    if "${KUBECTL[@]}" -n "${operator_namespace}" get endpointslice \
+        -l "kubernetes.io/service-name=${expected_webhook_service}" -o json \
+        >"${route_file}" 2>"${webhook_state_dir}/endpointslice.stderr"; then
+        if ! endpoint_slice_count="$("${PYTHON_BIN}" - "${route_file}" <<'PY'
+import json
+import sys
+
+try:
+    payload = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit(f"EndpointSlice response was not valid JSON: {exc}")
+if payload.get("kind") not in {"EndpointSliceList", "List"} or not isinstance(payload.get("items"), list):
+    raise SystemExit("EndpointSlice response was not a Kubernetes list")
+print(len(payload["items"]))
+PY
+        )"; then
+            log "ERROR: Kubernetes returned an invalid EndpointSlice response for ${operator_namespace}/${expected_webhook_service}."
+            exit 1
+        fi
+    else
+        endpoint_slice_count=0
+    fi
+    # Legacy clusters and narrowly-scoped RBAC may not expose EndpointSlice.
+    # Fall back only when the API query failed or returned no matching slices;
+    # a present but unready slice is validated and fails closed below.
+    if [[ "${endpoint_slice_count}" == "0" ]]; then
+        route_kind="endpoints"
+        route_file="${webhook_state_dir}/endpoints.json"
+        if ! "${KUBECTL[@]}" -n "${operator_namespace}" get endpoints \
+            "${expected_webhook_service}" -o json >"${route_file}"; then
+            log "ERROR: Kubernetes API failed while reading webhook EndpointSlices and fallback Endpoints ${operator_namespace}/${expected_webhook_service}."
+            exit 1
+        fi
     fi
     if ! webhook_policy="$("${PYTHON_BIN}" - \
         "${webhook_state_dir}/webhook.json" \
         "${webhook_state_dir}/service.json" \
-        "${webhook_state_dir}/endpoints.json" \
+        "${route_file}" "${route_kind}" \
         "${expected_webhook}" "${expected_webhook_service}" "${operator_namespace}" <<'PY'
 import base64
 import binascii
@@ -343,10 +652,10 @@ import json
 import re
 import sys
 
-webhook_path, service_path, endpoints_path, expected, service_name, namespace = sys.argv[1:]
+webhook_path, service_path, route_path, route_kind, expected, service_name, namespace = sys.argv[1:]
 webhook_obj = json.load(open(webhook_path, encoding="utf-8"))
 service_obj = json.load(open(service_path, encoding="utf-8"))
-endpoints_obj = json.load(open(endpoints_path, encoding="utf-8"))
+route_obj = json.load(open(route_path, encoding="utf-8"))
 
 if webhook_obj.get("kind") != "MutatingWebhookConfiguration":
     raise SystemExit("ERROR: Kubernetes returned the wrong webhook resource kind")
@@ -444,34 +753,68 @@ webhook_service_ports = [
 if len(webhook_service_ports) != 1:
     raise SystemExit("ERROR: Operator webhook Service does not expose the exact webhook-server port contract")
 
-endpoints_meta = endpoints_obj.get("metadata") or {}
-if (
-    endpoints_obj.get("kind") != "Endpoints"
-    or endpoints_meta.get("name") != service_name
-    or endpoints_meta.get("namespace") != namespace
-):
-    raise SystemExit("ERROR: Kubernetes returned different webhook Endpoints")
-route_ready = any(
-    bool(subset.get("addresses"))
-    and any(
-        port.get("name") in (None, "")
-        and port.get("protocol", "TCP") == "TCP"
-        and port.get("port") == 9443
-        for port in (subset.get("ports") or [])
+if route_kind == "endpointslice":
+    if route_obj.get("kind") not in {"EndpointSliceList", "List"}:
+        raise SystemExit("ERROR: Kubernetes returned the wrong EndpointSlice list kind")
+    slices = route_obj.get("items")
+    if not isinstance(slices, list) or not slices:
+        raise SystemExit("ERROR: Kubernetes returned no matching webhook EndpointSlices")
+    route_ready = False
+    for endpoint_slice in slices:
+        metadata = endpoint_slice.get("metadata") or {}
+        labels = metadata.get("labels") or {}
+        if (
+            endpoint_slice.get("apiVersion") != "discovery.k8s.io/v1"
+            or endpoint_slice.get("kind") != "EndpointSlice"
+            or metadata.get("namespace") != namespace
+            or labels.get("kubernetes.io/service-name") != service_name
+        ):
+            raise SystemExit("ERROR: Kubernetes returned an EndpointSlice outside the webhook Service identity")
+        ready_addresses = any(
+            endpoint.get("conditions", {}).get("ready") is True
+            and endpoint.get("conditions", {}).get("terminating") is not True
+            and bool(endpoint.get("addresses"))
+            for endpoint in (endpoint_slice.get("endpoints") or [])
+        )
+        pinned_port = any(
+            port.get("name") in (None, "", "webhook-server")
+            and port.get("protocol", "TCP") == "TCP"
+            and port.get("port") == 9443
+            for port in (endpoint_slice.get("ports") or [])
+        )
+        route_ready = route_ready or (ready_addresses and pinned_port)
+elif route_kind == "endpoints":
+    endpoints_meta = route_obj.get("metadata") or {}
+    if (
+        route_obj.get("kind") != "Endpoints"
+        or endpoints_meta.get("name") != service_name
+        or endpoints_meta.get("namespace") != namespace
+    ):
+        raise SystemExit("ERROR: Kubernetes returned different webhook Endpoints")
+    route_ready = any(
+        bool(subset.get("addresses"))
+        and any(
+            port.get("name") in (None, "", "webhook-server")
+            and port.get("protocol", "TCP") == "TCP"
+            and port.get("port") == 9443
+            for port in (subset.get("ports") or [])
+        )
+        for subset in (route_obj.get("subsets") or [])
     )
-    for subset in (endpoints_obj.get("subsets") or [])
-)
+else:
+    raise SystemExit("ERROR: unknown webhook route evidence kind")
 if not route_ready:
     raise SystemExit(
         "ERROR: Operator webhook Service has no ready address on the pinned 9443/TCP endpoint port"
     )
-print(failure_policy)
+print(f"{failure_policy}\t{route_kind}")
 PY
     )"; then
         log "ERROR: Operator pod admission webhook is not route-ready."
         exit 1
     fi
-    log "  MutatingWebhookConfiguration ${expected_webhook}: pod admission route ready (failurePolicy=${webhook_policy})."
+    IFS=$'\t' read -r webhook_policy_value webhook_route_source <<<"${webhook_policy}"
+    log "  MutatingWebhookConfiguration ${expected_webhook}: pod admission route ready (failurePolicy=${webhook_policy_value}); source=${webhook_route_source}."
     if ! operator_pods="$("${KUBECTL[@]}" -n "${operator_namespace}" get pods \
         -l app.kubernetes.io/name=operator -o json)"; then
         log "ERROR: Kubernetes API failed while reading OpenTelemetry Operator pods in ${operator_namespace}."
@@ -582,12 +925,19 @@ if metadata_identities != set(rendered_by_identity):
 
 def managed_projection(document):
     metadata = document.get("metadata") or {}
+    labels = metadata.get("labels") or {}
     return {
         "apiVersion": document.get("apiVersion"),
         "kind": document.get("kind"),
         "metadata": {
             "name": metadata.get("name"),
             "namespace": metadata.get("namespace"),
+            "labels": {
+                "app.kubernetes.io/name": labels.get("app.kubernetes.io/name"),
+                "app.kubernetes.io/managed-by": labels.get(
+                    "app.kubernetes.io/managed-by"
+                ),
+            },
         },
         "spec": document.get("spec"),
     }
@@ -615,384 +965,65 @@ fi
 
 if [[ "${CHECK_INJECTION}" == "true" ]]; then
     log "Live: --check-injection"
-    "${PYTHON_BIN}" - "${OUTPUT_DIR}" <<'PY'
-import json
-import os
-import subprocess
-import sys
-from pathlib import Path
+    audit_args=(--output-dir "${OUTPUT_DIR}" --target-all)
+    if [[ -n "${KUBE_CONTEXT}" ]]; then
+        audit_args+=(--kube-context "${KUBE_CONTEXT}")
+    else
+        audit_args+=(--allow-current-context)
+    fi
+    if ! "${PYTHON_BIN}" "${OUTPUT_DIR}/k8s-instrumentation/injection-audit.py" "${audit_args[@]}"; then
+        log "ERROR: Deep auto-instrumentation injection audit failed."
+        exit 1
+    fi
+fi
 
-try:
-    import yaml
-except ModuleNotFoundError:
-    print("ERROR: PyYAML is required to validate language injection evidence.", file=sys.stderr)
-    raise SystemExit(1)
-
-root = Path(sys.argv[1])
-meta = json.loads((root / "metadata.json").read_text(encoding="utf-8"))
-kube = json.loads(os.environ["KUBE_JSON"])
-targets = meta.get("targets") or []
-if not targets:
-    print("ERROR: metadata.json contains no workload targets for --check-injection.", file=sys.stderr)
-    sys.exit(1)
-
-managed_prefix = "instrumentation.opentelemetry.io/"
-language_spec_keys = {
-    "java": "java",
-    "nodejs": "nodejs",
-    "python": "python",
-    "dotnet": "dotnet",
-    "go": "go",
-    "apache-httpd": "apacheHttpd",
-    "nginx": "nginx",
-}
-language_init_names = {
-    "java": {"opentelemetry-auto-instrumentation-java"},
-    "nodejs": {"opentelemetry-auto-instrumentation-nodejs"},
-    "python": {"opentelemetry-auto-instrumentation-python"},
-    "dotnet": {"opentelemetry-auto-instrumentation-dotnet"},
-    "apache-httpd": {"otel-agent-source-container-clone", "otel-agent-attach-apache"},
-    "nginx": {"otel-agent-source-container-clone", "otel-agent-attach-nginx"},
-}
-all_injected_init_names = set().union(*language_init_names.values())
-
-
-def fail(message):
-    print(f"ERROR: {message}", file=sys.stderr)
-    raise SystemExit(1)
-
-
-def managed_annotations(resource):
-    return {
-        str(key): str(value)
-        for key, value in (resource or {}).items()
-        if str(key).startswith(managed_prefix)
-    }
-
-
-cr_path = root / "k8s-instrumentation/instrumentation-cr.yaml"
-cr_documents = [
-    document
-    for document in yaml.safe_load_all(cr_path.read_text(encoding="utf-8"))
-    if isinstance(document, dict)
-]
-cr_by_identity = {
-    (
-        str((document.get("metadata") or {}).get("namespace") or ""),
-        str((document.get("metadata") or {}).get("name") or ""),
-    ): document
-    for document in cr_documents
-}
-if len(cr_by_identity) != len(cr_documents) or not cr_documents:
-    fail("instrumentation-cr.yaml has missing or duplicate Instrumentation CR identities")
-
-
-def expected_endpoint(row, expected_annotations):
-    language = str(row["language"])
-    inject_key = f"{managed_prefix}inject-{language}"
-    binding = str(expected_annotations.get(inject_key) or "")
-    if binding == "false":
-        return ""
-    if binding == "true":
-        candidates = [
-            document
-            for (namespace, _), document in cr_by_identity.items()
-            if namespace == str(row["namespace"])
-            and language_spec_keys[language] in (document.get("spec") or {})
-        ]
-    elif "/" in binding:
-        namespace, name = binding.split("/", 1)
-        document = cr_by_identity.get((namespace, name))
-        candidates = [document] if document is not None else []
-    else:
-        fail(f"{row['target']} has invalid rendered {inject_key} value {binding!r}")
-    if len(candidates) != 1:
-        fail(f"{row['target']} does not resolve exactly one rendered {language} Instrumentation CR")
-    document = candidates[0]
-    language_block = (document.get("spec") or {}).get(language_spec_keys[language]) or {}
-    language_env = {
-        str(item.get("name") or ""): str(item.get("value") or "")
-        for item in (language_block.get("env") or [])
-        if isinstance(item, dict)
-    }
-    endpoint = language_env.get("OTEL_EXPORTER_OTLP_ENDPOINT") or str(
-        (((document.get("spec") or {}).get("exporter") or {}).get("endpoint") or "")
-    )
-    if not endpoint:
-        fail(f"{row['target']} rendered {language} Instrumentation CR has no OTLP endpoint")
-    return endpoint
-
-
-def env_value(container, name, context):
-    matches = [item for item in (container.get("env") or []) if item.get("name") == name]
-    if len(matches) != 1 or matches[0].get("valueFrom") is not None:
-        fail(f"{context} does not have one literal {name} environment value")
-    value = matches[0].get("value")
-    if not isinstance(value, str) or not value:
-        fail(f"{context} has an empty or non-literal {name} environment value")
-    return value
-
-
-def selected_containers(pod_spec, expected_annotations, context):
-    regular = [
-        container
-        for container in (pod_spec.get("containers") or [])
-        if container.get("name") != "opentelemetry-auto-instrumentation"
-    ]
-    original_init = [
-        container
-        for container in (pod_spec.get("initContainers") or [])
-        if container.get("name") not in all_injected_init_names
-    ]
-    configured = str(
-        expected_annotations.get(f"{managed_prefix}container-names") or ""
-    )
-    if configured:
-        names = [name.strip() for name in configured.split(",") if name.strip()]
-        if not names or len(names) != len(set(names)):
-            fail(f"{context} has invalid rendered container-names annotation")
-        by_name = {
-            str(container.get("name") or ""): container
-            for container in [*regular, *original_init]
-        }
-        missing = [name for name in names if name not in by_name]
-        if missing:
-            fail(f"{context} is missing annotated target container(s): {', '.join(missing)}")
-        return [by_name[name] for name in names]
-    if not regular:
-        fail(f"{context} has no application container to validate")
-    return [regular[0]]
-
-
-def volume_mount_names(container):
-    return {str(item.get("name") or "") for item in (container.get("volumeMounts") or [])}
-
-
-def require_endpoint(container, endpoint, context):
-    actual = env_value(container, "OTEL_EXPORTER_OTLP_ENDPOINT", context)
-    if actual != endpoint:
-        fail(f"{context} OTEL_EXPORTER_OTLP_ENDPOINT does not match the rendered Instrumentation CR")
-
-
-def verify_language_evidence(row, pod, expected_annotations):
-    language = str(row["language"])
-    pod_name = str((pod.get("metadata") or {}).get("name") or "<unknown>")
-    context = f"pod {row['namespace']}/{pod_name} for {row['kind']}/{row['name']}"
-    pod_spec = pod.get("spec") or {}
-    init_names = {
-        str(container.get("name") or "")
-        for container in (pod_spec.get("initContainers") or [])
-    }
-    inject_key = f"{managed_prefix}inject-{language}"
-    enabled = expected_annotations.get(inject_key) != "false"
-    required_init = language_init_names.get(language, set())
-    if not enabled:
-        stale = sorted(required_init & init_names)
-        if language == "go" and any(
-            container.get("name") == "opentelemetry-auto-instrumentation"
-            for container in (pod_spec.get("containers") or [])
-        ):
-            stale.append("opentelemetry-auto-instrumentation")
-        if stale:
-            fail(f"{context} retains disabled {language} injection artifacts: {', '.join(stale)}")
-        return
-
-    endpoint = expected_endpoint(row, expected_annotations)
-    if language == "go":
-        selected = selected_containers(pod_spec, expected_annotations, context)
-        if len(selected) != 1:
-            fail(f"{context} Go injection must target exactly one application container")
-        sidecars = [
-            container
-            for container in (pod_spec.get("containers") or [])
-            if container.get("name") == "opentelemetry-auto-instrumentation"
-        ]
-        if len(sidecars) != 1:
-            fail(f"{context} does not have exactly one Go auto-instrumentation sidecar")
-        sidecar = sidecars[0]
-        if pod_spec.get("shareProcessNamespace") is not True:
-            fail(f"{context} Go injection does not enable shareProcessNamespace")
-        security = sidecar.get("securityContext") or {}
-        if security.get("privileged") is not True or security.get("runAsUser") != 0:
-            fail(f"{context} Go sidecar lacks the rendered Operator privilege evidence")
-        expected_exe = str(
-            expected_annotations.get(f"{managed_prefix}otel-go-auto-target-exe") or ""
-        )
-        if env_value(sidecar, "OTEL_GO_AUTO_TARGET_EXE", context) != expected_exe:
-            fail(f"{context} Go target executable does not match the rendered annotation")
-        require_endpoint(sidecar, endpoint, context)
-        return
-
-    missing_init = sorted(required_init - init_names)
-    if missing_init:
-        fail(f"{context} lacks exact {language} init container(s): {', '.join(missing_init)}")
-
-    for container in selected_containers(pod_spec, expected_annotations, context):
-        container_name = str(container.get("name") or "<unknown>")
-        container_context = f"{context} container {container_name}"
-        require_endpoint(container, endpoint, container_context)
-        if language == "java":
-            value = env_value(container, "JAVA_TOOL_OPTIONS", container_context)
-            expected_agent = (
-                f"-javaagent:/otel-auto-instrumentation-java-{container_name}/javaagent.jar"
-            )
-            if expected_agent not in value.split():
-                fail(f"{container_context} lacks the exact Java agent option {expected_agent}")
-        elif language == "nodejs":
-            value = env_value(container, "NODE_OPTIONS", container_context)
-            if "--require /otel-auto-instrumentation-nodejs/autoinstrumentation.js" not in value:
-                fail(f"{container_context} lacks the OpenTelemetry Node.js require hook")
-        elif language == "python":
-            value = env_value(container, "PYTHONPATH", container_context)
-            required_paths = {
-                "/otel-auto-instrumentation-python/opentelemetry/instrumentation/auto_instrumentation",
-                "/otel-auto-instrumentation-python",
-            }
-            if not required_paths.issubset(set(value.split(":"))):
-                fail(f"{container_context} lacks the OpenTelemetry Python paths")
-        elif language == "dotnet":
-            expected_values = {
-                "CORECLR_ENABLE_PROFILING": "1",
-                "CORECLR_PROFILER": "{918728DD-259F-4A6A-AC2B-B85E1B658318}",
-                "OTEL_DOTNET_AUTO_HOME": "/otel-auto-instrumentation-dotnet",
-            }
-            for name, expected in expected_values.items():
-                if env_value(container, name, container_context) != expected:
-                    fail(f"{container_context} has unexpected {name}")
-            runtime = str(
-                expected_annotations.get(f"{managed_prefix}otel-dotnet-auto-runtime")
-                or "linux-x64"
-            )
-            library_dir = "linux-musl-x64" if runtime == "linux-musl-x64" else "linux-x64"
-            expected_path = (
-                f"/otel-auto-instrumentation-dotnet/{library_dir}/"
-                "OpenTelemetry.AutoInstrumentation.Native.so"
-            )
-            if env_value(container, "CORECLR_PROFILER_PATH", container_context) != expected_path:
-                fail(f"{container_context} CORECLR_PROFILER_PATH does not match {runtime}")
-        elif language == "apache-httpd":
-            required_mounts = {"otel-apache-agent", "otel-apache-conf-dir"}
-            if not required_mounts.issubset(volume_mount_names(container)):
-                fail(f"{container_context} lacks exact Apache agent/config volume mounts")
-        elif language == "nginx":
-            required_mounts = {"otel-nginx-agent", "otel-nginx-conf-dir"}
-            if not required_mounts.issubset(volume_mount_names(container)):
-                fail(f"{container_context} lacks exact Nginx agent/config volume mounts")
-            library_path = env_value(container, "LD_LIBRARY_PATH", container_context)
-            if "/opt/opentelemetry-webserver/agent/sdk_lib/lib" not in library_path.split(":"):
-                fail(f"{container_context} lacks the OpenTelemetry Nginx library path")
-
-
-def selector_matches(selector, labels):
-    for key, value in (selector.get("matchLabels") or {}).items():
-        if str(labels.get(key, "")) != str(value):
-            return False
-    for expr in selector.get("matchExpressions") or []:
-        key = str(expr.get("key") or "")
-        operator = str(expr.get("operator") or "")
-        values = {str(value) for value in (expr.get("values") or [])}
-        present = key in labels
-        actual = str(labels.get(key, ""))
-        if operator == "In" and (not present or actual not in values):
-            return False
-        if operator == "NotIn" and present and actual in values:
-            return False
-        if operator == "Exists" and not present:
-            return False
-        if operator == "DoesNotExist" and present:
-            return False
-        if operator not in {"In", "NotIn", "Exists", "DoesNotExist"}:
-            return False
-    return True
-
-
-grouped_targets = {}
-for row in targets:
-    if not isinstance(row, dict):
-        fail("metadata.json contains a non-object workload target")
-    language = str(row.get("language") or "")
-    if language not in language_spec_keys:
-        fail(f"metadata.json contains unsupported target language {language!r}")
-    identity = (str(row.get("kind") or ""), str(row.get("namespace") or ""), str(row.get("name") or ""))
-    if not all(identity):
-        fail("metadata.json contains a target with an incomplete identity")
-    expected = row.get("annotations") or {}
-    if not isinstance(expected, dict) or not expected:
-        fail(f"{row.get('target') or '/'.join(identity)} has no rendered annotations in metadata.json")
-    if any(not str(key).startswith(managed_prefix) for key in expected):
-        fail(f"{row.get('target') or '/'.join(identity)} metadata contains an unmanaged annotation")
-    group = grouped_targets.setdefault(identity, {"annotations": {}, "rows": []})
-    for key, value in expected.items():
-        key, value = str(key), str(value)
-        if key in group["annotations"] and group["annotations"][key] != value:
-            fail(f"{'/'.join(identity)} has conflicting rendered annotation values")
-        group["annotations"][key] = value
-    group["rows"].append(row)
-
-
-for (kind, ns, name), group in grouped_targets.items():
-    expected_annotations = group["annotations"]
-    sel_proc = subprocess.run(
-        kube + ["-n", ns, "get", kind.lower(), name, "-o", "json"],
-        capture_output=True,
-        text=True,
-    )
-    if sel_proc.returncode != 0:
-        print(f"ERROR: {kind}/{ns}/{name} lookup failed: {sel_proc.stderr.strip()}", file=sys.stderr)
-        sys.exit(1)
-    try:
-        workload = json.loads(sel_proc.stdout)
-    except json.JSONDecodeError as exc:
-        print(f"ERROR: {kind}/{ns}/{name} returned invalid JSON: {exc}", file=sys.stderr)
-        sys.exit(1)
-    template_annotations = managed_annotations(
-        (((workload.get("spec") or {}).get("template") or {}).get("metadata") or {}).get("annotations")
-        or {}
-    )
-    if template_annotations != expected_annotations:
-        fail(f"{kind}/{ns}/{name} managed pod-template annotations drifted from metadata.json")
-    selector = ((workload.get("spec") or {}).get("selector") or {})
-    if not selector.get("matchLabels") and not selector.get("matchExpressions"):
-        print(f"ERROR: {kind}/{ns}/{name} has no usable pod selector.", file=sys.stderr)
-        sys.exit(1)
-    pods_args = kube + ["-n", ns, "get", "pods", "-o", "json"]
-    pods_proc = subprocess.run(pods_args, capture_output=True, text=True)
-    if pods_proc.returncode != 0:
-        print(f"ERROR: pod lookup for {kind}/{ns}/{name} failed: {pods_proc.stderr.strip()}", file=sys.stderr)
-        sys.exit(1)
-    try:
-        pod_items = (json.loads(pods_proc.stdout or "{}") or {}).get("items", [])
-    except json.JSONDecodeError as exc:
-        print(f"ERROR: pod lookup for {kind}/{ns}/{name} returned invalid JSON: {exc}", file=sys.stderr)
-        sys.exit(1)
-    pods = [
-        pod
-        for pod in pod_items
-        if not (pod.get("metadata") or {}).get("deletionTimestamp")
-        and selector_matches(selector, (pod.get("metadata") or {}).get("labels") or {})
-    ]
-    if not pods:
-        print(f"ERROR: {kind}/{ns}/{name} has no active pods matching its selector.", file=sys.stderr)
-        sys.exit(1)
-    for pod in pods:
-        pod_name = str((pod.get("metadata") or {}).get("name") or "<unknown>")
-        pod_annotations = managed_annotations((pod.get("metadata") or {}).get("annotations") or {})
-        if pod_annotations != expected_annotations:
-            fail(f"pod {ns}/{pod_name} managed annotations drifted from metadata.json")
-        for row in group["rows"]:
-            verify_language_evidence(row, pod, expected_annotations)
-    languages = ",".join(sorted(str(row["language"]) for row in group["rows"]))
-    print(
-        f"  {kind}/{ns}/{name}: exact managed annotations and {languages} evidence "
-        f"on {len(pods)} pod(s)"
-    )
-PY
+if [[ "${CHECK_OBI}" == "true" ]]; then
+    log "Live: --check-obi"
+    obi_args=(--mode validate --metadata "${OUTPUT_DIR}/metadata.json")
+    if [[ -n "${KUBE_CONTEXT}" ]]; then obi_args+=(--kube-context "${KUBE_CONTEXT}"); fi
+    if ! "${PYTHON_BIN}" "${OUTPUT_DIR}/k8s-instrumentation/obi-lifecycle.py" "${obi_args[@]}"; then
+        log "ERROR: OBI lifecycle validation failed."
+        exit 1
+    fi
 fi
 
 if [[ -n "${CHECK_APM}" ]]; then
     log "Live: --check-apm ${CHECK_APM}"
     if [[ -z "${SPLUNK_O11Y_REALM:-}" || -z "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
         log "ERROR: SPLUNK_O11Y_REALM and SPLUNK_O11Y_TOKEN_FILE are required for --check-apm."
+        exit 1
+    fi
+    if ! APM_REALM="$("${PYTHON_BIN}" - "${OUTPUT_DIR}/metadata.json" "${CHECK_APM}" "${SPLUNK_O11Y_REALM}" <<'PY'
+import json, sys
+metadata_path, requested_service, environment_realm = sys.argv[1:]
+metadata = json.load(open(metadata_path, encoding="utf-8"))
+realm = str(metadata.get("realm") or "")
+if not realm or environment_realm != realm:
+    raise SystemExit("ERROR: SPLUNK_O11Y_REALM does not exactly match the realm bound in metadata.json")
+services = metadata.get("apm_services")
+if not isinstance(services, list) or any(not isinstance(row, dict) for row in services):
+    raise SystemExit("ERROR: metadata.json apm_services contract is malformed")
+matches = [
+    row for row in services
+    if row.get("service") == requested_service and row.get("realm") == realm
+]
+if not matches:
+    raise SystemExit(
+        "ERROR: --check-apm service is not allowlisted by a rendered workload target in metadata.json"
+    )
+expected_cluster = str(metadata.get("cluster_name") or "")
+expected_environment = str(metadata.get("deployment_environment") or "")
+if any(
+    row.get("cluster_name") != expected_cluster
+    or row.get("deployment_environment") != expected_environment
+    or not row.get("target")
+    for row in matches
+):
+    raise SystemExit("ERROR: metadata.json APM service binding is inconsistent")
+print(realm)
+PY
+    )"; then
+        log "ERROR: APM realm/service contract validation failed."
         exit 1
     fi
     case "${SPLUNK_O11Y_REALM}" in
@@ -1102,7 +1133,7 @@ try:
 finally:
     os.close(header_fd)
 PY
-    url="https://api.${SPLUNK_O11Y_REALM}.observability.splunkcloud.com/v2/apm/topology"
+    url="https://api.${APM_REALM}.observability.splunkcloud.com/v2/apm/topology"
     request_file="$(mktemp)"
     body_file="$(mktemp)"
     chmod 600 "${request_file}" "${body_file}"
@@ -1159,7 +1190,25 @@ except (OSError, json.JSONDecodeError) as exc:
     raise SystemExit(1)
 
 
-nodes = payload.get("nodes")
+if not isinstance(payload, dict):
+    print("ERROR: APM topology response was not a JSON object.", file=sys.stderr)
+    raise SystemExit(1)
+for error_key in ("error", "errors"):
+    if payload.get(error_key) not in (None, "", [], {}):
+        print("ERROR: APM topology response contains an explicit error payload.", file=sys.stderr)
+        raise SystemExit(1)
+if "data" in payload:
+    if "nodes" in payload or "edges" in payload or not isinstance(payload["data"], dict):
+        print("ERROR: APM topology response has an ambiguous data envelope.", file=sys.stderr)
+        raise SystemExit(1)
+    graph = payload["data"]
+else:
+    graph = payload
+for error_key in ("error", "errors"):
+    if graph.get(error_key) not in (None, "", [], {}):
+        print("ERROR: APM topology data envelope contains an explicit error payload.", file=sys.stderr)
+        raise SystemExit(1)
+nodes = graph.get("nodes")
 if not isinstance(nodes, list):
     print("ERROR: APM topology response has no nodes array.", file=sys.stderr)
     raise SystemExit(1)
@@ -1187,48 +1236,12 @@ fi
 
 if [[ "${CHECK_BACKUP}" == "true" ]]; then
     log "Live: --check-backup"
-    "${PYTHON_BIN}" - "${OUTPUT_DIR}" <<'PY'
-import json
-import os
-import subprocess
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-meta = json.loads((root / "metadata.json").read_text(encoding="utf-8"))
-kube = json.loads(os.environ["KUBE_JSON"])
-name = meta.get("backup_configmap", "splunk-otel-auto-instrumentation-annotations-backup")
-ns = meta.get("namespace", "splunk-otel")
-proc = subprocess.run(kube + ["-n", ns, "get", "configmap", name, "-o", "json"], capture_output=True, text=True)
-if proc.returncode != 0:
-    print(f"ERROR: backup ConfigMap {ns}/{name} missing; annotations have not been applied yet.", file=sys.stderr)
-    sys.exit(1)
-try:
-    obj = json.loads(proc.stdout)
-except json.JSONDecodeError as exc:
-    print(f"ERROR: backup ConfigMap {ns}/{name} returned invalid JSON: {exc}", file=sys.stderr)
-    sys.exit(1)
-data = obj.get("data") or {}
-targets = meta.get("targets") or []
-if not targets:
-    print("ERROR: metadata.json contains no workload targets for --check-backup.", file=sys.stderr)
-    sys.exit(1)
-for target in targets:
-    key = str(target.get("key") or "")
-    identity = str(target.get("target") or key or "<unknown>")
-    if not key or key not in data:
-        print(f"ERROR: backup ConfigMap {ns}/{name} has no snapshot for {identity} ({key}).", file=sys.stderr)
-        sys.exit(1)
-    try:
-        snapshot = json.loads(data[key])
-    except (TypeError, json.JSONDecodeError) as exc:
-        print(f"ERROR: backup snapshot {key} is not valid JSON: {exc}", file=sys.stderr)
-        sys.exit(1)
-    if not isinstance(snapshot, dict):
-        print(f"ERROR: backup snapshot {key} is not an annotation JSON object.", file=sys.stderr)
-        sys.exit(1)
-print(f"  backup {ns}/{name}: all {len(targets)} rendered workload snapshot(s) present")
-PY
+    backup_args=(--mode verify --metadata "${OUTPUT_DIR}/metadata.json" --target-all)
+    if [[ -n "${KUBE_CONTEXT}" ]]; then backup_args+=(--kube-context "${KUBE_CONTEXT}"); fi
+    if ! "${PYTHON_BIN}" "${OUTPUT_DIR}/k8s-instrumentation/annotation-backup.py" "${backup_args[@]}"; then
+        log "ERROR: transactional rollback snapshot validation failed."
+        exit 1
+    fi
 fi
 
 log "Validation complete."

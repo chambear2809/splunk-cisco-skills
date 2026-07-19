@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo Lemonade Instrumentation"
+  short_description: "Instrument Lemonade inference and agents for Galileo"
+  default_prompt: "Use $galileo-lemonade-instrumentation-setup to instrument Lemonade for Galileo and validate privacy-safe trace delivery."

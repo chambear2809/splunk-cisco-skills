@@ -21,7 +21,7 @@ Each block has the same sub-structure: `image`, `env`, and `resourceRequirements
 
 ```yaml
 java:
-  image: ghcr.io/signalfx/splunk-otel-java:latest
+  image: ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4317
@@ -44,7 +44,7 @@ AlwaysOn Profiling requires JDK 8u262+; Oracle JDK 8 and IBM J9 are unsupported.
 
 ```yaml
 nodejs:
-  image: ghcr.io/signalfx/splunk-otel-js:latest
+  image: ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4317
@@ -60,7 +60,7 @@ Node supports profiling + runtime metrics. For custom npm paths use the `NODE_PA
 
 ```yaml
 python:
-  image: quay.io/signalfx/splunk-otel-instrumentation-python:latest
+  image: quay.io/signalfx/splunk-otel-instrumentation-python@sha256:d488c507e0cacc64b81423b96f6e53b30f2602a0e4bcc614658182f6aa13d5b4
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4318   # HTTP/4318 recommended
@@ -72,7 +72,7 @@ Python's auto-instrumentation uses `PYTHONPATH` to load `opentelemetry-bootstrap
 
 ```yaml
 dotnet:
-  image: ghcr.io/signalfx/splunk-otel-dotnet:latest
+  image: ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4318
@@ -88,7 +88,7 @@ Linux-only (AMD64 only). Alpine/musl needs the workload annotation `instrumentat
 
 ```yaml
 go:
-  image: ghcr.io/signalfx/splunk-otel-go:latest
+  image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go@sha256:664715c04cb854ffdbb920ea1289a86b0717f39e46b18e6584caa9e1f2e4d83f
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4317
@@ -100,7 +100,7 @@ Go uses eBPF, NOT bytecode rewriting — it requires an explicit target binary o
 
 ```yaml
 apacheHttpd:
-  image: ghcr.io/signalfx/splunk-otel-apache-httpd:latest
+  image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d
   configPath: /usr/local/apache2/conf
   version: "2.4"
 ```
@@ -111,11 +111,24 @@ The operator mounts `mod_otel_apache.so` into the Apache container and injects a
 
 ```yaml
 nginx:
-  image: ghcr.io/signalfx/splunk-otel-nginx:latest
+  image: registry.example.test/reviewed-nginx-instrumentation@sha256:<64-hex-digest>
   configFile: /etc/nginx/nginx.conf
 ```
 
 Works like the Apache block but injects an `otel_ngx_module.so` directive into `configFile`.
+
+Nginx has no default because the repository's audited chart-0.154.0 image
+ledger contains no Nginx entry. Rendering Nginx therefore fails closed unless
+the operator supplies a reviewed digest-pinned override.
+
+## Image immutability
+
+The concrete defaults above come from the base Collector skill's audited
+Kubernetes image ledger. Tags are deliberately omitted: `latest` and version
+tags can both move. Every custom override must match
+`<registry>/<repository>[:tag]@sha256:<64 lowercase hex>`; a tag without a
+digest is a preflight failure. Updating a default requires updating the shared
+source evidence and regression fixtures in the same review.
 
 
 ## Cross-namespace CR reference
@@ -132,7 +145,11 @@ Two CRs with the same `metadata.namespace + metadata.name` are rejected by the A
 
 ## Feature gates
 
-Multi-CR requires the operator chart's `instrumentation.multiInstrumentation: true` feature gate. This skill emits a `--multi-instrumentation` flag that must be paired with a matching chart value on the base collector — passing it here drives the preflight, while the base collector skill drives the chart value.
+Multiple named Instrumentation resources require no overlay-specific feature
+gate. Each workload is bound explicitly to `<namespace>/<name>`. Operator chart
+installation/tuning remains owned by the base collector skill; this overlay
+fails closed if legacy operator-control inputs are supplied rather than
+claiming to apply them.
 
 ## Source references
 

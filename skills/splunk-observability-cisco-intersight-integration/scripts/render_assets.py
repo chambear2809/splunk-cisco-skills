@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -238,110 +240,194 @@ def overlay_pipeline(collector: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def dashboard_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def dashboard_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     if not (spec.get("dashboards") or {}).get("enabled", True):
         return {}
+    charts = [
+        ("Host power", "intersight.ucs.host.power"),
+        ("Host temperature", "intersight.ucs.host.temperature"),
+        ("Fan speed", "intersight.ucs.fan.speed"),
+        ("Network receive rate", "intersight.ucs.network.receive.rate"),
+        ("Network transmit rate", "intersight.ucs.network.transmit.rate"),
+        ("Network utilization (avg)", "intersight.ucs.network.utilization.average"),
+        ("Active alarms", "intersight.alarms.count"),
+        ("Security advisories", "intersight.advisories.security.count"),
+        (
+            "Non-security advisories (affected objects)",
+            "intersight.advisories.nonsecurity.affected_objects",
+        ),
+        ("VM inventory count", "intersight.vm_count"),
+    ]
     return {
         "intersight-overview": {
-            "name": "Cisco Intersight Overview",
-            "description": "UCS power, thermal, fan, network, alarms, advisories",
+            "api_version": "splunk-observability-dashboard-builder/v1",
+            "mode": "classic-api",
+            "realm": realm,
+            "dashboard_group": {
+                "name": "Cisco Intersight Observability",
+                "description": f"Cisco Intersight dashboards for cluster {cluster_name}.",
+            },
+            "dashboard": {
+                "name": "Cisco Intersight Overview",
+                "description": "UCS power, thermal, fan, network, alarms, advisories",
+                "chart_density": "DEFAULT",
+                "filters": {
+                    "variables": [
+                        {
+                            "property": "k8s.cluster.name",
+                            "alias": "Cluster",
+                            "value": [cluster_name],
+                            "required": True,
+                            "restricted": True,
+                        }
+                    ]
+                },
+            },
             "charts": [
-                _chart("Host power", "intersight.ucs.host.power"),
-                _chart("Host temperature", "intersight.ucs.host.temperature"),
-                _chart("Fan speed", "intersight.ucs.fan.speed"),
-                _chart("Network receive rate", "intersight.ucs.network.receive.rate"),
-                _chart("Network transmit rate", "intersight.ucs.network.transmit.rate"),
-                _chart("Network utilization (avg)", "intersight.ucs.network.utilization.average"),
-                _chart("Active alarms", "intersight.alarms.count"),
-                _chart("Security advisories", "intersight.advisories.security.count"),
-                _chart("Non-security advisories (affected objects)", "intersight.advisories.nonsecurity.affected_objects"),
-                _chart("VM inventory count", "intersight.vm_count"),
+                _chart(name, metric, cluster_name, position)
+                for position, (name, metric) in enumerate(charts)
             ],
-            "filters": [{"property": "k8s.cluster.name", "value": "${CLUSTER_NAME}"}],
         }
     }
 
 
-def _chart(name: str, metric: str) -> dict[str, Any]:
+def _chart(name: str, metric: str, cluster_name: str, position: int) -> dict[str, Any]:
+    metric_literal = json.dumps(metric)
+    cluster_literal = json.dumps(cluster_name)
     return {
+        "id": re.sub(r"[^a-z0-9]+", "-", metric.lower()).strip("-") or "metric",
         "name": name,
         "description": f"{metric} from Intersight OTel",
-        "program_text": f"data('{metric}', filter=filter('k8s.cluster.name', '${{CLUSTER_NAME}}')).publish(label='{metric}')",
+        "type": "TimeSeriesChart",
+        "plot_type": "LineChart",
+        "row": position // 2,
+        "column": 0 if position % 2 == 0 else 6,
+        "width": 6,
+        "height": 1,
+        "program_text": (
+            f"data({metric_literal}, filter=filter('k8s.cluster.name', {cluster_literal}))"
+            f".publish(label={metric_literal})"
+        ),
         "publish_label": metric,
     }
 
 
-def detector_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _detector_spec(
+    *,
+    realm: str,
+    cluster_name: str,
+    name: str,
+    metric: str,
+    direction: str,
+    threshold: int | float,
+    severity: str,
+    aggregation: str,
+    detect_label: str,
+) -> dict[str, Any]:
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise SpecError(f"Detector threshold for {name!r} must be numeric.")
+    transformations = {
+        "delta": ".delta()",
+        "max": ".max()",
+        "min": ".min()",
+    }
+    comparators = {"above": ">", "below": "<"}
+    if aggregation not in transformations or direction not in comparators:
+        raise SpecError(
+            f"Unsupported detector aggregation/direction: {aggregation!r}/{direction!r}"
+        )
+    stream = (
+        f"data({json.dumps(metric)}, "
+        f"filter=filter('k8s.cluster.name', {json.dumps(cluster_name)}))"
+    )
+    signal_label = f"{detect_label}_signal"
+    program_text = (
+        f"signal = {stream}{transformations[aggregation]}"
+        f".publish(label={json.dumps(signal_label)})\n"
+        f"detect(when(signal {comparators[direction]} threshold({json.dumps(threshold)})))"
+        f".publish({json.dumps(detect_label)})"
+    )
+    return {
+        "api_version": "splunk-observability-native-ops/v1",
+        "realm": realm,
+        "detectors": [
+            {
+                "name": name,
+                "description": f"Cisco Intersight {aggregation} detector for {metric}.",
+                "program_text": program_text,
+                "tags": ["cisco-intersight", aggregation],
+                "rules": [
+                    {
+                        "detect_label": detect_label,
+                        "severity": severity,
+                        "description": f"{metric} is {direction} threshold {threshold}.",
+                        "notifications": [],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def detector_specs(
+    spec: dict[str, Any], realm: str, cluster_name: str
+) -> dict[str, dict[str, Any]]:
     block = spec.get("detectors") or {}
     if not block.get("enabled", True):
         return {}
     thresholds = block.get("thresholds") or {}
-    return {
+    definitions = {
         "alarm-count-spike": {
-            "test_type": "intersight",
-            "detectors": [
-                {
-                    "name": "Intersight alarm count spike",
-                    "metric": "intersight.alarms.count",
-                    "direction": "above",
-                    "threshold": thresholds.get("alarm_count_delta_per_5m_max", 5),
-                    "severity": "Critical",
-                    "aggregation": "delta",
-                }
-            ],
+            "name": "Intersight alarm count spike",
+            "metric": "intersight.alarms.count",
+            "direction": "above",
+            "threshold": thresholds.get("alarm_count_delta_per_5m_max", 5),
+            "severity": "Critical",
+            "aggregation": "delta",
+            "detect_label": "intersight_alarm_count_spike",
         },
         "security-advisory-delta": {
-            "test_type": "intersight",
-            "detectors": [
-                {
-                    "name": "Intersight new security advisory",
-                    "metric": "intersight.advisories.security.count",
-                    "direction": "above",
-                    "threshold": thresholds.get("security_advisory_delta_per_24h_max", 0),
-                    "severity": "Major",
-                    "aggregation": "delta",
-                }
-            ],
+            "name": "Intersight new security advisory",
+            "metric": "intersight.advisories.security.count",
+            "direction": "above",
+            "threshold": thresholds.get("security_advisory_delta_per_24h_max", 0),
+            "severity": "Major",
+            "aggregation": "delta",
+            "detect_label": "intersight_security_advisory_delta",
         },
         "host-temp-ceiling": {
-            "test_type": "intersight",
-            "detectors": [
-                {
-                    "name": "Intersight host temperature ceiling",
-                    "metric": "intersight.ucs.host.temperature",
-                    "direction": "above",
-                    "threshold": thresholds.get("host_temp_ceiling_celsius", 80),
-                    "severity": "Major",
-                    "aggregation": "max",
-                }
-            ],
+            "name": "Intersight host temperature ceiling",
+            "metric": "intersight.ucs.host.temperature",
+            "direction": "above",
+            "threshold": thresholds.get("host_temp_ceiling_celsius", 80),
+            "severity": "Major",
+            "aggregation": "max",
+            "detect_label": "intersight_host_temp_ceiling",
         },
         "host-power-floor": {
-            "test_type": "intersight",
-            "detectors": [
-                {
-                    "name": "Intersight host power floor (unexpected power loss)",
-                    "metric": "intersight.ucs.host.power",
-                    "direction": "below",
-                    "threshold": thresholds.get("host_power_floor_watts", 50),
-                    "severity": "Warning",
-                    "aggregation": "min",
-                }
-            ],
+            "name": "Intersight host power floor (unexpected power loss)",
+            "metric": "intersight.ucs.host.power",
+            "direction": "below",
+            "threshold": thresholds.get("host_power_floor_watts", 50),
+            "severity": "Warning",
+            "aggregation": "min",
+            "detect_label": "intersight_host_power_floor",
         },
         "fan-speed-floor": {
-            "test_type": "intersight",
-            "detectors": [
-                {
-                    "name": "Intersight fan speed floor (failure indicator)",
-                    "metric": "intersight.ucs.fan.speed",
-                    "direction": "below",
-                    "threshold": thresholds.get("fan_speed_floor_rpm", 1000),
-                    "severity": "Warning",
-                    "aggregation": "min",
-                }
-            ],
+            "name": "Intersight fan speed floor (failure indicator)",
+            "metric": "intersight.ucs.fan.speed",
+            "direction": "below",
+            "threshold": thresholds.get("fan_speed_floor_rpm", 1000),
+            "severity": "Warning",
+            "aggregation": "min",
+            "detect_label": "intersight_fan_speed_floor",
         },
+    }
+    return {
+        key: _detector_spec(realm=realm, cluster_name=cluster_name, **definition)
+        for key, definition in definitions.items()
     }
 
 
@@ -397,29 +483,43 @@ fi
     )
 
 
-def render_handoffs(spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
+def render_handoffs(
+    spec: dict[str, Any], realm: str, cluster_name: str, distribution: str
+) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
+    realm_q = shlex.quote(str(realm))
+    cluster_name_q = shlex.quote(str(cluster_name))
+    distribution_q = shlex.quote(str(distribution))
     if handoffs.get("base_collector", True):
         helpers["handoff-base-collector.sh"] = (
             f"""#!/usr/bin/env bash
 set -euo pipefail
 
-OVERLAY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/splunk-otel-overlay/intersight-pipeline.yaml"
+BUNDLE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="$BUNDLE_DIR/splunk-otel-overlay/intersight-pipeline.yaml"
 BASE_OUTPUT_DIR="${{BASE_OUTPUT_DIR:-/tmp/splunk-observability-otel-rendered}}"
+REALM={realm_q}
+CLUSTER_NAME={cluster_name_q}
+DISTRIBUTION={distribution_q}
+printf -v BASE_OUTPUT_DIR_Q '%q' "$BASE_OUTPUT_DIR"
+printf -v OVERLAY_Q '%q' "$OVERLAY"
+printf -v REALM_Q '%q' "$REALM"
+printf -v CLUSTER_NAME_Q '%q' "$CLUSTER_NAME"
+printf -v DISTRIBUTION_Q '%q' "$DISTRIBUTION"
 
 echo "Step 1: Render base collector values."
 echo "    bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \\\\"
-echo "      --render-k8s --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
-echo "      --output-dir ${{BASE_OUTPUT_DIR}}"
+echo "      --render-k8s --realm ${{REALM_Q}} --cluster-name ${{CLUSTER_NAME_Q}} --distribution ${{DISTRIBUTION_Q}} \\\\"
+echo "      --output-dir ${{BASE_OUTPUT_DIR_Q}}"
 echo
 echo "Step 2: Confirm OTLP receiver enabled (it is by default in the chart)."
-echo "    grep -A 3 'receivers:' ${{BASE_OUTPUT_DIR}}/k8s/values.yaml | head"
+echo "    grep -A 3 'receivers:' ${{BASE_OUTPUT_DIR_Q}}/k8s/values.yaml | head"
 echo
 echo "Step 3 (optional): Merge intersight pipeline overlay if you customized the collector pipeline."
 echo "    yq eval-all '. as \\$item ireduce ({{}}; . * \\$item)' \\\\"
-echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
-echo "      ${{OVERLAY}} > /tmp/merged-values.yaml"
+echo "      ${{BASE_OUTPUT_DIR_Q}}/k8s/values.yaml \\\\"
+echo "      ${{OVERLAY_Q}} > /tmp/merged-values.yaml"
 """
         )
     if handoffs.get("dashboard_builder", True):
@@ -427,10 +527,13 @@ echo "      ${{OVERLAY}} > /tmp/merged-values.yaml"
             f"""#!/usr/bin/env bash
 set -euo pipefail
 DASHBOARDS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/dashboards"
+REALM={realm_q}
+printf -v DASHBOARDS_DIR_Q '%q' "$DASHBOARDS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Import dashboards via splunk-observability-dashboard-builder:"
-echo "    for spec in ${{DASHBOARDS_DIR}}/*.signalflow.yaml; do"
+echo "    for spec in ${{DASHBOARDS_DIR_Q}}/*.signalflow.yaml; do"
 echo "      bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \\\\"
-echo "        --render --apply --realm {realm} --spec \\$spec --token-file \\$O11Y_API_TOKEN_FILE"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
 echo "    done"
 """
         )
@@ -439,9 +542,14 @@ echo "    done"
             f"""#!/usr/bin/env bash
 set -euo pipefail
 DETECTORS_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/detectors"
+REALM={realm_q}
+printf -v DETECTORS_DIR_Q '%q' "$DETECTORS_DIR"
+printf -v REALM_Q '%q' "$REALM"
 echo "Apply detectors via splunk-observability-native-ops:"
-echo "    bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
-echo "      --render --apply --realm {realm} --spec ${{DETECTORS_DIR}}/<detector>.yaml --token-file \\$O11Y_API_TOKEN_FILE"
+echo "    for spec in ${{DETECTORS_DIR_Q}}/*.yaml; do"
+echo "      bash skills/splunk-observability-native-ops/scripts/setup.sh \\\\"
+echo "        --render --apply --realm ${{REALM_Q}} --spec \\\"\\$spec\\\" --token-file \\\"\\$O11Y_API_TOKEN_FILE\\\""
+echo "    done"
 """
         )
     return helpers
@@ -521,9 +629,9 @@ def main() -> int:
     )
     write_yaml(out / "splunk-otel-overlay/intersight-pipeline.yaml", overlay_pipeline(collector))
 
-    for name, payload in dashboard_specs(spec).items():
+    for name, payload in dashboard_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"dashboards/{name}.signalflow.yaml", payload)
-    for name, payload in detector_specs(spec).items():
+    for name, payload in detector_specs(spec, realm, cluster_name).items():
         write_yaml(out / f"detectors/{name}.yaml", payload)
 
     write_text(

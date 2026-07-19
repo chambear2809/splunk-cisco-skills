@@ -13,12 +13,13 @@ import argparse
 import hmac
 import ipaddress
 import json
+import os
 import ssl
 import stat
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from urllib.parse import urlparse
 
 
 MAX_BODY_BYTES = 1_048_576
+MAX_SECRET_FILE_BYTES = 64 * 1024
 DIRECT_SECRET_FLAGS = {
     "--access-token",
     "--api-key",
@@ -80,17 +82,67 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def read_secret_file(path: str, label: str) -> str:
     secret_path = Path(path).expanduser()
-    if not secret_path.is_file():
-        raise RuntimeError(f"{label} is not readable: {secret_path}")
-    mode = stat.S_IMODE(secret_path.stat().st_mode)
-    if mode & 0o077:
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "geteuid"):
+        raise RuntimeError(f"{label} cannot be read safely on this platform")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(secret_path, flags)
+    except OSError as exc:
         raise RuntimeError(
-            f"{label} permissions must be 0600 or stricter: {secret_path} has {mode:04o}"
+            f"{label} must be a readable, non-symlink regular file: {secret_path}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError(f"{label} must be a single-link regular file: {secret_path}")
+        if before.st_uid != os.geteuid():
+            raise RuntimeError(f"{label} must be owned by the current user: {secret_path}")
+        mode = stat.S_IMODE(before.st_mode)
+        if mode & 0o077:
+            raise RuntimeError(
+                f"{label} permissions must be 0600 or stricter: {secret_path} has {mode:04o}"
+            )
+        if not 1 <= before.st_size <= MAX_SECRET_FILE_BYTES:
+            raise RuntimeError(
+                f"{label} size must be between 1 and {MAX_SECRET_FILE_BYTES} bytes: {secret_path}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_SECRET_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
         )
-    value = secret_path.read_text(encoding="utf-8").strip()
-    if not value:
-        raise RuntimeError(f"{label} is empty: {secret_path}")
-    return value
+        after_fingerprint = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        data = b"".join(chunks)
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise RuntimeError(f"{label} changed while it was read: {secret_path}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(f"{label} must contain UTF-8 text: {secret_path}") from exc
+    if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+        raise RuntimeError(f"{label} must contain exactly one non-empty line: {secret_path}")
+    return lines[0]
 
 
 def normalize_hec_url(value: str, *, allow_insecure_http: bool = False) -> str:
@@ -152,8 +204,11 @@ def epoch_timestamp(value: Any) -> float | None:
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
     try:
-        return datetime.fromisoformat(text).timestamp()
-    except ValueError:
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except (OverflowError, ValueError):
         return None
 
 

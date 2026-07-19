@@ -1,0 +1,35 @@
+# Metadata-only native Lemonade fan-out
+bash skills/galileo-lemonade-instrumentation-setup/scripts/setup.sh \
+  --base /etc/otel/collector/agent_config.yaml \
+  --output /tmp/lemonade-galileo.yaml \
+  --mode server-fanout \
+  --routing ids \
+  --galileo-proxy-url http://127.0.0.1:18888 \
+  --queue-policy persistent \
+  --production \
+  --destination-fingerprint "$GALILEO_DESTINATION_FINGERPRINT" \
+  --queue-storage-directory "$GALILEO_QUEUE_STORAGE_DIRECTORY"
+
+# Rich agent/workflow instrumentation (recommended for agents)
+bash skills/galileo-lemonade-instrumentation-setup/scripts/setup.sh \
+  --base /etc/otel/collector/agent_config.yaml \
+  --output /tmp/lemonade-galileo-client.yaml \
+  --mode client-fanout \
+  --routing ids \
+  --galileo-proxy-url http://127.0.0.1:18888 \
+  --queue-policy persistent \
+  --production \
+  --destination-fingerprint "$GALILEO_DESTINATION_FINGERPRINT" \
+  --queue-storage-directory "$GALILEO_QUEUE_STORAGE_DIRECTORY" \
+  --client-receiver-endpoint 127.0.0.1:14318
+
+# Production validation runs protected proxy identity checks and live probes.
+bash skills/galileo-lemonade-instrumentation-setup/scripts/validate.sh \
+  --collector-config /tmp/lemonade-galileo-client.yaml \
+  --mode client-fanout \
+  --queue-policy persistent \
+  --production \
+  --galileo-proxy-url http://127.0.0.1:18888 \
+  --destination-fingerprint "$GALILEO_DESTINATION_FINGERPRINT" \
+  --queue-storage-directory "$GALILEO_QUEUE_STORAGE_DIRECTORY" \
+  --collector-binary /usr/bin/otelcol

@@ -1,11 +1,9 @@
 ---
 name: splunk-enterprise-kubernetes-setup
-description: >-
-  Render, preflight, apply, and validate Splunk Enterprise on Kubernetes with
-  Splunk Operator for Kubernetes 3.1.0 or Splunk POD 10.4.0_1.6.0 on Cisco UCS.
-  Covers SOK S1/C3/M4, guarded C3 indexing and ingestion separation, reviewed
-  Helm overlays, and POD Small through X-Large with ES, ITSI, and TLS variants.
-  Use when planning, installing, upgrading, or validating either runtime.
+description: "Use when planning, installing, upgrading, or validating either runtime. Render, preflight, apply, and
+  validate Splunk Enterprise on Kubernetes with Splunk Operator for Kubernetes 3.1.0 or Splunk POD
+  10.4.0_1.6.0 on Cisco UCS. Covers SOK S1/C3/M4, guarded C3 indexing and ingestion separation, reviewed
+  Helm overlays, and POD Small through X-Large with ES, ITSI, and TLS variants."
 compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "self-managed-10.4"
@@ -13,6 +11,61 @@ metadata:
 ---
 
 # Splunk Enterprise Kubernetes Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
++-- Preflight --+ -> +-- Render/review --+ -> +-- Apply/handoff --+ -> +-- Validate evidence --+
+```
+
+## When to Activate
+
+- Planning, installing, upgrading, or validating either runtime.
+- Preview and review the splunk enterprise kubernetes setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 Use this skill for customer-managed Splunk Enterprise on Kubernetes. Resolve the
 target before rendering:
@@ -175,61 +228,13 @@ intake and command in [reference.md](reference.md#sok-production-profile) and
 [template.example](template.example); capacity, path ownership across clusters,
 and zone-failure continuity remain external evidence.
 
-### SOK 3.1 Indexing and Ingestion Separation
+### Advanced SOK Options
 
-The first-class path is intentionally limited to C3 with AWS SQS and S3. It
-renders `Queue`, `ObjectStorage`, and `IngestorCluster` resources and attaches
-the same durable endpoints to the index-only tier. Select the upstream queue
-mode with `--queue-provider sqs|sqs_cp` (`sqs` is the default); do not infer
-different cloud-resource ownership from that selector. Supply an existing
-Queue credential Secret. The verified 3.1 path requires an empty workload
-`serviceAccount`; both `--ingestor-service-account` and
-`--splunk-service-account` are rejected for this mode because the upstream EKS
-workload-identity path has not been verified. The Secret must provide the
-upstream `s3_access_key` and `s3_secret_key` keys.
-
-```bash
-bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
-  --target sok \
-  --architecture c3 \
-  --indexing-ingestion-separation \
-  --ingestor-replicas 3 \
-  --queue-provider sqs \
-  --queue-name splunk-ingest \
-  --queue-dlq splunk-ingest-dlq \
-  --queue-region us-west-2 \
-  --queue-secret-ref splunk-ingest-queue-credentials \
-  --object-storage-path splunk-ingest-payloads/messages \
-  --accept-splunk-general-terms
-```
-
-For Kubernetes 1.34, separated ingestion requires a compatible 10.4+ Splunk
-release. Queue, DLQ, bucket, IAM/KMS policy, endpoints, and Queue Secret
-creation remain external cloud-owner tasks. The queue authentication region
-must satisfy the SOK 3.1 CRD's narrower lowercase region grammar; it is not
-accepted merely because a general AWS SDK recognizes it.
-
-Source: <https://splunk.github.io/splunk-operator/IndexIngestionSeparation.html>
-
-### SOK Overlays and App Framework
-
-Use `--operator-values-overlay` and `--enterprise-values-overlay` only for the
-skill's constrained, non-secret surface. Overlays are copied, hashed, and
-applied after generated values. Unknown/misspelled keys, secrets, topology,
-identity, images, services, commands/env, probes, host/security fields,
-arbitrary manifests/volumes, and protected defaults/license fields fail closed.
-Enterprise scheduling overlays cannot remove M4's generated zone pins.
-
-App Framework is structurally validated on supported CRs; indexer cluster-scope
-apps go through ClusterManager, not IndexerCluster. Existing `secretRef` is the
-reviewed storage-auth path. Combined Operator/Splunk provider identity is a
-separate unvalidated handoff and must not reuse SmartStore's indexer-only IRSA.
-The skill preserves the staging PVC, rejects explicit support-directed
-`appInstallPeriodSeconds`, and does not prove package compatibility, enablement,
-removal, or downgrade. ES premium automation is limited to supported S1/C3
-contexts; M4 and generic SOK ITSI are excluded. Use
-[reference.md](reference.md#sok-overlays) for the complete schema and
-[coverage.md](coverage.md) for every product boundary.
+C3 indexing/ingestion separation and constrained, non-secret overlays are
+advanced fail-closed paths. Read the complete
+[separated-ingestion contract](reference.md#sok-indexing-and-ingestion-separation),
+[overlay rules](reference.md#sok-overlays), and [coverage boundaries](coverage.md)
+before selecting either path.
 
 ### Review, Validate, and Apply SOK
 
@@ -487,8 +492,5 @@ approved recipient before use. This skill never runs them automatically.
 
 ## References
 
-- [reference.md](reference.md): defaults, gates, rendered assets, and commands
-- [coverage.md](coverage.md): feature-by-feature ownership and limitations
-- [template.example](template.example): non-secret intake checklist
-- [operator-values-overlay.example.yaml](operator-values-overlay.example.yaml)
-- [enterprise-values-overlay.example.yaml](enterprise-values-overlay.example.yaml)
+- [reference.md](reference.md), [coverage.md](coverage.md), and [template.example](template.example)
+- [operator overlay](operator-values-overlay.example.yaml) and [Enterprise overlay](enterprise-values-overlay.example.yaml)

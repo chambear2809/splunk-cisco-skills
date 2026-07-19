@@ -320,7 +320,10 @@ operator-owned HTTPS reverse proxy and validate a Galileo test event end to end.
 The export bridge and alert relay both require HTTPS for non-loopback HEC URLs,
 reject credentials and ambiguous URL components, and refuse HTTP redirects.
 Plaintext non-loopback HEC requires the explicit
-`--allow-insecure-hec-http` review override.
+`--allow-insecure-hec-http` review override. The export bridge verifies HTTPS
+certificates and hostnames by default; the separate
+`--accept-insecure-hec-tls` flag is the explicit, reviewed escape hatch for a
+lab HTTPS endpoint with an untrusted certificate.
 
 ## Codex Notify Runtime Logging
 

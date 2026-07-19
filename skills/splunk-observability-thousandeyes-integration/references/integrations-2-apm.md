@@ -1,6 +1,6 @@
 # Integrations 2.0 — Splunk Observability APM connector
 
-Source: TE docs (`Manage > Integrations > Integrations 2.0`) plus the in-repo reference implementation at `/Users/alecchamberlain/Documents/GitHub/network-streaming-app/scripts/thousandeyes/sync-o11y-apm-integration.py`.
+Source: TE docs (`Manage > Integrations > Integrations 2.0`) plus this skill's [renderer and apply workflow](../scripts/render_assets.py).
 
 ## What this is
 

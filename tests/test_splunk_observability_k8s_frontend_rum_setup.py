@@ -384,8 +384,9 @@ def test_source_map_helper_rendered_when_enabled(tmp_path: Path) -> None:
     out = tmp_path / "r"
     assert run_render("--spec", str(spec), "--output-dir", str(out)).returncode == 0
     sh = (out / "source-maps/sourcemap-upload.sh").read_text(encoding="utf-8")
-    assert "splunk-rum sourcemaps inject" in sh
+    assert "['splunk-rum', 'sourcemaps', 'inject'" in sh
     assert "SPLUNK_O11Y_TOKEN_FILE" in sh
+    assert "read_private_secret" in sh
     assert (out / "source-maps/gitlab-ci.yaml").exists()
     assert (out / "source-maps/splunk.webpack.js").exists()
     # github-actions snippet should NOT be rendered when ci_provider=gitlab_ci.

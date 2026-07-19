@@ -34,6 +34,8 @@ import argparse
 import copy
 import hashlib
 import json
+import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -61,6 +63,37 @@ ENTERPRISE_HUBBLE_ENT_CHART = "isovalent/hubble-enterprise"
 ENTERPRISE_TIMESCAPE_CHART = "isovalent/hubble-timescape"
 
 EKS_AWS_MIRROR_OCI = "oci://public.ecr.aws/eks/cilium/cilium"
+
+# Exact chart versions are part of the rendered execution contract.  Cilium
+# Enterprise Cilium/cilium-dnsproxy 1.18.8 plus Enterprise Tetragon 1.18.1 are
+# the versions validated by the repository's isovalent-demo acceptance
+# evidence. OSS uses the separately sourced upstream maintenance baselines:
+# Cilium 1.18.10 and Tetragon 1.7.0. The EKS OCI mirror retains its separately
+# reviewed 1.18.8 contract and must not be conflated with the public chart.
+# Hubble Enterprise and standalone Timescape are private charts; their 1.18.8
+# family pin must still be resolved by `helm show chart --version` at apply time
+# because no distributable chart archive/checksum is available in this repo.
+OSS_CILIUM_CHART_VERSION = "1.18.10"
+ENTERPRISE_CILIUM_CHART_VERSION = "1.18.8"
+EKS_MIRROR_CILIUM_CHART_VERSION = "1.18.8"
+OSS_TETRAGON_CHART_VERSION = "1.7.0"
+ENTERPRISE_TETRAGON_CHART_VERSION = "1.18.1"
+DNSPROXY_CHART_VERSION = "1.18.8"
+HUBBLE_ENTERPRISE_CHART_VERSION = "1.18.8"
+TIMESCAPE_CHART_VERSION = "1.18.8"
+HELM_TRANSACTION_TIMEOUT = "10m"
+
+DEFAULT_NAMESPACES = {
+    "cilium": "kube-system",
+    "tetragon": "tetragon",
+    "hubble_enterprise": "kube-system",
+    "cilium_dnsproxy": "kube-system",
+    "hubble_timescape": "hubble-timescape",
+}
+DNS1123_LABEL = re.compile(
+    r"^(?=.{1,63}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+)
+KERNEL_MINIMUM = re.compile(r"^[0-9]+\.[0-9]+(?:\.[0-9]+)?$")
 
 VALID_EDITIONS = {"oss", "enterprise"}
 VALID_EXPORT_MODES = {"file", "stdout", "fluentd"}
@@ -181,6 +214,115 @@ def parse_args() -> argparse.Namespace:
 
 def bool_flag(value: str) -> bool:
     return str(value).lower() == "true"
+
+
+def shell_literal(value: str) -> str:
+    """Return one safe shell word for a validated rendered literal."""
+
+    return shlex.quote(value)
+
+
+def namespace_prelude(namespace: str) -> str:
+    return (
+        f"DEFAULT_NAMESPACE={shell_literal(namespace)}\n"
+        "# shellcheck disable=SC2034  # Shared wrapper: not every body consumes NAMESPACE.\n"
+        'NAMESPACE="${1:-${DEFAULT_NAMESPACE}}"\n'
+    )
+
+
+def validated_namespaces(spec: dict[str, Any]) -> dict[str, str]:
+    raw = spec.get("namespaces") or {}
+    if not isinstance(raw, dict):
+        raise SpecError("spec.namespaces must be a mapping")
+    unknown = sorted(set(raw) - set(DEFAULT_NAMESPACES))
+    if unknown:
+        raise SpecError("unknown namespace field(s): " + ", ".join(unknown))
+    result = dict(DEFAULT_NAMESPACES)
+    for key, value in raw.items():
+        if not isinstance(value, str) or not DNS1123_LABEL.fullmatch(value):
+            raise SpecError(
+                f"namespaces.{key} must be a Kubernetes DNS-1123 label (1-63 lowercase characters)"
+            )
+        result[key] = value
+    return result
+
+
+def validated_kernel_minimum(spec: dict[str, Any]) -> str:
+    block = spec.get("kernel_preflight") or {}
+    if not isinstance(block, dict):
+        raise SpecError("spec.kernel_preflight must be a mapping")
+    value = block.get("minimum_version", "5.10")
+    if not isinstance(value, str) or not KERNEL_MINIMUM.fullmatch(value):
+        raise SpecError("kernel_preflight.minimum_version must be numeric major.minor or major.minor.patch")
+    return value
+
+
+def chart_contract(edition: str, eks_mirror: bool) -> dict[str, dict[str, Any]]:
+    cilium_chart = (
+        EKS_AWS_MIRROR_OCI
+        if eks_mirror
+        else ENTERPRISE_CILIUM_CHART
+        if edition == "enterprise"
+        else OSS_CILIUM_CHART
+    )
+    cilium_names = ["cilium-enterprise", "cilium"] if edition == "enterprise" else ["cilium"]
+    cilium_version = (
+        EKS_MIRROR_CILIUM_CHART_VERSION
+        if eks_mirror
+        else ENTERPRISE_CILIUM_CHART_VERSION
+        if edition == "enterprise"
+        else OSS_CILIUM_CHART_VERSION
+    )
+    tetragon_version = (
+        ENTERPRISE_TETRAGON_CHART_VERSION if edition == "enterprise" else OSS_TETRAGON_CHART_VERSION
+    )
+    return {
+        "cilium": {
+            "chart": cilium_chart,
+            "version": cilium_version,
+            "helm_list_chart_names": cilium_names,
+            "provenance": (
+                "reviewed EKS OCI Cilium mirror 1.18.8"
+                if eks_mirror
+                else "isovalent-demo validated Enterprise Cilium 1.18.8"
+                if edition == "enterprise"
+                else "official upstream Cilium 1.18.10 maintenance release"
+            ),
+            "archive_sha256": None,
+        },
+        "tetragon": {
+            "chart": ENTERPRISE_TETRAGON_CHART if edition == "enterprise" else OSS_TETRAGON_CHART,
+            "version": tetragon_version,
+            "helm_list_chart_names": ["tetragon"],
+            "provenance": (
+                "isovalent-demo validated Enterprise Tetragon 1.18.1"
+                if edition == "enterprise"
+                else "official upstream Tetragon 1.7.0 release"
+            ),
+            "archive_sha256": None,
+        },
+        "cilium-dnsproxy": {
+            "chart": ENTERPRISE_DNSPROXY_CHART,
+            "version": DNSPROXY_CHART_VERSION,
+            "helm_list_chart_names": ["cilium-dnsproxy"],
+            "provenance": "isovalent-demo validated cilium-dnsproxy 1.18.8",
+            "archive_sha256": None,
+        },
+        "hubble-enterprise": {
+            "chart": ENTERPRISE_HUBBLE_ENT_CHART,
+            "version": HUBBLE_ENTERPRISE_CHART_VERSION,
+            "helm_list_chart_names": ["hubble-enterprise"],
+            "provenance": "private Isovalent 1.18.8 family pin; apply-time helm show chart required",
+            "archive_sha256": None,
+        },
+        "hubble-timescape": {
+            "chart": ENTERPRISE_TIMESCAPE_CHART,
+            "version": TIMESCAPE_CHART_VERSION,
+            "helm_list_chart_names": ["hubble-timescape"],
+            "provenance": "private Isovalent 1.18.8 family pin; apply-time helm show chart required",
+            "archive_sha256": None,
+        },
+    }
 
 
 def load_spec(path: Path) -> dict[str, Any]:
@@ -735,6 +877,7 @@ def apply_plan(
         "output_dir": str(output_dir),
         "selected_sections": sections,
         "eks_mirror": eks_mirror,
+        "helm_charts": chart_contract(edition, eks_mirror),
         "enterprise_addons": {
             "dnsproxy": enable_dnsproxy,
             "hubble_enterprise": enable_hubble_enterprise,
@@ -837,23 +980,36 @@ def install_script(*, name: str, body: str) -> str:
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n\n"
         f"# {name}\n"
+        "# Shared wrapper variables are intentionally consumed only by the rendered body that needs them.\n"
+        "# shellcheck disable=SC2034\n"
         'KUBECTL=(kubectl)\n'
+        "# shellcheck disable=SC2034\n"
         'HELM=(helm)\n'
         'if [[ -n "${KUBE_CONTEXT:-}" ]]; then\n'
+        "    # shellcheck disable=SC2034\n"
         '    KUBECTL=(kubectl --context "${KUBE_CONTEXT}")\n'
+        "    # shellcheck disable=SC2034\n"
         '    HELM=(helm --kube-context "${KUBE_CONTEXT}")\n'
         'fi\n'
+        "# shellcheck disable=SC2034\n"
         'HELM_DRY_RUN=()\n'
+        "# shellcheck disable=SC2034\n"
         'KUBECTL_DRY_RUN=()\n'
         'if [[ "${K8S_APPLY_DRY_RUN:-false}" == "true" ]]; then\n'
+        "    # shellcheck disable=SC2034\n"
         '    HELM_DRY_RUN=(--dry-run)\n'
+        "    # shellcheck disable=SC2034\n"
         '    KUBECTL_DRY_RUN=(--dry-run=server)\n'
         'fi\n\n'
         f"{body}\n"
     )
 
 
-def enterprise_secret_args_body(chart: str, license_pattern: str = "license|enterprise") -> str:
+def enterprise_secret_args_body(
+    chart: str,
+    version: str,
+    license_pattern: str = "license|enterprise",
+) -> str:
     return (
         'SET_FILE_ARGS=()\n'
         'SET_ARGS=()\n'
@@ -862,7 +1018,14 @@ def enterprise_secret_args_body(chart: str, license_pattern: str = "license|ente
         '    exit 1\n'
         'fi\n'
         'if [[ -n "${ISOVALENT_LICENSE_FILE:-}" ]]; then\n'
-        f'    "${{HELM[@]}}" show values "{chart}" | grep -E "{license_pattern}" >/dev/null || {{\n'
+        '    if [[ "${K8S_APPLY_DRY_RUN:-false}" == "true" ]]; then\n'
+        "        if ! \"${HELM[@]}\" upgrade --help 2>/dev/null | awk 'index($0, \"--hide-secret\") { found=1 } END { exit !found }'; then\n"
+        '            echo "ERROR: Helm dry-run with an Enterprise license requires upgrade --hide-secret support; refusing to render Secret content." >&2\n'
+        '            exit 1\n'
+        '        fi\n'
+        '        HELM_DRY_RUN+=(--hide-secret)\n'
+        '    fi\n'
+        f'    "${{HELM[@]}}" show values "{chart}" --version "{version}" | grep -E "{license_pattern}" >/dev/null || {{\n'
         f'        echo "ERROR: could not verify license-related chart values for {chart}." >&2\n'
         '        exit 1\n'
         '    }\n'
@@ -888,12 +1051,14 @@ def enterprise_secret_args_body(chart: str, license_pattern: str = "license|ente
 def cilium_install_body(edition: str, eks_mirror: bool, namespace: str, distribution: str = "generic") -> str:
     if distribution in MANAGED_CILIUM_DISTRIBUTIONS:
         return (
-            f'NAMESPACE="${{1:-{namespace}}}"\n'
+            namespace_prelude(namespace)
+            +
             f'echo "ERROR: {distribution} uses a provider-managed Cilium dataplane." >&2\n'
             'echo "This skill will not Helm-replace provider-owned Cilium. Use --discover, --preflight, --validate, or a provider-supported BYOCNI migration path." >&2\n'
             'exit 1\n'
         )
     chart = OSS_CILIUM_CHART
+    version = OSS_CILIUM_CHART_VERSION
     repo_setup = (
         f'"${{HELM[@]}}" repo add {OSS_REPO_NAME} {OSS_REPO_URL}\n'
         f'"${{HELM[@]}}" repo update {OSS_REPO_NAME}\n'
@@ -901,24 +1066,29 @@ def cilium_install_body(edition: str, eks_mirror: bool, namespace: str, distribu
     secret_setup = "SET_FILE_ARGS=()\nSET_ARGS=()\n"
     if edition == "enterprise":
         chart = ENTERPRISE_CILIUM_CHART
+        version = ENTERPRISE_CILIUM_CHART_VERSION
         repo_setup = (
             f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
             f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
         )
-        secret_setup = enterprise_secret_args_body(chart)
+        secret_setup = enterprise_secret_args_body(chart, version)
     if eks_mirror:
         # AWS publishes Cilium for EKS Hybrid Nodes via OCI. When the operator
         # asks for the EKS-AWS mirror we install from the OCI registry instead
         # of helm.cilium.io.
         chart = EKS_AWS_MIRROR_OCI
+        version = EKS_MIRROR_CILIUM_CHART_VERSION
         repo_setup = "# EKS-AWS mirror: chart is an OCI URL; no helm repo add needed.\n"
         secret_setup = "SET_FILE_ARGS=()\nSET_ARGS=()\n"
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f"{repo_setup}"
+        f'"${{HELM[@]}}" show chart "{chart}" --version "{version}" >/dev/null\n'
         f"{secret_setup}"
         f'"${{HELM[@]}}" upgrade --install cilium "{chart}" \\\n'
         '    -n "${NAMESPACE}" --create-namespace \\\n'
+        f'    --version "{version}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
         '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/cilium-values.yaml" \\\n'
         '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
         'if [[ "${K8S_APPLY_DRY_RUN:-false}" != "true" ]]; then\n'
@@ -929,6 +1099,7 @@ def cilium_install_body(edition: str, eks_mirror: bool, namespace: str, distribu
 
 def tetragon_install_body(edition: str, namespace: str) -> str:
     chart = OSS_TETRAGON_CHART
+    version = OSS_TETRAGON_CHART_VERSION
     repo_setup = (
         f'"${{HELM[@]}}" repo add {OSS_REPO_NAME} {OSS_REPO_URL}\n'
         f'"${{HELM[@]}}" repo update {OSS_REPO_NAME}\n'
@@ -936,17 +1107,25 @@ def tetragon_install_body(edition: str, namespace: str) -> str:
     secret_setup = "SET_FILE_ARGS=()\nSET_ARGS=()\n"
     if edition == "enterprise":
         chart = ENTERPRISE_TETRAGON_CHART
+        version = ENTERPRISE_TETRAGON_CHART_VERSION
         repo_setup = (
             f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
             f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
         )
-        secret_setup = enterprise_secret_args_body(chart, "license|enterprise|tetragon")
+        secret_setup = enterprise_secret_args_body(
+            chart,
+            version,
+            "license|enterprise|tetragon",
+        )
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f"{repo_setup}"
+        f'"${{HELM[@]}}" show chart "{chart}" --version "{version}" >/dev/null\n'
         f"{secret_setup}"
         f'"${{HELM[@]}}" upgrade --install tetragon "{chart}" \\\n'
         '    -n "${NAMESPACE}" --create-namespace \\\n'
+        f'    --version "{version}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
         '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/tetragon-values.yaml" \\\n'
         '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
         'if [[ "${K8S_APPLY_DRY_RUN:-false}" != "true" ]]; then\n'
@@ -960,12 +1139,15 @@ def tetragon_install_body(edition: str, namespace: str) -> str:
 
 def cilium_dnsproxy_install_body(namespace: str) -> str:
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
         f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
-        f"{enterprise_secret_args_body(ENTERPRISE_DNSPROXY_CHART)}"
+        f'"${{HELM[@]}}" show chart "{ENTERPRISE_DNSPROXY_CHART}" --version "{DNSPROXY_CHART_VERSION}" >/dev/null\n'
+        f"{enterprise_secret_args_body(ENTERPRISE_DNSPROXY_CHART, DNSPROXY_CHART_VERSION)}"
         f'"${{HELM[@]}}" upgrade --install cilium-dnsproxy "{ENTERPRISE_DNSPROXY_CHART}" \\\n'
         '    -n "${NAMESPACE}" --create-namespace \\\n'
+        f'    --version "{DNSPROXY_CHART_VERSION}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
         '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/cilium-dnsproxy-values.yaml" \\\n'
         '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
     )
@@ -974,13 +1156,16 @@ def cilium_dnsproxy_install_body(namespace: str) -> str:
 def hubble_enterprise_install_body(namespace: str, *, private_chart_access_verified: bool = False) -> str:
     if private_chart_access_verified:
         return (
-            f'NAMESPACE="${{1:-{namespace}}}"\n'
+            namespace_prelude(namespace)
+            +
             f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
             f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
-            f'"${{HELM[@]}}" show values "{ENTERPRISE_HUBBLE_ENT_CHART}" >/dev/null\n'
-            f"{enterprise_secret_args_body(ENTERPRISE_HUBBLE_ENT_CHART)}"
+            f'"${{HELM[@]}}" show chart "{ENTERPRISE_HUBBLE_ENT_CHART}" --version "{HUBBLE_ENTERPRISE_CHART_VERSION}" >/dev/null\n'
+            f'"${{HELM[@]}}" show values "{ENTERPRISE_HUBBLE_ENT_CHART}" --version "{HUBBLE_ENTERPRISE_CHART_VERSION}" >/dev/null\n'
+            f"{enterprise_secret_args_body(ENTERPRISE_HUBBLE_ENT_CHART, HUBBLE_ENTERPRISE_CHART_VERSION)}"
             f'"${{HELM[@]}}" upgrade --install hubble-enterprise "{ENTERPRISE_HUBBLE_ENT_CHART}" \\\n'
             '    -n "${NAMESPACE}" --create-namespace \\\n'
+            f'    --version "{HUBBLE_ENTERPRISE_CHART_VERSION}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
             '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/hubble-enterprise-values.yaml" \\\n'
             '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
         )
@@ -996,7 +1181,7 @@ def hubble_enterprise_install_body(namespace: str, *, private_chart_access_verif
         f"  helm repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n"
         f"  helm repo update {ENTERPRISE_REPO_NAME}\n"
         f'  helm upgrade --install hubble-enterprise "{ENTERPRISE_HUBBLE_ENT_CHART}" \\\n'
-        f'      -n {namespace} --create-namespace --wait \\\n'
+        f'      -n {namespace} --create-namespace --version {HUBBLE_ENTERPRISE_CHART_VERSION} --atomic --wait --timeout {HELM_TRANSACTION_TIMEOUT} \\\n'
         '      -f "$(dirname "${BASH_SOURCE[0]}")/../helm/hubble-enterprise-values.yaml"\n'
         f'  kubectl rollout restart -n {namespace} ds/hubble-enterprise\n'
         'EOF\n'
@@ -1008,13 +1193,16 @@ def hubble_timescape_install_body(namespace: str, *, private_chart_access_verifi
     if not private_chart_access_verified:
         return gated_private_body("Hubble Timescape")
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
         f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
-        f'"${{HELM[@]}}" show values "{ENTERPRISE_TIMESCAPE_CHART}" >/dev/null\n'
-        f"{enterprise_secret_args_body(ENTERPRISE_TIMESCAPE_CHART)}"
+        f'"${{HELM[@]}}" show chart "{ENTERPRISE_TIMESCAPE_CHART}" --version "{TIMESCAPE_CHART_VERSION}" >/dev/null\n'
+        f'"${{HELM[@]}}" show values "{ENTERPRISE_TIMESCAPE_CHART}" --version "{TIMESCAPE_CHART_VERSION}" >/dev/null\n'
+        f"{enterprise_secret_args_body(ENTERPRISE_TIMESCAPE_CHART, TIMESCAPE_CHART_VERSION)}"
         f'"${{HELM[@]}}" upgrade --install hubble-timescape "{ENTERPRISE_TIMESCAPE_CHART}" \\\n'
         '    -n "${NAMESPACE}" --create-namespace \\\n'
+        f'    --version "{TIMESCAPE_CHART_VERSION}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
         '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/hubble-timescape-values.yaml" \\\n'
         '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
     )
@@ -1023,7 +1211,7 @@ def hubble_timescape_install_body(namespace: str, *, private_chart_access_verifi
 def preflight_body(spec: dict[str, Any], edition: str, distribution: str, catalog: dict[str, Any]) -> str:
     eks_byocni = (spec.get("eks_byocni") or {})
     kernel = (spec.get("kernel_preflight") or {})
-    minimum_kernel = kernel.get("minimum_version", "5.10")
+    minimum_kernel = validated_kernel_minimum(spec)
     profile = catalog["distribution_profiles"].get(distribution, catalog["distribution_profiles"]["generic"])
     body = [
         "# Preflight checks for Cilium / Tetragon install.",
@@ -1033,13 +1221,16 @@ def preflight_body(spec: dict[str, Any], edition: str, distribution: str, catalo
         f'echo "IPAM constraints: {profile["ipam_constraints"]}"',
     ]
     if kernel.get("enable", True):
+        body.append(f"MINIMUM_KERNEL={shell_literal(minimum_kernel)}")
         body.append(
-            f'echo "Kernel check: minimum {minimum_kernel} required for Cilium v1.18.x."'
+            'echo "Kernel check: minimum ${MINIMUM_KERNEL} required for Cilium v1.18.x."'
         )
         body.append(
             '"${KUBECTL[@]}" get nodes -o jsonpath=\'{range .items[*]}{.metadata.name}{"\\t"}{.status.nodeInfo.kernelVersion}{"\\n"}{end}\' \\\n'
-            f'    | awk -v min="{minimum_kernel}" \'{{split($2,a,/[.-]/); split(min,b,/[.-]/);'
-            ' ok=(a[1]>b[1] || (a[1]==b[1] && a[2]>=b[2])); printf "%s\\t%s\\t%s\\n", $1, $2, ok?"OK":"WARN"}\''
+            '    | awk -v min="${MINIMUM_KERNEL}" \'{split($2,a,/[.-]/); split(min,b,/[.-]/);'
+            ' a3=(a[3]==""?0:a[3]+0); b3=(b[3]==""?0:b[3]+0);'
+            ' ok=(a[1]+0>b[1]+0 || (a[1]+0==b[1]+0 && (a[2]+0>b[2]+0 || (a[2]+0==b[2]+0 && a3>=b3))));'
+            ' printf "%s\\t%s\\t%s\\n", $1, $2, ok?"OK":"WARN"}\''
         )
     if eks_byocni.get("enable_preflight", True):
         body.append(
@@ -1090,6 +1281,7 @@ def eksctl_byocni_example() -> str:
 
 def helm_section_apply_body(section: str, edition: str, eks_mirror: bool, namespace: str) -> str:
     chart = ENTERPRISE_CILIUM_CHART if edition == "enterprise" else OSS_CILIUM_CHART
+    version = ENTERPRISE_CILIUM_CHART_VERSION if edition == "enterprise" else OSS_CILIUM_CHART_VERSION
     repo_setup = (
         f'"${{HELM[@]}}" repo add {OSS_REPO_NAME} {OSS_REPO_URL}\n'
         f'"${{HELM[@]}}" repo update {OSS_REPO_NAME}\n'
@@ -1100,15 +1292,18 @@ def helm_section_apply_body(section: str, edition: str, eks_mirror: bool, namesp
             f'"${{HELM[@]}}" repo add {ENTERPRISE_REPO_NAME} {ENTERPRISE_REPO_URL}\n'
             f'"${{HELM[@]}}" repo update {ENTERPRISE_REPO_NAME}\n'
         )
-        secret_setup = enterprise_secret_args_body(chart)
+        secret_setup = enterprise_secret_args_body(chart, version)
     if eks_mirror:
         chart = EKS_AWS_MIRROR_OCI
+        version = EKS_MIRROR_CILIUM_CHART_VERSION
         repo_setup = "# EKS-AWS mirror: chart is an OCI URL; no helm repo add needed.\n"
         secret_setup = "SET_FILE_ARGS=()\nSET_ARGS=()\n"
     overlay = f"../helm/cilium-section-{section}-values.yaml"
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f"{repo_setup}"
+        f'"${{HELM[@]}}" show chart "{chart}" --version "{version}" >/dev/null\n'
         f"{secret_setup}"
         f'OVERLAY="$(dirname "${{BASH_SOURCE[0]}}")/{overlay}"\n'
         'if [[ ! -f "${OVERLAY}" ]]; then\n'
@@ -1118,6 +1313,7 @@ def helm_section_apply_body(section: str, edition: str, eks_mirror: bool, namesp
         f'echo "Applying scoped Cilium section: {section}"\n'
         f'"${{HELM[@]}}" upgrade --install cilium "{chart}" \\\n'
         '    -n "${NAMESPACE}" --create-namespace \\\n'
+        f'    --version "{version}" --atomic --wait --timeout "{HELM_TRANSACTION_TIMEOUT}" --history-max 10 \\\n'
         '    -f "$(dirname "${BASH_SOURCE[0]}")/../helm/cilium-values.yaml" \\\n'
         '    -f "${OVERLAY}" \\\n'
         '    "${SET_FILE_ARGS[@]}" "${SET_ARGS[@]}" "${HELM_DRY_RUN[@]}"\n'
@@ -1129,7 +1325,8 @@ def helm_section_apply_body(section: str, edition: str, eks_mirror: bool, namesp
 
 def clustermesh_cli_body(namespace: str) -> str:
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         'SERVICE_TYPE="${CILIUM_CLUSTERMESH_SERVICE_TYPE:-LoadBalancer}"\n'
         'REMOTE_CONTEXTS="${CILIUM_CLUSTERMESH_REMOTE_CONTEXTS:-}"\n'
         'CONTEXT_ARGS=()\n'
@@ -1168,7 +1365,8 @@ def clustermesh_cli_body(namespace: str) -> str:
 
 def kubectl_manifest_apply_body(name: str, manifest: str, namespace: str) -> str:
     return (
-        f'NAMESPACE="${{1:-{namespace}}}"\n'
+        namespace_prelude(namespace)
+        +
         f'MANIFEST="$(dirname "${{BASH_SOURCE[0]}}")/../{manifest}"\n'
         'if [[ ! -f "${MANIFEST}" ]]; then\n'
         f'    echo "ERROR: manifest for {name} not found: ${{MANIFEST}}" >&2\n'
@@ -1336,6 +1534,8 @@ def render_metadata(
     edition: str,
     distribution: str,
     sections: list[str],
+    namespaces: dict[str, str],
+    eks_mirror: bool,
     *,
     enable_dnsproxy: bool,
     enable_hubble_enterprise: bool,
@@ -1347,7 +1547,14 @@ def render_metadata(
         "edition": edition,
         "distribution": distribution,
         "cluster_name": spec.get("cluster_name", "lab-cluster"),
-        "eks_mirror": bool_flag(args.eks_mirror),
+        "eks_mirror": eks_mirror,
+        "namespaces": namespaces,
+        "helm_charts": chart_contract(edition, eks_mirror),
+        "chart_provenance_gap": (
+            "Exact versions are pinned and verified with helm show chart at apply time, "
+            "but this repository does not distribute upstream chart archives, signatures, "
+            "or SHA-256 values; private Hubble charts additionally require entitled repo access."
+        ),
         "enable_dnsproxy": enable_dnsproxy,
         "enable_hubble_enterprise": enable_hubble_enterprise,
         "enable_timescape": enable_timescape,
@@ -1442,6 +1649,15 @@ def main() -> int:
         spec = dict(spec)
         spec["cluster_name"] = args.cluster_name
 
+    try:
+        namespaces = validated_namespaces(spec)
+        validated_kernel_minimum(spec)
+    except SpecError as exc:
+        print(f"ERROR: {exc}", file=__import__("sys").stderr)
+        return 1
+    spec = dict(spec)
+    spec["namespaces"] = namespaces
+
     edition = (args.edition or spec.get("edition") or "oss").lower()
     if edition not in VALID_EDITIONS:
         print(f"ERROR: edition must be one of {sorted(VALID_EDITIONS)}; got {edition!r}", file=__import__("sys").stderr)
@@ -1467,12 +1683,11 @@ def main() -> int:
         enable_dnsproxy = enable_dnsproxy or "dnsproxy" in sections
         enable_hubble_enterprise = enable_hubble_enterprise or "hubble" in sections
         enable_timescape = enable_timescape or "timescape" in sections
-    namespaces = spec.get("namespaces") or {}
-    cilium_ns = namespaces.get("cilium", "kube-system")
-    tetragon_ns = namespaces.get("tetragon", "tetragon")
-    hubble_ent_ns = namespaces.get("hubble_enterprise", "kube-system")
-    dnsproxy_ns = namespaces.get("cilium_dnsproxy", "kube-system")
-    timescape_ns = namespaces.get("hubble_timescape", "hubble-timescape")
+    cilium_ns = namespaces["cilium"]
+    tetragon_ns = namespaces["tetragon"]
+    hubble_ent_ns = namespaces["hubble_enterprise"]
+    dnsproxy_ns = namespaces["cilium_dnsproxy"]
+    timescape_ns = namespaces["hubble_timescape"]
 
     plan = {
         "skill": SKILL_NAME,
@@ -1486,6 +1701,8 @@ def main() -> int:
         "enable_timescape": enable_timescape,
         "export_mode": export_mode,
         "apply_sections": sections,
+        "namespaces": namespaces,
+        "helm_charts": chart_contract(edition, eks_mirror),
         "coverage": {
             "missing_features": coverage_report(catalog, distribution)["missing_features"],
             "status_counts": coverage_report(catalog, distribution)["status_counts"],
@@ -1681,6 +1898,8 @@ def main() -> int:
                 edition,
                 distribution,
                 sections,
+                namespaces,
+                eks_mirror,
                 enable_dnsproxy=enable_dnsproxy,
                 enable_hubble_enterprise=enable_hubble_enterprise,
                 enable_timescape=enable_timescape,

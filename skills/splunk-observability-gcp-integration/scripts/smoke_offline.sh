@@ -58,9 +58,9 @@ src = src.replace(
 open(sys.argv[2], 'w').write(src)
 PY
 
-# The renderer validates spec at render time; key_file path is only checked on --apply.
-# Create a fake key file so the path check does not fail if it runs.
-# (The renderer does NOT read the key contents — just stores the path.)
+# Spec-embedded key paths render without file reads. Explicit --key-file
+# overrides are securely parsed only to map project_id; credential content is
+# never emitted.
 
 # Run the renderer.
 if ! "${PYTHON_BIN}" "${SKILL_DIR}/scripts/render_assets.py" \
@@ -113,8 +113,9 @@ data = json.loads(open('${TMPDIR}/rendered/rest/create.json').read())
 projects = data.get('projects')
 assert isinstance(projects, dict), 'projects must be an object'
 sync_mode = projects.get('syncMode')
-assert sync_mode == 'ALL', f'projects.syncMode={sync_mode!r}'
-print('projects.syncMode=ALL OK')
+assert sync_mode == 'ALL_REACHABLE', f'projects.syncMode={sync_mode!r}'
+assert 'projectIds' not in projects, 'legacy projectIds must not be emitted'
+print('projects.syncMode=ALL_REACHABLE OK')
 "; then
         failures+=("rest/create.json projects.syncMode check failed")
     fi
@@ -207,6 +208,21 @@ if [[ "${service_count}" != "32" ]]; then
 else
     echo "--list-services: 32 entries OK"
 fi
+
+# Assert the public reviewed-rollback surface stays exact and offline-safe.
+help_output="$(bash "${SKILL_DIR}/scripts/setup.sh" --help)"
+for required_flag in --observed-state-file --plan-hash \
+    --accept-disable-integration --accept-delete-integration; do
+    if ! grep -q -- "${required_flag}" <<<"${help_output}"; then
+        failures+=("setup help is missing ${required_flag}")
+    fi
+done
+for forbidden_flag in --rollback-action --plan-sha256 --acknowledge; do
+    if grep -q -- "${forbidden_flag}" <<<"${help_output}"; then
+        failures+=("setup help exposes unapproved flag ${forbidden_flag}")
+    fi
+done
+echo "setup rollback help: reviewed public flags OK"
 
 echo ""
 if [[ ${#failures[@]} -eq 0 ]]; then

@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+
+from skills.shared.skill_catalog import load_catalog
+from skills.shared.scripts import generate_deployment_docs
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +54,44 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         for role in roles:
             with self.subTest(role=role):
                 self.assertTrue(descriptions[role])
+
+    def test_help_only_aliases_have_no_operational_topology(self) -> None:
+        catalog = load_catalog()
+        topologies = {
+            entry["skill"]: entry for entry in self.registry["skill_topologies"]
+        }
+        no_roles = {role: "none" for role in self.registry["deployment_roles"]}
+
+        for legacy, canonical in catalog.aliases.items():
+            with self.subTest(legacy=legacy):
+                self.assertEqual(topologies[legacy]["role_support"], no_roles)
+                self.assertEqual(topologies[legacy]["cloud_pairing"], [])
+                self.assertNotEqual(topologies[canonical]["role_support"], {})
+                self.assertIn(
+                    f"| `{legacy}` | **Deprecated** -> `{canonical}` | None | None | None | None | None | None |",
+                    self.role_matrix,
+                )
+
+        legacy = next(iter(catalog.aliases))
+        bad_registry = copy.deepcopy(self.registry)
+        bad_topology = next(
+            entry
+            for entry in bad_registry["skill_topologies"]
+            if entry["skill"] == legacy
+        )
+        bad_topology["role_support"]["search-tier"] = "supported"
+        with self.assertRaisesRegex(ValueError, "must have no deployment role"):
+            generate_deployment_docs.validate_registry(bad_registry, catalog)
+
+        bad_registry = copy.deepcopy(self.registry)
+        bad_topology = next(
+            entry
+            for entry in bad_registry["skill_topologies"]
+            if entry["skill"] == legacy
+        )
+        bad_topology["cloud_pairing"] = ["search-tier"]
+        with self.assertRaisesRegex(ValueError, "empty cloud_pairing"):
+            generate_deployment_docs.validate_registry(bad_registry, catalog)
 
     def test_cloud_matrix_rows_reference_known_apps_and_workflows(self) -> None:
         apps_by_name = {app["app_name"]: app for app in self.registry["apps"]}
@@ -145,32 +187,92 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-asset-risk-intelligence-setup` Windows TA handoff | 7214 |", self.cloud_matrix)
         self.assertIn("| `splunk-asset-risk-intelligence-setup` Linux TA handoff | 7416 |", self.cloud_matrix)
         self.assertIn("| `splunk-asset-risk-intelligence-setup` macOS TA handoff | 7417 |", self.cloud_matrix)
-        self.assertIn("| `cisco-appdynamics-setup` | Supported |", self.role_matrix)
-        self.assertIn("| `cisco-scan-setup` | Required | None | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None |", self.role_matrix)
-        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For Windows` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
-        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For Linux` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
-        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For macOS` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
-        self.assertIn("| `splunk-ai-assistant-setup` | Required | None | None | None | None |", self.role_matrix)
-        self.assertIn("| `cisco-product-setup` | Supported | None | Supported |", self.role_matrix)
-        self.assertIn("| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required |", self.role_matrix)
-        self.assertIn("| `splunk-agent-management-setup` | Supported | Supported | Supported | Supported | None |", self.role_matrix)
-        self.assertIn("| `splunk-universal-forwarder-setup` | None | None | None | Required | None |", self.role_matrix)
-        self.assertIn("| `splunk-workload-management-setup` | Supported | Supported | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-hec-service-setup` | Supported | Supported | Supported | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported |", self.role_matrix)
         self.assertIn(
-            "| `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported | HF or External collector |",
+            "| `cisco-appdynamics-setup` | Canonical | Supported |", self.role_matrix
+        )
+        self.assertIn(
+            "| `cisco-scan-setup` | Canonical | Required | None | None | None | None |",
             self.role_matrix,
         )
-        self.assertIn("| `splunk-db-connect-setup` | Supported | None | Supported | None | None |", self.role_matrix)
-        self.assertIn("| `splunk_app_db_connect` | `splunk-db-connect-setup` | Supported | None | Supported | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-federated-search-setup` | Required | None | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-index-lifecycle-smartstore-setup` | None | Required | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-monitoring-console-setup` | Required | None | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-enterprise-host-setup` | Supported | Supported | Supported |", self.role_matrix)
-        self.assertIn("| `splunk-enterprise-kubernetes-setup` | Supported | Supported | None | None | None |", self.role_matrix)
-        self.assertIn("| `splunk-observability-native-ops` | None | None | None | None | None |", self.role_matrix)
+        self.assertIn(
+            "| `splunk-asset-risk-intelligence-setup` | Canonical | Required | Supported | None | None | None |",
+            self.role_matrix,
+        )
+        for platform in ("Windows", "Linux", "macOS"):
+            self.assertIn(
+                "| `Splunk Asset and Risk Intelligence Technical Add-on For "
+                f"{platform}` | `splunk-asset-risk-intelligence-setup` | Canonical | "
+                "None | Supported | None | Supported | None |",
+                self.role_matrix,
+            )
+        self.assertIn(
+            "| `splunk-ai-assistant-setup` | Canonical | Required | None | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `cisco-product-setup` | Canonical | Supported | None | Supported |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-connect-for-snmp-setup` | Canonical | Supported | None | None | None | Required |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-agent-management-setup` | Canonical | Supported | Supported | Supported | Supported | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-universal-forwarder-setup` | Canonical | None | None | None | Required | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-workload-management-setup` | Canonical | Supported | Supported | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-hec-service-setup` | Canonical | Supported | Supported | Supported | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-connect-for-otlp-setup` | Canonical | Supported | None | Supported | None | Supported |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-connect-for-otlp-setup` | Canonical | Supported | None | Supported | None | Supported | HF or External collector |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-db-connect-setup` | Canonical | Supported | None | Supported | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk_app_db_connect` | `splunk-db-connect-setup` | Canonical | Supported | None | Supported | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-federated-search-setup` | Canonical | Required | None | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-index-lifecycle-smartstore-setup` | Canonical | None | Required | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-monitoring-console-setup` | Canonical | Required | None | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-enterprise-host-setup` | Canonical | Supported | Supported | Supported |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-enterprise-kubernetes-setup` | Canonical | Supported | Supported | None | None | None |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-observability-native-ops` | Canonical | None | None | None | None | None |",
+            self.role_matrix,
+        )
 
     def test_ari_full_coverage_docs_are_visible(self) -> None:
         ari_skill = (

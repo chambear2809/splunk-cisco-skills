@@ -1,78 +1,48 @@
 ---
 name: splunk-knowledge-objects
-description: >-
-  Render, preflight, and validate Splunk knowledge-object governance assets for
-  saved searches, reports, alerts, macros, lookups, lookup definitions,
-  eventtypes, tags, and field extractions, plus sharing/permission metadata and
-  ownership reassignment. Use when the user asks to govern or audit saved
-  searches and scheduled searches, manage lookups and lookup definitions,
-  standardize macros, eventtypes, and tags, fix knowledge-object permissions and
-  sharing, find orphaned or private knowledge objects, reassign ownership, or
-  stage governed knowledge objects and metadata into an app.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-knowledge-objects-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "conditional"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-knowledge-objects-setup"
 ---
 
-# Splunk Knowledge-Object Governance
+# Splunk Knowledge-Object Governance (Deprecated Compatibility Alias)
 
-This skill renders knowledge-object (KO) governance assets and a live audit
-toolkit for Splunk Platform: saved searches, reports, alerts, macros, lookups
-and lookup definitions, eventtypes, tags, field extractions, and the
-sharing/ownership metadata (`local.meta`) that controls who can see and edit
-them. It is render-first because changing sharing, ownership, or scheduled
-search definitions affects every user and app that depends on them.
+> [!WARNING]
+> `splunk-knowledge-objects` is deprecated and replaced by
+> [`splunk-knowledge-objects-setup`](../splunk-knowledge-objects-setup/SKILL.md). Use the canonical skill for all work.
 
-## Agent Behavior
+## Fail-Closed Compatibility Contract
 
-This skill does not handle secrets. Knowledge objects live in app
-`default/` and `local/` conf plus `metadata/` (`default.meta`, `local.meta`).
-Always stage governed objects and metadata into a dedicated app `local/`; never
-edit shipped `default/` files.
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-knowledge-objects-setup` as `replaced_by`.
 
-Use `template.example` for non-secret values: target app context, object types
-to audit, governance app name, and the owner to reassign to.
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-## Quick Start
-
-Audit all knowledge objects across apps (read-only):
+## Safe Compatibility Checks
 
 ```bash
-bash skills/splunk-knowledge-objects/scripts/setup.sh --phase render
-bash skills/splunk-knowledge-objects/scripts/validate.sh --live
+bash skills/splunk-knowledge-objects/scripts/setup.sh --help
+bash skills/splunk-knowledge-objects/scripts/validate.sh --help
+python3 skills/splunk-knowledge-objects/scripts/render_assets.py --help
 ```
 
-Render governed conf + sharing metadata into an app:
+For supported behavior, begin here:
 
 ```bash
-bash skills/splunk-knowledge-objects/scripts/setup.sh \
-  --app-name ZZZ_governance \
-  --app-context search \
-  --object-types savedsearches,macros,lookups,eventtypes,tags
+bash skills/splunk-knowledge-objects-setup/scripts/setup.sh --help
+bash skills/splunk-knowledge-objects-setup/scripts/validate.sh --help
 ```
 
-## What It Renders
-
-- `inventory.sh` — full KO inventory via REST (app, owner, sharing, disabled)
-- `audit.sh` — governance findings: orphaned owners, private scheduled searches,
-  lookups without definitions, world-writable sharing, disabled objects
-- `local.meta` — sharing/ownership metadata template for governed objects
-- `savedsearches.conf`, `macros.conf`, `transforms.conf` — governed object and
-  lookup-definition templates (commented, review before use)
-- `apply.sh` — stage conf and `local.meta` into `etc/apps/<app>/{local,metadata}`
-- `reassign.sh` — reassign object ownership via the ACL REST endpoint (gated)
-- `README.md` / `metadata.json` — review context
-
-## Operating Notes
-
-- Prefer app-level (`global`/`app`) sharing for shared content; reserve `user`
-  (private) sharing for personal work.
-- Orphaned objects (owned by a removed user) keep running scheduled jobs but
-  cannot be edited in the UI; reassign them to a service account or app context.
-- Lookups need both a lookup-table file and a lookup definition (`transforms.conf`
-  `[<name>]` with `filename` or `external_cmd`); automatic lookups go in
-  `props.conf`.
-- On a search head cluster, apply through the SHC deployer.
-
-Read `reference.md` before reassigning ownership or changing sharing in bulk.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

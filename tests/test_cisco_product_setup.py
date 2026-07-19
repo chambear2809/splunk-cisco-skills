@@ -656,16 +656,19 @@ version = {version}
                 self.assertEqual(payload["route"]["type"], "webex")
                 self.assertEqual(payload["resolved_product"]["primary_skill"], "cisco-webex-setup")
 
-    def test_active_collector_products_route_to_partial_handoffs(self) -> None:
+    def test_collaboration_products_route_to_render_only_handoffs(self) -> None:
         expected = {
-            "cisco_cucm": ("splunk-connect-for-syslog-setup", "cisco:ucm"),
-            "cisco_expressway": ("splunk-connect-for-syslog-setup", "cisco:tvcs"),
-            "cisco_meeting_management": ("splunk-connect-for-syslog-setup", "cisco:mm:audit"),
-            "cisco_meeting_server": ("splunk-connect-for-syslog-setup", "cisco:ms"),
-            "cisco_imc": ("splunk-connect-for-snmp-setup", "cisco:infraops"),
+            "cisco_cucm": ["cisco:ucm"],
+            "cisco_expressway": ["cisco:tvcs"],
+            "cisco_meeting_management": ["cisco:mm:system:*", "cisco:mm:audit"],
+            "cisco_meeting_server": ["cisco:ms"],
         }
 
-        for product_id, (primary_skill, sourcetype) in expected.items():
+        expected_scripts = [
+            "skills/cisco-collaboration-setup/scripts/setup.sh",
+            "skills/cisco-collaboration-setup/scripts/validate.sh",
+        ]
+        for product_id, sourcetypes in expected.items():
             with self.subTest(product_id=product_id):
                 result = self.run_command(
                     "bash",
@@ -680,11 +683,149 @@ version = {version}
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 payload = json.loads(result.stdout)
                 self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
-                self.assertEqual(payload["resolved_product"]["primary_skill"], primary_skill)
-                self.assertEqual(payload["route"]["type"], "workflow_handoff")
-                self.assertIn(sourcetype, payload["route"]["sourcetypes"])
+                self.assertEqual(
+                    payload["resolved_product"]["primary_skill"],
+                    "cisco-collaboration-setup",
+                )
+                self.assertEqual(payload["route"]["type"], "collaboration")
+                self.assertEqual(payload["route"]["coverage_status"], "partial")
+                self.assertEqual(
+                    payload["route"]["collection_executable_status"],
+                    "handoff_only",
+                )
+                self.assertEqual(payload["route"]["sourcetypes"], sourcetypes)
                 self.assertTrue(payload["route"]["handoff"])
-                self.assertTrue(payload["workflow_scripts"])
+                self.assertTrue(payload["route"]["render_only"])
+                self.assertFalse(payload["route"]["live_verified"])
+                self.assertFalse(payload["route"]["apply_capable"])
+                self.assertFalse(payload["route"]["device_mutation_capable"])
+                self.assertEqual(payload["workflow_scripts"], expected_scripts)
+                self.assertEqual(payload["install_apps"], [])
+                self.assertEqual(payload["optional_non_secret_keys"], [])
+                self.assertEqual(payload["required_non_secret_keys"], [])
+                self.assertEqual(payload["required_secret_file_keys"], [])
+                self.assertEqual(payload["secret_file_keys"], [])
+                self.assertNotIn("apply", payload["planned_phases"])
+                self.assertNotIn("splunk-connect-for-syslog-setup", result.stdout)
+
+    def test_imc_remains_an_active_partial_snmp_handoff(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_imc",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
+        self.assertEqual(
+            payload["resolved_product"]["primary_skill"],
+            "splunk-connect-for-snmp-setup",
+        )
+        self.assertEqual(payload["route"]["type"], "workflow_handoff")
+        self.assertIn("cisco:infraops", payload["route"]["sourcetypes"])
+
+    def test_collaboration_roadmap_gaps_preserve_state_and_are_not_executable(self) -> None:
+        expected = {
+            "cisco_collab_hardware": [
+                "cisco-webex-setup",
+                "cisco-thousandeyes-setup",
+            ],
+            "cisco_broadworks": [
+                "https://developer.cisco.com/docs/broadworks/getting-started/",
+            ],
+        }
+
+        def executable_argv_paths(value: object, path: str = "$") -> list[str]:
+            found: list[str] = []
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    child_path = f"{path}.{key}"
+                    if key == "argv" or key.endswith("_argv"):
+                        found.append(child_path)
+                    found.extend(executable_argv_paths(child, child_path))
+            elif isinstance(value, list):
+                for offset, child in enumerate(value):
+                    found.extend(executable_argv_paths(child, f"{path}[{offset}]"))
+            return found
+
+        for product_id, handoff_targets in expected.items():
+            with self.subTest(product_id=product_id):
+                result = self.run_command(
+                    "bash",
+                    str(SETUP_SCRIPT),
+                    "--catalog",
+                    str(self.catalog_path),
+                    "--product",
+                    product_id,
+                    "--dry-run",
+                    "--json",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(
+                    payload["resolved_product"]["automation_state"],
+                    "unsupported_roadmap",
+                )
+                self.assertEqual(
+                    payload["resolved_product"]["primary_skill"],
+                    "cisco-collaboration-setup",
+                )
+                self.assertEqual(payload["route"]["type"], "gap_handoff")
+                self.assertEqual(
+                    payload["route"]["coverage_status"],
+                    "unsupported_roadmap",
+                )
+                self.assertEqual(
+                    payload["route"]["collection_executable_status"],
+                    "gap",
+                )
+                self.assertEqual(payload["route"]["handoff_targets"], handoff_targets)
+                self.assertEqual(payload["route"]["sourcetypes"], [])
+                self.assertTrue(payload["route"]["render_only"])
+                self.assertFalse(payload["route"]["live_verified"])
+                self.assertFalse(payload["route"]["apply_capable"])
+                self.assertFalse(payload["route"]["device_mutation_capable"])
+                self.assertEqual(payload["workflow_scripts"], [])
+                self.assertEqual(payload["install_apps"], [])
+                self.assertEqual(payload["optional_non_secret_keys"], [])
+                self.assertEqual(payload["required_non_secret_keys"], [])
+                self.assertEqual(payload["planned_phases"], ["gap_handoff"])
+                self.assertNotIn("apply", payload["planned_phases"])
+                self.assertEqual(executable_argv_paths(payload), [])
+
+    def test_collaboration_preview_routes_reject_unforwarded_set_values_without_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scratch = Path(tmpdir)
+            for product_id in ("cisco_cucm", "cisco_broadworks"):
+                for key in ("dry_run", "json", "output_dir", "replace_existing", "spec"):
+                    with self.subTest(product_id=product_id, key=key):
+                        candidate = scratch / f"{product_id}-{key}"
+                        before = sorted(path.name for path in scratch.iterdir())
+                        result = self.run_command(
+                            "bash",
+                            str(SETUP_SCRIPT),
+                            "--catalog",
+                            str(self.catalog_path),
+                            "--product",
+                            product_id,
+                            "--dry-run",
+                            "--json",
+                            "--set",
+                            key,
+                            str(candidate),
+                        )
+                        self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+                        self.assertIn("Unsupported non-secret key", result.stdout + result.stderr)
+                        self.assertFalse(candidate.exists())
+                        self.assertEqual(
+                            sorted(path.name for path in scratch.iterdir()),
+                            before,
+                        )
 
     def test_active_products_do_not_remain_manual_gaps(self) -> None:
         catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))

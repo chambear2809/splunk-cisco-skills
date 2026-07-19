@@ -2,8 +2,8 @@
 
 ## Sources of truth
 
-- Reference implementation: [/Users/alecchamberlain/Documents/GitHub/Isovalent_Splunk_o11y](https://github.com/) — `examples/splunk-otel-isovalent.yaml`, `examples/Cilium by Isovalent.json`, `examples/Hubble by Isovalent.json`. **Do NOT** copy from `values/*.yaml` in that repo; the explore subagent confirmed those files have contained plaintext access tokens.
-- Production-validated overlay: `/Users/alecchamberlain/Documents/GitHub/otel-gruve/6-splunk-otel-collector-values.yaml` (atl-ocp2 OpenShift cluster, Splunk OTel chart v0.147.1).
+- [Isovalent Splunk O11y reference implementation](https://github.com/chambear2809/isovalent_splunk_o11y) — `examples/splunk-otel-isovalent.yaml`, `examples/Cilium by Isovalent.json`, and `examples/Hubble by Isovalent.json`. **Do not** copy from `values/*.yaml` in that repository; treat those deployment values as potentially secret-bearing and use only the dashboard files under `examples/`.
+- [Splunk Platform path notes](references/splunk-platform-paths.md) and [troubleshooting guidance](references/troubleshooting.md) — repository-local records of the production-derived overlay requirements.
 - Splunk Workshop: `splunk.github.io/observability-workshop/en/scenarios/isovalent-cilium-integration/`.
 - Splunk blog: `splunk.com/en_us/blog/security/splunking-isovalent-data.html` (Splunk Threat Research Team, 2026-02-02).
 - Splunk Platform sourcetype: `cisco:isovalent` (broad), `cisco:isovalent:processExec` (specific to Tetragon process exec events).

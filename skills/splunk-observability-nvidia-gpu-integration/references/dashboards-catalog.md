@@ -4,18 +4,22 @@ The skill ships one starter SignalFlow dashboard at `dashboards/nvidia-gpu-overv
 
 ## Default dashboard: NVIDIA GPU Overview
 
-| Chart | Metric | Aggregation |
-|-------|--------|-------------|
-| GPU utilization | `DCGM_FI_DEV_GPU_UTIL` | mean per-GPU |
-| Memory utilization | `DCGM_FI_DEV_MEM_COPY_UTIL` | mean per-GPU |
-| Frame buffer used (VRAM) | `DCGM_FI_DEV_FB_USED` | mean per-GPU |
-| Frame buffer free | `DCGM_FI_DEV_FB_FREE` | mean per-GPU |
-| GPU temperature | `DCGM_FI_DEV_GPU_TEMP` | max over time |
-| Power usage | `DCGM_FI_DEV_POWER_USAGE` | mean per-GPU |
-| SM clock | `DCGM_FI_DEV_SM_CLOCK` | mean per-GPU |
-| PCIe replay errors | `DCGM_FI_DEV_PCIE_REPLAY_COUNTER` | sum over time |
+| Chart | Metric |
+|-------|--------|
+| GPU utilization | `DCGM_FI_DEV_GPU_UTIL` |
+| Memory copy utilization | `DCGM_FI_DEV_MEM_COPY_UTIL` |
+| Frame buffer used/free | `DCGM_FI_DEV_FB_USED`, `DCGM_FI_DEV_FB_FREE` |
+| GPU and memory temperature | `DCGM_FI_DEV_GPU_TEMP`, `DCGM_FI_DEV_MEMORY_TEMP` |
+| Power and total energy | `DCGM_FI_DEV_POWER_USAGE`, `DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION` |
+| SM and memory clocks | `DCGM_FI_DEV_SM_CLOCK`, `DCGM_FI_DEV_MEM_CLOCK` |
+| PCIe receive/transmit bytes | `DCGM_FI_PROF_PCIE_RX_BYTES`, `DCGM_FI_PROF_PCIE_TX_BYTES` |
+| Tensor, DRAM, and graphics activity | `DCGM_FI_PROF_PIPE_TENSOR_ACTIVE`, `DCGM_FI_PROF_DRAM_ACTIVE`, `DCGM_FI_PROF_GR_ENGINE_ACTIVE` |
 
-All charts filter by `k8s.cluster.name=${CLUSTER_NAME}`. The default group-by is `gpu` (DCGM's GPU index, 0-7 typical).
+The renderer writes a complete
+`splunk-observability-dashboard-builder/v1` spec. Every chart filters on the
+concrete `k8s.cluster.name` selected during render, and the dashboard includes
+the same value as a restricted cluster variable. The starter programs publish
+the raw metric streams; they do not impose a default GPU group-by.
 
 ## Per-workload extensions (requires `--enable-dcgm-pod-labels`)
 
@@ -77,12 +81,20 @@ Useful for capacity planning and identifying "lazy" GPUs (low util, high power).
 
 ## Adding charts
 
-Drop a new YAML file under `dashboards/<name>.signalflow.yaml`. The handoff-dashboards.sh script picks up every `*.signalflow.yaml` and feeds it to `splunk-observability-dashboard-builder`.
+Start from the rendered v1 spec or Dashboard Builder example, preserve the
+required group/dashboard/chart structure, and assign a non-overlapping layout.
+The handoff script includes every `*.signalflow.yaml` in the directory.
 
 ## Detector starter
 
-The skill ships one starter detector at `detectors/gpu-temp-critical.yaml` that triggers Critical when `DCGM_FI_DEV_GPU_TEMP > 85°C` for 5 minutes. The threshold is configurable via spec.
+The skill renders three starter Native Ops v1 detector specs: GPU temperature
+ceiling (Major), power floor (Warning), and low utilization (Info). A fourth
+energy-delta detector is rendered only when
+`energy_consumption_joules_anomaly` is greater than zero. Thresholds are
+configurable in the skill spec; no lasting duration is added implicitly.
 
 ## Coordination with cisco-intersight-setup
 
-If the GPUs are in Cisco UCS chassis managed by Intersight, you can deeplink GPU charts to Intersight server views. Use the dashboard-builder skill's `link` field on charts to redirect to Intersight URLs based on `k8s.node.name` -> Intersight server lookup.
+If the GPUs are in Cisco UCS chassis managed by Intersight, design deep links
+only through a verified dashboard capability. The current classic Dashboard
+Builder renderer does not accept a generic `link` field on charts.

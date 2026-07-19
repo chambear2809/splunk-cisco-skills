@@ -1,15 +1,12 @@
 ---
 name: splunk-platform-sizing
-description: >-
-  Size a Splunk deployment from a use case (daily ingest, retention, search
-  load, premium apps, high availability) and render a sizing recommendation
-  report plus machine-readable sizing.json. Covers All-In-One single-server
-  standalone, distributed Splunk Validated Architectures (C/M series), Splunk
-  on Kubernetes (SOK and Splunk POD), and Splunk Cloud, with Enterprise
-  Security and ITSI workload multipliers. Use when the user asks to size a
-  Splunk cluster, decide how many indexers or search heads they need, plan
-  reference hardware, evaluate an All-In-One vs distributed deployment, size
-  Splunk on Kubernetes, or estimate storage for a retention requirement.
+description: "Use when the user asks to size a Splunk cluster, decide how many indexers or search heads they need,
+  plan reference hardware, evaluate an All-In-One vs distributed deployment, size Splunk on Kubernetes, or
+  estimate storage for a retention requirement. Size a Splunk deployment from a use case (daily ingest,
+  retention, search load, premium apps, high availability) and render a sizing recommendation report plus
+  machine-readable sizing.json. Covers All-In-One single-server standalone, distributed Splunk Validated
+  Architectures (C/M series), Splunk on Kubernetes (SOK and Splunk POD), and Splunk Cloud, with Enterprise
+  Security and ITSI workload multipliers."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -17,6 +14,64 @@ metadata:
 ---
 
 # Splunk Platform Sizing
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Size a Splunk cluster, decide how many indexers or search heads they need, plan reference hardware, evaluate an
+  All-In-One vs distributed deployment, size Splunk on Kubernetes, or estimate storage for a retention requirement.
+- Preview and review the splunk platform sizing workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-platform-sizing/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-platform-sizing/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill turns a stated use case into a concrete Splunk sizing across four
 deployment families:

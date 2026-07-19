@@ -1,4 +1,4 @@
 interface:
   display_name: "Splunk Observability Cisco AI Pod Integration"
   short_description: "Monitor Cisco AI Pods with Splunk Observability"
-  default_prompt: "Use $splunk-observability-cisco-ai-pod-integration as the umbrella to deploy Splunk Observability Cloud for a Cisco AI Pod. It composes the Cisco Nexus, Cisco Intersight, and NVIDIA GPU component skills via yq deep-merge and adds AI-Pod-specific scrapes (NIM/vLLM/Milvus/ Trident/Portworx/Redfish), the dual-pipeline filtering pattern, OpenShift SCC + workshop multi-tenant helpers, and the rbac.customRules fix for cross-namespace endpoint-SD scrapes."
+  default_prompt: "Use $splunk-observability-cisco-ai-pod-integration to compose the Cisco Nexus, Intersight, and NVIDIA GPU child skills with AI-Pod scrapes, dual-pipeline filtering, OpenShift helpers, and endpoint-discovery RBAC."

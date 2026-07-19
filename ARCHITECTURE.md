@@ -15,12 +15,22 @@ repo and the runtime deployment models those scripts target.
 | Path | Role |
 |------|------|
 | `skills/<skill>/` | Skill-specific docs and automation for install, setup, validation, and optional MCP loading |
+| `skills/catalog.yaml` | Versioned canonical source for every skill identity, path, target, purpose, command summary, product/capability taxonomy, lifecycle, replacement alias, and alias migration/omission boundary |
+| `skills/shared/deprecated_skill_aliases.md` | Generated operator-facing projection of every deprecated alias, canonical replacement, and migration/omission boundary |
+| `skills/shared/skill_product_registry.json` | Generated product-first projection of `skills/catalog.yaml`; never an independently maintained identity source |
 | `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, account helpers, and host bootstrap helpers |
 | `skills/shared/scripts/` | Shared operational entrypoints such as credential setup and cloud batch install/uninstall |
-| `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, license-ack metadata, and role placement |
+| `skills/shared/app_registry.json` | Rich deployment extension for Splunkbase IDs, package patterns, app names, license acknowledgements, and role placement; every skill reference is validated against the canonical catalog |
 | `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz`, `.tar.gz`, `.rpm`, `.deb`, or `.spl` archives |
 | `splunk-ta/_unpacked/` | Review-only extracted copies, not the normal deployment path |
 | `tests/` and `.github/workflows/ci.yml` | Regression coverage for helper libraries and first-party shell scripts |
+| `agent/splunk_cisco_skills_mcp/` | Repo-local MCP discovery, bounded stdio protocol handling, plan capabilities, and supervised execution gates |
+
+Canonical skill paths are intentionally flat. Product and capability
+organization is defined once in `skills/catalog.yaml` and rendered into
+`skill_product_registry.json`;
+nesting skill directories would break stable command paths, editor links, and
+immediate-child discovery used by the repo-local MCP server.
 
 ### Shared Helper Modules
 

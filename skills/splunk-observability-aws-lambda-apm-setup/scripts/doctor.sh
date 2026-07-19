@@ -59,18 +59,20 @@ infos=()
 
 # --- Snapshot freshness ---
 if [[ -f "${SNAPSHOT}" ]]; then
-    SNAPSHOT_DATE="$("${PYTHON_BIN}" -c "
+    SNAPSHOT_DATE="$("${PYTHON_BIN}" -c '
 import json, sys
-data = json.loads(open('${SNAPSHOT}').read())
-print(data.get('_meta', {}).get('snapshot_date', ''))" 2>/dev/null || echo "")"
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(data.get("_meta", {}).get("snapshot_date", ""))' "${SNAPSHOT}" 2>/dev/null || echo "")"
     if [[ -n "${SNAPSHOT_DATE}" ]]; then
-        AGE="$("${PYTHON_BIN}" -c "
+        AGE="$("${PYTHON_BIN}" -c '
+import sys
 from datetime import datetime, timezone
-snap = datetime.fromisoformat('${SNAPSHOT_DATE}')
-now = datetime.now(timezone.utc).replace(tzinfo=None)
-print((now - snap).days)" 2>/dev/null || echo "0")"
+snap = datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
+if snap.tzinfo is None:
+    snap = snap.replace(tzinfo=timezone.utc)
+print((datetime.now(timezone.utc) - snap).days)' "${SNAPSHOT_DATE}" 2>/dev/null || echo "0")"
         if [[ "${AGE}" -gt 90 ]]; then
-            warns+=("Layer ARN snapshot is ${AGE} days old (>${SNAPSHOT_DATE}). Run --refresh-layer-manifest to update.")
+            warns+=("Layer ARN snapshot is ${AGE} days old (>90 days). Run --refresh-layer-manifest to update.")
         else
             infos+=("Layer ARN snapshot age: ${AGE} days (${SNAPSHOT_DATE})")
         fi

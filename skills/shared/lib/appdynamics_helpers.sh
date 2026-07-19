@@ -4,6 +4,11 @@
 # These helpers intentionally prefer file-backed credentials. They should be
 # sourced by AppDynamics setup scripts before argument parsing completes.
 
+if [[ "$-" == *x* ]]; then
+    echo "ERROR: shell xtrace is enabled; refusing to load AppDynamics credential helpers because expanded access tokens could be logged." >&2
+    return 1 2>/dev/null || exit 1
+fi
+
 set -euo pipefail
 
 _APPD_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -184,7 +189,7 @@ appd_controller_oauth_token() {
     local client_secret_file="$4"
     appd_assert_secret_file "${client_secret_file}" "AppDynamics OAuth client secret file"
 
-    local auth_config body_file rc
+    local auth_config body_file rc restore_errexit=false
     auth_config="$(mktemp)" || return 1
     body_file="$(mktemp)" || {
         rm -f "${auth_config}"
@@ -269,14 +274,21 @@ PY
         return 1
     fi
 
-    set +e
+    case $- in
+        *e*)
+            restore_errexit=true
+            set +e
+            ;;
+    esac
     credential_curl_stream_file "${body_file}" | appd_curl -fsS \
         -X POST "$(appd_controller_api_url "${controller_url}" "/controller/api/oauth/access_token")" \
         -K "${auth_config}" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         --data-binary @-
     rc=$?
-    set -e
+    if [[ "${restore_errexit}" == "true" ]]; then
+        set -e
+    fi
     rm -f "${auth_config}" "${body_file}"
     return "${rc}"
 }

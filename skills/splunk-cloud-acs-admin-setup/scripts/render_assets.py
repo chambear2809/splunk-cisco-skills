@@ -907,10 +907,10 @@ PY
 #         independent endpoints. We do NOT do v6 discovery automatically;
 #         operators on IPv6-only paths must pass --operator-ip-v6 if any
 #         IPv6 subnets are in the planned `acs` set.
-acs_planned_v4=$(python3 -c "import json; print(','.join(json.load(open('${{PLAN_FILE}}'))['features'].get('acs', {{}}).get('ipv4', [])))")
-acs_planned_v6=$(python3 -c "import json; print(','.join(json.load(open('${{PLAN_FILE}}'))['features'].get('acs', {{}}).get('ipv6', [])))")
-operator_v4=$(python3 -c "import json; print(','.join(json.load(open('${{PLAN_FILE}}')).get('operator_ips', {{}}).get('ipv4', [])))")
-operator_v6=$(python3 -c "import json; print(','.join(json.load(open('${{PLAN_FILE}}')).get('operator_ips', {{}}).get('ipv6', [])))")
+acs_planned_v4=$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1]))['features'].get('acs', {{}}).get('ipv4', [])))" "${{PLAN_FILE}}")
+acs_planned_v6=$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1]))['features'].get('acs', {{}}).get('ipv6', [])))" "${{PLAN_FILE}}")
+operator_v4=$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1])).get('operator_ips', {{}}).get('ipv4', [])))" "${{PLAN_FILE}}")
+operator_v6=$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1])).get('operator_ips', {{}}).get('ipv6', [])))" "${{PLAN_FILE}}")
 
 if [[ "${{ALLOWLISTS_ENABLED}}" == "true" && ( -n "${{acs_planned_v4}}" || -n "${{acs_planned_v6}}" ) && "${{ALLOW_ACS_LOCKOUT}}" != "true" ]]; then
   # Auto-discover v4 only when the operator did not supply one. Try multiple
@@ -1020,10 +1020,10 @@ EOM
 fi
 
 # 5. Drift detection: compare live state to the rendered plan, IPv4 + IPv6.
-strict=$(python3 -c "import json; print('true' if json.load(open('${{PLAN_FILE}}'))['strict_drift'] else 'false')")
+strict=$(python3 -c "import json,sys; print('true' if json.load(open(sys.argv[1]))['strict_drift'] else 'false')" "${{PLAN_FILE}}")
 if [[ "${{ALLOWLISTS_ENABLED}}" == "true" && "${{strict}}" == "true" ]]; then
   drift_found=false
-  for feature in $(python3 -c "import json; print(' '.join(json.load(open('${{PLAN_FILE}}'))['features'].keys()))"); do
+  for feature in $(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['features'].keys()))" "${{PLAN_FILE}}"); do
     for family in ipv4 ipv6; do
       if [[ "${{family}}" == "ipv4" ]]; then
         cli_group=ip-allowlist
@@ -1039,7 +1039,7 @@ try:
 except Exception:
     print('')
 ")
-      planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}'].get('${{family}}', []))))")
+      planned=$(python3 -c "import json,sys; print(','.join(sorted(json.load(open(sys.argv[1]))['features'][sys.argv[2]].get(sys.argv[3], []))))" "${{PLAN_FILE}}" "${{feature}}" "${{family}}")
       if [[ -z "${{planned}}" ]]; then
         continue
       fi
@@ -1087,9 +1087,9 @@ if [[ -n "${{TARGET_SH}}" ]]; then
   acs_command config use-stack "${{SPLUNK_CLOUD_STACK}}" --target-sh "${{TARGET_SH}}" >/dev/null
 fi
 
-features=$(python3 -c "import json; print(' '.join(sorted(json.load(open('${{PLAN_FILE}}'))['features'].keys())))")
+features=$(python3 -c "import json,sys; print(' '.join(sorted(json.load(open(sys.argv[1]))['features'].keys())))" "${{PLAN_FILE}}")
 for feature in ${{features}}; do
-  planned=$(python3 -c "import json; print(','.join(sorted(json.load(open('${{PLAN_FILE}}'))['features']['${{feature}}']['${{FAMILY}}'])))" 2>/dev/null || echo "")
+  planned=$(python3 -c "import json,sys; print(','.join(sorted(json.load(open(sys.argv[1]))['features'][sys.argv[2]][sys.argv[3]])))" "${{PLAN_FILE}}" "${{feature}}" "${{FAMILY}}" 2>/dev/null || echo "")
 
   if [[ -z "${{planned}}" ]]; then
     log "SKIP: no ${{FAMILY}} subnets were specified for '${{feature}}'; preserving live state."
@@ -1208,7 +1208,7 @@ TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 AUDIT_DIR="$(dirname "$0")/audit/${{TIMESTAMP}}"
 mkdir -p "${{AUDIT_DIR}}"
 
-features=$(python3 -c "import json; print(' '.join(sorted(json.load(open('${{PLAN_FILE}}'))['features'].keys())))")
+features=$(python3 -c "import json,sys; print(' '.join(sorted(json.load(open(sys.argv[1]))['features'].keys())))" "${{PLAN_FILE}}")
 
 mismatch=false
 

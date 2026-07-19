@@ -84,13 +84,13 @@ Expected (rendered by the GPU integration skill):
   verbs: ["get", "list", "watch"]
 ```
 
-If missing, the GPU integration skill's overlay adds an `rbac.customRules` block that the chart merges in. This is critical: without endpoint access, the receiver_creator can't discover the DCGM Exporter pods, and metrics never appear in O11y. See the AI Pod umbrella's `endpoints-rbac-patch.md` for full context.
+If missing, the GPU integration skill's overlay adds an `rbac.customRules` block that the chart merges in. This is critical: without endpoint access, the receiver_creator can't discover the DCGM Exporter pods, and metrics never appear in O11y. See the AI Pod umbrella's [endpoint RBAC reference](../../splunk-observability-cisco-ai-pod-integration/references/endpoints-rbac-patch.md) for full context.
 
 ## OpenShift / SCC considerations
 
 On OpenShift, the GPU Operator requires SCC `nvidia-gpu-operator` (provided by the operator at install). The DCGM Exporter and driver pods run with elevated privileges; this is by design. Don't try to run them under `restricted` SCC.
 
-The Splunk OTel collector itself does NOT need elevated SCC for GPU scraping; the receiver_creator only needs the namespace's default SCC + the RBAC above. The umbrella AI Pod skill ships an OpenShift SCC helper for the OTel collector specifically (filesystem mounts, hostNetwork, etc.); see `openshift-scc.md` in the AI Pod umbrella references.
+The Splunk OTel collector itself does NOT need elevated SCC for GPU scraping; the receiver_creator only needs the namespace's default SCC + the RBAC above. The umbrella AI Pod skill ships an OpenShift SCC helper for the OTel collector specifically (filesystem mounts, hostNetwork, etc.); see the AI Pod umbrella's [OpenShift SCC reference](../../splunk-observability-cisco-ai-pod-integration/references/openshift-scc.md).
 
 ## Multi-node clusters
 

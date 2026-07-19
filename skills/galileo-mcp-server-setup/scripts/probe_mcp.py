@@ -6,7 +6,9 @@ import argparse
 import hashlib
 import ipaddress
 import json
+import os
 import re
+import stat
 import sys
 import urllib.error
 import urllib.request
@@ -16,6 +18,7 @@ from urllib.parse import urlparse, urlunparse
 
 
 DEFAULT_MCP_URL = "https://api.galileo.ai/mcp/http/mcp"
+MAX_SECRET_FILE_BYTES = 64 * 1024
 EXPECTED_SERVER_NAME = "EvalsInIDEServer"
 EXPECTED_SERVER_VERSION = "1.28.1"
 EXPECTED_TOOLS: dict[str, dict[str, Any]] = {
@@ -148,7 +151,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-loose-key-perms",
         action="store_true",
-        help="Warn instead of failing when --galileo-api-key-file is not chmod 600.",
+        help="Warn instead of failing when --galileo-api-key-file is not owner-only.",
     )
     parser.add_argument("--timeout", type=float, default=20.0)
     parser.add_argument("--json", action="store_true")
@@ -308,11 +311,28 @@ class McpHttpSession:
         return data.get("result") or {}
 
 
-def check_key_permissions(target: Path, allow_loose: bool) -> None:
-    mode = target.stat().st_mode & 0o777
-    if mode == 0o600:
+def check_key_permissions(
+    target: Path,
+    allow_loose: bool,
+    metadata: os.stat_result | None = None,
+) -> None:
+    try:
+        info = metadata if metadata is not None else target.lstat()
+    except OSError as exc:
+        raise RuntimeError(f"Galileo API key file not found: {target}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise RuntimeError(
+            f"Galileo API key file must be a single-link, non-symlink regular file: {target}"
+        )
+    if not hasattr(os, "geteuid") or info.st_uid != os.geteuid():
+        raise RuntimeError(f"Galileo API key file must be owned by the current user: {target}")
+    mode = stat.S_IMODE(info.st_mode)
+    if not mode & 0o077:
         return
-    message = f"Galileo API key file {target} is mode {mode:o}; expected 600."
+    message = (
+        f"Galileo API key file {target} is mode {mode:04o}; "
+        "expected 0600 or stricter."
+    )
     if allow_loose:
         print(f"WARN: {message}", file=sys.stderr)
         return
@@ -323,13 +343,62 @@ def read_secret_file(path: str, allow_loose: bool) -> str:
     if not path:
         raise RuntimeError("--auth-check requires --galileo-api-key-file")
     target = Path(path).expanduser()
-    if not target.is_file():
-        raise RuntimeError(f"Galileo API key file not found: {target}")
-    check_key_permissions(target, allow_loose)
-    key = target.read_text(encoding="utf-8").strip()
-    if not key:
-        raise RuntimeError(f"Galileo API key file is empty: {target}")
-    return key
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise RuntimeError("this runtime cannot enforce O_NOFOLLOW for Galileo API key files")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(target, flags)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Galileo API key file must be readable without following symlinks: {target}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        check_key_permissions(target, allow_loose, before)
+        if not 1 <= before.st_size <= MAX_SECRET_FILE_BYTES:
+            raise RuntimeError(
+                f"Galileo API key file size must be between 1 and "
+                f"{MAX_SECRET_FILE_BYTES} bytes: {target}"
+            )
+        chunks: list[bytes] = []
+        remaining = MAX_SECRET_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 8192))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
+        )
+        after_fingerprint = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        data = b"".join(chunks)
+        if before_fingerprint != after_fingerprint or len(data) != before.st_size:
+            raise RuntimeError(f"Galileo API key file changed while it was read: {target}")
+    finally:
+        os.close(descriptor)
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(f"Galileo API key file must contain UTF-8 text: {target}") from exc
+    if len(lines) != 1 or not lines[0] or "\x00" in lines[0]:
+        raise RuntimeError(
+            f"Galileo API key file must contain exactly one non-empty line: {target}"
+        )
+    return lines[0]
 
 
 def auth_check(

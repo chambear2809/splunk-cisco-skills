@@ -59,7 +59,7 @@ repos:
         entry: python3 tests/check_skill_frontmatter.py
         language: system
         pass_filenames: false
-        files: ^skills/.*/SKILL\.md$
+        files: ^skills/(catalog\.yaml|.*/SKILL\.md)$
 
       - id: repo-readiness
         name: Repository readiness (catalog parity, symlinks, gitignore)
@@ -84,6 +84,40 @@ repos:
             \.gitattributes
           )$
 
+      - id: canonical-skill-catalog-fresh
+        name: Canonical skill manifest and direct generated surfaces
+        entry: python3 skills/shared/scripts/generate_skill_catalog.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            AGENTS\.md|
+            CLAUDE\.md|
+            SKILL_REQUIREMENTS\.md|
+            \.claude/commands/.*|
+            \.cursor/skills/.*|
+            skills/catalog\.yaml|
+            skills/shared/deprecated_skill_aliases\.md|
+            skills/[^/]+/(SKILL\.md|agents/openai\.yaml)|
+            skills/shared/(app_registry|skill_product_registry|skill_validation_registry)\.json|
+            skills/shared/skill_(catalog|validation)(\.schema\.json|\.py)?|
+            skills/shared/scripts/generate_skill_catalog\.py
+          )$
+
+      - id: skill-ux-catalog-fresh
+        name: Product-first skill UX catalog freshness
+        entry: python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            SKILL_UX_CATALOG\.md|
+            skills/catalog\.yaml|
+            skills/[^/]+/(SKILL\.md|reference\.md|references/.*|templates?/.*|scripts/.*)|
+            skills/shared/skill_product_registry\.json|
+            skills/shared/scripts/generate_skill_ux_catalog\.py
+          )$
+
       - id: deployment-docs-fresh
         name: generate_deployment_docs.py --check (registry vs generated docs)
         entry: python3 skills/shared/scripts/generate_deployment_docs.py --check
@@ -92,6 +126,7 @@ repos:
         files: |
           (?x)^(
             skills/shared/app_registry\.json|
+            skills/catalog\.yaml|
             skills/shared/scripts/generate_deployment_docs\.py|
             CLOUD_DEPLOYMENT_MATRIX\.md|
             DEPLOYMENT_ROLE_MATRIX\.md
@@ -105,11 +140,28 @@ repos:
         files: |
           (?x)^(
             SKILL_VALIDATION_MATRIX\.md|
+            skills/catalog\.yaml|
             skills/.*/SKILL\.md|
             skills/.*/scripts/.*|
             skills/shared/skill_validation_registry\.json|
+            skills/shared/skill_validation\.py|
             skills/shared/scripts/(audit|generate)_skill_validation\.py|
             tests/test_.*\.(py|bats)
+          )$
+
+      - id: splunk-compatibility-fresh
+        name: Splunk 10.5 compatibility matrix freshness
+        entry: python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            SPLUNK_10_5_COMPATIBILITY\.md|
+            skills/catalog\.yaml|
+            skills/[^/]+/SKILL\.md|
+            skills/shared/app_registry\.json|
+            skills/shared/references/splunk_platform_versions\.json|
+            skills/shared/scripts/(audit_skill_compatibility|generate_splunk_10_5_compatibility)\.py
           )$
 
       - id: ruff-lint

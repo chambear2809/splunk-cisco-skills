@@ -155,6 +155,8 @@ projects/tmp-*
 /splunk-rsa-securid-ta-rendered/
 /splunk-syslog-web-proxy-ta-rendered/
 /cisco-asa-ta-rendered/
+/cisco-collaboration-rendered/
+/cisco-collaboration-rendered-sc4s-child-render/
 /splunk-security-content-update-rendered/
 /splunk-fraud-analytics-rendered/
 /splunk-pci-compliance-rendered/

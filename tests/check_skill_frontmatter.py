@@ -13,6 +13,12 @@ except ModuleNotFoundError:  # pragma: no cover - exercised when PyYAML is absen
     yaml = None
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import SkillRecord, load_catalog  # noqa: E402
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
@@ -218,7 +224,10 @@ def parse_frontmatter(block: str) -> dict[str, Any]:
     return _fallback_mapping(block)
 
 
-def check_openai_metadata(skill_dir: Path) -> list[str]:
+def check_openai_metadata(
+    skill_dir: Path,
+    record: SkillRecord | None = None,
+) -> list[str]:
     errors: list[str] = []
     skill_name = skill_dir.name
     metadata_path = skill_dir / "agents" / "openai.yaml"
@@ -272,6 +281,12 @@ def check_openai_metadata(skill_dir: Path) -> list[str]:
             f"{skill_name}: agents/openai.yaml interface.default_prompt must "
             f"explicitly mention ${skill_name}"
         )
+    if record is not None and record.deprecated and isinstance(default_prompt, str):
+        for token in (f"${record.name}", f"${record.replaced_by}"):
+            if token not in default_prompt:
+                errors.append(
+                    f"{skill_name}: deprecated alias default_prompt must mention {token}"
+                )
 
     for key in ("icon_small", "icon_large", "brand_color"):
         value = interface.get(key)
@@ -295,6 +310,12 @@ def check_openai_metadata(skill_dir: Path) -> list[str]:
             errors.append(
                 f"{skill_name}: agents/openai.yaml "
                 "policy.allow_implicit_invocation must be a boolean"
+            )
+    if record is not None and record.deprecated:
+        if not isinstance(policy, dict) or policy.get("allow_implicit_invocation") is not False:
+            errors.append(
+                f"{skill_name}: deprecated alias must set "
+                "policy.allow_implicit_invocation: false"
             )
 
     dependencies = document.get("dependencies")
@@ -345,7 +366,7 @@ def check_openai_metadata(skill_dir: Path) -> list[str]:
     return errors
 
 
-def check_skill(skill_dir: Path) -> list[str]:
+def check_skill(skill_dir: Path, record: SkillRecord | None = None) -> list[str]:
     errors: list[str] = []
     skill_md = skill_dir / "SKILL.md"
     dir_name = skill_dir.name
@@ -453,6 +474,21 @@ def check_skill(skill_dir: Path) -> list[str]:
                 f"{dir_name}: metadata.compatibility_verified must be "
                 f"{COMPATIBILITY_VERIFIED_DATE}"
             )
+        if record is not None and record.deprecated:
+            if metadata_value.get("deprecated") != "true":
+                errors.append(
+                    f"{dir_name}: metadata.deprecated must be the string 'true'"
+                )
+            if metadata_value.get("replaced_by") != record.replaced_by:
+                errors.append(
+                    f"{dir_name}: metadata.replaced_by must be {record.replaced_by!r}"
+                )
+        elif record is not None and (
+            "deprecated" in metadata_value or "replaced_by" in metadata_value
+        ):
+            errors.append(
+                f"{dir_name}: canonical skill cannot declare deprecated/replaced_by metadata"
+            )
 
     allowed_tools = metadata.get("allowed-tools")
     if allowed_tools is not None and not isinstance(allowed_tools, str):
@@ -477,10 +513,8 @@ def check_skill(skill_dir: Path) -> list[str]:
 
 
 def main() -> int:
-    skill_dirs = sorted(
-        d for d in SKILLS_DIR.iterdir()
-        if d.is_dir() and not d.name.startswith(".")
-    )
+    catalog = load_catalog()
+    skill_dirs = [(REPO_ROOT / record.path).parent for record in catalog.skills]
 
     if not skill_dirs:
         print("ERROR: no skill directories found under skills/", file=sys.stderr)
@@ -488,15 +522,9 @@ def main() -> int:
 
     all_errors: list[str] = []
     checked_count = 0
-    for skill_dir in skill_dirs:
-        if skill_dir.name == "shared":
-            continue
-        if not (skill_dir / "SKILL.md").exists() and not any(
-            path.is_file() for path in skill_dir.rglob("*")
-        ):
-            continue
-        all_errors.extend(check_skill(skill_dir))
-        all_errors.extend(check_openai_metadata(skill_dir))
+    for record, skill_dir in zip(catalog.skills, skill_dirs, strict=True):
+        all_errors.extend(check_skill(skill_dir, record))
+        all_errors.extend(check_openai_metadata(skill_dir, record))
         checked_count += 1
 
     if all_errors:

@@ -6,12 +6,14 @@ safety gates can be tested with the repo's normal Python test environment.
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
+import math
 import os
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
@@ -23,24 +25,34 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 
 import yaml
+
+from . import discovery
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_DIR = REPO_ROOT / "skills"
 CATALOG_PATH = SKILLS_DIR / "cisco-product-setup" / "catalog.json"
 CISCO_SETUP_SCRIPT = SKILLS_DIR / "cisco-product-setup" / "scripts" / "setup.sh"
-CISCO_RESOLVE_SCRIPT = SKILLS_DIR / "cisco-product-setup" / "scripts" / "resolve_product.sh"
+CISCO_RESOLVE_SCRIPT = (
+    SKILLS_DIR / "cisco-product-setup" / "scripts" / "resolve_product.sh"
+)
 
 PLAN_HASH_CHARS = 64
 PLAN_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
-DEFAULT_TIMEOUT_SECONDS = 1800
 MIN_TIMEOUT_SECONDS = 1
+ABSOLUTE_MAX_TIMEOUT_SECONDS = 24 * 60 * 60
 
 
-def _env_int(name: str, default: int, *, min_value: int | None = None) -> int:
+def _env_int(
+    name: str,
+    default: int,
+    *,
+    min_value: int | None = None,
+    max_value: int | None = None,
+) -> int:
     """Read an integer env var without letting bad config crash import."""
     raw_value = os.environ.get(name)
     if raw_value in (None, ""):
@@ -51,6 +63,8 @@ def _env_int(name: str, default: int, *, min_value: int | None = None) -> int:
         return default
     if min_value is not None and value < min_value:
         return default
+    if max_value is not None and value > max_value:
+        return default
     return value
 
 
@@ -58,11 +72,42 @@ MAX_TIMEOUT_SECONDS = _env_int(
     "MCP_MAX_TIMEOUT_SECONDS",
     7200,
     min_value=MIN_TIMEOUT_SECONDS,
+    max_value=ABSOLUTE_MAX_TIMEOUT_SECONDS,
 )
-RESOLVE_TIMEOUT_SECONDS = _env_int(
-    "MCP_RESOLVE_TIMEOUT_SECONDS",
-    60,
-    min_value=MIN_TIMEOUT_SECONDS,
+DEFAULT_TIMEOUT_SECONDS = min(1800, MAX_TIMEOUT_SECONDS)
+RESOLVE_TIMEOUT_SECONDS = min(
+    _env_int(
+        "MCP_RESOLVE_TIMEOUT_SECONDS",
+        60,
+        min_value=MIN_TIMEOUT_SECONDS,
+        max_value=ABSOLUTE_MAX_TIMEOUT_SECONDS,
+    ),
+    MAX_TIMEOUT_SECONDS,
+)
+# All subprocess-producing tools share one bounded worker pool. A small queue
+# absorbs normal overlap between product resolution, dry-run planning, and
+# final execution without allowing untrusted clients to create unbounded
+# threads or child processes.
+MAX_CONCURRENT_SUBPROCESSES = _env_int(
+    "MCP_MAX_CONCURRENT_SUBPROCESSES",
+    1,
+    min_value=1,
+    max_value=32,
+)
+MAX_QUEUED_SUBPROCESSES = _env_int(
+    "MCP_MAX_QUEUED_SUBPROCESSES",
+    16,
+    min_value=0,
+    max_value=1024,
+)
+SUBPROCESS_QUEUE_TIMEOUT_SECONDS = min(
+    _env_int(
+        "MCP_SUBPROCESS_QUEUE_TIMEOUT_SECONDS",
+        60,
+        min_value=MIN_TIMEOUT_SECONDS,
+        max_value=ABSOLUTE_MAX_TIMEOUT_SECONDS,
+    ),
+    MAX_TIMEOUT_SECONDS,
 )
 # Max characters of stdout/stderr returned per stream. The bounded subprocess
 # wrapper enforces this at the byte level during execution to prevent unbounded
@@ -83,6 +128,12 @@ MAX_ARG_CHARS = 16 * 1024
 MAX_TOTAL_ARG_CHARS = 128 * 1024
 MAX_SNAPSHOT_FILES = 10_000
 MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024
+MAX_SNAPSHOT_ENTRIES = 20_000
+MAX_SNAPSHOT_DIRECTORIES = 2_000
+MAX_SNAPSHOT_DEPTH = 32
+MAX_PARSED_JSON_ITEMS = 10_000
+MAX_PARSED_JSON_DEPTH = 32
+MAX_SECRET_FILE_BYTES = 1024 * 1024
 CANCEL_KILL_GRACE_SECONDS = 1.0
 # Maximum age (in seconds) of a stored plan before execute_plan refuses to
 # run it. Plans older than this are treated as expired so that a hash that
@@ -284,6 +335,10 @@ class SkillMCPError(ValueError):
     """Raised when a requested MCP operation violates repo safety rules."""
 
 
+class _CommandCancelledBeforeStart(RuntimeError):
+    """Internal signal used to preserve a queued, unstarted plan."""
+
+
 @dataclass(frozen=True)
 class PlannedCommand:
     plan_hash: str
@@ -301,16 +356,281 @@ class PlannedCommand:
     executable_path: str = ""
     executable_sha256: str = ""
     repository_sha256: str = ""
+    interpreter_path: str = ""
+    interpreter_sha256: str = ""
+    secret_file_identities: tuple[dict[str, Any], ...] = ()
 
 
 _PLANS: "OrderedDict[str, PlannedCommand]" = OrderedDict()
 _PLANS_LOCK = Lock()
+_RESERVED_PLANS: set[str] = set()
 _EXECUTION_LOCK = Lock()
 _SNAPSHOT_CACHE_LOCK = Lock()
 _SNAPSHOT_FILE_CACHE: dict[
     str,
     tuple[tuple[int, int, int, int, int, int], bytes],
 ] = {}
+_SUBPROCESS_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_SUBPROCESSES)
+_SUBPROCESS_QUEUE_LOCK = Lock()
+_SUBPROCESS_QUEUE_WAITERS = 0
+_ACTIVE_PROCESSES_LOCK = Lock()
+_ACTIVE_PROCESSES: dict[int, subprocess.Popen[bytes]] = {}
+
+_CHILD_ENV_BLOCKLIST = frozenset(
+    {
+        # Shell startup hooks and option injection.
+        "BASH_ENV",
+        "ENV",
+        "BASHOPTS",
+        "SHELLOPTS",
+        "CDPATH",
+        "GLOBIGNORE",
+        "IFS",
+        "KSH_ENV",
+        "PROMPT_COMMAND",
+        "PS4",
+        "ZDOTDIR",
+        # Language-specific loader/option injection. The deployment-facing
+        # environment (AWS_*, KUBECONFIG, SPLUNK_*, proxy settings, etc.) is
+        # intentionally retained for skill workflows that require it.
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "PYTHONBREAKPOINT",
+        "PYTHONWARNINGS",
+        "PYTHONEXECUTABLE",
+        "PYTHONPLATLIBDIR",
+        "RUBYOPT",
+        "RUBYLIB",
+        "PERL5OPT",
+        "PERL5LIB",
+        "PERL5DB",
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        "JAVA_TOOL_OPTIONS",
+        "JDK_JAVA_OPTIONS",
+        "_JAVA_OPTIONS",
+        # Native loader injection and TLS key export.
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "DYLD_INSERT_LIBRARIES",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FRAMEWORK_PATH",
+        "DYLD_FALLBACK_LIBRARY_PATH",
+        "DYLD_FALLBACK_FRAMEWORK_PATH",
+        "DYLD_IMAGE_SUFFIX",
+        "DYLD_ROOT_PATH",
+        "GCONV_PATH",
+        "SSLKEYLOGFILE",
+        # Ambient helper/editor commands are executable hooks, not data.
+        "EDITOR",
+        "VISUAL",
+        "PAGER",
+        "GIT_PAGER",
+        "MANPAGER",
+        "LESSOPEN",
+        "LESSCLOSE",
+        "GIT_SSH",
+        "GIT_SSH_COMMAND",
+        "GIT_EXEC_PATH",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_NOSYSTEM",
+        "SSH_ASKPASS",
+        "SUDO_ASKPASS",
+        # MCP authorization belongs to the parent control plane and is never
+        # a deployment input for child skill scripts.
+        "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION",
+        "SPLUNK_SKILLS_MCP_ALLOW_MUTATION",
+        "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION",
+        "SPLUNK_CISCO_SKILLS_MCP_NO_VENV",
+        "SPLUNK_CISCO_SKILLS_MCP_REEXECED",
+    }
+)
+
+_SNAPSHOT_EXCLUDED_DIR_NAMES = frozenset(
+    {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+)
+_SNAPSHOT_EXCLUDED_FILE_NAMES = frozenset({".DS_Store"})
+_SNAPSHOT_EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".swp", ".swo", ".tmp", "~")
+_CHILD_ENV_BLOCKED_PREFIXES = (
+    "BASH_FUNC_",
+    "GIT_CONFIG_KEY_",
+    "GIT_CONFIG_VALUE_",
+)
+
+
+def _child_environment() -> dict[str, str]:
+    """Return a deployment-capable environment without loader injection hooks."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in _CHILD_ENV_BLOCKLIST
+        and not key.startswith(_CHILD_ENV_BLOCKED_PREFIXES)
+    }
+    # Empty and relative PATH entries implicitly search the repository cwd.
+    # Preserve absolute deployment-tool paths (including the repo venv) while
+    # removing that ambient current-directory execution behavior.
+    path_entries = []
+    for entry in env.get("PATH", os.defpath).split(os.pathsep):
+        if not entry:
+            continue
+        candidate = Path(entry)
+        if not candidate.is_absolute():
+            continue
+        try:
+            resolved = candidate.resolve(strict=True)
+            metadata = resolved.stat()
+        except OSError:
+            continue
+        if not stat.S_ISDIR(metadata.st_mode):
+            continue
+        if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o022:
+            continue
+        normalized = str(resolved)
+        if normalized not in path_entries:
+            path_entries.append(normalized)
+    env["PATH"] = os.pathsep.join(path_entries) or os.defpath
+    env["PWD"] = str(REPO_ROOT)
+    # Prevent user-site imports while retaining packages from the interpreter's
+    # selected virtual environment.
+    env["PYTHONNOUSERSITE"] = "1"
+    return env
+
+
+def _interpreter_path(command: list[str]) -> Path | None:
+    """Resolve a supported interpreter to a stable absolute executable."""
+    if not command:
+        raise SkillMCPError("Cannot execute an empty command")
+    requested = _safe_text(command[0], label="command interpreter")
+    name = Path(requested).name.lower()
+    if name not in {"bash", "ruby"} and not name.startswith("python"):
+        return None
+
+    child_env = _child_environment()
+    if Path(requested).is_absolute():
+        candidate = Path(requested)
+    else:
+        located = shutil.which(requested, path=child_env["PATH"])
+        if not located:
+            raise SkillMCPError(f"Required interpreter is not available: {requested}")
+        candidate = Path(located)
+    try:
+        resolved = candidate.resolve(strict=True)
+        metadata = resolved.stat()
+    except OSError as exc:
+        raise SkillMCPError(
+            f"Could not resolve interpreter {requested!r}: {exc}"
+        ) from exc
+    if not stat.S_ISREG(metadata.st_mode) or not os.access(resolved, os.X_OK):
+        raise SkillMCPError(
+            f"Interpreter is not an executable regular file: {resolved}"
+        )
+    if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o022:
+        raise SkillMCPError(
+            f"Interpreter is group/world writable and cannot be trusted: {resolved}"
+        )
+    if os.name == "posix":
+        for parent in resolved.parents:
+            try:
+                parent_metadata = parent.stat()
+                parent_mode = stat.S_IMODE(parent_metadata.st_mode)
+            except OSError as exc:
+                raise SkillMCPError(
+                    f"Could not inspect interpreter ancestry {parent}: {exc}"
+                ) from exc
+            if parent_mode & 0o002 or (
+                parent_mode & 0o020 and parent_metadata.st_uid not in {0, os.geteuid()}
+            ):
+                raise SkillMCPError(
+                    "Interpreter ancestry is writable by an untrusted group/world "
+                    "principal and cannot be "
+                    f"trusted: {parent}"
+                )
+    return resolved
+
+
+def _resolved_command(command: list[str]) -> list[str]:
+    resolved = list(command)
+    interpreter = _interpreter_path(resolved)
+    if interpreter is not None:
+        resolved[0] = str(interpreter)
+    return resolved
+
+
+def _register_active_process(process: subprocess.Popen[bytes]) -> None:
+    with _ACTIVE_PROCESSES_LOCK:
+        _ACTIVE_PROCESSES[process.pid] = process
+
+
+def _unregister_active_process(process: subprocess.Popen[bytes]) -> None:
+    with _ACTIVE_PROCESSES_LOCK:
+        if _ACTIVE_PROCESSES.get(process.pid) is process:
+            _ACTIVE_PROCESSES.pop(process.pid, None)
+
+
+def shutdown_active_processes() -> int:
+    """Terminate every child process group still owned by the MCP server.
+
+    This is intended for the server lifespan shutdown hook. It returns the
+    number of process groups that were active when shutdown began.
+    """
+    with _ACTIVE_PROCESSES_LOCK:
+        active = list(_ACTIVE_PROCESSES.values())
+    for process in active:
+        _terminate_process(process, force=False)
+    if active:
+        time.sleep(CANCEL_KILL_GRACE_SECONDS)
+    # Always target each process group with SIGKILL. Its leader may already
+    # have exited while a descendant ignored SIGTERM.
+    for process in active:
+        _terminate_process(process, force=True)
+    wait_deadline = time.monotonic() + 5
+    for process in active:
+        remaining = wait_deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            process.wait(timeout=remaining)
+        except (subprocess.TimeoutExpired, OSError, ProcessLookupError):
+            pass
+    return len(active)
+
+
+def _acquire_subprocess_slot(
+    *,
+    deadline: float,
+    cancellation: CommandCancellation | None,
+) -> tuple[bool, str]:
+    """Acquire the global worker semaphore through a bounded wait queue."""
+    global _SUBPROCESS_QUEUE_WAITERS
+
+    if _SUBPROCESS_SEMAPHORE.acquire(blocking=False):
+        return True, ""
+    with _SUBPROCESS_QUEUE_LOCK:
+        if _SUBPROCESS_QUEUE_WAITERS >= MAX_QUEUED_SUBPROCESSES:
+            raise SkillMCPError(
+                "The MCP subprocess queue is full; retry after active work completes."
+            )
+        _SUBPROCESS_QUEUE_WAITERS += 1
+    queue_deadline = min(
+        deadline,
+        time.monotonic() + SUBPROCESS_QUEUE_TIMEOUT_SECONDS,
+    )
+    try:
+        while True:
+            if cancellation is not None and cancellation.cancelled:
+                return False, "Command cancelled while waiting for a subprocess slot."
+            remaining = queue_deadline - time.monotonic()
+            if remaining <= 0:
+                return False, "Timed out while waiting for a subprocess slot."
+            if _SUBPROCESS_SEMAPHORE.acquire(timeout=min(0.1, remaining)):
+                return True, ""
+    finally:
+        with _SUBPROCESS_QUEUE_LOCK:
+            _SUBPROCESS_QUEUE_WAITERS -= 1
 
 
 def _force_kill_after_cancel(process: subprocess.Popen[bytes]) -> None:
@@ -337,6 +657,7 @@ class CommandCancellation:
         self._lock = Lock()
         self._process: subprocess.Popen[bytes] | None = None
         self._cancelled = False
+        self._plan_hashes: set[str] = set()
 
     def attach(self, process: subprocess.Popen[bytes]) -> bool:
         with self._lock:
@@ -356,8 +677,23 @@ class CommandCancellation:
             was_cancelled = self._cancelled
             self._cancelled = True
             process = self._process
+            plan_hashes = tuple(self._plan_hashes)
+            self._plan_hashes.clear()
         if process is not None and not was_cancelled:
             _request_process_cancel(process)
+        if plan_hashes:
+            with _PLANS_LOCK:
+                for plan_hash in plan_hashes:
+                    _PLANS.pop(plan_hash, None)
+                    _RESERVED_PLANS.discard(plan_hash)
+
+    def track_plan(self, plan_hash: str) -> bool:
+        """Track a newly stored plan, or reject it if cancellation already won."""
+        with self._lock:
+            if self._cancelled:
+                return False
+            self._plan_hashes.add(plan_hash)
+            return True
 
     @property
     def cancelled(self) -> bool:
@@ -435,7 +771,9 @@ def _script_path(skill: str, script: str) -> Path:
     try:
         resolved.relative_to(scripts_root)
     except ValueError as exc:
-        raise SkillMCPError(f"Script escapes skill scripts directory: {script}") from exc
+        raise SkillMCPError(
+            f"Script escapes skill scripts directory: {script}"
+        ) from exc
     return resolved
 
 
@@ -563,9 +901,7 @@ def _validate_args(args: list[str]) -> list[str]:
                 f"args exceed the {MAX_TOTAL_ARG_CHARS}-character aggregate limit"
             )
         flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
-        is_option_flag = bool(
-            re.fullmatch(r"--[A-Za-z0-9][A-Za-z0-9_-]*", flag)
-        )
+        is_option_flag = bool(re.fullmatch(r"--[A-Za-z0-9][A-Za-z0-9_-]*", flag))
         normalized_flag = _normalize_key(flag.removeprefix("--"))
         secret_file_flag = _is_secret_file_flag(flag)
         if flag in DIRECT_SECRET_FLAGS or (
@@ -583,6 +919,10 @@ def _validate_args(args: list[str]) -> list[str]:
                 "Use a matching *-file flag."
             )
         if arg.startswith("--") and "=" in arg and secret_file_flag:
+            if flag == "--secret-file":
+                raise SkillMCPError(
+                    "--secret-file requires separate KEY PATH arguments"
+                )
             path_value = arg.split("=", 1)[1]
             if not path_value:
                 raise SkillMCPError(f"{flag} requires a file path")
@@ -609,6 +949,137 @@ def _validate_args(args: list[str]) -> list[str]:
         safe_args.append(arg)
         index += 1
     return safe_args
+
+
+def _secret_file_arguments(command: list[str]) -> list[tuple[str, str]]:
+    """Extract secret-file flag/path pairs without opening the files."""
+    bindings: list[tuple[str, str]] = []
+    index = 0
+    while index < len(command):
+        argument = command[index]
+        if not isinstance(argument, str) or not argument.startswith("--"):
+            index += 1
+            continue
+        flag, separator, inline_value = argument.partition("=")
+        if flag == "--secret-file":
+            if separator:
+                raise SkillMCPError(
+                    "--secret-file requires separate KEY PATH arguments"
+                )
+            if index + 2 >= len(command):
+                raise SkillMCPError("--secret-file requires KEY PATH")
+            key = _safe_text(command[index + 1], label="--secret-file key")
+            path = _safe_text(command[index + 2], label="--secret-file path")
+            bindings.append((f"--secret-file:{key}", path))
+            index += 3
+            continue
+        if _is_secret_file_flag(flag):
+            if separator:
+                path = inline_value
+                index += 1
+            else:
+                if index + 1 >= len(command):
+                    raise SkillMCPError(f"{flag} requires a file path")
+                path = _safe_text(command[index + 1], label=f"{flag} path")
+                index += 2
+            if not path:
+                raise SkillMCPError(f"{flag} requires a file path")
+            bindings.append((flag, path))
+            continue
+        index += 1
+    return bindings
+
+
+def _secret_file_identity(
+    path_value: str,
+    *,
+    label: str,
+    require_exists: bool,
+) -> dict[str, Any]:
+    """Validate secret-file metadata without reading credential contents."""
+    path_value = _safe_text(path_value, label=f"{label} path")
+    if not path_value:
+        raise SkillMCPError(f"{label} path cannot be empty")
+    candidate = Path(path_value)
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    absolute = Path(os.path.abspath(candidate))
+    try:
+        metadata = absolute.lstat()
+    except FileNotFoundError:
+        if require_exists:
+            raise SkillMCPError(
+                f"{label} does not exist; create it securely and re-run the plan: {absolute}"
+            ) from None
+        return {"path": str(absolute), "exists": False}
+    except OSError as exc:
+        raise SkillMCPError(f"Could not inspect {label} at {absolute}: {exc}") from exc
+
+    if stat.S_ISLNK(metadata.st_mode):
+        raise SkillMCPError(f"{label} must not be a symbolic link: {absolute}")
+    if not stat.S_ISREG(metadata.st_mode):
+        raise SkillMCPError(f"{label} must be a regular file: {absolute}")
+    mode = stat.S_IMODE(metadata.st_mode)
+    if os.name == "posix":
+        if metadata.st_uid != os.geteuid():
+            raise SkillMCPError(
+                f"{label} must be owned by the MCP server user: {absolute}"
+            )
+        if mode & 0o077:
+            raise SkillMCPError(
+                f"{label} must not be accessible by group or other users: {absolute}"
+            )
+        if not mode & stat.S_IRUSR:
+            raise SkillMCPError(f"{label} must be owner-readable: {absolute}")
+        if metadata.st_nlink != 1:
+            raise SkillMCPError(
+                f"{label} must not have multiple hard links: {absolute}"
+            )
+    if metadata.st_size > MAX_SECRET_FILE_BYTES:
+        raise SkillMCPError(
+            f"{label} exceeds the {MAX_SECRET_FILE_BYTES}-byte secret-file limit: {absolute}"
+        )
+    return {
+        "path": str(absolute),
+        "exists": True,
+        "device": metadata.st_dev,
+        "inode": metadata.st_ino,
+        "mode": mode,
+        "uid": getattr(metadata, "st_uid", None),
+        "gid": getattr(metadata, "st_gid", None),
+        "size": metadata.st_size,
+        "mtime_ns": metadata.st_mtime_ns,
+        "ctime_ns": metadata.st_ctime_ns,
+    }
+
+
+def _secret_file_identities(
+    command: list[str],
+    *,
+    require_exists: bool = False,
+) -> tuple[dict[str, Any], ...]:
+    identities = []
+    for label, path in _secret_file_arguments(command):
+        identities.append(
+            {
+                "argument": label,
+                "identity": _secret_file_identity(
+                    path,
+                    label=label,
+                    require_exists=require_exists,
+                ),
+            }
+        )
+    return tuple(identities)
+
+
+def _verify_secret_file_identities(plan: PlannedCommand) -> None:
+    current = _secret_file_identities(plan.command, require_exists=True)
+    if current != plan.secret_file_identities:
+        raise SkillMCPError(
+            "A planned secret file changed after review; the plan was invalidated. "
+            "Re-run the plan step."
+        )
 
 
 def _file_sha256(path: Path) -> str:
@@ -658,6 +1129,42 @@ def _cached_file_digest(path: Path) -> tuple[bytes, int]:
     return value, initial.st_size
 
 
+def _bounded_snapshot_paths() -> list[Path]:
+    """Enumerate the snapshot tree with bounds before allocating path state."""
+    paths: list[Path] = []
+    directory_count = 0
+    entry_count = 0
+    for current, directories, files in os.walk(SKILLS_DIR, followlinks=False):
+        directory_count += 1
+        current_path = Path(current)
+        depth = len(current_path.relative_to(SKILLS_DIR).parts)
+        if directory_count > MAX_SNAPSHOT_DIRECTORIES:
+            raise SkillMCPError(
+                f"Skill snapshot exceeds {MAX_SNAPSHOT_DIRECTORIES} directories"
+            )
+        if depth > MAX_SNAPSHOT_DEPTH:
+            raise SkillMCPError(
+                f"Skill snapshot exceeds traversal depth {MAX_SNAPSHOT_DEPTH}"
+            )
+        entry_count += len(directories) + len(files)
+        if entry_count > MAX_SNAPSHOT_ENTRIES:
+            raise SkillMCPError(
+                f"Skill snapshot exceeds {MAX_SNAPSHOT_ENTRIES} entries"
+            )
+        kept_directories: list[str] = []
+        for name in sorted(directories):
+            if name in _SNAPSHOT_EXCLUDED_DIR_NAMES:
+                continue
+            path = current_path / name
+            if path.is_symlink():
+                paths.append(path)
+            else:
+                kept_directories.append(name)
+        directories[:] = kept_directories
+        paths.extend(current_path / name for name in sorted(files))
+    return sorted(paths, key=lambda item: item.as_posix())
+
+
 def _skills_snapshot_sha256() -> str:
     """Bind a plan to all executable skill code, helpers, and local policy.
 
@@ -672,14 +1179,24 @@ def _skills_snapshot_sha256() -> str:
     total_bytes = 0
     skills_root = SKILLS_DIR.resolve()
     try:
-        paths = sorted(SKILLS_DIR.rglob("*"), key=lambda item: item.as_posix())
-        for path in paths:
-            relative = path.relative_to(SKILLS_DIR).as_posix().encode("utf-8")
+        for path in _bounded_snapshot_paths():
+            relative_path = path.relative_to(SKILLS_DIR)
+            if any(
+                part in _SNAPSHOT_EXCLUDED_DIR_NAMES for part in relative_path.parts
+            ):
+                continue
+            if path.name in _SNAPSHOT_EXCLUDED_FILE_NAMES or path.name.endswith(
+                _SNAPSHOT_EXCLUDED_SUFFIXES
+            ):
+                continue
+            relative = relative_path.as_posix().encode("utf-8")
             if path.is_symlink():
                 target = path.resolve(strict=True)
                 target.relative_to(skills_root)
                 digest.update(b"L\0" + relative + b"\0")
-                digest.update(os.readlink(path).encode("utf-8", errors="surrogateescape"))
+                digest.update(
+                    os.readlink(path).encode("utf-8", errors="surrogateescape")
+                )
                 digest.update(b"\0")
                 continue
             if not path.is_file():
@@ -721,10 +1238,33 @@ def _planned_executable(command: list[str]) -> Path:
     try:
         resolved.relative_to(REPO_ROOT.resolve())
     except ValueError as exc:
-        raise SkillMCPError(f"Planned executable escapes the repository: {resolved}") from exc
+        raise SkillMCPError(
+            f"Planned executable escapes the repository: {resolved}"
+        ) from exc
     if not resolved.is_file():
         raise SkillMCPError(f"Planned executable is not a file: {resolved}")
     return resolved
+
+
+def _plan_expired(plan: PlannedCommand, now: float | None = None) -> bool:
+    if PLAN_TTL_SECONDS <= 0:
+        return False
+    checked_at = time.monotonic() if now is None else now
+    return checked_at - plan.created_at > PLAN_TTL_SECONDS
+
+
+def _purge_expired_plans_locked(now: float | None = None) -> int:
+    """Remove expired plans. Caller must hold ``_PLANS_LOCK``."""
+    checked_at = time.monotonic() if now is None else now
+    expired = [
+        plan_hash
+        for plan_hash, plan in _PLANS.items()
+        if _plan_expired(plan, checked_at)
+    ]
+    for plan_hash in expired:
+        _PLANS.pop(plan_hash, None)
+        _RESERVED_PLANS.discard(plan_hash)
+    return len(expired)
 
 
 def _store_plan(
@@ -735,11 +1275,25 @@ def _store_plan(
     read_only: bool,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     dry_run: dict[str, Any] | None = None,
+    expected_repository_sha256: str | None = None,
+    cancellation: CommandCancellation | None = None,
 ) -> dict[str, Any]:
+    if cancellation is not None and cancellation.cancelled:
+        raise SkillMCPError("Plan creation was cancelled.")
     timeout_seconds = _validate_timeout(timeout_seconds)
     executable = _planned_executable(command)
     executable_sha256 = _file_sha256(executable)
+    interpreter = _interpreter_path(command)
+    interpreter_sha256 = _file_sha256(interpreter) if interpreter is not None else ""
+    secret_file_identities = _secret_file_identities(command)
     repository_sha256 = _skills_snapshot_sha256()
+    if (
+        expected_repository_sha256 is not None
+        and repository_sha256 != expected_repository_sha256
+    ):
+        raise SkillMCPError(
+            "The skill repository changed after the reviewed dry-run; re-run the plan step."
+        )
     plan_hash = secrets.token_hex(PLAN_HASH_CHARS // 2)
     plan = PlannedCommand(
         plan_hash=plan_hash,
@@ -754,15 +1308,33 @@ def _store_plan(
         executable_path=str(executable),
         executable_sha256=executable_sha256,
         repository_sha256=repository_sha256,
+        interpreter_path=str(interpreter) if interpreter is not None else "",
+        interpreter_sha256=interpreter_sha256,
+        secret_file_identities=secret_file_identities,
     )
     with _PLANS_LOCK:
+        _purge_expired_plans_locked()
         while plan_hash in _PLANS:  # cryptographically implausible, but fail safe
             plan_hash = secrets.token_hex(PLAN_HASH_CHARS // 2)
             plan = PlannedCommand(**{**asdict(plan), "plan_hash": plan_hash})
         _PLANS[plan_hash] = plan
         # LRU eviction: drop the least-recently-used plan when over capacity.
         while len(_PLANS) > MAX_STORED_PLANS:
-            _PLANS.popitem(last=False)
+            evicted = next(
+                (candidate for candidate in _PLANS if candidate not in _RESERVED_PLANS),
+                None,
+            )
+            if evicted is None:
+                _PLANS.pop(plan_hash, None)
+                raise SkillMCPError(
+                    "All stored plan slots are currently reserved; retry later."
+                )
+            _PLANS.pop(evicted, None)
+    if cancellation is not None and not cancellation.track_plan(plan_hash):
+        with _PLANS_LOCK:
+            _PLANS.pop(plan_hash, None)
+            _RESERVED_PLANS.discard(plan_hash)
+        raise SkillMCPError("Plan creation was cancelled.")
     return asdict(plan)
 
 
@@ -775,7 +1347,9 @@ class _BoundedResult:
     cancelled: bool = False
 
 
-def _drain_stream(stream: Any, sink: list[bytes], byte_cap: int, dropped: list[int]) -> None:
+def _drain_stream(
+    stream: Any, sink: list[bytes], byte_cap: int, dropped: list[int]
+) -> None:
     """Read a stream into a byte-capped buffer; remaining bytes are discarded.
 
     Runs in a worker thread. Reads in 64KiB chunks until EOF. Once the
@@ -827,6 +1401,7 @@ def _run_command(
     *,
     timeout_seconds: int,
     cancellation: CommandCancellation | None = None,
+    before_spawn: Callable[[], None] | None = None,
 ) -> _BoundedResult:
     """Run a command with bounded stdout/stderr buffering.
 
@@ -848,93 +1423,153 @@ def _run_command(
             stderr="Command cancelled before start.",
             cancelled=True,
         )
-    try:
-        proc = subprocess.Popen(
-            command,
-            cwd=REPO_ROOT,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=False,
-            start_new_session=os.name == "posix",
-        )
-    except OSError as exc:
+    started_at = time.monotonic()
+    deadline = started_at + timeout_seconds
+    acquired, queue_message = _acquire_subprocess_slot(
+        deadline=deadline,
+        cancellation=cancellation,
+    )
+    if not acquired:
+        cancelled = cancellation is not None and cancellation.cancelled
         return _BoundedResult(
-            returncode=127,
+            returncode=130 if cancelled else 124,
             stdout="",
-            stderr=f"Failed to start command: {exc}",
+            stderr=queue_message,
+            timed_out=not cancelled,
+            cancelled=cancelled,
         )
-    if cancellation is not None:
-        cancellation.attach(proc)
-    stdout_buf: list[bytes] = []
-    stderr_buf: list[bytes] = []
-    stdout_dropped = [0]
-    stderr_dropped = [0]
-    stdout_thread = threading.Thread(
-        target=_drain_stream,
-        args=(proc.stdout, stdout_buf, MAX_OUTPUT_BYTES, stdout_dropped),
-        daemon=True,
-    )
-    stderr_thread = threading.Thread(
-        target=_drain_stream,
-        args=(proc.stderr, stderr_buf, MAX_OUTPUT_BYTES, stderr_dropped),
-        daemon=True,
-    )
-    stdout_thread.start()
-    stderr_thread.start()
-    timed_out = False
-    cancelled = False
     try:
-        returncode = proc.wait(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        # Send SIGTERM, then SIGKILL after a grace period if needed. The
-        # child is started in a new session so this reaches subprocesses that
-        # inherited the script's process group as well as the shell itself.
-        _terminate_process(proc, force=False)
+        # Authorization may have changed while this call was queued.
+        if os.environ.get("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION") != "1":
+            raise SkillMCPError(
+                "Subprocess execution was disabled while the command was queued."
+            )
+        if cancellation is not None and cancellation.cancelled:
+            return _BoundedResult(
+                returncode=130,
+                stdout="",
+                stderr="Command cancelled before start.",
+                cancelled=True,
+            )
+        if time.monotonic() >= deadline:
+            return _BoundedResult(
+                returncode=124,
+                stdout="",
+                stderr="Command timed out before a subprocess could start.",
+                timed_out=True,
+            )
+        resolved_command = _resolved_command(command)
+        if before_spawn is not None:
+            # execute_plan uses this final boundary to recheck its TTL, gates,
+            # and reservation, then consume the single-use plan. It runs only
+            # after a worker slot exists, so queue cancellation keeps the plan.
+            try:
+                before_spawn()
+            except _CommandCancelledBeforeStart:
+                return _BoundedResult(
+                    returncode=130,
+                    stdout="",
+                    stderr="Command cancelled before start.",
+                    cancelled=True,
+                )
         try:
+            proc = subprocess.Popen(
+                resolved_command,
+                cwd=REPO_ROOT,
+                env=_child_environment(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+                start_new_session=os.name == "posix",
+            )
+        except OSError as exc:
+            return _BoundedResult(
+                returncode=127,
+                stdout="",
+                stderr=f"Failed to start command: {exc}",
+            )
+        _register_active_process(proc)
+        if cancellation is not None:
+            cancellation.attach(proc)
+        stdout_buf: list[bytes] = []
+        stderr_buf: list[bytes] = []
+        stdout_dropped = [0]
+        stderr_dropped = [0]
+        stdout_thread = threading.Thread(
+            target=_drain_stream,
+            args=(proc.stdout, stdout_buf, MAX_OUTPUT_BYTES, stdout_dropped),
+            daemon=True,
+        )
+        stderr_thread = threading.Thread(
+            target=_drain_stream,
+            args=(proc.stderr, stderr_buf, MAX_OUTPUT_BYTES, stderr_dropped),
+            daemon=True,
+        )
+        stdout_thread.start()
+        stderr_thread.start()
+        timed_out = False
+        cancelled = False
+        try:
+            remaining_runtime = max(0.001, deadline - time.monotonic())
+            returncode = proc.wait(timeout=remaining_runtime)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            # Send SIGTERM, allow a short cleanup window, then *always* send
+            # SIGKILL to the group. A leader can exit on SIGTERM while a
+            # descendant in the same group continues running.
+            grace_started = time.monotonic()
+            _terminate_process(proc, force=False)
+            try:
+                returncode = proc.wait(timeout=CANCEL_KILL_GRACE_SECONDS)
+            except subprocess.TimeoutExpired:
+                returncode = -signal.SIGKILL
+            except (OSError, ProcessLookupError):
+                returncode = -signal.SIGKILL
+            grace_remaining = CANCEL_KILL_GRACE_SECONDS - (
+                time.monotonic() - grace_started
+            )
+            if grace_remaining > 0:
+                time.sleep(grace_remaining)
+            _terminate_process(proc, force=True)
             try:
                 returncode = proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                _terminate_process(proc, force=True)
-                try:
-                    returncode = proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    returncode = -signal.SIGKILL
-        except (OSError, ProcessLookupError):
-            returncode = -signal.SIGKILL
-    finally:
-        if cancellation is not None:
-            cancelled = cancellation.cancelled
-            cancellation.detach(proc)
-        # Reader threads exit when pipes close (process exit closes them).
-        stdout_thread.join(timeout=5)
-        stderr_thread.join(timeout=5)
-        # Defensive: close pipes if still open.
-        for stream in (proc.stdout, proc.stderr):
-            if stream is not None:
-                try:
-                    stream.close()
-                except OSError:
-                    pass
+            except (subprocess.TimeoutExpired, OSError, ProcessLookupError):
+                returncode = -signal.SIGKILL
+        finally:
+            if cancellation is not None:
+                cancelled = cancellation.cancelled
+                cancellation.detach(proc)
+            # Reader threads exit when all process-group pipe writers close.
+            stdout_thread.join(timeout=5)
+            stderr_thread.join(timeout=5)
+            for stream in (proc.stdout, proc.stderr):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
+            _unregister_active_process(proc)
 
-    stdout_text = b"".join(stdout_buf).decode("utf-8", errors="replace")
-    stderr_text = b"".join(stderr_buf).decode("utf-8", errors="replace")
-    if stdout_dropped[0]:
-        stdout_text += f"\n...[dropped {stdout_dropped[0]} bytes from stdout]"
-    if stderr_dropped[0]:
-        stderr_text += f"\n...[dropped {stderr_dropped[0]} bytes from stderr]"
-    if timed_out:
-        stderr_text += f"\n...[command exceeded timeout of {timeout_seconds}s and was terminated]"
-    if cancelled and not timed_out:
-        stderr_text += "\n...[command was cancelled and terminated]"
-    return _BoundedResult(
-        returncode=returncode,
-        stdout=stdout_text,
-        stderr=stderr_text,
-        timed_out=timed_out,
-        cancelled=cancelled,
-    )
+        stdout_text = b"".join(stdout_buf).decode("utf-8", errors="replace")
+        stderr_text = b"".join(stderr_buf).decode("utf-8", errors="replace")
+        if stdout_dropped[0]:
+            stdout_text += f"\n...[dropped {stdout_dropped[0]} bytes from stdout]"
+        if stderr_dropped[0]:
+            stderr_text += f"\n...[dropped {stderr_dropped[0]} bytes from stderr]"
+        if timed_out:
+            stderr_text += f"\n...[command exceeded timeout of {timeout_seconds}s and was terminated]"
+        if cancelled and not timed_out:
+            stderr_text += "\n...[command was cancelled and terminated]"
+        return _BoundedResult(
+            returncode=returncode,
+            stdout=stdout_text,
+            stderr=stderr_text,
+            timed_out=timed_out,
+            cancelled=cancelled,
+        )
+    finally:
+        _SUBPROCESS_SEMAPHORE.release()
 
 
 def _truncate(value: str) -> str:
@@ -969,7 +1604,7 @@ _SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
             r"(?i)(Authorization\s*:\s*(?:Bearer|Basic|Splunk|Token|Digest|MAC)\s+)"
-            r"[A-Za-z0-9+/=._\-]{6,}"
+            r"[A-Za-z0-9+/=._\-]+"
         ),
         r"\1[REDACTED]",
     ),
@@ -995,7 +1630,7 @@ _SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
             r"private[_-]?key"
             r")[\"']?)"
             r"(\s*[:=]\s*['\"]?)"
-            r"[^\s'\",&]{6,}"
+            r"[^\s'\",&]+"
         ),
         r"\1\2[REDACTED]",
     ),
@@ -1025,6 +1660,113 @@ def _redact_secrets(value: str) -> str:
 
 def _truncate_and_redact(value: str) -> str:
     return _truncate(_redact_secrets(value))
+
+
+def _json_key_carries_secret_material(key: str) -> bool:
+    normalized = _normalize_key(key)
+    if not normalized or normalized in NON_SECRET_VALUE_KEYS:
+        return False
+    if normalized.endswith(
+        (
+            "_file",
+            "_files",
+            "_path",
+            "_paths",
+            "_key_name",
+            "_keys",
+            "_name",
+            "_ref",
+            "_reference",
+            "_url",
+            "_id",
+        )
+    ):
+        return False
+    return _looks_secret_key(normalized)
+
+
+def _sanitize_parsed_json(payload: Any, *, label: str) -> dict[str, Any]:
+    """Recursively redact and shape-bound JSON returned by child scripts."""
+    if not isinstance(payload, dict):
+        raise SkillMCPError(f"{label} must be a JSON object")
+    item_count = 0
+
+    def visit(value: Any, *, depth: int, key_hint: str | None = None) -> Any:
+        nonlocal item_count
+        item_count += 1
+        if item_count > MAX_PARSED_JSON_ITEMS:
+            raise SkillMCPError(
+                f"{label} exceeds the {MAX_PARSED_JSON_ITEMS}-item JSON limit"
+            )
+        if depth > MAX_PARSED_JSON_DEPTH:
+            raise SkillMCPError(
+                f"{label} exceeds the {MAX_PARSED_JSON_DEPTH}-level JSON depth limit"
+            )
+        if key_hint is not None and _json_key_carries_secret_material(key_hint):
+            return "[REDACTED]"
+        if isinstance(value, str):
+            return _truncate_and_redact(value)
+        if value is None or isinstance(value, (bool, int)):
+            return value
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise SkillMCPError(f"{label} contains a non-finite JSON number")
+            return value
+        if isinstance(value, list):
+            return [visit(item, depth=depth + 1) for item in value]
+        if isinstance(value, dict):
+            sanitized: dict[str, Any] = {}
+            for raw_key, item in value.items():
+                if not isinstance(raw_key, str):
+                    raise SkillMCPError(f"{label} contains a non-string object key")
+                key = _truncate_and_redact(raw_key)
+                if key in sanitized:
+                    raise SkillMCPError(
+                        f"{label} contains duplicate keys after output sanitization"
+                    )
+                sanitized[key] = visit(
+                    item,
+                    depth=depth + 1,
+                    key_hint=raw_key,
+                )
+            return sanitized
+        raise SkillMCPError(
+            f"{label} contains unsupported value type {type(value).__name__}"
+        )
+
+    sanitized_payload = visit(payload, depth=0)
+    encoded = json.dumps(
+        sanitized_payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    if len(encoded) > MAX_OUTPUT_BYTES:
+        raise SkillMCPError(
+            f"{label} exceeds the {MAX_OUTPUT_BYTES}-byte parsed-output limit"
+        )
+    return sanitized_payload
+
+
+def _load_subprocess_json(value: str, *, label: str) -> Any:
+    """Parse child JSON while rejecting duplicate keys and non-finite values."""
+
+    def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise SkillMCPError(f"{label} contains duplicate object key {key!r}")
+            result[key] = item
+        return result
+
+    def reject_constant(constant: str) -> Any:
+        raise SkillMCPError(f"{label} contains non-finite number {constant}")
+
+    return json.loads(
+        value,
+        object_pairs_hook=object_pairs,
+        parse_constant=reject_constant,
+    )
 
 
 def _skill_reference_files(skill_dir: Path) -> list[Path]:
@@ -1059,9 +1801,7 @@ def _contained_skill_file(path: Path, skill_dir: Path) -> Path:
         resolved = path.resolve(strict=True)
         resolved.relative_to(skill_dir.resolve())
     except (FileNotFoundError, ValueError) as exc:
-        raise SkillMCPError(
-            f"Skill file escapes its skill directory: {path}"
-        ) from exc
+        raise SkillMCPError(f"Skill file escapes its skill directory: {path}") from exc
     if not resolved.is_file():
         raise SkillMCPError(f"Skill resource is not a regular file: {path}")
     return resolved
@@ -1085,7 +1825,9 @@ def _skill_template_files(skill_dir: Path) -> list[Path]:
         for path in sorted(templates_dir.rglob("*")):
             if not path.is_file():
                 continue
-            if any(part.startswith(".") for part in path.relative_to(templates_dir).parts):
+            if any(
+                part.startswith(".") for part in path.relative_to(templates_dir).parts
+            ):
                 continue
             files.append(_contained_skill_file(path, skill_dir))
     if len(files) > MAX_RESOURCE_FILES:
@@ -1114,9 +1856,13 @@ def list_skills() -> dict[str, Any]:
                 "description": metadata.get("description", ""),
                 "path": str(skill_md.relative_to(REPO_ROOT)),
                 "has_template": bool(template_files),
-                "template_files": [str(path.relative_to(skill_dir)) for path in template_files],
+                "template_files": [
+                    str(path.relative_to(skill_dir)) for path in template_files
+                ],
                 "has_reference": bool(reference_files),
-                "reference_files": [str(path.relative_to(skill_dir)) for path in reference_files],
+                "reference_files": [
+                    str(path.relative_to(skill_dir)) for path in reference_files
+                ],
                 "has_mcp_tools": (skill_dir / "mcp_tools.json").is_file(),
                 "scripts": scripts,
             }
@@ -1136,7 +1882,9 @@ def read_skill_file(skill: str, file_name: str) -> str:
     if file_name == "reference":
         reference_files = _skill_reference_files(skill_dir)
         if not reference_files:
-            raise SkillMCPError(f"{skill} does not have reference.md or references/*.md")
+            raise SkillMCPError(
+                f"{skill} does not have reference.md or references/*.md"
+            )
         if len(reference_files) == 1:
             return _read_bounded_text(reference_files[0], MAX_RESOURCE_BYTES)
         chunks = []
@@ -1176,7 +1924,9 @@ def read_skill_file(skill: str, file_name: str) -> str:
     path = skill_dir / allowed[file_name]
     if not path.is_file():
         raise SkillMCPError(f"{skill} does not have {allowed[file_name]}")
-    return _read_bounded_text(_contained_skill_file(path, skill_dir), MAX_RESOURCE_BYTES)
+    return _read_bounded_text(
+        _contained_skill_file(path, skill_dir), MAX_RESOURCE_BYTES
+    )
 
 
 def _read_bounded_text(path: Path, max_bytes: int) -> str:
@@ -1204,6 +1954,7 @@ def _read_bounded_text(path: Path, max_bytes: int) -> str:
 
 
 def credential_status() -> dict[str, Any]:
+    """Report credential-file metadata without following links or reading data."""
     candidates: list[tuple[str, Path]] = []
     env_path = os.environ.get("SPLUNK_CREDENTIALS_FILE")
     if env_path:
@@ -1211,31 +1962,80 @@ def credential_status() -> dict[str, Any]:
     candidates.append(("project", REPO_ROOT / "credentials"))
     candidates.append(("home", Path.home() / ".splunk" / "credentials"))
 
-    entries = []
+    entries: list[dict[str, Any]] = []
     active: dict[str, Any] | None = None
     for source, path in candidates:
-        exists = path.is_file()
-        mode = None
-        secure_mode = None
-        if exists:
-            try:
-                mode_int = stat.S_IMODE(path.stat().st_mode)
-                mode = oct(mode_int)
-                secure_mode = (mode_int & 0o077) == 0
-            except OSError:
-                mode = None
-                secure_mode = None
+        exists = False
+        mode: str | None = None
+        owner_ok: bool | None = None
+        single_link: bool | None = None
+        regular_file = False
+        reasons: list[str] = []
+        try:
+            metadata = path.lstat()
+            exists = True
+            mode_int = stat.S_IMODE(metadata.st_mode)
+            mode = oct(mode_int)
+            if stat.S_ISLNK(metadata.st_mode):
+                reasons.append("symbolic link")
+            elif not stat.S_ISREG(metadata.st_mode):
+                reasons.append("not a regular file")
+            else:
+                regular_file = True
+            if os.name == "posix" and hasattr(os, "geteuid"):
+                owner_ok = metadata.st_uid == os.geteuid()
+                single_link = metadata.st_nlink == 1
+                if not owner_ok:
+                    reasons.append("not owned by the MCP server user")
+                if not single_link:
+                    reasons.append("link count is not one")
+                if mode_int & 0o077:
+                    reasons.append("accessible by group or other users")
+                if not mode_int & stat.S_IRUSR:
+                    reasons.append("not owner-readable")
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            reasons.append(f"metadata unavailable: {type(exc).__name__}")
+        secure_mode = exists and regular_file and not reasons
         entry = {
             "source": source,
             "path": str(path),
             "exists": exists,
             "mode": mode,
             "secure_mode": secure_mode,
+            "regular_file": regular_file,
+            "owner_ok": owner_ok,
+            "single_link": single_link,
+            "reasons": reasons,
         }
         entries.append(entry)
-        if active is None and exists:
+        if active is None and secure_mode:
             active = entry
     return {"active": active, "candidates": entries}
+
+
+def get_server_status() -> dict[str, Any]:
+    """Return aggregate supervisor state without exposing commands or plan data."""
+    with _PLANS_LOCK:
+        purged_expired_plans = _purge_expired_plans_locked()
+        stored_plans = len(_PLANS)
+        reserved_plans = len(_RESERVED_PLANS)
+    with _ACTIVE_PROCESSES_LOCK:
+        active_processes = len(_ACTIVE_PROCESSES)
+    with _SUBPROCESS_QUEUE_LOCK:
+        queued_subprocesses = _SUBPROCESS_QUEUE_WAITERS
+    return {
+        "stored_plans": stored_plans,
+        "reserved_plans": reserved_plans,
+        "purged_expired_plans": purged_expired_plans,
+        "max_stored_plans": MAX_STORED_PLANS,
+        "plan_ttl_seconds": PLAN_TTL_SECONDS,
+        "active_processes": active_processes,
+        "queued_subprocesses": queued_subprocesses,
+        "max_concurrent_subprocesses": MAX_CONCURRENT_SUBPROCESSES,
+        "max_queued_subprocesses": MAX_QUEUED_SUBPROCESSES,
+    }
 
 
 _VALID_PRODUCT_STATES = {
@@ -1277,29 +2077,14 @@ def resolve_cisco_product(
     *,
     cancellation: CommandCancellation | None = None,
 ) -> dict[str, Any]:
+    """Resolve a product from checked-in catalog data without running code."""
     query = _safe_text(query, label="query")
-    command = ["bash", str(CISCO_RESOLVE_SCRIPT), "--json", query]
-    result = _run_command(
-        command,
-        timeout_seconds=RESOLVE_TIMEOUT_SECONDS,
-        cancellation=cancellation,
-    )
-    payload: dict[str, Any]
+    if cancellation is not None and cancellation.cancelled:
+        raise SkillMCPError("Cisco product resolution was cancelled.")
     try:
-        payload = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError:
-        payload = {
-            "status": "error",
-            "raw_stdout": _truncate_and_redact(result.stdout),
-            "returncode": result.returncode,
-        }
-        if result.stderr:
-            payload["stderr"] = _truncate_and_redact(result.stderr)
-        return payload
-    payload["returncode"] = result.returncode
-    if result.stderr:
-        payload["stderr"] = _truncate_and_redact(result.stderr)
-    return payload
+        return discovery.resolve_cisco_product(query)
+    except discovery.DiscoveryError as exc:
+        raise SkillMCPError(f"Could not resolve Cisco product: {exc}") from exc
 
 
 def _catalog_keys_for_product(
@@ -1353,7 +2138,9 @@ def _catalog_keys_for_product(
     return {"non_secret": non_secret, "secret": secret}
 
 
-def secret_file_instructions(secret_keys: list[str], prefix: str = "/tmp/splunk_skill") -> dict[str, Any]:
+def secret_file_instructions(
+    secret_keys: list[str], prefix: str = "/tmp/splunk_skill"
+) -> dict[str, Any]:
     prefix = _safe_text(prefix, label="prefix")
     if len(prefix) > 4096:
         raise SkillMCPError("prefix exceeds the 4096-character limit")
@@ -1363,15 +2150,38 @@ def secret_file_instructions(secret_keys: list[str], prefix: str = "/tmp/splunk_
         raise SkillMCPError(
             f"secret_keys cannot contain more than {MAX_SECRET_KEYS} entries"
         )
-    commands = []
+    prepared: list[tuple[str, str]] = []
+    seen_keys: set[str] = set()
     for raw_key in secret_keys:
         key = _safe_text(raw_key, label="secret key")
         if not key or len(key) > MAX_KEY_CHARS:
             raise SkillMCPError(
                 f"secret key must contain 1 to {MAX_KEY_CHARS} characters"
             )
+        if key in seen_keys:
+            raise SkillMCPError(f"secret_keys contains duplicate key: {key}")
+        seen_keys.add(key)
         safe_key = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_") or "secret"
+        prepared.append((key, safe_key))
+
+    normalized_counts: dict[str, int] = {}
+    for _, safe_key in prepared:
+        normalized_counts[safe_key] = normalized_counts.get(safe_key, 0) + 1
+
+    commands = []
+    used_paths: set[str] = set()
+    for key, safe_key in prepared:
+        if normalized_counts[safe_key] > 1:
+            suffix = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+            safe_key = f"{safe_key}_{suffix}"
         path = f"{prefix}_{safe_key}"
+        counter = 1
+        unique_path = path
+        while unique_path in used_paths:
+            counter += 1
+            unique_path = f"{path}_{counter}"
+        path = unique_path
+        used_paths.add(path)
         argv = ["bash", "skills/shared/scripts/write_secret_file.sh", path]
         commands.append(
             {
@@ -1459,14 +2269,32 @@ def plan_cisco_product_setup(
         dry_run_command.extend(["--secret-file", key, path])
         execute_command.extend(["--secret-file", key, path])
 
+    # Refuse unsafe existing secret paths before the dry-run can inspect them.
+    # Missing files remain representable so the dry-run can report its normal
+    # missing-value guidance, but such a plan cannot execute until replanned.
+    _secret_file_identities(dry_run_command)
+    snapshot_before_dry_run = _skills_snapshot_sha256()
     dry_run_result = _run_command(
         dry_run_command,
         timeout_seconds=timeout_seconds,
         cancellation=cancellation,
     )
+    snapshot_after_dry_run = _skills_snapshot_sha256()
+    if snapshot_after_dry_run != snapshot_before_dry_run:
+        raise SkillMCPError(
+            "The skill repository changed during the reviewed dry-run; "
+            "the result was discarded. Re-run the plan step."
+        )
     try:
-        dry_run = json.loads(dry_run_result.stdout or "{}")
-    except json.JSONDecodeError as exc:
+        parsed_dry_run = _load_subprocess_json(
+            dry_run_result.stdout or "{}",
+            label="Cisco product dry-run output",
+        )
+        dry_run = _sanitize_parsed_json(
+            parsed_dry_run,
+            label="Cisco product dry-run output",
+        )
+    except (json.JSONDecodeError, SkillMCPError) as exc:
         detail = _truncate_and_redact(dry_run_result.stderr or dry_run_result.stdout)
         raise SkillMCPError(
             f"Cisco product dry-run did not return JSON: {detail}"
@@ -1483,12 +2311,15 @@ def plan_cisco_product_setup(
         kind="cisco_product_setup",
         command=execute_command,
         summary=summary,
-        # Only the typed validate-only route is allowed through without the
-        # mutation gate. Manual/partial routes may still write handoff assets
-        # or delegate work, so catalog status is not an authorization signal.
-        read_only=phase == "validate",
+        # Phase names are not an authorization boundary. Some validators
+        # create reports, caches, or sessions, so every executable product
+        # plan remains mutation-gated. The dry-run above is the only operation
+        # enabled by the normal execution-on/mutation-off registration.
+        read_only=False,
         timeout_seconds=timeout_seconds,
         dry_run=dry_run,
+        expected_repository_sha256=snapshot_after_dry_run,
+        cancellation=cancellation,
     )
     plan["dry_run_command"] = dry_run_command
     return plan
@@ -1499,6 +2330,8 @@ def plan_skill_script(
     script: str,
     args: list[str] | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    cancellation: CommandCancellation | None = None,
 ) -> dict[str, Any]:
     path = _script_path(skill, script)
     timeout_seconds = _validate_timeout(timeout_seconds)
@@ -1518,7 +2351,85 @@ def plan_skill_script(
         summary=f"Run {skill}/scripts/{script_name}",
         read_only=read_only,
         timeout_seconds=timeout_seconds,
+        cancellation=cancellation,
     )
+
+
+def _check_plan_execution_gates(
+    plan: PlannedCommand,
+    *,
+    expected_kind: str | None,
+) -> None:
+    if expected_kind is not None and plan.kind != expected_kind:
+        raise SkillMCPError(
+            f"Plan {plan.plan_hash} is {plan.kind}, not {expected_kind}."
+        )
+    if os.environ.get("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION") != "1":
+        raise SkillMCPError(
+            "Subprocess execution is disabled. Set "
+            "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 in the MCP server environment."
+        )
+    if (
+        plan.kind == "skill_script"
+        and os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION") != "1"
+    ):
+        raise SkillMCPError(
+            "Generic skill-script execution is disabled. Set "
+            "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1 in addition to the "
+            "execution and mutation gates only after reviewing this arbitrary-script risk."
+        )
+    if not plan.read_only and os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_MUTATION") != "1":
+        raise SkillMCPError(
+            "Mutating execution is disabled. Set SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 "
+            "in the MCP server environment."
+        )
+
+
+def _verify_plan_integrity(plan: PlannedCommand) -> None:
+    current_path = Path(plan.executable_path)
+    if (
+        not current_path.is_file()
+        or _file_sha256(current_path) != plan.executable_sha256
+    ):
+        raise SkillMCPError(
+            "The planned script changed after review; the plan was invalidated. "
+            "Re-run the plan step."
+        )
+    if plan.interpreter_path:
+        interpreter = Path(plan.interpreter_path)
+        if (
+            not interpreter.is_file()
+            or _file_sha256(interpreter) != plan.interpreter_sha256
+        ):
+            raise SkillMCPError(
+                "The planned interpreter changed after review; the plan was "
+                "invalidated. Re-run the plan step."
+            )
+    if _skills_snapshot_sha256() != plan.repository_sha256:
+        raise SkillMCPError(
+            "The skill repository changed after review; the plan was invalidated. "
+            "Re-run the plan step."
+        )
+    _verify_secret_file_identities(plan)
+
+
+def _cancelled_execution_payload(
+    plan: PlannedCommand,
+    *,
+    plan_hash: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "plan_hash": plan_hash,
+        "returncode": 130,
+        "stdout": "",
+        "stderr": message,
+        "command": plan.command,
+        "cwd": plan.cwd,
+        "timed_out": False,
+        "cancelled": True,
+    }
 
 
 def execute_plan(
@@ -1531,66 +2442,112 @@ def execute_plan(
     plan_hash = _safe_text(plan_hash, label="plan_hash")
     if not PLAN_HASH_RE.match(plan_hash):
         raise SkillMCPError("plan_hash must be a 64-character lowercase hex string.")
+    if confirm is not True:
+        raise SkillMCPError("Execution requires confirm=true.")
 
-    # Validate and consume the exact same immutable object under one lock.
-    # Validation errors leave the plan available for a corrected retry.
+    # Reserve (but do not consume) the exact immutable plan. Queue
+    # cancellation, an authorization change, or shutdown before spawn leaves
+    # the plan available for a corrected retry.
     with _PLANS_LOCK:
         plan = _PLANS.get(plan_hash)
         if plan is None:
             raise SkillMCPError(f"Unknown plan_hash: {plan_hash}")
-        if PLAN_TTL_SECONDS > 0 and time.monotonic() - plan.created_at > PLAN_TTL_SECONDS:
+        if _plan_expired(plan):
             _PLANS.pop(plan_hash, None)
-            raise SkillMCPError(
-                f"Plan {plan_hash} has expired; re-run the plan step."
-            )
-        if not confirm:
-            raise SkillMCPError("Execution requires confirm=true.")
-        if expected_kind is not None and plan.kind != expected_kind:
-            raise SkillMCPError(f"Plan {plan_hash} is {plan.kind}, not {expected_kind}.")
-        if os.environ.get("SPLUNK_SKILLS_MCP_ENABLE_EXECUTION") != "1":
-            raise SkillMCPError(
-                "Subprocess execution is disabled. Set "
-                "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1 in the MCP server environment."
-            )
-        if not plan.read_only and os.environ.get("SPLUNK_SKILLS_MCP_ALLOW_MUTATION") != "1":
-            raise SkillMCPError(
-                "Mutating execution is disabled. Set SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 "
-                "in the MCP server environment."
-            )
-        plan = _PLANS.pop(plan_hash)
+            _RESERVED_PLANS.discard(plan_hash)
+            raise SkillMCPError(f"Plan {plan_hash} has expired; re-run the plan step.")
+        _purge_expired_plans_locked()
+        _check_plan_execution_gates(plan, expected_kind=expected_kind)
+        if plan_hash in _RESERVED_PLANS:
+            raise SkillMCPError(f"Plan {plan_hash} is already queued for execution.")
+        _RESERVED_PLANS.add(plan_hash)
 
-    while not _EXECUTION_LOCK.acquire(timeout=0.1):
-        if cancellation is not None and cancellation.cancelled:
-            return {
-                "ok": False,
-                "plan_hash": plan_hash,
-                "returncode": 130,
-                "stdout": "",
-                "stderr": "Command cancelled before execution.",
-                "command": plan.command,
-                "cwd": plan.cwd,
-                "timed_out": False,
-                "cancelled": True,
-            }
+    execution_lock_acquired = False
     try:
-        current_path = Path(plan.executable_path)
-        if not current_path.is_file() or _file_sha256(current_path) != plan.executable_sha256:
-            raise SkillMCPError(
-                "The planned script changed after review; the plan was invalidated. "
-                "Re-run the plan step."
+        while not _EXECUTION_LOCK.acquire(timeout=0.1):
+            if cancellation is not None and cancellation.cancelled:
+                return _cancelled_execution_payload(
+                    plan,
+                    plan_hash=plan_hash,
+                    message="Command cancelled before execution.",
+                )
+        execution_lock_acquired = True
+
+        # Recheck mutable authorization and plan lifetime after queueing.
+        with _PLANS_LOCK:
+            current = _PLANS.get(plan_hash)
+            if current is None or current is not plan:
+                raise SkillMCPError(
+                    f"Plan {plan_hash} expired or was invalidated while queued."
+                )
+            if _plan_expired(plan):
+                _PLANS.pop(plan_hash, None)
+                _RESERVED_PLANS.discard(plan_hash)
+                raise SkillMCPError(
+                    f"Plan {plan_hash} has expired; re-run the plan step."
+                )
+            _check_plan_execution_gates(plan, expected_kind=expected_kind)
+        if cancellation is not None and cancellation.cancelled:
+            return _cancelled_execution_payload(
+                plan,
+                plan_hash=plan_hash,
+                message="Command cancelled before execution.",
             )
-        if _skills_snapshot_sha256() != plan.repository_sha256:
-            raise SkillMCPError(
-                "The skill repository changed after review; the plan was invalidated. "
-                "Re-run the plan step."
-            )
+
+        # Integrity failures permanently invalidate the reviewed plan. Gate,
+        # queue, and cancellation failures above intentionally do not.
+        try:
+            _verify_plan_integrity(plan)
+        except SkillMCPError:
+            with _PLANS_LOCK:
+                _PLANS.pop(plan_hash, None)
+                _RESERVED_PLANS.discard(plan_hash)
+            raise
+
+        execution_command = list(plan.command)
+        if plan.interpreter_path:
+            execution_command[0] = plan.interpreter_path
+
+        def consume_immediately_before_spawn() -> None:
+            # A resolver or dry-run may have occupied the subprocess worker
+            # after the first verification. Rebind the complete plan after
+            # that queue wait, immediately before consuming it.
+            try:
+                _verify_plan_integrity(plan)
+            except SkillMCPError:
+                with _PLANS_LOCK:
+                    _PLANS.pop(plan_hash, None)
+                    _RESERVED_PLANS.discard(plan_hash)
+                raise
+            with _PLANS_LOCK:
+                current = _PLANS.get(plan_hash)
+                if current is None or current is not plan:
+                    raise SkillMCPError(
+                        f"Plan {plan_hash} expired or was invalidated before execution."
+                    )
+                if _plan_expired(plan):
+                    _PLANS.pop(plan_hash, None)
+                    _RESERVED_PLANS.discard(plan_hash)
+                    raise SkillMCPError(
+                        f"Plan {plan_hash} has expired; re-run the plan step."
+                    )
+                _check_plan_execution_gates(plan, expected_kind=expected_kind)
+                if cancellation is not None and cancellation.cancelled:
+                    raise _CommandCancelledBeforeStart
+                _PLANS.pop(plan_hash, None)
+                _RESERVED_PLANS.discard(plan_hash)
+
         result = _run_command(
-            plan.command,
+            execution_command,
             timeout_seconds=plan.timeout_seconds,
             cancellation=cancellation,
+            before_spawn=consume_immediately_before_spawn,
         )
     finally:
-        _EXECUTION_LOCK.release()
+        if execution_lock_acquired:
+            _EXECUTION_LOCK.release()
+        with _PLANS_LOCK:
+            _RESERVED_PLANS.discard(plan_hash)
     return {
         "ok": result.returncode == 0 and not result.timed_out and not result.cancelled,
         "plan_hash": plan_hash,

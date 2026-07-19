@@ -1,7 +1,6 @@
 interface:
   display_name: "Splunk CIM Data-Model Management"
-  short_description: "Manage CIM data model acceleration and audits"
-  default_prompt: >-
-    Use $splunk-cim-data-model to render and validate CIM data model
-    acceleration overrides (datamodels.conf), rebuild/backfill helpers, and CIM
-    population/compliance audits for Enterprise Security and ITSI readiness.
+  short_description: "Deprecated alias for CIM data-model management"
+  default_prompt: "Use $splunk-cim-data-model only for compatibility; route new work to $splunk-cim-data-model-setup."
+policy:
+  allow_implicit_invocation: false

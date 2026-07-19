@@ -41,10 +41,10 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 if [[ -z "${REALM}" && -f "${OUTPUT_DIR}/coverage-report.json" ]]; then
-    REALM="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/coverage-report.json').read()).get('realm','unknown'))
-" 2>/dev/null || echo "unknown")"
+    REALM="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("realm", "unknown"))
+' "${OUTPUT_DIR}/coverage-report.json" 2>/dev/null || echo "unknown")"
 fi
 
 fails=()
@@ -63,13 +63,15 @@ auth = data.get('authMethod')
 assert auth in ('SERVICE_ACCOUNT_KEY', 'WORKLOAD_IDENTITY_FEDERATION'), 'invalid authMethod'
 projects = data.get('projects')
 assert isinstance(projects, dict), 'projects must be an object'
-assert projects.get('syncMode') in ('ALL', 'SELECTED'), 'projects.syncMode missing or invalid'
-project_ids = projects.get('projectIds', [])
-assert isinstance(project_ids, list) and all(isinstance(item, str) and item for item in project_ids), 'projects.projectIds must be a string list'
-if projects['syncMode'] == 'ALL':
-    assert not project_ids, 'projects.projectIds must be empty for ALL'
+assert projects.get('syncMode') in ('ALL_REACHABLE', 'SELECTED'), 'projects.syncMode missing or invalid'
+assert 'projectIds' not in projects, 'legacy projects.projectIds must not be emitted'
+selected_project_ids_present = 'selectedProjectIds' in projects
+if projects['syncMode'] == 'ALL_REACHABLE':
+    assert not selected_project_ids_present, 'projects.selectedProjectIds must be absent for ALL_REACHABLE'
 else:
-    assert project_ids, 'projects.projectIds is required for SELECTED'
+    assert selected_project_ids_present, 'projects.selectedProjectIds is required for SELECTED'
+    project_ids = projects['selectedProjectIds']
+    assert isinstance(project_ids, list) and project_ids and all(isinstance(item, str) and item for item in project_ids), 'projects.selectedProjectIds must be a non-empty string list for SELECTED'
 if auth == 'WORKLOAD_IDENTITY_FEDERATION':
     value = data.get('workloadIdentityFederationConfig')
     assert isinstance(value, str) and value, 'workloadIdentityFederationConfig missing'
@@ -127,10 +129,10 @@ fi
 
 # 2. Poll rate check.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    poll_rate_ms="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('pollRate', 0))
-" 2>/dev/null || echo "0")"
+    poll_rate_ms="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("pollRate", 0))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "0")"
     if (( poll_rate_ms < 300000 )); then
         warns+=("pollRate=${poll_rate_ms}ms is below the recommended 300000ms (300s). Low poll rates increase Cloud Monitoring API quota usage.")
     else
@@ -140,10 +142,10 @@ fi
 
 # 3. namedToken ForceNew check.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    named_token="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('namedToken',''))
-" 2>/dev/null || echo "")"
+    named_token="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("namedToken", ""))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "")"
     if [[ -n "${named_token}" ]]; then
         warns+=("namedToken=${named_token} is set. Changing namedToken after apply destroys and re-creates the integration (ForceNew in Terraform). Confirm this is intentional.")
     fi
@@ -151,18 +153,18 @@ fi
 
 # 4. services non-empty when explicit mode.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    services_mode_info="$("${PYTHON_BIN}" -c "
-import json
-data = json.loads(open('${OUTPUT_DIR}/rest/create.json').read())
-svcs = data.get('services') or []
-print(f'count={len(svcs)}')
-" 2>/dev/null || echo "count=0")"
+    services_mode_info="$("${PYTHON_BIN}" -c '
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+svcs = data.get("services") or []
+print(f"count={len(svcs)}")
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "count=0")"
     if [[ -f "${OUTPUT_DIR}/coverage-report.json" ]]; then
-        cov_services_mode="$("${PYTHON_BIN}" -c "
-import json
-cov = json.loads(open('${OUTPUT_DIR}/coverage-report.json').read())
-print(cov.get('coverage', {}).get('services.mode', {}).get('notes', ''))
-" 2>/dev/null || echo "")"
+        cov_services_mode="$("${PYTHON_BIN}" -c '
+import json, sys
+cov = json.load(open(sys.argv[1], encoding="utf-8"))
+print(cov.get("coverage", {}).get("services.mode", {}).get("notes", ""))
+' "${OUTPUT_DIR}/coverage-report.json" 2>/dev/null || echo "")"
         if echo "${cov_services_mode}" | grep -q 'mode=explicit'; then
             if echo "${services_mode_info}" | grep -q 'count=0'; then
                 warns+=("services.mode=explicit but no services listed in rest/create.json. Integration will monitor all built-in services; confirm this is intended.")
@@ -174,13 +176,13 @@ fi
 
 # 5. Credential hash drift.
 if [[ -f "${OUTPUT_DIR}/state/credential-hashes.json" ]]; then
-    hash_count="$("${PYTHON_BIN}" -c "
-import json
-h = json.loads(open('${OUTPUT_DIR}/state/credential-hashes.json').read())
-pks = h.get('project_key_sha256', {})
-wif = h.get('wif_config_sha256', {})
+    hash_count="$("${PYTHON_BIN}" -c '
+import json, sys
+h = json.load(open(sys.argv[1], encoding="utf-8"))
+pks = h.get("project_key_sha256", {})
+wif = h.get("wif_config_sha256", {})
 print(len(pks) + len(wif))
-" 2>/dev/null || echo "0")"
+' "${OUTPUT_DIR}/state/credential-hashes.json" 2>/dev/null || echo "0")"
     if [[ "${hash_count}" == "0" ]]; then
         warns+=("state/credential-hashes.json has no stored credential hashes. Apply has not been run yet, or hashes were not recorded.")
     else
@@ -190,10 +192,10 @@ fi
 
 # 6. useMetricSourceProjectForQuota warning.
 if [[ -f "${OUTPUT_DIR}/rest/create.json" ]]; then
-    quota_flag="$("${PYTHON_BIN}" -c "
-import json
-print(json.loads(open('${OUTPUT_DIR}/rest/create.json').read()).get('useMetricSourceProjectForQuota', False))
-" 2>/dev/null || echo "False")"
+    quota_flag="$("${PYTHON_BIN}" -c '
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("useMetricSourceProjectForQuota", False))
+' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || echo "False")"
     if [[ "${quota_flag}" == "True" ]]; then
         warns+=("useMetricSourceProjectForQuota=true: ensure roles/serviceusage.serviceUsageConsumer is granted on the metric source project SA.")
     fi

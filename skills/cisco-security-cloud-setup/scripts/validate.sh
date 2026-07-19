@@ -231,7 +231,10 @@ if [[ -n "${INPUT_TYPE}" && -n "${INPUT_NAME}" ]]; then
         if ! ${SKIP_DATA_FLOW}; then
             log ""
             log "--- Data Flow ---"
-            mapfile -t selected_indexes < <(handler_indexes "${handler}" "${INPUT_NAME}")
+            selected_indexes=()
+            while IFS= read -r idx; do
+                selected_indexes+=("${idx}")
+            done < <(handler_indexes "${handler}" "${INPUT_NAME}")
             if [[ "${#selected_indexes[@]}" -eq 0 ]]; then
                 selected_indexes+=("$(input_type_default_index "${INPUT_TYPE}")")
             fi
@@ -252,7 +255,10 @@ elif [[ -n "${INPUT_TYPE}" ]]; then
         if [[ "${selected_count}" -gt 0 ]]; then
             log ""
             log "--- Data Flow ---"
-            mapfile -t selected_indexes < <(handler_indexes "${APP_NAME}_${INPUT_TYPE}")
+            selected_indexes=()
+            while IFS= read -r idx; do
+                selected_indexes+=("${idx}")
+            done < <(handler_indexes "${APP_NAME}_${INPUT_TYPE}")
             if [[ "${#selected_indexes[@]}" -eq 0 ]]; then
                 selected_indexes+=("$(input_type_default_index "${INPUT_TYPE}")")
             fi
@@ -304,18 +310,28 @@ else
         log "--- Data Flow (configured inputs only) ---"
         # Probe each configured stanza's actual index, falling back to the
         # product default only when the handler omits an index value.
-        declare -A SEEN_INDEXES=()
+        declare -a SEEN_INDEXES=()
         for type in "${CONFIGURED_TYPES[@]}"; do
-            mapfile -t configured_indexes < <(handler_indexes "${APP_NAME}_${type}")
+            configured_indexes=()
+            while IFS= read -r idx; do
+                configured_indexes+=("${idx}")
+            done < <(handler_indexes "${APP_NAME}_${type}")
             if [[ "${#configured_indexes[@]}" -eq 0 ]]; then
                 configured_indexes+=("$(input_type_default_index "${type}")")
             fi
             for idx in "${configured_indexes[@]}"; do
+                already_seen=false
                 [[ -n "${idx}" ]] || continue
-                if [[ -n "${SEEN_INDEXES[${idx}]:-}" ]]; then
+                for seen_idx in "${SEEN_INDEXES[@]}"; do
+                    if [[ "${seen_idx}" == "${idx}" ]]; then
+                        already_seen=true
+                        break
+                    fi
+                done
+                if [[ "${already_seen}" == "true" ]]; then
                     continue
                 fi
-                SEEN_INDEXES["${idx}"]=1
+                SEEN_INDEXES+=("${idx}")
                 probe_index_event_flow "${idx}" "${type}"
             done
         done

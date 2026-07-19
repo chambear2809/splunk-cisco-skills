@@ -2,9 +2,9 @@
 
 ## Sources of truth
 
-- `/Users/alecchamberlain/Downloads/Configuration Guide Splunk Observability for Cisco AI Pods - Updated 2026-05-01.pdf` — the operator-facing guide.
+- *Configuration Guide: Splunk Observability for Cisco AI Pods* (updated 2026-05-01) — operator-supplied; the PDF is not bundled with this repository.
 - `signalfx/splunk-opentelemetry-examples/collector/cisco-ai-ready-pods/otel-collector/values.yaml` — the canonical signalfx example.
-- `/Users/alecchamberlain/Documents/GitHub/otel-gruve/6-splunk-otel-collector-values.yaml` — production-validated atl-ocp2 OpenShift cluster (Splunk OTel chart v0.147.1).
+- [Production atl-ocp2 troubleshooting evidence](references/production-troubleshooting-atl-ocp2.md) — lessons from the OpenShift deployment that informed the rendered overlay.
 - Splunk Observability Workshop AI Pod scenario: `splunk.github.io/observability-workshop/en/ninja-workshops/14-cisco-ai-pods/`.
 
 ## Composition model

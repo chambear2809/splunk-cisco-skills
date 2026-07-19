@@ -32,4 +32,3 @@ payload =
   end
 
 File.write(output_path, JSON.pretty_generate(payload) + "\n")
-

@@ -1,17 +1,13 @@
 ---
 name: splunk-platform-pki-setup
-description: >-
-  Render, preflight, apply, validate, rotate, and inventory private or public
-  PKI for Splunk Enterprise TLS surfaces: Splunk Web, splunkd REST, S2S, HEC,
-  KV Store, indexer clusters, SHC, License Manager, Deployment Server,
-  Monitoring Console, Federated Search, heavy forwarders, Universal Forwarders,
-  Edge Processor, SAML SP signing, LDAPS trust, and CLI CA trust. Covers CSR
-  handoffs, internal CA rendering, FIPS mode, TLS policy presets, KV Store EKU
-  enforcement, default-cert refusal, SAN-aware leaf certs, mTLS, replication-port
-  TLS, and delegated rotation runbooks. Use when the user asks to build Splunk
-  PKI, mint certs, prepare third-party CA CSRs, replace default certs, configure
-  mTLS, fix KV Store cert validation, encrypt replication traffic, configure
-  SAML/LDAPS trust, or rotate Splunk TLS certificates.
+description: "Use when the user asks to build Splunk PKI, mint certs, prepare third-party CA CSRs, replace default
+  certs, configure mTLS, fix KV Store cert validation, encrypt replication traffic, configure SAML/LDAPS
+  trust, or rotate Splunk TLS certificates. Render, preflight, apply, validate, rotate, and inventory
+  private or public PKI for Splunk Enterprise TLS surfaces: Splunk Web, splunkd REST, S2S, HEC, KV Store,
+  indexer clusters, SHC, License Manager, Deployment Server, Monitoring Console, Federated Search, heavy
+  forwarders, Universal Forwarders, Edge Processor, SAML SP signing, LDAPS trust, and CLI CA trust. Covers
+  CSR handoffs, internal CA rendering, FIPS mode, TLS policy presets, KV Store EKU enforcement, default-
+  cert refusal, SAN-aware leaf certs, mTLS, replication-port TLS, and delegated rotation runbooks."
 compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "self-managed-10.4"
@@ -19,6 +15,64 @@ metadata:
 ---
 
 # Splunk Platform PKI Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Build Splunk PKI, mint certs, prepare third-party CA CSRs, replace default certs, configure mTLS, fix KV Store
+  cert validation, encrypt replication traffic, configure SAML/LDAPS trust, or rotate Splunk TLS certificates.
+- Preview and review the splunk platform pki setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-platform-pki-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-platform-pki-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## Shared add-on completion gate
 
@@ -395,78 +449,16 @@ validation, and rollback commands. That delegation preserves the
 [`splunk-indexer-cluster-setup`](../splunk-indexer-cluster-setup/SKILL.md)
 ownership model instead of duplicating restart orchestration here.
 
-## Cross-skill handoff matrix
+## Handoffs and TLS Policy
 
-The skill consumes — does not duplicate — these. When you also
-use one of the adjacent skills below, run THIS skill's render +
-preflight first to establish the cert paths, then layer the
-adjacent skill's behaviour on top.
-
-| Adjacent skill | What it owns | What this skill provides |
-|---|---|---|
-| [splunk-enterprise-public-exposure-hardening](../splunk-enterprise-public-exposure-hardening/SKILL.md) | Splunk Web HSTS / CSP / browser headers via reverse proxy, public-FQDN binding, default-cert refusal, `splunk.secret` rotation, public-exposure preflight | All cert PEMs the hardening skill consumes; this skill consumes the hardening skill's `--enable-fips` / `--fips-version` semantics rather than re-defining |
-| [splunk-indexer-cluster-setup](../splunk-indexer-cluster-setup/SKILL.md) | Cluster bundle apply, rolling restart, peer offline, multisite migration | Cluster-bundle drop-in (including `[replication_port-ssl://9887]`); rotation runbook delegates to its `--phase bundle-apply` and `--phase rolling-restart` |
-| [splunk-agent-management-setup](../splunk-agent-management-setup/SKILL.md) | SHC deployer push, server classes, deployment apps | SHC deployer drop-in and the forwarder-fleet outputs overlay |
-| [splunk-hec-service-setup](../splunk-hec-service-setup/SKILL.md) | HEC token lifecycle, allowed indexes, ACS HEC tokens | HEC TLS cert + optional mTLS |
-| [splunk-federated-search-setup](../splunk-federated-search-setup/SKILL.md) | Federation provider / consumer wiring | Per-provider client cert and `--cacert` snippet |
-| [splunk-monitoring-console-setup](../splunk-monitoring-console-setup/SKILL.md) | MC distributed config | `trusted.pem` distribution helper |
-| [splunk-universal-forwarder-setup](../splunk-universal-forwarder-setup/SKILL.md) | UF runtime install / upgrade | UF outputs overlay; for Splunk Cloud-bound UFs, this skill refuses and points at the UFCP |
-| [splunk-license-manager-setup](../splunk-license-manager-setup/SKILL.md) | License manager / peer wiring | LM cert install |
-| [splunk-mcp-server-setup](../splunk-mcp-server-setup/SKILL.md) | MCP server install + token issuance | MCP `mcp.conf [server] ssl_verify=true` aligns with the new trust anchor |
-| [splunk-edge-processor-setup](../splunk-edge-processor-setup/SKILL.md) | EP control-plane object, instance install, pipelines | EP cert profile (RSA + ECDSA) + REST upload helper when `--include-edge-processor=true` |
-| [splunk-enterprise-host-setup](../splunk-enterprise-host-setup/SKILL.md) | Splunk host install / cluster bootstrap | Unblocks the v1 "TLS certificate generation — out of scope" gap noted in its [reference.md](../splunk-enterprise-host-setup/reference.md) lines 49–55 |
-| [splunk-cloud-acs-admin-setup](../splunk-cloud-acs-admin-setup/SKILL.md) | Splunk Cloud ACS IP allowlists | Out of scope — this skill is on-prem only; the Splunk Cloud HEC custom-domain BYOC handoff lives in `handoff/splunk-cloud-byoc.md` |
-
-## TLS algorithm presets
-
-Pick with `--tls-policy {splunk-modern|fips-140-3|stig}`.
-Keep the detailed cipher and key constraints in
-[references/algorithm-presets.md](references/algorithm-presets.md);
-the renderer also consumes
-[references/algorithm-policy.json](references/algorithm-policy.json).
-
-## TLS protocol floor
-
-Defaults to a TLS 1.2 floor: `tls1.2,tls1.3` on Splunk 10.4+ and
-`tls1.2` on older supported versions. `--tls-version-floor tls1.3`
-requires Splunk 10.4+. The legacy `--allow-deprecated-tls` flag now fails
-closed instead of emitting unsupported protocols. Read
-[references/tls-protocol-policy.md](references/tls-protocol-policy.md).
-
-## FIPS mode
-
-`--fips-mode {none|140-2|140-3}` — when set, the renderer emits a
-`splunk-launch.conf` overlay with `SPLUNK_FIPS = 1` (the master enable
-switch, which defaults to 0) plus `SPLUNK_FIPS_VERSION = 140-3` (or
-`140-2`). Both keys are required for FIPS to engage. Read
-[references/fips-and-common-criteria.md](references/fips-and-common-criteria.md)
-before apply; the skill refuses mid-migration states.
-
-## Validity-day defaults
-
-| Identity type | Default | Cap |
-|---|---|---|
-| Internal Root CA | 3650 d (10 y) | unlimited |
-| Internal Intermediate CA | 1825 d (5 y) | unlimited |
-| Server / client leaf (private mode) | 825 d | 825 d (preflight refuses higher) |
-| Server / client leaf (public mode) | 397 d | warns at 90 d (Let's Encrypt floor) and 397 d (CA/Browser Forum baseline); operator's CA enforces its own cap |
-
-Override with `--root-ca-days`, `--intermediate-ca-days`, and `--leaf-days`.
-
-## Key format / permissions
-
-Default private keys are encrypted PKCS#1 PEM. Use `--key-format pkcs8`
-for Edge Processor or DB Connect compatibility. The install and
-validation details live in
-[references/key-format-and-permissions.md](references/key-format-and-permissions.md).
-
-## mTLS surfaces
-
-Opt-in via `--enable-mtls {none|s2s|hec|splunkd|all}`. Default is
-`s2s,hec`. Read
-[references/mtls-and-hostname-validation.md](references/mtls-and-hostname-validation.md)
-before enabling splunkd mTLS because it can break operator tooling
-that does not present a client cert.
+Read the [cross-skill ownership matrix](reference.md#cross-skill-ownership)
+before delegating restarts, bundle pushes, token lifecycle, or fleet rollout.
+TLS algorithms, protocol floors, FIPS lifecycle, validity caps, key formats,
+and mTLS defaults are defined in [reference.md](reference.md#cross-cutting-controls)
+and the topic files under [references/](references/authoritative-sources.md).
+The renderer consumes the machine-readable
+[algorithm policy](references/algorithm-policy.json) and fails closed on
+deprecated protocols or incomplete FIPS transitions.
 
 ## References
 

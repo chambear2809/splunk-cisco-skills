@@ -4,7 +4,7 @@
 
 phase: render
 app_name: splunk_secure_gateway
-action: configure          # configure | enable | disable
+action: configure          # configure renders runbooks only; there is no live configure API
 
 deployment_name: prod-sh
 visible_apps:              # e.g. search,cisco-catalyst-app
@@ -17,3 +17,5 @@ custom_endpoint_grpc_hostname:
 client_cert_required: true
 
 # Enabling the app requires --accept-spacebridge-egress (outbound 443 to Spacebridge).
+# Splunk Cloud supports plain render only: rendered skeletons/runbooks and an
+# exit-2 support handoff replace local egress probes or live app-state requests.

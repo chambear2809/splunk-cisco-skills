@@ -401,8 +401,8 @@ if [[ -n "${CHECK_CSP_URL}" ]]; then
 fi
 
 if [[ "${CHECK_RUM_INGEST}" == "true" ]]; then
-    realm="$("${PYTHON_BIN}" -c "import json,sys; print(json.loads(open('${OUTPUT_DIR}/metadata.json').read()).get('realm') or 'us0')")"
-    domain="$("${PYTHON_BIN}" -c "import json; print(json.loads(open('${OUTPUT_DIR}/metadata.json').read()).get('endpoint_domain') or 'splunkcloud')")"
+    realm="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("realm") or "us0")' "${OUTPUT_DIR}/metadata.json")"
+    domain="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("endpoint_domain") or "splunkcloud")' "${OUTPUT_DIR}/metadata.json")"
     if [[ "${domain}" == "splunkcloud" ]]; then
         host="rum-ingest.${realm}.observability.splunkcloud.com"
     else
@@ -416,7 +416,14 @@ if [[ "${CHECK_RUM_INGEST}" == "true" ]]; then
         log "  FAIL: DNS does not resolve for ${host}"
         LIVE_FAIL_COUNT=$((LIVE_FAIL_COUNT + 1))
     fi
-    if (timeout 5 bash -c "exec 9<>/dev/tcp/${host}/443") 2>/dev/null; then
+    if "${PYTHON_BIN}" - "${host}" 443 >/dev/null 2>&1 <<'PY'
+import socket
+import sys
+
+with socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=5):
+    pass
+PY
+    then
         log "  OK: TCP 443 reachable on ${host}"
     else
         log "  WARN: TCP 443 not reachable on ${host} from this host (egress firewall may block; browsers may still reach it)."
@@ -430,6 +437,7 @@ if [[ -n "${CHECK_SERVER_TIMING_URL}" ]]; then
         log "  OK: backend emits Server-Timing: traceparent (RUM-to-APM linking will work)."
     else
         log "  FAIL: backend missing Server-Timing: traceparent header. Emitting handoff-auto-instrumentation.sh."
+        printf -v check_server_timing_url_q '%q' "${CHECK_SERVER_TIMING_URL}"
         cat > "${OUTPUT_DIR}/handoff-auto-instrumentation.sh" <<HANDOFF
 #!/usr/bin/env bash
 # Advisory: backend missing Server-Timing: traceparent header.
@@ -443,7 +451,7 @@ if [[ -n "${CHECK_SERVER_TIMING_URL}" ]]; then
 # CORS callers also need:
 #   Access-Control-Expose-Headers: Server-Timing
 #
-# Probe was against: ${CHECK_SERVER_TIMING_URL}
+# Probe was against: ${check_server_timing_url_q}
 echo 'See skills/splunk-observability-k8s-auto-instrumentation-setup/SKILL.md for backend wiring.'
 HANDOFF
         chmod +x "${OUTPUT_DIR}/handoff-auto-instrumentation.sh"

@@ -16,7 +16,7 @@
 
 ## DaemonSet shape
 
-This skill renders `obi-daemonset.yaml` with:
+This skill renders `obi-daemonset.yaml` with an owned ServiceAccount followed by:
 
 ```yaml
 apiVersion: apps/v1
@@ -32,22 +32,28 @@ spec:
     spec:
       hostPID: true
       serviceAccountName: splunk-obi
+      nodeSelector: { kubernetes.io/os: linux }
+      tolerations: [{ operator: Exists }]
       containers:
       - name: obi
-        image: ghcr.io/signalfx/splunk-otel-obi:<version>
+        image: registry.example.test/reviewed-obi@sha256:<64-hex-digest>
         securityContext:
           privileged: true
-          runAsUser: 0
         volumeMounts:
-        - { name: security, mountPath: /sys/kernel/security, readOnly: true }
-        - { name: cgroup,   mountPath: /sys/fs/cgroup,      readOnly: true }
+        - { name: kernel-security, mountPath: /sys/kernel/security }
+        - { name: cgroup, mountPath: /sys/fs/cgroup }
         env:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: http://$(SPLUNK_OTEL_AGENT):4317
       volumes:
-      - { name: security, hostPath: { path: /sys/kernel/security } }
-      - { name: cgroup,   hostPath: { path: /sys/fs/cgroup } }
+      - { name: kernel-security, hostPath: { path: /sys/kernel/security } }
+      - { name: cgroup, hostPath: { path: /sys/fs/cgroup } }
 ```
+
+The placeholder is deliberate. This repository does not contain an audited
+digest for the exact standalone OBI DaemonSet contract above, so
+`--enable-obi` requires an operator-reviewed `--obi-image` digest. Mutable tags
+and the legacy `--obi-version` flag are rejected.
 
 ## Namespace scoping
 
@@ -56,11 +62,15 @@ OBI watches every pod on every node by default. Restrict via:
 - `--obi-namespaces payments,checkout` — include list.
 - `--obi-exclude-namespaces kube-system,kube-public` — deny list.
 
-Internally this renders the `OBI_INCLUDE_NAMESPACES` and `OBI_EXCLUDE_NAMESPACES` env on the DaemonSet container.
+Internally this renders `SPLUNK_OBI_NAMESPACE_INCLUDE` and
+`SPLUNK_OBI_NAMESPACE_EXCLUDE` on the DaemonSet container.
 
 ## Kernel requirements
 
-Linux ≥ 5.8 for full feature parity. 5.4 works with reduced fidelity (no user-space tracepoints). The preflight does not probe the kernel version; operators must confirm out-of-band.
+Linux ≥ 5.8 is the enforced production contract. Static render records it in
+`metadata.json`; `validate.sh --check-obi` lists live nodes and fails unless
+every Ready schedulable Linux node has a supported architecture and kernel,
+and one exact-image Ready OBI pod covers each eligible node.
 
 ## OpenShift SCC
 
@@ -70,11 +80,9 @@ On OpenShift, the OBI ServiceAccount needs the `privileged` SCC. When `--distrib
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
-  name: splunk-obi-scc
+  name: splunk-obi-privileged
 allowPrivilegedContainer: true
 allowHostPID: true
-allowHostNetwork: false
-readOnlyRootFilesystem: false
 runAsUser:
   type: RunAsAny
 seLinuxContext:
@@ -88,11 +96,18 @@ Disabling `--render-openshift-scc` is a fail-render.
 ## Verification
 
 ```bash
-kubectl -n splunk-otel get daemonset splunk-obi
-kubectl -n splunk-otel logs ds/splunk-obi -c obi | tail -20
+bash skills/splunk-observability-k8s-auto-instrumentation-setup/scripts/validate.sh \
+  --check-obi --kube-context <reviewed-context>
 ```
 
-Look for `"probe attached"` and `"traces exported"` log lines.
+The gate compares live owned resources to the rendered contract, requires a
+fully observed/Ready DaemonSet and complete node coverage, and checks only the
+defined fatal rules over at most 200 lines from the last 10 minutes per pod
+(1-MiB aggregate cap). It does not require brittle positive log strings.
+
+For teardown, `uninstall.sh --purge-obi` first proves the exact managed config
+and ownership labels, then deletes DaemonSet, optional SCC, and ServiceAccount
+in that order. Drift or an unrelated same-named resource blocks deletion.
 
 ## Coexistence with operator injection
 

@@ -93,7 +93,7 @@ def _read_state_from_descriptor(descriptor: int, state_path: Path) -> bytes:
     """Read at most ``MAX_STATE_BYTES`` plus one sentinel byte."""
     chunks: list[bytes] = []
     total = 0
-    while True:
+    while total <= MAX_STATE_BYTES:
         chunk = os.read(descriptor, min(64 * 1024, MAX_STATE_BYTES + 1 - total))
         if not chunk:
             return b"".join(chunks)
@@ -103,6 +103,9 @@ def _read_state_from_descriptor(descriptor: int, state_path: Path) -> bytes:
             raise PermissionError(
                 f"apply state exceeds the {MAX_STATE_BYTES}-byte safety limit: {state_path}"
             )
+    raise PermissionError(
+        f"apply state exceeds the {MAX_STATE_BYTES}-byte safety limit: {state_path}"
+    )
 
 
 def _read_state_bytes(state_path: Path) -> bytes:
@@ -401,7 +404,7 @@ def _read_secret_bytes(descriptor: int, path: Path) -> bytes:
     """Read at most ``MAX_SECRET_BYTES`` plus one sentinel byte."""
     chunks: list[bytes] = []
     total = 0
-    while True:
+    while total <= MAX_SECRET_BYTES:
         chunk = os.read(descriptor, min(8192, MAX_SECRET_BYTES + 1 - total))
         if not chunk:
             return b"".join(chunks)
@@ -411,3 +414,6 @@ def _read_secret_bytes(descriptor: int, path: Path) -> bytes:
             raise PermissionError(
                 f"secret file exceeds the {MAX_SECRET_BYTES}-byte safety limit: {path}"
             )
+    raise PermissionError(
+        f"secret file exceeds the {MAX_SECRET_BYTES}-byte safety limit: {path}"
+    )

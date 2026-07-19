@@ -916,7 +916,7 @@ def build_apply_plan(spec: dict[str, Any]) -> dict[str, Any]:
     return {
         "api_version": "splunk-cloud-data-manager-setup/v1",
         "requires_accept_apply": True,
-        "rendered_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat(),
+        "rendered_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "unsupported_claims_blocked": [
             "No private Data Manager API.",
             "No Terraform-based Data Manager input CRUD.",

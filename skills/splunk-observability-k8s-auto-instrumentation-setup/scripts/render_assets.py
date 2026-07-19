@@ -13,11 +13,13 @@ import copy
 import hashlib
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 SKILL_NAME = "splunk-observability-k8s-auto-instrumentation-setup"
@@ -45,16 +47,63 @@ LANGUAGE_SPEC_KEYS = {
     "apache-httpd": "apacheHttpd",
     "nginx": "nginx",
 }
-LANGUAGE_IMAGE_DEFAULTS = {
-    "java": "ghcr.io/signalfx/splunk-otel-java:latest",
-    "nodejs": "ghcr.io/signalfx/splunk-otel-js:latest",
-    "python": "ghcr.io/signalfx/splunk-otel-python:latest",
-    "dotnet": "ghcr.io/signalfx/splunk-otel-dotnet:latest",
-    "go": "ghcr.io/signalfx/splunk-otel-go:latest",
-    "apache-httpd": "ghcr.io/signalfx/splunk-otel-apache-httpd:latest",
-    "nginx": "ghcr.io/signalfx/splunk-otel-nginx:latest",
+# These exact manifest digests are shared with the base Collector skill's
+# chart-0.154.0 supply-chain audit. Do not replace them with tags: even a
+# concrete-looking registry tag is mutable. Nginx intentionally has no default
+# because this repository has no audited Nginx image digest yet.
+LANGUAGE_IMAGE_DEFAULTS: dict[str, str | None] = {
+    "java": (
+        "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@"
+        "sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9"
+    ),
+    "nodejs": (
+        "ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@"
+        "sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a"
+    ),
+    "python": (
+        "quay.io/signalfx/splunk-otel-instrumentation-python@"
+        "sha256:d488c507e0cacc64b81423b96f6e53b30f2602a0e4bcc614658182f6aa13d5b4"
+    ),
+    "dotnet": (
+        "ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@"
+        "sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910"
+    ),
+    "go": (
+        "ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go@"
+        "sha256:664715c04cb854ffdbb920ea1289a86b0717f39e46b18e6584caa9e1f2e4d83f"
+    ),
+    "apache-httpd": (
+        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@"
+        "sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d"
+    ),
+    "nginx": None,
 }
-AUTO_CLUSTER_DISTRIBUTIONS = {"eks", "eks/auto-mode", "gke", "gke/autopilot", "openshift"}
+DIGEST_IMAGE_RE = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
+DNS_LABEL_RE = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
+DNS_SUBDOMAIN_RE = re.compile(
+    r"(?=.{1,253}\Z)[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?"
+)
+SUPPORTED_REALMS = {"us0", "us1", "us2", "us3", "us2-gcp", "au0", "eu0", "eu1", "eu2", "jp0", "sg0"}
+SUPPORTED_PROPAGATORS = {
+    "tracecontext",
+    "baggage",
+    "b3",
+    "b3multi",
+    "jaeger",
+    "xray",
+    "ottrace",
+    "none",
+}
+SUPPORTED_SAMPLERS = {
+    "always_on",
+    "always_off",
+    "traceidratio",
+    "parentbased_always_on",
+    "parentbased_always_off",
+    "parentbased_traceidratio",
+    "jaeger_remote",
+    "xray",
+}
 DIRECT_SECRET_FLAGS = {
     "--access-token",
     "--token",
@@ -68,9 +117,19 @@ DIRECT_SECRET_FLAGS = {
     "--api-key",
 }
 TOKEN_SHAPED_RE = re.compile(
-    r"(?i)(access[_-]?token|api[_-]?token|bearer[_-]?token|hec[_-]?token|sf[_-]?token)"
-    r"\s*[:=]\s*[A-Za-z0-9._-]{20,}"
+    r"(?i)(access[_-]?token|api[_-]?key|api[_-]?token|authorization|bearer(?:[_-]?token)?|"
+    r"hec[_-]?token|org[_-]?token|password|passwd|secret|sf[_-]?token|x-sf-token)"
+    r"\s*[:=]\s*[^\s,;}]{4,}"
 )
+SECRET_KEY_RE = re.compile(
+    r"(?i)(access[_-]?token|api[_-]?key|api[_-]?token|authorization|bearer|"
+    r"credential|hec(?:[_-]?token)?|org[_-]?token|password|passwd|secret|sf[_-]?token|token)"
+)
+SECRET_VALUE_RE = re.compile(
+    r"(?i)(?:authorization|bearer|x-sf-token)\s*[:= ]\s*\S+|"
+    r"(?:access[_-]?token|api[_-]?key|api[_-]?token|hec[_-]?token|password|secret|token)="
+)
+SAFE_SECRET_REFERENCE_KEYS = {"image_pull_secret", "imagePullSecret", "imagePullSecrets"}
 
 
 class SpecError(ValueError):
@@ -95,6 +154,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--discover-workloads", action="store_true")
     parser.add_argument("--mode", default="render")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--operation-dry-run", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--gitops-mode", action="store_true")
@@ -109,7 +169,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-namespace", default="")
 
     parser.add_argument("--languages", default="")
-    parser.add_argument("--multi-instrumentation", action="store_true")
+    parser.add_argument("--multi-instrumentation", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--profiling-enabled", action="store_true")
     parser.add_argument("--profiling-memory-enabled", action="store_true")
     parser.add_argument("--profiler-call-stack-interval-ms", default="")
@@ -128,14 +188,15 @@ def parse_args() -> argparse.Namespace:
     for lang in ("java", "nodejs", "python", "dotnet", "go", "apache-httpd", "nginx"):
         parser.add_argument(f"--{lang}-image", dest=f"{lang.replace('-', '_')}_image", default="")
 
-    parser.add_argument("--operator-watch-namespaces", default="")
-    parser.add_argument("--webhook-cert-mode", default="")
-    parser.add_argument("--installation-job-enabled", action="store_true")
+    parser.add_argument("--operator-watch-namespaces", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--webhook-cert-mode", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--installation-job-enabled", default="", help=argparse.SUPPRESS)
 
     parser.add_argument("--enable-obi", action="store_true")
     parser.add_argument("--obi-namespaces", default="")
     parser.add_argument("--obi-exclude-namespaces", default="")
     parser.add_argument("--obi-version", default="")
+    parser.add_argument("--obi-image", default="")
     parser.add_argument("--accept-obi-privileged", action="store_true")
     parser.add_argument("--render-openshift-scc", default="")
 
@@ -145,12 +206,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target", action="append", default=[])
     parser.add_argument("--target-all", action="store_true")
     parser.add_argument("--purge-crs", action="store_true")
-    parser.add_argument("--detect-vendors", action="store_true")
-    parser.add_argument("--exclude-vendor", default="")
+    parser.add_argument("--purge-obi", action="store_true")
+    parser.add_argument("--detect-vendors", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--exclude-vendor", default="", help=argparse.SUPPRESS)
     parser.add_argument("--backup-configmap", default="")
-    parser.add_argument("--restore-from-backup", action="store_true")
+    parser.add_argument("--restore-from-backup", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--purge-backup", action="store_true")
     parser.add_argument("--kube-context", default="")
+    parser.add_argument("--allow-current-context", action="store_true")
     parser.add_argument("--accept-auto-instrumentation", action="store_true")
 
     return parser.parse_args()
@@ -175,6 +238,15 @@ def boolish(value: Any, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def cli_bool(value: str, *, label: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    raise SpecError(f"{label} must be true or false; got {value!r}.")
+
+
 def normalize_language(value: str) -> str:
     lang = value.strip().lower().replace("_", "-")
     aliases = {"node": "nodejs", "javascript": "nodejs", "js": "nodejs", ".net": "dotnet"}
@@ -182,6 +254,21 @@ def normalize_language(value: str) -> str:
     if lang not in SUPPORTED_LANGUAGES:
         raise SpecError(f"Unsupported language {value!r}. Supported: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
     return lang
+
+
+def normalize_image_overrides(value: Any) -> dict[str, str]:
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, dict):
+        raise SpecError("Instrumentation CR images must be a language-to-image mapping.")
+    result: dict[str, str] = {}
+    for raw_language, raw_image in value.items():
+        language = normalize_language(str(raw_language))
+        image = str(raw_image or "").strip()
+        if not image:
+            raise SpecError(f"Instrumentation image override for {language} is empty.")
+        result[language] = image
+    return result
 
 
 def normalize_kind(value: str) -> str:
@@ -220,9 +307,87 @@ def load_spec(path: Path | None) -> dict[str, Any]:
     api_version = data.get("api_version") or data.get("apiVersion")
     if api_version != API_VERSION:
         raise SpecError(f"Spec api_version must be {API_VERSION!r}; got {api_version!r}.")
-    if TOKEN_SHAPED_RE.search(text):
-        raise SpecError("Spec appears to contain an inline token-shaped value; use file-based credentials only.")
+    reject_secret_values(data, path="spec")
     return data
+
+
+def reject_secret_values(value: Any, *, path: str) -> None:
+    """Reject credential material and credential-shaped configuration recursively.
+
+    The sole exception is the name of an existing Kubernetes image-pull Secret.
+    This renderer never reads or renders the Secret's data.
+    """
+
+    if isinstance(value, dict):
+        for raw_key, child in value.items():
+            key = str(raw_key)
+            child_path = f"{path}.{key}"
+            if key not in SAFE_SECRET_REFERENCE_KEYS and SECRET_KEY_RE.search(key):
+                raise SpecError(
+                    f"{child_path} is a secret-like key; credential values are not accepted by this skill."
+                )
+            reject_secret_values(child, path=child_path)
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_secret_values(child, path=f"{path}[{index}]")
+        return
+    if isinstance(value, str) and (TOKEN_SHAPED_RE.search(value) or SECRET_VALUE_RE.search(value)):
+        raise SpecError(
+            f"{path} contains a secret-like value; use the base collector's file-backed credential flow."
+        )
+
+
+def validate_dns_label(value: Any, *, label: str) -> str:
+    text = str(value or "")
+    if not DNS_LABEL_RE.fullmatch(text):
+        raise SpecError(f"{label} must be a Kubernetes DNS-1123 label (1-63 characters); got {text!r}.")
+    return text
+
+
+def validate_dns_subdomain(value: Any, *, label: str) -> str:
+    text = str(value or "")
+    if not DNS_SUBDOMAIN_RE.fullmatch(text) or any(
+        not DNS_LABEL_RE.fullmatch(part) for part in text.split(".")
+    ):
+        raise SpecError(
+            f"{label} must be a Kubernetes DNS-1123 subdomain (1-253 characters); got {text!r}."
+        )
+    return text
+
+
+def validate_endpoint(value: Any, *, label: str) -> str:
+    endpoint = str(value or "").strip()
+    if not endpoint or endpoint != str(value):
+        raise SpecError(f"{label} must be a nonempty URL without surrounding whitespace.")
+    if TOKEN_SHAPED_RE.search(endpoint) or SECRET_VALUE_RE.search(endpoint):
+        raise SpecError(f"{label} contains credential material; OTLP URLs must be credential-free.")
+    try:
+        parsed = urlsplit(endpoint)
+        port = parsed.port
+    except ValueError as exc:
+        raise SpecError(f"{label} is not a valid OTLP URL: {exc}.") from exc
+    if parsed.scheme not in {"http", "https"}:
+        raise SpecError(f"{label} must use http or https.")
+    if parsed.username is not None or parsed.password is not None:
+        raise SpecError(f"{label} must not contain userinfo or credentials.")
+    if parsed.query or parsed.fragment:
+        raise SpecError(f"{label} must not contain a query string or fragment.")
+    if not parsed.hostname or port is None:
+        raise SpecError(f"{label} must include a host and explicit port.")
+    hostname = parsed.hostname
+    if hostname != "$(splunk_otel_agent)" and not (
+        DNS_SUBDOMAIN_RE.fullmatch(hostname)
+        and all(DNS_LABEL_RE.fullmatch(part) for part in hostname.split("."))
+    ):
+        # Permit IP literals while rejecting shell syntax and malformed names.
+        try:
+            import ipaddress
+
+            ipaddress.ip_address(hostname)
+        except ValueError as exc:
+            raise SpecError(f"{label} has an invalid or unsafe host {hostname!r}.") from exc
+    return endpoint
 
 
 def read_yaml_or_json(path: Path) -> Any:
@@ -285,6 +450,8 @@ def parse_mapping_flags(values: list[str], *, label: str) -> dict[str, str]:
     result: dict[str, str] = {}
     for item in values:
         key, val = parse_key_value(item, label=label)
+        if key in result:
+            raise SpecError(f"{label} repeats key {key!r}.")
         result[key] = val
     return result
 
@@ -295,7 +462,13 @@ def parse_nested_lang_env(values: list[str]) -> dict[str, dict[str, str]]:
         lang, rest = parse_key_value(item, label="--extra-env")
         lang = normalize_language(lang)
         key, val = parse_key_value(rest, label="--extra-env value")
-        result.setdefault(lang, {})[key] = val
+        if SECRET_KEY_RE.search(key) or TOKEN_SHAPED_RE.search(val) or SECRET_VALUE_RE.search(val):
+            raise SpecError(
+                f"--extra-env {lang}={key}=... is secret-like; credential values are not accepted."
+            )
+        if key in result.setdefault(lang, {}):
+            raise SpecError(f"--extra-env repeats {lang} key {key!r}.")
+        result[lang][key] = val
     return result
 
 
@@ -307,8 +480,52 @@ def parse_resource_limits(values: list[str]) -> dict[str, dict[str, str]]:
         limits: dict[str, str] = {}
         for part in split_csv(rest):
             key, val = parse_key_value(part, label="--resource-limits value")
+            if key not in {"cpu", "memory"}:
+                raise SpecError(f"--resource-limits supports only cpu and memory; got {key!r}.")
+            if key in limits:
+                raise SpecError(f"--resource-limits repeats {lang} key {key!r}.")
+            if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eEinumkKMGTP]*[-+]?[0-9]*)?", val):
+                raise SpecError(f"--resource-limits {lang} {key} has invalid Kubernetes quantity {val!r}.")
             limits[key] = val
+        if lang in result:
+            raise SpecError(f"--resource-limits repeats language {lang!r}.")
         result[lang] = limits
+    return result
+
+
+def string_mapping(value: Any, *, label: str) -> dict[str, str]:
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, dict):
+        raise SpecError(f"{label} must be a mapping.")
+    result: dict[str, str] = {}
+    for key, item in value.items():
+        if isinstance(item, (dict, list, tuple, set)) or item is None:
+            raise SpecError(f"{label}.{key} must be a scalar value.")
+        result[str(key)] = str(item).lower() if isinstance(item, bool) else str(item)
+    return result
+
+
+def language_nested_mapping(value: Any, *, label: str) -> dict[str, dict[str, str]]:
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, dict):
+        raise SpecError(f"{label} must be a language-to-mapping object.")
+    result: dict[str, dict[str, str]] = {}
+    for raw_language, raw_mapping in value.items():
+        language = normalize_language(str(raw_language))
+        result[language] = string_mapping(raw_mapping, label=f"{label}.{language}")
+    return result
+
+
+def language_string_mapping(value: Any, *, label: str) -> dict[str, str]:
+    mapping = string_mapping(value, label=label)
+    result: dict[str, str] = {}
+    for raw_language, item in mapping.items():
+        language = normalize_language(raw_language)
+        if language in result:
+            raise SpecError(f"{label} repeats normalized language {language!r}.")
+        result[language] = item
     return result
 
 
@@ -467,6 +684,9 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
     obi_spec = spec.get("obi") if isinstance(spec.get("obi"), dict) else {}
     vendors = spec.get("vendors") if isinstance(spec.get("vendors"), dict) else {}
     handoffs = spec.get("handoffs") if isinstance(spec.get("handoffs"), dict) else {}
+    root_sampler = spec.get("sampler") or {}
+    if not isinstance(root_sampler, dict):
+        raise SpecError("sampler must be an object.")
 
     namespace = args.namespace or first_value(spec, "namespace", default="splunk-otel")
     base_namespace = args.base_namespace or first_value(base, "namespace", default=namespace)
@@ -475,16 +695,31 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
     gateway_endpoint = args.gateway_endpoint or first_value(spec, "gateway_endpoint", "gatewayEndpoint", default="")
     agent_endpoint = args.agent_endpoint or first_value(spec, "agent_endpoint", "agentEndpoint", default=DEFAULT_ENDPOINT)
     endpoint = gateway_endpoint or agent_endpoint
-    per_language_endpoint = dict(first_value(spec, "per_language_endpoint", "perLanguageEndpoint", default={}) or {})
+    per_language_endpoint = language_string_mapping(
+        first_value(spec, "per_language_endpoint", "perLanguageEndpoint", default={}),
+        label="per_language_endpoint",
+    )
     per_language_endpoint.update(parse_mapping_flags(args.per_language_endpoint, label="--per-language-endpoint"))
 
     cli_languages = [normalize_language(lang) for lang in split_csv(args.languages)]
     spec_crs = first_value(spec, "instrumentation_crs", "instrumentationCRs", default=[])
+    if (
+        args.instrumentation_cr_name
+        and isinstance(spec_crs, list)
+        and len([row for row in spec_crs if isinstance(row, dict)]) > 1
+    ):
+        raise SpecError(
+            "--instrumentation-cr-name is valid only with one Instrumentation CR; "
+            "name each CR independently in the multi-CR spec."
+        )
     crs: list[dict[str, Any]] = []
     if isinstance(spec_crs, list) and spec_crs:
         for index, row in enumerate(spec_crs):
             if not isinstance(row, dict):
-                continue
+                raise SpecError(f"instrumentation_crs[{index}] must be an object.")
+            row_sampler = row.get("sampler") or {}
+            if not isinstance(row_sampler, dict):
+                raise SpecError(f"instrumentation_crs[{index}].sampler must be an object.")
             cr_languages = cli_languages or [
                 normalize_language(lang) for lang in split_csv(row.get("languages") or spec.get("languages") or [])
             ]
@@ -497,22 +732,28 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
                         if index == 0 and args.instrumentation_cr_name
                         else str(row.get("name") or args.instrumentation_cr_name or "splunk-otel-auto-instrumentation")
                     ),
-                    "namespace": str(row.get("namespace") or namespace),
+                    # An explicit CLI namespace is a global override. This is
+                    # intentionally different from an omitted flag, which
+                    # preserves each CR's spec namespace.
+                    "namespace": str(args.namespace or row.get("namespace") or namespace),
                     "languages": cr_languages,
                     "endpoint": str(row.get("endpoint") or endpoint),
                     "per_language_endpoint": {
-                        **dict(row.get("per_language_endpoint") or row.get("perLanguageEndpoint") or {}),
+                        **language_string_mapping(
+                            row.get("per_language_endpoint") or row.get("perLanguageEndpoint") or {},
+                            label=f"instrumentation_crs[{index}].per_language_endpoint",
+                        ),
                         **per_language_endpoint,
                     },
                     "propagators": split_csv(args.propagators) or split_csv(row.get("propagators")) or ["tracecontext", "baggage", "b3"],
                     "sampler": {
                         "type": args.sampler
-                        or (row.get("sampler") or {}).get("type")
+                        or row_sampler.get("type")
                         or row.get("sampler_type")
                         or "parentbased_always_on",
                         "argument": args.sampler_argument
                         if args.sampler_argument != ""
-                        else (row.get("sampler") or {}).get("argument", row.get("sampler_argument", "")),
+                        else row_sampler.get("argument", row.get("sampler_argument", "")),
                     },
                     "profiling_enabled": args.profiling_enabled or boolish(row.get("profiling_enabled"), False),
                     "profiling_memory_enabled": args.profiling_memory_enabled
@@ -525,12 +766,21 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
                     "use_labels_for_resource_attributes": args.use_labels_for_resource_attributes
                     or boolish(row.get("use_labels_for_resource_attributes"), False),
                     "extra_resource_attrs": {
-                        **dict(row.get("extra_resource_attrs") or row.get("extraResourceAttrs") or {}),
+                        **string_mapping(
+                            row.get("extra_resource_attrs") or row.get("extraResourceAttrs") or {},
+                            label=f"instrumentation_crs[{index}].extra_resource_attrs",
+                        ),
                         **parse_mapping_flags(args.extra_resource_attr, label="--extra-resource-attr"),
                     },
-                    "images": dict(row.get("images") or {}),
-                    "extra_env": copy.deepcopy(row.get("extra_env") or row.get("extraEnv") or {}),
-                    "resource_limits": copy.deepcopy(row.get("resource_limits") or row.get("resourceLimits") or {}),
+                    "images": normalize_image_overrides(row.get("images")),
+                    "extra_env": language_nested_mapping(
+                        row.get("extra_env") or row.get("extraEnv") or {},
+                        label=f"instrumentation_crs[{index}].extra_env",
+                    ),
+                    "resource_limits": language_nested_mapping(
+                        row.get("resource_limits") or row.get("resourceLimits") or {},
+                        label=f"instrumentation_crs[{index}].resource_limits",
+                    ),
                 }
             )
     else:
@@ -547,11 +797,11 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
                 "propagators": split_csv(args.propagators) or split_csv(spec.get("propagators")) or ["tracecontext", "baggage", "b3"],
                 "sampler": {
                     "type": args.sampler
-                    or (spec.get("sampler") or {}).get("type")
+                    or root_sampler.get("type")
                     or first_value(spec, "sampler_type", "samplerType", default="parentbased_always_on"),
                     "argument": args.sampler_argument
                     if args.sampler_argument != ""
-                    else (spec.get("sampler") or {}).get("argument", first_value(spec, "sampler_argument", "samplerArgument", default="")),
+                    else root_sampler.get("argument", first_value(spec, "sampler_argument", "samplerArgument", default="")),
                 },
                 "profiling_enabled": args.profiling_enabled or boolish(spec.get("profiling_enabled"), False),
                 "profiling_memory_enabled": args.profiling_memory_enabled
@@ -599,15 +849,33 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
         workload_annotations.extend(parse_inventory_file(Path(args.inventory_file).expanduser()))
 
     image_pull_secret = args.image_pull_secret or first_value(spec, "image_pull_secret", "imagePullSecret", default="")
-    multi_instrumentation = (
-        args.multi_instrumentation
-        or boolish(operator.get("multi_instrumentation"), False)
-        or boolish(first_value(spec, "multi_instrumentation", "multiInstrumentation", default=False), False)
-    )
+    unsupported_operator_controls: list[str] = []
+    for key in (
+        "watch_namespaces",
+        "watchNamespaces",
+        "webhook_cert_mode",
+        "webhookCertMode",
+        "installation_job_enabled",
+        "installationJobEnabled",
+        "multi_instrumentation",
+        "multiInstrumentation",
+    ):
+        if key in operator:
+            unsupported_operator_controls.append(f"operator.{key}")
+    if args.operator_watch_namespaces:
+        unsupported_operator_controls.append("--operator-watch-namespaces")
+    if args.webhook_cert_mode:
+        unsupported_operator_controls.append("--webhook-cert-mode")
+    if args.installation_job_enabled:
+        unsupported_operator_controls.append("--installation-job-enabled")
+    if args.multi_instrumentation:
+        unsupported_operator_controls.append("--multi-instrumentation")
+    if first_value(spec, "multi_instrumentation", "multiInstrumentation", default=None) is not None:
+        unsupported_operator_controls.append("multi_instrumentation")
     render_scc_default = distribution == "openshift" and (args.enable_obi or boolish(obi_spec.get("enabled"), False))
     render_scc = render_scc_default
     if args.render_openshift_scc != "":
-        render_scc = boolish(args.render_openshift_scc)
+        render_scc = cli_bool(args.render_openshift_scc, label="--render-openshift-scc")
     elif "render_openshift_scc" in obi_spec:
         render_scc = boolish(obi_spec.get("render_openshift_scc"), render_scc_default)
 
@@ -623,12 +891,7 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
         "base": {"release": base_release, "namespace": base_namespace},
         "instrumentation_crs": crs,
         "operator": {
-            "watch_namespaces": split_csv(args.operator_watch_namespaces)
-            or split_csv(operator.get("watch_namespaces") or operator.get("watchNamespaces")),
-            "webhook_cert_mode": args.webhook_cert_mode or operator.get("webhook_cert_mode") or "auto",
-            "installation_job_enabled": args.installation_job_enabled
-            or boolish(operator.get("installation_job_enabled"), True),
-            "multi_instrumentation": multi_instrumentation,
+            "unsupported_controls": sorted(set(unsupported_operator_controls)),
         },
         "image_pull_secret": image_pull_secret,
         "namespace_annotations": namespace_annotations,
@@ -640,11 +903,13 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
             or split_csv(obi_spec.get("exclude_namespaces") or obi_spec.get("excludeNamespaces"))
             or ["kube-system", "kube-public"],
             "version": args.obi_version or str(obi_spec.get("version") or ""),
+            "image": args.obi_image or str(obi_spec.get("image") or ""),
             "render_openshift_scc": render_scc,
         },
         "vendors": {
             "detect": args.detect_vendors or boolish(vendors.get("detect"), False),
             "exclude": split_csv(args.exclude_vendor) or split_csv(vendors.get("exclude")),
+            "requested": bool(vendors) or args.detect_vendors or bool(args.exclude_vendor),
         },
         "pss_overrides": spec.get("pss_overrides") or spec.get("pssOverrides") or [],
         "handoffs": {
@@ -657,12 +922,16 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any], spec_path: Path
         "target": args.target,
         "target_all": args.target_all,
         "purge_crs": args.purge_crs,
+        "purge_obi": args.purge_obi,
         "restore_from_backup": args.restore_from_backup,
         "purge_backup": args.purge_backup,
         "accept_auto_instrumentation": args.accept_auto_instrumentation,
         "accept_obi_privileged": args.accept_obi_privileged,
+        "operation_dry_run": args.operation_dry_run,
         "kube_context": args.kube_context,
+        "allow_current_context": args.allow_current_context,
     }
+    reject_secret_values(config, path="render configuration")
     return config
 
 
@@ -671,7 +940,8 @@ def workload_target(workload: dict[str, Any]) -> str:
 
 
 def workload_key(workload: dict[str, Any]) -> str:
-    return f"{workload['kind'].lower()}-{workload['namespace']}-{workload['name']}".replace("/", "-")
+    target = workload_target(workload)
+    return f"snapshot-{hashlib.sha256(target.encode('utf-8')).hexdigest()[:20]}"
 
 
 def bounded_k8s_name(value: str, limit: int) -> str:
@@ -694,16 +964,24 @@ def operator_resource_names(release: str, namespace: str) -> dict[str, str]:
     }
 
 
-def annotation_value_for(workload: dict[str, Any]) -> str:
+def default_cr_reference(config: dict[str, Any]) -> str:
+    cr = config["instrumentation_crs"][0]
+    return f"{cr['namespace']}/{cr['name']}"
+
+
+def annotation_value_for(config: dict[str, Any], workload: dict[str, Any]) -> str:
     if boolish(workload.get("disable"), False):
         return "false"
-    return str(workload.get("cr") or "true")
+    # Always render an explicit namespace/name binding. A bare "true" makes
+    # the Operator search the workload namespace and silently misses the
+    # default splunk-otel CR for the common cross-namespace topology.
+    return str(workload.get("cr") or default_cr_reference(config))
 
 
-def workload_annotations_for(workload: dict[str, Any]) -> dict[str, str]:
+def workload_annotations_for(config: dict[str, Any], workload: dict[str, Any]) -> dict[str, str]:
     language = normalize_language(str(workload["language"]))
     annotations = {
-        f"instrumentation.opentelemetry.io/inject-{language}": annotation_value_for(workload)
+        f"instrumentation.opentelemetry.io/inject-{language}": annotation_value_for(config, workload)
     }
     if workload.get("container_names"):
         annotations["instrumentation.opentelemetry.io/container-names"] = str(workload["container_names"])
@@ -759,6 +1037,18 @@ def resource_requirements(cr: dict[str, Any], language: str) -> dict[str, Any]:
     return {"resourceRequirements": {"limits": {str(k): str(v) for k, v in limits.items()}}}
 
 
+def instrumentation_image(cr: dict[str, Any], language: str) -> str:
+    override = str((cr.get("images") or {}).get(language) or "").strip()
+    default = LANGUAGE_IMAGE_DEFAULTS[language]
+    if override:
+        return override
+    if default:
+        return default
+    # collect_preflights reports the actionable error. Keeping an explicit
+    # marker in a failed review packet is safer than substituting a mutable tag.
+    return "UNRESOLVED-AUDITED-IMAGE"
+
+
 def instrumentation_cr_doc(config: dict[str, Any], cr: dict[str, Any]) -> dict[str, Any]:
     spec: dict[str, Any] = {
         "exporter": {"endpoint": cr["endpoint"]},
@@ -775,7 +1065,7 @@ def instrumentation_cr_doc(config: dict[str, Any], cr: dict[str, Any]) -> dict[s
 
     for language in cr["languages"]:
         block: dict[str, Any] = {
-            "image": cr.get("images", {}).get(language) or LANGUAGE_IMAGE_DEFAULTS[language],
+            "image": instrumentation_image(cr, language),
             "env": env_list(language_env(config, cr, language)),
         }
         block.update(resource_requirements(cr, language))
@@ -788,39 +1078,85 @@ def instrumentation_cr_doc(config: dict[str, Any], cr: dict[str, Any]) -> dict[s
     return {
         "apiVersion": "opentelemetry.io/v1alpha1",
         "kind": "Instrumentation",
-        "metadata": {"name": cr["name"], "namespace": cr["namespace"]},
+        "metadata": {
+            "name": cr["name"],
+            "namespace": cr["namespace"],
+            "labels": {
+                "app.kubernetes.io/name": "splunk-otel-auto-instrumentation",
+                "app.kubernetes.io/managed-by": SKILL_NAME,
+            },
+        },
         "spec": spec,
     }
 
 
 def namespace_annotation_docs(config: dict[str, Any]) -> list[dict[str, Any]]:
-    docs: list[dict[str, Any]] = []
+    grouped: dict[str, dict[str, str]] = {}
     for row in config["namespace_annotations"]:
-        annotations: dict[str, str] = {}
+        annotations = grouped.setdefault(str(row["namespace"]), {})
         for language in row["languages"]:
-            annotations[f"instrumentation.opentelemetry.io/inject-{language}"] = "true"
+            annotations[f"instrumentation.opentelemetry.io/inject-{language}"] = default_cr_reference(
+                config
+            )
+    docs: list[dict[str, Any]] = []
+    for namespace, annotations in grouped.items():
         docs.append(
             {
                 "apiVersion": "v1",
                 "kind": "Namespace",
-                "metadata": {"name": row["namespace"], "annotations": annotations},
+                "metadata": {"name": namespace, "annotations": annotations},
             }
         )
     return docs
 
 
+def namespace_target_records(config: dict[str, Any]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for document in namespace_annotation_docs(config):
+        metadata = document["metadata"]
+        annotations = metadata["annotations"]
+        languages = sorted(
+            key.rsplit("inject-", 1)[1]
+            for key in annotations
+            if key.startswith("instrumentation.opentelemetry.io/inject-")
+        )
+        namespace = str(metadata["name"])
+        records.append(
+            {
+                "target": f"Namespace/{namespace}",
+                "namespace": namespace,
+                "languages": languages,
+                "annotations": annotations,
+            }
+        )
+    return records
+
+
 def workload_annotation_docs(config: dict[str, Any]) -> list[dict[str, Any]]:
-    docs: list[dict[str, Any]] = []
+    grouped: dict[tuple[str, str, str], dict[str, str]] = {}
     for workload in config["workload_annotations"]:
+        identity = (
+            str(workload["kind"]),
+            str(workload["namespace"]),
+            str(workload["name"]),
+        )
+        annotations = grouped.setdefault(identity, {})
+        for key, value in workload_annotations_for(config, workload).items():
+            # collect_preflights reports conflicting values. Retain the first
+            # value so a failed review packet never silently chooses the last
+            # duplicate row.
+            annotations.setdefault(key, value)
+    docs: list[dict[str, Any]] = []
+    for (kind, namespace, name), annotations in grouped.items():
         docs.append(
             {
                 "apiVersion": "apps/v1",
-                "kind": workload["kind"],
-                "metadata": {"name": workload["name"], "namespace": workload["namespace"]},
+                "kind": kind,
+                "metadata": {"name": name, "namespace": namespace},
                 "spec": {
                     "template": {
                         "metadata": {
-                            "annotations": workload_annotations_for(workload),
+                            "annotations": annotations,
                         }
                     }
                 },
@@ -846,30 +1182,51 @@ def backup_configmap_doc(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def obi_service_account_doc(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "apiVersion": "v1",
+        "kind": "ServiceAccount",
+        "metadata": {
+            "name": "splunk-obi",
+            "namespace": config["namespace"],
+            "labels": {
+                "app.kubernetes.io/name": "splunk-obi",
+                "app.kubernetes.io/managed-by": SKILL_NAME,
+            },
+        },
+    }
+
+
 def obi_daemonset_doc(config: dict[str, Any]) -> dict[str, Any]:
     obi = config["obi"]
-    image = "ghcr.io/signalfx/splunk-obi"
-    if obi.get("version"):
-        image = f"{image}:{obi['version']}"
-    else:
-        image = f"{image}:latest"
+    image = str(obi.get("image") or "UNRESOLVED-AUDITED-OBI-IMAGE")
     env = {
         "SPLUNK_OBI_NAMESPACE_INCLUDE": ",".join(obi.get("namespaces") or []),
         "SPLUNK_OBI_NAMESPACE_EXCLUDE": ",".join(obi.get("exclude_namespaces") or []),
         "OTEL_EXPORTER_OTLP_ENDPOINT": DEFAULT_ENDPOINT,
         "OTEL_RESOURCE_ATTRIBUTES": f"k8s.cluster.name={config['cluster_name']},deployment.environment={config['deployment_environment']}",
     }
+    labels = {
+        "app.kubernetes.io/name": "splunk-obi",
+        "app.kubernetes.io/managed-by": SKILL_NAME,
+    }
     return {
         "apiVersion": "apps/v1",
         "kind": "DaemonSet",
-        "metadata": {"name": "splunk-obi", "namespace": config["namespace"]},
+        "metadata": {
+            "name": "splunk-obi",
+            "namespace": config["namespace"],
+            "labels": labels,
+        },
         "spec": {
             "selector": {"matchLabels": {"app.kubernetes.io/name": "splunk-obi"}},
             "template": {
-                "metadata": {"labels": {"app.kubernetes.io/name": "splunk-obi"}},
+                "metadata": {"labels": labels},
                 "spec": {
                     "serviceAccountName": "splunk-obi",
                     "hostPID": True,
+                    "nodeSelector": {"kubernetes.io/os": "linux"},
+                    "tolerations": [{"operator": "Exists"}],
                     "containers": [
                         {
                             "name": "obi",
@@ -895,11 +1252,16 @@ def obi_daemonset_doc(config: dict[str, Any]) -> dict[str, Any]:
 def openshift_scc_docs(config: dict[str, Any]) -> list[dict[str, Any]]:
     namespace = config["namespace"]
     return [
-        {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": "splunk-obi", "namespace": namespace}},
         {
             "apiVersion": "security.openshift.io/v1",
             "kind": "SecurityContextConstraints",
-            "metadata": {"name": "splunk-obi-privileged"},
+            "metadata": {
+                "name": "splunk-obi-privileged",
+                "labels": {
+                    "app.kubernetes.io/name": "splunk-obi",
+                    "app.kubernetes.io/managed-by": SKILL_NAME,
+                },
+            },
             "allowHostDirVolumePlugin": True,
             "allowHostPID": True,
             "allowPrivilegedContainer": True,
@@ -914,6 +1276,12 @@ def openshift_scc_docs(config: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def obi_documents(config: dict[str, Any]) -> list[dict[str, Any]]:
+    if not config["obi"]["enabled"]:
+        return []
+    return [obi_service_account_doc(config), obi_daemonset_doc(config)]
+
+
 def target_records(config: dict[str, Any]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for workload in config["workload_annotations"]:
@@ -925,8 +1293,10 @@ def target_records(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "namespace": workload["namespace"],
                 "name": workload["name"],
                 "language": workload["language"],
-                "annotations": workload_annotations_for(workload),
-                "cr": workload.get("cr") or "",
+                "annotations": workload_annotations_for(config, workload),
+                "cr": ""
+                if boolish(workload.get("disable"), False)
+                else annotation_value_for(config, workload),
             }
         )
     return records
@@ -937,29 +1307,235 @@ def collect_preflights(config: dict[str, Any], mode: str) -> tuple[list[str], li
     warnings: list[str] = []
     advisories = [
         "Instrumentation CR image or env changes require a pod restart to take effect.",
-        "kubectl rollout restart is idempotent; re-applying annotations safely reruns restarts.",
+        "Re-running annotation apply/uninstall intentionally starts another workload rollout.",
     ]
 
-    if not config["cluster_name"] and config["distribution"] not in AUTO_CLUSTER_DISTRIBUTIONS:
-        errors.append("Missing cluster name: pass --cluster-name or use an auto-detected distribution.")
+    if not config["realm"]:
+        errors.append("Missing Splunk Observability realm: pass --realm.")
+    elif config["realm"] not in SUPPORTED_REALMS:
+        errors.append(
+            f"Unsupported Splunk Observability realm {config['realm']!r}; use a documented realm identifier."
+        )
+    if not config["cluster_name"]:
+        errors.append(
+            "Missing cluster name: pass --cluster-name explicitly; this offline renderer does not auto-detect cluster identity."
+        )
     if not config["deployment_environment"]:
         errors.append("Missing deployment environment: pass --deployment-environment.")
+    for value, label in (
+        (config["cluster_name"], "cluster name"),
+        (config["deployment_environment"], "deployment environment"),
+    ):
+        text = str(value or "")
+        if text and (
+            text != text.strip()
+            or any(character.isspace() for character in text)
+            or any(character in text for character in (",", "=", "\r", "\n", "\x00"))
+        ):
+            errors.append(f"{label.capitalize()} contains characters unsafe for OTEL_RESOURCE_ATTRIBUTES.")
+    for value, label, validator in (
+        (config["namespace"], "overlay namespace", validate_dns_label),
+        (config["base"]["namespace"], "base collector namespace", validate_dns_label),
+        (config["base"]["release"], "base collector release", validate_dns_label),
+        (config["backup_configmap"], "backup ConfigMap name", validate_dns_subdomain),
+    ):
+        try:
+            validator(value, label=label)
+        except SpecError as exc:
+            errors.append(str(exc))
+    if config.get("image_pull_secret"):
+        try:
+            validate_dns_subdomain(config["image_pull_secret"], label="image pull Secret name")
+        except SpecError as exc:
+            errors.append(str(exc))
+    if config["operator"].get("unsupported_controls"):
+        errors.append(
+            "Operator installation controls are owned by splunk-observability-otel-collector-setup and "
+            "cannot be applied by this overlay; remove: "
+            + ", ".join(config["operator"]["unsupported_controls"])
+            + "."
+        )
+    if config["vendors"].get("requested"):
+        errors.append(
+            "Vendor detection/exclusion is not implemented by this offline overlay; remove vendors/"
+            "--detect-vendors/--exclude-vendor and perform the documented manual coexistence audit."
+        )
+    if config.get("restore_from_backup"):
+        errors.append(
+            "--restore-from-backup is not a standalone overlay control; use uninstall with explicit targets, which always requires the owned transactional snapshot."
+        )
     if config["distribution"] == "eks/fargate":
         endpoints = [cr.get("endpoint", "") for cr in config["instrumentation_crs"]]
         if all("SPLUNK_OTEL_AGENT" in endpoint for endpoint in endpoints):
             errors.append("EKS Fargate requires --gateway-endpoint; the DaemonSet agent is not available.")
 
-    if len(config["instrumentation_crs"]) > 1 and not config["operator"]["multi_instrumentation"]:
-        errors.append("Multiple Instrumentation CRs require --multi-instrumentation.")
-
     seen_crs: set[tuple[str, str]] = set()
+    cr_by_identity: dict[tuple[str, str], dict[str, Any]] = {}
     for cr in config["instrumentation_crs"]:
         key = (cr["namespace"], cr["name"])
         if key in seen_crs:
             errors.append(f"Duplicate Instrumentation CR name: {cr['namespace']}/{cr['name']}.")
         seen_crs.add(key)
+        cr_by_identity[key] = cr
+        if not cr["languages"] or len(cr["languages"]) != len(set(cr["languages"])):
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} has no languages or repeats a language."
+            )
+        try:
+            validate_dns_label(cr["namespace"], label="Instrumentation CR namespace")
+            validate_dns_subdomain(cr["name"], label="Instrumentation CR name")
+        except SpecError as exc:
+            errors.append(str(exc))
+        try:
+            validate_endpoint(cr["endpoint"], label=f"Instrumentation CR {cr['namespace']}/{cr['name']} endpoint")
+            for language, endpoint in (cr.get("per_language_endpoint") or {}).items():
+                normalize_language(str(language))
+                validate_endpoint(
+                    endpoint,
+                    label=f"Instrumentation CR {cr['namespace']}/{cr['name']} {language} endpoint",
+                )
+        except SpecError as exc:
+            errors.append(str(exc))
+        propagators = [str(value) for value in cr.get("propagators") or []]
+        if (
+            not propagators
+            or len(propagators) != len(set(propagators))
+            or any(value not in SUPPORTED_PROPAGATORS for value in propagators)
+            or ("none" in propagators and len(propagators) != 1)
+        ):
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} has invalid, duplicate, or incompatible propagators."
+            )
+        sampler_type = str((cr.get("sampler") or {}).get("type") or "")
+        sampler_argument = str((cr.get("sampler") or {}).get("argument") or "")
+        if sampler_type not in SUPPORTED_SAMPLERS:
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} has unsupported sampler {sampler_type!r}."
+            )
+        ratio_samplers = {"traceidratio", "parentbased_traceidratio"}
+        if sampler_type in ratio_samplers:
+            try:
+                ratio = float(sampler_argument)
+                if not 0.0 <= ratio <= 1.0:
+                    raise ValueError
+            except ValueError:
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} sampler {sampler_type} requires an argument from 0 through 1."
+                )
+        elif sampler_argument and sampler_type not in {"jaeger_remote"}:
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} sampler {sampler_type} does not accept an argument."
+            )
+        for attribute_key, attribute_value in (cr.get("extra_resource_attrs") or {}).items():
+            key_text, value_text = str(attribute_key), str(attribute_value)
+            if (
+                not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]*", key_text)
+                or any(character in value_text for character in (",", "=", "\r", "\n", "\x00"))
+            ):
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} has an unsafe resource attribute {key_text!r}."
+                )
+        for language in cr["languages"]:
+            image = instrumentation_image(cr, language)
+            if image == "UNRESOLVED-AUDITED-IMAGE":
+                errors.append(
+                    f"No repository-audited default image exists for {language}; provide "
+                    f"instrumentation_crs[].images.{language} or --{language}-image with an @sha256 digest."
+                )
+            elif not DIGEST_IMAGE_RE.fullmatch(image):
+                errors.append(
+                    f"Instrumentation image for {cr['namespace']}/{cr['name']} language {language} "
+                    "must be pinned by an immutable @sha256 digest."
+                )
+        unused_images = sorted(set(cr.get("images") or {}) - set(cr["languages"]))
+        if unused_images:
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} has image overrides for "
+                f"languages it does not enable: {', '.join(unused_images)}."
+            )
+        for mapping_name in ("per_language_endpoint", "extra_env", "resource_limits"):
+            unused = sorted(set(cr.get(mapping_name) or {}) - set(cr["languages"]))
+            if unused:
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} has {mapping_name} entries for disabled languages: {', '.join(unused)}."
+                )
+        for language, limits in (cr.get("resource_limits") or {}).items():
+            if any(key not in {"cpu", "memory"} for key in limits):
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} {language} resource limits support only cpu and memory."
+                )
+            for resource, quantity in limits.items():
+                if not re.fullmatch(
+                    r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eEinumkKMGTP]*[-+]?[0-9]*)?",
+                    str(quantity),
+                ):
+                    errors.append(
+                        f"Instrumentation CR {cr['namespace']}/{cr['name']} {language} {resource} has invalid Kubernetes quantity {quantity!r}."
+                    )
+        if cr.get("profiling_memory_enabled") and not cr.get("profiling_enabled"):
+            errors.append(
+                f"Instrumentation CR {cr['namespace']}/{cr['name']} enables memory profiling without profiling."
+            )
+        interval = str(cr.get("profiler_call_stack_interval_ms") or "")
+        if interval:
+            if not cr.get("profiling_enabled"):
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} sets a profiler interval while profiling is disabled."
+                )
+            try:
+                interval_value = int(interval)
+                if not 1 <= interval_value <= 60000:
+                    raise ValueError
+            except ValueError:
+                errors.append(
+                    f"Instrumentation CR {cr['namespace']}/{cr['name']} profiler interval must be an integer from 1 through 60000 ms."
+                )
 
+    default_cr = config["instrumentation_crs"][0]
+    seen_targets: set[tuple[str, str, str, str]] = set()
+    grouped_annotations: dict[tuple[str, str, str], dict[str, str]] = {}
     for workload in config["workload_annotations"]:
+        target_key = (
+            workload["kind"],
+            workload["namespace"],
+            workload["name"],
+            workload["language"],
+        )
+        if target_key in seen_targets:
+            errors.append(
+                f"Duplicate workload/language target: {workload_target(workload)}={workload['language']}."
+            )
+        seen_targets.add(target_key)
+        try:
+            validate_dns_label(workload["namespace"], label=f"{workload_target(workload)} namespace")
+            validate_dns_subdomain(workload["name"], label=f"{workload_target(workload)} name")
+        except SpecError as exc:
+            errors.append(str(exc))
+        workload_identity = (
+            str(workload["kind"]),
+            str(workload["namespace"]),
+            str(workload["name"]),
+        )
+        merged = grouped_annotations.setdefault(workload_identity, {})
+        for annotation_key, annotation_value in workload_annotations_for(config, workload).items():
+            if annotation_key in merged and merged[annotation_key] != annotation_value:
+                errors.append(
+                    f"{workload_target(workload)} has conflicting values for managed annotation {annotation_key}."
+                )
+            merged[annotation_key] = annotation_value
+        if not boolish(workload.get("disable"), False):
+            binding = str(workload.get("cr") or f"{default_cr['namespace']}/{default_cr['name']}")
+            binding_parts = binding.split("/")
+            bound_cr = cr_by_identity.get(tuple(binding_parts)) if len(binding_parts) == 2 else None
+            if bound_cr is None:
+                errors.append(
+                    f"{workload_target(workload)} references missing Instrumentation CR {binding!r}."
+                )
+            elif workload["language"] not in bound_cr["languages"]:
+                errors.append(
+                    f"{workload_target(workload)} binds {workload['language']} to {binding}, "
+                    "but that Instrumentation CR does not enable the language."
+                )
         if workload["language"] == "go" and not workload.get("go_target_exe"):
             errors.append(f"{workload_target(workload)} uses Go instrumentation but is missing go-target-exe.")
         runtime = str(workload.get("dotnet_runtime") or "").lower()
@@ -978,14 +1554,69 @@ def collect_preflights(config: dict[str, Any], mode: str) -> tuple[list[str], li
                 if override.get("namespace") == workload["namespace"] and str(override.get("enforce", "")).lower() in {"restricted", "baseline"} and not boolish(override.get("acknowledged"), False):
                     errors.append(f"{workload_target(workload)} is in a {override.get('enforce')} PSS namespace; Go instrumentation requires elevated privileges.")
 
+    for row in config["namespace_annotations"]:
+        namespace = str(row["namespace"])
+        try:
+            validate_dns_label(namespace, label="Namespace annotation target")
+        except SpecError as exc:
+            errors.append(str(exc))
+        for language in row["languages"]:
+            if language not in default_cr["languages"]:
+                errors.append(
+                    f"Namespace {namespace} binds {language} to default Instrumentation CR "
+                    f"{default_cr['namespace']}/{default_cr['name']}, but that CR does not enable the language."
+                )
+
     if config["obi"]["enabled"] and config["distribution"] == "openshift" and not config["obi"]["render_openshift_scc"]:
         errors.append("OpenShift OBI rendering requires openshift-scc-obi.yaml; do not disable --render-openshift-scc.")
+    if config["obi"]["enabled"]:
+        for namespace in [
+            *(config["obi"].get("namespaces") or []),
+            *(config["obi"].get("exclude_namespaces") or []),
+        ]:
+            try:
+                validate_dns_label(namespace, label="OBI namespace selector")
+            except SpecError as exc:
+                errors.append(str(exc))
+        if config["obi"].get("version"):
+            errors.append(
+                "--obi-version and obi.version are tag-only inputs and are not accepted for production; "
+                "use --obi-image with a reviewed @sha256 digest."
+            )
+        obi_image = str(config["obi"].get("image") or "")
+        if not obi_image:
+            errors.append(
+                "No repository-audited OBI container default exists; --enable-obi requires "
+                "--obi-image with a reviewed @sha256 digest."
+            )
+        elif not DIGEST_IMAGE_RE.fullmatch(obi_image):
+            errors.append("OBI image must be pinned by an immutable @sha256 digest.")
+    if (
+        mode == "apply-instrumentation"
+        and not config["operation_dry_run"]
+        and not config["accept_auto_instrumentation"]
+    ):
+        errors.append(
+            "--apply-instrumentation requires --accept-auto-instrumentation because CR changes "
+            "can alter already-annotated workloads on their next pod creation or restart."
+        )
     if mode == "apply-annotations" and not config["accept_auto_instrumentation"]:
         errors.append("--apply-annotations requires --accept-auto-instrumentation.")
     if mode == "uninstall-instrumentation" and not config["accept_auto_instrumentation"]:
         errors.append("--uninstall-instrumentation requires --accept-auto-instrumentation.")
     if mode == "apply-instrumentation" and config["obi"]["enabled"] and not config["accept_obi_privileged"]:
         errors.append("--apply-instrumentation with OBI requires --accept-obi-privileged.")
+    if (
+        mode in {"apply-instrumentation", "apply-annotations", "uninstall-instrumentation"}
+        and not config["operation_dry_run"]
+        and not config["kube_context"]
+        and not config["allow_current_context"]
+    ):
+        errors.append(
+            f"--{mode} requires --kube-context CTX or the explicit --allow-current-context acknowledgement."
+        )
+    if config["kube_context"] and config["allow_current_context"]:
+        errors.append("--kube-context conflicts with --allow-current-context.")
     if mode in {"apply-annotations", "uninstall-instrumentation"} and (config["target"] or config["target_all"]):
         advisories.append("Targeted apply/uninstall consumes metadata.json from the most recent render.")
 
@@ -993,19 +1624,10 @@ def collect_preflights(config: dict[str, Any], mode: str) -> tuple[list[str], li
         warnings.append("GKE Private Cluster requires firewall access to the operator webhook on port 9443.")
     if config["distribution"] == "openshift" and not config["obi"]["render_openshift_scc"] and config["obi"]["enabled"]:
         warnings.append("OpenShift OBI needs an SCC binding for privileged eBPF access.")
-    if config["operator"]["webhook_cert_mode"] == "external":
-        advisories.append("External webhook certificates must be rotated outside this skill.")
     if config["base"]["namespace"] != config["namespace"]:
         warnings.append(
             "Base collector namespace differs from Instrumentation CR namespace; consider a gateway Service DNS endpoint if workloads cannot resolve SPLUNK_OTEL_AGENT."
         )
-    if config["vendors"]["detect"]:
-        warnings.append(
-            "Vendor detection requested; live apply scripts will warn on Datadog/New Relic/AppDynamics/Dynatrace webhook coexistence."
-        )
-    for vendor in config["vendors"]["exclude"]:
-        advisories.append(f"Vendor exclusion requested for {vendor}; see migration-guide.md for env-var cleanup.")
-
     return errors, warnings, advisories
 
 
@@ -1028,7 +1650,7 @@ def runbook(config: dict[str, Any], errors: list[str]) -> str:
     lines = [
         "# Splunk Observability Kubernetes Auto-Instrumentation Runbook",
         "",
-        f"Cluster: `{config['cluster_name'] or '<auto-detect>'}`",
+        f"Cluster: `{config['cluster_name'] or '<missing>'}`",
         f"Environment: `{config['deployment_environment'] or '<missing>'}`",
         f"Distribution: `{config['distribution']}`",
         "",
@@ -1070,6 +1692,39 @@ def metadata_payload(
     normalized.pop("accept_obi_privileged", None)
     digest = hashlib.sha256(json.dumps(normalized, sort_keys=True).encode("utf-8")).hexdigest()
     all_languages = sorted({lang for cr in config["instrumentation_crs"] for lang in cr["languages"]})
+    cr_lookup = {
+        f"{cr['namespace']}/{cr['name']}": cr for cr in config["instrumentation_crs"]
+    }
+    apm_services: list[dict[str, str]] = []
+    seen_apm: set[tuple[str, str]] = set()
+    for target in target_records(config):
+        if not target.get("cr"):
+            continue
+        cr = cr_lookup.get(str(target["cr"])) or {}
+        language = str(target["language"])
+        env = (cr.get("extra_env") or {}).get(language) or {}
+        attributes = cr.get("extra_resource_attrs") or {}
+        service = str(env.get("OTEL_SERVICE_NAME") or attributes.get("service.name") or target["name"])
+        key = (str(target["target"]), service)
+        if key in seen_apm:
+            continue
+        seen_apm.add(key)
+        apm_services.append(
+            {
+                "service": service,
+                "target": str(target["target"]),
+                "realm": str(config["realm"]),
+                "cluster_name": str(config["cluster_name"]),
+                "deployment_environment": str(config["deployment_environment"]),
+            }
+        )
+    scc_documents = (
+        openshift_scc_docs(config)
+        if config["obi"]["enabled"]
+        and config["obi"]["render_openshift_scc"]
+        and config["distribution"] == "openshift"
+        else []
+    )
     return {
         "skill": SKILL_NAME,
         "api_version": API_VERSION,
@@ -1089,9 +1744,22 @@ def metadata_payload(
             {"name": cr["name"], "namespace": cr["namespace"], "languages": cr["languages"], "endpoint": cr["endpoint"]}
             for cr in config["instrumentation_crs"]
         ],
+        "instrumentation_documents": [
+            instrumentation_cr_doc(config, cr) for cr in config["instrumentation_crs"]
+        ],
         "obi_enabled": bool(config["obi"]["enabled"]),
+        "obi_contract": {
+            "enabled": bool(config["obi"]["enabled"]),
+            "namespace": config["namespace"],
+            "documents": obi_documents(config),
+            "scc_documents": scc_documents,
+            "minimum_kernel": "5.8.0",
+            "supported_architectures": ["amd64", "arm64"],
+        },
         "backup_configmap": config["backup_configmap"],
         "targets": target_records(config),
+        "namespace_targets": namespace_target_records(config),
+        "apm_services": apm_services,
         "preflight": {"errors": errors, "warnings": warnings, "advisories": advisories},
         "errors": errors,
         "warnings": warnings,
@@ -1126,13 +1794,15 @@ usage() {{
 {title}
 
 Options:
-  --target Kind/namespace/name      Limit to one workload (repeatable where supported)
+  --target TARGET                   Kind/namespace/name; audits also accept Namespace/name
   --target-all                      Use every workload from metadata.json
-  --accept-auto-instrumentation     Required for annotation apply/uninstall restarts
+  --accept-auto-instrumentation     Required for live CR/annotation apply and uninstall
   --accept-obi-privileged           Required when applying OBI
   --purge-crs                       Delete rendered Instrumentation CRs during uninstall
+  --purge-obi                       Verify ownership then delete rendered OBI resources
   --purge-backup                    Delete the backup ConfigMap during uninstall
   --kube-context NAME               Use a specific kube context
+  --allow-current-context           Explicitly acknowledge kubectl's current context
   --dry-run                         Print commands without running them
   --help                            Show this help
 EOF
@@ -1155,13 +1825,26 @@ run_cmd() {{
 
 
 def apply_instrumentation_script(config: dict[str, Any]) -> str:
+    operator = operator_resource_names(
+        str(config["base"]["release"]), str(config["base"]["namespace"])
+    )
+    manifest_args = ['--manifest "${SCRIPT_DIR}/instrumentation-cr.yaml"']
+    if config["obi"]["enabled"] and config["obi"]["render_openshift_scc"] and config["distribution"] == "openshift":
+        manifest_args.insert(0, '--manifest "${SCRIPT_DIR}/openshift-scc-obi.yaml"')
+    if config["obi"]["enabled"]:
+        manifest_args.append('--manifest "${SCRIPT_DIR}/obi-daemonset.yaml"')
+    manifest_arg_text = " ".join(manifest_args)
     return script_header("Apply Splunk OTel Instrumentation CRs and optional OBI assets") + f"""
 DRY_RUN=false
 ACCEPT_OBI=false
-KUBE_CONTEXT="{config.get('kube_context', '')}"
+ACCEPT_AUTO=false
+ALLOW_CURRENT_CONTEXT=false
+KUBE_CONTEXT={shlex.quote(str(config.get('kube_context') or ''))}
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --accept-auto-instrumentation) ACCEPT_AUTO=true; shift ;;
     --accept-obi-privileged) ACCEPT_OBI=true; shift ;;
+    --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
     --kube-context) KUBE_CONTEXT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -1169,6 +1852,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 require_metadata
+if [[ -n "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" == "true" ]]; then
+  echo "ERROR: --kube-context conflicts with --allow-current-context." >&2
+  exit 1
+fi
+if [[ "${{DRY_RUN}}" != "true" && -z "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" != "true" ]]; then
+  echo "ERROR: pass --kube-context CTX or explicitly acknowledge --allow-current-context." >&2
+  exit 1
+fi
+if [[ "${{DRY_RUN}}" != "true" && "${{ACCEPT_AUTO}}" != "true" ]]; then
+  echo "ERROR: --accept-auto-instrumentation is required because Instrumentation CR changes can affect annotated workloads." >&2
+  exit 1
+fi
 OBI_ENABLED="$(python3 - "$METADATA" <<'PY'
 import json, sys
 print(str(json.load(open(sys.argv[1])).get("obi_enabled", False)).lower())
@@ -1194,23 +1889,107 @@ if [[ "${{DRY_RUN}}" != "true" ]]; then
     exit 1
   fi
 fi
-if [[ -f "${{SCRIPT_DIR}}/openshift-scc-obi.yaml" ]]; then
-  run_cmd "${{KUBECTL[@]}}" apply -f "${{SCRIPT_DIR}}/openshift-scc-obi.yaml"
-fi
-run_cmd "${{KUBECTL[@]}}" apply -f "${{SCRIPT_DIR}}/instrumentation-cr.yaml"
-if [[ -f "${{SCRIPT_DIR}}/obi-daemonset.yaml" ]]; then
-  run_cmd "${{KUBECTL[@]}}" apply -f "${{SCRIPT_DIR}}/obi-daemonset.yaml"
+if [[ "${{DRY_RUN}}" == "true" ]]; then
+  echo "DRY RUN: would preflight exact ownership for every managed SCC, Instrumentation, ServiceAccount, and DaemonSet before race-safe create/replace."
+else
+  LIFECYCLE_CONTEXT_ARGS=()
+  if [[ -n "${{KUBE_CONTEXT}}" ]]; then LIFECYCLE_CONTEXT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+  python3 "${{SCRIPT_DIR}}/managed-resource-lifecycle.py" --mode apply \
+    {manifest_arg_text} \
+    "${{LIFECYCLE_CONTEXT_ARGS[@]+"${{LIFECYCLE_CONTEXT_ARGS[@]}}"}}"
 fi
 if [[ "${{DRY_RUN}}" != "true" ]]; then
-  echo "Waiting for an OpenTelemetry operator webhook endpoint on port 9443..."
+  WEBHOOK_NAMESPACE={shlex.quote(operator['namespace'])}
+  WEBHOOK_SERVICE={shlex.quote(operator['webhook_service_name'])}
+  echo "Waiting for ${{WEBHOOK_NAMESPACE}}/${{WEBHOOK_SERVICE}} on ready 9443/TCP route evidence..."
+  route_source=""
   for _ in $(seq 1 30); do
-    if "${{KUBECTL[@]}}" get endpoints -A 2>/dev/null | grep -q '9443'; then
-      echo "Webhook endpoint detected."
-      exit 0
+    use_endpoints=false
+    if slices_json="$("${{KUBECTL[@]}}" -n "${{WEBHOOK_NAMESPACE}}" get endpointslice \
+      -l "kubernetes.io/service-name=${{WEBHOOK_SERVICE}}" -o json 2>/dev/null)"; then
+      if python3 - "endpointslice" "${{WEBHOOK_NAMESPACE}}" "${{WEBHOOK_SERVICE}}" 3<<<"${{slices_json}}" <<'PY'
+import json, os, sys
+kind, namespace, service = sys.argv[1:]
+with os.fdopen(3, encoding="utf-8") as handle:
+    payload = json.load(handle)
+items = payload.get("items")
+if payload.get("kind") not in {{"EndpointSliceList", "List"}} or not isinstance(items, list):
+    raise SystemExit(1)
+if not items:
+    raise SystemExit(3)
+for item in items:
+    metadata = item.get("metadata") or {{}}
+    if (
+        item.get("apiVersion") != "discovery.k8s.io/v1"
+        or item.get("kind") != "EndpointSlice"
+        or metadata.get("namespace") != namespace
+        or (metadata.get("labels") or {{}}).get("kubernetes.io/service-name") != service
+    ):
+        raise SystemExit(1)
+ready = any(
+    any(
+        endpoint.get("conditions", {{}}).get("ready") is True
+        and endpoint.get("conditions", {{}}).get("terminating") is not True
+        and bool(endpoint.get("addresses"))
+        for endpoint in (item.get("endpoints") or [])
+    )
+    and any(
+        port.get("name") in (None, "", "webhook-server")
+        and port.get("protocol", "TCP") == "TCP"
+        and port.get("port") == 9443
+        for port in (item.get("ports") or [])
+    )
+    for item in items
+)
+raise SystemExit(0 if ready else 1)
+PY
+      then
+        route_source="endpointslice"
+        break
+      else
+        slice_status=$?
+        if [[ ${{slice_status}} -eq 3 ]]; then use_endpoints=true; fi
+      fi
+    else
+      use_endpoints=true
+    fi
+    if [[ "${{use_endpoints}}" == "true" ]] \
+      && endpoints_json="$("${{KUBECTL[@]}}" -n "${{WEBHOOK_NAMESPACE}}" get endpoints "${{WEBHOOK_SERVICE}}" -o json 2>/dev/null)" \
+      && python3 - "endpoints" "${{WEBHOOK_NAMESPACE}}" "${{WEBHOOK_SERVICE}}" 3<<<"${{endpoints_json}}" <<'PY'
+import json, os, sys
+_, namespace, service = sys.argv[1:]
+with os.fdopen(3, encoding="utf-8") as handle:
+    payload = json.load(handle)
+metadata = payload.get("metadata") or {{}}
+if (
+    payload.get("kind") != "Endpoints"
+    or metadata.get("namespace") != namespace
+    or metadata.get("name") != service
+):
+    raise SystemExit(1)
+ready = any(
+    bool(subset.get("addresses"))
+    and any(
+        port.get("name") in (None, "", "webhook-server")
+        and port.get("protocol", "TCP") == "TCP"
+        and port.get("port") == 9443
+        for port in (subset.get("ports") or [])
+    )
+    for subset in (payload.get("subsets") or [])
+)
+raise SystemExit(0 if ready else 1)
+PY
+    then
+      route_source="endpoints"
+      break
     fi
     sleep 2
   done
-  echo "WARN: webhook endpoint on port 9443 was not observed; inspect operator logs before annotating workloads." >&2
+  if [[ -z "${{route_source}}" ]]; then
+    echo "ERROR: exact Operator webhook Service did not become route-ready on 9443/TCP." >&2
+    exit 1
+  fi
+  echo "Webhook route ready via ${{route_source}}."
 fi
 """
 
@@ -1218,10 +1997,8 @@ fi
 def apply_annotations_script(config: dict[str, Any]) -> str:
     head = script_header("Apply Splunk OTel auto-instrumentation workload annotations")
     prelude = (
-        f'\nDRY_RUN=false\nACCEPT=false\nTARGET_ALL=false\n'
-        f'KUBE_CONTEXT="{config.get("kube_context", "")}"\n'
-        f'BACKUP_NAME="{config["backup_configmap"]}"\n'
-        f'BACKUP_NAMESPACE="{config["namespace"]}"\n'
+        f'\nDRY_RUN=false\nACCEPT=false\nTARGET_ALL=false\nALLOW_CURRENT_CONTEXT=false\n'
+        f'KUBE_CONTEXT={shlex.quote(str(config.get("kube_context") or ""))}\n'
     )
     body = r"""TARGETS=()
 while [[ $# -gt 0 ]]; do
@@ -1229,6 +2006,7 @@ while [[ $# -gt 0 ]]; do
     --accept-auto-instrumentation) ACCEPT=true; shift ;;
     --target) TARGETS+=("$2"); shift 2 ;;
     --target-all) TARGET_ALL=true; shift ;;
+    --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
     --kube-context) KUBE_CONTEXT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -1236,6 +2014,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 require_metadata
+if [[ -n "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" == "true" ]]; then
+  echo "ERROR: --kube-context conflicts with --allow-current-context." >&2
+  exit 1
+fi
+if [[ "${DRY_RUN}" != "true" && -z "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" != "true" ]]; then
+  echo "ERROR: pass --kube-context CTX or explicitly acknowledge --allow-current-context." >&2
+  exit 1
+fi
 if [[ "${ACCEPT}" != "true" ]]; then
   echo "ERROR: --accept-auto-instrumentation is required because this restarts pods." >&2
   exit 1
@@ -1246,60 +2032,33 @@ if [[ "${TARGET_ALL}" != "true" && ${#TARGETS[@]} -eq 0 ]]; then
 fi
 KUBECTL=(kubectl)
 if [[ -n "${KUBE_CONTEXT}" ]]; then KUBECTL+=(--context "${KUBE_CONTEXT}"); fi
-run_cmd "${KUBECTL[@]}" apply -f "${SCRIPT_DIR}/annotation-backup-configmap.yaml"
-TARGET_JSON="$(python3 - "$METADATA" "${TARGET_ALL}" "${TARGETS[@]+"${TARGETS[@]}"}" <<'PY'
-import json, sys
-meta = json.load(open(sys.argv[1]))
-target_all = sys.argv[2] == "true"
-requested = {token for token in sys.argv[3:] if token}
-records = meta.get("targets", [])
-if requested:
-    records = [r for r in records if r.get("target") in requested]
-elif not target_all:
-    records = []
-print(json.dumps(records))
-PY
-)"
-while IFS=$'\t' read -r kind namespace name key patch; do
+SELECTION_ARGS=()
+if [[ "${TARGET_ALL}" == "true" ]]; then SELECTION_ARGS+=(--target-all); fi
+for target in "${TARGETS[@]+"${TARGETS[@]}"}"; do SELECTION_ARGS+=(--target "${target}"); done
+CONTEXT_ARGS=()
+if [[ -n "${KUBE_CONTEXT}" ]]; then CONTEXT_ARGS+=(--kube-context "${KUBE_CONTEXT}"); fi
+if [[ "${DRY_RUN}" != "true" ]]; then
+  PLAN_JSON="$(python3 "${SCRIPT_DIR}/annotation-backup.py" \
+    --mode capture --metadata "${METADATA}" \
+    "${CONTEXT_ARGS[@]+"${CONTEXT_ARGS[@]}"}" \
+    "${SELECTION_ARGS[@]+"${SELECTION_ARGS[@]}"}")"
+else
+  echo "DRY RUN: would transactionally capture and verify every selected managed annotation before patching."
+  PLAN_JSON="$(python3 "${SCRIPT_DIR}/annotation-backup.py" \
+    --mode apply-plan --metadata "${METADATA}" \
+    "${SELECTION_ARGS[@]+"${SELECTION_ARGS[@]}"}")"
+fi
+while IFS=$'\t' read -r kind namespace name patch; do
   [[ -n "${kind}" ]] || continue
-  if [[ "${DRY_RUN}" != "true" ]]; then
-    # Capture current pod-template annotations as a real JSON object so the
-    # backup ConfigMap stores a value uninstall.sh can decode for restore.
-    # `kubectl get -o jsonpath` emits Go map syntax, so use -o json + python.
-    current_json="$("${KUBECTL[@]}" -n "${namespace}" get "${kind}" "${name}" -o json 2>/dev/null \
-      | python3 -c 'import json,sys
-try:
-    obj = json.load(sys.stdin)
-    annotations = (((obj or {}).get("spec") or {}).get("template") or {}).get("metadata", {}).get("annotations") or {}
-except Exception:
-    annotations = {}
-print(json.dumps(annotations))' || echo '{}')"
-    if ! "${KUBECTL[@]}" -n "${BACKUP_NAMESPACE}" get configmap "${BACKUP_NAME}" -o "jsonpath={.data.${key}}" >/dev/null 2>&1; then
-      backup_patch="$(python3 - "${key}" "${current_json}" <<'PY'
-import json, sys
-key = sys.argv[1]
-prior = sys.argv[2].strip() or "{}"
-# Validate that the prior payload is JSON; fall back to empty object on failure.
-try:
-    json.loads(prior)
-except Exception:
-    prior = "{}"
-print(json.dumps({"data": {key: prior}}))
-PY
-)"
-      "${KUBECTL[@]}" -n "${BACKUP_NAMESPACE}" patch configmap "${BACKUP_NAME}" --type merge -p "${backup_patch}" >/dev/null
-    fi
-  fi
   run_cmd "${KUBECTL[@]}" -n "${namespace}" patch "${kind}" "${name}" --type strategic -p "${patch}"
   run_cmd "${KUBECTL[@]}" -n "${namespace}" rollout restart "${kind}/${name}"
   if [[ "${DRY_RUN}" != "true" ]]; then
     "${KUBECTL[@]}" -n "${namespace}" rollout status "${kind}/${name}"
   fi
-done < <(python3 - "$TARGET_JSON" <<'PY'
+done < <(python3 - "$PLAN_JSON" <<'PY'
 import json, sys
 for row in json.loads(sys.argv[1]):
-    patch = {"spec": {"template": {"metadata": {"annotations": row["annotations"]}}}}
-    print("\t".join([row["kind"], row["namespace"], row["name"], row["key"], json.dumps(patch)]))
+    print("\t".join([row["kind"], row["namespace"], row["name"], json.dumps(row["patch"])]))
 PY
 )
 """
@@ -1307,17 +2066,10 @@ PY
 
 
 def uninstall_script(config: dict[str, Any]) -> str:
-    cr_delete_lines = "\n".join(
-        f'  run_cmd "${{KUBECTL[@]}}" -n "{cr["namespace"]}" delete otelinst "{cr["name"]}" --ignore-not-found'
-        for cr in config["instrumentation_crs"]
-    )
     head = script_header("Uninstall Splunk OTel auto-instrumentation annotations and CRs")
     prelude = (
-        f'\nDRY_RUN=false\nACCEPT=false\nTARGET_ALL=false\nPURGE_CRS=false\nPURGE_BACKUP=false\n'
-        f'KUBE_CONTEXT="{config.get("kube_context", "")}"\n'
-        f'CR_NAMESPACE="{config["namespace"]}"\n'
-        f'BACKUP_NAMESPACE="{config["namespace"]}"\n'
-        f'BACKUP_NAME="{config["backup_configmap"]}"\n'
+        f'\nDRY_RUN=false\nACCEPT=false\nTARGET_ALL=false\nPURGE_CRS=false\nPURGE_OBI=false\nPURGE_BACKUP=false\nALLOW_CURRENT_CONTEXT=false\n'
+        f'KUBE_CONTEXT={shlex.quote(str(config.get("kube_context") or ""))}\n'
     )
     body = r"""TARGETS=()
 while [[ $# -gt 0 ]]; do
@@ -1326,7 +2078,9 @@ while [[ $# -gt 0 ]]; do
     --target) TARGETS+=("$2"); shift 2 ;;
     --target-all) TARGET_ALL=true; shift ;;
     --purge-crs) PURGE_CRS=true; shift ;;
+    --purge-obi) PURGE_OBI=true; shift ;;
     --purge-backup) PURGE_BACKUP=true; shift ;;
+    --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
     --kube-context) KUBE_CONTEXT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -1334,126 +2088,128 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 require_metadata
+if [[ -n "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" == "true" ]]; then
+  echo "ERROR: --kube-context conflicts with --allow-current-context." >&2
+  exit 1
+fi
+if [[ "${DRY_RUN}" != "true" && -z "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" != "true" ]]; then
+  echo "ERROR: pass --kube-context CTX or explicitly acknowledge --allow-current-context." >&2
+  exit 1
+fi
 if [[ "${ACCEPT}" != "true" ]]; then
   echo "ERROR: --accept-auto-instrumentation is required because this restarts pods." >&2
   exit 1
 fi
-if [[ "${TARGET_ALL}" != "true" && ${#TARGETS[@]} -eq 0 ]]; then
-  echo "ERROR: pass --target Kind/namespace/name (repeatable) or --target-all." >&2
+if [[ "${TARGET_ALL}" != "true" && ${#TARGETS[@]} -eq 0 \
+  && "${PURGE_CRS}" != "true" && "${PURGE_OBI}" != "true" && "${PURGE_BACKUP}" != "true" ]]; then
+  echo "ERROR: select workload targets or an explicit --purge-* operation." >&2
   exit 1
 fi
 KUBECTL=(kubectl)
 if [[ -n "${KUBE_CONTEXT}" ]]; then KUBECTL+=(--context "${KUBE_CONTEXT}"); fi
-TARGET_JSON="$(python3 - "$METADATA" "${TARGET_ALL}" "${TARGETS[@]+"${TARGETS[@]}"}" <<'PY'
-import json, sys
-meta = json.load(open(sys.argv[1]))
-target_all = sys.argv[2] == "true"
-requested = {token for token in sys.argv[3:] if token}
-records = meta.get("targets", [])
-if requested:
-    records = [r for r in records if r.get("target") in requested]
-elif not target_all:
-    records = []
-print(json.dumps(records))
-PY
-)"
-while IFS=$'\t' read -r kind namespace name language key; do
-  [[ -n "${kind}" ]] || continue
-  # Best-effort restore: read the prior pod-template annotations from the
-  # backup ConfigMap so we can return any pre-existing values (e.g. a
-  # container-names annotation the operator set before instrumentation).
-  # If the backup key is missing, fall back to nulling only the inject-*
-  # annotations we may have written.
-  prior_json='{}'
-  if [[ "${DRY_RUN}" != "true" ]]; then
-    prior_json="$("${KUBECTL[@]}" -n "${BACKUP_NAMESPACE}" get configmap "${BACKUP_NAME}" -o "jsonpath={.data.${key}}" 2>/dev/null || true)"
-    [[ -n "${prior_json}" ]] || prior_json='{}'
-  fi
-  patch="$(python3 - "${language}" "${prior_json}" <<'PY'
-import json, sys
-lang = sys.argv[1]
-prior_text = (sys.argv[2] or "").strip() or "{}"
-try:
-    prior = json.loads(prior_text)
-    if not isinstance(prior, dict):
-        prior = {}
-except Exception:
-    prior = {}
-managed_keys = [
-    "instrumentation.opentelemetry.io/inject-" + lang,
-    "instrumentation.opentelemetry.io/container-names",
-    "instrumentation.opentelemetry.io/otel-dotnet-auto-runtime",
-    "instrumentation.opentelemetry.io/otel-go-auto-target-exe",
-]
-annotations = {key: prior[key] if key in prior else None for key in managed_keys}
-print(json.dumps({"spec": {"template": {"metadata": {"annotations": annotations}}}}))
-PY
-)"
-  run_cmd "${KUBECTL[@]}" -n "${namespace}" patch "${kind}" "${name}" --type strategic -p "${patch}"
-  run_cmd "${KUBECTL[@]}" -n "${namespace}" rollout restart "${kind}/${name}"
-  if [[ "${DRY_RUN}" != "true" ]]; then
-    "${KUBECTL[@]}" -n "${namespace}" rollout status "${kind}/${name}"
-  fi
-done < <(python3 - "$TARGET_JSON" <<'PY'
+if [[ "${TARGET_ALL}" == "true" || ${#TARGETS[@]} -gt 0 ]]; then
+  SELECTION_ARGS=()
+  if [[ "${TARGET_ALL}" == "true" ]]; then SELECTION_ARGS+=(--target-all); fi
+  for target in "${TARGETS[@]+"${TARGETS[@]}"}"; do SELECTION_ARGS+=(--target "${target}"); done
+  CONTEXT_ARGS=()
+  if [[ -n "${KUBE_CONTEXT}" ]]; then CONTEXT_ARGS+=(--kube-context "${KUBE_CONTEXT}"); fi
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    echo "DRY RUN: would require a complete, owned rollback snapshot before restoring selected workloads."
+  else
+    PLAN_JSON="$(python3 "${SCRIPT_DIR}/annotation-backup.py" \
+      --mode restore-plan --metadata "${METADATA}" \
+      "${CONTEXT_ARGS[@]+"${CONTEXT_ARGS[@]}"}" \
+      "${SELECTION_ARGS[@]+"${SELECTION_ARGS[@]}"}")"
+    while IFS=$'\t' read -r kind namespace name patch; do
+      [[ -n "${kind}" ]] || continue
+      "${KUBECTL[@]}" -n "${namespace}" patch "${kind}" "${name}" --type strategic -p "${patch}"
+      "${KUBECTL[@]}" -n "${namespace}" rollout restart "${kind}/${name}"
+      "${KUBECTL[@]}" -n "${namespace}" rollout status "${kind}/${name}"
+    done < <(python3 - "$PLAN_JSON" <<'PY'
 import json, sys
 for row in json.loads(sys.argv[1]):
-    print("\t".join([row["kind"], row["namespace"], row["name"], row["language"], row["key"]]))
+    print("\t".join([row["kind"], row["namespace"], row["name"], json.dumps(row["patch"])]))
 PY
 )
+  fi
+fi
 """
-    tail = (
-        f'if [[ "${{PURGE_CRS}}" == "true" ]]; then\n{cr_delete_lines}\nfi\n'
-        f'if [[ "${{PURGE_BACKUP}}" == "true" ]]; then\n'
-        f'  run_cmd "${{KUBECTL[@]}}" -n "${{CR_NAMESPACE}}" delete configmap "${{BACKUP_NAME}}" --ignore-not-found\n'
-        f'fi\n'
-    )
+    # The empty interpolation makes this one f-string while doubled braces emit
+    # the literal Bash parameter-expansion syntax used by the rendered helper.
+    tail = f"""{''}if [[ "${{PURGE_CRS}}" == "true" ]]; then
+  if [[ "${{DRY_RUN}}" == "true" ]]; then
+    echo "DRY RUN: would verify exact Instrumentation ownership then delete with UID/resourceVersion preconditions."
+  else
+    CR_CONTEXT_ARGS=()
+    if [[ -n "${{KUBE_CONTEXT}}" ]]; then CR_CONTEXT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+    python3 "${{SCRIPT_DIR}}/managed-resource-lifecycle.py" --mode delete --manifest "${{SCRIPT_DIR}}/instrumentation-cr.yaml" "${{CR_CONTEXT_ARGS[@]+"${{CR_CONTEXT_ARGS[@]}}"}}"
+  fi
+fi
+if [[ "${{PURGE_OBI}}" == "true" ]]; then
+  if [[ "${{DRY_RUN}}" == "true" ]]; then
+    echo "DRY RUN: would verify exact OBI ownership/config then delete DaemonSet, optional SCC, and ServiceAccount."
+  else
+    OBI_CONTEXT_ARGS=()
+    if [[ -n "${{KUBE_CONTEXT}}" ]]; then OBI_CONTEXT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+    python3 "${{SCRIPT_DIR}}/obi-lifecycle.py" --mode purge --metadata "${{METADATA}}" "${{OBI_CONTEXT_ARGS[@]+"${{OBI_CONTEXT_ARGS[@]}}"}}"
+  fi
+fi
+if [[ "${{PURGE_BACKUP}}" == "true" ]]; then
+  if [[ "${{DRY_RUN}}" == "true" ]]; then
+    echo "DRY RUN: would require every owned snapshot before deleting the backup ConfigMap."
+  else
+    BACKUP_CONTEXT_ARGS=()
+    if [[ -n "${{KUBE_CONTEXT}}" ]]; then BACKUP_CONTEXT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+    python3 "${{SCRIPT_DIR}}/annotation-backup.py" --mode purge --metadata "${{METADATA}}" --target-all "${{BACKUP_CONTEXT_ARGS[@]+"${{BACKUP_CONTEXT_ARGS[@]}}"}}"
+  fi
+fi
+"""
     return head + prelude + body + tail
 
 
 def verify_injection_script(config: dict[str, Any]) -> str:
-    return script_header("Verify Splunk OTel auto-instrumentation injection for a target workload") + """
-DRY_RUN=false
-TARGET=""
-KUBE_CONTEXT=""
+    return script_header("Verify Splunk OTel auto-instrumentation injection for rendered workloads") + f"""
+TARGET_ALL=false
+TARGETS=()
+ALLOW_CURRENT_CONTEXT=false
+KUBE_CONTEXT={shlex.quote(str(config.get('kube_context') or ''))}
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --target) TARGET="$2"; shift 2 ;;
+    --target) [[ $# -ge 2 ]] || {{ echo "ERROR: --target requires a value." >&2; exit 1; }}; TARGETS+=("$2"); shift 2 ;;
+    --target-all) TARGET_ALL=true; shift ;;
+    --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
     --kube-context) KUBE_CONTEXT="$2"; shift 2 ;;
-    --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "ERROR: Unknown option: $1" >&2; usage; exit 1 ;;
   esac
 done
 require_metadata
-[[ -n "${TARGET}" ]] || { echo "ERROR: --target Kind/namespace/name is required." >&2; exit 1; }
-KUBECTL=(kubectl)
-if [[ -n "${KUBE_CONTEXT}" ]]; then KUBECTL+=(--context "${KUBE_CONTEXT}"); fi
-IFS=/ read -r kind namespace name <<<"${TARGET}"
-echo "Workload annotations:"
-"${KUBECTL[@]}" -n "${namespace}" get "${kind}" "${name}" -o jsonpath='{.spec.template.metadata.annotations}' || true
-echo
-echo "Sample pods with OpenTelemetry init containers:"
-# Resolve the workload's actual matchLabels selector and use it to scope the
-# pod query. Falls back to listing all pods in the namespace when the
-# selector cannot be resolved (e.g. the workload was just deleted).
-selector_label="$("${KUBECTL[@]}" -n "${namespace}" get "${kind}" "${name}" -o json 2>/dev/null | python3 -c 'import json,sys
-try:
-    obj = json.load(sys.stdin)
-    labels = (((obj or {}).get("spec") or {}).get("selector") or {}).get("matchLabels") or {}
-    print(",".join(f"{k}={v}" for k, v in sorted(labels.items())))
-except Exception:
-    print("")' || echo "")"
-if [[ -n "${selector_label}" ]]; then
-  pods_json="$("${KUBECTL[@]}" -n "${namespace}" get pods -l "${selector_label}" -o json)"
-else
-  pods_json="$("${KUBECTL[@]}" -n "${namespace}" get pods -o json)"
+if [[ "${{TARGET_ALL}}" == "true" && ${{#TARGETS[@]}} -gt 0 ]]; then
+  echo "ERROR: --target and --target-all are mutually exclusive." >&2
+  exit 1
 fi
-printf '%s\\n' "${pods_json}" | python3 -c 'import json,sys
-data = json.load(sys.stdin)
-for p in data.get("items", []):
-    init_containers = (p.get("spec") or {}).get("initContainers") or []
-    if any(c.get("name") == "opentelemetry-auto-instrumentation" for c in init_containers):
-        print(p["metadata"]["name"])' || true
+if [[ "${{TARGET_ALL}}" != "true" && ${{#TARGETS[@]}} -eq 0 ]]; then
+  echo "ERROR: pass --target Kind/namespace/name or --target-all." >&2
+  exit 1
+fi
+if [[ -n "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" == "true" ]]; then
+  echo "ERROR: --kube-context conflicts with --allow-current-context." >&2
+  exit 1
+fi
+if [[ -z "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" != "true" ]]; then
+  echo "ERROR: pass --kube-context CTX or explicitly acknowledge --allow-current-context." >&2
+  exit 1
+fi
+command -v python3 >/dev/null 2>&1 || {{ echo "ERROR: python3 is required." >&2; exit 1; }}
+command -v kubectl >/dev/null 2>&1 || {{ echo "ERROR: kubectl is required." >&2; exit 1; }}
+AUDIT_ARGS=(--output-dir "${{OUTPUT_DIR}}")
+if [[ -n "${{KUBE_CONTEXT}}" ]]; then AUDIT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+if [[ "${{ALLOW_CURRENT_CONTEXT}}" == "true" ]]; then AUDIT_ARGS+=(--allow-current-context); fi
+if [[ "${{TARGET_ALL}}" == "true" ]]; then AUDIT_ARGS+=(--target-all); fi
+for target in "${{TARGETS[@]+"${{TARGETS[@]}}"}}"; do
+  AUDIT_ARGS+=(--target "${{target}}")
+done
+python3 "${{SCRIPT_DIR}}/injection-audit.py" "${{AUDIT_ARGS[@]}}"
 """
 
 
@@ -1489,24 +2245,57 @@ for p in data.get("items", []):
 
 
 def list_instrumented_script(config: dict[str, Any]) -> str:
-    return script_header("List workloads rendered for Splunk OTel auto-instrumentation") + """
+    return script_header("Audit and list workloads rendered for Splunk OTel auto-instrumentation") + f"""
+KUBE_CONTEXT={shlex.quote(str(config.get('kube_context') or ''))}
+ALLOW_CURRENT_CONTEXT=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --kube-context) [[ $# -ge 2 ]] || {{ echo "ERROR: --kube-context requires a value." >&2; exit 1; }}; KUBE_CONTEXT="$2"; shift 2 ;;
+    --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "ERROR: Unknown option: $1" >&2; usage; exit 1 ;;
+  esac
+done
 require_metadata
-python3 - "$METADATA" <<'PY'
+if [[ -n "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" == "true" ]]; then
+  echo "ERROR: --kube-context conflicts with --allow-current-context." >&2
+  exit 1
+fi
+if [[ -z "${{KUBE_CONTEXT}}" && "${{ALLOW_CURRENT_CONTEXT}}" != "true" ]]; then
+  echo "ERROR: pass --kube-context CTX or explicitly acknowledge --allow-current-context." >&2
+  exit 1
+fi
+command -v python3 >/dev/null 2>&1 || {{ echo "ERROR: python3 is required." >&2; exit 1; }}
+command -v kubectl >/dev/null 2>&1 || {{ echo "ERROR: kubectl is required." >&2; exit 1; }}
+AUDIT_ARGS=(--output-dir "${{OUTPUT_DIR}}" --target-all)
+if [[ -n "${{KUBE_CONTEXT}}" ]]; then AUDIT_ARGS+=(--kube-context "${{KUBE_CONTEXT}}"); fi
+if [[ "${{ALLOW_CURRENT_CONTEXT}}" == "true" ]]; then AUDIT_ARGS+=(--allow-current-context); fi
+python3 "${{SCRIPT_DIR}}/injection-audit.py" "${{AUDIT_ARGS[@]}}"
+python3 - "${{METADATA}}" <<'PY'
 import json, sys
 meta = json.load(open(sys.argv[1]))
 print("TARGET\\tLANGUAGE\\tCR")
 for row in meta.get("targets", []):
-    print(f"{row['target']}\\t{row['language']}\\t{row.get('cr') or '<default>'}")
+    print(f"{{row['target']}}\\t{{row['language']}}\\t{{row.get('cr') or '<default>'}}")
+for row in meta.get("namespace_targets", []):
+    bindings = sorted(set((row.get("annotations") or {{}}).values()))
+    print(f"{{row['target']}}\\t{{','.join(row.get('languages') or [])}}\\t{{','.join(bindings)}}")
 PY
 """
 
 
 def handoff_collector(config: dict[str, Any]) -> str:
+    command = (
+        "bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh "
+        f"--render-k8s --realm {config['realm'] or '<realm>'} "
+        f"--cluster-name {config['cluster_name'] or '<cluster>'} "
+        f"--distribution {config['distribution']}"
+    )
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 echo "Run the base collector setup first if the Instrumentation CRD is absent:"
-echo "bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render-k8s --realm {config['realm'] or '<realm>'} --cluster-name {config['cluster_name'] or '<cluster>'} --distribution {config['distribution']}"
+printf '%s\n' {shlex.quote(command)}
 echo "The base collector includes Operator CRDs unless --skip-operator-crds is set; then return to this skill for Instrumentation CRs and workload annotations."
 """
 
@@ -1519,7 +2308,8 @@ def handoff_native_ops(config: dict[str, Any]) -> dict[str, Any]:
             {
                 "kind": "detector",
                 "name": "Auto-instrumented services reporting errors",
-                "programText": "A = traces.count(filter=filter('sf_environment', '%s')).publish()" % config["deployment_environment"],
+                "programText": "A = traces.count(filter=filter('sf_environment', %s)).publish()"
+                % json.dumps(config["deployment_environment"]),
                 "description": "Starter detector for services onboarded through Kubernetes auto-instrumentation.",
             }
         ],
@@ -1553,7 +2343,7 @@ def render_all(config: dict[str, Any], output_dir: Path, mode: str) -> tuple[dic
     namespace_docs = namespace_annotation_docs(config)
     workload_docs = workload_annotation_docs(config)
     backup_doc = backup_configmap_doc(config)
-    obi_docs = [obi_daemonset_doc(config)] if config["obi"]["enabled"] else []
+    obi_docs = obi_documents(config)
     scc_docs = openshift_scc_docs(config) if config["obi"]["enabled"] and config["obi"]["render_openshift_scc"] and config["distribution"] == "openshift" else []
 
     files: list[tuple[Path, str | Any, str]] = [
@@ -1579,6 +2369,26 @@ def render_all(config: dict[str, Any], output_dir: Path, mode: str) -> tuple[dic
     # the cluster in a mutating way.
     files.extend(
         [
+            (
+                k8s_dir / "injection-audit.py",
+                Path(__file__).with_name("injection_audit.py").read_text(encoding="utf-8"),
+                "script",
+            ),
+            (
+                k8s_dir / "annotation-backup.py",
+                Path(__file__).with_name("annotation_backup.py").read_text(encoding="utf-8"),
+                "script",
+            ),
+            (
+                k8s_dir / "obi-lifecycle.py",
+                Path(__file__).with_name("obi_lifecycle.py").read_text(encoding="utf-8"),
+                "script",
+            ),
+            (
+                k8s_dir / "managed-resource-lifecycle.py",
+                Path(__file__).with_name("managed_resource_lifecycle.py").read_text(encoding="utf-8"),
+                "script",
+            ),
             (k8s_dir / "verify-injection.sh", verify_injection_script(config), "script"),
             (k8s_dir / "status.sh", status_script(config), "script"),
             (k8s_dir / "list-instrumented.sh", list_instrumented_script(config), "script"),
@@ -1705,7 +2515,7 @@ def explain(config: dict[str, Any], mode: str) -> str:
         f"  Mode: {mode}",
         f"  Output directory: {DEFAULT_OUTPUT_DIR}",
         f"  Realm: {config['realm'] or '<missing>'}",
-        f"  Cluster: {config['cluster_name'] or '<auto/missing>'}",
+        f"  Cluster: {config['cluster_name'] or '<missing>'}",
         f"  Environment: {config['deployment_environment'] or '<missing>'}",
         f"  Distribution: {config['distribution']}",
         f"  Instrumentation CRs: {len(config['instrumentation_crs'])}",

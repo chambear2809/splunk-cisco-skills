@@ -98,7 +98,7 @@ if [[ -z "${SPEC}" ]]; then
 fi
 
 # Build the plan in Python — much safer than building JSON via printf/%s.
-PLAN_JSON="$(
+if ! PLAN_JSON="$(
     SPEC_PATH="${SPEC}" \
     APPLY_FLAG="${APPLY}" \
     UNINSTALL_FLAG="${UNINSTALL}" \
@@ -272,9 +272,7 @@ print(json.dumps({
     "actions": actions,
 }, indent=2, sort_keys=True))
 PY
-)"
-
-if [[ $? -ne 0 ]]; then
+)"; then
     log "ERROR: Failed to build the splunk-side plan."
     exit 1
 fi

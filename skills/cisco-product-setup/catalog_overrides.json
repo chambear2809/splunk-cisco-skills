@@ -249,47 +249,58 @@
     },
     "cisco_cucm": {
       "automation_state": "partial",
-      "route_type": "workflow_handoff",
-      "primary_skill": "splunk-connect-for-syslog-setup",
-      "workflow_scripts": [
-        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
-      ],
-      "handoff": "Render or apply SC4S assets for CUCM syslog, then validate that cisco:ucm events are reaching the target index.",
-      "notes": "CUCM is syslog-sourcetype coverage in SCAN rather than a product-specific Splunk app. This route provides the SC4S handoff instead of pretending there is a dedicated CUCM installer."
+      "route_type": "collaboration",
+      "coverage_status": "partial",
+      "collection_executable_status": "handoff_only",
+      "handoff": "Render the collaboration packet for separate CUCM syslog, CDR, and CMR paths; no SC4S apply, child apply, or device mutation is generated.",
+      "notes": "CUCM remains partial. The collaboration router independently gates syslog, CDR, CMR, and AXL-enrichment evidence."
     },
     "cisco_expressway": {
       "automation_state": "partial",
-      "route_type": "workflow_handoff",
-      "primary_skill": "splunk-connect-for-syslog-setup",
-      "workflow_scripts": [
-        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
-      ],
-      "handoff": "Render or apply SC4S assets for Expressway syslog, then validate that cisco:tvcs events are reaching the target index.",
-      "notes": "Expressway coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+      "route_type": "collaboration",
+      "coverage_status": "partial",
+      "collection_executable_status": "handoff_only",
+      "handoff": "Render Expressway UDP/TLS device and cisco:tvcs plans; TLS listener/certificate readiness stays an explicit unresolved SC4S handoff gap.",
+      "notes": "Expressway remains partial and render-only; the pinned SC4S parser/test resolve the human-documentation source-type typo to cisco:tvcs."
     },
     "cisco_meeting_management": {
       "automation_state": "partial",
-      "route_type": "workflow_handoff",
-      "primary_skill": "splunk-connect-for-syslog-setup",
-      "workflow_scripts": [
-        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
-      ],
-      "handoff": "Render or apply SC4S assets for Meeting Management syslog, then validate cisco:mm:system:* and cisco:mm:audit events.",
-      "notes": "Meeting Management coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+      "route_type": "collaboration",
+      "coverage_status": "partial",
+      "collection_executable_status": "handoff_only",
+      "handoff": "Render independent Meeting Management system and audit syslog paths with deterministic SC4S classification; no live configuration is claimed.",
+      "notes": "Meeting Management remains partial. System and audit enablement/evidence are independent and retain TLS 1.2, five-server, and 8192-byte receiver boundaries."
     },
     "cisco_meeting_server": {
       "automation_state": "partial",
-      "route_type": "workflow_handoff",
-      "primary_skill": "splunk-connect-for-syslog-setup",
-      "workflow_scripts": [
-        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      "route_type": "collaboration",
+      "coverage_status": "partial",
+      "collection_executable_status": "handoff_only",
+      "handoff": "Render CMS TCP/optional-TLS syslog classification while preserving the external XML CDR receiver as an explicit implementation gap.",
+      "notes": "Meeting Server remains partial; no XML CDR receiver, live collection, or completion is claimed."
+    },
+    "cisco_broadworks": {
+      "automation_state": "unsupported_roadmap",
+      "route_type": "gap_handoff",
+      "coverage_status": "unsupported_roadmap",
+      "collection_executable_status": "gap",
+      "handoff_targets": [
+        "https://developer.cisco.com/docs/broadworks/getting-started/"
       ],
-      "handoff": "Render or apply SC4S assets for Cisco Meeting Server syslog, then validate that cisco:ms events are reaching the target index.",
-      "notes": "Meeting Server coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+      "handoff": "Render documentation and evidence-gap guidance only; no BroadWorks collector, parser, source type, TA, or executable collection route is claimed.",
+      "manual_gap_reason": "BroadWorks remains unsupported_roadmap with a primary vendor-interface handoff and an explicit collection-executable gap."
+    },
+    "cisco_collab_hardware": {
+      "automation_state": "unsupported_roadmap",
+      "route_type": "gap_handoff",
+      "coverage_status": "unsupported_roadmap",
+      "collection_executable_status": "gap",
+      "handoff_targets": [
+        "cisco-webex-setup",
+        "cisco-thousandeyes-setup"
+      ],
+      "handoff": "Render distinct Webex xAPI and ThousandEyes-on-RoomOS evidence handoffs only; no RoomOS Splunk parser or collector is claimed.",
+      "manual_gap_reason": "RoomOS collaboration hardware remains unsupported_roadmap with distinct Webex and ThousandEyes capability handoffs and no executable collection route."
     },
     "cisco_imc": {
       "automation_state": "partial",

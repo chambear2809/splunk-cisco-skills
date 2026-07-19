@@ -53,15 +53,20 @@ interception.
 
 The repo-local `splunk-cisco-skills` MCP server (`agent/run-splunk-cisco-skills-mcp.py`)
 is a development assistant for trusted, single-operator use. It starts in
-discovery-and-plan-only mode. Its security model is:
+discovery-only mode when launched directly without gate environment variables;
+the committed client registrations enable typed subprocess planning but keep
+generic execution and mutation off. Its security model is:
 
 - Every local subprocess requires the server process to start with
   `SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1`. Client confirmation alone cannot
   enable execution.
 - Every generic `plan_skill_script` plan is classified as mutating, regardless
   of its script name or arguments. Executing one additionally requires
-  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; only typed, schema-backed workflows may
-  receive a narrower read-only classification.
+  `SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1` and
+  `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`. Typed product executions are also
+  mutation-gated, including validate-only phases, because validators may write
+  reports or caches. The committed registrations explicitly set both gates to
+  `0`, so they allow dry-run planning but no final execution.
 - Tool schemas are strict: unknown properties are rejected, enum values are
   constrained, and text, list, argument, and timeout sizes are bounded.
 - Direct secret-on-argv flags (`--password`, `--api-key`, `--token`, etc.) are
@@ -77,6 +82,16 @@ discovery-and-plan-only mode. Its security model is:
 - Subprocesses are serialized. Their runtime and stdout/stderr are bounded,
   cancellation escalates from process-group termination to forced kill, and
   returned output is truncated and redacted.
+- Python starts with isolated-mode `-I`. Child interpreters are resolved to
+  absolute, non-group/world-writable executables; loader, shell, language,
+  editor, Git-helper, and MCP-control environment hooks are removed, and unsafe
+  relative or shared-writable `PATH` entries are discarded.
+- Stdio uses strict UTF-8 and a 1 MiB frame limit. Malformed frames, invalid
+  tool/prompt inputs, and protocol errors return generic value-free errors so
+  rejected input cannot be echoed into responses or stderr.
+- Product-first discovery is subprocess-free, paginated, no-follow, UTF-8-only,
+  extension-curated, revision-bound, and capped by file, byte, entry, directory,
+  traversal-depth, and worker limits.
 
 This server is not a sandbox. Do not expose it to untrusted clients, do not
 run it inside a multi-tenant context, and do not treat a plan or client-side
