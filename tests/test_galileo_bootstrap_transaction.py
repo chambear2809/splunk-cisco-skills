@@ -1295,6 +1295,27 @@ def test_secret_output_collision_preserves_existing_file(tmp_path: Path) -> None
     assert (after.st_dev, after.st_ino) == (before.st_dev, before.st_ino)
 
 
+def test_owned_output_cleanup_rejects_ctime_aba_identity(tmp_path: Path) -> None:
+    output = tmp_path / "runtime.key"
+    record = MODULE.create_secret_file(output, RUNTIME_SECRET)
+    output.unlink()
+    replacement = protected_file(output, "x" * len(RUNTIME_SECRET) + "\n")
+    current = replacement.stat()
+    simulated_reused_inode = {
+        **record,
+        "device": current.st_dev,
+        "inode": current.st_ino,
+        "size": current.st_size,
+        "mtime_ns": current.st_mtime_ns,
+        "ctime_ns": current.st_ctime_ns + 1,
+    }
+
+    with pytest.raises(MODULE.TransactionError, match="inode changed"):
+        MODULE.unlink_owned_file(simulated_reused_inode)
+
+    assert replacement.read_text(encoding="utf-8") == "x" * len(RUNTIME_SECRET) + "\n"
+
+
 class FakeResponse:
     def __init__(self, document: dict[str, object]):
         self.status = 200

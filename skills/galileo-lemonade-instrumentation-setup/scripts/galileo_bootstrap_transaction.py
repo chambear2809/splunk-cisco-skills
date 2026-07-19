@@ -442,6 +442,8 @@ def create_secret_file(path: Path, secret: str) -> dict[str, object]:
             "device": info.st_dev,
             "inode": info.st_ino,
             "size": info.st_size,
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
         }
     except BaseException:
         if descriptor >= 0:
@@ -488,16 +490,37 @@ def unlink_owned_file(
             _read_descriptor(descriptor, MAX_SECRET_BYTES, "owned runtime key output")
         finally:
             os.close(descriptor)
-        if (info.st_dev, info.st_ino) != (
+        if (
+            info.st_dev,
+            info.st_ino,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
+        ) != (
             record.get("device"),
             record.get("inode"),
+            record.get("size"),
+            record.get("mtime_ns"),
+            record.get("ctime_ns"),
         ):
-            raise TransactionError("runtime key output inode changed; refusing cleanup")
+            raise TransactionError(
+                "runtime key output inode changed or metadata changed; refusing cleanup"
+            )
         current = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
-        if (current.st_dev, current.st_ino, current.st_nlink) != (
+        if (
+            current.st_dev,
+            current.st_ino,
+            current.st_nlink,
+            current.st_size,
+            current.st_mtime_ns,
+            current.st_ctime_ns,
+        ) != (
             info.st_dev,
             info.st_ino,
             1,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
         ):
             raise TransactionError("runtime key output changed before cleanup")
         os.unlink(parts[-1], dir_fd=parent)
@@ -1690,7 +1713,14 @@ class GalileoBootstrapTransaction:
                 current_output = _file_record(output_path, "runtime key output")
                 recorded_output = runtime.get("output")
                 if isinstance(recorded_output, dict):
-                    for field in ("path", "device", "inode", "size"):
+                    for field in (
+                        "path",
+                        "device",
+                        "inode",
+                        "size",
+                        "mtime_ns",
+                        "ctime_ns",
+                    ):
                         if recorded_output.get(field) != current_output.get(field):
                             raise TransactionError(
                                 "runtime key output identity changed"
@@ -2963,8 +2993,9 @@ class GalileoBootstrapTransaction:
                 raise TransactionError("owned runtime API key remains after rollback")
             if isinstance(output, dict):
                 # Exact key absence is established above. A missing file is now
-                # an idempotent crash-resume success; a replacement inode still
-                # fails closed and is never unlinked.
+                # an idempotent crash-resume success; a replacement filesystem
+                # identity still fails closed and is never unlinked, including
+                # when the filesystem immediately reuses the original inode.
                 unlink_owned_file(output, missing_ok=True)
                 self.failpoint("after_runtime_output_unlink")
             runtime["rolled_back"] = True
@@ -3012,6 +3043,8 @@ def _file_record(path: Path, label: str) -> dict[str, object]:
         "device": info.st_dev,
         "inode": info.st_ino,
         "size": info.st_size,
+        "mtime_ns": info.st_mtime_ns,
+        "ctime_ns": info.st_ctime_ns,
     }
 
 

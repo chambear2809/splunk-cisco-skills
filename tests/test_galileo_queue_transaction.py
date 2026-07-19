@@ -173,6 +173,7 @@ def test_apply_creates_exact_destination_bound_private_queue(
         "uid": info.st_uid,
         "gid": info.st_gid,
         "mode": 0o700,
+        "ctime_ns": info.st_ctime_ns,
         "fingerprint": FINGERPRINT,
     }
 
@@ -187,6 +188,34 @@ def test_restore_removes_only_the_exact_empty_created_queue_and_is_idempotent(
     assert not (case["queue_root"] / FINGERPRINT).exists()
     assert not (case["state_root"] / "current.json").exists()
     assert restore(tx, case, result)["disposition"] == "removed"
+
+
+def test_legacy_queue_identity_without_ctime_is_quarantined(
+    tx: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    case = make_case(tx, tmp_path, monkeypatch)
+    result = apply(tx, case)
+    document, manifest_payload = tx.load_manifest(
+        manifest_path(case, result), owner_uid=case["uid"]
+    )
+    journal = tx.load_journal(document, owner_uid=case["uid"])
+    legacy_identity = dict(journal["created_queue"])
+    legacy_identity.pop("ctime_ns")
+    tx.write_journal(
+        document,
+        manifest_payload,
+        {**journal, "created_queue": legacy_identity},
+        owner_uid=case["uid"],
+        owner_gid=case["gid"],
+        invoke_hook=False,
+    )
+
+    restored = restore(tx, case, result)
+    quarantine = case["quarantine_root"] / tx.quarantine_name(
+        result["generation"], FINGERPRINT
+    )
+    assert restored["disposition"] == "quarantined"
+    assert quarantine.is_dir()
 
 
 def test_completed_restore_rechecks_active_path_before_claiming_idempotence(
