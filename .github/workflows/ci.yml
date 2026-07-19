@@ -31,7 +31,26 @@ jobs:
           python -m pip install -r requirements-dev.txt -r requirements-agent.txt
 
       - name: Run Python tests
-        run: pytest tests/ -v
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Security-sensitive runtime tests reject writable checkout ancestors
+          # and interpreters. GitHub's hosted tool cache and work directory are
+          # group-writable, so exercise the suite from an owner-only copy with
+          # a repo-local interpreter instead of weakening production checks.
+          trusted_workspace="$(mktemp -d "${HOME}/splunk-cisco-skills-ci.XXXXXX")"
+          cp -a "${GITHUB_WORKSPACE}/." "${trusted_workspace}/"
+          chmod go-w "${HOME}" "${trusted_workspace}"
+          python -m venv --copies --system-site-packages "${trusted_workspace}/.venv"
+          trusted_python="$(readlink -f "${trusted_workspace}/.venv/bin/python")"
+          chmod go-w "${trusted_python}"
+          install -d -m 700 "${trusted_workspace}/.tmp"
+
+          cd "${trusted_workspace}"
+          PATH="${trusted_workspace}/.venv/bin:${PATH}" \
+            TMPDIR="${trusted_workspace}/.tmp" \
+            "${trusted_python}" -m pytest tests/ -v
 
       - name: Import local MCP agent server
         run: python3 -c "import agent.splunk_cisco_skills_mcp.server; print('local MCP agent import ok')"

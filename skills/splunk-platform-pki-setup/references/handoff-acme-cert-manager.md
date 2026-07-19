@@ -20,15 +20,38 @@ EKU) are NOT well-suited to public ACME because:
 - They need long-lived certs (Let's Encrypt's 90-day cert
   triggers a rolling-restart every ~60 days).
 
-For Splunk Web with `acme.sh`:
+For Splunk Web with a pinned `acme.sh` release:
 
 ```bash
-# Install acme.sh on the SH host
-curl https://get.acme.sh | sh
+# Download the official 3.1.2 source archive, verify its pinned digest, and
+# only then run its installer. Review and update both values together when
+# adopting a newer official release.
+ACME_SH_VERSION="3.1.2"
+ACME_SH_SHA256="a51511ad0e2912be45125cf189401e4ae776ca1a29d5768f020a1e35a9560186"
+ACME_ACCOUNT_EMAIL="operator@example.com"
+ACME_SH_WORK_DIR="$(mktemp -d)"
+ACME_SH_ARCHIVE="${ACME_SH_WORK_DIR}/acme.sh-${ACME_SH_VERSION}.tar.gz"
+
+curl --fail --location --silent --show-error \
+    "https://github.com/acmesh-official/acme.sh/archive/refs/tags/${ACME_SH_VERSION}.tar.gz" \
+    --output "${ACME_SH_ARCHIVE}"
+printf '%s  %s\n' \
+    "${ACME_SH_SHA256}" "$(basename "${ACME_SH_ARCHIVE}")" \
+    > "${ACME_SH_WORK_DIR}/SHA256SUMS"
+(
+    cd "${ACME_SH_WORK_DIR}"
+    sha256sum --check SHA256SUMS
+    tar -xzf "$(basename "${ACME_SH_ARCHIVE}")"
+    "./acme.sh-${ACME_SH_VERSION}/acme.sh" \
+        --install --email "${ACME_ACCOUNT_EMAIL}"
+)
+printf 'Verified installer source retained for review at %s\n' \
+    "${ACME_SH_WORK_DIR}"
 
 # Issue a cert via DNS-01 (recommended; doesn't need port 80 open)
 ~/.acme.sh/acme.sh \
     --issue \
+    --server letsencrypt \
     --dns dns_route53 \
     -d splunk.example.com \
     --keylength 2048 \
