@@ -1570,8 +1570,8 @@ def main() -> int:
             "Drop the upstream Cilium / Hubble dashboard JSON exports into this directory\n"
             "(or re-run the renderer with --dashboards-source <dir>) and they will be\n"
             "token-scrubbed via scripts/scrub-tokens.py.\n\n"
-            "Reference dashboards are available at\n"
-            "/Users/alecchamberlain/Documents/GitHub/Isovalent_Splunk_o11y/examples/*.json.\n"
+            "Reference dashboards are available in the directory supplied via\n"
+            "--dashboards-source, such as an Isovalent_Splunk_o11y examples checkout.\n"
             "Do NOT copy from values/*.yaml in that repo -- those files have been observed\n"
             "to contain plaintext access tokens.\n",
         )
