@@ -1,0 +1,51 @@
+[Unit]
+Description=AMD-Deskside Galileo native-ingest sidecar collector
+Wants=network-online.target galileo-amd-bridge.service
+After=network-online.target galileo-amd-bridge.service
+Before=splunk-otel-collector.service
+
+[Service]
+Type=exec
+User=splunk-otel-collector
+Group=splunk-otel-collector
+UnsetEnvironment=HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy
+ExecStartPre=/usr/bin/otelcol validate --config=/etc/splunk-otel-collector/galileo-amd-sidecar.yaml
+ExecStart=/usr/bin/otelcol --config=/etc/splunk-otel-collector/galileo-amd-sidecar.yaml
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+UMask=0077
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/splunk-otel-collector/galileo-amd-queue/cbe7b38b830c4159aa189be8ad8c0dadcabeb3f78868e48c875b86d544176a4b
+TasksMax=256
+LimitNOFILE=65536
+MemoryMax=768M
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
