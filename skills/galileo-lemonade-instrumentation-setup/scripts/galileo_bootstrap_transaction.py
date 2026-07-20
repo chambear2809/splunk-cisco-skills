@@ -22,6 +22,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import stat
 import time
 import urllib.error
@@ -442,6 +443,9 @@ def create_secret_file(path: Path, secret: str) -> dict[str, object]:
             "device": info.st_dev,
             "inode": info.st_ino,
             "size": info.st_size,
+            "sha256": hashlib.sha256(
+                secret.encode("utf-8") + b"\n"
+            ).hexdigest(),
             "mtime_ns": info.st_mtime_ns,
             "ctime_ns": info.st_ctime_ns,
         }
@@ -491,7 +495,9 @@ def unlink_owned_file(
             info = _validate_regular_file(
                 descriptor, "owned runtime key output", require_private=True
             )
-            _read_descriptor(descriptor, MAX_SECRET_BYTES, "owned runtime key output")
+            payload = _read_descriptor(
+                descriptor, MAX_SECRET_BYTES, "owned runtime key output"
+            )
         finally:
             os.close(descriptor)
         if (
@@ -509,6 +515,19 @@ def unlink_owned_file(
         ):
             raise TransactionError(
                 "runtime key output inode changed or metadata changed; refusing cleanup"
+            )
+        expected_digest = record.get("sha256")
+        if not isinstance(expected_digest, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", expected_digest
+        ):
+            raise TransactionError(
+                "runtime key output digest is missing; refusing cleanup"
+            )
+        if not hmac.compare_digest(
+            hashlib.sha256(payload).hexdigest(), expected_digest
+        ):
+            raise TransactionError(
+                "runtime key output inode changed or content differs; refusing cleanup"
             )
         current = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
         if (
@@ -3074,12 +3093,12 @@ class GalileoBootstrapTransaction:
 
 def _file_record(path: Path, label: str) -> dict[str, object]:
     raw, info = read_protected_bytes(path, MAX_SECRET_BYTES, label)
-    del raw
     return {
         "path": str(path),
         "device": info.st_dev,
         "inode": info.st_ino,
         "size": info.st_size,
+        "sha256": hashlib.sha256(raw).hexdigest(),
         "mtime_ns": info.st_mtime_ns,
         "ctime_ns": info.st_ctime_ns,
     }

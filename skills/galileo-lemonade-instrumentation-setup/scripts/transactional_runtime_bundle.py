@@ -111,6 +111,8 @@ ROUTING_FIXED_KEYS = frozenset(
         "GALILEO_TINYPROXY_EVIDENCE_FILE",
         "GALILEO_DESTINATION_FINGERPRINT",
         "GALILEO_QUEUE_STORAGE_DIRECTORY",
+        "GALILEO_COLLECTOR_BINARY",
+        "GALILEO_COLLECTOR_BINARY_SHA256",
     }
 )
 ROUTING_ID_KEYS = frozenset({"GALILEO_PROJECT_ID", "GALILEO_LOG_STREAM_ID"})
@@ -419,6 +421,10 @@ def validate_routing_environment_contract(
         environment["GALILEO_API_KEY_FILE"] != key["target"]
         or environment["GALILEO_TINYPROXY_EVIDENCE_FILE"] != evidence["target"]
         or environment["GALILEO_PROXY_URL"] != GALILEO_PROXY_URL
+        or environment["GALILEO_COLLECTOR_BINARY"]
+        != request["provenance"]["collector_binary"]
+        or environment["GALILEO_COLLECTOR_BINARY_SHA256"]
+        != request["provenance"]["collector_binary_sha256"]
     ):
         raise TransactionError(
             "invalid_routing_env", "routing environment paths are not bound"
@@ -518,7 +524,20 @@ def assert_trusted_path(
             raise TransactionError(
                 "unsafe_path", f"{label} ancestor is not a directory"
             )
-        if info.st_uid not in {0, owner_uid} or stat.S_IMODE(info.st_mode) & 0o022:
+        mode = stat.S_IMODE(info.st_mode)
+        # A root-owned sticky directory such as /tmp is safe solely as an
+        # already-existing traversal ancestor: sticky semantics prevent an
+        # untrusted principal from replacing another owner's descendant.
+        sticky_root_ancestor = (
+            index < final_index
+            and stat.S_ISDIR(info.st_mode)
+            and info.st_uid == 0
+            and bool(info.st_mode & stat.S_ISVTX)
+        )
+        if (
+            not sticky_root_ancestor
+            and (info.st_uid not in {0, owner_uid} or mode & 0o022)
+        ):
             raise TransactionError(
                 "unsafe_path",
                 f"{label} ancestors must be trusted and not group/other-writable",

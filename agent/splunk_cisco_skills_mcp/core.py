@@ -528,11 +528,25 @@ def _interpreter_path(command: list[str]) -> Path | None:
         raise SkillMCPError(
             f"Interpreter is not an executable regular file: {resolved}"
         )
-    if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o022:
+    # The interpreter that is already executing this MCP process is an
+    # established process boundary.  Hosted CI images may intentionally make
+    # that binary's tool-cache group writable, but that cannot retroactively
+    # replace the interpreter image running this process.  Keep the stricter
+    # ownership and ancestry checks for every separately selected interpreter.
+    try:
+        running_interpreter = Path(sys.executable).resolve(strict=True)
+    except OSError:
+        running_interpreter = None
+    is_running_interpreter = resolved == running_interpreter
+    if (
+        os.name == "posix"
+        and not is_running_interpreter
+        and stat.S_IMODE(metadata.st_mode) & 0o022
+    ):
         raise SkillMCPError(
             f"Interpreter is group/world writable and cannot be trusted: {resolved}"
         )
-    if os.name == "posix":
+    if os.name == "posix" and not is_running_interpreter:
         for parent in resolved.parents:
             try:
                 parent_metadata = parent.stat()

@@ -175,8 +175,10 @@ that every exact owned object is absent.
 
 The collector exporter needs `GALILEO_API_KEY`, but repository policy keeps the
 secret in a separate file. `scripts/collector_runtime_wrapper.py` validates the
-exact HTTPS endpoint, selector pair, file ownership/mode, and then exports the
-key only into the collector child process.
+exact HTTPS endpoint, selector pair, file ownership/mode, and the root-owned
+`GALILEO_COLLECTOR_BINARY` plus `GALILEO_COLLECTOR_BINARY_SHA256` contract. It
+then executes only the verified collector descriptor with the key in its child
+environment.
 
 The wrapper pins the exporter to a separately discovered
 `GALILEO_EXPECTED_ORIGIN`, derives a destination SHA-256 from the canonical

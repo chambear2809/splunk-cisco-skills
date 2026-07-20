@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -39,11 +40,8 @@ def run_setup(*args: str, cwd: Path | None = None) -> subprocess.CompletedProces
 
 
 def run_render(*args: str) -> subprocess.CompletedProcess[str]:
-    python = REPO_ROOT / ".venv/bin/python3"
-    if not python.exists():
-        python = Path("python3")
     return subprocess.run(
-        [str(python), str(RENDER), *args],
+        [sys.executable, str(RENDER), *args],
         cwd=REPO_ROOT,
         env=os.environ.copy(),
         text=True,
@@ -835,7 +833,7 @@ def test_obi_live_gate_and_safe_purge_contract(tmp_path: Path) -> None:
     env["OBI_DELETE_LOG"] = str(delete_log)
     helper = out / "k8s-instrumentation/obi-lifecycle.py"
     command = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(helper),
         "--mode",
         "validate",
@@ -2386,7 +2384,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     helper = out / "k8s-instrumentation/annotation-backup.py"
     capture = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "capture",
@@ -2413,7 +2411,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
 
     restore = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "restore-plan",
@@ -2442,7 +2440,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     (state / "configmap.json").write_text(json.dumps(configmap), encoding="utf-8")
     corrupt = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "restore-plan",
@@ -2464,7 +2462,7 @@ def test_transactional_backup_capture_and_restore_fail_closed(tmp_path: Path) ->
     (state / "workload.json").write_text("{broken", encoding="utf-8")
     invalid_workload = subprocess.run(
         [
-            str(REPO_ROOT / ".venv/bin/python3"),
+            sys.executable,
             str(helper),
             "--mode",
             "capture",
@@ -2699,7 +2697,7 @@ def test_managed_resource_apply_preflights_all_foreign_names_before_mutation(
     )
     kubectl.chmod(0o755)
     command = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(out / "k8s-instrumentation/managed-resource-lifecycle.py"),
         "--mode",
         "apply",
@@ -2712,6 +2710,100 @@ def test_managed_resource_apply_preflights_all_foreign_names_before_mutation(
     assert result.returncode != 0
     assert "ownership labels" in combined(result) or "ambiguous ownership" in combined(result)
     assert not mutation_log.exists(), "a resource mutated before all ownership checks passed"
+
+
+def test_managed_resource_apply_rolls_back_earlier_create_after_late_race(
+    tmp_path: Path,
+) -> None:
+    spec = write_spec(tmp_path / "spec.yaml")
+    out = tmp_path / "rendered"
+    assert run_render("--spec", str(spec), "--output-dir", str(out)).returncode == 0
+    labels = {
+        "app.kubernetes.io/name": "splunk-otel-auto-instrumentation",
+        "app.kubernetes.io/managed-by": (
+            "splunk-observability-k8s-auto-instrumentation-setup"
+        ),
+    }
+    service_account = {
+        "apiVersion": "v1",
+        "kind": "ServiceAccount",
+        "metadata": {"name": "rollback-test", "namespace": "splunk-otel", "labels": labels},
+    }
+    instrumentation = {
+        "apiVersion": "opentelemetry.io/v1alpha1",
+        "kind": "Instrumentation",
+        "metadata": {"name": "late-race", "namespace": "splunk-otel", "labels": labels},
+        "spec": {},
+    }
+    first = tmp_path / "service-account.yaml"
+    second = tmp_path / "instrumentation.yaml"
+    first.write_text(yaml.safe_dump(service_account), encoding="utf-8")
+    second.write_text(yaml.safe_dump(instrumentation), encoding="utf-8")
+    state = tmp_path / "state.json"
+    state.write_text("{}", encoding="utf-8")
+    events = tmp_path / "events"
+    kubectl = tmp_path / "kubectl"
+    kubectl.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, pathlib, sys\n"
+        f"state_path = pathlib.Path({str(state)!r})\n"
+        f"events = pathlib.Path({str(events)!r})\n"
+        "state = json.loads(state_path.read_text())\n"
+        "args = sys.argv[1:]\n"
+        "def key_for(resource, name): return resource + '/' + name\n"
+        "def record(value):\n"
+        "    with events.open('a') as handle: handle.write(value + '\\n')\n"
+        "if 'get' in args:\n"
+        "    index = args.index('get')\n"
+        "    item = state.get(key_for(args[index + 1], args[index + 2]))\n"
+        "    if item is not None: print(json.dumps(item))\n"
+        "elif 'create' in args:\n"
+        "    payload = json.load(sys.stdin)\n"
+        "    kind = payload['kind']\n"
+        "    if kind == 'Instrumentation':\n"
+        "        record('race Instrumentation')\n"
+        "        raise SystemExit(3)\n"
+        "    payload['metadata'].update({'uid': 'service-account-uid', 'resourceVersion': '1'})\n"
+        "    state[key_for('serviceaccounts', payload['metadata']['name'])] = payload\n"
+        "    state_path.write_text(json.dumps(state))\n"
+        "    record('create ServiceAccount')\n"
+        "    print('{}')\n"
+        "elif 'delete' in args and '--raw' in args:\n"
+        "    options = json.load(sys.stdin)\n"
+        "    assert options['preconditions'] == {'uid': 'service-account-uid', 'resourceVersion': '1'}\n"
+        "    del state['serviceaccounts/rollback-test']\n"
+        "    state_path.write_text(json.dumps(state))\n"
+        "    record('delete ServiceAccount')\n"
+        "    print('{}')\n"
+        "else:\n"
+        "    raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    kubectl.chmod(0o755)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(out / "k8s-instrumentation/managed-resource-lifecycle.py"),
+            "--mode",
+            "apply",
+            "--kubectl-bin",
+            str(kubectl),
+            "--manifest",
+            str(first),
+            "--manifest",
+            str(second),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert json.loads(state.read_text()) == {}
+    assert events.read_text().splitlines() == [
+        "create ServiceAccount",
+        "race Instrumentation",
+        "delete ServiceAccount",
+    ]
 
 
 def test_managed_resource_replace_and_delete_use_uid_rv_preconditions(
@@ -2755,7 +2847,7 @@ def test_managed_resource_replace_and_delete_use_uid_rv_preconditions(
     )
     kubectl.chmod(0o755)
     base = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(out / "k8s-instrumentation/managed-resource-lifecycle.py"),
         "--manifest",
         str(manifest),
@@ -2847,7 +2939,7 @@ def test_backup_purge_requires_exact_target_all_key_coverage(tmp_path: Path) -> 
     kubectl.chmod(0o755)
     helper = out / "k8s-instrumentation/annotation-backup.py"
     base = [
-        str(REPO_ROOT / ".venv/bin/python3"),
+        sys.executable,
         str(helper),
         "--mode",
         "purge",
