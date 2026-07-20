@@ -1,0 +1,338 @@
+extensions:
+  headers_setter:
+    headers:
+    - action: upsert
+      key: X-SF-TOKEN
+      from_context: X-SF-TOKEN
+      default_value: ${SPLUNK_ACCESS_TOKEN}
+  health_check:
+    endpoint: ${SPLUNK_LISTEN_INTERFACE}:13133
+  http_forwarder:
+    ingress:
+      endpoint: ${SPLUNK_LISTEN_INTERFACE}:6060
+    egress:
+      endpoint: ${SPLUNK_API_URL}
+  http_forwarder/opamp_splunk_o11y:
+    ingress:
+      endpoint: ${SPLUNK_LISTEN_INTERFACE}:4320
+    egress:
+      endpoint: ${SPLUNK_INGEST_URL}
+      headers:
+        X-SF-Token: ${SPLUNK_ACCESS_TOKEN}
+  opamp/splunk_o11y:
+    agent_description:
+      include_resource_attributes: true
+    server:
+      http:
+        endpoint: ${SPLUNK_INGEST_URL}/v1/opamp
+        polling_interval: 30s
+        headers:
+          X-SF-Token: ${SPLUNK_ACCESS_TOKEN}
+  zpages:
+    expvar:
+      enabled: true
+  file_storage/galileo_lemonade:
+    directory: /var/lib/splunk-otel-collector/galileo-queue/6614e1dd6525e3b7e548e651084dd9f4c9c90885d63e95093fa41004801d531d
+    timeout: 10s
+    max_size: 1073741824
+    fsync: true
+    create_directory: true
+    directory_permissions: '0700'
+    compaction:
+      on_rebound: true
+      directory: /var/lib/splunk-otel-collector/galileo-queue/6614e1dd6525e3b7e548e651084dd9f4c9c90885d63e95093fa41004801d531d/compaction
+      rebound_needed_threshold_mib: 256
+      rebound_trigger_threshold_mib: 64
+      check_interval: 5m
+receivers:
+  fluent_forward:
+    endpoint: ${SPLUNK_LISTEN_INTERFACE}:8006
+  host_metrics:
+    collection_interval: 10s
+    scrapers:
+      cpu: null
+      disk: null
+      filesystem: null
+      memory: null
+      network: null
+      load: null
+      paging: null
+      processes: null
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:14250
+      thrift_binary:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:6832
+      thrift_compact:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:6831
+      thrift_http:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:14268
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:4317
+      http:
+        endpoint: ${SPLUNK_LISTEN_INTERFACE}:4318
+  prometheus/internal:
+    config:
+      scrape_configs:
+      - job_name: otel-collector
+        scrape_interval: 10s
+        static_configs:
+        - targets:
+          - 0.0.0.0:8888
+        metric_relabel_configs:
+        - source_labels:
+          - __name__
+          regex: promhttp_metric_handler_errors.*
+          action: drop
+        - source_labels:
+          - __name__
+          regex: otelcol_processor_batch_.*
+          action: drop
+  smartagent/processlist:
+    type: processlist
+  zipkin:
+    endpoint: ${SPLUNK_LISTEN_INTERFACE}:9411
+  nop: null
+  otlp/lemonade_galileo_client:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:14318
+  otlp/codex_galileo_client:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:14319
+processors:
+  batch:
+    metadata_keys:
+    - X-SF-Token
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: ${SPLUNK_MEMORY_LIMIT_MIB}
+  resource_detection:
+    detectors:
+    - system
+    override: true
+  resource/lemonade_galileo_client:
+    attributes:
+    - key: service.name
+      value: lemonade-galileo-client
+      action: upsert
+    - key: telemetry.source
+      value: lemonade-client
+      action: upsert
+  resource/codex_galileo_client:
+    attributes:
+    - key: service.name
+      value: codex-cisco
+      action: upsert
+    - key: telemetry.source
+      value: codex
+      action: upsert
+    - key: deployment.environment.name
+      value: lemonade-dev
+      action: upsert
+  transform/lemonade_client_semantics:
+    error_mode: propagate
+    trace_statements:
+    - context: span
+      statements:
+      - set(span.attributes["llm.provider"], "lemonade") where span.attributes["openinference.span.kind"]
+        == "LLM"
+      - set(span.attributes["gen_ai.provider.name"], "lemonade") where span.attributes["openinference.span.kind"]
+        == "LLM"
+      - set(span.attributes["gen_ai.operation.name"], "chat") where span.attributes["openinference.span.kind"]
+        == "LLM" and span.attributes["gen_ai.operation.name"] == nil
+      - set(span.attributes["gen_ai.request.model"], span.attributes["llm.model_name"])
+        where span.attributes["openinference.span.kind"] == "LLM" and span.attributes["gen_ai.request.model"]
+        == nil and span.attributes["llm.model_name"] != nil
+      - set(span.attributes["gen_ai.response.model"], span.attributes["llm.model_name"])
+        where span.attributes["openinference.span.kind"] == "LLM" and span.attributes["gen_ai.response.model"]
+        == nil and span.attributes["llm.model_name"] != nil
+      - set(span.attributes["llm.input_messages.0.message.role"], "user") where span.attributes["openinference.span.kind"]
+        == "LLM" and span.attributes["llm.input_messages.0.message.role"] == nil
+      - set(span.attributes["llm.output_messages.0.message.role"], "assistant") where
+        span.attributes["openinference.span.kind"] == "LLM" and span.attributes["llm.output_messages.0.message.role"]
+        == nil
+exporters:
+  otlp_http:
+    traces_endpoint: ${SPLUNK_INGEST_URL}/v2/trace/otlp
+    headers:
+      X-SF-Token: ${SPLUNK_ACCESS_TOKEN}
+    auth:
+      authenticator: headers_setter
+  signalfx:
+    access_token: ${SPLUNK_ACCESS_TOKEN}
+    api_url: ${SPLUNK_API_URL}
+    ingest_url: ${SPLUNK_INGEST_URL}
+    sync_host_metadata: true
+    correlation: null
+    send_otlp_histograms: true
+  otlp_http/entities:
+    logs_endpoint: ${SPLUNK_INGEST_URL}/v3/event
+    headers:
+      X-SF-Token: ${SPLUNK_ACCESS_TOKEN}
+    auth:
+      authenticator: headers_setter
+  splunk_hec:
+    token: ${SPLUNK_HEC_TOKEN}
+    endpoint: ${SPLUNK_HEC_URL}
+    source: otel
+    sourcetype: otel
+    profiling_data_enabled: false
+  splunk_hec/profiling:
+    token: ${SPLUNK_ACCESS_TOKEN}
+    endpoint: ${SPLUNK_INGEST_URL}/v1/log
+    log_data_enabled: false
+  otlp_grpc/gateway:
+    endpoint: ${SPLUNK_GATEWAY_URL}:4317
+    tls:
+      insecure: true
+    auth:
+      authenticator: headers_setter
+  otlp_http/galileo_lemonade:
+    traces_endpoint: ${env:GALILEO_OTLP_TRACES_ENDPOINT}
+    proxy_url: http://127.0.0.1:18888
+    headers:
+      Galileo-API-Key: ${env:GALILEO_API_KEY}
+      projectid: ${env:GALILEO_PROJECT_ID}
+      logstreamid: ${env:GALILEO_LOG_STREAM_ID}
+    compression: gzip
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 30m
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 268435456
+      block_on_overflow: false
+      sizer: bytes
+      storage: file_storage/galileo_lemonade
+  otlp_http/amd_deskside_sidecar:
+    traces_endpoint: http://127.0.0.1:14320/v1/traces
+    compression: gzip
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      queue_size: 1000
+      block_on_overflow: false
+      sizer: requests
+service:
+  telemetry:
+    logs:
+      level: ${env:SPLUNK_COLLECTOR_LOG_LEVEL:-info}
+    resource:
+      attributes:
+      - name: otelcol.service.mode
+        value: agent
+    metrics:
+      readers:
+      - pull:
+          exporter:
+            prometheus:
+              host: 127.0.0.1
+              port: 8888
+  extensions:
+  - headers_setter
+  - health_check
+  - http_forwarder
+  - http_forwarder/opamp_splunk_o11y
+  - opamp/splunk_o11y
+  - zpages
+  - file_storage/galileo_lemonade
+  pipelines:
+    traces:
+      receivers:
+      - jaeger
+      - otlp
+      - zipkin
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - otlp_http
+    metrics:
+      receivers:
+      - host_metrics
+      - otlp
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - signalfx
+    metrics/internal:
+      receivers:
+      - prometheus/internal
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - signalfx
+    logs/signalfx:
+      receivers:
+      - smartagent/processlist
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - signalfx
+    logs/entities:
+      receivers:
+      - nop
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - otlp_http/entities
+    logs:
+      receivers:
+      - fluent_forward
+      - otlp
+      processors:
+      - memory_limiter
+      - batch
+      - resource_detection
+      exporters:
+      - splunk_hec
+      - splunk_hec/profiling
+    traces/lemonade_galileo_client:
+      receivers:
+      - otlp/lemonade_galileo_client
+      processors:
+      - memory_limiter
+      - resource_detection
+      - resource/lemonade_galileo_client
+      - transform/lemonade_client_semantics
+      - batch
+      exporters:
+      - otlp_http
+      - otlp_http/galileo_lemonade
+      - otlp_http/amd_deskside_sidecar
+    traces/codex_galileo_client:
+      receivers:
+      - otlp/codex_galileo_client
+      processors:
+      - memory_limiter
+      - resource_detection
+      - resource/codex_galileo_client
+      - transform/lemonade_client_semantics
+      - batch
+      exporters:
+      - otlp_http
+      - otlp_http/galileo_lemonade
