@@ -1,15 +1,12 @@
 ---
 name: splunk-federated-search-setup
-description: >-
-  Use when configuring Cisco Data Fabric federated search or standalone Splunk
-  Federated Search, cross-domain search, federated analytics, S3 data-lake
-  search, or querying data where it resides. Render, preflight, apply, and
-  validate FSS2S standard/transparent providers and reviewed legacy FSS3
-  payloads; render 10.5 migration guidance and current Data Management
-  handoffs for S3, Azure, Databricks, Snowflake, and DDSS; distinguish Glue,
-  Iceberg REST, and Splunk-native catalogs; preserve handoff-only Amazon
-  Security Lake (`aws_lake`) and Cisco SAL (`aws_s3_sal`) identities; and
-  manage supported global-switch, status, file, SHC, and REST workflows.
+description: "Use when configuring Cisco Data Fabric federated search or standalone Splunk Federated Search, cross-
+  domain search, federated analytics, S3 data-lake search, or querying data where it resides. Render,
+  preflight, apply, and validate FSS2S standard/transparent providers and reviewed legacy FSS3 payloads;
+  render 10.5 migration guidance and current Data Management handoffs for S3, Azure, Databricks,
+  Snowflake, and DDSS; distinguish Glue, Iceberg REST, and Splunk-native catalogs; preserve handoff-only
+  Amazon Security Lake (`aws_lake`) and Cisco SAL (`aws_s3_sal`) identities; and manage supported global-
+  switch, status, file, SHC, and REST workflows."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -17,6 +14,65 @@ metadata:
 ---
 
 # Splunk Federated Search Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Configuring Cisco Data Fabric federated search or standalone Splunk Federated Search, cross-domain search,
+  federated analytics, S3 data-lake search, or querying data where it resides. Render, preflight, apply, and
+  validate FSS2S.
+- Preview and review the splunk federated search setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-federated-search-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-federated-search-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill prepares the Splunk Federated Search product surface across remote
 Splunk platform deployments, Amazon S3 data lakes, and current Data Management

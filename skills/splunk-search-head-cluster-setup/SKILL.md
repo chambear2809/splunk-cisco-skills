@@ -1,20 +1,15 @@
 ---
 name: splunk-search-head-cluster-setup
-description: >-
-  Render, preflight, apply, validate, and operate Splunk Enterprise Search Head
-  Clusters end-to-end: bootstrap (deployer + N-member init + captain election),
-  deployer bundle push (validate / status / apply / apply-skip-validation /
-  rollback with SHA and generation-drift tracking), rolling restart (default,
-  searchable with health-check loop, forced), captain transfer, member add /
-  decommission / remove, KV Store replication health (lag thresholds, oplog
-  reset, captain re-election), standalone-to-SHC migration, deployer
-  replacement, ES-on-SHC deployer placement, and failure-mode runbooks
-  (split-brain, quorum loss, deployer mismatch, captain crash loop). SHC
-  pass4SymmKey is templated as `$SHC_SECRET` for operator-managed rotation
-  (see Out of Scope). Use when the user asks to bootstrap an SHC, push a
-  deployer bundle, perform a searchable rolling restart, transfer the captain,
-  add or remove a member, troubleshoot KV Store replication lag, migrate a
-  standalone search head to SHC, or replace a deployer.
+description: "Use when the user asks to bootstrap an SHC, push a deployer bundle, perform a searchable rolling
+  restart, transfer the captain, add or remove a member, troubleshoot KV Store replication lag, migrate a
+  standalone search head to SHC, or replace a deployer. Render, preflight, apply, validate, and operate
+  Splunk Enterprise Search Head Clusters end-to-end: bootstrap (deployer + N-member init + captain
+  election), deployer bundle push (validate / status / apply / apply-skip-validation / rollback with SHA
+  and generation-drift tracking), rolling restart (default, searchable with health-check loop, forced),
+  captain transfer, member add / decommission / remove, KV Store replication health (lag thresholds, oplog
+  reset, captain re-election), standalone-to-SHC migration, deployer replacement, ES-on-SHC deployer
+  placement, and failure-mode runbooks (split-brain, quorum loss, deployer mismatch, captain crash loop).
+  SHC pass4SymmKey is templated as `$SHC_SECRET` for operator-managed rotation (see Out of Scope)."
 compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "self-managed-10.4"
@@ -22,6 +17,65 @@ metadata:
 ---
 
 # Splunk Search Head Cluster Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Bootstrap an SHC, push a deployer bundle, perform a searchable rolling restart, transfer the captain, add or
+  remove a member, troubleshoot KV Store replication lag, migrate a standalone search head to SHC, or replace a
+  deployer.
+- Preview and review the splunk search head cluster setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-search-head-cluster-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-search-head-cluster-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill sits **above**
 [`skills/splunk-enterprise-host-setup`](../splunk-enterprise-host-setup/SKILL.md),

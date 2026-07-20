@@ -1,18 +1,73 @@
 ---
 name: cisco-ucs-ta-setup
-description: >-
-  Install, configure, and validate the Splunk Add-on for Cisco UCS
-  (Splunk_TA_cisco-ucs). Covers UCS Manager server records, encrypted
-  passwords, default/custom templates, cisco_ucs_task inputs, indexes, and
-  cisco:ucs data validation. Use when the user asks about Cisco UCS, UCS
-  Manager, Fabric Interconnects, Splunk_TA_cisco-ucs, or cisco:ucs telemetry.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring Cisco UCS Manager records, task inputs, templates, or cisco:ucs data in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco UCS TA Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and `curl` | Run setup and REST configuration helpers | `command -v bash curl` |
+| Splunk administrative access | Install the TA and configure tasks | Confirm search-tier REST access |
+| UCS Manager account | Poll the selected domain | Store its password in a protected file |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────┐   ┌────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Install TA │ → │ Configure tasks│ → │ Validate data │
+└───────────┘   └────────────┘   └────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard a Cisco UCS Manager or Fabric Interconnect domain.
+- Configure server records, default/custom templates, or `cisco_ucs_task` inputs.
+- Diagnose missing `cisco:ucs` events or task failures.
+
+## Scope
+
+This skill configures the Splunk add-on and task schedule. It does not change
+UCS infrastructure, request passwords in chat, or enable overlapping tasks
+without considering API and ingestion load.
+
+## Examples
+
+Install the Cisco UCS add-on through the reviewed package path:
+
+```bash
+bash skills/cisco-ucs-ta-setup/scripts/setup.sh --install
+```
+
+Expected output: the package is installed or a topology-specific manual
+handoff is emitted without configuring a UCS password inline.
+
+Run strict completion checks after configuring a task:
+
+```bash
+bash skills/cisco-ucs-ta-setup/scripts/validate.sh --completion
+```
+
+Expected output: package, server, task, index, `cisco:ucs` event, and dashboard
+handoff checks report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| UCS login fails | Host, username, or protected password is wrong | Verify the account outside chat and retry |
+| Task has no events | Template/domain access is incomplete | Review template and logs |
+| API load is high | Tasks overlap or poll too frequently | Reduce task scope or increase intervals |
+| No TA dashboards | TA supplies collection/parsing | Validate consuming content |
 
 ## TA Completion Gate
 

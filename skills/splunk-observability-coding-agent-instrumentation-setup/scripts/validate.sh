@@ -34,4 +34,3 @@ if [[ "${JSON_OUTPUT}" == true ]]; then
 fi
 
 exec python3 "${PROJECT_ROOT}/skills/shared/coding_agent_o11y/parent.py" "${args[@]}"
-

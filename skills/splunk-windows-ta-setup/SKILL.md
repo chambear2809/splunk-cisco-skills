@@ -1,15 +1,11 @@
 ---
 name: splunk-windows-ta-setup
-description: >-
-  Install, render, configure, and validate the Splunk Add-on for Microsoft
-  Windows (Splunk_TA_windows, Splunkbase 742). Renders reviewable
-  inputs.local.conf overlays for WinEventLog (Security/System/Application,
-  Defender, PowerShell), Perfmon, and WinHostMon inputs, creates the
-  wineventlog and perfmon indexes, enforces UF/HF/search-tier placement, and
-  maps source types to CIM data models. Use when the user asks about
-  Splunk_TA_windows, the Splunk Add-on for Microsoft Windows, WinEventLog or
-  Perfmon inputs, Windows Security event onboarding, Sysmon, or Windows CIM
-  readiness in Splunk.
+description: "Use when the user asks about Splunk_TA_windows, the Splunk Add-on for Microsoft Windows, WinEventLog or
+  Perfmon inputs, Windows Security event onboarding, Sysmon, or Windows CIM readiness in Splunk. Install,
+  render, configure, and validate the Splunk Add-on for Microsoft Windows (Splunk_TA_windows, Splunkbase
+  742). Renders reviewable inputs.local.conf overlays for WinEventLog (Security/System/Application,
+  Defender, PowerShell), Perfmon, and WinHostMon inputs, creates the wineventlog and perfmon indexes,
+  enforces UF/HF/search-tier placement, and maps source types to CIM data models."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -17,6 +13,64 @@ metadata:
 ---
 
 # Splunk Add-on for Microsoft Windows Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Splunk_TA_windows, the Splunk Add-on for Microsoft Windows, WinEventLog or Perfmon inputs, Windows Security event
+  onboarding, Sysmon, or Windows CIM readiness in Splunk.
+- Preview and review the splunk windows ta setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-windows-ta-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-windows-ta-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 ## TA Completion Gate
 

@@ -1,76 +1,48 @@
 ---
 name: splunk-cim-data-model
-description: >-
-  Render, preflight, and validate Splunk Common Information Model (CIM)
-  data-model management assets: per-model acceleration settings in
-  datamodels.conf, acceleration enable/disable plans, rebuild and backfill
-  helpers, and CIM population/compliance audits via tstats and the
-  summarization REST endpoint. Use when the user asks to manage CIM data models,
-  enable or tune data model acceleration, set earliest/backfill ranges, rebuild
-  an accelerated data model, audit CIM field compliance or model population, or
-  prepare Splunk_SA_CIM acceleration overrides for Enterprise Security and ITSI.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-cim-data-model-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "conditional"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-cim-data-model-setup"
 ---
 
-# Splunk CIM Data-Model Management
+# Splunk CIM Data-Model Management (Deprecated Compatibility Alias)
 
-This skill renders Common Information Model (CIM) data-model administration:
-acceleration configuration (`datamodels.conf`), acceleration enable/disable and
-rebuild helpers, and CIM population/compliance audits. It is render-first
-because data model acceleration consumes indexer storage and search resources
-and is a prerequisite for Enterprise Security and many ITSI/correlation
-workflows.
+> [!WARNING]
+> `splunk-cim-data-model` is deprecated and replaced by
+> [`splunk-cim-data-model-setup`](../splunk-cim-data-model-setup/SKILL.md). Use the canonical skill for all work.
 
-## Agent Behavior
+## Fail-Closed Compatibility Contract
 
-This skill does not handle secrets. Acceleration applies to data models defined
-by `Splunk_SA_CIM` (or custom models). Render overrides into a dedicated app so
-you never edit the shipped `Splunk_SA_CIM/default` files.
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-cim-data-model-setup` as `replaced_by`.
 
-Use `template.example` for non-secret values: model list, acceleration toggle,
-summary range, backfill range, and app name.
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-## Quick Start
-
-Render acceleration for the core ES models with a 7-day summary range:
-
-```bash
-bash skills/splunk-cim-data-model/scripts/setup.sh \
-  --models Authentication,Network_Traffic,Web,Endpoint \
-  --acceleration true \
-  --earliest-time -7d@d
-```
-
-Render a CIM population/compliance audit only (no config changes):
+## Safe Compatibility Checks
 
 ```bash
-bash skills/splunk-cim-data-model/scripts/setup.sh --phase render --acceleration false
-bash skills/splunk-cim-data-model/scripts/validate.sh --live
+bash skills/splunk-cim-data-model/scripts/setup.sh --help
+bash skills/splunk-cim-data-model/scripts/validate.sh --help
+python3 skills/splunk-cim-data-model/scripts/render_assets.py --help
 ```
 
-## What It Renders
+For supported behavior, begin here:
 
-- `datamodels.conf` — per-model `acceleration`, `acceleration.earliest_time`,
-  `acceleration.backfill_time`, and `acceleration.max_concurrent` overrides
-- `apply.sh` — stages `datamodels.conf` into an app `local/` and reloads it
-- `rebuild.sh` — documented rebuild/backfill options (automatic / UI / disable-enable)
-- `status.sh` — acceleration status via the summarization REST endpoint
-- `audit.sh` — per-model population checks via `tstats` and CIM compliance hints
-- `README.md` / `metadata.json` — review context
+```bash
+bash skills/splunk-cim-data-model-setup/scripts/setup.sh --help
+bash skills/splunk-cim-data-model-setup/scripts/validate.sh --help
+```
 
-## Operating Notes
-
-- Acceleration only summarizes data already mapped to a model by its
-  constraints, tags, and field aliases. If a model is empty, fix data onboarding
-  and CIM mapping first (see `splunk-data-source-readiness-doctor`).
-- Set `acceleration.earliest_time` to the smallest range your detections need;
-  larger ranges cost more storage and longer backfills.
-- On indexer clusters, accelerated summaries live on the indexers; coordinate
-  capacity before enabling many models.
-- Enterprise Security expects the standard CIM models accelerated; align ranges
-  with ES retention.
-
-Read `reference.md` before enabling acceleration broadly or changing ranges.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

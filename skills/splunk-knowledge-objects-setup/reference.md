@@ -55,8 +55,9 @@ reconciliation.
 
 The SHC deployer bundle path is refused before mutation because file-based
 content delivery and a live member `/acl` POST cannot form one transaction.
-Use `splunk-knowledge-objects` to stage the conf and `local.meta` together on
-the deployer. Knowledge object changes generally take effect after a
+This skill does not stage `local.meta` or bulk content; use a reviewed,
+deployer-owned app bundle through a supported SHC deployment workflow.
+Knowledge object changes generally take effect after a
 configuration reload; the skill prints platform-appropriate restart/reload
 guidance after verified success.
 

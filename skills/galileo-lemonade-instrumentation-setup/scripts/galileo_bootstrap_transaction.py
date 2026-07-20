@@ -446,6 +446,8 @@ def create_secret_file(path: Path, secret: str) -> dict[str, object]:
             "sha256": hashlib.sha256(
                 secret.encode("utf-8") + b"\n"
             ).hexdigest(),
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
         }
     except BaseException:
         if descriptor >= 0:
@@ -469,6 +471,10 @@ def create_secret_file(path: Path, secret: str) -> dict[str, object]:
 def unlink_owned_file(
     record: Mapping[str, object], *, missing_ok: bool = False
 ) -> bool:
+    if not _has_exact_timestamp_identity(record, "owned runtime key output"):
+        raise TransactionError(
+            "owned runtime key output lacks exact timestamp identity; refusing cleanup"
+        )
     path = Path(validate_text(record.get("path"), "owned output path", maximum=4096))
     parts = _path_parts(path)
     parent = open_secure_directory(path.parent, create=False, final_private=False)
@@ -494,11 +500,22 @@ def unlink_owned_file(
             )
         finally:
             os.close(descriptor)
-        if (info.st_dev, info.st_ino) != (
+        if (
+            info.st_dev,
+            info.st_ino,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
+        ) != (
             record.get("device"),
             record.get("inode"),
+            record.get("size"),
+            record.get("mtime_ns"),
+            record.get("ctime_ns"),
         ):
-            raise TransactionError("runtime key output inode changed; refusing cleanup")
+            raise TransactionError(
+                "runtime key output inode changed or metadata changed; refusing cleanup"
+            )
         expected_digest = record.get("sha256")
         if not isinstance(expected_digest, str) or not re.fullmatch(
             r"[0-9a-f]{64}", expected_digest
@@ -513,10 +530,20 @@ def unlink_owned_file(
                 "runtime key output inode changed or content differs; refusing cleanup"
             )
         current = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
-        if (current.st_dev, current.st_ino, current.st_nlink) != (
+        if (
+            current.st_dev,
+            current.st_ino,
+            current.st_nlink,
+            current.st_size,
+            current.st_mtime_ns,
+            current.st_ctime_ns,
+        ) != (
             info.st_dev,
             info.st_ino,
             1,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
         ):
             raise TransactionError("runtime key output changed before cleanup")
         os.unlink(parts[-1], dir_fd=parent)
@@ -524,6 +551,19 @@ def unlink_owned_file(
         return True
     finally:
         os.close(parent)
+
+
+def _has_exact_timestamp_identity(
+    record: Mapping[str, object], label: str
+) -> bool:
+    """Distinguish legacy file records from exact cleanup identities."""
+
+    values = (record.get("mtime_ns"), record.get("ctime_ns"))
+    if values == (None, None):
+        return False
+    if any(type(value) is not int or value < 0 for value in values):
+        raise TransactionError(f"{label} timestamp identity is malformed")
+    return True
 
 
 class StateStore:
@@ -1708,8 +1748,22 @@ class GalileoBootstrapTransaction:
             else:
                 current_output = _file_record(output_path, "runtime key output")
                 recorded_output = runtime.get("output")
+                upgrade_legacy_output = False
                 if isinstance(recorded_output, dict):
-                    for field in ("path", "device", "inode", "size"):
+                    exact_timestamp_identity = _has_exact_timestamp_identity(
+                        recorded_output, "runtime key output"
+                    )
+                    identity_fields = (
+                        "path",
+                        "device",
+                        "inode",
+                        "size",
+                    )
+                    if exact_timestamp_identity:
+                        identity_fields += ("mtime_ns", "ctime_ns")
+                    else:
+                        upgrade_legacy_output = True
+                    for field in identity_fields:
                         if recorded_output.get(field) != current_output.get(field):
                             raise TransactionError(
                                 "runtime key output identity changed"
@@ -1724,6 +1778,11 @@ class GalileoBootstrapTransaction:
                         "recorded runtime API key cannot be revalidated"
                     )
                 self._verify_runtime(state, secret, selected[0])
+                if upgrade_legacy_output:
+                    # Pre-timestamp journals are upgraded only after the file's
+                    # secret has reauthenticated and revalidated the exact
+                    # runtime scope. Until then, they remain deletion-ineligible.
+                    runtime["output"] = current_output
                 runtime["status"] = "verified"
                 intent.update(
                     {
@@ -2982,10 +3041,19 @@ class GalileoBootstrapTransaction:
                 raise TransactionError("owned runtime API key remains after rollback")
             if isinstance(output, dict):
                 # Exact key absence is established above. A missing file is now
-                # an idempotent crash-resume success; a replacement inode still
-                # fails closed and is never unlinked.
-                unlink_owned_file(output, missing_ok=True)
-                self.failpoint("after_runtime_output_unlink")
+                # an idempotent crash-resume success; a replacement filesystem
+                # identity still fails closed and is never unlinked, including
+                # when the filesystem immediately reuses the original inode.
+                if _has_exact_timestamp_identity(output, "runtime key output"):
+                    unlink_owned_file(output, missing_ok=True)
+                    self.failpoint("after_runtime_output_unlink")
+                else:
+                    # Older journals cannot prove that the current pathname is
+                    # still the file this transaction created. Revoke the exact
+                    # owned key, but preserve the local file for manual cleanup.
+                    runtime["output_cleanup_skipped"] = (
+                        "legacy_record_missing_timestamp_identity"
+                    )
             runtime["rolled_back"] = True
             self._save(state)
 
@@ -3031,6 +3099,8 @@ def _file_record(path: Path, label: str) -> dict[str, object]:
         "inode": info.st_ino,
         "size": info.st_size,
         "sha256": hashlib.sha256(raw).hexdigest(),
+        "mtime_ns": info.st_mtime_ns,
+        "ctime_ns": info.st_ctime_ns,
     }
 
 

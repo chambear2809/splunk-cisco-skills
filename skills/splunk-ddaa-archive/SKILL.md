@@ -1,95 +1,48 @@
 ---
 name: splunk-ddaa-archive
-description: >-
-  Render, preflight, and validate Splunk Cloud Platform Dynamic Data Active
-  Archive (DDAA) lifecycle assets: per-index archive retention via the ACS API
-  (searchableDays plus splunkArchivalRetentionDays), enable/update payloads,
-  archived/restored storage audits, and a guided UI restore handoff. Use when
-  the user asks to archive expired Splunk Cloud data to the Splunk-managed
-  archive, set or change DDAA archive retention, enable DDAA on an index,
-  restore archived data for searching, audit archive/restore storage
-  consumption, or understand DDAA versus DDSS retention tiers.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-ddaa-archive-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "conditional"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-ddaa-archive-setup"
 ---
 
-# Splunk Cloud DDAA Archive Lifecycle
+# Splunk Cloud DDAA Archive Lifecycle (Deprecated Compatibility Alias)
 
-This skill renders Splunk Cloud Platform **Dynamic Data Active Archive (DDAA)**
-lifecycle assets: per-index archive retention configuration through the Admin
-Config Service (ACS) API, enable/update payloads, archived/restored storage
-audits, and a guided restore handoff. It is render-first because retention
-changes affect how long data is kept and when it is permanently deleted.
+> [!WARNING]
+> `splunk-ddaa-archive` is deprecated and replaced by
+> [`splunk-ddaa-archive-setup`](../splunk-ddaa-archive-setup/SKILL.md). Use the canonical skill for all work.
 
-## Retention Model (Read First)
+## Fail-Closed Compatibility Contract
 
-- **DDAS** (Dynamic Data Active Searchable) — searchable storage. Controlled by
-  `searchableDays`.
-- **DDAA** (Dynamic Data Active Archive) — Splunk-managed archive for expired
-  data. Controlled by `splunkArchivalRetentionDays`, which is the **total**
-  retention (searchable + archived) measured from index creation date, not a
-  rolling window.
-- Archive retention period = `splunkArchivalRetentionDays` − `searchableDays`.
-- `splunkArchivalRetentionDays` must be **greater than** `searchableDays` and
-  **≤ 3650** days (10 years, deployment max may be lower).
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-ddaa-archive-setup` as `replaced_by`.
 
-Constraints enforced by ACS:
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-- You can enable DDAA and increase/decrease `splunkArchivalRetentionDays` via the
-  API (POST to create, PATCH to update).
-- You **cannot disable DDAA**, nor switch between DDAA and DDSS, via the API —
-  those require the Splunk Web UI.
-- **Restore is UI-only**: restore archived data from **Settings > Indexes**.
-  Restored data lands in DDAS and auto-expires after 30 days (or clear it
-  manually). You can restore up to ~10% of your DDAS entitlement at a time.
-
-## Agent Behavior
-
-Never paste the ACS token into chat or argv. Provide it as a local file:
+## Safe Compatibility Checks
 
 ```bash
-bash skills/shared/scripts/write_secret_file.sh /tmp/acs_token
+bash skills/splunk-ddaa-archive/scripts/setup.sh --help
+bash skills/splunk-ddaa-archive/scripts/validate.sh --help
+python3 skills/splunk-ddaa-archive/scripts/render_assets.py --help
 ```
 
-The rendered apply script reads the token from that file. Its ACS client is
-HTTPS-only, does not follow redirects, and ignores user curl configuration. Use
-`template.example` for non-secret values: stack, index, datatype, and retention
-days.
-
-## Quick Start
-
-Render a DDAA enable plan (1 year total, 90 days searchable):
+For supported behavior, begin here:
 
 ```bash
-bash skills/splunk-ddaa-archive/scripts/setup.sh \
-  --stack my-stack --index cisco_asa \
-  --searchable-days 90 --archival-retention-days 365 --operation enable
+bash skills/splunk-ddaa-archive-setup/scripts/setup.sh --help
+bash skills/splunk-ddaa-archive-setup/scripts/validate.sh --help
 ```
 
-Audit and check current archive retention (read-only):
-
-```bash
-bash skills/splunk-ddaa-archive/scripts/validate.sh --live
-```
-
-## What It Renders
-
-- `create-payload.json` / `patch-payload.json` — ACS index bodies for DDAA
-- `enable-ddaa.sh` — apply create/PATCH via the ACS API using a token file (gated)
-- `status.sh` — GET the index and show `searchableDays` / `splunkArchivalRetentionDays`
-- `restore.sh` — guided UI restore handoff + a search to inspect restored buckets
-- `audit.sh` — archived/restored storage consumption hints
-- `README.md` / `metadata.json` — review context
-
-## Operating Notes
-
-- DDAA enablement and retention changes are not rolling; compute from the index
-  creation date.
-- To disable DDAA or switch DDAA/DDSS, use the Splunk Web UI; this skill refuses
-  to render an API "disable".
-- For general Cloud index management (create, searchable retention, DDSS), see
-  `splunk-cloud-acs-admin-setup`.
-
-Read `reference.md` before changing retention or restoring archived data.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

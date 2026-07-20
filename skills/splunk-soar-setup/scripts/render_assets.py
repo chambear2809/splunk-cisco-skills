@@ -346,8 +346,8 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
     # which means the LOCAL shell does not expand $1/$2 — the values are only
     # bound on the remote side after ssh has handed them through argv. This
     # avoids the previous pattern that interpolated $BACKUP_PATH into a
-    # double-quoted ssh argument, where a value like `; rm -rf /` would have
-    # been executed remotely.
+    # double-quoted ssh argument, where shell metacharacters in a path could
+    # have been interpreted remotely.
     backup_body = (
         f"SOAR_HOME={soar_home}\n"
         f'PRIMARY_HOST="{primary}"\n'

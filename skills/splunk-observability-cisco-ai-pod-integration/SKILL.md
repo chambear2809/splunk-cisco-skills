@@ -1,14 +1,11 @@
 ---
 name: splunk-observability-cisco-ai-pod-integration
-description: >-
-  Compose Cisco Nexus, Cisco Intersight, and NVIDIA GPU Observability skills
-  into a Cisco AI Pod overlay, then add NIM, vLLM, Milvus, NetApp Trident,
-  Pure Portworx, Redfish exporter, OpenShift SCC, workshop tenancy, RBAC,
-  receiver naming, DCGM discovery, dual-pipeline filtering, NIM model-name
-  extraction, and existing-collector cleanup patterns. Use when deploying
-  Splunk Observability Cloud for a Cisco AI Pod with UCS, Nexus, NVIDIA GPUs,
-  NIM/vLLM inference, and storage telemetry. Hand off base collector, HEC,
-  dashboards, and detectors to the owning skills.
+description: "Use when deploying Splunk Observability Cloud for a Cisco AI Pod with UCS, Nexus, NVIDIA GPUs, NIM/vLLM
+  inference, and storage telemetry. Hand off base collector, HEC, dashboards, and detectors to the owning
+  skills. Compose Cisco Nexus, Cisco Intersight, and NVIDIA GPU Observability skills into a Cisco AI Pod
+  overlay, then add NIM, vLLM, Milvus, NetApp Trident, Pure Portworx, Redfish exporter, OpenShift SCC,
+  workshop tenancy, RBAC, receiver naming, DCGM discovery, dual-pipeline filtering, NIM model-name
+  extraction, and existing-collector cleanup patterns."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -16,6 +13,64 @@ metadata:
 ---
 
 # Splunk Observability Cisco AI Pod Integration (Umbrella)
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Deploying Splunk Observability Cloud for a Cisco AI Pod with UCS, Nexus, NVIDIA GPUs, NIM/vLLM inference, and
+  storage telemetry. Hand off base collector, HEC, dashboards, and detectors to the owning skills.
+- Preview and review the splunk observability cisco ai pod integration workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-cisco-ai-pod-integration/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This is the **AI Pod umbrella** that ties together every component skill needed for end-to-end Cisco AI Pod observability in Splunk Observability Cloud. It composes:
 

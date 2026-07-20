@@ -10,6 +10,16 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import (  # noqa: E402
+    CatalogError,
+    load_catalog,
+    parse_requirement_skill_rows,
+)
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 
 REQUIRED_TOP_LEVEL = [
@@ -20,7 +30,13 @@ REQUIRED_TOP_LEVEL = [
     "SPLUNK_10_5_COMPATIBILITY.md",
     "SKILL_VALIDATION_MATRIX.md",
     "SKILL_REQUIREMENTS.md",
+    "skills/catalog.yaml",
+    "skills/shared/skill_catalog.schema.json",
+    "skills/shared/skill_catalog.py",
+    "skills/shared/scripts/generate_skill_catalog.py",
+    "skills/shared/deprecated_skill_aliases.md",
     "skills/shared/skill_product_registry.json",
+    "skills/shared/skill_validation_registry.json",
     ".gitattributes",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
@@ -225,19 +241,12 @@ def tracked_files() -> list[str]:
 
 
 def skill_names() -> list[str]:
-    return sorted(
-        path.name
-        for path in SKILLS_DIR.iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    )
+    return sorted(load_catalog().by_name)
 
 
 def catalog_skills(doc_path: Path) -> set[str]:
     text = doc_path.read_text(encoding="utf-8")
-    return set(re.findall(r"^\| `([^`]+)` \|", text, flags=re.MULTILINE))
+    return set(parse_requirement_skill_rows(text, load_catalog()))
 
 
 def iter_secret_doc_files() -> list[Path]:
@@ -260,25 +269,29 @@ def check_required_files(errors: list[str]) -> None:
 
 
 def check_catalog_sync(errors: list[str]) -> None:
-    expected = set(skill_names())
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     for required_link in (
         "SKILL_UX_CATALOG.md",
         "SKILL_REQUIREMENTS.md",
         "SPLUNK_10_5_COMPATIBILITY.md",
         "SKILL_VALIDATION_MATRIX.md",
+        "skills/shared/deprecated_skill_aliases.md",
     ):
         if required_link not in readme_text:
             errors.append(f"README.md: missing operator catalog link: {required_link}")
 
-    for rel in ["AGENTS.md", "CLAUDE.md"]:
-        actual = catalog_skills(REPO_ROOT / rel)
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        if missing:
-            errors.append(f"{rel}: missing skill catalog entries: {', '.join(missing)}")
-        if extra:
-            errors.append(f"{rel}: unknown skill catalog entries: {', '.join(extra)}")
+    generator = REPO_ROOT / "skills/shared/scripts/generate_skill_catalog.py"
+    result = subprocess.run(
+        [sys.executable, str(generator), "--check"],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        details = (result.stdout + result.stderr).strip()
+        errors.append(f"canonical skill catalog generation check failed: {details}")
 
 
 def check_skill_requirements_catalog(errors: list[str]) -> None:
@@ -286,7 +299,11 @@ def check_skill_requirements_catalog(errors: list[str]) -> None:
     if not doc_path.exists():
         return
     expected = set(skill_names())
-    actual = catalog_skills(doc_path)
+    try:
+        actual = catalog_skills(doc_path)
+    except CatalogError as exc:
+        errors.append(f"SKILL_REQUIREMENTS.md: {exc}")
+        return
     missing = sorted(expected - actual)
     extra = sorted(actual - expected)
     if missing:
@@ -325,6 +342,7 @@ def check_skill_surface_completeness(errors: list[str]) -> None:
         "splunk-observability-thousandeyes-integration",
         "splunk-security-portfolio-setup",
     }
+    aliases = set(load_catalog().aliases)
     for skill in skill_names():
         skill_dir = SKILLS_DIR / skill
         skill_doc = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
@@ -332,7 +350,7 @@ def check_skill_surface_completeness(errors: list[str]) -> None:
         if not agents_path.is_file():
             errors.append(f"skills/{skill}/agents/openai.yaml: missing agent metadata")
 
-        if not (skill_dir / "reference.md").is_file():
+        if skill not in aliases and not (skill_dir / "reference.md").is_file():
             errors.append(f"skills/{skill}/reference.md: missing reference index")
 
         requires_completion_gate = (
@@ -405,6 +423,7 @@ def check_no_internal_skill_symlinks(errors: list[str]) -> None:
 
 
 def check_cursor_and_claude_commands(errors: list[str]) -> None:
+    catalog = load_catalog()
     for skill in skill_names():
         cursor_link = REPO_ROOT / ".cursor" / "skills" / skill
         expected_target = f"../../skills/{skill}"
@@ -420,8 +439,23 @@ def check_cursor_and_claude_commands(errors: list[str]) -> None:
         command_file = REPO_ROOT / ".claude" / "commands" / f"{skill}.md"
         if not command_file.exists():
             errors.append(f".claude/commands/{skill}.md: missing Claude command")
-        elif f"skills/{skill}/SKILL.md" not in command_file.read_text(encoding="utf-8"):
-            errors.append(f".claude/commands/{skill}.md: does not reference its SKILL.md")
+        else:
+            command_text = command_file.read_text(encoding="utf-8")
+            required_paths = [f"skills/{skill}/SKILL.md"]
+            replacement = catalog.aliases.get(skill)
+            if replacement is not None:
+                required_paths.extend(
+                    (
+                        f"skills/{replacement}/SKILL.md",
+                        f"skills/{replacement}/reference.md",
+                    )
+                )
+            for required_path in required_paths:
+                if required_path not in command_text:
+                    errors.append(
+                        f".claude/commands/{skill}.md: does not reference "
+                        f"{required_path}"
+                    )
 
 
 def check_no_tracked_local_artifacts(errors: list[str]) -> None:

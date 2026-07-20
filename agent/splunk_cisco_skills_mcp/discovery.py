@@ -58,6 +58,7 @@ MAX_CATALOG_NODES = 100_000
 MAX_CATALOG_DEPTH = 64
 
 SkillFileKind = Literal["instructions", "reference", "template"]
+SkillLifecycle = Literal["canonical", "deprecated"]
 
 _SKILL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,253}[a-z0-9])?$")
 _IDENTIFIER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -202,6 +203,8 @@ class CapabilityRef(TypedDict):
 class SkillSearchRecord(TypedDict):
     skill: str
     description: str
+    status: SkillLifecycle
+    replaced_by: str | None
     product: ProductRef
     capability: CapabilityRef
 
@@ -227,6 +230,8 @@ class RunnableEntrypoint(TypedDict):
 class SkillManifestResult(TypedDict):
     skill: str
     description: str
+    status: SkillLifecycle
+    replaced_by: str | None
     product: ProductRef
     capability: CapabilityRef
     resources: list[ResourceSummary]
@@ -272,6 +277,8 @@ class ResolveCiscoProductResult(TypedDict):
 class _SkillRecord:
     skill: str
     description: str
+    status: SkillLifecycle
+    replaced_by: str | None
     product_id: str
     product_name: str
     capability_id: str
@@ -283,6 +290,8 @@ class _SkillRecord:
         return {
             "skill": self.skill,
             "description": self.description,
+            "status": self.status,
+            "replaced_by": self.replaced_by,
             "product": {"id": self.product_id, "name": self.product_name},
             "capability": {
                 "id": self.capability_id,
@@ -576,6 +585,13 @@ class SkillDiscovery:
 
         ranked: list[tuple[int, int, int, str, _SkillRecord]] = []
         for record in catalog.records:
+            # Generic navigation exposes canonical skills only. An exact legacy
+            # name still resolves for compatibility and carries its handoff.
+            if (
+                record.status == "deprecated"
+                and query_norm != _normalize(record.skill)
+            ):
+                continue
             if product_id is not None and record.product_id != product_id:
                 continue
             if capability_id is not None and record.capability_id != capability_id:
@@ -991,8 +1007,47 @@ class SkillDiscovery:
             max_size=MAX_CATALOG_BYTES,
         )
         payload = _load_catalog_json(registry_text, label="product registry")
-        if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-            raise DiscoveryCatalogError("product registry must use schema_version 1")
+        if not isinstance(payload, dict) or payload.get("schema_version") != 2:
+            raise DiscoveryCatalogError("product registry must use schema_version 2")
+        raw_skill_records = payload.get("skill_records")
+        if not isinstance(raw_skill_records, list) or not raw_skill_records:
+            raise DiscoveryCatalogError(
+                "product registry must contain non-empty skill_records"
+            )
+        lifecycle_by_skill: dict[str, tuple[SkillLifecycle, str | None]] = {}
+        for index, value in enumerate(raw_skill_records):
+            location = f"skill_records[{index}]"
+            if not isinstance(value, dict) or set(value) != {
+                "name",
+                "status",
+                "replaced_by",
+            }:
+                raise DiscoveryCatalogError(
+                    f"{location} must contain exactly name, status, and replaced_by"
+                )
+            name = _validate_skill(value.get("name"))
+            if name in lifecycle_by_skill:
+                raise DiscoveryCatalogError(f"duplicate lifecycle record: {name}")
+            status = value.get("status")
+            if status not in {"canonical", "deprecated"}:
+                raise DiscoveryCatalogError(
+                    f"{location}.status must be canonical or deprecated"
+                )
+            replacement = value.get("replaced_by")
+            if status == "canonical":
+                if replacement is not None:
+                    raise DiscoveryCatalogError(
+                        f"{location}.replaced_by must be null for a canonical skill"
+                    )
+            elif not isinstance(replacement, str):
+                raise DiscoveryCatalogError(
+                    f"{location}.replaced_by must name the canonical replacement"
+                )
+            elif _validate_skill(replacement) == name:
+                raise DiscoveryCatalogError(
+                    f"{location}.replaced_by cannot refer to the alias itself"
+                )
+            lifecycle_by_skill[name] = (status, replacement)
         products = payload.get("products")
         if not isinstance(products, list) or not products:
             raise DiscoveryCatalogError(
@@ -1056,6 +1111,11 @@ class SkillDiscovery:
                         raise DiscoveryCatalogError(
                             f"skill is classified more than once: {skill}"
                         )
+                    lifecycle = lifecycle_by_skill.get(skill)
+                    if lifecycle is None:
+                        raise DiscoveryCatalogError(
+                            f"skill is missing a lifecycle record: {skill}"
+                        )
                     instruction_text = self._read_complete_text(
                         (skill, "SKILL.md"),
                         max_size=MAX_TEXT_FILE_BYTES,
@@ -1078,6 +1138,8 @@ class SkillDiscovery:
                         _SkillRecord(
                             skill=skill,
                             description=_compact(description),
+                            status=lifecycle[0],
+                            replaced_by=lifecycle[1],
                             product_id=product_id,
                             product_name=product_name,
                             capability_id=capability_id,
@@ -1088,17 +1150,39 @@ class SkillDiscovery:
                     )
 
         actual = {item[0] for item in self._catalog_signature()[-1]}
-        if classified != actual:
+        lifecycle_names = set(lifecycle_by_skill)
+        if classified != actual or lifecycle_names != actual:
             missing = sorted(actual - classified)
             unknown = sorted(classified - actual)
+            missing_lifecycle = sorted(actual - lifecycle_names)
+            unknown_lifecycle = sorted(lifecycle_names - actual)
             raise DiscoveryCatalogError(
                 "product registry classification mismatch; "
-                f"unclassified={missing}, missing_skill_directories={unknown}"
+                f"unclassified={missing}, missing_skill_directories={unknown}, "
+                f"missing_lifecycle={missing_lifecycle}, "
+                f"unknown_lifecycle={unknown_lifecycle}"
             )
+        by_skill = {record.skill: record for record in records}
+        for record in records:
+            if record.status != "deprecated":
+                continue
+            replacement = by_skill.get(record.replaced_by or "")
+            if replacement is None or replacement.status != "canonical":
+                raise DiscoveryCatalogError(
+                    f"deprecated skill {record.skill} must replace a canonical skill"
+                )
+            if (
+                replacement.product_id != record.product_id
+                or replacement.capability_id != record.capability_id
+            ):
+                raise DiscoveryCatalogError(
+                    f"deprecated skill {record.skill} must share product and capability "
+                    f"with {replacement.skill}"
+                )
         return _Catalog(
             revision=digest.hexdigest(),
             records=tuple(records),
-            by_skill={record.skill: record for record in records},
+            by_skill=by_skill,
             product_filters=product_filters,
             capability_filters=capability_filters,
         )

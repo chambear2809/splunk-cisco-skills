@@ -6,7 +6,7 @@ set -euo pipefail
 # Render-first CLI — mirrors splunk-observability-aws-integration:
 #   --render (default), --apply [SECTIONS], --validate [--live],
 #   --doctor, --discover, --quickstart, --quickstart-from-live,
-#   --explain, --rollback SECTION, --list-services
+#   --explain, --rollback [ACTION], --list-services
 #
 # File-based secrets only. The Splunk O11y token, Azure appId, and
 # Azure secretKey are read from chmod-600 files. Never passed in argv.
@@ -26,13 +26,28 @@ if [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
 fi
 
 MODE="render"
+PRIMARY_MODE=""
+MODE_CONFLICT=false
+APPLY_REQUESTED=false
+ROLLBACK_REQUESTED=false
+ROLLBACK_ACTION_EXPLICIT=false
+ROLLBACK_INTEGRATION_ALIAS=false
 SECTIONS=""
+ROLLBACK_ACTION=""
 SPEC=""
 OUTPUT_DIR=""
 REALM=""
 TOKEN_FILE=""
 APP_ID_FILE=""
 SECRET_FILE=""
+INTEGRATION_ID=""
+INTEGRATION_NAME=""
+EXPECTED_ENABLED_STATE="true"
+PLAN_FILE=""
+PLAN_SHA256=""
+OBSERVED_STATE_FILE=""
+ACKNOWLEDGE_DISABLE=""
+ACKNOWLEDGE_DELETE=""
 ALLOW_LOOSE_TOKEN_PERMS=false
 JSON_OUTPUT=false
 DRY_RUN=false
@@ -49,11 +64,13 @@ Modes (pick one; --render is the default):
   --apply [SECTIONS]             Call POST/PUT /v2/integration. Sections: integration,validation.
   --validate [--live]            Static checks; --live adds probe GET /v2/integration.
   --doctor                       Validate services, poll-rate, namedToken, GovCloud, credential-hash.
-  --discover                     List existing Azure integrations via GET /v2/integration.
+  --discover                     Capture a private, fully paginated count/results snapshot.
   --quickstart                   Render + print exact --apply command.
-  --quickstart-from-live         Snapshot a live integration into observed.yaml.
+  --quickstart-from-live         Capture live state/current-state.json and print a handoff.
   --explain                      Print the apply plan in plain English; no API calls.
-  --rollback SECTION             Disable or delete the integration. Sections: integration, delete.
+  --rollback [ACTION]            Render an offline plan. ACTION: disable, delete;
+                                 integration is a deprecated alias for disable.
+                                 Bare --rollback renders disable but cannot apply.
   --list-services                Print the supported Azure services enum.
 
 Spec / output:
@@ -62,10 +79,21 @@ Spec / output:
   --realm REALM                  Override spec.realm.
 
 File-based secrets (chmod 600 enforced):
-  --token-file PATH              Splunk O11y admin user API access token.
+  --token-file PATH              Org/API token for GET; admin session/User token for mutation.
   --app-id-file PATH             Azure AD application (client) ID file.
   --secret-file PATH             Azure AD client secret file.
-  --allow-loose-token-perms      Override chmod-600 check (WARN-only).
+  --allow-loose-token-perms      Non-rollback compatibility only; rollback rejects it.
+
+Rollback review/apply flags:
+  --integration-id ID            Exact server-assigned integration ID; names never mutate.
+  --integration-name NAME        Required exact expected name; never inferred from a spec.
+  --expected-enabled-state BOOL  Pre-mutation Boolean bound into a new plan (default: true).
+  --plan-file PATH               Mode-600 rollback plan (default: output state/rollback-plan.json).
+  --observed-state-file PATH     Mode-600 discover snapshot bound during offline plan render.
+  --plan-hash SHA256             Canonical reviewed plan digest; required for mutation.
+  --accept-disable-integration ID  Required only for disable; must equal integration ID.
+  --accept-delete-integration ID   Required only for delete; must equal integration ID.
+  Mutation also requires --apply. Disable and delete are separately planned actions.
 
 Behaviour flags:
   --dry-run                      Skip live API calls; render only.
@@ -84,6 +112,27 @@ Examples:
     --token-file /tmp/splunk_token \\
     --app-id-file /tmp/azure-app-id.txt \\
     --secret-file /tmp/azure-secret.txt
+
+  # Capture the trusted snapshot used by rollback review:
+  bash $0 --discover --realm us1 --token-file /secure/o11y-read-token \\
+    --output-dir azure-live
+
+  # Render a disable plan offline (the default rollback behavior):
+  bash $0 --rollback disable --realm us1 \\
+    --integration-id SERVER_ID --integration-name EXPECTED_NAME \\
+    --observed-state-file /secure/current-state.json \\
+    --app-id-file /secure/azure-app-id --secret-file /secure/azure-secret
+
+  # Apply only that reviewed plan (HASH is printed by the render command):
+  bash $0 --rollback disable --apply --realm us1 --integration-id SERVER_ID \\
+    --plan-file PATH --plan-hash HASH --accept-disable-integration SERVER_ID \\
+    --token-file /secure/o11y-token --app-id-file /secure/azure-app-id \\
+    --secret-file /secure/azure-secret
+
+  # Delete is separately reviewed and accepts no Azure credential files:
+  bash $0 --rollback delete --realm us1 --integration-id SERVER_ID \\
+    --integration-name EXPECTED_NAME --expected-enabled-state false \\
+    --observed-state-file /secure/current-state.json --plan-file /secure/delete-plan.json
 EOF
     exit "${exit_code}"
 }
@@ -100,24 +149,55 @@ EOF
     exit 2
 }
 
+record_primary_mode() {
+    local requested="$1"
+    if [[ -n "${PRIMARY_MODE}" && "${PRIMARY_MODE}" != "${requested}" ]]; then
+        MODE_CONFLICT=true
+    elif [[ -z "${PRIMARY_MODE}" ]]; then
+        PRIMARY_MODE="${requested}"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --render) MODE="render" ;;
+        --render) record_primary_mode "render" ;;
         --apply)
-            MODE="apply"
+            APPLY_REQUESTED=true
             if [[ $# -ge 2 && "$2" != --* ]]; then
                 SECTIONS="$2"; shift
             fi
             ;;
-        --validate) MODE="validate" ;;
+        --validate) record_primary_mode "validate" ;;
         --live) export SAZURE_VALIDATE_LIVE=true ;;
-        --doctor) MODE="doctor" ;;
-        --discover) MODE="discover" ;;
-        --quickstart) MODE="quickstart" ;;
-        --quickstart-from-live) MODE="quickstart_from_live" ;;
-        --explain) MODE="explain" ;;
-        --rollback) MODE="rollback"; SECTIONS="${2:-}"; [[ -n "${SECTIONS:-}" ]] && shift ;;
-        --list-services) MODE="list_services" ;;
+        --doctor) record_primary_mode "doctor" ;;
+        --discover) record_primary_mode "discover" ;;
+        --quickstart) record_primary_mode "quickstart" ;;
+        --quickstart-from-live) record_primary_mode "quickstart_from_live" ;;
+        --explain) record_primary_mode "explain" ;;
+        --rollback)
+            ROLLBACK_REQUESTED=true
+            record_primary_mode "rollback"
+            if [[ $# -ge 2 && "$2" != --* ]]; then
+                case "$2" in
+                    disable|delete) ROLLBACK_ACTION="$2"; ROLLBACK_ACTION_EXPLICIT=true; shift ;;
+                    integration)
+                        ROLLBACK_ACTION="disable"
+                        ROLLBACK_ACTION_EXPLICIT=true
+                        ROLLBACK_INTEGRATION_ALIAS=true
+                        shift
+                        ;;
+                esac
+            fi
+            ;;
+        --integration-id) INTEGRATION_ID="$2"; shift ;;
+        --integration-name) INTEGRATION_NAME="$2"; shift ;;
+        --expected-enabled-state) EXPECTED_ENABLED_STATE="$2"; shift ;;
+        --plan-file) PLAN_FILE="$2"; shift ;;
+        --plan-hash) PLAN_SHA256="$2"; shift ;;
+        --observed-state-file) OBSERVED_STATE_FILE="$2"; shift ;;
+        --accept-disable-integration) ACKNOWLEDGE_DISABLE="$2"; shift ;;
+        --accept-delete-integration) ACKNOWLEDGE_DELETE="$2"; shift ;;
+        --list-services) record_primary_mode "list_services" ;;
         --spec) SPEC="$2"; shift ;;
         --output-dir) OUTPUT_DIR="$2"; shift ;;
         --realm) REALM="$2"; shift ;;
@@ -127,12 +207,32 @@ while [[ $# -gt 0 ]]; do
         --allow-loose-token-perms) ALLOW_LOOSE_TOKEN_PERMS=true ;;
         --dry-run) DRY_RUN=true ;;
         --json) JSON_OUTPUT=true ;;
-        --secret|--client-secret|--token|--password|--app-secret) reject_direct_secret "${1#--}" ;;
+        --secret|--client-secret|--token|--password|--app-secret|--secret=*|--client-secret=*|--token=*|--password=*|--app-secret=*)
+            rejected_flag="${1%%=*}"
+            reject_direct_secret "${rejected_flag#--}"
+            ;;
         -h|--help) usage 0 ;;
-        *) echo "Unknown option: $1" >&2; usage 1 ;;
+        *) echo "Unknown option: ${1%%=*}" >&2; usage 1 ;;
     esac
     shift
 done
+
+if [[ "${MODE_CONFLICT}" == "true" ]]; then
+    echo "ERROR: conflicting primary modes were requested." >&2
+    exit 2
+fi
+if [[ "${ROLLBACK_REQUESTED}" == "true" ]]; then
+    MODE="rollback"
+    [[ -z "${ROLLBACK_ACTION}" ]] && ROLLBACK_ACTION="disable"
+elif [[ "${APPLY_REQUESTED}" == "true" ]]; then
+    if [[ -n "${PRIMARY_MODE}" ]]; then
+        echo "ERROR: --apply conflicts with a separate primary mode." >&2
+        exit 2
+    fi
+    MODE="apply"
+elif [[ -n "${PRIMARY_MODE}" ]]; then
+    MODE="${PRIMARY_MODE}"
+fi
 
 if [[ -z "${SPEC}" ]]; then
     SPEC="${SCRIPT_DIR}/../template.example"
@@ -140,20 +240,29 @@ fi
 if [[ -z "${OUTPUT_DIR}" ]]; then
     OUTPUT_DIR="${PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}"
 fi
-
-load_observability_cloud_settings
-if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
-    REALM="${SPLUNK_O11Y_REALM}"
+if [[ -z "${PLAN_FILE}" ]]; then
+    PLAN_FILE="${OUTPUT_DIR}/state/rollback-plan.json"
 fi
-if [[ -z "${TOKEN_FILE}" && -n "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
-    TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE}"
+
+if [[ "${MODE}" != "rollback" ]]; then
+    load_observability_cloud_settings
+    if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
+        REALM="${SPLUNK_O11Y_REALM}"
+    fi
+    if [[ -z "${TOKEN_FILE}" && -n "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
+        TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE}"
+    fi
 fi
 
 file_mode_octal() {
     local path="$1"
     "${PYTHON_BIN}" - "${path}" <<'PY'
 import os, stat, sys
-print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "03o"))
+try:
+    metadata = os.stat(sys.argv[1])
+except OSError:
+    raise SystemExit("FAIL: credential file metadata could not be read safely")
+print(format(stat.S_IMODE(metadata.st_mode), "03o"))
 PY
 }
 
@@ -161,19 +270,19 @@ assert_secret_file_perms() {
     local path="$1"
     local label="$2"
     [[ -z "${path}" ]] && return 0
-    if [[ ! -f "${path}" ]]; then
-        echo "FAIL: ${label} (${path}) does not exist." >&2; exit 2
+    if [[ -L "${path}" || ! -f "${path}" ]]; then
+        echo "FAIL: ${label} file is missing, symlinked, or not regular." >&2; exit 2
     fi
     if [[ ! -s "${path}" ]]; then
-        echo "FAIL: ${label} (${path}) is empty." >&2; exit 2
+        echo "FAIL: ${label} file is empty." >&2; exit 2
     fi
     local mode
     mode="$(file_mode_octal "${path}")"
     if [[ "${mode}" != "600" ]]; then
         if [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
-            echo "WARN: ${label} (${path}) has loose permissions (${mode}); proceeding under --allow-loose-token-perms." >&2
+            echo "WARN: ${label} file has loose permissions (${mode}); proceeding under --allow-loose-token-perms." >&2
         else
-            echo "FAIL: ${label} (${path}) has loose permissions (${mode}); chmod 600 ${path}" >&2; exit 2
+            echo "FAIL: ${label} file has loose permissions (${mode}); mode 600 is required." >&2; exit 2
         fi
     fi
 }
@@ -302,37 +411,140 @@ case "${MODE}" in
         echo "    cp skills/${SKILL_NAME}/template.example template.observed.yaml"
         ;;
     rollback)
-        case "${SECTIONS}" in
-            integration|"")
-                echo "==> Rollback: disabling Azure integration in Splunk O11y..."
-                if [[ -z "${TOKEN_FILE}" ]]; then
-                    echo "ERROR: --token-file is required for rollback." >&2; exit 2
+        if [[ -z "${REALM}" || -z "${INTEGRATION_ID}" ]]; then
+            echo "ERROR: --rollback requires explicit --realm and --integration-id." >&2
+            exit 2
+        fi
+        if [[ "${ROLLBACK_ACTION}" != "disable" && "${ROLLBACK_ACTION}" != "delete" ]]; then
+            echo "ERROR: rollback action must be disable or delete." >&2
+            exit 2
+        fi
+        if [[ "${ROLLBACK_INTEGRATION_ALIAS}" == "true" ]]; then
+            echo "WARN: --rollback integration is deprecated; use --rollback disable." >&2
+        fi
+        if [[ "${APPLY_REQUESTED}" == "true" && "${ROLLBACK_ACTION_EXPLICIT}" != "true" ]]; then
+            echo "ERROR: rollback action was not explicit; use --rollback disable or --rollback delete" >&2
+            exit 2
+        fi
+        if [[ "${EXPECTED_ENABLED_STATE}" != "true" && "${EXPECTED_ENABLED_STATE}" != "false" ]]; then
+            echo "ERROR: --expected-enabled-state must be true or false." >&2
+            exit 2
+        fi
+        if [[ "${DRY_RUN}" == "true" ]]; then
+            echo "ERROR: rollback is already render-only without --apply; do not combine it with --dry-run." >&2
+            exit 2
+        fi
+
+        if [[ "${APPLY_REQUESTED}" != "true" ]]; then
+            if [[ -z "${INTEGRATION_NAME}" ]]; then
+                echo "ERROR: offline rollback render requires explicit --integration-name." >&2
+                exit 2
+            fi
+            if [[ -z "${OBSERVED_STATE_FILE}" ]]; then
+                echo "ERROR: offline rollback render requires explicit --observed-state-file." >&2
+                exit 2
+            fi
+            assert_secret_file_perms "${OBSERVED_STATE_FILE}" "observed state snapshot"
+            if [[ -n "${PLAN_SHA256}" || -n "${ACKNOWLEDGE_DISABLE}" || -n "${ACKNOWLEDGE_DELETE}" ]]; then
+                echo "ERROR: offline rollback render does not accept --plan-hash or acceptance flags." >&2
+                exit 2
+            fi
+            if [[ -n "${TOKEN_FILE}" || "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
+                echo "ERROR: offline rollback render does not accept token options." >&2
+                exit 2
+            fi
+            credential_args=()
+            if [[ "${ROLLBACK_ACTION}" == "disable" ]]; then
+                if [[ -z "${APP_ID_FILE}" || -z "${SECRET_FILE}" ]]; then
+                    echo "ERROR: disable plan render requires --app-id-file and --secret-file." >&2
+                    exit 2
                 fi
-                assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
-                "${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" \
-                    --realm "${REALM:-us1}" \
-                    --token-file "${TOKEN_FILE}" \
-                    --state-dir "${OUTPUT_DIR}/state" \
-                    --payload-file "${OUTPUT_DIR}/rest/create.json" \
-                    disable
+                assert_secret_file_perms "${APP_ID_FILE}" "Azure appId"
+                assert_secret_file_perms "${SECRET_FILE}" "Azure secretKey"
+                credential_args+=(--app-id-file "${APP_ID_FILE}" --secret-file "${SECRET_FILE}")
+            elif [[ -n "${APP_ID_FILE}" || -n "${SECRET_FILE}" ]]; then
+                echo "ERROR: delete rollback plans reject Azure credential files." >&2
+                exit 2
+            fi
+            plan_result="$("${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" \
+                --realm "${REALM}" \
+                --state-dir "${OUTPUT_DIR}/state" \
+                --plan-file "${PLAN_FILE}" \
+                --integration-id "${INTEGRATION_ID}" \
+                --integration-name "${INTEGRATION_NAME}" \
+                --expected-enabled-state "${EXPECTED_ENABLED_STATE}" \
+                --observed-state-file "${OBSERVED_STATE_FILE}" \
+                "${credential_args[@]}" \
+                rollback "${ROLLBACK_ACTION}")"
+            echo "${plan_result}"
+            rendered_plan_sha="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(sys.stdin)["plan_hash"])' <<<"${plan_result}")"
+            echo "==> Rollback plan rendered offline to: ${PLAN_FILE}"
+            echo "==> Review SHA-256: ${rendered_plan_sha}"
+            echo "==> Apply this exact ${ROLLBACK_ACTION} plan only after review:"
+            if [[ "${ROLLBACK_ACTION}" == "disable" ]]; then
+                echo "    bash ${0} --rollback disable --apply --realm ${REALM} \\"
+                echo "      --integration-id ${INTEGRATION_ID} --plan-file ${PLAN_FILE} --plan-hash ${rendered_plan_sha} \\"
+                echo "      --accept-disable-integration ${INTEGRATION_ID} --token-file /secure/o11y-token \\"
+                echo "      --app-id-file /secure/azure-app-id --secret-file /secure/azure-secret"
+            else
+                echo "    bash ${0} --rollback delete --apply --realm ${REALM} \\"
+                echo "      --integration-id ${INTEGRATION_ID} --plan-file ${PLAN_FILE} --plan-hash ${rendered_plan_sha} \\"
+                echo "      --accept-delete-integration ${INTEGRATION_ID} --token-file /secure/o11y-token"
+            fi
+            exit 0
+        fi
+
+        if [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
+            echo "ERROR: rollback mutation does not allow loose token permissions." >&2
+            exit 2
+        fi
+        if [[ -n "${OBSERVED_STATE_FILE}" ]]; then
+            echo "ERROR: rollback --apply uses the observed snapshot already bound in the plan." >&2
+            exit 2
+        fi
+        if [[ -z "${TOKEN_FILE}" || -z "${PLAN_SHA256}" ]]; then
+            echo "ERROR: rollback --apply requires --token-file and --plan-hash." >&2
+            exit 2
+        fi
+        case "${ROLLBACK_ACTION}" in
+            disable)
+                if [[ "${ACKNOWLEDGE_DISABLE}" != "${INTEGRATION_ID}" || -n "${ACKNOWLEDGE_DELETE}" ]]; then
+                    echo "ERROR: exactly --accept-disable-integration ${INTEGRATION_ID} is required." >&2
+                    exit 2
+                fi
+                if [[ -z "${APP_ID_FILE}" || -z "${SECRET_FILE}" ]]; then
+                    echo "ERROR: disable requires --app-id-file and --secret-file for safe payload reconstruction." >&2
+                    exit 2
+                fi
+                assert_secret_file_perms "${APP_ID_FILE}" "Azure appId"
+                assert_secret_file_perms "${SECRET_FILE}" "Azure secretKey"
                 ;;
             delete)
-                echo "==> Rollback (delete): removing Azure integration from Splunk O11y..."
-                if [[ -z "${TOKEN_FILE}" ]]; then
-                    echo "ERROR: --token-file is required for rollback delete." >&2; exit 2
+                if [[ "${ACKNOWLEDGE_DELETE}" != "${INTEGRATION_ID}" || -n "${ACKNOWLEDGE_DISABLE}" ]]; then
+                    echo "ERROR: exactly --accept-delete-integration ${INTEGRATION_ID} is required." >&2
+                    exit 2
                 fi
-                assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
-                "${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" \
-                    --realm "${REALM:-us1}" \
-                    --token-file "${TOKEN_FILE}" \
-                    --state-dir "${OUTPUT_DIR}/state" \
-                    --payload-file "${OUTPUT_DIR}/rest/create.json" \
-                    delete
-                ;;
-            *)
-                echo "Unknown rollback section: ${SECTIONS}. Supported: integration, delete" >&2; exit 2
+                if [[ -n "${APP_ID_FILE}" || -n "${SECRET_FILE}" ]]; then
+                    echo "ERROR: delete rollback rejects Azure credential files." >&2
+                    exit 2
+                fi
                 ;;
         esac
+        assert_secret_file_perms "${TOKEN_FILE}" "Splunk O11y token"
+        rollback_args=(
+            --realm "${REALM}"
+            --token-file "${TOKEN_FILE}"
+            --state-dir "${OUTPUT_DIR}/state"
+            --plan-file "${PLAN_FILE}"
+            --plan-hash "${PLAN_SHA256}"
+            --integration-id "${INTEGRATION_ID}"
+            --apply
+        )
+        [[ -n "${ACKNOWLEDGE_DISABLE}" ]] && rollback_args+=(--accept-disable-integration "${ACKNOWLEDGE_DISABLE}")
+        [[ -n "${ACKNOWLEDGE_DELETE}" ]] && rollback_args+=(--accept-delete-integration "${ACKNOWLEDGE_DELETE}")
+        [[ -n "${APP_ID_FILE}" ]] && rollback_args+=(--app-id-file "${APP_ID_FILE}")
+        [[ -n "${SECRET_FILE}" ]] && rollback_args+=(--secret-file "${SECRET_FILE}")
+        "${PYTHON_BIN}" "${SCRIPT_DIR}/azure_integration_api.py" "${rollback_args[@]}" rollback "${ROLLBACK_ACTION}"
         ;;
     list_services)
         "${PYTHON_BIN}" "${RENDERER}" --spec "${SPEC}" --output-dir "${OUTPUT_DIR}" --list-services

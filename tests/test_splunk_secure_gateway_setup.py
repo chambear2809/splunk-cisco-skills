@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -13,8 +14,7 @@ from tests.regression_helpers import REPO_ROOT
 
 RENDERER = REPO_ROOT / "skills/splunk-secure-gateway-setup/scripts/render_assets.py"
 SETUP = REPO_ROOT / "skills/splunk-secure-gateway-setup/scripts/setup.sh"
-CANONICAL_RENDERER = REPO_ROOT / "skills/splunk-secure-gateway/scripts/render_assets.py"
-CANONICAL_SETUP = REPO_ROOT / "skills/splunk-secure-gateway/scripts/setup.sh"
+VALIDATE = REPO_ROOT / "skills/splunk-secure-gateway-setup/scripts/validate.sh"
 
 
 class SecureGatewayTests(unittest.TestCase):
@@ -24,11 +24,50 @@ class SecureGatewayTests(unittest.TestCase):
             cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=60,
         )
 
-    def run_setup(self, *args: str) -> subprocess.CompletedProcess:
+    def run_setup(
+        self, *args: str, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess:
         return subprocess.run(
             ["bash", str(SETUP), *args],
-            cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=60,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+            env=env,
         )
+
+    def cloud_guard_env(self, root: Path, *, auto: bool) -> tuple[dict[str, str], Path]:
+        env = os.environ.copy()
+        for key in list(env):
+            if key.startswith(("SPLUNK_", "STACK_", "ACS_")):
+                env.pop(key)
+        marker = root / "unexpected-live-io.log"
+        fake_bin = root / "fake-bin"
+        fake_bin.mkdir()
+        for tool in ("curl", "nc"):
+            path = fake_bin / tool
+            path.write_text(
+                "#!/usr/bin/env bash\n"
+                'printf "%s\\n" "$0 $*" >> "${LIVE_IO_MARKER}"\n'
+                "exit 99\n",
+                encoding="utf-8",
+            )
+            path.chmod(0o755)
+        env["PATH"] = f"{fake_bin}:{env['PATH']}"
+        env["LIVE_IO_MARKER"] = str(marker)
+        env["HOME"] = str(root / "empty-home")
+        credentials = root / "platform-settings"
+        if auto:
+            credentials.write_text(
+                "SPLUNK_PLATFORM=cloud\nSPLUNK_URI=https://example.splunkcloud.com:8089\n",
+                encoding="utf-8",
+            )
+        else:
+            # An explicit platform must not even try to parse the credential source.
+            credentials.mkdir()
+        env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+        return env, marker
 
     def test_render_private_spacebridge_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -82,34 +121,76 @@ class SecureGatewayTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("DRY RUN", result.stdout + result.stderr)
 
-    def test_cloud_apply_is_blocked_and_routed_without_credentials(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = self.run_setup(
-                "--output-dir", tmpdir, "--platform", "cloud",
-                "--phase", "apply", "--action", "enable",
-                "--accept-spacebridge-egress",
-            )
-            output = result.stdout + result.stderr
-            self.assertEqual(result.returncode, 2, msg=output)
-            self.assertIn("will not enable, disable, or configure", output)
-            self.assertIn("splunk-secure-gateway/scripts/setup.sh --platform cloud", output)
-            metadata = json.loads(
-                (Path(tmpdir) / "secure-gateway" / "metadata.json").read_text(encoding="utf-8")
-            )
-            self.assertEqual(metadata["platform"], "cloud")
+    def test_cloud_operational_modes_fail_before_render_or_live_io(self) -> None:
+        cases = (
+            ("preflight", []),
+            ("apply", ["--action", "enable", "--accept-spacebridge-egress"]),
+            ("status", []),
+            ("all", ["--action", "enable", "--accept-spacebridge-egress"]),
+            ("render-apply", ["--phase", "render", "--apply"]),
+        )
+        for platform in ("cloud", "auto"):
+            for label, extra in cases:
+                with self.subTest(platform=platform, mode=label), tempfile.TemporaryDirectory() as tmpdir:
+                    root = Path(tmpdir)
+                    env, marker = self.cloud_guard_env(root, auto=platform == "auto")
+                    output_dir = root / "rendered"
+                    phase_args = extra if label == "render-apply" else ["--phase", label, *extra]
+                    result = self.run_setup(
+                        "--output-dir",
+                        str(output_dir),
+                        "--platform",
+                        platform,
+                        *phase_args,
+                        env=env,
+                    )
+                    output = result.stdout + result.stderr
+                    self.assertEqual(result.returncode, 2, msg=output)
+                    self.assertIn("No artifacts were rendered", output)
+                    self.assertIn("--platform cloud --phase render", output)
+                    self.assertFalse(output_dir.exists())
+                    self.assertFalse(marker.exists())
 
-    def test_canonical_cloud_local_phases_exit_before_rendering(self) -> None:
-        for phase in ("preflight", "enable", "status"):
-            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir) / "rendered"
-                result = subprocess.run(
+    def test_cloud_plain_render_emits_non_network_handoff_for_explicit_and_auto(self) -> None:
+        for platform in ("cloud", "auto"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                env, marker = self.cloud_guard_env(root, auto=platform == "auto")
+                output_dir = root / "rendered"
+                result = self.run_setup(
+                    "--output-dir",
+                    str(output_dir),
+                    "--platform",
+                    platform,
+                    "--phase",
+                    "render",
+                    env=env,
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                render_dir = output_dir / "secure-gateway"
+                metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+                self.assertEqual(metadata["platform"], "cloud")
+                egress = render_dir / "egress-preflight.sh"
+                text = egress.read_text(encoding="utf-8")
+                self.assertIn("HANDOFF", text)
+                self.assertNotIn("nc -z", text)
+                self.assertNotIn("curl -", text)
+                handoff = subprocess.run(
+                    ["bash", str(egress)],
+                    cwd=render_dir,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env=env,
+                )
+                self.assertEqual(handoff.returncode, 2)
+                self.assertIn("Splunk Cloud Support", handoff.stderr)
+                self.assertFalse(marker.exists())
+                validation = subprocess.run(
                     [
                         "bash",
-                        str(CANONICAL_SETUP),
-                        "--platform",
-                        "cloud",
-                        "--phase",
-                        phase,
+                        str(VALIDATE),
+                        "--live",
                         "--output-dir",
                         str(output_dir),
                     ],
@@ -117,43 +198,12 @@ class SecureGatewayTests(unittest.TestCase):
                     capture_output=True,
                     text=True,
                     check=False,
-                    timeout=60,
+                    env=env,
                 )
-                self.assertEqual(result.returncode, 2, msg=result.stdout + result.stderr)
-                self.assertIn("managed Splunk Cloud search tier", result.stdout + result.stderr)
-                self.assertFalse(output_dir.exists())
-
-    def test_canonical_cloud_rendered_local_checks_are_handoffs(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = subprocess.run(
-                [
-                    "python3",
-                    str(CANONICAL_RENDERER),
-                    "--platform",
-                    "cloud",
-                    "--output-dir",
-                    tmpdir,
-                ],
-                cwd=REPO_ROOT,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=60,
-            )
-            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            render_dir = Path(tmpdir) / "secure-gateway"
-            for script_name in ("connectivity-preflight.sh", "status.sh"):
-                run = subprocess.run(
-                    ["bash", str(render_dir / script_name)],
-                    cwd=render_dir,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    timeout=60,
-                )
-                self.assertEqual(run.returncode, 2, msg=run.stdout + run.stderr)
-                self.assertIn("HANDOFF", run.stdout + run.stderr)
-
+                validation_output = validation.stdout + validation.stderr
+                self.assertEqual(validation.returncode, 2, msg=validation_output)
+                self.assertIn("HANDOFF", validation_output)
+                self.assertFalse(marker.exists())
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,11 @@ trusted repo `.venv`.
 Product resolution and discovery never execute repository code. Generic
 script manifests expose only `setup.sh`, `validate.sh`, and optional
 `doctor.sh`, and do not label validators or doctors as inherently read-only.
+Generic search and cursor traversal return canonical skills only. An exact
+deprecated skill name remains resolvable for compatibility and returns
+`status: deprecated` plus `replaced_by`; aliases are not ordinary traversal
+peers, so canonical traversal is intentionally smaller than the full manifest
+identity set.
 
 ## Authorization gates
 

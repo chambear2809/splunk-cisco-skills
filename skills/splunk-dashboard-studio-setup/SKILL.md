@@ -1,14 +1,11 @@
 ---
 name: splunk-dashboard-studio-setup
-description: >-
-  Render, validate, and apply Splunk Platform Dashboard Studio dashboards: build
-  a version 2 JSON definition (dataSources, visualizations, inputs, layout,
-  defaults), wrap it in the data/ui/views eai:data XML, and create or update the
-  view via REST with ACL governance. Use when the user asks to create a Splunk
-  Dashboard Studio dashboard, build a platform dashboard as code, push a
-  dashboard JSON to data/ui/views, or replicate a dashboard between Splunk
-  environments. Not for Splunk Observability Cloud dashboards, which use
-  splunk-observability-dashboard-builder.
+description: "Use when the user asks to create a Splunk Dashboard Studio dashboard, build a platform dashboard as
+  code, push a dashboard JSON to data/ui/views, or replicate a dashboard between Splunk environments. Not
+  for Splunk Observability Cloud dashboards, which use splunk-observability-dashboard-builder. Render,
+  validate, and apply Splunk Platform Dashboard Studio dashboards: build a version 2 JSON definition
+  (dataSources, visualizations, inputs, layout, defaults), wrap it in the data/ui/views eai:data XML, and
+  create or update the view via REST with ACL governance."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -16,6 +13,65 @@ metadata:
 ---
 
 # Splunk Dashboard Studio Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Create a Splunk Dashboard Studio dashboard, build a platform dashboard as code, push a dashboard JSON to
+  data/ui/views, or replicate a dashboard between Splunk environments. Not for Splunk Observability Cloud
+  dashboards, which use.
+- Preview and review the splunk dashboard studio setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-dashboard-studio-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-dashboard-studio-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill renders and applies Splunk Platform Dashboard Studio dashboards. It
 is render-first so you can review the JSON definition and the `data/ui/views`

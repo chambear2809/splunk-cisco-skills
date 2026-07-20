@@ -84,13 +84,15 @@ poll_rate = data.get("pollRate", 0)
 assert 60000 <= poll_rate <= 600000, f"pollRate must be 60000-600000 ms, got {poll_rate}"
 projects = data.get("projects")
 assert isinstance(projects, dict), "projects must be an object"
-assert projects.get("syncMode") in ("ALL", "SELECTED"), "projects.syncMode missing or invalid"
-project_ids = projects.get("projectIds", [])
-assert isinstance(project_ids, list) and all(isinstance(item, str) and item for item in project_ids), "projects.projectIds must be a string list"
-if projects["syncMode"] == "ALL":
-    assert not project_ids, "projects.projectIds must be empty for ALL"
+assert projects.get("syncMode") in ("ALL_REACHABLE", "SELECTED"), "projects.syncMode missing or invalid"
+assert "projectIds" not in projects, "legacy projects.projectIds must not be emitted"
+selected_project_ids_present = "selectedProjectIds" in projects
+if projects["syncMode"] == "ALL_REACHABLE":
+    assert not selected_project_ids_present, "projects.selectedProjectIds must be absent for ALL_REACHABLE"
 else:
-    assert project_ids, "projects.projectIds is required for SELECTED"
+    assert selected_project_ids_present, "projects.selectedProjectIds is required for SELECTED"
+    project_ids = projects["selectedProjectIds"]
+    assert isinstance(project_ids, list) and project_ids and all(isinstance(item, str) and item for item in project_ids), "projects.selectedProjectIds must be a non-empty string list for SELECTED"
 if auth == "WORKLOAD_IDENTITY_FEDERATION":
     value = data.get("workloadIdentityFederationConfig")
     assert isinstance(value, str) and value, "workloadIdentityFederationConfig missing"
@@ -106,14 +108,15 @@ else:
     fi
 fi
 
-# Validate Terraform without claiming unsupported WIF provider arguments.
+# Validate this skill's intentional REST-only WIF output. The current upstream
+# provider supports WIF/projects; Terraform WIF generation is out of scope here.
 if [[ -f "${OUTPUT_DIR}/terraform/main.tf" ]]; then
     auth_method="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("authMethod", ""))' "${OUTPUT_DIR}/rest/create.json" 2>/dev/null || true)"
     if [[ "${auth_method}" == "WORKLOAD_IDENTITY_FEDERATION" ]]; then
         if grep -Eq 'resource[[:space:]]+"signalfx_gcp_integration"|workload_identity_(pool|provider)_id' "${OUTPUT_DIR}/terraform/main.tf"; then
-            failures+=("terraform/main.tf: unsupported WIF resource or pool/provider arguments were rendered")
+            failures+=("terraform/main.tf: this skill unexpectedly rendered a WIF Terraform resource")
         else
-            infos+=("terraform/main.tf: correctly declines unsupported WIF provider arguments")
+            infos+=("terraform/main.tf: WIF intentionally remains on this skill's REST path")
         fi
     elif grep -q 'signalfx_gcp_integration' "${OUTPUT_DIR}/terraform/main.tf" >/dev/null 2>&1; then
         infos+=("terraform/main.tf: service-account signalfx_gcp_integration resource present")

@@ -38,15 +38,18 @@ gated behind `--accept-spacebridge-egress`.
 
 Splunk Cloud manages Secure Gateway app state and Spacebridge configuration.
 `scripts/setup.sh` accepts `--platform auto|cloud|enterprise` and defaults to
-`auto`. Before apply, the configured target is resolved through the shared
-credential helpers. A Cloud target renders the review assets, refuses enable,
-disable, and configure mutations, prints a handoff, and exits `2`.
+`auto`. The configured target is resolved through platform settings before
+rendering; this classification does not authenticate. A Cloud preflight,
+status, apply, all, or render-with-apply request is refused before artifacts,
+probes, session authentication, or live requests and exits `2`. Plain render is
+allowed and emits review-only skeletons/runbooks plus an egress script that
+itself exits `2` with the managed-service handoff.
 
 For Splunk Cloud Platform 10.5.2605, render the managed-service readiness bundle
 with:
 
 ```bash
-bash skills/splunk-secure-gateway/scripts/setup.sh \
+bash skills/splunk-secure-gateway-setup/scripts/setup.sh \
   --platform cloud --phase render
 ```
 

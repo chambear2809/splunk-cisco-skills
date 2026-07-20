@@ -1,5 +1,862 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "generated_from": {
+    "path": "skills/catalog.yaml",
+    "schema_version": 1,
+    "sha256": "9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5"
+  },
+  "skill_records": [
+    {
+      "name": "cisco-product-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-collaboration-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-cloud-control-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-data-fabric-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-scan-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-catalyst-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-catalyst-enhanced-netflow-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-appdynamics-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-platform-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-controller-admin-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-agent-management-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-dual-agent-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-apm-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-k8s-cluster-agent-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-infrastructure-visibility-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-machine-agent-otel-collector-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-database-visibility-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-analytics-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-eum-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-synthetic-monitoring-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-log-observer-connect-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-alerting-content-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-dashboards-reports-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-thousandeyes-integration-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-tags-extensions-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-security-ai-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-appdynamics-sap-agent-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-security-cloud-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-secure-access-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-webex-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-ucs-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-secure-email-web-gateway-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-asa-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-talos-intelligence-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-spaces-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-dc-networking-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-intersight-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-meraki-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-meraki-aam-thousandeyes-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-enterprise-networking-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-thousandeyes-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-thousandeyes-mcp-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-defenseclaw-deskside-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "cisco-isovalent-platform-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-security-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-okta-integration-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-saviynt-integration-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-splunk-siem-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-google-secops-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "widefield-identity-threat-doctor",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-itsi-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-itsi-config",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-enterprise-security-install",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-enterprise-security-config",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-security-portfolio-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-security-essentials-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-security-content-update-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-lookup-file-editing-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-infosec-app-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-pci-compliance-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-fraud-analytics-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-asset-risk-intelligence-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-attack-analyzer-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-uba-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-ai-assistant-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-ai-ml-toolkit-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-mcp-server-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-admin-doctor",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-data-source-readiness-doctor",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-supported-addons-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-windows-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-microsoft-cloud-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-aws-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-amazon-kinesis-firehose-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-okta-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-gcp-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-servicenow-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-google-workspace-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-microsoft-security-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-microsoft-exchange-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-microsoft-scom-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-sysmon-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-github-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-salesforce-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-box-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-cyberark-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-rsa-securid-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-security-appliance-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-syslog-web-proxy-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-vmware-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-database-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-netapp-ontap-ta-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-spl2-pipeline-kit",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-ingest-processor-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-cloud-data-manager-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-db-connect-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-app-install",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-universal-forwarder-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-agent-management-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-workload-management-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-hec-service-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-platform-restart-orchestrator",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-connect-for-otlp-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-federated-search-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-index-lifecycle-smartstore-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-kvstore-admin",
+      "status": "deprecated",
+      "replaced_by": "splunk-kvstore-admin-setup"
+    },
+    {
+      "name": "splunk-cim-data-model",
+      "status": "deprecated",
+      "replaced_by": "splunk-cim-data-model-setup"
+    },
+    {
+      "name": "splunk-knowledge-objects",
+      "status": "deprecated",
+      "replaced_by": "splunk-knowledge-objects-setup"
+    },
+    {
+      "name": "splunk-ingest-actions",
+      "status": "deprecated",
+      "replaced_by": "splunk-ingest-actions-setup"
+    },
+    {
+      "name": "splunk-ddaa-archive",
+      "status": "deprecated",
+      "replaced_by": "splunk-ddaa-archive-setup"
+    },
+    {
+      "name": "splunk-secure-gateway",
+      "status": "deprecated",
+      "replaced_by": "splunk-secure-gateway-setup"
+    },
+    {
+      "name": "splunk-dashboard-studio",
+      "status": "deprecated",
+      "replaced_by": "splunk-dashboard-studio-setup"
+    },
+    {
+      "name": "splunk-kvstore-admin-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-cim-data-model-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-knowledge-objects-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-ingest-actions-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-ddaa-archive-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-secure-gateway-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-dashboard-studio-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-monitoring-console-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-enterprise-host-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-enterprise-kubernetes-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-platform-sizing",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-otel-collector-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-ai-agent-monitoring-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-coding-agent-instrumentation-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-codex-instrumentation-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-claude-code-instrumentation-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-database-monitoring-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-k8s-auto-instrumentation-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-k8s-frontend-rum-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-browser-rum-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-mobile-rum-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-cloud-integration-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-thousandeyes-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-mcp-server-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-platform-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-lemonade-instrumentation-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "lemonade-splunk-otel",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-agent-control-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-isovalent-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-cisco-nexus-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-cisco-intersight-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-nvidia-gpu-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-cisco-ai-pod-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-aws-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-azure-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-gcp-integration",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-aws-lambda-apm-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-dashboard-builder",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-deep-native-workflows",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-native-ops",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-synthetics-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-slo-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-observability-metrics-pipeline-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-oncall-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-stream-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-connect-for-syslog-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-connect-for-snmp-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-license-manager-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-soar-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-edge-processor-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-indexer-cluster-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-search-head-cluster-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-deployment-server-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-cloud-acs-admin-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-cloud-acs-allowlist-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-enterprise-public-exposure-hardening",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "splunk-platform-pki-setup",
+      "status": "canonical",
+      "replaced_by": null
+    }
+  ],
   "products": [
     {
       "id": "splunk-platform",
@@ -361,6 +1218,7 @@
           "id": "cisco-native-products",
           "name": "Cisco-Native Products",
           "skills": [
+            "cisco-defenseclaw-deskside-setup",
             "cisco-isovalent-platform-setup",
             "cisco-meraki-aam-thousandeyes-setup",
             "cisco-thousandeyes-mcp-setup"
@@ -389,6 +1247,7 @@
           "name": "Cisco Cross-Product Routing",
           "skills": [
             "cisco-cloud-control-setup",
+            "cisco-collaboration-setup",
             "cisco-data-fabric-setup",
             "cisco-product-setup"
           ]

@@ -1,19 +1,73 @@
 ---
 name: cisco-intersight-setup
-description: >-
-  Automate Cisco Intersight Add-on for Splunk (Splunk_TA_Cisco_Intersight) setup
-  and configuration. Creates indexes, configures Intersight accounts via REST API
-  using OAuth2 client credentials, enables audit/alarm, inventory, and metrics
-  inputs, stores credentials securely, and validates the deployment. Use when the
-  user asks about Cisco Intersight, UCS, HyperFlex, Intersight TA setup,
-  Splunk_TA_Cisco_Intersight, or compute infrastructure monitoring.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring or validating Cisco Intersight audit, inventory, alarm, or metrics inputs in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Intersight TA Setup Automation
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run setup and REST configuration helpers | `command -v bash curl jq` |
+| Splunk administrative access | Create the index, account, and inputs | Confirm search-tier REST access |
+| Intersight API client | Authorize selected APIs | Store the secret in a protected file |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Install TA │ → │ Configure inputs │ → │ Validate data │
+└───────────┘   └────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Onboard Cisco Intersight audit, alarm, inventory, or metrics data.
+- Configure `Splunk_TA_Cisco_Intersight` with an OAuth client.
+- Diagnose missing Intersight events, metrics, or dashboard panels.
+
+## Scope
+
+This skill configures the Splunk add-on and validates its data path. It does
+not create Intersight API clients, expose client secrets in chat, or change UCS
+or HyperFlex infrastructure. Keep credentials file-backed.
+
+## Examples
+
+Run readiness checks before configuring an account:
+
+```bash
+bash skills/cisco-intersight-setup/scripts/validate.sh
+```
+
+Expected output: local tools, Splunk connectivity, package state, and account
+prerequisites are reported without changing the deployment.
+
+Run strict completion validation after enabling inputs:
+
+```bash
+bash skills/cisco-intersight-setup/scripts/validate.sh --completion
+```
+
+Expected output: account, input, index, source type, data, and dashboard checks
+report `[PASS]`; absent evidence exits nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| OAuth fails | Client or endpoint is wrong | Verify the client and secret file |
+| Metrics are absent | Metric input/index is disabled | Review metric settings |
+| Inputs repeatedly error | Scope, clock, or network issue | Inspect logs and test reachability |
+| Empty dashboards | Macro/index is wrong | Validate data, then align dashboards |
 
 ## TA Completion Gate
 
@@ -100,7 +154,8 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ## Splunk Authentication
 
-Scripts read Splunk credentials from the project-root `credentials` file (falls back to `~/.splunk/credentials`) automatically.
+Scripts read Splunk credentials from the project-root `credentials` file. They
+fall back to `~/.splunk/credentials` automatically.
 No environment variables or command-line password arguments are needed:
 
 ```bash
@@ -234,7 +289,8 @@ the app. Macro updates run over search-tier REST.
 
 ## MCP Server Integration
 
-Load custom tools into the MCP Server (credentials read from the project-root `credentials` file, falls back to `~/.splunk/credentials`):
+Load custom tools into the MCP Server. Credentials come from the project-root
+`credentials` file or the `~/.splunk/credentials` fallback:
 
 ```bash
 bash skills/cisco-intersight-setup/scripts/load_mcp_tools.sh

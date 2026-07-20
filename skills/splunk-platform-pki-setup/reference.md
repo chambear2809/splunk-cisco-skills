@@ -527,6 +527,26 @@ This matches the repo precedent at
 "Cluster `pass4SymmKey` rotation… does not orchestrate that
 rolling rotation."
 
+## Cross-skill ownership
+
+Run this skill's render and preflight phases first to establish certificate
+paths, then delegate adjacent operations according to this matrix.
+
+| Adjacent skill | What it owns | What this skill provides |
+|---|---|---|
+| [splunk-enterprise-public-exposure-hardening](../splunk-enterprise-public-exposure-hardening/SKILL.md) | Splunk Web HSTS/CSP/browser headers, public-FQDN binding, default-cert refusal, `splunk.secret` rotation, and public-exposure preflight | Certificate PEMs; consumes the hardening skill's FIPS semantics |
+| [splunk-indexer-cluster-setup](../splunk-indexer-cluster-setup/SKILL.md) | Cluster bundle apply, rolling restart, peer offline, and multisite migration | Cluster-bundle drop-in, including optional replication-port TLS |
+| [splunk-agent-management-setup](../splunk-agent-management-setup/SKILL.md) | SHC deployer push, server classes, and deployment apps | SHC deployer drop-in and forwarder-fleet outputs overlay |
+| [splunk-hec-service-setup](../splunk-hec-service-setup/SKILL.md) | HEC token lifecycle, allowed indexes, and ACS HEC tokens | HEC TLS certificate and optional mTLS |
+| [splunk-federated-search-setup](../splunk-federated-search-setup/SKILL.md) | Federation provider/consumer wiring | Per-provider client certificate and `--cacert` snippet |
+| [splunk-monitoring-console-setup](../splunk-monitoring-console-setup/SKILL.md) | Monitoring Console distributed configuration | `trusted.pem` distribution helper |
+| [splunk-universal-forwarder-setup](../splunk-universal-forwarder-setup/SKILL.md) | Universal Forwarder install and upgrade | Enterprise-destination outputs overlay; Splunk Cloud destinations use UFCP |
+| [splunk-license-manager-setup](../splunk-license-manager-setup/SKILL.md) | License manager and peer wiring | License-manager certificate install |
+| [splunk-mcp-server-setup](../splunk-mcp-server-setup/SKILL.md) | MCP server install and token issuance | MCP server trust alignment |
+| [splunk-edge-processor-setup](../splunk-edge-processor-setup/SKILL.md) | Edge Processor control-plane object, instance install, and pipelines | Edge Processor certificate profile and REST upload helper |
+| [splunk-enterprise-host-setup](../splunk-enterprise-host-setup/SKILL.md) | Splunk host install and cluster bootstrap | TLS certificate lifecycle omitted by host setup |
+| [splunk-cloud-acs-admin-setup](../splunk-cloud-acs-admin-setup/SKILL.md) | Splunk Cloud ACS IP allowlists | No direct output; Splunk Cloud HEC custom-domain BYOC remains a handoff |
+
 ## Out of Scope
 
 - Talking to a CA (Public-PKI mode renders CSR + handoff only).

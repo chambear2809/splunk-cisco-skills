@@ -1296,6 +1296,17 @@ def test_static_token_scan_finds_leak_even_when_placeholder_also_exists(
     assert synthetic_secret not in combined_output(validated)
 
 
+def test_dashboard_placeholder_uses_portable_source_guidance(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    readme = (output / "dashboards/README.md").read_text(encoding="utf-8")
+    assert "--dashboards-source" in readme
+    assert "Isovalent_Splunk_o11y examples checkout" in readme
+    assert "/Users/" not in readme
+
+
 def test_dashboard_scrubber_redacts_generic_credential_keys_and_values(
     tmp_path: Path,
 ) -> None:

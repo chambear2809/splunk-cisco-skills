@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+from render_bundle_ownership import ensure_canonical_bundle_compatible  # noqa: E402
 
 BUNDLE_OWNER = "splunk-secure-gateway-setup"
 
@@ -121,6 +121,13 @@ def render_instance_id(args: argparse.Namespace) -> str:
 
 
 def render_egress_preflight(args: argparse.Namespace) -> str:
+    if args.platform == "cloud":
+        return (
+            "#!/usr/bin/env bash\nset -euo pipefail\n\n"
+            'echo "HANDOFF: Splunk Cloud egress originates from Splunk-managed infrastructure; " \\\n'
+            '     "do not run a local Spacebridge probe. Use Splunk Cloud Support/readiness evidence." >&2\n'
+            "exit 2\n"
+        )
     host = SPACEBRIDGE_HOST
     if args.private_spacebridge == "true" and args.custom_endpoint_hostname:
         host = args.custom_endpoint_hostname
@@ -155,8 +162,9 @@ settings (admin role required).
 4. Mobile notifications and device management: review under the Secure Gateway
    app's Administration pages.
 
-These settings are managed through Splunk Web; this skill enables/disables the
-app and validates Spacebridge egress.
+These settings are managed through Splunk Web. On Splunk Enterprise, this skill
+can enable or disable the app and run the rendered egress check. On Splunk
+Cloud, the app state and egress path are managed-service responsibilities.
 """
 
 
@@ -186,9 +194,9 @@ def render_readme(args: argparse.Namespace) -> str:
     if args.platform == "cloud":
         platform_note = (
             "Splunk Cloud manages Secure Gateway app state and Spacebridge configuration. "
-            "This setup workflow renders review assets but refuses enable, disable, and "
-            "configure mutations. Use `splunk-secure-gateway --platform cloud` for the "
-            "managed-service readiness and operator handoff bundle."
+            "This setup workflow renders review assets only; its egress helper is an "
+            "exit-2 support handoff and performs no local probe. Operational preflight, "
+            "status, apply, all, and render-with-apply modes are refused before rendering."
         )
     elif args.platform == "enterprise":
         platform_note = (
@@ -210,7 +218,7 @@ Private Spacebridge: `{args.private_spacebridge}`
 Files:
 
 - `instance-id-config.json` - MDM custom app configuration skeleton
-- `egress-preflight.sh` - outbound 443 check to the Spacebridge host
+- `egress-preflight.sh` - Enterprise outbound check, or Cloud exit-2 support handoff
 - `deployment-settings-runbook.md` - Splunk Web deployment settings steps
 - `registration-runbook.md` - device registration (auth code / QR / MDM)
 
@@ -226,7 +234,12 @@ device registration are Splunk Web / MDM operations.
 def render(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "secure-gateway"
-    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
+    ensure_canonical_bundle_compatible(
+        render_dir,
+        canonical=BUNDLE_OWNER,
+        generated_files=GENERATED_FILES,
+        write=not args.dry_run,
+    )
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)

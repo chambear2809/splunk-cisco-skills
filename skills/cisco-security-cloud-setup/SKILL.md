@@ -1,17 +1,73 @@
 ---
 name: cisco-security-cloud-setup
-description: >-
-  Install and configure Cisco Security Cloud (CiscoSecurityCloud). Supports
-  Cisco Duo, XDR, Secure Endpoint, Secure Firewall, ETD, Secure Network
-  Analytics, CII, Secure Workload, and other Cisco Security Cloud inputs. Use
-  when the user asks about Cisco Security Cloud, app ID 7404, or CiscoSecurityCloud.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when configuring Cisco Security Cloud API inputs, product flows, indexes, or dashboards in Splunk.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Security Cloud Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash, `curl`, and `jq` | Run package, product, and input helpers | `command -v bash curl jq` |
+| Splunk administrative access | Install app ID 7404 and configure inputs | Confirm search-tier REST access |
+| Product credentials | Authorize API/eStreamer | Store secrets in protected files |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌─────────────────┐   ┌──────────────────┐   ┌───────────────┐
+│ Preflight │ → │ Select product  │ → │ Configure inputs │ → │ Validate data │
+└───────────┘   └─────────────────┘   └──────────────────┘   └───────────────┘
+```
+
+## When to Activate
+
+- Configure Cisco Duo, XDR, Secure Endpoint, Secure Firewall, or another supported flow.
+- Install or validate the `CiscoSecurityCloud` app and its product-specific inputs.
+- Diagnose missing events, wrong source types, or empty app dashboards.
+
+## Scope
+
+This skill covers product flows documented by the app. It does not route ASA
+or FTD syslog through API inputs, invent unsupported endpoints, or expose
+credentials in chat. Use `cisco-asa-ta-setup` for ASA/FTD syslog.
+
+## Examples
+
+Install the Cisco Security Cloud app:
+
+```bash
+bash skills/cisco-security-cloud-setup/scripts/setup.sh --install
+```
+
+Expected output: the package and prerequisite plan is applied or a topology-
+specific manual handoff is emitted.
+
+Run strict validation for configured product flows:
+
+```bash
+bash skills/cisco-security-cloud-setup/scripts/validate.sh --completion
+```
+
+Expected output: package, product, input, index, source type, event, and
+dashboard evidence report `[PASS]`; incomplete flows exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Unsupported product | Flow is absent | Render a handoff; do not invent an API |
+| Authentication fails | Credential type/scope is wrong | Verify the protected file |
+| Events use ASA source typing | Syslog was routed to the wrong workflow | Hand off to `cisco-asa-ta-setup` |
+| Dashboards are empty | Product input, index, or macro is incomplete | Validate events first, then app content |
 
 ## TA Completion Gate
 

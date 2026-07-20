@@ -1,7 +1,6 @@
 interface:
   display_name: "Splunk KV Store Administration"
-  short_description: "Back up, restore, migrate, and check the Splunk KV Store"
-  default_prompt: >-
-    Use $splunk-kvstore-admin to render and validate KV Store backup, restore,
-    storage-engine migration, SHC member resync, and kvstore-status health
-    assets for standalone search heads or search head clusters.
+  short_description: "Deprecated alias for KV Store administration"
+  default_prompt: "Use $splunk-kvstore-admin only for compatibility; route new work to $splunk-kvstore-admin-setup."
+policy:
+  allow_implicit_invocation: false

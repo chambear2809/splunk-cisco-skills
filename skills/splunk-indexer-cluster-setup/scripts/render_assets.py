@@ -307,7 +307,12 @@ push_conf() {{
   if ! ssh "${{HBS_SSH_TRUST_ARGS[@]}}" -o BatchMode=yes "${{user}}@${{host}}" bash -s <<REMOTE_EOF
 set -euo pipefail
 cleanup_secret() {{
-  shred -u /tmp/${{secret_basename}} 2>/dev/null || rm -f /tmp/${{secret_basename}}
+  staged_secret="/tmp/${{secret_basename}}"
+  if command -v shred >/dev/null 2>&1; then
+    shred --remove -- "${{staged_secret}}" 2>/dev/null || rm -f -- "${{staged_secret}}"
+  else
+    rm -f -- "${{staged_secret}}"
+  fi
 }}
 trap cleanup_secret EXIT
 target_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster/local

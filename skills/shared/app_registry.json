@@ -165,6 +165,15 @@
         "notes": "Top-level Cisco product orchestrator. Uses the checksum-pinned normalized SCAN public-catalog fixture plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow."
       },
       {
+        "kind": "workflow",
+        "skill": "cisco-collaboration-setup",
+        "label": "`cisco-collaboration-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No app installation; strict offline render-only collaboration evidence and handoff packet",
+        "cloud_config_path": "Render/validate CUCM, Expressway, CMS, and Meeting Management collection plans; child apply and device mutation are prohibited",
+        "notes": "Product routes remain partial or unsupported_roadmap. Optional Sideview packages are entitlement-gated partner evidence and are never treated as Splunk-owned official TAs."
+      },
+      {
         "kind": "app",
         "app_name": "splunk-cisco-app-navigator",
         "label": "`cisco-scan-setup`",
@@ -1339,6 +1348,22 @@
       "notes": "Product-name router that resolves a Cisco product from the SCAN catalog and delegates to the matching setup skill or explicit gap classification."
     },
     {
+      "skill": "cisco-collaboration-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Strict offline render-first Cisco collaboration router. It emits private evidence/readiness packets and separately owned SC4S/Webex/ThousandEyes handoffs without installing apps, contacting services, or mutating devices."
+    },
+    {
       "skill": "cisco-cloud-control-setup",
       "role_support": {
         "search-tier": "supported",
@@ -2380,6 +2405,18 @@
       "notes": "Lemonade Server host and native OpenTelemetry foundation for Debian and AMD Ryzen AI systems. Owns upgrade safety, privacy controls, loopback OTLP, full-config rendering, validation, and rollback through an external Splunk OTel Collector."
     },
     {
+      "skill": "cisco-defenseclaw-deskside-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "DefenseClaw lifecycle for a self-managed Linux Lemonade deskside. Installs signed Cisco releases, selects a loopback local model, configures Codex hooks and guardrails, and validates the gateway without Splunk Platform tier placement."
+    },
+    {
       "skill": "galileo-agent-control-setup",
       "role_support": {
         "search-tier": "none",
@@ -2855,14 +2892,14 @@
     {
       "skill": "splunk-kvstore-admin",
       "role_support": {
-        "search-tier": "supported",
+        "search-tier": "none",
         "indexer": "none",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier / SHC KV Store administration workflow. Mirrors splunk-kvstore-admin-setup for backup, restore, clean, storage-engine migration, maintenance mode, and collection governance."
+      "notes": "Deprecated help-only compatibility alias for splunk-kvstore-admin-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-cim-data-model-setup",
@@ -2879,14 +2916,14 @@
     {
       "skill": "splunk-cim-data-model",
       "role_support": {
-        "search-tier": "required",
-        "indexer": "supported",
+        "search-tier": "none",
+        "indexer": "none",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "CIM data model acceleration and compliance workflow authored on the search tier; acceleration summaries build on indexers. Mirrors the setup skill topology."
+      "notes": "Deprecated help-only compatibility alias for splunk-cim-data-model-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-knowledge-objects-setup",
@@ -2903,14 +2940,14 @@
     {
       "skill": "splunk-knowledge-objects",
       "role_support": {
-        "search-tier": "required",
+        "search-tier": "none",
         "indexer": "none",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier knowledge object governance workflow for saved searches, macros, lookups, eventtypes, tags, and sharing/ownership ACLs. Mirrors the setup skill topology."
+      "notes": "Deprecated help-only compatibility alias for splunk-knowledge-objects-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-ingest-actions-setup",
@@ -2924,21 +2961,19 @@
       "cloud_pairing": [
         "heavy-forwarder"
       ],
-      "notes": "Ingest-time rulesets (filter/mask/drop/route) and RFS S3 destinations applied on indexers, heavy forwarders, or authored from the cluster manager / search head."
+      "notes": "Eval, mask, and drop rules are applied through target-app props/transforms REST endpoints on indexers or customer-managed heavy forwarders. Route-s3 applies only RFS destination staging through conf-outputs, then requires the Splunk Web or supported rulesets-API rule handoff; retain the topology-appropriate deploy step."
     },
     {
       "skill": "splunk-ingest-actions",
       "role_support": {
-        "search-tier": "supported",
-        "indexer": "supported",
-        "heavy-forwarder": "supported",
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
-      "cloud_pairing": [
-        "heavy-forwarder"
-      ],
-      "notes": "Ingest Actions workflow for filter, mask, drop, route, and RFS destination assets. Mirrors the setup skill topology for indexers, heavy forwarders, and authoring tiers."
+      "cloud_pairing": [],
+      "notes": "Deprecated help-only compatibility alias for splunk-ingest-actions-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-ddaa-archive-setup",
@@ -2962,7 +2997,7 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Splunk Cloud Dynamic Data Active Archive workflow. Control-plane retention changes are via ACS; restore and disable are Splunk Web-only. No Splunk Enterprise role placement."
+      "notes": "Deprecated help-only compatibility alias for splunk-ddaa-archive-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-secure-gateway-setup",
@@ -2974,19 +3009,19 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier Splunk Secure Gateway / Spacebridge enablement, egress preflight, MDM/instance-ID configuration, and device-registration runbooks."
+      "notes": "Only Splunk Enterprise search-tier app enable/disable is live-applied. The workflow renders an Enterprise egress check plus Private Spacebridge/instance-ID placeholder skeleton and MDM/device-registration runbooks; Splunk Cloud is render/support-only with no local probe or live REST."
     },
     {
       "skill": "splunk-secure-gateway",
       "role_support": {
-        "search-tier": "required",
+        "search-tier": "none",
         "indexer": "none",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier Splunk Secure Gateway / Spacebridge workflow. Mirrors the setup skill topology for enablement, egress preflight, MDM, and device-registration runbooks."
+      "notes": "Deprecated help-only compatibility alias for splunk-secure-gateway-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-dashboard-studio-setup",
@@ -3003,14 +3038,14 @@
     {
       "skill": "splunk-dashboard-studio",
       "role_support": {
-        "search-tier": "required",
+        "search-tier": "none",
         "indexer": "none",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier Dashboard Studio workflow for version=2 dashboard JSON and data/ui/views REST publishing. Mirrors the setup skill topology."
+      "notes": "Deprecated help-only compatibility alias for splunk-dashboard-studio-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-okta-ta-setup",

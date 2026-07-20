@@ -1088,7 +1088,7 @@
         "broadsoft"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/unified-communications/broadworks/index.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "BroadWorks remains unsupported_roadmap with a primary vendor-interface handoff and an explicit collection-executable gap.",
       "normalized_search_terms": [
         "cisco broadworks",
         "cisco broadsoft",
@@ -1108,11 +1108,29 @@
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "apply_capable": false,
+        "collection_executable_status": "gap",
+        "coverage_status": "unsupported_roadmap",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render documentation and evidence-gap guidance only; no BroadWorks collector, parser, source type, TA, or executable collection route is claimed.",
+        "handoff_targets": [
+          "https://developer.cisco.com/docs/broadworks/getting-started/"
+        ],
+        "live_verified": false,
+        "product_id": "cisco_broadworks",
+        "render_only": true,
+        "sourcetypes": [],
+        "workflow_scripts": []
+      },
+      "route_type": "gap_handoff",
       "search_terms": [
         "cisco_broadworks",
         "cisco broadworks",
@@ -1134,8 +1152,16 @@
       "sourcetypes": [],
       "status": "roadmap",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "Ingest BroadWorks CDRs, alarm logs, and audit events into Splunk for service provider call analytics, fraud detection, platform health monitoring, and SLA compliance reporting."
     },
     {
@@ -2260,7 +2286,7 @@
         "collaboration hardware"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/collaboration-endpoints/index.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "RoomOS collaboration hardware remains unsupported_roadmap with distinct Webex and ThousandEyes capability handoffs and no executable collection route.",
       "normalized_search_terms": [
         "cisco collab hardware",
         "cisco collaboration hardware deskpro board",
@@ -2280,11 +2306,30 @@
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "apply_capable": false,
+        "collection_executable_status": "gap",
+        "coverage_status": "unsupported_roadmap",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render distinct Webex xAPI and ThousandEyes-on-RoomOS evidence handoffs only; no RoomOS Splunk parser or collector is claimed.",
+        "handoff_targets": [
+          "cisco-webex-setup",
+          "cisco-thousandeyes-setup"
+        ],
+        "live_verified": false,
+        "product_id": "cisco_collab_hardware",
+        "render_only": true,
+        "sourcetypes": [],
+        "workflow_scripts": []
+      },
+      "route_type": "gap_handoff",
       "search_terms": [
         "cisco_collab_hardware",
         "cisco collab hardware",
@@ -2306,8 +2351,16 @@
       "sourcetypes": [],
       "status": "roadmap",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "A Splunk integration for RoomOS environmental and ThousandEyes endpoint telemetry could transform meeting rooms into smart building sensors \u2014 correlating occupancy patterns, air quality trends, and network performance to optimize real estate utilization and proactively identify collaboration experience degradation."
     },
     {
@@ -3241,24 +3294,36 @@
         "jabber mra",
         "telepresence gateway"
       ],
-      "notes": "Expressway coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
+      "notes": "Expressway remains partial and render-only; the pinned SC4S parser/test resolve the human-documentation source-type typo to cisco:tvcs.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-connect-for-syslog-setup",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "handoff": "Render or apply SC4S assets for Expressway syslog, then validate that cisco:tvcs events are reaching the target index.",
+        "apply_capable": false,
+        "collection_executable_status": "handoff_only",
+        "coverage_status": "partial",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render Expressway UDP/TLS device and cisco:tvcs plans; TLS listener/certificate readiness stays an explicit unresolved SC4S handoff gap.",
+        "handoff_targets": [],
+        "live_verified": false,
+        "product_id": "cisco_expressway",
+        "render_only": true,
         "sourcetypes": [
           "cisco:tvcs"
         ],
         "workflow_scripts": [
-          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+          "skills/cisco-collaboration-setup/scripts/setup.sh",
+          "skills/cisco-collaboration-setup/scripts/validate.sh"
         ]
       },
-      "route_type": "workflow_handoff",
+      "route_type": "collaboration",
       "search_terms": [
         "cisco_expressway",
         "cisco expressway",
@@ -3283,8 +3348,16 @@
       ],
       "status": "active",
       "subcategory": "voice_telephony",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "Ingest Expressway syslog events into Splunk for video infrastructure monitoring, firewall traversal troubleshooting, and MRA session analytics."
     },
     {
@@ -4788,25 +4861,37 @@
         "recording",
         "streaming"
       ],
-      "notes": "Meeting Management coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
+      "notes": "Meeting Management remains partial. System and audit enablement/evidence are independent and retain TLS 1.2, five-server, and 8192-byte receiver boundaries.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-connect-for-syslog-setup",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "handoff": "Render or apply SC4S assets for Meeting Management syslog, then validate cisco:mm:system:* and cisco:mm:audit events.",
+        "apply_capable": false,
+        "collection_executable_status": "handoff_only",
+        "coverage_status": "partial",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render independent Meeting Management system and audit syslog paths with deterministic SC4S classification; no live configuration is claimed.",
+        "handoff_targets": [],
+        "live_verified": false,
+        "product_id": "cisco_meeting_management",
+        "render_only": true,
         "sourcetypes": [
           "cisco:mm:system:*",
           "cisco:mm:audit"
         ],
         "workflow_scripts": [
-          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+          "skills/cisco-collaboration-setup/scripts/setup.sh",
+          "skills/cisco-collaboration-setup/scripts/validate.sh"
         ]
       },
-      "route_type": "workflow_handoff",
+      "route_type": "collaboration",
       "search_terms": [
         "cisco_meeting_management",
         "cisco meeting management",
@@ -4824,8 +4909,16 @@
       ],
       "status": "active",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "Ingest Meeting Management audit logs and operational events into Splunk for meeting lifecycle analytics and compliance monitoring."
     },
     {
@@ -4868,24 +4961,36 @@
         "webrtc",
         "call bridge"
       ],
-      "notes": "Meeting Server coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
+      "notes": "Meeting Server remains partial; no XML CDR receiver, live collection, or completion is claimed.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-connect-for-syslog-setup",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "handoff": "Render or apply SC4S assets for Cisco Meeting Server syslog, then validate that cisco:ms events are reaching the target index.",
+        "apply_capable": false,
+        "collection_executable_status": "handoff_only",
+        "coverage_status": "partial",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render CMS TCP/optional-TLS syslog classification while preserving the external XML CDR receiver as an explicit implementation gap.",
+        "handoff_targets": [],
+        "live_verified": false,
+        "product_id": "cisco_meeting_server",
+        "render_only": true,
         "sourcetypes": [
           "cisco:ms"
         ],
         "workflow_scripts": [
-          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+          "skills/cisco-collaboration-setup/scripts/setup.sh",
+          "skills/cisco-collaboration-setup/scripts/validate.sh"
         ]
       },
-      "route_type": "workflow_handoff",
+      "route_type": "collaboration",
       "search_terms": [
         "cisco_meeting_server",
         "cisco meeting server",
@@ -4905,8 +5010,16 @@
       ],
       "status": "active",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "Ingest CMS call detail records and system logs into Splunk for meeting quality analytics and capacity planning."
     },
     {
@@ -8670,24 +8783,36 @@
         "presence",
         "cisco phone"
       ],
-      "notes": "CUCM is syslog-sourcetype coverage in SCAN rather than a product-specific Splunk app. This route provides the SC4S handoff instead of pretending there is a dedicated CUCM installer.",
+      "notes": "CUCM remains partial. The collaboration router independently gates syslog, CDR, CMR, and AXL-enrichment evidence.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-connect-for-syslog-setup",
+      "primary_skill": "cisco-collaboration-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "handoff": "Render or apply SC4S assets for CUCM syslog, then validate that cisco:ucm events are reaching the target index.",
+        "apply_capable": false,
+        "collection_executable_status": "handoff_only",
+        "coverage_status": "partial",
+        "device_mutation_capable": false,
+        "documentation_paths": [
+          "skills/cisco-collaboration-setup/SKILL.md",
+          "skills/cisco-collaboration-setup/reference.md"
+        ],
+        "handoff": "Render the collaboration packet for separate CUCM syslog, CDR, and CMR paths; no SC4S apply, child apply, or device mutation is generated.",
+        "handoff_targets": [],
+        "live_verified": false,
+        "product_id": "cisco_cucm",
+        "render_only": true,
         "sourcetypes": [
           "cisco:ucm"
         ],
         "workflow_scripts": [
-          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
-          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+          "skills/cisco-collaboration-setup/scripts/setup.sh",
+          "skills/cisco-collaboration-setup/scripts/validate.sh"
         ]
       },
-      "route_type": "workflow_handoff",
+      "route_type": "collaboration",
       "search_terms": [
         "cisco_cucm",
         "cisco cucm",
@@ -8716,8 +8841,16 @@
       ],
       "status": "active",
       "subcategory": "voice_telephony",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "contains": [
+          "api_version: cisco-collaboration-setup/v1",
+          "status: unsupported_roadmap",
+          "mode: handoff_only"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-collaboration-setup/template.example"
+      ],
       "value_proposition": "Correlate CUCM CDR/CMR records and syslog events in Splunk for voice quality monitoring and capacity management."
     },
     {

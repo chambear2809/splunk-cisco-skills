@@ -987,20 +987,28 @@ def load_manifest(path: Path, *, owner_uid: int) -> tuple[dict[str, Any], bytes]
 
 
 def validate_queue_identity(value: Any, fingerprint: str) -> dict[str, Any]:
-    required_keys = {"device", "inode", "uid", "gid", "mode", "fingerprint"}
-    current_keys = required_keys | {"ctime_ns"}
+    legacy_keys = {"device", "inode", "uid", "gid", "mode", "fingerprint"}
+    keys = legacy_keys | {"ctime_ns"}
     if (
         not isinstance(value, dict)
-        or (set(value) != required_keys and set(value) != current_keys)
+        or set(value) not in (legacy_keys, keys)
         or value.get("fingerprint") != fingerprint
     ):
         raise TransactionError("invalid_state", "created queue identity is invalid")
     result: dict[str, Any] = {"fingerprint": fingerprint}
-    for key in set(value) - {"fingerprint"}:
+    for key in legacy_keys - {"fingerprint"}:
         item = value[key]
         if isinstance(item, bool) or not isinstance(item, int) or item < 0:
             raise TransactionError("invalid_state", "created queue identity is invalid")
         result[key] = item
+    ctime_ns = value.get("ctime_ns")
+    if ctime_ns is not None and (
+        isinstance(ctime_ns, bool) or not isinstance(ctime_ns, int) or ctime_ns < 0
+    ):
+        raise TransactionError("invalid_state", "created queue identity is invalid")
+    # Journals written before ctime binding remain recoverable, but the missing
+    # value makes exact deletion ineligible and therefore forces quarantine.
+    result["ctime_ns"] = ctime_ns
     if result["mode"] > 0o7777:
         raise TransactionError("invalid_state", "created queue identity is invalid")
     return result
@@ -1286,11 +1294,10 @@ def path_exists(path: Path) -> bool:
         return False
 
 
-def exact_created_queue(path: Path, expected: Mapping[str, Any]) -> bool:
-    try:
-        info = os.lstat(path)
-    except FileNotFoundError:
-        return False
+def created_queue_identity_matches(
+    info: os.stat_result, expected: Mapping[str, Any]
+) -> bool:
+    ctime_ns = expected.get("ctime_ns")
     return (
         stat.S_ISDIR(info.st_mode)
         and not stat.S_ISLNK(info.st_mode)
@@ -1299,10 +1306,20 @@ def exact_created_queue(path: Path, expected: Mapping[str, Any]) -> bool:
         and info.st_uid == expected["uid"]
         and info.st_gid == expected["gid"]
         and stat.S_IMODE(info.st_mode) == expected["mode"] == 0o700
-        and isinstance(expected.get("ctime_ns"), int)
-        and info.st_ctime_ns == expected["ctime_ns"]
-        and path.name == expected["fingerprint"]
+        and isinstance(ctime_ns, int)
+        and not isinstance(ctime_ns, bool)
+        and info.st_ctime_ns == ctime_ns
     )
+
+
+def exact_created_queue(path: Path, expected: Mapping[str, Any]) -> bool:
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return created_queue_identity_matches(info, expected) and path.name == expected[
+        "fingerprint"
+    ]
 
 
 def queue_is_empty_and_stable(path: Path, expected: Mapping[str, Any]) -> bool:
@@ -1315,15 +1332,7 @@ def queue_is_empty_and_stable(path: Path, expected: Mapping[str, Any]) -> bool:
         return False
     try:
         before = os.fstat(descriptor)
-        if (
-            before.st_dev != expected["device"]
-            or before.st_ino != expected["inode"]
-            or before.st_uid != expected["uid"]
-            or before.st_gid != expected["gid"]
-            or stat.S_IMODE(before.st_mode) != 0o700
-            or not isinstance(expected.get("ctime_ns"), int)
-            or before.st_ctime_ns != expected["ctime_ns"]
-        ):
+        if not created_queue_identity_matches(before, expected):
             return False
         entries = os.listdir(descriptor)
         after = os.fstat(descriptor)
@@ -1571,7 +1580,8 @@ def move_to_quarantine(
     *,
     expected_queue_root: Mapping[str, Any],
     expected_quarantine_root: Mapping[str, Any],
-) -> None:
+    expected_entry: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     if source.parent != QUEUE_ROOT or destination.parent != QUARANTINE_ROOT:
         raise TransactionError("invalid_state", "queue rename target is invalid")
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0)
@@ -1579,6 +1589,8 @@ def move_to_quarantine(
         flags |= os.O_NOFOLLOW
     queue_fd = -1
     quarantine_fd = -1
+    source_fd = -1
+    opened_source: os.stat_result | None = None
     try:
         queue_fd = os.open(QUEUE_ROOT, flags)
         quarantine_fd = os.open(QUARANTINE_ROOT, flags)
@@ -1598,6 +1610,29 @@ def move_to_quarantine(
             raise TransactionError(
                 "quarantine_collision", "deterministic quarantine already exists"
             )
+        if expected_entry is not None:
+            source_fd = os.open(source.name, flags, dir_fd=queue_fd)
+            opened_source = os.fstat(source_fd)
+            named_source = os.stat(
+                source.name, dir_fd=queue_fd, follow_symlinks=False
+            )
+            if (
+                not created_queue_identity_matches(opened_source, expected_entry)
+                or (
+                    opened_source.st_dev,
+                    opened_source.st_ino,
+                    opened_source.st_ctime_ns,
+                )
+                != (
+                    named_source.st_dev,
+                    named_source.st_ino,
+                    named_source.st_ctime_ns,
+                )
+                or os.listdir(source_fd)
+            ):
+                raise TransactionError(
+                    "queue_drift", "created queue changed before retirement"
+                )
         os.rename(
             source.name,
             destination.name,
@@ -1614,6 +1649,27 @@ def move_to_quarantine(
             raise TransactionError(
                 "provenance_drift", "queue support root changed during quarantine"
             )
+        moved = os.stat(
+            destination.name, dir_fd=quarantine_fd, follow_symlinks=False
+        )
+        if opened_source is not None and (
+            moved.st_dev != opened_source.st_dev
+            or moved.st_ino != opened_source.st_ino
+            or moved.st_uid != opened_source.st_uid
+            or moved.st_gid != opened_source.st_gid
+            or stat.S_IMODE(moved.st_mode) != stat.S_IMODE(opened_source.st_mode)
+        ):
+            raise TransactionError(
+                "queue_drift", "retired queue identity is incorrect"
+            )
+        return {
+            "device": moved.st_dev,
+            "inode": moved.st_ino,
+            "uid": moved.st_uid,
+            "gid": moved.st_gid,
+            "mode": stat.S_IMODE(moved.st_mode),
+            "kind": quarantine_kind(moved.st_mode),
+        }
     except TransactionError:
         raise
     except OSError as exc:
@@ -1621,6 +1677,8 @@ def move_to_quarantine(
             "quarantine_failed", "queue could not be quarantined atomically"
         ) from exc
     finally:
+        if source_fd >= 0:
+            os.close(source_fd)
         if quarantine_fd >= 0:
             os.close(quarantine_fd)
         if queue_fd >= 0:
@@ -1636,8 +1694,7 @@ def quarantine_queue(
     expected_queue_root: Mapping[str, Any],
     expected_quarantine_root: Mapping[str, Any],
 ) -> dict[str, Any]:
-    source_identity = filesystem_entry_identity(source)
-    move_to_quarantine(
+    moved_identity = move_to_quarantine(
         source,
         destination,
         expected_queue_root=expected_queue_root,
@@ -1648,7 +1705,7 @@ def quarantine_queue(
         owner_uid=owner_uid,
         owner_gid=owner_gid,
         expected_root=expected_quarantine_root,
-        expected_entry=source_identity,
+        expected_entry=moved_identity,
     )
 
 
@@ -1826,16 +1883,17 @@ def restore_from_document(
             # quarantine boundary before the final exact/empty decision. A
             # crash or concurrent writer therefore preserves rather than
             # deletes the queue.
-            move_to_quarantine(
+            retired_identity = move_to_quarantine(
                 source,
                 quarantine,
                 expected_queue_root=document["provenance"]["queue_root"],
                 expected_quarantine_root=document["provenance"]["quarantine_root"],
+                expected_entry=created,
             )
             after_queue_side_effect("retire_rename")
             if remove_exact_empty_quarantine(
                 quarantine,
-                created,
+                retired_identity,
                 document["provenance"]["quarantine_root"],
             ):
                 after_queue_side_effect("remove")

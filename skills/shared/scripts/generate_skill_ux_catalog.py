@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the top-level skill UX catalog from SKILL.md metadata."""
+"""Generate the top-level skill UX catalog from the canonical manifest."""
 
 from __future__ import annotations
 
@@ -17,17 +17,17 @@ except ModuleNotFoundError:  # pragma: no cover - local fallback
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skills.shared.skill_catalog import SkillCatalog, SkillRecord, load_catalog  # noqa: E402
+
+
 SKILLS_DIR = REPO_ROOT / "skills"
 OUTPUT_PATH = REPO_ROOT / "SKILL_UX_CATALOG.md"
 PRODUCT_REGISTRY_PATH = SKILLS_DIR / "shared" / "skill_product_registry.json"
 
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
-GENERATED_BANNER = (
-    "_Generated from `skills/*/SKILL.md`, local skill files, and "
-    "`skills/shared/skill_product_registry.json` by "
-    "`skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._"
-)
-
 ASCII_TRANSLATION = str.maketrans(
     {
         "\u2018": "'",
@@ -107,15 +107,9 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return metadata
 
 
-def skill_dirs() -> list[Path]:
-    return sorted(
-        path
-        for path in SKILLS_DIR.iterdir()
-        if path.is_dir()
-        and path.name != "shared"
-        and not path.name.startswith(".")
-        and (path / "SKILL.md").is_file()
-    )
+def skill_dirs(catalog: SkillCatalog | None = None) -> list[Path]:
+    manifest = catalog or load_catalog()
+    return [(REPO_ROOT / record.path).parent for record in manifest.skills]
 
 
 def template_files(skill_dir: Path) -> list[Path]:
@@ -168,7 +162,7 @@ def first_sentence(value: str, limit: int = 150) -> str:
     return sentence[: limit - 3].rsplit(" ", 1)[0].rstrip(".,;:") + "..."
 
 
-def load_product_registry() -> list[dict[str, Any]]:
+def load_product_registry(catalog: SkillCatalog) -> list[dict[str, Any]]:
     try:
         payload = json.loads(PRODUCT_REGISTRY_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -176,8 +170,31 @@ def load_product_registry() -> list[dict[str, Any]]:
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid product registry JSON: {exc}") from exc
 
-    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise ValueError("product registry must be an object with schema_version 1")
+    if not isinstance(payload, dict) or payload.get("schema_version") != 2:
+        raise ValueError("product registry must be an object with schema_version 2")
+    expected_provenance = {
+        "path": "skills/catalog.yaml",
+        "schema_version": catalog.schema_version,
+        "sha256": catalog.checksum,
+    }
+    if payload.get("generated_from") != expected_provenance:
+        raise ValueError(
+            "product registry provenance does not match skills/catalog.yaml; "
+            "run generate_skill_catalog.py --write"
+        )
+    expected_skill_records = [
+        {
+            "name": record.name,
+            "status": record.status,
+            "replaced_by": record.replaced_by,
+        }
+        for record in catalog.skills
+    ]
+    if payload.get("skill_records") != expected_skill_records:
+        raise ValueError(
+            "product registry lifecycle records do not match skills/catalog.yaml; "
+            "run generate_skill_catalog.py --write"
+        )
     products = payload.get("products")
     if not isinstance(products, list) or not products:
         raise ValueError("product registry products must be a non-empty list")
@@ -258,9 +275,9 @@ def load_product_registry() -> list[dict[str, Any]]:
                     )
                 classified[skill_name] = owner
 
-    on_disk = {path.name for path in skill_dirs()}
-    missing = sorted(on_disk - set(classified))
-    unknown = sorted(set(classified) - on_disk)
+    manifest_names = set(catalog.by_name)
+    missing = sorted(manifest_names - set(classified))
+    unknown = sorted(set(classified) - manifest_names)
     if missing or unknown:
         details: list[str] = []
         if missing:
@@ -268,7 +285,8 @@ def load_product_registry() -> list[dict[str, Any]]:
         if unknown:
             details.append("unknown skills: " + ", ".join(unknown))
         raise ValueError(
-            "product registry does not match skills/: " + "; ".join(details)
+            "product registry does not match skills/catalog.yaml: "
+            + "; ".join(details)
         )
 
     return products
@@ -332,11 +350,11 @@ def markdown_table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join(lines)
 
 
-def skill_row(skill_dir: Path) -> list[str]:
+def skill_row(skill_dir: Path, record: SkillRecord) -> list[str]:
     skill_md = skill_dir / "SKILL.md"
     metadata = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
-    name = metadata.get("name") or skill_dir.name
-    description, use_when = split_description(metadata.get("description", ""))
+    name = record.name
+    _, use_when = split_description(metadata.get("description", ""))
     compatibility = metadata.get("compatibility", "Compatibility not classified")
     script_names = scripts(skill_dir)
     templates = template_files(skill_dir)
@@ -353,7 +371,12 @@ def skill_row(skill_dir: Path) -> list[str]:
 
     return [
         f"`{name}`",
-        first_sentence(description),
+        (
+            f"**Deprecated** -> `{record.replaced_by}`"
+            if record.deprecated
+            else "Canonical"
+        ),
+        first_sentence(record.purpose),
         first_sentence(compatibility),
         start,
         safe_first_command(name, script_names),
@@ -363,15 +386,25 @@ def skill_row(skill_dir: Path) -> list[str]:
 
 
 def render_catalog() -> str:
-    products = load_product_registry()
+    catalog = load_catalog()
+    products = load_product_registry(catalog)
     rows_by_skill: dict[str, list[str]] = {}
-    for skill_dir in skill_dirs():
-        rows_by_skill[skill_dir.name] = skill_row(skill_dir)
+    for record in catalog.skills:
+        skill_md = REPO_ROOT / record.path
+        rows_by_skill[record.name] = skill_row(skill_md.parent, record)
+
+    generated_banner = (
+        "_Generated from `skills/catalog.yaml` "
+        f"(schema {catalog.schema_version}, SHA-256 `{catalog.checksum}`), "
+        "repo-local skill files, and the manifest-generated "
+        "`skills/shared/skill_product_registry.json` by "
+        "`skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._"
+    )
 
     lines = [
         "# Skill UX Catalog",
         "",
-        GENERATED_BANNER,
+        generated_banner,
         "",
         "This product-first catalog is the user-facing entry point for choosing and",
         "consuming a skill. Canonical skill directories remain flat at",
@@ -411,6 +444,7 @@ def render_catalog() -> str:
 
     headers = [
         "Skill",
+        "Lifecycle",
         "Plain-language purpose",
         "Splunk 10.5 compatibility",
         "Start here",

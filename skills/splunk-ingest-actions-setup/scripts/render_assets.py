@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from render_bundle_ownership import ensure_bundle_owner  # noqa: E402
+from render_bundle_ownership import ensure_canonical_bundle_compatible  # noqa: E402
 
 BUNDLE_OWNER = "splunk-ingest-actions-setup"
 
@@ -202,7 +202,7 @@ def render_readme(args: argparse.Namespace) -> str:
     if args.platform == "cloud":
         platform_note = (
             "Splunk Cloud is a managed target. This setup workflow will not apply the "
-            "rendered conf files to a Cloud search tier. Use `splunk-ingest-actions "
+            "rendered conf files to a Cloud search tier. Use `splunk-ingest-actions-setup "
             "--platform cloud --phase render` for the supported UI/REST handoff, or "
             "`splunk-ingest-processor-setup` for Cloud control-plane pipelines."
         )
@@ -248,7 +248,12 @@ of 8 S3 destinations.
 def render(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     render_dir = output_dir / "ingest-actions"
-    ensure_bundle_owner(render_dir, owner=BUNDLE_OWNER, write=not args.dry_run)
+    ensure_canonical_bundle_compatible(
+        render_dir,
+        canonical=BUNDLE_OWNER,
+        generated_files=GENERATED_FILES,
+        write=not args.dry_run,
+    )
     assets: list[str] = []
     if not args.dry_run:
         clean_render_dir(render_dir)

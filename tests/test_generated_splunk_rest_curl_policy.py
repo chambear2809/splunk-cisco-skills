@@ -9,8 +9,6 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DASHBOARD_RENDERER = REPO_ROOT / "skills/splunk-dashboard-studio/scripts/render_assets.py"
-DDAA_RENDERER = REPO_ROOT / "skills/splunk-ddaa-archive/scripts/render_assets.py"
 FEDERATED_RENDERER = REPO_ROOT / "skills/splunk-federated-search-setup/scripts/render_assets.py"
 PKI_RENDERER = REPO_ROOT / "skills/splunk-platform-pki-setup/scripts/render_assets.py"
 
@@ -32,112 +30,6 @@ def assert_curl_transport_policy(script: str) -> None:
     assert "--proto-redir '=https'" in script
     assert "--max-redirs 0" in script
     assert "--globoff" in script
-
-
-def test_dashboard_apply_rejects_plaintext_and_curl_config_injection(tmp_path: Path) -> None:
-    result = run_renderer(
-        DASHBOARD_RENDERER,
-        "--output-dir",
-        str(tmp_path),
-        "--title",
-        "Transport policy",
-        "--panel",
-        "Count::single::index=main | stats count",
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    render_dir = tmp_path / "dashboard-studio"
-    apply_script = render_dir / "apply.sh"
-    text = apply_script.read_text(encoding="utf-8")
-    assert_curl_transport_policy(text)
-    assert "command curl -q" in text
-    assert "auth-only user directive" in text
-    assert "stat -c '%a' --" in text
-    assert "|| stat -f '%A' --" in text
-
-    config = tmp_path / "curl.cfg"
-    config.write_text('user = "admin:test-password"\n', encoding="utf-8")
-    config.chmod(0o600)
-    env = {
-        **os.environ,
-        "SPLUNK_CURL_CONFIG": str(config),
-        "SPLUNK_MGMT_URI": "http://127.0.0.1:9",
-    }
-    env.pop("SPLUNK_ALLOW_INSECURE_HTTP", None)
-    refused = subprocess.run(
-        ["bash", str(apply_script)],
-        cwd=render_dir,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=10,
-    )
-    assert refused.returncode != 0
-    assert "credential-free HTTPS origin" in refused.stderr
-
-    config.write_text('user = "admin:test-password"\nlocation\n', encoding="utf-8")
-    env["SPLUNK_MGMT_URI"] = "https://127.0.0.1:9"
-    refused = subprocess.run(
-        ["bash", str(apply_script)],
-        cwd=render_dir,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=10,
-    )
-    assert refused.returncode != 0
-    assert "auth-only user directive" in refused.stderr
-    assert "test-password" not in refused.stderr
-
-    env.pop("SPLUNK_CURL_CONFIG")
-    env["SPLUNK_USERNAME"] = "admin:inline-password-must-not-reach-argv"
-    refused = subprocess.run(
-        ["bash", str(apply_script)],
-        cwd=render_dir,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=10,
-    )
-    assert refused.returncode != 0
-    assert "inline :password material" in refused.stderr
-    assert "inline-password-must-not-reach-argv" not in refused.stderr
-
-
-def test_ddaa_generated_clients_are_https_only_and_no_redirect(tmp_path: Path) -> None:
-    base_args = (
-        "--output-dir",
-        str(tmp_path),
-        "--stack",
-        "test-stack",
-        "--index",
-        "main",
-        "--searchable-days",
-        "30",
-        "--archival-retention-days",
-        "90",
-    )
-    result = run_renderer(DDAA_RENDERER, *base_args)
-    assert result.returncode == 0, result.stdout + result.stderr
-    for name in ("enable-ddaa.sh", "status.sh"):
-        script = (tmp_path / "ddaa" / name).read_text(encoding="utf-8")
-        assert_curl_transport_policy(script)
-        assert "command curl -q" in script
-        assert 'token_escaped="${token//' in script
-        assert '"${token_escaped}" > "${curl_config}"' in script
-
-    secret = "uri-password-must-not-leak"
-    refused = run_renderer(
-        DDAA_RENDERER,
-        *base_args,
-        "--acs-base",
-        f"https://user:{secret}@admin.splunk.com",
-    )
-    assert refused.returncode != 0
-    assert "credential-free HTTPS origin" in refused.stderr
-    assert secret not in refused.stderr
 
 
 def test_federated_status_and_toggle_use_hardened_curl_wrapper(tmp_path: Path) -> None:

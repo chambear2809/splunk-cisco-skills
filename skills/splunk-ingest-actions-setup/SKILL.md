@@ -1,17 +1,11 @@
 ---
 name: splunk-ingest-actions-setup
-description: >-
-  Render, validate, and apply Splunk Ingest Actions rulesets that filter, mask,
-  evaluate, drop, or route data before indexing, plus Remote File System (RFS)
-  S3 destinations for routing to object storage. Renders the equivalent
-  props.conf RULESET, transforms.conf INGEST_EVAL, and outputs.conf [rfs:]
-  representation and applies them via REST only to Splunk Enterprise or a
-  customer-managed heavy forwarder. Splunk Cloud targets render a review bundle
-  and route to the supported managed-service workflow without mutation. Use when
-  the user asks to set up Ingest Actions, filter or mask data at ingest, drop
-  noisy events before indexing, route data to S3 with RFS, or manage ingest-time
-  rulesets. Not for Ingest Processor or Edge Processor pipelines, which are
-  separate skills.
+description: "Use when the user asks to set up Ingest Actions, evaluate or mask data at ingest, drop noisy events
+  before indexing, or stage an RFS S3 destination for a route handoff. Not for Ingest Processor or Edge
+  Processor pipelines. Render, validate, and apply eval, mask, and drop rules as props.conf RULESET and
+  transforms.conf INGEST_EVAL through target-app REST endpoints on Splunk Enterprise or a customer-managed
+  heavy forwarder. For route-s3, apply stages only outputs.conf [rfs:] and exits 2 with an explicit Splunk
+  Web or supported rulesets-API handoff for the route rule. Splunk Cloud is render/handoff-only."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -20,9 +14,69 @@ metadata:
 
 # Splunk Ingest Actions Setup
 
-This skill renders and applies Splunk Ingest Actions rulesets and RFS S3
-destinations. It is render-first because Ingest Actions transform data before
-indexing and cannot be reverted for already-indexed events.
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Set up Ingest Actions, filter or mask data at ingest, drop noisy events before indexing, route data to S3 with
+  RFS, or manage ingest-time rulesets. Not for Ingest Processor or Edge Processor pipelines, which are separate
+  skills.
+- Preview and review the splunk ingest actions setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-ingest-actions-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-ingest-actions-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
+
+This skill renders and applies eval, mask, and drop Ingest Actions rules plus
+RFS S3 destination staging. It is render-first because ingest transforms cannot
+be reverted for already-indexed events. It does not claim to apply a route-s3
+rule through an unverified transport.
 
 ## Agent Behavior
 
@@ -40,7 +94,7 @@ auto` resolves the configured target; a managed Splunk Cloud target exits `2`
 without writing `props.conf`, `transforms.conf`, or `outputs.conf`.
 
 For Splunk Cloud Platform 10.5.2605, render the supported ruleset handoff with
-`splunk-ingest-actions --platform cloud --phase render`. Use
+`splunk-ingest-actions-setup --platform cloud --phase render`. Use
 `splunk-ingest-processor-setup` when the request is for a Cloud control-plane
 pipeline rather than an Ingest Actions ruleset.
 
@@ -86,6 +140,6 @@ cannot be mistaken for completed routing. Author and verify the rule in the
 Ingest Actions UI / rulesets endpoint (the internal RFS routing transform is
 not hand-authored). Only one ruleset is supported per source type.
 
-For managed Splunk Cloud targets, use `splunk-ingest-actions` for the supported
-UI/REST handoff, `splunk-ingest-processor-setup` for Cloud control-plane
+For managed Splunk Cloud targets, use `splunk-ingest-actions-setup` for the
+rendered UI/rulesets-API handoff, `splunk-ingest-processor-setup` for Cloud control-plane
 pipelines, and `splunk-edge-processor-setup` for edge transformation.

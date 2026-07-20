@@ -1,5 +1,10 @@
 {
   "schema_version": 1,
+  "generated_from": {
+    "path": "skills/catalog.yaml",
+    "schema_version": 1,
+    "sha256": "9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5"
+  },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
     "cisco-appdynamics-setup",
@@ -7,8 +12,10 @@
     "cisco-catalyst-enhanced-netflow-setup",
     "cisco-catalyst-ta-setup",
     "cisco-cloud-control-setup",
+    "cisco-collaboration-setup",
     "cisco-data-fabric-setup",
     "cisco-dc-networking-setup",
+    "cisco-defenseclaw-deskside-setup",
     "cisco-enterprise-networking-setup",
     "cisco-intersight-setup",
     "cisco-isovalent-platform-setup",
@@ -309,8 +316,8 @@
       "live_apply_e2e": {
         "status": "partial",
         "targets": [
-          "AWS EKS lab; MySQL 8.4.10 and MariaDB 10.11.18 standalone; Splunk OTel Collector/chart 0.155.0; us1",
-          "AWS EKS isolated-node lab; Amazon RDS PostgreSQL 17.5, self-hosted SQL Server 2022 CU25 and Oracle Database Free 26ai; Splunk OTel Collector/chart 0.155.0; us1"
+          "AWS EKS isolated-node lab; Amazon RDS PostgreSQL 17.5, self-hosted SQL Server 2022 CU25 and Oracle Database Free 26ai; Splunk OTel Collector/chart 0.155.0; us1",
+          "AWS EKS lab; MySQL 8.4.10 and MariaDB 10.11.18 standalone; Splunk OTel Collector/chart 0.155.0; us1"
         ],
         "last_verified": "2026-07-07",
         "evidence": [

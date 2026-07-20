@@ -1,7 +1,7 @@
 interface:
   display_name: "Splunk Ingest Actions Setup"
-  short_description: "Filter, mask, drop, and route data before indexing"
+  short_description: "Apply eval/mask/drop; stage route destinations"
   default_prompt: >-
-    Use $splunk-ingest-actions-setup to render and apply Splunk Ingest Actions
-    rulesets (eval, mask, drop, route) as props/transforms plus RFS S3
-    destinations, and validate rulesets via the ingest rulesets REST endpoint.
+    Use $splunk-ingest-actions-setup to apply eval, mask, and drop rules as
+    props/transforms. For route-s3, stage only the RFS destination and require
+    the explicit Splunk Web or supported rulesets-API rule handoff.

@@ -1,6 +1,6 @@
 # Cloud Deployment Matrix
 
-_Generated from `skills/shared/app_registry.json` by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
+_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
 
 This document defines the normal Splunk Cloud deployment model for the
 repo's cloud-supported apps and workflows.
@@ -44,6 +44,7 @@ external collectors, see
 | `cisco-dc-networking-setup` | 7777 | ACS Splunkbase | REST via custom account/input handlers | Cisco EULA license-ack required. Index creation uses ACS. |
 | `cisco-enterprise-networking-setup` | 7539 | ACS Splunkbase pinned to repo-verified 3.1.0 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded | Target/version preflight, then REST for macros/saved searches/datamodel settings | Cisco EULA license-ack required. Verified 3.1.0 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. The setup wrapper reads the installed version and fails before REST mutation unless --accept-unsupported-platform is backed by vendor approval. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards. |
 | `cisco-product-setup` | N/A | Delegates to the routed Cisco app install path for the resolved product | Delegates to the routed Cisco setup skill after resolving the SCAN catalog product name | Top-level Cisco product orchestrator. Uses the checksum-pinned normalized SCAN public-catalog fixture plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow. |
+| `cisco-collaboration-setup` | N/A | No app installation; strict offline render-only collaboration evidence and handoff packet | Render/validate CUCM, Expressway, CMS, and Meeting Management collection plans; child apply and device mutation are prohibited | Product routes remain partial or unsupported_roadmap. Optional Sideview packages are entitlement-gated partner evidence and are never treated as Splunk-owned official TAs. |
 | `cisco-scan-setup` | 8566 | ACS Splunkbase | Search-tier REST validation and optional S3 catalog sync | Cisco EULA license-ack required. Search-head-only catalog app; no data inputs, indexes, or forwarder deployment. |
 | `cisco-thousandeyes-setup` | 7719 | ACS Splunkbase | REST for OAuth account, HEC-based streaming inputs, polling inputs | Requires HEC token. OAuth device code flow for auth. ITSI integration optional. |
 | `splunk-itsi-setup` | 1841 | ACS Splunkbase | No post-install REST config needed | Premium product; requires ITSI license. Enables ThousandEyes ITSI integration. |

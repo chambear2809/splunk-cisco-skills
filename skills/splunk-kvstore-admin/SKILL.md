@@ -1,85 +1,48 @@
 ---
 name: splunk-kvstore-admin
-description: >-
-  Render, preflight, and validate Splunk App Key Value Store (KV Store)
-  administration assets for backup, restore, migration, resync, and health
-  checks. Use when the user asks to back up or restore the KV Store, migrate the
-  KV Store storage engine to WiredTiger, recover a stale or failed SHC KV Store
-  member, resync KV Store replication, change kvstore server.conf settings, or
-  check kvstore-status and replication on standalone search heads or search head
-  clusters.
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+description: "Deprecated help-only compatibility alias for splunk-kvstore-admin-setup. Use when an existing caller supplies the exact legacy skill name and needs an actionable canonical handoff; every operational invocation fails closed before rendering, validation, live access, or mutation."
+compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
-  splunk_cloud_10_5: "self-managed-10.4"
+  splunk_cloud_10_5: "delegated"
   compatibility_verified: "2026-07-02"
+  deprecated: "true"
+  replaced_by: "splunk-kvstore-admin-setup"
 ---
 
-# Splunk KV Store Administration
+# Splunk KV Store Administration (Deprecated Compatibility Alias)
 
-This skill renders Splunk Enterprise App Key Value Store (KV Store) operations:
-backup, restore, storage-engine migration, SHC member resync, and health
-checks. It is render-first because KV Store restore and resync rewrite
-collection data and can disrupt apps that depend on it (Enterprise Security,
-ITSI, lookups, and saved-search state).
+> [!WARNING]
+> `splunk-kvstore-admin` is deprecated and replaced by
+> [`splunk-kvstore-admin-setup`](../splunk-kvstore-admin-setup/SKILL.md). Use the canonical skill for all work.
 
-## Agent Behavior
+## Fail-Closed Compatibility Contract
 
-Never ask for the Splunk admin password in chat. KV Store CLI verbs
-(`splunk backup kvstore`, `splunk restore kvstore`) authenticate against
-splunkd; let the operator run the rendered scripts and authenticate
-interactively with `splunk login` and the CLI's local authenticated session.
-Do not embed credentials in argv.
+This directory preserves only exact-name discovery and an actionable handoff. No legacy
+operational interface is demonstrably compatible with the canonical safety gates, so
+nothing is forwarded. The setup, validation, and renderer entrypoints accept only an
+exact `--help` or `-h` request. Every other invocation exits with status 2 before
+rendering files, opening network connections, launching product commands, or changing
+state, and names `splunk-kvstore-admin-setup` as `replaced_by`.
 
-Use `template.example` for non-secret values: deployment type, `$SPLUNK_HOME`,
-archive names, and target storage engine.
+Legacy reference and intake-template copies were removed so this alias cannot be mistaken
+for an independently maintained workflow. Do not reconstruct or execute an old rendered
+bundle. Read the canonical skill and collect inputs using its current contract.
 
-## Quick Start
-
-Render standalone backup and health assets:
+## Safe Compatibility Checks
 
 ```bash
-bash skills/splunk-kvstore-admin/scripts/setup.sh \
-  --deployment standalone \
-  --archive-name kvstore_$(date +%Y%m%d)
+bash skills/splunk-kvstore-admin/scripts/setup.sh --help
+bash skills/splunk-kvstore-admin/scripts/validate.sh --help
+python3 skills/splunk-kvstore-admin/scripts/render_assets.py --help
 ```
 
-Render a search head cluster migration + resync plan:
+For supported behavior, begin here:
 
 ```bash
-bash skills/splunk-kvstore-admin/scripts/setup.sh \
-  --deployment shc \
-  --storage-engine wiredTiger \
-  --archive-name kvstore_premigration
+bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --help
+bash skills/splunk-kvstore-admin-setup/scripts/validate.sh --help
 ```
 
-Run the read-only status check after rendering:
-
-```bash
-bash skills/splunk-kvstore-admin/scripts/validate.sh --live
-```
-
-## What It Renders
-
-- `backup.sh` — `splunk backup kvstore` with an explicit archive name
-- `restore.sh` — `splunk restore kvstore` with guardrails and a manifest list step
-- `status.sh` — read-only `splunk show kvstore-status --verbose`
-- `migrate.sh` — SHC storage-engine dry run and migration with
-  `start-shcluster-migration`; standalone emits an upgrade handoff
-- `resync.sh` — gated SHC stale-member clean, restart, explicit resync, and
-  status check; standalone refuses the operation
-- `server.conf` — optional `[kvstore]` storage-engine override and tuning comments
-- `README.md` / `metadata.json` — review context
-
-## Operating Notes
-
-- Take a fresh backup before any restore, migrate, or resync.
-- On a search head cluster, run restore on the captain with maintenance mode;
-  resync is only for one stale non-captain member at a time.
-- WiredTiger is the supported storage engine on current Splunk releases; the
-  migration is one-way and requires a maintenance window.
-- Live migration requires `--deployment shc --storage-engine wiredTiger`.
-  Standalone migration occurs through the supported Splunk upgrade workflow.
-- KV Store and the bundled MongoDB are version-coupled to the Splunk release;
-  validate version compatibility before upgrades.
-
-Read `reference.md` before restoring, migrating, or resyncing in production.
+Any existing automation that supplies operational legacy flags must stop and be migrated
+to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
+flag translation.

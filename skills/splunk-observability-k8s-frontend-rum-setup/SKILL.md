@@ -1,19 +1,15 @@
 ---
 name: splunk-observability-k8s-frontend-rum-setup
-description: >-
-  Render, apply, verify, and uninstall Splunk Browser RUM and browser-side
-  Digital Experience Analytics (DXA) prerequisites plus optional Session Replay
-  injection for Kubernetes-served frontends. Supports nginx sub_filter,
-  ingress-nginx snippets, initContainer HTML rewrites, runtime config, backup
-  and revert manifests, SplunkRum.init options, Frustration Signals, source-map
-  upload helpers, RUM-to-APM Server-Timing validation, multi-workload specs,
-  distroless detection, version pinning, SRI hashes, IE11 opt-in, and dashboard,
-  detector, SIM, and backend auto-instrumentation handoffs. Use when wiring a
-  React, Vue, Angular, Next.js, Nuxt, Remix, nginx/httpd, SPA, or MPA frontend
-  to Splunk Browser RUM, enabling Session Replay, configuring Frustration
-  Signals, preparing browser-side Digital Experience Analytics (DXA), uploading
-  source maps, validating trace linking, or uninstalling RUM. Do not use for
-  AppDynamics BRUM.
+description: "Use when wiring a React, Vue, Angular, Next.js, Nuxt, Remix, nginx/httpd, SPA, or MPA frontend to Splunk
+  Browser RUM, enabling Session Replay, configuring Frustration Signals, preparing browser-side Digital
+  Experience Analytics (DXA), uploading source maps, validating trace linking, or uninstalling RUM. Do not
+  use for AppDynamics BRUM. Render, apply, verify, and uninstall Splunk Browser RUM and browser-side
+  Digital Experience Analytics (DXA) prerequisites plus optional Session Replay injection for Kubernetes-
+  served frontends. Supports nginx sub_filter, ingress-nginx snippets, initContainer HTML rewrites,
+  runtime config, backup and revert manifests, SplunkRum.init options, Frustration Signals, source-map
+  upload helpers, RUM-to-APM Server-Timing validation, multi-workload specs, distroless detection, version
+  pinning, SRI hashes, IE11 opt-in, and dashboard, detector, SIM, and backend auto-instrumentation
+  handoffs."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -21,6 +17,65 @@ metadata:
 ---
 
 # Splunk Observability Kubernetes Frontend RUM + Session Replay
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Wiring a React, Vue, Angular, Next.js, Nuxt, Remix, nginx/httpd, SPA, or MPA frontend to Splunk Browser RUM,
+  enabling Session Replay, configuring Frustration Signals, preparing browser-side Digital Experience Analytics
+  (DXA), uploading.
+- Preview and review the splunk observability k8s frontend rum setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-k8s-frontend-rum-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-k8s-frontend-rum-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill configures **Splunk Browser RUM** (`@splunk/otel-web` 2.x) plus optional **Session Replay** (Splunk recorder) for frontend applications served from Kubernetes pods. It is a **standalone reusable** skill: Splunk Browser RUM beacons land directly at `rum-ingest.<realm>.observability.splunkcloud.com/v1/rum`, so the Splunk OTel Collector is **not** a prerequisite for the browser side. Use it as the browser instrumentation handoff when a Digital Experience Analytics (DXA) request needs RUM agent setup, source maps, user tracking, session replay, or frustration signals.
 
@@ -101,7 +156,7 @@ There is no `handoff-base-collector.sh` because RUM beacons direct to ingest.
      --realm us0 \
      --application-name acme-checkout \
      --deployment-environment prod \
-     --version 1.42.0 \
+     --version "${APP_VERSION:?set application version}" \
      --workload Deployment/prod/checkout-web=nginx-configmap
    ```
 

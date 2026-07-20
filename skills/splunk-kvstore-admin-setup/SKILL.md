@@ -1,14 +1,11 @@
 ---
 name: splunk-kvstore-admin-setup
-description: >-
-  Render, validate, and apply Splunk App Key Value Store administration: backup
-  and restore (point-in-time), clean/reset, storage-engine migration to
-  WiredTiger, KV Store server-version upgrade (7.0/8.0), maintenance mode,
-  collections.conf and KV Store lookup-definition governance, and standalone vs
-  search head cluster paths. Use when the user asks to back up or restore the KV
-  Store, migrate the KV Store storage engine, upgrade the KV Store server
-  version, reset or clean the KV Store, define a KV Store collection or lookup,
-  or recover KV Store on an SHC.
+description: "Use when the user asks to back up or restore the KV Store, migrate the KV Store storage engine, upgrade
+  the KV Store server version, reset or clean the KV Store, define a KV Store collection or lookup, or
+  recover KV Store on an SHC. Render, validate, and apply Splunk App Key Value Store administration:
+  backup and restore (point-in-time), clean/reset, storage-engine migration to WiredTiger, KV Store
+  server-version upgrade (7.0/8.0), maintenance mode, collections.conf and KV Store lookup-definition
+  governance, and standalone vs search head cluster paths."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -16,6 +13,64 @@ metadata:
 ---
 
 # Splunk KV Store Admin Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
+| Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Back up or restore the KV Store, migrate the KV Store storage engine, upgrade the KV Store server version, reset
+  or clean the KV Store, define a KV Store collection or lookup, or recover KV Store on an SHC.
+- Preview and review the splunk kvstore admin setup workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-kvstore-admin-setup/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This skill renders and applies Splunk App Key Value Store (KV Store)
 administration assets. It is render-first because backup, restore, clean,

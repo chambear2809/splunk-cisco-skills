@@ -1,0 +1,6 @@
+interface:
+  display_name: "Cisco Collaboration Setup"
+  short_description: "Render privacy-safe collaboration onboarding"
+  default_prompt: "Use $cisco-collaboration-setup to render and validate a non-mutating Cisco collaboration onboarding and evidence plan."
+policy:
+  allow_implicit_invocation: true

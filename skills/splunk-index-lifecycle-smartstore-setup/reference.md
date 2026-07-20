@@ -12,7 +12,7 @@ This skill covers decisions around Splunk index lifecycle:
   `searchableDays` / `maxDataSizeMB`.
 - SmartStore: Enterprise remote volumes, per-index/global `remotePath`, cache
   manager, provider settings, and cluster-manager bundle assets.
-- Archive/restore: Splunk Cloud DDAA handoff to `splunk-ddaa-archive`; Cloud
+- Archive/restore: Splunk Cloud DDAA handoff to `splunk-ddaa-archive-setup`; Cloud
   restore is UI-only. Enterprise archive/thaw remains a reviewed runbook.
 - Disable/delete/clean: full apply is available only behind explicit gates.
 
@@ -135,7 +135,7 @@ Hard blocks and protected defaults:
 - Multi-index ACS operations are sequential, not transactional. If a later
   target fails, the helper exits nonzero and reports the earlier targets that
   were already verified.
-- Cloud DDAA enable/update is delegated to `splunk-ddaa-archive`.
+- Cloud DDAA enable/update is delegated to `splunk-ddaa-archive-setup`.
 - Cloud restore is a UI handoff from Settings > Indexes.
 - Dependency proof routes to `splunk-data-source-readiness-doctor`.
 - `collect-evidence.sh` can POST read-only searches to

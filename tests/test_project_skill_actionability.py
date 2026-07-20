@@ -7,6 +7,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from skills.shared.skill_catalog import load_catalog
 from tests.regression_helpers import REPO_ROOT
 
 
@@ -106,9 +107,18 @@ def test_every_skill_has_working_setup_and_validate_entrypoints() -> None:
 
 def test_every_setup_help_advertises_a_task_or_action_surface() -> None:
     failures: list[str] = []
+    aliases = load_catalog().aliases
     for skill in skill_dirs():
         result = run_help(skill / "scripts/setup.sh")
         help_text = (result.stdout + result.stderr).lower()
+        replacement = aliases.get(skill.name)
+        if replacement is not None:
+            if "deprecated" not in help_text or replacement not in help_text:
+                failures.append(
+                    f"{skill.name}: alias help does not name its deprecated "
+                    f"handoff to {replacement}"
+                )
+            continue
         if not any(cue in help_text for cue in ACTION_CUES):
             failures.append(f"{skill.name}: setup.sh --help does not advertise render, validate, apply, install, or task execution")
 

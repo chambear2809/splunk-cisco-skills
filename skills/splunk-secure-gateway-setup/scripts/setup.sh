@@ -35,7 +35,7 @@ Options:
   --phase render|preflight|apply|status|all
   --apply | --dry-run | --json
   --output-dir PATH
-  --platform auto|cloud|enterprise  (default auto; resolves configured target before apply)
+  --platform auto|cloud|enterprise  (default auto; resolves configured target before rendering)
   --app-name NAME                  (default splunk_secure_gateway)
   --action configure|enable|disable
   --deployment-name NAME
@@ -184,6 +184,31 @@ effective_target_platform() {
     esac
 }
 
+resolve_target_platform() {
+    local platform
+    if ! platform="$(effective_target_platform)"; then
+        log "ERROR: Could not resolve the Splunk target platform."
+        return 1
+    fi
+    TARGET_PLATFORM="${platform}"
+}
+
+guard_managed_cloud_operation() {
+    if [[ "${TARGET_PLATFORM}" != "cloud" ]]; then
+        return 0
+    fi
+    if [[ "${PHASE}" == "render" && "${APPLY}" != "true" ]]; then
+        return 0
+    fi
+
+    log "ERROR: Splunk Cloud manages Secure Gateway app state, egress, and Spacebridge configuration."
+    log "       Cloud preflight, apply, status, all, and render --apply are unsupported."
+    log "       No artifacts were rendered and no probe, authentication, or live request was attempted."
+    log "HANDOFF: render the non-operational Cloud review bundle with:"
+    log "  bash skills/splunk-secure-gateway-setup/scripts/setup.sh --platform cloud --phase render"
+    return 2
+}
+
 guard_managed_cloud_apply() {
     local platform
     if ! platform="$(effective_target_platform)"; then
@@ -198,7 +223,7 @@ guard_managed_cloud_apply() {
     log "       This workflow will not enable, disable, or configure splunk_secure_gateway"
     log "       on a managed Cloud search tier."
     log "HANDOFF: render the supported Cloud readiness bundle with:"
-    log "  bash skills/splunk-secure-gateway/scripts/setup.sh --platform cloud --phase render"
+    log "  bash skills/splunk-secure-gateway-setup/scripts/setup.sh --platform cloud --phase render"
     return 2
 }
 
@@ -245,6 +270,10 @@ get_status() {
 
 main() {
     validate_args
+    resolve_target_platform
+    local guard_rc=0
+    guard_managed_cloud_operation || guard_rc=$?
+    (( guard_rc == 0 )) || return "${guard_rc}"
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
         if [[ "${JSON_OUTPUT}" == "true" ]]; then
@@ -258,7 +287,9 @@ main() {
     case "${PHASE}" in
         render)
             render_assets
-            [[ "${APPLY}" == "true" ]] && apply_live
+            if [[ "${APPLY}" == "true" ]]; then
+                apply_live
+            fi
             ;;
         preflight) render_assets; run_preflight ;;
         apply) render_assets; apply_live ;;

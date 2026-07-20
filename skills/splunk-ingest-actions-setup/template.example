@@ -22,6 +22,8 @@ mask_replacement: "########"
 drop_regex: level=DEBUG
 
 # rule-type route-s3 (RFS destination; max 8 per deployment)
+# Apply stages only the RFS destination, then exits 2 with a Splunk Web or
+# supported rulesets-API handoff for the route rule itself.
 s3_destination_name:
 s3_path:                   # s3://bucket/path
 s3_auth_region:

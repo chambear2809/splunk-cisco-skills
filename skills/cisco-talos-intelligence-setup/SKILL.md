@@ -1,19 +1,73 @@
 ---
 name: cisco-talos-intelligence-setup
-description: >-
-  Install and validate Cisco Talos Intelligence for Splunk Enterprise Security
-  Cloud. Covers ES Cloud support posture, Talos service account certificate
-  readiness, get_talos_enrichment capability, adaptive response actions,
-  optional collection index, and disabled IP blacklist threatlist checks. Use
-  when the user asks about Cisco Talos Intelligence, Talos reputation
-  enrichment, Splunk_TA_Talos_Intelligence, or Talos ES Cloud readiness.
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+description: Use when validating Cisco Talos reputation enrichment and service-account readiness in Splunk ES Cloud.
+compatibility: >-
+  Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
+  entitlement, topology, and customer-managed runtime guardrails; self-managed
+  paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-07-02"
 ---
 
 # Cisco Talos Intelligence Setup
+
+## Prerequisites
+
+| Tool or access | Purpose | Verify |
+|---|---|---|
+| Bash | Run package and completion checks | `bash --version` |
+| ES Cloud admin access | Install and validate Talos | Confirm administrative access |
+| Service certificate | Authorize enrichment | Verify without printing it |
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌────────────────┐   ┌───────────────────┐   ┌─────────────────────┐
+│ Preflight │ → │ Install add-on │ → │ Verify capability │ → │ Validate enrichment │
+└───────────┘   └────────────────┘   └───────────────────┘   └─────────────────────┘
+```
+
+## When to Activate
+
+- Install or validate `Splunk_TA_Talos_Intelligence` in ES Cloud.
+- Check Talos service-account certificate and capability readiness.
+- Diagnose failed enrichment, adaptive response, or threat-list state.
+
+## Scope
+
+This skill validates the supported ES Cloud integration surface. It does not
+mint certificates, enable deprecated blacklist collection silently, or claim
+support for an unverified self-managed topology.
+
+## Examples
+
+Install the reviewed Talos package path:
+
+```bash
+bash skills/cisco-talos-intelligence-setup/scripts/setup.sh --install
+```
+
+Expected output: the package is installed through the supported topology path,
+or a precise ES Cloud administrative handoff is emitted.
+
+Run the strict readiness gate:
+
+```bash
+bash skills/cisco-talos-intelligence-setup/scripts/validate.sh --completion
+```
+
+Expected output: package, certificate, `get_talos_enrichment`, adaptive action,
+and disabled-threat-list checks report `[PASS]` or exit nonzero.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Enrichment capability is absent | Role or package setup is incomplete | Correct ES capability mapping and retest |
+| Certificate fails | Material is missing/expired | Renew through its owner |
+| Adaptive response fails | Permissions/app state is incomplete | Verify ES action setup |
+| Legacy blacklist is enabled | Unsupported threat-list state remains | Review and disable it before completion |
 
 ## TA Completion Gate
 

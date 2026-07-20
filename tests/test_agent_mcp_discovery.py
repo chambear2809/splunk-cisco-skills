@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from agent.splunk_cisco_skills_mcp import discovery
+from skills.shared.skill_catalog import load_catalog
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,11 @@ def _write_fake_repository(
     skills_root = root / "skills"
     (skills_root / "shared").mkdir(parents=True)
     registry = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "skill_records": [
+            {"name": name, "status": "canonical", "replaced_by": None}
+            for name in skills
+        ],
         "products": [
             {
                 "id": "demo-product",
@@ -73,7 +78,8 @@ class DiscoveryRepositoryTests(unittest.TestCase):
     def test_search_is_product_first_bounded_and_paginated(self) -> None:
         first = discovery.search_skills(limit=7)
 
-        self.assertEqual(first["total"], 168)
+        catalog = load_catalog()
+        self.assertEqual(first["total"], len(catalog.skills) - len(catalog.aliases))
         self.assertEqual(len(first["skills"]), 7)
         self.assertRegex(first["revision"], r"^[0-9a-f]{64}$")
         self.assertIsNotNone(first["next_cursor"])
@@ -85,8 +91,18 @@ class DiscoveryRepositoryTests(unittest.TestCase):
         )
         for item in first["skills"]:
             self.assertEqual(
-                set(item), {"skill", "description", "product", "capability"}
+                set(item),
+                {
+                    "skill",
+                    "description",
+                    "status",
+                    "replaced_by",
+                    "product",
+                    "capability",
+                },
             )
+            self.assertEqual(item["status"], "canonical")
+            self.assertIsNone(item["replaced_by"])
 
     def test_search_filters_by_product_capability_and_query(self) -> None:
         cloud = discovery.search_skills(product="Splunk Cloud Platform", limit=100)
@@ -108,6 +124,26 @@ class DiscoveryRepositoryTests(unittest.TestCase):
             )
         )
         self.assertEqual(exact["skills"][0]["skill"], "cisco-product-setup")
+
+    def test_generic_search_prefers_canonical_but_exact_alias_still_resolves(
+        self,
+    ) -> None:
+        generic = discovery.search_skills(query="kvstore", limit=10)
+        generic_names = [item["skill"] for item in generic["skills"]]
+        exact = discovery.search_skills(query="splunk-kvstore-admin", limit=10)
+        legacy_manifest = discovery.get_skill_manifest("splunk-kvstore-admin")
+
+        self.assertIn("splunk-kvstore-admin-setup", generic_names)
+        self.assertNotIn("splunk-kvstore-admin", generic_names)
+        self.assertEqual(exact["skills"][0]["skill"], "splunk-kvstore-admin")
+        self.assertEqual(exact["skills"][0]["status"], "deprecated")
+        self.assertEqual(
+            exact["skills"][0]["replaced_by"], "splunk-kvstore-admin-setup"
+        )
+        self.assertEqual(legacy_manifest["status"], "deprecated")
+        self.assertEqual(
+            legacy_manifest["replaced_by"], "splunk-kvstore-admin-setup"
+        )
 
     def test_search_rejects_bad_limits_filters_and_cursors(self) -> None:
         with self.assertRaises(discovery.InvalidDiscoveryRequest):

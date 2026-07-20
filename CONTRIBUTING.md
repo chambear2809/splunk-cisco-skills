@@ -94,9 +94,12 @@ PY
 shellcheck --severity=warning $(find skills -name '*.sh' -print)
 ruff check skills/ tests/ agent/
 yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents
+python3 skills/shared/scripts/generate_skill_catalog.py --check
 python3 skills/shared/scripts/generate_deployment_docs.py --check
+python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
 python3 skills/shared/scripts/audit_skill_validation.py
 python3 skills/shared/scripts/generate_skill_validation_matrix.py --check
+python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
 if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
   python3 skills/cisco-product-setup/scripts/build_catalog.py --check
 else
@@ -135,24 +138,39 @@ When adding a skill under `skills/<skill-name>/`, include:
   non-secret configuration values
 - tests for argument parsing, dry runs, credential handling, and any shared
   helper behavior
-- the skill name in `skills/shared/skill_validation_registry.json`; add
-  sanitized integration or live evidence only when a target, ISO date, and
-  reviewable evidence file or URL are available
 
-Also update:
+Add the skill identity exactly once to `skills/catalog.yaml`. Supply its stable
+path, target, purpose, command summary, primary product and capability, and
+lifecycle status there. For a deprecated compatibility alias, also set
+`replaced_by` and a concise `migration` boundary; the replacement must be
+canonical and share the alias's product and capability. State which legacy
+behaviors map to the replacement and which are intentionally unsupported.
 
-- `SKILL_UX_CATALOG.md` through its generator, plus `AGENTS.md` and
-  `CLAUDE.md` skill catalogs
-- `skills/shared/skill_product_registry.json` with exactly one primary product
-  and capability assignment for the skill; keep each capability's skill list
-  alphabetized
-- `README.md` only when the operator entry flow, routing table, or repo-level
-  docs links change
-- `.cursor/skills/<skill-name>` symlink
-- `.claude/commands/<skill-name>.md`
-- `skills/shared/app_registry.json` when the skill maps to a Splunk app or
-  deployment topology
-- generated deployment docs when registry placement changes
+Maintain only the richer validated extensions that apply:
+
+- add the skill's tool/access contract to `SKILL_REQUIREMENTS.md`
+- add package and deployment-topology data to
+  `skills/shared/app_registry.json`
+- add sanitized integration or live evidence under `evidence` in
+  `skills/shared/skill_validation_registry.json` only when a target, ISO date,
+  and reviewable evidence file or URL are available
+- update `README.md` only when the operator entry flow, routing table, or
+  repo-level documentation links change
+
+Then regenerate in dependency order:
+
+```bash
+python3 skills/shared/scripts/generate_skill_catalog.py --write
+python3 skills/shared/scripts/generate_skill_ux_catalog.py --write
+python3 skills/shared/scripts/generate_skill_validation_matrix.py --write
+python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --write
+python3 skills/shared/scripts/generate_deployment_docs.py --write
+```
+
+Do not hand-edit the generated catalog sections in `AGENTS.md` or `CLAUDE.md`,
+the flat validation skill list, `skill_product_registry.json`, Claude command
+files, Cursor skill links, or generated matrix/catalog documents. Run the
+corresponding `--check` commands after regeneration.
 
 ## Shell Script Rules
 

@@ -1,14 +1,11 @@
 ---
 name: splunk-observability-nvidia-gpu-integration
-description: >-
-  Render NVIDIA GPU telemetry from DCGM Exporter into Splunk Observability
-  Cloud. Uses receiver_creator/dcgm-cisco to avoid chart autodetect collisions,
-  matches both common DCGM labels, defaults to an unfiltered NVIDIA metrics
-  pipeline, optionally patches DCGM pod labels, and emits dashboard, detector,
-  base-collector, and apply handoffs. Use when the user asks to send NVIDIA GPU,
-  DCGM, DCGM Exporter, GPU Operator, DGX, AI Pod, or CUDA workload telemetry to
-  Splunk Observability Cloud, configure receiver_creator/dcgm-cisco, enable
-  per-pod DCGM labels, or render GPU dashboards and detectors.
+description: "Use when the user asks to send NVIDIA GPU, DCGM, DCGM Exporter, GPU Operator, DGX, AI Pod, or CUDA
+  workload telemetry to Splunk Observability Cloud, configure receiver_creator/dcgm-cisco, enable per-pod
+  DCGM labels, or render GPU dashboards and detectors. Render NVIDIA GPU telemetry from DCGM Exporter into
+  Splunk Observability Cloud. Uses receiver_creator/dcgm-cisco to avoid chart autodetect collisions,
+  matches both common DCGM labels, defaults to an unfiltered NVIDIA metrics pipeline, optionally patches
+  DCGM pod labels, and emits dashboard, detector, base-collector, and apply handoffs."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
@@ -16,6 +13,57 @@ metadata:
 ---
 
 # Splunk Observability NVIDIA GPU Integration
+
+## Workflow Overview
+
+```text
+┌───────────┐   ┌───────────────┐   ┌───────────────┐   ┌─────────────────┐
+│ Preflight │ → │ Render/review │ → │ Apply/handoff │ → │ Validate evidence │
+└───────────┘   └───────────────┘   └───────────────┘   └─────────────────┘
+```
+
+## When to Activate
+
+- Send NVIDIA GPU, DCGM, DCGM Exporter, GPU Operator, DGX, AI Pod, or CUDA workload telemetry to Splunk
+  Observability Cloud, configure receiver_creator/dcgm-cisco, enable per-pod DCGM labels, or render GPU dashboards
+  and detectors.
+- Preview and review the splunk observability nvidia gpu integration workflow before any live apply phase.
+- Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
+
+## Scope
+
+Follow the documented read-only or render-first path whenever it is available.
+This skill does not imply permission to mutate live systems. Require explicit
+apply flags, protected credentials, and operator review for state changes.
+
+## Examples
+
+Inspect the supported setup modes before selecting one:
+
+```bash
+bash skills/splunk-observability-nvidia-gpu-integration/scripts/setup.sh --help
+```
+
+Expected output: usage, supported modes, and required arguments are displayed
+without changing the target environment.
+
+Inspect validation modes before running completion checks:
+
+```bash
+bash skills/splunk-observability-nvidia-gpu-integration/scripts/validate.sh --help
+```
+
+Expected output: offline, live, and completion options are displayed when the
+skill supports them; help exits without mutation.
+
+## Troubleshooting
+
+| Issue | Cause | Resolution |
+|---|---|---|
+| Preflight fails | A required tool or access path is missing | Resolve it before rendering or applying |
+| Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
+| Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
+| Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
 This is a **standalone reusable skill** for NVIDIA GPU telemetry (DCGM Exporter) in Splunk Observability Cloud. It is **independent of the AI Pod** umbrella — works for NVIDIA DGX clusters, AI Pods, generic K8s + GPUs, anywhere DCGM Exporter is installed.
 

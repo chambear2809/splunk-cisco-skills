@@ -27,7 +27,9 @@ This skill is a router over the existing Cisco setup skills in this repo.
 
 | Route Type | Backing skill(s) | Typical products |
 |---|---|---|
-| `workflow_handoff` | `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup` | CUCM, Expressway, Meeting Management, Meeting Server, IMC |
+| `collaboration` | `cisco-collaboration-setup` | CUCM, Expressway, Meeting Management, Meeting Server (partial render/validate handoff only) |
+| `gap_handoff` | `cisco-collaboration-setup` | BroadWorks and RoomOS collaboration hardware (state remains `unsupported_roadmap`; no executable workflow) |
+| `workflow_handoff` | `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup` | IMC and other collector handoffs |
 
 ## Output States
 

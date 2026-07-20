@@ -619,6 +619,48 @@ def test_scope_or_permission_failure_is_owned_and_rollbackable(
     assert state["streams"] == []
 
 
+def test_resume_revalidates_and_upgrades_legacy_runtime_output_identity(
+    tmp_path: Path,
+) -> None:
+    state = world()
+    state["runtime_log_data"] = False
+    cfg = config(tmp_path)
+
+    with MODULE.StateStore(tmp_path / "state") as store:
+        with pytest.raises(MODULE.TransactionError):
+            transaction(store, state).bootstrap(cfg)
+        journal = store.load()
+        output = journal["runtime_key"]["output"]
+        output.pop("mtime_ns")
+        output.pop("ctime_ns")
+        store.save(journal)
+
+        state["runtime_log_data"] = True
+        result = transaction(store, state).bootstrap(cfg)
+        upgraded = store.load()["runtime_key"]["output"]
+
+    assert result["phase"] == "RUNTIME_KEY_CREATED"
+    assert type(upgraded["mtime_ns"]) is int
+    assert type(upgraded["ctime_ns"]) is int
+
+
+def test_resume_rejects_partial_legacy_runtime_output_identity(tmp_path: Path) -> None:
+    state = world()
+    state["runtime_log_data"] = False
+    cfg = config(tmp_path)
+
+    with MODULE.StateStore(tmp_path / "state") as store:
+        with pytest.raises(MODULE.TransactionError):
+            transaction(store, state).bootstrap(cfg)
+        journal = store.load()
+        journal["runtime_key"]["output"].pop("ctime_ns")
+        store.save(journal)
+
+        state["runtime_log_data"] = True
+        with pytest.raises(MODULE.TransactionError, match="timestamp identity"):
+            transaction(store, state).bootstrap(cfg)
+
+
 def evidence_document(journal: dict[str, Any]) -> dict[str, object]:
     return {
         "schema_version": 2,
@@ -1197,6 +1239,32 @@ def test_rollback_never_unlinks_replacement_after_unlink_crash(
     assert replacement.read_text(encoding="utf-8") == "replacement\n"
 
 
+def test_rollback_revokes_key_but_preserves_legacy_runtime_output(
+    tmp_path: Path,
+) -> None:
+    state = world()
+    output_path = tmp_path / "runtime.key"
+
+    with MODULE.StateStore(tmp_path / "state") as store:
+        transaction(store, state).bootstrap(config(tmp_path))
+        journal = store.load()
+        output = journal["runtime_key"]["output"]
+        output.pop("mtime_ns")
+        output.pop("ctime_ns")
+        store.save(journal)
+
+        result = transaction(store, state).rollback()
+        rolled_back = store.load()["runtime_key"]
+
+    assert result["phase"] == "ROLLED_BACK"
+    assert [item["id"] for item in state["keys"]] == [OLD_KEY_ID]
+    assert output_path.read_text(encoding="utf-8") == RUNTIME_SECRET + "\n"
+    assert (
+        rolled_back["output_cleanup_skipped"]
+        == "legacy_record_missing_timestamp_identity"
+    )
+
+
 def test_rollback_preserves_adopted_target(tmp_path: Path) -> None:
     state = world()
     state["projects"].append(
@@ -1293,6 +1361,27 @@ def test_secret_output_collision_preserves_existing_file(tmp_path: Path) -> None
     after = output.stat()
     assert output.read_text(encoding="utf-8") == "do-not-delete\n"
     assert (after.st_dev, after.st_ino) == (before.st_dev, before.st_ino)
+
+
+def test_owned_output_cleanup_rejects_ctime_aba_identity(tmp_path: Path) -> None:
+    output = tmp_path / "runtime.key"
+    record = MODULE.create_secret_file(output, RUNTIME_SECRET)
+    output.unlink()
+    replacement = protected_file(output, "x" * len(RUNTIME_SECRET) + "\n")
+    current = replacement.stat()
+    simulated_reused_inode = {
+        **record,
+        "device": current.st_dev,
+        "inode": current.st_ino,
+        "size": current.st_size,
+        "mtime_ns": current.st_mtime_ns,
+        "ctime_ns": current.st_ctime_ns + 1,
+    }
+
+    with pytest.raises(MODULE.TransactionError, match="inode changed"):
+        MODULE.unlink_owned_file(simulated_reused_inode)
+
+    assert replacement.read_text(encoding="utf-8") == "x" * len(RUNTIME_SECRET) + "\n"
 
 
 class FakeResponse:

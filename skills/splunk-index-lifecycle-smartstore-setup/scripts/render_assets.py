@@ -767,7 +767,7 @@ def lifecycle_report_payload(args: argparse.Namespace, evidence: dict[str, Any],
     findings = dependency_findings(args, evidence)
     handoffs = []
     if args.operation == "archive" and args.platform == "cloud":
-        handoffs.append("splunk-ddaa-archive")
+        handoffs.append("splunk-ddaa-archive-setup")
     if args.operation in {"inventory", "retention", "delete-index", "disable-index"}:
         handoffs.append("splunk-data-source-readiness-doctor")
     if args.platform == "cloud" and args.operation in {"retention", "delete-index"}:
@@ -2085,7 +2085,7 @@ def render_archive_handoff(args: argparse.Namespace) -> str:
     if args.platform == "cloud":
         return make_script(
             f"""cat <<'EOF'
-Splunk Cloud archive lifecycle is delegated to splunk-ddaa-archive.
+Splunk Cloud archive lifecycle is delegated to splunk-ddaa-archive-setup.
 
 Suggested command:
 bash skills/splunk-ddaa-archive-setup/scripts/setup.sh \\
