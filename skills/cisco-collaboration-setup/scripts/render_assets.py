@@ -3387,7 +3387,9 @@ def validate_command_plan(plan: dict[str, Any], out: Path) -> None:
             for arg in command:
                 flag = arg.split("=", 1)[0]
                 if flag in FORBIDDEN_ARG_FLAGS or SECRET_KEY_RE.search(flag):
-                    raise SpecError(f"handoff plan contains a forbidden mutation or secret argument: {flag}")
+                    raise SpecError(
+                        f"handoff plan argument is outside the render-only allowlist: {flag}"
+                    )
             if command[0] != "bash" or len(command) < 3:
                 raise SpecError("delegated commands must invoke a reviewed repo-local Bash child")
             script = command[1]

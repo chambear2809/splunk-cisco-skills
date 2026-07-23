@@ -38,6 +38,26 @@ MAX_DESCRIPTION_LENGTH = 1024
 MAX_COMPATIBILITY_LENGTH = 500
 MAX_SKILL_MD_LINES = 500
 MAX_BODY_WORDS = 5000
+MARKETPLACE_REQUIRED_BODY_SECTIONS = (
+    "Prerequisites",
+    "Workflow Overview",
+    "When to Activate",
+    "Troubleshooting",
+)
+MARKETPLACE_WORKFLOW_CODE_BLOCK_RE = re.compile(
+    r"^[ \t]*```[^\n]*\n(.*?)^[ \t]*```[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
+MARKETPLACE_WORKFLOW_STRUCTURE_MARKERS = (
+    "┌",
+    "┐",
+    "└",
+    "┘",
+    "│",
+    "+--",
+    "--+",
+)
+MARKETPLACE_WORKFLOW_FLOW_MARKERS = ("▼", "▶", "→", "->")
 COMPATIBILITY_STATUSES = {
     "supported",
     "conditional",
@@ -222,6 +242,24 @@ def parse_frontmatter(block: str) -> dict[str, Any]:
     # Minimal fallback for local environments that have not installed
     # requirements-dev.txt yet. CI installs PyYAML and uses the full parser.
     return _fallback_mapping(block)
+
+
+def has_marketplace_workflow_diagram(workflow: str) -> bool:
+    """Return whether a workflow section contains a structured flow diagram."""
+
+    for code_block in MARKETPLACE_WORKFLOW_CODE_BLOCK_RE.findall(workflow):
+        structural_markers = {
+            marker
+            for marker in MARKETPLACE_WORKFLOW_STRUCTURE_MARKERS
+            if marker in code_block
+        }
+        has_flow_direction = any(
+            marker in code_block
+            for marker in MARKETPLACE_WORKFLOW_FLOW_MARKERS
+        )
+        if len(structural_markers) >= 2 and has_flow_direction:
+            return True
+    return False
 
 
 def check_openai_metadata(
@@ -508,6 +546,33 @@ def check_skill(skill_dir: Path, record: SkillRecord | None = None) -> list[str]
             f"{dir_name}: SKILL.md body has about {body_words} words; move "
             "detailed reference material to references/"
         )
+
+    if record is not None:
+        for section in MARKETPLACE_REQUIRED_BODY_SECTIONS:
+            if not re.search(rf"^## {re.escape(section)}", body, re.MULTILINE):
+                errors.append(
+                    f"{dir_name}: SKILL.md missing marketplace-required "
+                    f"{section!r} section"
+                )
+
+        if not re.search(r"^## (?:Examples|Commands)", body, re.MULTILINE):
+            errors.append(
+                f"{dir_name}: SKILL.md missing marketplace-required "
+                "Examples or Commands section"
+            )
+
+        workflow = re.search(
+            r"^## Workflow Overview[^\n]*\n(.*?)(?=^## |\Z)",
+            body,
+            re.MULTILINE | re.DOTALL,
+        )
+        if workflow is not None and not has_marketplace_workflow_diagram(
+            workflow.group(1)
+        ):
+            errors.append(
+                f"{dir_name}: SKILL.md Workflow Overview section "
+                "missing a marketplace workflow diagram"
+            )
 
     return errors
 

@@ -5,6 +5,41 @@ from pathlib import Path
 from tests import check_skill_frontmatter as metadata_check
 
 
+def test_marketplace_workflow_diagram_accepts_structured_fenced_flows() -> None:
+    unicode_flow = """
+```text
+┌─────────┐
+│ Review  │
+└────┬────┘
+     ▼
+┌─────────┐
+│ Handoff │
+└─────────┘
+```
+"""
+    ascii_flow = """
+```text
++-- Review --+ -> +-- Handoff --+
+```
+"""
+
+    assert metadata_check.has_marketplace_workflow_diagram(unicode_flow)
+    assert metadata_check.has_marketplace_workflow_diagram(ascii_flow)
+
+
+def test_marketplace_workflow_diagram_rejects_weak_or_unfenced_markers() -> None:
+    invalid_workflows = (
+        "A stray │ glyph is not a workflow diagram.",
+        "```text\n│\n→\n```",
+        "```text\n│ │ →\n```",
+        "┌─────────┐ → ┌─────────┐",
+        "```text\n┌─────────┐\n│ Review  │\n└─────────┘\n```",
+    )
+
+    for workflow in invalid_workflows:
+        assert not metadata_check.has_marketplace_workflow_diagram(workflow)
+
+
 def test_fallback_parser_supports_nested_skill_and_interface_metadata(
     monkeypatch,
 ) -> None:

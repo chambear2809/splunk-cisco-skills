@@ -34,6 +34,33 @@ Do not use this skill for Webex REST collection itself; hand that work to
 `cisco-webex-setup`. Use `cisco-thousandeyes-setup` for ThousandEyes data and
 `cisco-product-setup` when the Cisco product is not yet known.
 
+## Workflow Overview
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  1. REVIEW INTAKE                                               │
+│  Confirm product routes, privacy choices, and local evidence    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. RENDER OFFLINE                                              │
+│  Build classifier, readiness, evidence, gap, and handoff assets │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. VALIDATE                                                    │
+│  Re-read trusted evidence and verify the private packet         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. HAND OFF                                                    │
+│  Operators review unresolved gaps before any child workflow     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Safety Contract
 
 - Rendering is the only mode and is the default. There is no apply, install,
@@ -77,7 +104,7 @@ Do not use this skill for Webex REST collection itself; hand that work to
   install commands; require exact version, tier, entitlement, and package
   metadata evidence before recording a selection.
 
-## Render and Validate
+## Commands: Render and Validate
 
 Render the example spec offline:
 
