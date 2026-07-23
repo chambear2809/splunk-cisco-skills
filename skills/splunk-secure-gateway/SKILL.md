@@ -15,6 +15,41 @@ metadata:
 > `splunk-secure-gateway` is deprecated and replaced by
 > [`splunk-secure-gateway-setup`](../splunk-secure-gateway-setup/SKILL.md). Use the canonical skill for all work.
 
+## Prerequisites
+
+| Requirement | Purpose | Verify |
+|---|---|---|
+| Bash and Python 3 | Display the help-only compatibility handoff | `bash --version && python3 --version` |
+| Canonical replacement | Perform supported Secure Gateway work | `test -f skills/splunk-secure-gateway-setup/SKILL.md` |
+
+## When to Activate
+
+- An existing caller supplies the exact legacy name `splunk-secure-gateway`.
+- The caller needs the canonical replacement name before taking any action.
+
+Do not activate this alias for setup, rendering, validation, or live operations.
+
+## Workflow Overview
+
+```text
+┌──────────────────────────┐
+│ Compatibility invocation │
+└────────────┬─────────────┘
+             │
+     ┌───────┴────────┐
+     ▼                ▼
+┌────────────────┐  ┌────────────────────┐
+│ Exactly one    │  │ Anything else,     │
+│ --help or -h   │  │ including no args  │
+└───────┬────────┘  └─────────┬──────────┘
+        ▼                     ▼
+┌────────────────────┐  ┌────────────────────┐
+│ Show deprecation   │  │ Exit 2 before      │
+│ and canonical      │  │ rendering, network │
+│ handoff            │  │ access, or mutation│
+└────────────────────┘  └────────────────────┘
+```
+
 ## Fail-Closed Compatibility Contract
 
 This directory preserves only exact-name discovery and an actionable handoff. No legacy
@@ -28,7 +63,7 @@ Legacy reference and intake-template copies were removed so this alias cannot be
 for an independently maintained workflow. Do not reconstruct or execute an old rendered
 bundle. Read the canonical skill and collect inputs using its current contract.
 
-## Safe Compatibility Checks
+## Commands
 
 ```bash
 bash skills/splunk-secure-gateway/scripts/setup.sh --help
@@ -46,3 +81,10 @@ bash skills/splunk-secure-gateway-setup/scripts/validate.sh --help
 Any existing automation that supplies operational legacy flags must stop and be migrated
 to the canonical interface after reviewing its apply and acceptance gates. Do not infer a
 flag translation.
+
+## Troubleshooting
+
+| Failure | Meaning | Resolution |
+|---|---|---|
+| Exit status 2 | An operational legacy argument was refused | Read `splunk-secure-gateway-setup` and migrate explicitly |
+| Canonical skill missing | The checkout is incomplete or stale | Refresh the canonical skill source before continuing |
