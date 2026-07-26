@@ -79,7 +79,7 @@ probe_index_event_flow() {
         pass "${label} index '${idx}' has ${count} events since ${DATA_FLOW_EARLIEST}"
 
         typed_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
-            "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now sourcetype IN (\"cisco:cloud_security:*\",\"cisco:secure_access:*\")" \
+            "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now sourcetype IN (\"cisco:cloud_security:*\",\"cisco:secure_access:*\") NOT sourcetype=\"cisco:secure_access:security_events_andalerts\"" \
             "count" 2>/dev/null || echo "0")
         if [[ "${typed_count}" =~ ^[0-9]+$ ]] && [[ "${typed_count}" -gt 0 ]]; then
             DATA_FLOW_TYPED_EVENTS=$((DATA_FLOW_TYPED_EVENTS + typed_count))
