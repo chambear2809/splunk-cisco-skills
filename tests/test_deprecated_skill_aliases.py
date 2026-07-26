@@ -112,6 +112,9 @@ GENERATED_ROW_DOCS = {
     "DEPLOYMENT_ROLE_MATRIX.md",
     "skills/shared/deprecated_skill_aliases.md",
 }
+# Security-scanner fingerprint registries may contain historical path text,
+# but are not operational handoff surfaces.
+NON_OPERATIONAL_METADATA = {".gitleaksignore"}
 CATALOG_BEGIN = "<!-- BEGIN GENERATED SKILL CATALOG -->"
 CATALOG_END = "<!-- END GENERATED SKILL CATALOG -->"
 
@@ -364,6 +367,8 @@ def deprecated_name_offenders(
     for relative in sorted(relatives):
         path = REPO_ROOT / relative
         if relative.startswith("tests/"):
+            continue
+        if relative in NON_OPERATIONAL_METADATA:
             continue
         if any(relative.startswith(f"skills/{legacy}/") for legacy in catalog.aliases):
             continue
