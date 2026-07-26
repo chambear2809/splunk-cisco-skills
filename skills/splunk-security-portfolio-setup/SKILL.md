@@ -1,10 +1,11 @@
 ---
 name: splunk-security-portfolio-setup
 description: "Use when a user asks for total Splunk security portfolio coverage, product gap analysis, or which Splunk
-  security skill handles ES, ES 8.x native SOAR, Security AI Assistant / AI Assistant in Security,
-  Federated Analytics, SOAR, Security Essentials, UBA, Attack Analyzer, ARI, Mission Control, PCI,
-  InfoSec, CIM, or related security apps. Resolve Splunk security products and associated security
-  offerings to the correct local setup skill, install-only path, ES bundled workflow, or manual handoff."
+  security skill handles ES Essentials, ES Premier, ES native SOAR, Automated Threat Analysis,
+  Malware Reversing or Phishing Analysis agents, Security AI Assistant, Federated Analytics, SOAR,
+  Security Essentials, UBA, Attack Analyzer, ARI, Mission Control, PCI, InfoSec, CIM, or related
+  security apps. Resolve Splunk security products and associated security offerings to the correct
+  local setup skill, install-only path, ES bundled workflow, or manual handoff."
 compatibility: "Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package."
 metadata:
   splunk_cloud_10_5: "delegated"
@@ -86,6 +87,8 @@ specific setup skill.
 
 - Resolves a security product, capability, or related app name against the
   static security coverage catalog.
+- Resolves exact normalized catalog keys, names, and aliases before considering
+  fuzzy candidates; rejects low-confidence and tied fuzzy results.
 - Classifies coverage as `first_class`, `existing_skill`, `install_only`,
   `partial`, `bundled_es`, or `manual_gap`.
 - Routes first-class products to the product setup skills in this repo.
@@ -118,6 +121,9 @@ bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
   --execute
 ```
 
+Execution requires an exact, unique catalog key, product name, or alias. Fuzzy
+resolution is preview-only, even when `--execute --dry-run` is requested.
+
 Preview the exact routed action without changing Splunk:
 
 ```bash
@@ -141,6 +147,10 @@ bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
 
 - Prefer the resolved product skill for `first_class` and `existing_skill`
   results.
+- Require an exact unique identity before `--execute`; return ranked candidates
+  for low-confidence or ambiguous input instead of guessing.
+- Keep `ES Essentials` / `ES Premier` edition routing distinct from the
+  separate `Splunk Security Essentials` app.
 - Use `splunk-app-install` for `install_only` apps unless a future product
   skill is added.
 - Treat `bundled_es` results as Enterprise Security configuration scope.

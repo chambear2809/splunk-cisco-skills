@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1",
+    "source_commit": "83d9cd684c87d95d656c1458ef04895a7f1cbd8e",
+    "release_url": "https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1",
+    "linux_x64_archive": "gitleaks_8.30.1_linux_x64.tar.gz",
+    "linux_x64_sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  },
+  "reviewed_at": "2026-07-25",
+  "review_policy": "The baseline contains only fingerprints, line hashes, and redacted classification metadata. It never contains matched values. Commit-bound history fingerprints cannot suppress a finding introduced by a new commit. Current-tree false positives are removed only from a temporary scan snapshot after the exact reviewed source line passes SHA-256 verification; any line change fails closed and requires re-review.",
+  "history_fingerprint_count": 88,
+  "history_fingerprints_sha256": "8a1cf69c34acc6d7553f2a473b1f1e1c01b2514a902db01d0c6f95954c662531",
+  "history_categories": {
+    "documentation-and-placeholders": {
+      "count": 9,
+      "rationale": "Documentation and example templates contain literal option names, credential placeholders, curl authentication syntax, or PEM boundary text but no credential material."
+    },
+    "legacy-vendored-package-snapshots": {
+      "count": 19,
+      "rationale": "Removed historical Splunk package snapshots triggered generic patterns in vendored libraries, generated JavaScript, default configuration, and vendor test code. The immutable commit fingerprints are retained so newly added package content is still scanned."
+    },
+    "literal-guardrail-and-renderer-syntax": {
+      "count": 38,
+      "rationale": "First-party validators and renderers intentionally recognize or emit secret option names, file-backed credential syntax, curl flags, and PEM boundaries without embedding values."
+    },
+    "synthetic-security-tests": {
+      "count": 22,
+      "rationale": "Security tests intentionally use synthetic secret-shaped sentinels to verify rejection, file guardrails, and redaction. This includes the AWS-shaped value in the secret-like metric rejection test."
+    }
+  },
+  "current_tree_categories": {
+    "documentation-placeholder": "Documentation and example templates contain literal placeholders or command syntax, never credential values.",
+    "literal-guardrail-or-renderer-syntax": "First-party code recognizes or emits secret-related option names, file-backed credential syntax, or PEM boundaries without embedding credential material.",
+    "registry-metadata": "Generated or maintained registry metadata describes credential file arguments and secret-handling boundaries without values.",
+    "synthetic-security-test": "A test intentionally contains a synthetic secret-shaped sentinel or PEM boundary to verify rejection, parsing, or redaction behavior."
+  },
+  "current_tree_exemptions": [
+    {
+      "path": "CLOUD_DEPLOYMENT_MATRIX.md",
+      "line": 76,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f5ac29d5a618f4ef3377da473d515ed4c99825779ba0c63377a7d44eb68fa244",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/cisco-collaboration-setup/template.example",
+      "line": 24,
+      "rule_id": "generic-api-key",
+      "line_sha256": "4e1c2bf560d9ba806879e4949d8c9de786b2ae7a11b3bec5f78526fd436a1be9",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/galileo-mcp-server-setup/scripts/deep_audit.sh",
+      "line": 18,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f2bb7ad96ca9d614855ddce3a34e5f72433137ee7e457264eb635ef53a3e07c7",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/shared/app_registry.json",
+      "line": 408,
+      "rule_id": "generic-api-key",
+      "line_sha256": "c0156c0a6a6d347c9a238882387a52d8f6fb2726da4a43351fe2ab1aba72d7d4",
+      "category": "registry-metadata"
+    },
+    {
+      "path": "skills/splunk-cloud-acs-admin-setup/scripts/setup.sh",
+      "line": 35,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f5432b13fbfd211b4a52263162609729915e9db6ad5994a17610796628ce683b",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-cloud-acs-admin-setup/scripts/setup.sh",
+      "line": 39,
+      "rule_id": "generic-api-key",
+      "line_sha256": "cbd26928b3a80b702c54e512dfa81fe24a1ead507f0369867f6949ac5ddc75e7",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh",
+      "line": 33,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f5432b13fbfd211b4a52263162609729915e9db6ad5994a17610796628ce683b",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh",
+      "line": 37,
+      "rule_id": "generic-api-key",
+      "line_sha256": "cbd26928b3a80b702c54e512dfa81fe24a1ead507f0369867f6949ac5ddc75e7",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-cloud-data-manager-setup/SKILL.md",
+      "line": 86,
+      "rule_id": "generic-api-key",
+      "line_sha256": "37a44e8fa33e97155b7fa42cdc32aa0beb860b6db3355519f910fb6c45d5993c",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/splunk-enterprise-security-config/scripts/es_config_engine.py",
+      "line": 1655,
+      "rule_id": "generic-api-key",
+      "line_sha256": "afe9e4e2b671437fa86f1bc7056b5109214d7974f4ee9f2fe6b8b1260cd452ff",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-ingest-actions-setup/scripts/setup.sh",
+      "line": 26,
+      "rule_id": "generic-api-key",
+      "line_sha256": "21ce5d67cdfbeecb4e3120ef9b9e2f285862a7a14ca458ddd260a1db33de8ebf",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-mcp-server-setup/scripts/validate.sh",
+      "line": 26,
+      "rule_id": "generic-api-key",
+      "line_sha256": "6f212ed98bca0e086a1f9c1cc7c707b1ab63a166aedb952e621ebed736b5485a",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-observability-aws-integration/scripts/render_assets.py",
+      "line": 126,
+      "rule_id": "generic-api-key",
+      "line_sha256": "41bbb93a2bfdf2e1895d17c5fc9bb6f5f47d5611744ecb229507384dba0a6b10",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-observability-cisco-intersight-integration/scripts/render_assets.py",
+      "line": 125,
+      "rule_id": "private-key",
+      "line_sha256": "f74375cf58869138c7b1943a3139e4588109350d57b3d00cacc0059e8257490e",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-observability-cisco-nexus-integration/scripts/render_assets.py",
+      "line": 284,
+      "rule_id": "private-key",
+      "line_sha256": "5bea9c27b2ad8218764b472468502cd57e5216e5f37e2e87a6e7f81e327ae11d",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-observability-thousandeyes-integration/scripts/render_assets.py",
+      "line": 204,
+      "rule_id": "generic-api-key",
+      "line_sha256": "72c398103ac14b183e2be46a5f93e1392a1472116aee2ecc03bf9453a3fa7e23",
+      "category": "literal-guardrail-or-renderer-syntax"
+    },
+    {
+      "path": "skills/splunk-platform-pki-setup/references/edge-processor-pki.md",
+      "line": 109,
+      "rule_id": "curl-auth-user",
+      "line_sha256": "0a6021ba9690d2e9f540cad4a643921fc7467e2c7a41190cb0509a54890316b8",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/splunk-platform-pki-setup/references/key-format-and-permissions.md",
+      "line": 11,
+      "rule_id": "private-key",
+      "line_sha256": "bc7fbd7db7d81e7f141c0396bb44ec0bd8f3464794b3728245a7bee20db8ae87",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/splunk-platform-pki-setup/references/key-format-and-permissions.md",
+      "line": 12,
+      "rule_id": "private-key",
+      "line_sha256": "03d54e597c4b44e594bbeee76d5d2f6d96c798e81b05dfbfc39fe16dc3022d12",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "skills/splunk-platform-pki-setup/references/key-format-and-permissions.md",
+      "line": 13,
+      "rule_id": "private-key",
+      "line_sha256": "01f0a4eddfe02d9b32bf018f5155867be319568611fdb77f9f5db50487b89c7e",
+      "category": "documentation-placeholder"
+    },
+    {
+      "path": "tests/test_agent_mcp_core.py",
+      "line": 1156,
+      "rule_id": "generic-api-key",
+      "line_sha256": "2812cd63dd6b4f606e7d1aff0041cb5b678bc5bace31808d477d7074bfbce3ca",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_agent_mcp_core.py",
+      "line": 1174,
+      "rule_id": "jwt",
+      "line_sha256": "f79cfdfabf8d44eb5209b8c810a2097e3a281b51bba4ae7373d6ca5c3e920546",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_cisco_collaboration_setup.py",
+      "line": 880,
+      "rule_id": "generic-api-key",
+      "line_sha256": "5863b12e6116ca3943f9325692254af740cade6dfab8e14904d393639e5c1369",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_cisco_collaboration_setup.py",
+      "line": 1066,
+      "rule_id": "generic-api-key",
+      "line_sha256": "a8bbdec5a3e366d49c4bf78d2e77e212c5764404e7921cff8a4df00f05530241",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_live_validation_runner.py",
+      "line": 606,
+      "rule_id": "generic-api-key",
+      "line_sha256": "3ceb3e6cc5b81ac85e71a3d5c34797a85392444930304824c0ae1131e32caf23",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_enterprise_kubernetes_setup.py",
+      "line": 4538,
+      "rule_id": "private-key",
+      "line_sha256": "6bd539a72ffc59fb36b844d60c7b943db4d79c468921debe23887f339170eb3d",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_enterprise_security_config.py",
+      "line": 719,
+      "rule_id": "generic-api-key",
+      "line_sha256": "1ff92bc48287405ed0f2a20a183893a68b412223083a093863e12ee6a9e1129e",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_azure_integration.py",
+      "line": 928,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f4ab831fcdddc3d16590ba4360ebc87225f9b9a3fd08fa80f1c0cac3df42b080",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_azure_integration.py",
+      "line": 1190,
+      "rule_id": "private-key",
+      "line_sha256": "d14cb86f845f97c1468c511bc9f5ee9921c93fd03d952811e9c5e4fca2f93d52",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_database_monitoring_setup.py",
+      "line": 2900,
+      "rule_id": "aws-access-token",
+      "line_sha256": "c562d1c8d092d2f3bea7981654ce3e49746af0c0d73698465e0d308a091c81fd",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_gcp_integration.py",
+      "line": 970,
+      "rule_id": "generic-api-key",
+      "line_sha256": "f4ab831fcdddc3d16590ba4360ebc87225f9b9a3fd08fa80f1c0cac3df42b080",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_gcp_integration.py",
+      "line": 3003,
+      "rule_id": "private-key",
+      "line_sha256": "83ad8979707e896042e49af1d8ec5e7474cc5d36f1aa73a12647f298bb37060d",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_otel_collector_setup.py",
+      "line": 3200,
+      "rule_id": "private-key",
+      "line_sha256": "673a0a9100129e94f2d983c24a2c8429ed90e77243a8dccc34f7acb193204f57",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_otel_collector_setup.py",
+      "line": 3202,
+      "rule_id": "private-key",
+      "line_sha256": "adaad9d9280d7199d1a8507e2b972789ed7aa0e87f15feab619ebbc80193a4cc",
+      "category": "synthetic-security-test"
+    },
+    {
+      "path": "tests/test_splunk_observability_otel_collector_setup.py",
+      "line": 3204,
+      "rule_id": "private-key",
+      "line_sha256": "4915d3d567984166387437262abbaa7731c2e7d061bb2466e79576aa770c90f8",
+      "category": "synthetic-security-test"
+    }
+  ]
+}

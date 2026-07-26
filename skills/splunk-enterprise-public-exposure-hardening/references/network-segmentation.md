@@ -172,4 +172,6 @@ infrastructure.
 `ssh probe@bastion nc -zv`) to confirm `8089`, `8191`, `8065`, `9887`
 are NOT reachable from outside. Without this probe configured the
 checks are skipped and the operator is responsible for manual
-verification.
+verification. The value is POSIX argv syntax, not a shell expression: the
+renderer rejects shell metacharacters and invokes the parsed argument array
+with the target FQDN and port appended as two separate arguments.

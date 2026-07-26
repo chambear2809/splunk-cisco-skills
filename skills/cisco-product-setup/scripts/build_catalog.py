@@ -22,6 +22,7 @@ CATALOG_PATH = SKILL_ROOT / "catalog.json"
 OVERRIDES_PATH = SKILL_ROOT / "catalog_overrides.json"
 SCAN_SOURCE_MANIFEST_PATH = SKILL_ROOT / "scan_source.json"
 SCAN_SOURCE_FIXTURE_PATH = SKILL_ROOT / "scan_products.fixture.json"
+SCAN_SOURCETYPE_RECONCILIATION_PATH = SKILL_ROOT / "scan_sourcetype_reconciliation.json"
 SCAN_SOURCE_URL = "https://is4s.s3.amazonaws.com/scan/products.conf"
 SCAN_SOURCE_SCHEMA_VERSION = 1
 SCAN_GLOB = "splunk-cisco-app-navigator-*.tar.gz"
@@ -118,6 +119,15 @@ SCAN_LIST_FIELDS = (
     "aliases",
     "keywords",
 )
+RECONCILIATION_CHANGE_KINDS = {
+    "addition",
+    "addition_with_version_boundary",
+    "canonicalization",
+    "correction",
+    "product_reclassification",
+    "split_and_expand",
+    "version_boundary",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -564,6 +574,212 @@ def load_scan_package_source(scan_package: Path) -> tuple[list[dict], dict]:
         "app_version": scan_app_version(scan_package),
         "sha256": sha256_bytes(package_payload),
     }
+
+
+def sourcetype_set_sha256(values: list[str]) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            sorted(set(values)),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def sourcetype_map_sha256(values: dict[str, list[str]]) -> str:
+    normalized = {
+        product_id: sorted(set(sourcetypes))
+        for product_id, sourcetypes in sorted(values.items())
+    }
+    return hashlib.sha256(
+        json.dumps(
+            normalized,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def validate_scan_sourcetype_reconciliation(
+    scan_products: list[dict], scan_source: dict, known_skills: set[str]
+) -> None:
+    """Require a reviewed, source-bound disposition for the latest SCAN delta."""
+    contract = load_json(SCAN_SOURCETYPE_RECONCILIATION_PATH)
+    if contract.get("schema_version") != 2:
+        raise ValueError("Unsupported SCAN sourcetype reconciliation schema_version")
+
+    source_version = str(scan_source.get("catalog_version", "")).strip()
+    if contract.get("source_catalog_version") != source_version:
+        raise ValueError(
+            "SCAN sourcetype reconciliation is stale: "
+            f"{contract.get('source_catalog_version')!r} != {source_version!r}"
+        )
+    previous_version = str(contract.get("previous_source_catalog_version", "")).strip()
+    if not previous_version or previous_version == source_version:
+        raise ValueError(
+            "SCAN sourcetype reconciliation must identify a distinct previous catalog version"
+        )
+
+    reviewed_date = str(contract.get("reviewed_date", "")).strip()
+    try:
+        parsed_reviewed_date = date.fromisoformat(reviewed_date)
+    except ValueError as exc:
+        raise ValueError(
+            "SCAN sourcetype reconciliation reviewed_date must be valid YYYY-MM-DD"
+        ) from exc
+    if parsed_reviewed_date.isoformat() != reviewed_date or parsed_reviewed_date > date.today():
+        raise ValueError(
+            "SCAN sourcetype reconciliation reviewed_date must be canonical and not in the future"
+        )
+
+    entries = contract.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("SCAN sourcetype reconciliation entries must be a list")
+
+    products_by_id = {product["id"]: product for product in scan_products}
+    entry_ids: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("SCAN sourcetype reconciliation entries must be objects")
+        product_id = str(entry.get("product_id", "")).strip()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_]*", product_id):
+            raise ValueError(f"Invalid reconciled SCAN product ID: {product_id!r}")
+        entry_ids.append(product_id)
+
+        change_kind = str(entry.get("change_kind", "")).strip()
+        if change_kind not in RECONCILIATION_CHANGE_KINDS:
+            raise ValueError(
+                f"SCAN sourcetype reconciliation has invalid change_kind for {product_id}"
+            )
+
+        current_sourcetypes = sorted(
+            set(products_by_id.get(product_id, {}).get("sourcetypes", []))
+        )
+        current_hash = sourcetype_set_sha256(current_sourcetypes)
+        expected_hash = str(entry.get("current_sourcetypes_sha256", "")).strip()
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_hash) or expected_hash != current_hash:
+            raise ValueError(
+                f"SCAN sourcetype reconciliation current set changed for {product_id}"
+            )
+
+        added = entry.get("added_sourcetypes")
+        removed = entry.get("removed_sourcetypes")
+        if not isinstance(added, list) or not all(isinstance(value, str) for value in added):
+            raise ValueError(f"Invalid added_sourcetypes for {product_id}")
+        if not isinstance(removed, list) or not all(
+            isinstance(value, str) for value in removed
+        ):
+            raise ValueError(f"Invalid removed_sourcetypes for {product_id}")
+        if added != sorted(set(added)) or removed != sorted(set(removed)):
+            raise ValueError(
+                f"SCAN sourcetype reconciliation deltas must be sorted and unique for {product_id}"
+            )
+        if not added and not removed:
+            raise ValueError(f"Empty SCAN sourcetype reconciliation delta for {product_id}")
+        if set(added) & set(removed):
+            raise ValueError(
+                f"SCAN sourcetype reconciliation additions/removals overlap for {product_id}"
+            )
+        if set(added) - set(current_sourcetypes):
+            raise ValueError(
+                f"Reconciled additions are absent from current SCAN product {product_id}"
+            )
+        if set(removed) & set(current_sourcetypes):
+            raise ValueError(
+                f"Reconciled removals remain in current SCAN product {product_id}"
+            )
+        reconstructed_previous = sorted(
+            (set(current_sourcetypes) - set(added)) | set(removed)
+        )
+        previous_hash = str(entry.get("previous_sourcetypes_sha256", "")).strip()
+        if (
+            not re.fullmatch(r"[0-9a-f]{64}", previous_hash)
+            or previous_hash != sourcetype_set_sha256(reconstructed_previous)
+        ):
+            raise ValueError(
+                f"SCAN sourcetype reconciliation delta is incomplete for {product_id}"
+            )
+
+        owners = entry.get("owner_skills")
+        if not isinstance(owners, list) or not owners or not all(
+            isinstance(owner, str) and owner for owner in owners
+        ):
+            raise ValueError(f"Invalid owner_skills for {product_id}")
+        for owner in owners:
+            if owner not in known_skills:
+                raise ValueError(
+                    f"SCAN sourcetype reconciliation owner is not canonical: {owner}"
+                )
+            if not (REPO_ROOT / "skills" / owner / "SKILL.md").is_file():
+                raise ValueError(
+                    f"SCAN sourcetype reconciliation owner has no SKILL.md: {owner}"
+                )
+
+        resolution = str(entry.get("resolution", "")).strip()
+        if len(resolution) < 40:
+            raise ValueError(
+                f"SCAN sourcetype reconciliation needs a substantive resolution for {product_id}"
+            )
+
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, list) or not evidence:
+            raise ValueError(f"SCAN sourcetype reconciliation needs evidence for {product_id}")
+        for assertion in evidence:
+            if not isinstance(assertion, dict):
+                raise ValueError(f"Invalid reconciliation evidence for {product_id}")
+            rel_path = str(assertion.get("path", "")).strip()
+            evidence_path = (REPO_ROOT / rel_path).resolve()
+            if (
+                not rel_path
+                or evidence_path == REPO_ROOT
+                or REPO_ROOT not in evidence_path.parents
+                or not evidence_path.is_file()
+            ):
+                raise ValueError(
+                    f"Invalid reconciliation evidence path for {product_id}: {rel_path!r}"
+                )
+            required_tokens = assertion.get("required_tokens")
+            if not isinstance(required_tokens, list) or not required_tokens or not all(
+                isinstance(token, str) and token for token in required_tokens
+            ):
+                raise ValueError(
+                    f"Invalid reconciliation evidence tokens for {product_id}: {rel_path}"
+                )
+            evidence_text = evidence_path.read_text(encoding="utf-8")
+            missing_tokens = [
+                token for token in required_tokens if token not in evidence_text
+            ]
+            if missing_tokens:
+                raise ValueError(
+                    f"Reconciliation evidence {rel_path} is missing tokens for "
+                    f"{product_id}: {missing_tokens}"
+                )
+
+    if len(entry_ids) != len(set(entry_ids)):
+        raise ValueError("Duplicate product IDs in SCAN sourcetype reconciliation")
+    if entry_ids != sorted(entry_ids):
+        raise ValueError(
+            "SCAN sourcetype reconciliation entries must be sorted by product_id"
+        )
+
+    unchanged_products = {
+        product_id: sorted(set(product.get("sourcetypes", [])))
+        for product_id, product in products_by_id.items()
+        if product_id not in set(entry_ids)
+    }
+    expected_unchanged_hash = str(
+        contract.get("unchanged_products_sourcetypes_sha256", "")
+    ).strip()
+    actual_unchanged_hash = sourcetype_map_sha256(unchanged_products)
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", expected_unchanged_hash)
+        or expected_unchanged_hash != actual_unchanged_hash
+    ):
+        raise ValueError(
+            "SCAN sourcetype reconciliation omitted a changed product; "
+            "review the complete source delta"
+        )
 
 
 def synthetic_product_entry(raw: dict) -> dict:
@@ -1491,6 +1707,9 @@ def build_catalog(scan_package: Path | None = None) -> dict:
     products = []
     if scan_package is None:
         scan_products, scan_source = load_scan_source_fixture()
+        validate_scan_sourcetype_reconciliation(
+            scan_products, scan_source, known_skills
+        )
     else:
         scan_products, scan_source = load_scan_package_source(scan_package)
     source_products = scan_products + load_synthetic_products(overrides_doc)

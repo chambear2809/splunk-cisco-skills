@@ -35,9 +35,12 @@ REQUIRED_TOP_LEVEL = [
     "skills/shared/skill_catalog.py",
     "skills/shared/scripts/generate_skill_catalog.py",
     "skills/shared/deprecated_skill_aliases.md",
+    "skills/shared/product_feature_coverage.json",
     "skills/shared/skill_product_registry.json",
     "skills/shared/skill_validation_registry.json",
     ".gitattributes",
+    ".gitleaks-baseline.json",
+    ".gitleaksignore",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
     ".github/ISSUE_TEMPLATE/bug_report.md",
@@ -47,6 +50,8 @@ REQUIRED_TOP_LEVEL = [
     "agent/splunk_cisco_skills_mcp/__init__.py",
     "agent/splunk_cisco_skills_mcp/core.py",
     "agent/splunk_cisco_skills_mcp/server.py",
+    "scripts/run_secret_scan.py",
+    "scripts/validate_tracked_configs.py",
     "requirements-agent.txt",
 ]
 
@@ -197,6 +202,7 @@ LOCAL_ARTIFACT_ROOTS = [
 ]
 
 TRACKED_ARTIFACT_PATTERNS = [
+    re.compile(r"^\.codex-stage(?:/|$)"),
     re.compile(r"^credentials$"),
     re.compile(r"(^|/)template\.local$"),
     *[re.compile(rf"^{re.escape(root)}/") for root in LOCAL_ARTIFACT_ROOTS],
@@ -207,6 +213,7 @@ TRACKED_ARTIFACT_PATTERNS = [
 ]
 
 REQUIRED_GITIGNORE_LINES = [
+    "/.codex-stage/",
     "credentials",
     "**/template.local",
     *[f"/{root}/" for root in LOCAL_ARTIFACT_ROOTS],
@@ -529,10 +536,11 @@ def check_product_feature_coverage_contract(errors: list[str]) -> None:
         return
     text = doc_path.read_text(encoding="utf-8")
     for fragment in (
-        "Skill catalog",
+        "Canonical skill catalog",
         "App/package routing",
-        "Product routers",
-        "Production safety",
+        "Source provenance",
+        "Stable feature identity",
+        "Router/catalog parity",
         "audit_product_feature_coverage.py",
     ):
         if fragment not in text:

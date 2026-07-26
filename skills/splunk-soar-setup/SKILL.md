@@ -128,18 +128,21 @@ operator inspects the automation user and revokes any orphan token.
 Render a single-instance unprivileged install:
 
 ```bash
+SOAR_TGZ_SHA256="$(awk '{print $1}' /secure/vendor/splunk-soar.sha256)"
 bash skills/splunk-soar-setup/scripts/setup.sh \
   --phase render \
   --soar-platform onprem-single \
   --soar-home /opt/soar \
   --soar-https-port 8443 \
   --soar-hostname soar01.example.com \
-  --soar-tgz /tmp/splunk_soar-unpriv-8.5.0.tgz
+  --soar-tgz /tmp/splunk_soar-unpriv-8.5.0.tgz \
+  --soar-tgz-sha256 "${SOAR_TGZ_SHA256}"
 ```
 
 Render a 3-node cluster with external PostgreSQL on AWS RDS:
 
 ```bash
+SOAR_TGZ_SHA256="$(awk '{print $1}' /secure/vendor/splunk-soar.sha256)"
 bash skills/splunk-soar-setup/scripts/setup.sh \
   --phase render \
   --soar-platform onprem-cluster \
@@ -148,6 +151,7 @@ bash skills/splunk-soar-setup/scripts/setup.sh \
   --soar-hosts soar01,soar02,soar03 \
   --soar-ssh-known-hosts-file /secure/ssh/known_hosts \
   --soar-tgz /tmp/splunk_soar-unpriv-8.5.0.tgz \
+  --soar-tgz-sha256 "${SOAR_TGZ_SHA256}" \
   --external-pg "mode=rds,host=soar-db.cluster-xyz.us-east-1.rds.amazonaws.com,port=5432" \
   --external-gluster gluster01,gluster02 \
   --external-es es01,es02,es03 \
@@ -178,6 +182,14 @@ All mutating phases (`apply`, `onprem-single`, `onprem-cluster`,
 `automation-broker`, `splunk-side-apps`, and `all`) require
 the explicit `--apply` gate. Render, preflight, status, and validation remain
 non-mutating.
+Mutating on-prem package phases additionally require
+`--soar-tgz-sha256` sourced from a trusted vendor or controlled artifact
+handoff. The wrapper validates that digest and the complete archive member
+graph before rendering or contacting a cluster host. Each installer extracts
+into a private validation stage before privileged host changes, requires the
+single top-level `splunk-soar` root and non-link installer entrypoints, then
+moves the validated root through a private same-filesystem promotion stage
+without replacing an existing installation.
 `--phase es-integration` exits nonzero before any mutation because the supported
 ES engine models `conf-essoar` as inventory/preflight-only. Complete tenant
 pairing, token entry, notable forwarding, and Adaptive Response verification in
@@ -218,6 +230,7 @@ Under `splunk-soar-rendered/`:
 - `onprem-single/{prepare-system.sh, install-soar.sh, post-install-checklist.md}`
 - `onprem-cluster/{make-cluster-node.sh, backup.sh, restore.sh}`
 - `onprem-cluster/external-services/{postgres-rds.tf, postgres-local.sh, gluster-volume.sh, elasticsearch.yml, haproxy.cfg}`
+- `shared/safe_extract_tar.py`
 - `cloud/{onboarding-checklist.md, jwt-token-helper.sh, ip-allowlist.json, apply-allowlist.sh, automation-user.sh}`
 - `automation-broker/{docker-compose.yml, podman-compose.yml, install.sh, add-ca-certificate.sh, preflight.sh}`
 - `splunk-side/{install-app-for-soar.sh, install-app-for-soar-export.sh, configure-phantom-endpoint.sh}`

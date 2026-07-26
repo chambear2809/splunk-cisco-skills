@@ -267,6 +267,12 @@ the app. Macro updates run over search-tier REST.
 | `cisco:dc:aci:health` | `cisco_nexus_aci://health_*`, `cisco_nexus_aci://fex` | Fabric health scores, FEX status |
 | `cisco:dc:aci:authentication` | `cisco_nexus_aci://authentication` | APIC session/login records |
 
+For Nexus Dashboard, use the current SCAN-advertised `cisco:dc:nd:*` family
+documented in [reference.md](reference.md). The local `1.2.0` package still
+contains version-bound `fabrics` and `switches` inputs, but those two
+sourcetypes are no longer advertised by pinned SCAN catalog
+`2026_07_09_1837` and therefore require direct event/dashboard evidence.
+
 ## MCP Server Integration
 
 ```bash

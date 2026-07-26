@@ -82,7 +82,7 @@ def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_cataly
 if [[ -n "${def}" ]]; then
     pass "cisco_catalyst_app_index macro defined: ${def}"
     for idx in "catalyst" "ise" "sdwan" "cybervision"; do
-        if echo "${def}" | grep -q "${idx}"; then
+        if [[ "${def}" == *"${idx}"* ]]; then
             pass "  Index '${idx}' included in macro"
         else
             completion_issue "Index '${idx}' is not in cisco_catalyst_app_index — dashboards will not search it"
@@ -90,6 +90,23 @@ if [[ -n "${def}" ]]; then
     done
 else
     completion_issue "cisco_catalyst_app_index macro not found; dashboard searches are not aligned"
+fi
+
+sourcetype_def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_app_sourcetypes" "definition" 2>/dev/null || true)
+if [[ -n "${sourcetype_def}" ]]; then
+    pass "cisco_catalyst_app_sourcetypes macro is defined"
+    for source_family in "cisco:dnac*" "cisco:catalyst:center:*" "cisco:ise*" "cisco:sdwan*" "cisco:thousandeyes:*"; do
+        if [[ "${sourcetype_def}" == *"${source_family}"* ]]; then
+            pass "  Sourcetype family '${source_family}' included in macro"
+        else
+            completion_issue "Sourcetype family '${source_family}' is missing from cisco_catalyst_app_sourcetypes"
+        fi
+    done
+    if [[ "${sourcetype_def}" == *"cisco:thousandeyes:test"* || "${sourcetype_def}" == *"cisco:sgacl:logs"* ]]; then
+        warn "Sourcetype macro still contains a retired SCAN alias; run setup.sh --macros-only"
+    fi
+else
+    completion_issue "cisco_catalyst_app_sourcetypes macro not found; dashboard source coverage is not aligned"
 fi
 
 view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \

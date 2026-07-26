@@ -55,6 +55,17 @@ Input type prefix: `cisco_nexus_dashboard://`
 | `mso_fabric_policy` | Orchestrator | `orchestrator_arguments=fabric policy` | 300s | `cisco_nd` |
 | `mso_audit_user` | Orchestrator | `orchestrator_arguments=audit user` | 300s | `cisco_nd` |
 
+The repo-inspected app `1.2.0` still ships the `fabrics` and `switches` inputs
+and parser stanzas. However, pinned SCAN catalog `2026_07_09_1837` no longer
+advertises `cisco:dc:nd:fabrics` or `cisco:dc:nd:switches`. Keep those inputs
+version-bound: they may be enabled for a reviewed `1.2.0` deployment, but do
+not count them as current SCAN product coverage without observed event and
+dashboard evidence. The current advertised Nexus Dashboard family is:
+`cisco:dc:nd:advisories`, `cisco:dc:nd:anomalies`,
+`cisco:dc:nd:congestion`, `cisco:dc:nd:endpoints`, `cisco:dc:nd:flows`,
+`cisco:dc:nd:mso`, `cisco:dc:nd:protocols`, and `cisco:dc:nd:syslog`, plus
+`cisco:dc:mso:syslog`.
+
 ### Nexus Dashboard Account Configuration Fields
 
 | Field | Description |

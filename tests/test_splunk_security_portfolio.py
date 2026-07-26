@@ -64,14 +64,14 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
         "--json",
     )
 
-    assert payload["last_verified"] == "2026-05-26"
+    assert payload["last_verified"] == "2026-07-25"
     entries = {entry["key"]: entry for entry in payload["entries"]}
-    assert len(entries) == 27
+    assert len(entries) == 30
     assert Counter(entry["status"] for entry in payload["entries"]) == {
         "first_class": 12,
-        "existing_skill": 3,
+        "existing_skill": 5,
         "partial": 3,
-        "bundled_es": 9,
+        "bundled_es": 10,
     }
     assert not any(entry["status"] in {"install_only", "manual_gap"} for entry in payload["entries"])
 
@@ -88,6 +88,8 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
         assert entries[key]["route"]
 
     associated = {
+        "es-essentials-edition": "existing_skill",
+        "es-premier-edition": "existing_skill",
         "soar-export": "first_class",
         "mission-control": "bundled_es",
         "es-native-soar": "bundled_es",
@@ -105,12 +107,51 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
         "lookup-file-editing": "first_class",
         "cim": "existing_skill",
         "automation-broker": "partial",
+        "automated-threat-analysis": "bundled_es",
     }
     for key, status in associated.items():
         assert entries[key]["status"] == status
 
 
 def test_security_portfolio_router_resolves_current_es_capability_names() -> None:
+    for query, expected_key in {
+        "ES Essentials": "es-essentials-edition",
+        "ES Premier": "es-premier-edition",
+        "Automated Threat Analysis": "automated-threat-analysis",
+        "Automated Threat Analysis powered by Splunk Attack Analyzer": "automated-threat-analysis",
+        "Phishing Analysis Agent": "automated-threat-analysis",
+        "Malware Reversing Agent": "automated-threat-analysis",
+    }.items():
+        current_identity = load_json_from_bash(
+            "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+            "--product",
+            query,
+            "--json",
+        )
+        assert current_identity["entry"]["key"] == expected_key
+        assert current_identity["match"]["type"] == "exact"
+
+    separate_security_essentials_app = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "Security Essentials",
+        "--json",
+    )
+    assert separate_security_essentials_app["entry"]["key"] == "security-essentials"
+
+    automated_threat_analysis = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "Automated Threat Analysis",
+        "--json",
+    )
+    assert automated_threat_analysis["entry"]["route"] == [
+        "splunk-enterprise-security-config",
+        "splunk-attack-analyzer-setup",
+        "splunk-soar-setup",
+    ]
+    assert automated_threat_analysis["action_command"] == []
+
     native_soar = load_json_from_bash(
         "skills/splunk-security-portfolio-setup/scripts/setup.sh",
         "--product",
@@ -162,6 +203,156 @@ def test_security_portfolio_router_resolves_current_es_capability_names() -> Non
         "--dry-run",
     ]
     assert "aws_s3" not in json.dumps(federated_analytics["route_command"])
+
+
+def test_security_portfolio_router_rejects_unsafe_fuzzy_resolution() -> None:
+    setup = REPO_ROOT / "skills/splunk-security-portfolio-setup/scripts/setup.sh"
+
+    fuzzy_preview = subprocess.run(
+        [
+            "bash",
+            str(setup),
+            "--product",
+            "automated threat analysis capability",
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert fuzzy_preview.returncode == 0, fuzzy_preview.stdout + fuzzy_preview.stderr
+    fuzzy_payload = json.loads(fuzzy_preview.stdout)
+    assert fuzzy_payload["entry"]["key"] == "automated-threat-analysis"
+    assert fuzzy_payload["match"]["type"] == "fuzzy"
+
+    fuzzy_execute = subprocess.run(
+        [
+            "bash",
+            str(setup),
+            "--product",
+            "automated threat analysis capability",
+            "--execute",
+            "--dry-run",
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert fuzzy_execute.returncode == 2
+    fuzzy_execute_payload = json.loads(fuzzy_execute.stdout)
+    assert fuzzy_execute_payload["ok"] is False
+    assert "exact, unique" in fuzzy_execute_payload["error"]
+
+    low_confidence = subprocess.run(
+        ["bash", str(setup), "--product", "security app", "--json"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert low_confidence.returncode == 2
+    low_confidence_payload = json.loads(low_confidence.stdout)
+    assert low_confidence_payload["ok"] is False
+    assert "high-confidence" in low_confidence_payload["error"]
+    assert low_confidence_payload["candidates"]
+    scores = [candidate["score"] for candidate in low_confidence_payload["candidates"]]
+    assert scores == sorted(scores, reverse=True)
+
+    ambiguous = subprocess.run(
+        ["bash", str(setup), "--product", "enterprise security edition", "--json"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ambiguous.returncode == 2
+    ambiguous_payload = json.loads(ambiguous.stdout)
+    assert ambiguous_payload["ok"] is False
+    assert "Ambiguous" in ambiguous_payload["error"]
+    assert {
+        candidate["key"] for candidate in ambiguous_payload["candidates"][:2]
+    } == {"es-essentials-edition", "es-premier-edition"}
+
+    exact_execute = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "security-content-update",
+        "--execute",
+        "--dry-run",
+        "--json",
+    )
+    assert exact_execute["match"]["type"] == "exact"
+    assert exact_execute["would_execute"] == [
+        "bash",
+        "skills/splunk-security-content-update-setup/scripts/setup.sh",
+        "--install",
+    ]
+
+
+def test_security_portfolio_reference_table_is_catalog_derived() -> None:
+    result = subprocess.run(
+        [
+            "python3",
+            str(
+                REPO_ROOT
+                / "skills/splunk-security-portfolio-setup/scripts/render_reference_table.py"
+            ),
+            "--check",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matches catalog.json" in result.stdout
+
+
+def test_security_portfolio_validator_requires_current_unique_identities(
+    tmp_path: Path,
+) -> None:
+    catalog_path = (
+        REPO_ROOT / "skills/splunk-security-portfolio-setup/catalog.json"
+    )
+    validate = (
+        REPO_ROOT / "skills/splunk-security-portfolio-setup/scripts/validate.sh"
+    )
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+
+    missing_current = dict(catalog)
+    missing_current["entries"] = [
+        entry
+        for entry in catalog["entries"]
+        if entry["key"] != "automated-threat-analysis"
+    ]
+    missing_path = tmp_path / "missing-current.json"
+    missing_path.write_text(json.dumps(missing_current), encoding="utf-8")
+    missing_result = subprocess.run(
+        ["bash", str(validate), "--catalog", str(missing_path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert missing_result.returncode != 0
+    assert "automated-threat-analysis" in missing_result.stdout
+
+    duplicate_identity = json.loads(json.dumps(catalog))
+    duplicate_identity["entries"][1]["aliases"].append("enterprise security")
+    duplicate_path = tmp_path / "duplicate-identity.json"
+    duplicate_path.write_text(json.dumps(duplicate_identity), encoding="utf-8")
+    duplicate_result = subprocess.run(
+        ["bash", str(validate), "--catalog", str(duplicate_path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert duplicate_result.returncode != 0
+    assert "normalized identity 'enterprise security' is shared" in duplicate_result.stdout
 
 
 def test_security_portfolio_router_preserves_specific_handoffs() -> None:

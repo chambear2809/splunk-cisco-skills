@@ -124,6 +124,52 @@ The add-on package supplies the event-log ingestion inputs and index settings
 that are not created by the app-only package. Keep `TA-cisco-cloud-security-addon`
 installed before validating production event-log coverage.
 
+## SCAN Sourcetype Contract
+
+The pinned SCAN catalog version `2026_07_09_1837` identifies these current
+Secure Access sourcetypes:
+
+```text
+cisco:cloud_security:appdiscovery
+cisco:cloud_security:audit
+cisco:cloud_security:dlp
+cisco:cloud_security:dns
+cisco:cloud_security:fileevent
+cisco:cloud_security:firewall
+cisco:cloud_security:intrusion
+cisco:cloud_security:ntg
+cisco:cloud_security:privateapps
+cisco:cloud_security:proxy
+cisco:cloud_security:ravpn
+cisco:cloud_security:ztna
+cisco:cloud_security:ztnaenrollment
+cisco:cloud_security:ztnaflow
+cisco:secure_access:*
+cisco:secure_access:alerts_accessrulechanges
+cisco:secure_access:alerts_apianomaly
+cisco:secure_access:alerts_behavioranalytics
+cisco:secure_access:alerts_connectivity_tunnels
+cisco:secure_access:security_events_dlp
+cisco:secure_access:security_events_dns
+cisco:secure_access:security_events_firewall
+cisco:secure_access:security_events_intrusion
+cisco:secure_access:security_events_ravpn
+cisco:secure_access:security_events_web
+cisco:secure_access:security_events_ztna
+```
+
+This catalog revision adds `cisco:cloud_security:ntg`, four split alert
+sourcetypes, and `cisco:secure_access:security_events_firewall`. It retires the
+combined `cisco:secure_access:security_events_andalerts` alias. The validator
+requires event evidence from a current `cisco:cloud_security:*` or
+`cisco:secure_access:*` family and warns when the retired combined alias is
+still present.
+
+For Umbrella-specific coverage, the current subset is audit, DLP, DNS,
+firewall, and proxy. `cisco:cloud_security:appdiscovery` remains valid for
+Secure Access but is no longer classified as an Umbrella sourcetype;
+`cisco:cloud_security:ip` is no longer in the current SCAN contract.
+
 ## Validation Checklist
 
 - `cisco-cloud-security` is installed
@@ -135,10 +181,12 @@ installed before validating production event-log coverage.
 - `dashboard_settings` and `refresh_rate` are initialized when dashboard defaults are desired
 - optional `cloudlock_settings`, `selected_destination_lists`, and `s3_indexes`
   are present when those dashboard features are in scope
+- data-flow evidence uses a current Secure Access sourcetype family rather
+  than merely finding unrelated events in a configured index
 
 ## Completion Validation
 
 `validate.sh --completion`/`--strict` requires org configuration, visible
-shipped views, and nonzero data flow in a configured index. The no-flag form is
-warning-oriented diagnostics; `--skip-data-flow` is incompatible with strict
-completion.
+shipped views, nonzero data flow in a configured index, and current Secure
+Access sourcetype-family evidence. The no-flag form is warning-oriented
+diagnostics; `--skip-data-flow` is incompatible with strict completion.

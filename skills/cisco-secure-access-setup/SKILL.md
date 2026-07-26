@@ -261,5 +261,8 @@ The current skill automates:
 
 Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
 to require an org/global-org configuration, dashboard views, and events in at
-least one configured org or S3-backed index. Strict mode rejects
-`--skip-data-flow` because it cannot prove completion without event evidence.
+least one configured org or S3-backed index using a current
+`cisco:cloud_security:*` or `cisco:secure_access:*` sourcetype. Strict mode
+rejects `--skip-data-flow` because it cannot prove completion without typed
+event evidence. See [reference.md](reference.md) for the source-backed current
+sourcetype ledger and retired-alias migration note.

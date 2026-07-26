@@ -54,6 +54,7 @@ projects/tmp-*
 /skills/splunk-itsi-config/reports/
 
 # --- Local rendered deployment assets ---
+/.codex-stage/
 /cisco-isovalent-platform-rendered/
 /meraki-aam-live-validation/
 /meraki-aam-thousandeyes-rendered/

@@ -7,6 +7,21 @@ Complete catalog of all data inputs, default arguments, and recommended index ma
 > (overriding these defaults); adjust the interval per input afterward if a
 > higher-frequency source (e.g., audit logs) needs it.
 
+## SCAN Canonicalization Boundary
+
+The pinned SCAN `2026_07_09_1837` source treats `cisco:dnac:*`,
+`cisco:ise:*`, and `cisco:sdwan:*` as the current output families. It no
+longer advertises the older Catalyst Center `cisco:catalyst:*` aliases,
+unqualified `cisco:dnac:custom` (the current wildcard is
+`cisco:dnac:custom:*`), unqualified `cisco:ise`, `cisco:ise:custom`,
+`cisco:sdwan:custom`, `cisco:sdwan:sytem:logs`, or `cisco:sgacl:logs`.
+
+The repo-inspected Catalyst TA `3.1.0` still contains compatibility parser
+stanzas for several old inputs and normalizes them to canonical outputs such as
+`cisco:ise:syslog`, `cisco:sdwan:system:logs`, and
+`cisco:sdwan:sgacl:logs`. Treat those old names as parser compatibility, not as
+current dashboard or completion-search contracts.
+
 ## Catalyst Center (DNAC) Inputs
 
 Input type prefix: `cisco_catalyst_dnac_`

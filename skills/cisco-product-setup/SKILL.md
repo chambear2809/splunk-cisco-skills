@@ -154,14 +154,22 @@ output lists for the resolved product.
   version, raw source SHA-256, and normalized fixture SHA-256.
 - `scan_products.fixture.json` is the sanitized, package-free source fixture
   consumed by clean-clone builds.
+- `scan_sourcetype_reconciliation.json` binds the current SCAN version to every
+  reviewed sourcetype delta, the previous and current complete-set hashes, a
+  snapshot of every unchanged product, canonical owner skills, and downstream
+  evidence. This makes omitted product changes and incomplete per-product
+  deltas fail closed.
 - `catalog.json` is the generated runtime catalog.
 - `scripts/build_catalog.py --check` verifies that `catalog.json` matches the
-  pinned fixture and overrides, including both provenance checksums.
+  pinned fixture and overrides, including both provenance checksums and the
+  sourcetype reconciliation contract.
 - `scripts/build_catalog.py --write` regenerates `catalog.json` after editing
   `catalog_overrides.json`.
 - `scripts/build_catalog.py --refresh-source --write` fetches the public SCAN
-  `products.conf`, refreshes the fixture and manifest, and regenerates the
-  runtime catalog. Review all source and catalog diffs before commit.
+  `products.conf` and refreshes the fixture and manifest. When the source
+  version changes, catalog generation intentionally stops until
+  `scan_sourcetype_reconciliation.json` and its downstream evidence are
+  reviewed; rerun `--write` after that review.
 - `scripts/build_catalog.py --check-live-source` is the networked drift check;
   it is scheduled separately from pull-request gating.
 - `--scan-package PATH` produces one-off comparison output from a reviewed

@@ -17,26 +17,7 @@ _splunkbase_append_cleanup_trap() {
         return
     fi
 
-    local cleanup_cmd="${1:-}"
-    shift || true
-    local signal trap_output body existing
-    [[ -n "${cleanup_cmd}" ]] || return 0
-    for signal in "$@"; do
-        trap_output="$(trap -p "${signal}" || true)"
-        existing=""
-        if [[ -n "${trap_output}" ]]; then
-            body="${trap_output#trap -- }"
-            body="${body%" ${signal}"}"
-            existing="$(eval "printf '%s' ${body}")"
-        fi
-        if [[ -n "${existing}" ]]; then
-            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
-            trap "${existing}; ${cleanup_cmd}" "${signal}"
-        else
-            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
-            trap "${cleanup_cmd}" "${signal}"
-        fi
-    done
+    credential_curl_append_cleanup_trap "$@"
 }
 
 get_splunkbase_session() {

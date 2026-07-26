@@ -1,0 +1,297 @@
+{
+  "entries": [
+    {
+      "added_sourcetypes": [],
+      "change_kind": "canonicalization",
+      "current_sourcetypes_sha256": "51ec2166fd8dbd13342ed31097873b3434bded1125c6d5314faf3a50abfcc1c9",
+      "previous_sourcetypes_sha256": "e8d094408c285d964eb331f7011504edeed7f9a60474ca6534544aec95bc6ff1",
+      "evidence": [
+        {
+          "path": "skills/cisco-catalyst-ta-setup/reference.md",
+          "required_tokens": [
+            "cisco:dnac:*",
+            "cisco:catalyst:*",
+            "cisco:dnac:custom"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-catalyst-ta-setup"
+      ],
+      "product_id": "cisco_catalyst_center",
+      "removed_sourcetypes": [
+        "cisco:catalyst:client",
+        "cisco:catalyst:clienthealth",
+        "cisco:catalyst:compliance",
+        "cisco:catalyst:devicehealth",
+        "cisco:catalyst:issue",
+        "cisco:catalyst:networkhealth",
+        "cisco:catalyst:securityadvisory",
+        "cisco:dnac:custom"
+      ],
+      "resolution": "Use the canonical cisco:dnac:* outputs and cisco:dnac:custom:* wildcard; retain old package parser aliases only as compatibility inputs."
+    },
+    {
+      "added_sourcetypes": [],
+      "change_kind": "canonicalization",
+      "current_sourcetypes_sha256": "9937170397067438b7b1d944bb69ae49b62fe7a3747c092813ceade6e539a716",
+      "previous_sourcetypes_sha256": "d65d08e7efc2670dee7561e885ede34c3308d30433f0afa87907ca81283e590a",
+      "evidence": [
+        {
+          "path": "skills/cisco-catalyst-ta-setup/reference.md",
+          "required_tokens": [
+            "cisco:sdwan:system:logs",
+            "cisco:sdwan:sgacl:logs",
+            "cisco:sdwan:sytem:logs",
+            "cisco:sgacl:logs"
+          ]
+        },
+        {
+          "path": "skills/cisco-enterprise-networking-setup/reference.md",
+          "required_tokens": [
+            "cisco:sdwan:sgacl:logs"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-catalyst-ta-setup",
+        "cisco-enterprise-networking-setup"
+      ],
+      "product_id": "cisco_catalyst_sdwan",
+      "removed_sourcetypes": [
+        "cisco:sdwan:custom",
+        "cisco:sdwan:custom:*",
+        "cisco:sdwan:sytem:logs",
+        "cisco:sgacl:logs"
+      ],
+      "resolution": "Use canonical cisco:sdwan:* outputs. The inspected TA may normalize the misspelling and unqualified SGACL alias, but dashboards no longer depend on them."
+    },
+    {
+      "added_sourcetypes": [],
+      "change_kind": "canonicalization",
+      "current_sourcetypes_sha256": "dab4ba13a7661b59e9e472e89a360366aba66078476b6968661b42410815fa66",
+      "previous_sourcetypes_sha256": "a96abe54170100a92ced5d0833cc8b89fa859b0536ff21c431e428dad2d8bee5",
+      "evidence": [
+        {
+          "path": "skills/cisco-catalyst-ta-setup/reference.md",
+          "required_tokens": [
+            "cisco:ise:*",
+            "cisco:ise:syslog",
+            "cisco:ise:custom"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-catalyst-ta-setup"
+      ],
+      "product_id": "cisco_ise",
+      "removed_sourcetypes": [
+        "cisco:ise",
+        "cisco:ise:custom"
+      ],
+      "resolution": "Use qualified cisco:ise:* outputs and cisco:ise:custom:*; unqualified cisco:ise remains parser compatibility rather than a completion target."
+    },
+    {
+      "added_sourcetypes": [
+        "cisco:multicloud:defense:fqdn_resolve"
+      ],
+      "change_kind": "correction",
+      "current_sourcetypes_sha256": "9bfe666030dab304ac93f9e74c02296511e62e77053f414c37a28d69c8cba817",
+      "previous_sourcetypes_sha256": "0bf79e22f7df7bfdf2039e85805098aa13c40463d98d1e20616d4ce7a4f7fc83",
+      "evidence": [
+        {
+          "path": "skills/cisco-security-cloud-setup/reference.md",
+          "required_tokens": [
+            "cisco:multicloud:defense:fqdn_resolve",
+            "cisco:multicloud:defense:fqdn_resoleve"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-security-cloud-setup"
+      ],
+      "product_id": "cisco_multicloud_defense",
+      "removed_sourcetypes": [
+        "cisco:multicloud:defense:fqdn_resoleve"
+      ],
+      "resolution": "Adopt the corrected fqdn_resolve spelling and keep the prior misspelling only in migration documentation."
+    },
+    {
+      "added_sourcetypes": [],
+      "change_kind": "version_boundary",
+      "current_sourcetypes_sha256": "68b1921c71d157515b883590268caf8f9c1f82470570cc3e7cc6d35583deb075",
+      "previous_sourcetypes_sha256": "f2c9acdbdc5548513ad73aab05edf389587ac11d6e18d5aa2f5ed8cf538eeaff",
+      "evidence": [
+        {
+          "path": "skills/cisco-dc-networking-setup/reference.md",
+          "required_tokens": [
+            "cisco:dc:nd:fabrics",
+            "cisco:dc:nd:switches",
+            "cisco:dc:nd:advisories"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-dc-networking-setup"
+      ],
+      "product_id": "cisco_nexus_dashboard",
+      "removed_sourcetypes": [
+        "cisco:dc:nd:fabrics",
+        "cisco:dc:nd:switches"
+      ],
+      "resolution": "The local 1.2.0 package still ships these inputs, but current SCAN no longer advertises them; require direct version-specific event and dashboard evidence."
+    },
+    {
+      "added_sourcetypes": [
+        "cisco:cloud_security:ntg",
+        "cisco:secure_access:alerts_accessrulechanges",
+        "cisco:secure_access:alerts_apianomaly",
+        "cisco:secure_access:alerts_behavioranalytics",
+        "cisco:secure_access:alerts_connectivity_tunnels",
+        "cisco:secure_access:security_events_firewall"
+      ],
+      "change_kind": "split_and_expand",
+      "current_sourcetypes_sha256": "f8154c0c280ece6451fabf808264e4c833fe1e7e518983a15382f9f7e83bc09d",
+      "previous_sourcetypes_sha256": "16de43bce03978624b1a0d4a5a4151dd96e466b2c33cf81230816eec75b1c3d1",
+      "evidence": [
+        {
+          "path": "skills/cisco-secure-access-setup/reference.md",
+          "required_tokens": [
+            "cisco:cloud_security:ntg",
+            "cisco:secure_access:alerts_accessrulechanges",
+            "cisco:secure_access:alerts_apianomaly",
+            "cisco:secure_access:alerts_behavioranalytics",
+            "cisco:secure_access:alerts_connectivity_tunnels",
+            "cisco:secure_access:security_events_firewall",
+            "cisco:secure_access:security_events_andalerts"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-secure-access-setup"
+      ],
+      "product_id": "cisco_secure_access",
+      "removed_sourcetypes": [
+        "cisco:secure_access:security_events_andalerts"
+      ],
+      "resolution": "Validate the current cloud_security and secure_access families, add the split alert and firewall types, and warn on the retired combined alias."
+    },
+    {
+      "added_sourcetypes": [
+        "cisco:spaces:firehose:health"
+      ],
+      "change_kind": "addition_with_version_boundary",
+      "current_sourcetypes_sha256": "6a7f692404ece028e2fc50b1bc8d9762a04d87bcff3786007d7cc871775d5d47",
+      "previous_sourcetypes_sha256": "1b5d55baa7c7c146362e47f0604c9391601ff75ed5af0c7972f83c43782c155e",
+      "evidence": [
+        {
+          "path": "skills/cisco-spaces-setup/reference.md",
+          "required_tokens": [
+            "cisco:spaces:firehose",
+            "cisco:spaces:firehose:health"
+          ]
+        },
+        {
+          "path": "skills/cisco-spaces-setup/scripts/validate.sh",
+          "required_tokens": [
+            "cisco:spaces:firehose:health"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-spaces-setup"
+      ],
+      "product_id": "cisco_spaces",
+      "removed_sourcetypes": [],
+      "resolution": "Require primary firehose events and report health events separately because the repo-local 1.0.7 fallback predates this SCAN addition."
+    },
+    {
+      "added_sourcetypes": [
+        "talos:domain",
+        "talos:ip",
+        "talos:url"
+      ],
+      "change_kind": "canonicalization",
+      "current_sourcetypes_sha256": "dd09bbccf49bba7aa0b93131fe7dfa967155c2179f480aa75b351597f92f7739",
+      "previous_sourcetypes_sha256": "dad9d4cab51e0ac1de32b93abc2f3c9a683c6a0bed5caa6f1866d5bb96549309",
+      "evidence": [
+        {
+          "path": "skills/cisco-talos-intelligence-setup/reference.md",
+          "required_tokens": [
+            "talos:domain",
+            "talos:ip",
+            "talos:url",
+            "cisco:talos"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-talos-intelligence-setup"
+      ],
+      "product_id": "cisco_talos",
+      "removed_sourcetypes": [
+        "cisco:talos"
+      ],
+      "resolution": "Use the package-emitted observable-specific talos sourcetypes; the former aggregate catalog label is not an event sourcetype."
+    },
+    {
+      "added_sourcetypes": [
+        "cisco:thousandeyes:account-group"
+      ],
+      "change_kind": "addition",
+      "current_sourcetypes_sha256": "aa07c74d7edb1c023cb383e1776c4686feb202b2320a9862045ad22cd52b4263",
+      "previous_sourcetypes_sha256": "fbb667a53c64a2cc11e4979b249d2eaf639640b79426bd579c00c5b83587f3ae",
+      "evidence": [
+        {
+          "path": "skills/cisco-thousandeyes-setup/reference.md",
+          "required_tokens": [
+            "cisco:thousandeyes:account-group",
+            "thousandeyes_account_group"
+          ]
+        },
+        {
+          "path": "skills/cisco-thousandeyes-setup/scripts/validate.sh",
+          "required_tokens": [
+            "cisco:thousandeyes:account-group"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-thousandeyes-setup"
+      ],
+      "product_id": "cisco_thousandeyes",
+      "removed_sourcetypes": [],
+      "resolution": "Document and validate account-group metadata written by metrics and event collectors into their configured indexes."
+    },
+    {
+      "added_sourcetypes": [],
+      "change_kind": "product_reclassification",
+      "current_sourcetypes_sha256": "7c17802fa86e0b595f50472cd79f22b8f2620f72d99cc9086db157b21f68f1ee",
+      "previous_sourcetypes_sha256": "08fc89ab7714e36e3ba405620d8d4a54e5f505d4aa7cef9b75d5641106094308",
+      "evidence": [
+        {
+          "path": "skills/cisco-secure-access-setup/reference.md",
+          "required_tokens": [
+            "cisco:cloud_security:appdiscovery",
+            "cisco:cloud_security:ip",
+            "For Umbrella-specific coverage"
+          ]
+        }
+      ],
+      "owner_skills": [
+        "cisco-secure-access-setup"
+      ],
+      "product_id": "cisco_umbrella",
+      "removed_sourcetypes": [
+        "cisco:cloud_security:appdiscovery",
+        "cisco:cloud_security:ip"
+      ],
+      "resolution": "Keep App Discovery under Secure Access but remove it and the old IP type from the Umbrella-specific coverage subset."
+    }
+  ],
+  "previous_source_catalog_version": "2026_06_26_1427",
+  "reviewed_date": "2026-07-25",
+  "schema_version": 2,
+  "source_catalog_version": "2026_07_09_1837",
+  "unchanged_products_sourcetypes_sha256": "8404974dcbbc73a79b7d22e5e7c90e2fdadae9d660e3d94db01b38a5fa1fdf10"
+}

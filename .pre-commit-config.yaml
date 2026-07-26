@@ -33,26 +33,32 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=1024"]
       - id: check-json
-        exclude: ^skills/cisco-product-setup/catalog\.json$
       - id: check-yaml
-        # Skip YAML files with custom tags / multi-doc oddities the generic
-        # parser doesn't like; .yamllint.yml is the canonical YAML linter.
+        args: ["--allow-multiple-documents"]
+        # Render-time {{TOKEN}} templates are parsed after constrained
+        # placeholder normalization by validate_tracked_configs.py.
         exclude: |
           (?x)^(
-            \.github/.*|
-            skills/splunk-itsi-config/.*|
-            skills/splunk-observability-otel-collector-setup/agents/.*
+            skills/splunk-connect-for-snmp-setup/templates/compose/docker-compose\.yml|
+            skills/splunk-connect-for-snmp-setup/templates/kubernetes/(namespace|values)\.yaml|
+            skills/splunk-connect-for-syslog-setup/templates/host/docker-compose\.yml|
+            skills/splunk-connect-for-syslog-setup/templates/kubernetes/(namespace|values)\.yaml
           )$
       - id: check-symlinks
       - id: detect-private-key
 
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
+    hooks:
+      - id: gitleaks
+
   - repo: local
     hooks:
       - id: bash-syntax
-        name: bash -n on all skills/**/*.sh
+        name: bash -n on all first-party shell scripts
         entry: bash -c 'for f in "$@"; do bash -n "$f" || exit 1; done' --
         language: system
-        files: ^skills/.*\.sh$
+        files: ^(agent|scripts|skills)/.*\.sh$
 
       - id: skill-frontmatter
         name: Agent Skills SKILL.md contract
@@ -72,10 +78,13 @@ repos:
             AGENTS\.md|
             CLAUDE\.md|
             \.mcp\.json|
+            \.gitleaks-baseline\.json|
+            \.gitleaksignore|
             \.cursor/mcp\.json|
             \.cursor/skills/.*|
             \.claude/commands/.*|
             agent/.*|
+            scripts/.*|
             skills/.*|
             requirements-agent\.txt|
             CHANGELOG\.md|
@@ -170,19 +179,18 @@ repos:
         language: system
         pass_filenames: false
         files: \.py$
-        args: [skills/, tests/, agent/]
+        args: [skills/, tests/, agent/, scripts/]
 
-      - id: yamllint-targets
-        name: yamllint (.github + ITSI templates + Observability agents)
-        entry: yamllint -c .yamllint.yml
+      - id: tracked-config-validation
+        name: Parse tracked JSON/YAML and lint tracked YAML
+        entry: python3 scripts/validate_tracked_configs.py --yamllint
         language: system
         pass_filenames: false
         files: |
           (?x)^(
             \.yamllint\.yml|
-            \.github/.*\.ya?ml|
-            skills/splunk-itsi-config/templates/.*|
-            skills/splunk-itsi-config/agents/.*|
-            skills/splunk-observability-otel-collector-setup/agents/.*
+            \.pre-commit-config\.yaml|
+            scripts/validate_tracked_configs\.py|
+            .*\.json|
+            .*\.ya?ml
           )$
-        args: [.github/, skills/splunk-itsi-config/templates, skills/splunk-itsi-config/agents]

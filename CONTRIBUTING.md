@@ -69,8 +69,8 @@ Run against the whole tree at any time:
 pre-commit run --all-files
 ```
 
-Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
-`bash -n` on every skill script, the Agent Skills frontmatter and
+Hooks include trailing-whitespace, all-tracked JSON/YAML validity, private-key
+and pinned Gitleaks detection, `bash -n` on every first-party shell script, the Agent Skills frontmatter and
 progressive-disclosure contract, the repo-readiness check (operator catalog links,
 agent catalog parity, and symlinks), generated deployment and skill-validation
 matrix freshness, `ruff`, and `yamllint`. The full
@@ -88,12 +88,13 @@ bats tests/*.bats
 python3 - <<'PY'
 import subprocess
 from pathlib import Path
-for path in sorted(Path("skills").rglob("*.sh")):
-    subprocess.run(["bash", "-n", str(path)], check=True)
+for root in ("agent", "skills", "scripts"):
+    for path in sorted(Path(root).rglob("*.sh")):
+        subprocess.run(["bash", "-n", str(path)], check=True)
 PY
-shellcheck --severity=warning $(find skills -name '*.sh' -print)
-ruff check skills/ tests/ agent/
-yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents
+shellcheck --severity=warning $(find agent skills scripts -name '*.sh' -print)
+ruff check skills/ tests/ agent/ scripts/
+python3 scripts/validate_tracked_configs.py --yamllint
 python3 skills/shared/scripts/generate_skill_catalog.py --check
 python3 skills/shared/scripts/generate_deployment_docs.py --check
 python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
@@ -108,6 +109,13 @@ fi
 python3 tests/check_skill_frontmatter.py
 python3 tests/check_repo_readiness.py
 ```
+
+CI also installs Gitleaks 8.30.1 from its checksum-verified official release
+archive and runs `scripts/run_secret_scan.py` against both the tracked tree and
+the complete Git history. The reviewed baseline stores only commit-bound
+fingerprints and hashes of exact false-positive lines. Never add matched secret
+text to `.gitleaksignore` or `.gitleaks-baseline.json`; a changed line must be
+removed from the baseline or explicitly re-reviewed.
 
 For MCP changes, also run the focused contract suites:
 

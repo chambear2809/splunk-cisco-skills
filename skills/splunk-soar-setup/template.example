@@ -13,6 +13,7 @@ soar_https_port: 8443
 soar_port_forward: false
 soar_hostname: soar01.example.com
 soar_tgz: /tmp/splunk_soar-unpriv-8.5.0.tgz
+soar_tgz_sha256: <vendor-verified-64-character-sha256>
 soar_fips: auto                # auto | require | disable
 
 # On-prem cluster only

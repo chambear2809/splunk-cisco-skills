@@ -3,5 +3,7 @@ interface:
   short_description: "Route Splunk security products to setup workflows"
   default_prompt: >-
     Use $splunk-security-portfolio-setup to resolve Splunk security products to
-    local setup skills, install-only paths, bundled ES workflows, manual
-    handoffs, and security portfolio gap analysis.
+    local setup skills, bundled ES workflows, and explicit handoffs. Distinguish
+    ES Essentials and ES Premier from the separate Security Essentials app,
+    recognize Automated Threat Analysis and its phishing/malware agents, and
+    require an exact unique product identity before any routed execution.

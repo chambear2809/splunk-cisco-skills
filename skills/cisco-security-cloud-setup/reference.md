@@ -58,6 +58,12 @@ This repo exposes them through product keys in `products.json` and
 | `secure_client_nvm` | `sbg_nvm_input` | Cisco Secure Client NVM | none | none | `index=main`, `interval=300`, `sourcetype=cisco:nvm:*` |
 | `secure_workload` | `sbg_sw_input` | Cisco Secure Workload | `type`, `port` | none | `index=cisco_secure_workload`, `interval=60`, `sourcetype=cisco:secure:workload` |
 
+For Multicloud Defense, pinned SCAN catalog `2026_07_09_1837` corrects the
+derived FQDN-resolution sourcetype to
+`cisco:multicloud:defense:fqdn_resolve`. The misspelled
+`cisco:multicloud:defense:fqdn_resoleve` value belongs only to older catalog
+metadata and must not be used in new searches or validation.
+
 ## Endpoint Pattern
 
 Each input type is managed through the app’s custom admin handler endpoint:

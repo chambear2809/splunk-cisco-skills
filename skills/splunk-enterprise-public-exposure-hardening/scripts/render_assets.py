@@ -355,6 +355,29 @@ def shell_quote(value: object) -> str:
     return shlex.quote(str(value))
 
 
+def external_probe_argv(value: str) -> list[str]:
+    if not value:
+        return []
+    if "\\" in value or re.search(r"[\x00-\x1f\x7f;&|<>`$(){}]", value):
+        die(
+            "--external-probe-cmd contains shell metacharacters or control characters; "
+            "provide a command and arguments only"
+        )
+    try:
+        argv = shlex.split(value, posix=True)
+    except ValueError as exc:
+        die(f"--external-probe-cmd is not valid POSIX argv syntax: {exc}")
+    if not argv or not argv[0]:
+        die("--external-probe-cmd must contain an executable")
+    if len(argv) > 64 or any(len(item) > 4096 for item in argv):
+        die("--external-probe-cmd exceeds the supported argv size")
+    return argv
+
+
+def shell_array_assignment(name: str, values: list[str]) -> str:
+    return f"{name}=(" + " ".join(shell_quote(value) for value in values) + ")"
+
+
 def csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -419,6 +442,7 @@ def validate(args: argparse.Namespace) -> None:
         die("--tls-policy=tls12_13 requires Splunk Enterprise 10.4.0 or later.")
     if args.auth_mode == "ldap":
         validate_ldap_args(args)
+    external_probe_argv(args.external_probe_cmd)
 
 
 def _validate_dn(value: str, option: str) -> None:
@@ -2932,7 +2956,7 @@ SOC 2 auditor needs your org's broader operational controls.
 def render_preflight(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     fqdn = shell_quote(args.public_fqdn)
-    probe = shell_quote(args.external_probe_cmd or "")
+    probe = shell_array_assignment("external_probe", external_probe_argv(args.external_probe_cmd))
     platform_helper = shell_quote(helper_path().with_name("platform_version_helpers.sh"))
     target_version = shell_quote(args.splunk_version)
     cert_path = shell_quote(args.server_cert_path)
@@ -2942,7 +2966,7 @@ def render_preflight(args: argparse.Namespace) -> str:
     return make_script(
         f"""splunk_home={splunk_home}
 fqdn={fqdn}
-external_probe={probe}
+{probe}
 cert_path={cert_path}
 public_ca_file={public_ca}
 platform_helper={platform_helper}
@@ -3196,9 +3220,9 @@ else
 fi
 
 # 14. External probe (ports must be UNREACHABLE from outside)
-if [[ -n "$external_probe" ]]; then
+if [[ "${{#external_probe[@]}}" -gt 0 ]]; then
   for port in 8089 8191 9887 8065; do
-    if eval "$external_probe $fqdn $port" >/dev/null 2>&1; then
+    if "${{external_probe[@]}}" "$fqdn" "$port" >/dev/null 2>&1; then
       fail "port $port is reachable from outside (must be blocked)"
     else
       ok "port $port is unreachable from outside"
@@ -3412,14 +3436,14 @@ echo "PREFLIGHT PASSED."
 
 def render_validate(args: argparse.Namespace) -> str:
     fqdn = shell_quote(args.public_fqdn)
-    probe = shell_quote(args.external_probe_cmd or "")
+    probe = shell_array_assignment("external_probe", external_probe_argv(args.external_probe_cmd))
     splunk_home = shell_quote(args.splunk_home)
     public_ca = shell_quote(args.public_ca_file or "")
     expected_auth_type = shell_quote(_auth_type_for(args))
     enable_hec = "true" if args.enable_hec == "true" else "false"
     return make_script(
         f"""fqdn={fqdn}
-external_probe={probe}
+{probe}
 splunk_home={splunk_home}
 public_ca_file={public_ca}
 expected_auth_type={expected_auth_type}
@@ -3555,9 +3579,9 @@ else
 fi
 
 # External port probe
-if [[ -n "$external_probe" ]]; then
+if [[ "${{#external_probe[@]}}" -gt 0 ]]; then
   for port in 8089 8191 9887 8065; do
-    if eval "$external_probe $fqdn $port" >/dev/null 2>&1; then
+    if "${{external_probe[@]}}" "$fqdn" "$port" >/dev/null 2>&1; then
       record "port_${{port}}_blocked" fail "reachable"
     else
       record "port_${{port}}_blocked" ok "unreachable"

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 RENDERER="${SCRIPT_DIR}/render_assets.py"
+SAFE_EXTRACTOR="${SCRIPT_DIR}/../../shared/scripts/safe_extract_tar.py"
 DEFAULT_RENDER_DIR_NAME="splunk-soar-rendered"
 
 PHASE="render"
@@ -20,6 +21,7 @@ SOAR_HTTPS_PORT="8443"
 SOAR_PORT_FORWARD="false"
 SOAR_HOSTNAME=""
 SOAR_TGZ=""
+SOAR_TGZ_SHA256=""
 SOAR_FIPS="auto"
 SOAR_HOSTS=""
 SOAR_SSH_USER="splunk"
@@ -54,6 +56,7 @@ Options:
   --soar-port-forward true|false
   --soar-hostname HOST
   --soar-tgz PATH
+  --soar-tgz-sha256 HEX
   --file PATH
   --soar-fips auto|require|disable
   --soar-hosts CSV
@@ -97,6 +100,7 @@ while [[ $# -gt 0 ]]; do
         --soar-port-forward) require_arg "$1" $# || exit 1; SOAR_PORT_FORWARD="$2"; shift 2 ;;
         --soar-hostname) require_arg "$1" $# || exit 1; SOAR_HOSTNAME="$2"; shift 2 ;;
         --soar-tgz|--file) require_arg "$1" $# || exit 1; SOAR_TGZ="$2"; shift 2 ;;
+        --soar-tgz-sha256|--file-sha256) require_arg "$1" $# || exit 1; SOAR_TGZ_SHA256="$2"; shift 2 ;;
         --soar-fips) require_arg "$1" $# || exit 1; SOAR_FIPS="$2"; shift 2 ;;
         --soar-hosts) require_arg "$1" $# || exit 1; SOAR_HOSTS="$2"; shift 2 ;;
         --soar-ssh-user) require_arg "$1" $# || exit 1; SOAR_SSH_USER="$2"; shift 2 ;;
@@ -145,6 +149,16 @@ print(Path(sys.argv[1]).expanduser().resolve(), end="")
 PY
 }
 
+resolve_abs_path_no_follow() {
+    python3 - "$1" <<'PY'
+import os
+from pathlib import Path
+import sys
+
+print(os.path.abspath(Path(sys.argv[1]).expanduser()), end="")
+PY
+}
+
 if [[ -n "${OUTPUT_DIR}" ]]; then
     OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 else
@@ -152,6 +166,9 @@ else
 fi
 if [[ -n "${SOAR_AUTOMATION_TOKEN_FILE}" ]]; then
     SOAR_AUTOMATION_TOKEN_FILE="$(resolve_abs_path "${SOAR_AUTOMATION_TOKEN_FILE}")"
+fi
+if [[ -n "${SOAR_TGZ}" ]]; then
+    SOAR_TGZ="$(resolve_abs_path_no_follow "${SOAR_TGZ}")"
 fi
 
 RENDER_ARGS=(
@@ -162,6 +179,7 @@ RENDER_ARGS=(
     --soar-port-forward "${SOAR_PORT_FORWARD}"
     --soar-hostname "${SOAR_HOSTNAME}"
     --soar-tgz "${SOAR_TGZ}"
+    --soar-tgz-sha256 "${SOAR_TGZ_SHA256}"
     --soar-fips "${SOAR_FIPS}"
     --soar-hosts "${SOAR_HOSTS}"
     --soar-ssh-user "${SOAR_SSH_USER}"
@@ -222,10 +240,24 @@ require_soar_automation_inputs() {
 }
 
 require_soar_package() {
-    [[ -f "${SOAR_TGZ}" && -r "${SOAR_TGZ}" && -s "${SOAR_TGZ}" ]] || {
-        log "ERROR: --soar-tgz must point to a readable, non-empty regular file."
+    [[ -f "${SOAR_TGZ}" && ! -L "${SOAR_TGZ}" && -r "${SOAR_TGZ}" && -s "${SOAR_TGZ}" ]] || {
+        log "ERROR: --soar-tgz must point to a readable, non-empty, non-symlink regular file."
         exit 1
     }
+    [[ "${SOAR_TGZ_SHA256}" =~ ^[A-Fa-f0-9]{64}$ ]] || {
+        log "ERROR: --soar-tgz-sha256 must supply the expected 64-character SHA-256 for mutating on-prem phases."
+        exit 1
+    }
+    [[ -f "${SAFE_EXTRACTOR}" && -r "${SAFE_EXTRACTOR}" ]] || {
+        log "ERROR: safe archive extractor is missing: ${SAFE_EXTRACTOR}"
+        exit 1
+    }
+    python3 "${SAFE_EXTRACTOR}" \
+        --validate-only \
+        --expected-sha256 "${SOAR_TGZ_SHA256}" \
+        --expected-root splunk-soar \
+        --require-exact-roots \
+        "${SOAR_TGZ}"
 }
 
 require_cluster_inputs() {

@@ -24,6 +24,8 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="ta_cisco_spaces"
 DEFAULT_INDEX="cisco_spaces"
+PRIMARY_SOURCETYPE="cisco:spaces:firehose"
+HEALTH_SOURCETYPE="cisco:spaces:firehose:health"
 
 PASS=0
 FAIL=0
@@ -128,11 +130,22 @@ else
     completion_issue "Index '${DEFAULT_INDEX}' has no events (may be normal if just configured)"
 fi
 
-sourcetype_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats dc(sourcetype) as stcount where index=${DEFAULT_INDEX} | eval stcount=stcount-0" "stcount" 2>/dev/null || echo "0")
-if [[ "${sourcetype_count}" -gt 0 ]]; then
-    pass "${sourcetype_count} distinct sourcetype(s) in ${DEFAULT_INDEX} index"
+primary_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
+    "| tstats count where index=${DEFAULT_INDEX} sourcetype=\"${PRIMARY_SOURCETYPE}\"" \
+    "count" 2>/dev/null || echo "0")
+if [[ "${primary_count}" =~ ^[0-9]+$ ]] && [[ "${primary_count}" -gt 0 ]]; then
+    pass "Primary sourcetype '${PRIMARY_SOURCETYPE}' has ${primary_count} events"
 else
-    completion_issue "No sourcetypes found in ${DEFAULT_INDEX} index yet"
+    completion_issue "Primary sourcetype '${PRIMARY_SOURCETYPE}' has no events in ${DEFAULT_INDEX}"
+fi
+
+health_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
+    "| tstats count where index=${DEFAULT_INDEX} sourcetype=\"${HEALTH_SOURCETYPE}\"" \
+    "count" 2>/dev/null || echo "0")
+if [[ "${health_count}" =~ ^[0-9]+$ ]] && [[ "${health_count}" -gt 0 ]]; then
+    pass "Health sourcetype '${HEALTH_SOURCETYPE}' has ${health_count} events"
+else
+    warn "No '${HEALTH_SOURCETYPE}' events found; this is expected for the repo-local 1.0.7 fallback package"
 fi
 
 log ""

@@ -1489,6 +1489,9 @@
         "password"
       ],
       "sourcetypes": [
+        "cisco:catalyst:center:compliance:report",
+        "cisco:catalyst:center:inventory:report",
+        "cisco:catalyst:center:report",
         "cisco:dnac:application:traffic",
         "cisco:dnac:audit:logs",
         "cisco:dnac:client",
@@ -1501,18 +1504,7 @@
         "cisco:dnac:securityadvisory",
         "cisco:dnac:site:topology",
         "cisco:dnac:swim",
-        "cisco:dnac:custom",
-        "cisco:dnac:custom:*",
-        "cisco:catalyst:center:inventory:report",
-        "cisco:catalyst:center:compliance:report",
-        "cisco:catalyst:center:report",
-        "cisco:catalyst:client",
-        "cisco:catalyst:clienthealth",
-        "cisco:catalyst:compliance",
-        "cisco:catalyst:devicehealth",
-        "cisco:catalyst:issue",
-        "cisco:catalyst:networkhealth",
-        "cisco:catalyst:securityadvisory"
+        "cisco:dnac:custom:*"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -1574,7 +1566,9 @@
         "omp",
         "tloc",
         "bfd",
-        "cflowd"
+        "cflowd",
+        "cisco:sdwan:*",
+        "cisco:sdwan:custom:*"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/solutions/networking/sdwan/index.html",
       "manual_gap_reason": "",
@@ -1597,6 +1591,8 @@
         "tloc",
         "bfd",
         "cflowd",
+        "cisco sdwan",
+        "cisco sdwan custom",
         "ta cisco catalyst",
         "cisco catalyst add on for splunk",
         "cisco catalyst app",
@@ -1644,6 +1640,8 @@
         "tloc",
         "bfd",
         "cflowd",
+        "cisco:sdwan:*",
+        "cisco:sdwan:custom:*",
         "TA_cisco_catalyst",
         "TA cisco catalyst",
         "Cisco Catalyst Add-on for Splunk",
@@ -1655,35 +1653,31 @@
         "password"
       ],
       "sourcetypes": [
+        "cisco:sdwan:acl:logs",
+        "cisco:sdwan:alert:off",
+        "cisco:sdwan:alert:on",
         "cisco:sdwan:audit:logs",
+        "cisco:sdwan:block:host",
+        "cisco:sdwan:dmi:cli:engine:write:fail",
+        "cisco:sdwan:drop:pkt",
         "cisco:sdwan:energy:stats",
+        "cisco:sdwan:host:tcp:alert:on",
         "cisco:sdwan:linkhealth",
+        "cisco:sdwan:log:summary",
+        "cisco:sdwan:pass:pkt",
+        "cisco:sdwan:session:audit:trail",
+        "cisco:sdwan:session:audit:trail:start",
+        "cisco:sdwan:sessions:maximum",
+        "cisco:sdwan:sgacl:logs",
         "cisco:sdwan:sitehealth",
+        "cisco:sdwan:smart:lic:platform:error",
         "cisco:sdwan:ssetunnelhealth",
         "cisco:sdwan:ssetunnels",
-        "cisco:sdwan:tunnelhealth",
-        "cisco:sdwan:utdhealth",
-        "cisco:sdwan:custom",
-        "cisco:sdwan:custom:*",
         "cisco:sdwan:system:logs",
-        "cisco:sdwan:sytem:logs",
-        "cisco:sdwan:session:audit:trail:start",
-        "cisco:sdwan:session:audit:trail",
+        "cisco:sdwan:tunnelhealth",
         "cisco:sdwan:unblock:host",
-        "cisco:sdwan:block:host",
-        "cisco:sdwan:host:tcp:alert:on",
-        "cisco:sdwan:alert:on",
-        "cisco:sdwan:alert:off",
-        "cisco:sdwan:sessions:maximum",
-        "cisco:sdwan:pass:pkt",
-        "cisco:sdwan:drop:pkt",
-        "cisco:sdwan:log:summary",
-        "cisco:sdwan:smart:lic:platform:error",
-        "cisco:sdwan:dmi:cli:engine:write:fail",
         "cisco:sdwan:utd:logs",
-        "cisco:sdwan:acl:logs",
-        "cisco:sdwan:sgacl:logs",
-        "cisco:sgacl:logs"
+        "cisco:sdwan:utdhealth"
       ],
       "status": "active",
       "subcategory": "routing_wan",
@@ -2656,8 +2650,8 @@
         "cisco:cybervision:devices",
         "cisco:cybervision:events",
         "cisco:cybervision:flows",
-        "cisco:cybervision:vulnerabilities",
-        "cisco:cybervision:syslog"
+        "cisco:cybervision:syslog",
+        "cisco:cybervision:vulnerabilities"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -3424,7 +3418,8 @@
         "securex",
         "ai assistant",
         "attack path analysis",
-        "automated investigation"
+        "automated investigation",
+        "cisco xdr"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/xdr/index.html",
       "manual_gap_reason": "",
@@ -3976,20 +3971,18 @@
         "password"
       ],
       "sourcetypes": [
-        "cisco:ise",
-        "cisco:ise:syslog",
-        "cisco:ise:radius:policyset",
-        "cisco:ise:radius:authz:policy",
-        "cisco:ise:tacacs:policyset",
-        "cisco:ise:tacacs:authz:policy",
-        "cisco:ise:securitygroups",
-        "cisco:ise:sgtbindings",
         "cisco:ise:analytics",
         "cisco:ise:analytics:applications",
         "cisco:ise:analytics:fullreport",
         "cisco:ise:analytics:hardware",
         "cisco:ise:analytics:registry",
-        "cisco:ise:custom",
+        "cisco:ise:radius:authz:policy",
+        "cisco:ise:radius:policyset",
+        "cisco:ise:securitygroups",
+        "cisco:ise:sgtbindings",
+        "cisco:ise:syslog",
+        "cisco:ise:tacacs:authz:policy",
+        "cisco:ise:tacacs:policyset",
         "cisco:ise:custom:*"
       ],
       "status": "active",
@@ -5290,7 +5283,7 @@
         "cisco:multicloud:defense:av",
         "cisco:multicloud:defense:dlp",
         "cisco:multicloud:defense:dpi",
-        "cisco:multicloud:defense:fqdn_resoleve",
+        "cisco:multicloud:defense:fqdn_resolve",
         "cisco:multicloud:defense:fqdnfilter",
         "cisco:multicloud:defense:l4_fw",
         "cisco:multicloud:defense:l7dos",
@@ -5431,7 +5424,8 @@
         "secure client nvm",
         "endpoint flow",
         "user protection suite",
-        "cisco security cloud"
+        "cisco security cloud",
+        "cisco nvm"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-client/resources.html",
       "manual_gap_reason": "",
@@ -5616,11 +5610,9 @@
         "cisco:dc:nd:anomalies",
         "cisco:dc:nd:congestion",
         "cisco:dc:nd:endpoints",
-        "cisco:dc:nd:fabrics",
         "cisco:dc:nd:flows",
         "cisco:dc:nd:mso",
         "cisco:dc:nd:protocols",
-        "cisco:dc:nd:switches",
         "cisco:dc:nd:syslog"
       ],
       "status": "active",
@@ -6473,6 +6465,7 @@
         "cisco:cloud_security:fileevent",
         "cisco:cloud_security:firewall",
         "cisco:cloud_security:intrusion",
+        "cisco:cloud_security:ntg",
         "cisco:cloud_security:privateapps",
         "cisco:cloud_security:proxy",
         "cisco:cloud_security:ravpn",
@@ -6480,9 +6473,13 @@
         "cisco:cloud_security:ztnaenrollment",
         "cisco:cloud_security:ztnaflow",
         "cisco:secure_access:*",
-        "cisco:secure_access:security_events_andalerts",
+        "cisco:secure_access:alerts_accessrulechanges",
+        "cisco:secure_access:alerts_apianomaly",
+        "cisco:secure_access:alerts_behavioranalytics",
+        "cisco:secure_access:alerts_connectivity_tunnels",
         "cisco:secure_access:security_events_dlp",
         "cisco:secure_access:security_events_dns",
+        "cisco:secure_access:security_events_firewall",
         "cisco:secure_access:security_events_intrusion",
         "cisco:secure_access:security_events_ravpn",
         "cisco:secure_access:security_events_web",
@@ -7999,7 +7996,8 @@
         "activation_token"
       ],
       "sourcetypes": [
-        "cisco:spaces:firehose"
+        "cisco:spaces:firehose",
+        "cisco:spaces:firehose:health"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -8099,7 +8097,9 @@
         "service_account"
       ],
       "sourcetypes": [
-        "cisco:talos"
+        "talos:domain",
+        "talos:ip",
+        "talos:url"
       ],
       "status": "active",
       "subcategory": "threat_response",
@@ -8324,6 +8324,7 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
+        "cisco:thousandeyes:account-group",
         "cisco:thousandeyes:activity",
         "cisco:thousandeyes:alerts",
         "cisco:thousandeyes:event",
@@ -8549,12 +8550,10 @@
         "api_secret"
       ],
       "sourcetypes": [
-        "cisco:cloud_security:appdiscovery",
         "cisco:cloud_security:audit",
         "cisco:cloud_security:dlp",
         "cisco:cloud_security:dns",
         "cisco:cloud_security:firewall",
-        "cisco:cloud_security:ip",
         "cisco:cloud_security:proxy"
       ],
       "status": "active",
@@ -9913,13 +9912,13 @@
     }
   ],
   "scan_source": {
-    "catalog_version": "2026_06_26_1427",
+    "catalog_version": "2026_07_09_1837",
     "kind": "scan_public_catalog",
-    "minimum_scan_version": "1.0.28",
+    "minimum_scan_version": "1.0.29",
     "normalized_fixture": "scan_products.fixture.json",
-    "normalized_fixture_sha256": "47313edcd1c145f582d115b41375e42bff4651a26af09330135b0bb69de1224e",
-    "retrieved_date": "2026-07-03",
-    "sha256": "94e694bb7e922902ffdd44c3306dc818715651532f97930620270e81aeafd721",
+    "normalized_fixture_sha256": "b715def93bf01b59e0a422e53054d9f4c69b25f78701ee17a0df776c259df5c7",
+    "retrieved_date": "2026-07-25",
+    "sha256": "e1c8866f66f8936413685f3336ef80c361d6b2cb1c8834572872868da2cba5ce",
     "url": "https://is4s.s3.amazonaws.com/scan/products.conf"
   }
 }

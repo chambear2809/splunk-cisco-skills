@@ -56,6 +56,26 @@ For an explicitly approved non-TLS lab endpoint only, set
 `SOAR_API_ALLOW_HTTP=true`; production token-bearing requests should remain on
 verified HTTPS (or use `SOAR_API_CA_CERT` for a private CA).
 
+## On-prem Package Integrity
+
+Every mutating on-prem phase requires a trusted expected digest through
+`--soar-tgz-sha256`. Before rendering an executable plan or contacting a
+cluster host, the wrapper verifies the package through a no-follow file
+descriptor and validates every archive member. Absolute paths, traversal,
+special files, duplicate paths, members below links, and links that escape
+their top-level root are rejected. The archive must contain exactly one
+top-level `splunk-soar` directory.
+
+Single-node and remote cluster installers repeat the digest/member validation,
+extract into a private validation stage before privileged host changes, require
+regular non-link `soar-prepare-system` and `soar-install` entrypoints, move the
+validated root through a private same-filesystem promotion stage, and publish
+it only when `${SOAR_HOME}/splunk-soar` does not already exist.
+Promotion prevents partial archive contents from becoming the live install
+tree; it does not roll back firewall, locale, `soar-prepare-system`,
+`soar-install`, or already-completed cluster-node changes if a later
+vendor installer step fails.
+
 ## REST Automation User Model
 
 The Splunk SOAR REST API supports two user types:
