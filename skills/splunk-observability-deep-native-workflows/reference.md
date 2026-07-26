@@ -1,9 +1,9 @@
 # Splunk Observability Deep Native Workflow Reference
 
 This skill was researched against current Splunk Observability Cloud help and
-developer documentation in May 2026. Use it to distinguish native product
-workflows from collector setup, classic dashboard API rendering, and basic
-detector creation.
+developer documentation in May 2026. The tracked freshness date is
+`2026-05-01`. Use it to distinguish native product workflows from collector
+setup, classic dashboard API rendering, and basic detector creation.
 
 ## Product Coverage Matrix
 

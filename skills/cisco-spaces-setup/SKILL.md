@@ -257,6 +257,12 @@ Checks: app installation, index, stream configuration, inputs, data flow, settin
 | Sourcetype | Content |
 |---|---|
 | `cisco:spaces:firehose` | Cisco Spaces firehose events (device presence, location updates, IoT telemetry, etc.) |
+| `cisco:spaces:firehose:health` | Firehose connection and collector-health events in current SCAN catalog releases |
+
+The pinned SCAN `2026_07_09_1837` catalog adds the health sourcetype. The
+repo-local fallback package `1.0.7` predates that catalog entry, so validation
+requires primary firehose data and reports health data separately instead of
+claiming that every installed package must emit it.
 
 ## Key Learnings / Known Issues
 
@@ -284,6 +290,8 @@ Checks: app installation, index, stream configuration, inputs, data flow, settin
 ## Validation Modes
 
 Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
-to require a stream stanza, enabled input, index, events, and sourcetypes. The
-Cisco Spaces TA ships no dashboards; the consuming dashboard/content handoff
-is therefore explicit rather than inferred.
+to require a stream stanza, enabled input, index, events, and the primary
+`cisco:spaces:firehose` sourcetype. The validator also reports the version-bound
+`cisco:spaces:firehose:health` sourcetype independently. The Cisco Spaces TA
+ships no dashboards; the consuming dashboard/content handoff is therefore
+explicit rather than inferred.

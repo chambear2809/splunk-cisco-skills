@@ -289,7 +289,10 @@ Checks: app installation, indexes, accounts, inputs, data flow, settings.
 | `cisco:cybervision:vulnerabilities` | Cyber Vision | OT vulnerabilities |
 
 ISE and SD-WAN sourcetypes vary by data type and are prefixed `cisco:ise*` and
-`cisco:sdwan*` respectively.
+`cisco:sdwan*` respectively. Completion and dashboard searches use those
+canonical families. The installed TA may still accept old raw aliases and
+normalize them, but the current SCAN contract no longer advertises
+unqualified `cisco:ise`, `cisco:sdwan:sytem:logs`, or `cisco:sgacl:logs`.
 
 ## MCP Server Integration
 

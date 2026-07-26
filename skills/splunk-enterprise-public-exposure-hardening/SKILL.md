@@ -192,7 +192,10 @@ bash skills/splunk-enterprise-public-exposure-hardening/scripts/setup.sh \
 
 Omit `--public-ca-file` for a publicly trusted certificate. Public probes use
 system trust by default and always verify the certificate chain and FQDN;
-there is no insecure `curl -k` production-pass path.
+there is no insecure `curl -k` production-pass path. The external probe value
+is parsed once as POSIX-style argv, never evaluated as shell source, and the
+target FQDN and port are appended as separate arguments. Shell metacharacters
+and control characters are rejected.
 
 Apply the hardening app on a search head (mutates Splunk; requires the
 explicit accept flag):

@@ -11,6 +11,7 @@ VERIFIED_APP_VERSION="3.1.0"
 PUBLIC_APP_VERSION="3.2.0"
 CATALYST_TA_APP="TA_cisco_catalyst"
 ENHANCED_NETFLOW_TA_APP="splunk_app_stream_ipfix_cisco_hsl"
+SOURCETYPE_MACRO_DEFINITION='sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", "cisco:catalyst:center:*", "stream:netflow", "cisco:cybervision:*", "meraki:*", "cisco:ios", "cisco:thousandeyes:*")'
 
 MACROS_ONLY=false
 ACCELERATE=false
@@ -141,7 +142,7 @@ check_prereqs() {
 }
 
 update_macros() {
-    log "Updating index macro..."
+    log "Updating dashboard macros..."
 
     local body index_list idx
     if [[ -n "${CUSTOM_INDEXES}" ]]; then
@@ -171,7 +172,18 @@ update_macros() {
     fi
 
     log "  cisco_catalyst_app_index = ${index_list}"
-    log "Macro update complete."
+
+    body=$(form_urlencode_pairs \
+        definition "${SOURCETYPE_MACRO_DEFINITION}" \
+        description "Current SCAN-aligned Cisco sourcetypes used by Enterprise Networking dashboards" \
+        iseval "0")
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_app_sourcetypes" "${body}"; then
+        log "ERROR: Failed to update macro 'cisco_catalyst_app_sourcetypes'."
+        return 1
+    fi
+
+    log "  cisco_catalyst_app_sourcetypes = ${SOURCETYPE_MACRO_DEFINITION}"
+    log "Macro updates complete."
 }
 
 enable_saved_searches() {

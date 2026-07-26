@@ -66,3 +66,19 @@ Automated product routes call child validators with `--completion` (alias
 `--strict` in each child). Missing account/input, data-flow, or shipped
 dashboard evidence therefore exits nonzero. Direct child validation without
 the flag remains diagnostic for staged onboarding.
+
+## SCAN Source Reconciliation Gate
+
+`scan_sourcetype_reconciliation.json` is the machine-readable review record for
+the pinned SCAN source version. For each changed product it records the added
+and removed sourcetypes, SHA-256 snapshots of the reconstructed previous and
+complete current sourcetype sets, canonical owner skills, an explicit
+resolution, and downstream files/tokens that prove the change reached the
+applicable setup or validation surface. A separate hash covers the complete
+product-to-sourcetype map outside those entries, so omitting a changed product
+also fails validation.
+
+`build_catalog.py --check` validates that record. A future SCAN source refresh
+with a different catalog version therefore cannot silently regenerate
+`catalog.json`; the reconciliation record and downstream assets must be
+reviewed first.

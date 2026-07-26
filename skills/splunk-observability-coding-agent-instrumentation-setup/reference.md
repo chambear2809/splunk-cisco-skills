@@ -1,5 +1,18 @@
 # Coding Agent Instrumentation Router Reference
 
+Last researched: `2026-07-02`.
+
+## Source Anchors
+
+- Codex configuration and telemetry:
+  https://developers.openai.com/codex/codex-manual.md
+- Claude Code OpenTelemetry monitoring:
+  https://code.claude.com/docs/en/monitoring-usage
+- Splunk Observability ingest APIs:
+  https://dev.splunk.com/observability/reference/api/ingest_data/latest
+- Splunk AI Agent Monitoring code-based instrumentation:
+  https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/splunk-ai-agent-monitoring/set-up-ai-agent-monitoring/code-based-instrumentation
+
 ## Contract
 
 The parent skill is a routing and planning layer only. It never writes to
@@ -18,10 +31,11 @@ configuration.
 
 | Destination | Parent behavior |
 |---|---|
-| `local-collector` | Emit a Codex child render command for loopback OTLP. |
-| `external-collector` | Emit a Codex child render command and warn that trace and metric endpoints are required. |
-| `direct` | Emit a Codex child render command and warn that direct native logs are refused. |
-| `all` | Emit a Codex child render command covering every destination, with endpoint warnings. |
+| `local-collector` | Emit the selected child render command for loopback OTLP. |
+| `external-collector` | Emit the selected child render command and warn that trace and metric endpoints are required. |
+| `direct` | Emit the selected child render command; normalize to the child's direct-mode name and preserve agent-specific direct-ingest warnings. |
+| `splunk-direct` | Emit the selected child render command; normalize to the child's direct-mode name and preserve agent-specific direct-ingest warnings. |
+| `all` | Emit the selected child render command covering every destination, with agent-specific endpoint warnings. |
 
 ## Exact Dry-Run Shape
 

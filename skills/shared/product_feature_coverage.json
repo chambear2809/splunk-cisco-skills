@@ -1,0 +1,451 @@
+{
+  "schema_version": 1,
+  "router_count": 8,
+  "maximum_source_age_days": 180,
+  "allowed_coverage_statuses": [
+    "delegated_apply",
+    "delegated_render",
+    "direct_apply",
+    "handoff",
+    "manual_gap",
+    "render_runbook",
+    "unsupported",
+    "validate_only"
+  ],
+  "routers": [
+    {
+      "id": "cisco-scan",
+      "product_area": "Cisco product catalog and SCAN routes",
+      "router_skill": "cisco-product-setup",
+      "inventory_classification": "coverage_owner",
+      "adapter": "cisco_scan_catalog",
+      "source_path": "skills/cisco-product-setup/catalog.json",
+      "reference_path": "skills/cisco-product-setup/reference.md",
+      "validation_path": "skills/cisco-product-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "admin.webex.com",
+        "appomni.com",
+        "developer.cisco.com",
+        "is4s.s3.amazonaws.com",
+        "isovalent.com",
+        "meraki.cisco.com",
+        "newsroom.cisco.com",
+        "splunkbase.splunk.com",
+        "talosintelligence.com",
+        "umbrella.cisco.com",
+        "www.cisco.com",
+        "www.radware.com",
+        "www.webex.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/cisco-product-setup/catalog.json",
+          "format": "json",
+          "date_field": "scan_source.retrieved_date",
+          "url_fields": [
+            "scan_source.url"
+          ]
+        }
+      ],
+      "feature_count": 86,
+      "feature_ids_sha256": "505daf0592c0d825caa4b80a4abfadc1e5718f263ae7dc4bcadb49538c863dea",
+      "feature_contracts_sha256": "9b7a1944de6d427a8fcab437455156275a30acad95b48051aef3d4bb8b31207e",
+      "require_row_boundary_statuses": [
+        "no_plans_available",
+        "partial",
+        "unsupported_legacy",
+        "unsupported_roadmap"
+      ],
+      "status_contracts": {
+        "automated": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The router may delegate only to the catalog's exact canonical child route; the child mutation gates and completion validator remain authoritative."
+        },
+        "no_plans_available": {
+          "coverage_status": "manual_gap",
+          "automation_boundary": "No product-specific apply is permitted; emit the catalog gap and source-backed operator handoff."
+        },
+        "partial": {
+          "coverage_status": "handoff",
+          "automation_boundary": "The router may render or delegate only the named partial collector/install workflow and must preserve the unautomated product boundary."
+        },
+        "unsupported_legacy": {
+          "coverage_status": "unsupported",
+          "automation_boundary": "Legacy or retired products fail closed and do not acquire a live route."
+        },
+        "unsupported_roadmap": {
+          "coverage_status": "unsupported",
+          "automation_boundary": "Roadmap coverage remains a non-executable gap until a reviewed canonical route is added."
+        }
+      }
+    },
+    {
+      "id": "cisco-data-fabric",
+      "product_area": "Cisco Data Fabric and Cisco/Splunk experience layers",
+      "router_skill": "cisco-data-fabric-setup",
+      "inventory_classification": "coverage_owner",
+      "adapter": "data_fabric_markdown_matrix",
+      "source_path": "skills/cisco-data-fabric-setup/references/feature-matrix.md",
+      "reference_path": "skills/cisco-data-fabric-setup/reference.md",
+      "validation_path": "skills/cisco-data-fabric-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "blogs.cisco.com",
+        "cloud.cisco.com",
+        "help.splunk.com",
+        "huggingface.co",
+        "lantern.splunk.com",
+        "newsroom.cisco.com",
+        "www.cisco.com",
+        "www.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/cisco-data-fabric-setup/references/research-ledger.md",
+          "format": "text",
+          "date_pattern": "Verified (?P<date>\\d{4}-\\d{2}-\\d{2})",
+          "extract_https_urls": true
+        }
+      ],
+      "feature_count": 47,
+      "feature_ids_sha256": "97659825736928bbc374f2920450db835419cf25fc0ebd114e27d3d57c0bf884",
+      "feature_contracts_sha256": "fb19ec5cedbf00ec14889e348df30feff17fb22859ffb79887ea9a8da3041eb6",
+      "require_row_boundary_statuses": [
+        "documented_boundary"
+      ],
+      "status_contracts": {
+        "documented_boundary": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "The architecture router renders lifecycle-aware plans, evidence, gaps, and safe child handoffs; it never infers a universal Data Fabric mutation API."
+        }
+      }
+    },
+    {
+      "id": "appdynamics-suite",
+      "product_area": "AppDynamics suite feature families",
+      "router_skill": "splunk-appdynamics-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "appdynamics_taxonomy",
+      "source_path": "skills/splunk-appdynamics-setup/references/appdynamics-taxonomy.yaml",
+      "reference_path": "skills/splunk-appdynamics-setup/reference.md",
+      "validation_path": "skills/splunk-appdynamics-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "developer.cisco.com",
+        "docs.thousandeyes.com",
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-appdynamics-setup/references/appdynamics-taxonomy.yaml",
+          "format": "yaml",
+          "date_field": "last_researched",
+          "url_fields": [
+            "generated_from"
+          ]
+        }
+      ],
+      "feature_count": 134,
+      "feature_ids_sha256": "f3d5930107f8d9d4eebafa941c011aa5f6ac36db6ac85269e278f48ef72b8392",
+      "feature_contracts_sha256": "77f4c82fcdaa0a35d6cec675846c7f5f9d613e790ffea102bc287d3df2af290a",
+      "require_row_boundary_statuses": [
+        "api_apply",
+        "cli_apply",
+        "delegated_apply",
+        "k8s_apply",
+        "not_applicable",
+        "render_runbook",
+        "validate_only"
+      ],
+      "reserved_source_statuses": [
+        "not_applicable"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "api_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Only the documented API operation named by the feature row may mutate, behind the child skill's explicit gate."
+        },
+        "cli_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Only the reviewed CLI operation named by the feature row may mutate, behind the child skill's explicit gate."
+        },
+        "delegated_apply": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "Mutation is delegated to the named canonical child workflow and its own acceptance gate."
+        },
+        "k8s_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Only reviewed Kubernetes objects may be applied, behind the child skill's explicit mutation gate."
+        },
+        "not_applicable": {
+          "coverage_status": "unsupported",
+          "automation_boundary": "The taxonomy explicitly records why this surface is not applicable and no mutation is allowed."
+        },
+        "render_runbook": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "The owner renders reviewable assets and operator steps but does not perform the product mutation."
+        },
+        "validate_only": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "The owner performs read-only validation and renders evidence without product mutation."
+        }
+      }
+    },
+    {
+      "id": "splunk-security",
+      "product_area": "Splunk security portfolio",
+      "router_skill": "splunk-security-portfolio-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "security_catalog",
+      "source_path": "skills/splunk-security-portfolio-setup/catalog.json",
+      "reference_path": "skills/splunk-security-portfolio-setup/reference.md",
+      "validation_path": "skills/splunk-security-portfolio-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "help.splunk.com",
+        "www.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-security-portfolio-setup/catalog.json",
+          "format": "json",
+          "date_field": "last_verified"
+        },
+        {
+          "path": "skills/splunk-security-portfolio-setup/reference.md",
+          "format": "text",
+          "extract_https_urls": true
+        }
+      ],
+      "feature_count": 30,
+      "feature_ids_sha256": "0824a36250e861827cf8637b426f7cbf52f8aa5853bbcc68a5577d9a431c3363",
+      "feature_contracts_sha256": "d1268853bfae99a99a905a066156a7ef552fe6d6b9e4bdb2e9816ed41613d85f",
+      "require_row_boundary_statuses": [
+        "bundled_es",
+        "existing_skill",
+        "first_class",
+        "install_only",
+        "manual_gap",
+        "partial"
+      ],
+      "status_contracts": {
+        "bundled_es": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "Bundled Enterprise Security capabilities route only to the named ES or prerequisite child workflow; the portfolio router does not mutate them."
+        },
+        "existing_skill": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The portfolio router delegates to the existing canonical skill and preserves its mutation and validation gates."
+        },
+        "first_class": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The portfolio router delegates to the dedicated first-class child and never bypasses its production gates."
+        },
+        "install_only": {
+          "coverage_status": "handoff",
+          "automation_boundary": "Only package installation is delegated; configuration and product activation remain explicit handoffs."
+        },
+        "manual_gap": {
+          "coverage_status": "manual_gap",
+          "automation_boundary": "The product remains non-executable until a source-backed canonical owner is added."
+        },
+        "partial": {
+          "coverage_status": "handoff",
+          "automation_boundary": "Only the documented partial readiness or migration workflow is delegated; uncovered lifecycle operations remain handoffs."
+        }
+      }
+    },
+    {
+      "id": "splunk-observability-native",
+      "product_area": "Splunk Observability native surfaces",
+      "router_skill": "splunk-observability-deep-native-workflows",
+      "inventory_classification": "coverage_owner",
+      "adapter": "observability_markdown_matrix",
+      "source_path": "skills/splunk-observability-deep-native-workflows/reference.md",
+      "reference_path": "skills/splunk-observability-deep-native-workflows/reference.md",
+      "validation_path": "skills/splunk-observability-deep-native-workflows/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "dev.splunk.com",
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-observability-deep-native-workflows/reference.md",
+          "format": "text",
+          "date_pattern": "(?P<date>2026-05-01)",
+          "extract_https_urls": true
+        }
+      ],
+      "feature_count": 23,
+      "feature_ids_sha256": "3797603c20785f08453ee748e366bc776c7c8f437f0fab12cd162334442435a9",
+      "feature_contracts_sha256": "e1f58b9e865a67ad29c17e4e125daab20a1c7bc86645100aadd716ef637e8780",
+      "require_row_boundary_statuses": [
+        "api_apply",
+        "api_validate",
+        "deeplink",
+        "delegated_apply",
+        "handoff"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "api_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Only the documented public API surface named by the row may be applied through an approved client and explicit gate."
+        },
+        "api_validate": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "Public APIs are used for read-only validation; native UI object mutation is not inferred."
+        },
+        "deeplink": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "The workflow renders a tenant deeplink and investigation checklist without mutating the native surface."
+        },
+        "delegated_apply": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "Apply is delegated to the named canonical child workflow and its own mutation gate."
+        },
+        "handoff": {
+          "coverage_status": "handoff",
+          "automation_boundary": "The native or entitlement-gated operation remains an explicit UI/operator handoff."
+        }
+      }
+    },
+    {
+      "id": "widefield-adoption",
+      "product_area": "WideField Security adoption and delegated integrations",
+      "router_skill": "widefield-security-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "widefield_markdown_router",
+      "source_path": "skills/widefield-security-setup/reference.md",
+      "runtime_source_path": "skills/widefield-security-setup/scripts/render_assets.py",
+      "reference_path": "skills/widefield-security-setup/reference.md",
+      "validation_path": "skills/widefield-security-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "blogs.cisco.com",
+        "docs.cloud.google.com",
+        "exchange.saviynt.com",
+        "help.okta.com",
+        "www.businesswire.com",
+        "www.ciscoinvestments.com",
+        "www.okta.com",
+        "www.widefield.ai"
+      ],
+      "provenance": [
+        {
+          "path": "skills/widefield-security-setup/reference.md",
+          "format": "text",
+          "date_pattern": "Last researched: `(?P<date>\\d{4}-\\d{2}-\\d{2})`",
+          "extract_https_urls": true
+        }
+      ],
+      "feature_count": 11,
+      "feature_ids_sha256": "d6b892288b1addb97975cacfb307231911556b7425ced3f4082049a18c765822",
+      "feature_contracts_sha256": "b88ceeab18715fdb71544367180b1d1e1bb4736373953761adb1cc08106cf5fa",
+      "require_row_boundary_statuses": [
+        "delegated_child",
+        "rendered_capability"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "delegated_child": {
+          "coverage_status": "delegated_render",
+          "automation_boundary": "The parent delegates child render and validation only; any documented live mutation remains gated by the selected child."
+        },
+        "rendered_capability": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "The parent renders source-backed capability and evidence coverage without calling private or undocumented WideField APIs."
+        }
+      }
+    },
+    {
+      "id": "coding-agent-telemetry",
+      "product_area": "Coding-agent telemetry routing",
+      "router_skill": "splunk-observability-coding-agent-instrumentation-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "coding_agent_markdown_router",
+      "source_path": "skills/splunk-observability-coding-agent-instrumentation-setup/reference.md",
+      "runtime_source_path": "skills/shared/coding_agent_o11y/parent.py",
+      "reference_path": "skills/splunk-observability-coding-agent-instrumentation-setup/reference.md",
+      "validation_path": "skills/splunk-observability-coding-agent-instrumentation-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "code.claude.com",
+        "dev.splunk.com",
+        "developers.openai.com",
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-observability-coding-agent-instrumentation-setup/reference.md",
+          "format": "text",
+          "date_pattern": "Last researched: `(?P<date>\\d{4}-\\d{2}-\\d{2})`",
+          "extract_https_urls": true
+        }
+      ],
+      "feature_count": 8,
+      "feature_ids_sha256": "48935ce3a4184ee87f4cb68967b8aa8cddd47b521191907e8f358d2e5a79742f",
+      "feature_contracts_sha256": "1897d66394d7e2245d03ad58c52c316db7977ce01d6e665f2d649db3715486fd",
+      "require_row_boundary_statuses": [
+        "implemented",
+        "placeholder",
+        "render_plan"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "implemented": {
+          "coverage_status": "delegated_render",
+          "automation_boundary": "The parent resolves an implemented child and may invoke only its non-mutating render command; the child owns all agent-specific setup."
+        },
+        "placeholder": {
+          "coverage_status": "manual_gap",
+          "automation_boundary": "Future coding agents remain non-executable placeholders until a canonical child and source-backed contract are added."
+        },
+        "render_plan": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "Destination selection emits a reviewed orchestration plan and warnings without writing agent, collector, or Splunk configuration."
+        }
+      }
+    },
+    {
+      "id": "splunk-supported-addons",
+      "product_area": "Splunk Supported Add-ons and package families",
+      "router_skill": "splunk-supported-addons-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "supported_addons_catalog",
+      "source_path": "skills/splunk-supported-addons-setup/catalog.json",
+      "reference_path": "skills/splunk-supported-addons-setup/reference.md",
+      "validation_path": "skills/splunk-supported-addons-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-supported-addons-setup/catalog.json",
+          "format": "json",
+          "date_field": "official_glossary.last_researched",
+          "url_fields": [
+            "official_glossary.source_url"
+          ]
+        }
+      ],
+      "feature_count": 80,
+      "feature_ids_sha256": "785f71265e4d942ca0cd3d79ccc41df330906c62f177d92dddde29b8f667ada8",
+      "feature_contracts_sha256": "84f943a1c0b989879ac4b7053b0c204b66413ceff965893f5fb0da8f3e052b50",
+      "status_contracts": {
+        "first_class_profile": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The router may render and validate only its reviewed first-class profile; live changes retain the profile's explicit gates."
+        },
+        "handoff_profile": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The router delegates to the named canonical product skill and preserves that skill's package, configuration, and validation boundaries."
+        },
+        "install_only_handoff": {
+          "coverage_status": "handoff",
+          "automation_boundary": "The generic route covers package delivery only; input configuration and data readiness remain official-documentation/operator handoffs."
+        },
+        "manual_gap": {
+          "coverage_status": "manual_gap",
+          "automation_boundary": "No package or configuration workflow is claimed until a reviewed route is added."
+        }
+      }
+    }
+  ]
+}

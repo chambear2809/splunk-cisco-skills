@@ -38,8 +38,16 @@ Controls which sourcetypes the dashboards include.
 | Property | Value |
 |---|---|
 | Default definition | `sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", "stream:netflow", "cisco:cybervision:*", "meraki:*", "cisco:ios", "cisco:thousandeyes:test", "cisco:sgacl:logs")` |
+| Setup-managed definition | `sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", "cisco:catalyst:center:*", "stream:netflow", "cisco:cybervision:*", "meraki:*", "cisco:ios", "cisco:thousandeyes:*")` |
 | Description | All Cisco sourcetypes |
-| Location | `default/macros.conf` (typically no override needed) |
+| Location | Package default in `default/macros.conf`; SCAN-aligned override in `local/macros.conf` |
+
+The package `3.1.0` default retains `cisco:thousandeyes:test` and
+`cisco:sgacl:logs`. The pinned SCAN `2026_07_09_1837` catalog instead exposes
+the `cisco:thousandeyes:*` family and canonical
+`cisco:sdwan:sgacl:logs`. `setup.sh --macros-only` writes the managed
+definition above so current ThousandEyes data and Catalyst Center report
+sourcetypes are not silently excluded.
 
 ### summariesonly
 

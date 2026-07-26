@@ -83,22 +83,34 @@ hbs_shell_join() {
     printf '%s' "${joined% }"
 }
 
-# Returns the unquoted body of the currently-registered trap for the given signal,
-# or empty if no trap is registered. Uses `eval` because `trap -p` returns the body
-# wrapped in shell-quoted single-quotes; the eval removes that quoting.
-#
-# SECURITY NOTE: This helper assumes every trap currently in scope was registered by
-# repo-controlled code with sanitized arguments. Callers must NOT register traps
-# whose body is constructed from untrusted input — the eval here would re-interpret
-# any shell metacharacters in such a body.
+# Returns the unquoted body of the currently registered trap for the given signal,
+# or empty if no trap is registered. Parse Bash's shell-quoted `trap -p` output as
+# data so command substitutions in an existing trap cannot execute while a cleanup
+# handler is being appended.
 hbs_trap_body() {
     local signal="${1:-}"
-    local trap_output body
+    local trap_output
     trap_output="$(trap -p "${signal}" || true)"
     [[ -n "${trap_output}" ]] || return 0
-    body="${trap_output#trap -- }"
-    body="${body%" ${signal}"}"
-    eval "printf '%s' ${body}"
+    python3 -c '
+import shlex
+import sys
+
+expected = sys.argv[1].upper()
+base_signal = expected[3:] if expected.startswith("SIG") else expected
+raw = sys.stdin.read()
+if raw.endswith("\n"):
+    raw = raw[:-1]
+try:
+    fields = shlex.split(raw, posix=True)
+except ValueError:
+    raise SystemExit(1)
+actual = fields[3].upper() if len(fields) == 4 else ""
+valid_signals = {expected, base_signal, f"SIG{base_signal}"}
+if fields[:2] != ["trap", "--"] or actual not in valid_signals:
+    raise SystemExit(1)
+sys.stdout.write(fields[2])
+' "${signal}" <<< "${trap_output}"
 }
 
 hbs_append_cleanup_trap() {
@@ -107,7 +119,10 @@ hbs_append_cleanup_trap() {
     local signal existing
     [[ -n "${cleanup_cmd}" ]] || return 0
     for signal in "$@"; do
-        existing="$(hbs_trap_body "${signal}")"
+        existing="$(hbs_trap_body "${signal}")" || {
+            echo "ERROR: Failed to parse the existing ${signal} trap safely." >&2
+            return 1
+        }
         if [[ -n "${existing}" ]]; then
             # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
             trap "${existing}; ${cleanup_cmd}" "${signal}"

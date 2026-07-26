@@ -6,18 +6,40 @@ _CREDENTIAL_CURL_HELPERS_LOADED=true
 
 CREDENTIAL_CURL_TRANSPORT_ARGS=()
 
+credential_curl_trap_body() {
+    local signal="${1:-}" trap_output
+    trap_output="$(trap -p "${signal}" || true)"
+    [[ -n "${trap_output}" ]] || return 0
+    python3 -c '
+import shlex
+import sys
+
+expected = sys.argv[1].upper()
+base_signal = expected[3:] if expected.startswith("SIG") else expected
+raw = sys.stdin.read()
+if raw.endswith("\n"):
+    raw = raw[:-1]
+try:
+    fields = shlex.split(raw, posix=True)
+except ValueError:
+    raise SystemExit(1)
+actual = fields[3].upper() if len(fields) == 4 else ""
+valid_signals = {expected, base_signal, f"SIG{base_signal}"}
+if fields[:2] != ["trap", "--"] or actual not in valid_signals:
+    raise SystemExit(1)
+sys.stdout.write(fields[2])
+' "${signal}" <<< "${trap_output}"
+}
+
 credential_curl_append_cleanup_trap() {
-    local cleanup_cmd="${1:-}" signal trap_output body existing
+    local cleanup_cmd="${1:-}" signal existing
     shift || true
     [[ -n "${cleanup_cmd}" ]] || return 0
     for signal in "$@"; do
-        trap_output="$(trap -p "${signal}" || true)"
-        existing=""
-        if [[ -n "${trap_output}" ]]; then
-            body="${trap_output#trap -- }"
-            body="${body%" ${signal}"}"
-            existing="$(eval "printf '%s' ${body}")"
-        fi
+        existing="$(credential_curl_trap_body "${signal}")" || {
+            echo "ERROR: Failed to parse the existing ${signal} trap safely." >&2
+            return 1
+        }
         if [[ -n "${existing}" ]]; then
             # shellcheck disable=SC2064  # capture the cleanup path now.
             trap "${existing}; ${cleanup_cmd}" "${signal}"

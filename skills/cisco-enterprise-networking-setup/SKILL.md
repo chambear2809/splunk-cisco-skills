@@ -231,13 +231,17 @@ Checks: app installation, macros, saved searches, data model, data presence.
 | Macro | Default | Purpose |
 |---|---|---|
 | `cisco_catalyst_app_index` | `index IN ("main")` | Tells dashboards which indexes to search |
-| `cisco_catalyst_app_sourcetypes` | `sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", ...)` | Filters to known Cisco sourcetypes |
+| `cisco_catalyst_app_sourcetypes` | Setup writes the current SCAN-aligned Cisco source families, including `cisco:catalyst:center:*` and `cisco:thousandeyes:*` | Filters to known Cisco sourcetypes |
 | `summariesonly` | `summariesonly=false` | Controls data model acceleration usage |
 
-The setup script updates `cisco_catalyst_app_index` to:
+The setup script updates both dashboard filter macros. The index definition is:
 ```
 index IN ("catalyst", "ise", "sdwan", "cybervision")
 ```
+
+The managed sourcetype definition preserves broad canonical product families
+while removing the stale exact aliases `cisco:thousandeyes:test` and
+`cisco:sgacl:logs`.
 
 ## Dashboards
 

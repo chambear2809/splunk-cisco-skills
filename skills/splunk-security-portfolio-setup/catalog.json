@@ -1,5 +1,5 @@
 {
-  "last_verified": "2026-05-26",
+  "last_verified": "2026-07-25",
   "statuses": [
     "first_class",
     "existing_skill",
@@ -17,6 +17,28 @@
       "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
       "splunkbase_ids": ["263"],
       "notes": "Existing ES install/config skills are the source of truth."
+    },
+    {
+      "key": "es-essentials-edition",
+      "name": "Splunk Enterprise Security Essentials",
+      "aliases": ["es essentials", "es essentials edition", "enterprise security essentials", "enterprise security essentials edition", "splunk enterprise security essentials edition"],
+      "status": "existing_skill",
+      "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": ["263"],
+      "source_urls": ["https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions/overview-of-splunk-enterprise-security-editions"],
+      "notes": "Current ES Essentials edition identity. It routes to the existing ES install/config workflows; licensing and edition entitlement remain Splunk-managed."
+    },
+    {
+      "key": "es-premier-edition",
+      "name": "Splunk Enterprise Security Premier",
+      "aliases": ["es premier", "es premier edition", "enterprise security premier", "enterprise security premier edition", "splunk enterprise security premier edition"],
+      "status": "existing_skill",
+      "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": ["263"],
+      "source_urls": ["https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions/overview-of-splunk-enterprise-security-editions"],
+      "notes": "Current ES Premier edition identity. It routes to existing ES install/config workflows; native SOAR, UEBA, and Automated Threat Analysis retain their more specific catalog identities."
     },
     {
       "key": "security-essentials",
@@ -75,6 +97,20 @@
       "route": ["splunk-attack-analyzer-setup"],
       "splunkbase_ids": ["6999", "7000"],
       "notes": "Installs app and add-on, prepares index and dashboard macro, then validates handoff state."
+    },
+    {
+      "key": "automated-threat-analysis",
+      "name": "Automated Threat Analysis",
+      "aliases": ["splunk automated threat analysis", "automated threat analysis powered by splunk attack analyzer", "phishing threat analysis", "phishing analysis agent", "malware reversing agent", "malware reversing and phishing agent", "malware reversing and phishing analysis agent"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config", "splunk-attack-analyzer-setup", "splunk-soar-setup"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "source_urls": [
+        "https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions/overview-of-splunk-enterprise-security-editions",
+        "https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.6/ai-assistant-in-security-and-agentic-capabilities/analyze-scripts-using-the-ai-powered-malware-reversing-agent-and-phishing-analysis-agent-in-splunk-enterprise-security"
+      ],
+      "notes": "ES Premier cloud capability powered by Splunk Attack Analyzer. ES configuration is the safe primary route; Attack Analyzer and paired-SOAR workflows are explicit prerequisite handoffs. No router-level mutation is inferred."
     },
     {
       "key": "asset-risk-intelligence",
@@ -266,7 +302,7 @@
       "route": ["splunk-soar-setup"],
       "route_args": ["--automation-broker-plan"],
       "splunkbase_ids": [],
-      "notes": "Docker/Podman host readiness and handoff only."
+      "notes": "Renders Docker/Podman readiness and installation plans; the child SOAR workflow owns explicitly gated Automation Broker apply and validation."
     },
     {
       "key": "fraud-analytics",

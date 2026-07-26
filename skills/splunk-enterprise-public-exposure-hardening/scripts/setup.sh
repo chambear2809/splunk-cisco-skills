@@ -175,6 +175,9 @@ Secrets (file paths only — never values on argv):
 
 Validation:
   --external-probe-cmd "ssh probe@bastion nc -zv"
+                                                Parsed as argv; the renderer
+                                                rejects shell metacharacters
+                                                and appends FQDN and port.
   --public-ca-file PATH                         CA bundle for public TLS probes
                                                 (default: system trust)
 

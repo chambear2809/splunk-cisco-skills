@@ -16,6 +16,14 @@ This repository must not contain real credentials, API keys, bearer tokens,
 private keys, Splunk session keys, HEC tokens, Splunkbase passwords, or customer
 deployment secrets.
 
+CI runs checksum-pinned Gitleaks against a tracked-file-only snapshot and the
+complete Git history with output redaction enabled. Historical exceptions in
+`.gitleaksignore` are bound to immutable commit fingerprints. Current-tree
+false positives in `.gitleaks-baseline.json` are bound to the SHA-256 of an
+exact reviewed line and are masked only in a temporary scan snapshot; changing
+one fails closed and requires re-review. Baseline files must contain no matched
+secret values.
+
 Local secret files are intentionally ignored:
 
 - `credentials`

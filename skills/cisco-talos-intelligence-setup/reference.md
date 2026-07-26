@@ -34,6 +34,10 @@ inspection and Splunk Enterprise Security Cloud docs.
 | `intelligence_enrichment_with_talos` | Enriches notable-event investigation context through ES incident review when available |
 
 Observable types supported by the package code are URL, IP address, and domain.
+The pinned SCAN `2026_07_09_1837` catalog expresses the resulting sourcetypes
+explicitly as `talos:url`, `talos:ip`, and `talos:domain`. The former aggregate
+catalog label `cisco:talos` is not a current event sourcetype and must not be
+used for completion searches.
 
 ## Threatlist
 

@@ -33,7 +33,7 @@ https://partners.dnaspaces.<region>/api/partners/v1/firehose/events
 
 | Input Stanza | Sourcetype | Description |
 |---|---|---|
-| `cisco_spaces_firehose://<name>` | `cisco:spaces:firehose` | Streaming SSE connection to Cisco Spaces Firehose API |
+| `cisco_spaces_firehose://<name>` | `cisco:spaces:firehose`; current releases may also emit `cisco:spaces:firehose:health` | Streaming SSE connection to Cisco Spaces Firehose API |
 
 The firehose input is a long-lived SSE (Server-Sent Events) connection. The
 `interval` field (default 300s) controls the retry wait time when the
@@ -58,6 +58,11 @@ connection drops — it is **not** a polling interval.
 | Sourcetype | Content |
 |---|---|
 | `cisco:spaces:firehose` | Device presence, location updates, IoT telemetry, and contextual data from Cisco Spaces Firehose API |
+| `cisco:spaces:firehose:health` | Firehose connection and collector-health events in the pinned SCAN `2026_07_09_1837` catalog |
+
+The repo-local fallback package is `1.0.7` and does not contain the newer
+health sourcetype. Treat health-event presence as version-bound evidence; do
+not fail an otherwise complete `1.0.7` onboarding solely because it is absent.
 
 ## REST API Endpoints
 
@@ -92,10 +97,10 @@ members automatically.
 ## Dashboard Notes
 
 This TA does not ship its own dashboards. Use the data in `cisco_spaces` with
-ad-hoc search or with a companion visualization app. The
-`cisco:spaces:firehose` sourcetype covers all event types; use `event_type`
-field values to filter by specific event categories (e.g. device presence,
-location updates).
+ad-hoc search or with a companion visualization app. Use
+`cisco:spaces:firehose` plus `event_type` for product events. Keep
+`cisco:spaces:firehose:health` separate when a current package emits collector
+health so operational events do not distort product-event panels.
 
 ## Platform Notes
 
@@ -111,5 +116,6 @@ after installation completes.
 ## Completion Validation
 
 `validate.sh --completion`/`--strict` exits nonzero for missing stream, enabled
-input, index, event, or sourcetype evidence. No-flag validation is diagnostic.
-This TA ships no pre-built dashboards.
+input, index, event, or primary `cisco:spaces:firehose` evidence. It reports
+the version-bound health sourcetype separately. No-flag validation is
+diagnostic. This TA ships no pre-built dashboards.

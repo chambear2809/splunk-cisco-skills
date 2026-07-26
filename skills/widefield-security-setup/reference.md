@@ -1,5 +1,7 @@
 # WideField Security Setup Reference
 
+Last researched: `2026-07-02`.
+
 ## Source Boundaries
 
 - WideField public platform page: https://www.widefield.ai/

@@ -2,7 +2,9 @@ pytest>=9.0.3,<10
 jsonschema>=4.25,<5
 pip-audit==2.10.1
 PyYAML>=6,<7
-ruff>=0.11,<1
+# Pin until the repository's legacy lint baseline is intentionally migrated;
+# Ruff 0.16 changes default rule behavior and exposes unrelated existing findings.
+ruff==0.15.20
 yamllint>=1.35,<2
 defusedxml>=0.7,<1
 # Optional: enables `pre-commit install` per CONTRIBUTING.md.

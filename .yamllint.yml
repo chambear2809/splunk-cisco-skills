@@ -1,6 +1,8 @@
 extends: default
 
 ignore: |
+  # These six files contain render-time {{TOKEN}} placeholders and are parsed
+  # after constrained normalization by scripts/validate_tracked_configs.py.
   skills/splunk-connect-for-snmp-setup/templates/compose/docker-compose.yml
   skills/splunk-connect-for-snmp-setup/templates/kubernetes/namespace.yaml
   skills/splunk-connect-for-snmp-setup/templates/kubernetes/values.yaml
@@ -9,8 +11,9 @@ ignore: |
   skills/splunk-connect-for-syslog-setup/templates/kubernetes/values.yaml
 
 rules:
-  line-length:
-    max: 200
+  # Catalog purposes, agent prompts, and embedded SPL are semantic scalars
+  # that cannot be wrapped safely. Other YAML style rules remain enforced.
+  line-length: disable
   truthy:
     check-keys: false
   document-start: disable

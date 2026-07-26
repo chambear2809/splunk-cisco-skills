@@ -86,8 +86,8 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(manifest["schema_version"], 1)
         self.assertEqual(manifest["source"]["kind"], "scan_public_catalog")
         self.assertEqual(manifest["source"]["url"], self.module.SCAN_SOURCE_URL)
-        self.assertEqual(manifest["source"]["catalog_version"], "2026_06_26_1427")
-        self.assertEqual(manifest["source"]["minimum_scan_version"], "1.0.28")
+        self.assertEqual(manifest["source"]["catalog_version"], "2026_07_09_1837")
+        self.assertEqual(manifest["source"]["minimum_scan_version"], "1.0.29")
         self.assertEqual(
             date.fromisoformat(manifest["source"]["retrieved_date"]).isoformat(),
             manifest["source"]["retrieved_date"],
@@ -105,6 +105,49 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(
             catalog["scan_source"]["sha256"],
             manifest["source"]["sha256"],
+        )
+
+    def test_scan_sourcetype_changes_have_reviewed_downstream_evidence(self) -> None:
+        skill_root = REPO_ROOT / "skills/cisco-product-setup"
+        manifest = json.loads(
+            (skill_root / "scan_source.json").read_text(encoding="utf-8")
+        )
+        reconciliation = json.loads(
+            (skill_root / "scan_sourcetype_reconciliation.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(reconciliation["schema_version"], 2)
+        self.assertEqual(
+            reconciliation["source_catalog_version"],
+            manifest["source"]["catalog_version"],
+        )
+        self.assertEqual(
+            len(reconciliation["unchanged_products_sourcetypes_sha256"]),
+            64,
+        )
+        self.assertTrue(
+            all(
+                len(entry["previous_sourcetypes_sha256"]) == 64
+                and len(entry["current_sourcetypes_sha256"]) == 64
+                for entry in reconciliation["entries"]
+            )
+        )
+        self.assertEqual(
+            {entry["product_id"] for entry in reconciliation["entries"]},
+            {
+                "cisco_catalyst_center",
+                "cisco_catalyst_sdwan",
+                "cisco_ise",
+                "cisco_multicloud_defense",
+                "cisco_nexus_dashboard",
+                "cisco_secure_access",
+                "cisco_spaces",
+                "cisco_talos",
+                "cisco_thousandeyes",
+                "cisco_umbrella",
+            },
         )
 
     def test_scan_fixture_rejects_untrusted_source_identity_and_date(self) -> None:

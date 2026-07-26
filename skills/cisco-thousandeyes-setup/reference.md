@@ -68,6 +68,8 @@ streams:manage alerts:manage tags:read integrations:manage`
 
 - **Delivery**: ThousandEyes Streaming API pushes to Splunk HEC
 - **Sourcetype**: `cisco:thousandeyes:metric`
+- **Collector metadata**: writes `cisco:thousandeyes:account-group` into the
+  configured metrics index
 - **Fields**: `thousandeyes_user`, `thousandeyes_acc_group`, `tags`,
   `cea_tests`, `endpoint_tests`, `hec_target`, `hec_token`, `test_index`,
   `thousandeyes_stream_id`, `related_paths` (checkbox), `index` (path data),
@@ -88,6 +90,8 @@ streams:manage alerts:manage tags:read integrations:manage`
 
 - **Delivery**: API polling
 - **Sourcetype**: `cisco:thousandeyes:event`
+- **Collector metadata**: writes `cisco:thousandeyes:account-group` into the
+  configured events index
 - **Fields**: `thousandeyes_user`, `thousandeyes_acc_group`, `index`,
   `interval` (180-31622400s, default 3600s)
 
@@ -111,6 +115,7 @@ streams:manage alerts:manage tags:read integrations:manage`
 ### Token Refresh (internal)
 
 - **Modular input**: `thousandeyes_refresh_tokens`
+- **Sourcetype**: `cisco:thousandeyes:refresh-tokens` in `_internal`
 - **Interval**: 604800s (weekly)
 - **Purpose**: Regenerates OAuth tokens for all accounts
 - **Retry**: 3 attempts with 600s wait between retries
@@ -148,6 +153,12 @@ Base URL: `https://api.thousandeyes.com/v7`
 | `/operations/webhooks` | Webhook operations CRUD |
 | `/connectors/generic` | Webhook connectors CRUD |
 | `/tags` | Get tags |
+
+The pinned SCAN `2026_07_09_1837` catalog and the repo-inspected `0.6.0`
+package both identify `cisco:thousandeyes:account-group`. Package code writes
+it from the metrics and event collectors, and the scheduled
+`thousandeyes_account_group_lookup` search materializes it into the
+`thousandeyes_account_group` KV Store collection.
 
 ## CEA Test Types
 

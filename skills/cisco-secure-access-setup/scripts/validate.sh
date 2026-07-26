@@ -13,6 +13,8 @@ DATA_FLOW_EARLIEST="-1h@h"
 STRICT=false
 DATA_FLOW_CHECKS=0
 DATA_FLOW_EVENTS=0
+DATA_FLOW_TYPED_EVENTS=0
+DATA_FLOW_LEGACY_EVENTS=0
 
 PASS=0
 FAIL=0
@@ -54,12 +56,20 @@ if ${STRICT} && ${SKIP_DATA_FLOW}; then
     log "ERROR: --skip-data-flow cannot be combined with --strict/--completion." >&2
     exit 1
 fi
+if [[ ! "${DATA_FLOW_EARLIEST}" =~ ^-[1-9][0-9]*(s|m|h|d|w|mon|q|y)(@(s|m|h|d|w|mon|q|y))?$ ]]; then
+    log "ERROR: --data-flow-earliest must be a bounded relative Splunk time such as -1h@h or -7d@d." >&2
+    exit 1
+fi
 
 probe_index_event_flow() {
     local idx="$1"
     local label="$2"
     [[ -z "${idx}" ]] && return 0
-    local count
+    if [[ ! "${idx}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        fail "${label} index name is unsafe for validation: ${idx}"
+        return 0
+    fi
+    local count typed_count legacy_count
     DATA_FLOW_CHECKS=$((DATA_FLOW_CHECKS + 1))
     count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
         "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now" \
@@ -67,6 +77,23 @@ probe_index_event_flow() {
     if [[ "${count}" =~ ^[0-9]+$ ]] && [[ "${count}" -gt 0 ]]; then
         DATA_FLOW_EVENTS=$((DATA_FLOW_EVENTS + count))
         pass "${label} index '${idx}' has ${count} events since ${DATA_FLOW_EARLIEST}"
+
+        typed_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
+            "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now sourcetype IN (\"cisco:cloud_security:*\",\"cisco:secure_access:*\") NOT sourcetype=\"cisco:secure_access:security_events_andalerts\"" \
+            "count" 2>/dev/null || echo "0")
+        if [[ "${typed_count}" =~ ^[0-9]+$ ]] && [[ "${typed_count}" -gt 0 ]]; then
+            DATA_FLOW_TYPED_EVENTS=$((DATA_FLOW_TYPED_EVENTS + typed_count))
+            pass "${label} index has ${typed_count} events using a current Cisco Secure Access sourcetype family"
+        else
+            warn "${label} index has data but no current cisco:cloud_security:* or cisco:secure_access:* events"
+        fi
+
+        legacy_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
+            "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now sourcetype=\"cisco:secure_access:security_events_andalerts\"" \
+            "count" 2>/dev/null || echo "0")
+        if [[ "${legacy_count}" =~ ^[0-9]+$ ]] && [[ "${legacy_count}" -gt 0 ]]; then
+            DATA_FLOW_LEGACY_EVENTS=$((DATA_FLOW_LEGACY_EVENTS + legacy_count))
+        fi
     else
         warn "${label} index '${idx}' has no events since ${DATA_FLOW_EARLIEST} (may be normal if just configured)"
     fi
@@ -353,7 +380,12 @@ if ${STRICT}; then
         fail "No configured event index was available for completion data-flow evidence"
     elif [[ "${DATA_FLOW_EVENTS}" -eq 0 ]]; then
         fail "No Secure Access events were found in any configured index"
+    elif [[ "${DATA_FLOW_TYPED_EVENTS}" -eq 0 ]]; then
+        fail "Configured indexes have data, but none uses a current Cisco Secure Access sourcetype family"
     fi
+fi
+if [[ "${DATA_FLOW_LEGACY_EVENTS}" -gt 0 ]]; then
+    warn "Found ${DATA_FLOW_LEGACY_EVENTS} events using retired cisco:secure_access:security_events_andalerts; migrate collection to the split security-events and alerts sourcetypes"
 fi
 fi
 

@@ -308,18 +308,33 @@ fi
 log ""
 log "--- Data Flow Check ---"
 event_total=0
+account_group_expected=false
 for idx_label in "thousandeyes_metrics:metrics" "thousandeyes_traces:traces" "thousandeyes_events:events" "thousandeyes_activity:activity" "thousandeyes_alerts:alerts" "thousandeyes_pathvis:pathvis"; do
     idx="${idx_label%%:*}"
     label="${idx_label#*:}"
     event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
         event_total=$((event_total + event_count))
+        if [[ "${idx}" == "thousandeyes_metrics" || "${idx}" == "thousandeyes_events" ]]; then
+            account_group_expected=true
+        fi
         pass "Index '${idx}' has ${event_count} events (${label})"
     else
         warn "Index '${idx}' has no events yet (${label})"
     fi
 done
 [[ "${event_total}" -gt 0 ]] || completion_issue "No ThousandEyes events were found in any app index"
+
+account_group_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
+    '| tstats count where index IN ("thousandeyes_metrics","thousandeyes_events") sourcetype="cisco:thousandeyes:account-group"' \
+    "count" 2>/dev/null || echo "0")
+if [[ "${account_group_count}" =~ ^[0-9]+$ ]] && [[ "${account_group_count}" -gt 0 ]]; then
+    pass "Account-group metadata sourcetype has ${account_group_count} events"
+elif ${account_group_expected}; then
+    completion_issue "Metrics or event data exists, but cisco:thousandeyes:account-group metadata is missing"
+else
+    log "  INFO: Account-group metadata is emitted only by configured metrics or event collectors"
+fi
 
 log ""
 log "--- Dashboard Completion ---"

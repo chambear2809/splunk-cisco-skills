@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import stat
@@ -70,6 +71,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--soar-port-forward", choices=("true", "false"), default="false")
     p.add_argument("--soar-hostname", default="")
     p.add_argument("--soar-tgz", default="")
+    p.add_argument("--soar-tgz-sha256", default="")
     p.add_argument("--soar-fips", choices=VALID_FIPS, default="auto")
     p.add_argument("--soar-hosts", default="")
     p.add_argument("--soar-ssh-user", default="splunk")
@@ -108,6 +110,18 @@ def validate_inputs(args: argparse.Namespace) -> None:
         die(f"SOAR HTTPS port must be an integer: {exc}")
     if not 1 <= port <= 65535:
         die("SOAR HTTPS port must be between 1 and 65535")
+    soar_home = Path(args.soar_home).expanduser()
+    normalized_soar_home = Path(os.path.normpath(str(soar_home)))
+    if (
+        not soar_home.is_absolute()
+        or not str(soar_home).strip("/")
+        or normalized_soar_home != soar_home
+    ):
+        die("SOAR home must be an absolute path other than /")
+    if not re.fullmatch(r"/[A-Za-z0-9._/-]+", args.soar_home) or any(
+        part in {".", ".."} for part in args.soar_home.split("/")
+    ):
+        die("SOAR home contains unsupported path characters or traversal components")
     if args.soar_tenant_url:
         value = args.soar_tenant_url.strip().rstrip("/")
         if any(character.isspace() for character in value):
@@ -135,6 +149,8 @@ def validate_inputs(args: argparse.Namespace) -> None:
     for host in csv_list(args.soar_hosts):
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host):
             die(f"SOAR cluster host contains unsupported characters: {host!r}")
+    if args.soar_tgz_sha256 and not re.fullmatch(r"[A-Fa-f0-9]{64}", args.soar_tgz_sha256):
+        die("SOAR TGZ SHA-256 must be exactly 64 hexadecimal characters")
 
 
 def shell_quote(value: object) -> str:
@@ -168,6 +184,15 @@ def make_script(body: str) -> str:
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
 
 
+def safe_extractor_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[2]
+        / "shared"
+        / "scripts"
+        / "safe_extract_tar.py"
+    )
+
+
 # Runtime locator for skills/shared/lib so the rendered SOAR scripts can
 # source soar_helpers.sh (which keeps the SOAR ph-auth-token and
 # soar_local_admin password off curl's argv via process-substituted curl config).
@@ -197,6 +222,7 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
     soar_home = shell_quote(args.soar_home)
     https_port = shell_quote(args.soar_https_port)
     soar_tgz = shell_quote(args.soar_tgz)
+    soar_tgz_sha256 = shell_quote(args.soar_tgz_sha256)
     port_forward = "true" if args.soar_port_forward == "true" else "false"
     fips = args.soar_fips
 
@@ -204,21 +230,40 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         f"SOAR_HOME={soar_home}\n"
         f"HTTPS_PORT={https_port}\n"
         f"SOAR_TGZ={soar_tgz}\n"
+        f"SOAR_TGZ_SHA256={soar_tgz_sha256}\n"
+        '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'SAFE_EXTRACTOR="$(cd "${_SCRIPT_DIR}/../shared" && pwd)/safe_extract_tar.py"\n'
         f"PORT_FORWARD={port_forward}\n"
         f"FIPS_MODE={fips}\n\n"
-        'if [[ ! -s "${SOAR_TGZ}" ]]; then\n'
-        '  echo "ERROR: SOAR TGZ missing or empty: ${SOAR_TGZ}" >&2\n'
+        'if [[ ! -f "${SOAR_TGZ}" || -L "${SOAR_TGZ}" || ! -r "${SOAR_TGZ}" || ! -s "${SOAR_TGZ}" ]]; then\n'
+        '  echo "ERROR: SOAR TGZ must be a readable, non-empty, non-symlink regular file: ${SOAR_TGZ}" >&2\n'
         '  exit 1\n'
         'fi\n\n'
-        'if ! systemctl status firewalld >/dev/null 2>&1; then\n'
-        '  echo "WARNING: firewalld not running; SOAR install requires firewalld." >&2\n'
-        '  sudo systemctl enable firewalld\n'
-        '  sudo systemctl start firewalld\n'
-        'fi\n'
-        'sudo firewall-cmd --permanent --zone public --add-port "${HTTPS_PORT}/tcp" >/dev/null\n'
-        'sudo firewall-cmd --reload >/dev/null\n\n'
-        'sudo localectl set-locale LANG=en_US.UTF-8\n'
-        'sudo localectl set-keymap us\n\n'
+        '[[ "${SOAR_TGZ_SHA256}" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "ERROR: expected SOAR TGZ SHA-256 is missing or invalid." >&2; exit 1; }\n'
+        '[[ -f "${SAFE_EXTRACTOR}" && -r "${SAFE_EXTRACTOR}" ]] || { echo "ERROR: safe archive extractor is missing: ${SAFE_EXTRACTOR}" >&2; exit 1; }\n'
+        'VALIDATED_STAGE="$(mktemp -d /tmp/splunk-soar-validated.XXXXXX)"\n'
+        'INSTALL_STAGE=""\n'
+        'cleanup_stages() {\n'
+        '  if [[ -n "${VALIDATED_STAGE:-}" && "${VALIDATED_STAGE}" =~ ^/tmp/splunk-soar-validated\\.[A-Za-z0-9]+$ ]]; then\n'
+        '    rm -rf -- "${VALIDATED_STAGE}"\n'
+        '  fi\n'
+        '  if [[ -n "${INSTALL_STAGE:-}" && "${INSTALL_STAGE}" == "${SOAR_HOME}"/.install-stage.* ]]; then\n'
+        '    rm -rf -- "${INSTALL_STAGE}"\n'
+        '  fi\n'
+        '}\n'
+        'trap cleanup_stages EXIT\n'
+        "trap 'exit 130' INT\n"
+        "trap 'exit 143' TERM\n"
+        'python3 "${SAFE_EXTRACTOR}" --containment-root "${VALIDATED_STAGE}" \\\n'
+        '  --expected-sha256 "${SOAR_TGZ_SHA256}" \\\n'
+        '  --expected-root splunk-soar --require-exact-roots \\\n'
+        '  "${SOAR_TGZ}" "${VALIDATED_STAGE}/extracted"\n'
+        '[[ -f "${VALIDATED_STAGE}/extracted/splunk-soar/soar-prepare-system" \\\n'
+        '   && ! -L "${VALIDATED_STAGE}/extracted/splunk-soar/soar-prepare-system" \\\n'
+        '   && -f "${VALIDATED_STAGE}/extracted/splunk-soar/soar-install" \\\n'
+        '   && ! -L "${VALIDATED_STAGE}/extracted/splunk-soar/soar-install" ]] || { echo "ERROR: archive is missing non-symlink SOAR installer entrypoints." >&2; exit 1; }\n'
+        '[[ ! -L "${SOAR_HOME}" ]] || { echo "ERROR: SOAR home must not be a symbolic link: ${SOAR_HOME}" >&2; exit 1; }\n'
+        '[[ ! -e "${SOAR_HOME}/splunk-soar" && ! -L "${SOAR_HOME}/splunk-soar" ]] || { echo "ERROR: refusing to replace existing ${SOAR_HOME}/splunk-soar" >&2; exit 1; }\n\n'
         'if [[ -r /proc/sys/crypto/fips_enabled ]]; then\n'
         '  fips_state=$(cat /proc/sys/crypto/fips_enabled)\n'
         'else\n'
@@ -232,9 +277,22 @@ def render_onprem_single(args: argparse.Namespace) -> dict:
         '    fi\n'
         '    ;;\n'
         'esac\n\n'
-        'mkdir -p "${SOAR_HOME}"\n'
+        'if ! systemctl status firewalld >/dev/null 2>&1; then\n'
+        '  echo "WARNING: firewalld not running; SOAR install requires firewalld." >&2\n'
+        '  sudo systemctl enable firewalld\n'
+        '  sudo systemctl start firewalld\n'
+        'fi\n'
+        'sudo firewall-cmd --permanent --zone public --add-port "${HTTPS_PORT}/tcp" >/dev/null\n'
+        'sudo firewall-cmd --reload >/dev/null\n\n'
+        'sudo localectl set-locale LANG=en_US.UTF-8\n'
+        'sudo localectl set-keymap us\n\n'
+        'sudo mkdir -p "${SOAR_HOME}"\n'
         'sudo chown "$(id -un):$(id -gn)" "${SOAR_HOME}"\n'
-        'tar -xzf "${SOAR_TGZ}" -C "${SOAR_HOME}"\n'
+        'INSTALL_STAGE="$(mktemp -d "${SOAR_HOME}/.install-stage.XXXXXX")"\n'
+        'mv -- "${VALIDATED_STAGE}/extracted/splunk-soar" "${INSTALL_STAGE}/splunk-soar"\n'
+        'mv -- "${INSTALL_STAGE}/splunk-soar" "${SOAR_HOME}/splunk-soar"\n'
+        'cleanup_stages\n'
+        'trap - EXIT INT TERM\n'
         'cd "${SOAR_HOME}/splunk-soar"\n\n'
         'PREPARE_ARGS=(--splunk-soar-home "${SOAR_HOME}" --https-port "${HTTPS_PORT}")\n'
         'if [[ "${PORT_FORWARD}" == "true" ]]; then\n'
@@ -282,6 +340,7 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
     soar_home = shell_quote(args.soar_home)
     https_port = shell_quote(args.soar_https_port)
     soar_tgz = shell_quote(args.soar_tgz)
+    soar_tgz_sha256 = shell_quote(args.soar_tgz_sha256)
     pg = kv_dict(args.external_pg)
     es_hosts = csv_list(args.external_es)
     gluster_hosts = csv_list(args.external_gluster)
@@ -294,10 +353,18 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         f"SOAR_HOME={soar_home}\n"
         f"HTTPS_PORT={https_port}\n"
         f"SOAR_TGZ={soar_tgz}\n"
+        f"SOAR_TGZ_SHA256={soar_tgz_sha256}\n"
+        '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'SAFE_EXTRACTOR="$(cd "${_SCRIPT_DIR}/../shared" && pwd)/safe_extract_tar.py"\n'
         f"SSH_USER={soar_ssh}\n"
         f"SSH_KNOWN_HOSTS_FILE={known_hosts}\n"
-        '[[ -s "${SOAR_TGZ}" ]] || { echo "ERROR: SOAR TGZ missing or empty: ${SOAR_TGZ}" >&2; exit 1; }\n'
+        '[[ -f "${SOAR_TGZ}" && ! -L "${SOAR_TGZ}" && -r "${SOAR_TGZ}" && -s "${SOAR_TGZ}" ]] || { echo "ERROR: SOAR TGZ must be a readable, non-empty, non-symlink regular file: ${SOAR_TGZ}" >&2; exit 1; }\n'
+        '[[ "${SOAR_TGZ_SHA256}" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "ERROR: expected SOAR TGZ SHA-256 is missing or invalid." >&2; exit 1; }\n'
+        '[[ -f "${SAFE_EXTRACTOR}" && -r "${SAFE_EXTRACTOR}" ]] || { echo "ERROR: safe archive extractor is missing: ${SAFE_EXTRACTOR}" >&2; exit 1; }\n'
         '[[ -r "${SSH_KNOWN_HOSTS_FILE}" ]] || { echo "ERROR: --soar-ssh-known-hosts-file must be readable." >&2; exit 1; }\n'
+        '# Validate the digest, complete member graph, and exact archive root before the first SSH connection.\n'
+        'python3 "${SAFE_EXTRACTOR}" --validate-only --expected-sha256 "${SOAR_TGZ_SHA256}" \\\n'
+        '  --expected-root splunk-soar --require-exact-roots "${SOAR_TGZ}"\n'
         'SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS_FILE}")\n'
         'ACTIVE_HOST=""\n'
         'ACTIVE_DIR=""\n'
@@ -315,17 +382,41 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         '  ACTIVE_HOST="${host}"\n'
         '  ACTIVE_DIR="${remote_dir}"\n'
         '  scp "${SSH_OPTS[@]}" "${SOAR_TGZ}" "${SSH_USER}@${host}:${remote_dir}/soar.tgz"\n'
-        '  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" bash -s -- "${SOAR_HOME}" "${HTTPS_PORT}" "${remote_dir}/soar.tgz" "${remote_dir}" <<\'REMOTE\'\n'
+        '  scp "${SSH_OPTS[@]}" "${SAFE_EXTRACTOR}" "${SSH_USER}@${host}:${remote_dir}/safe_extract_tar.py"\n'
+        '  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" bash -s -- "${SOAR_HOME}" "${HTTPS_PORT}" "${remote_dir}/soar.tgz" "${remote_dir}" "${SOAR_TGZ_SHA256}" "${remote_dir}/safe_extract_tar.py" <<\'REMOTE\'\n'
         "set -euo pipefail\n"
         'soar_home="$1"\n'
         'https_port="$2"\n'
         'archive="$3"\n'
         'staging_dir="$4"\n'
+        'expected_sha256="$5"\n'
+        'safe_extractor="$6"\n'
         '[[ "${staging_dir}" =~ ^/tmp/splunk-soar-install\\.[A-Za-z0-9]+$ ]] || { echo "ERROR: invalid remote staging path" >&2; exit 1; }\n'
-        'trap \'rm -rf -- "${staging_dir}"\' EXIT\n'
+        'install_stage=""\n'
+        'cleanup_remote_stages() {\n'
+        '  if [[ -n "${install_stage:-}" && "${install_stage}" == "${soar_home}"/.install-stage.* ]]; then\n'
+        '    rm -rf -- "${install_stage}"\n'
+        '  fi\n'
+        '  rm -rf -- "${staging_dir}"\n'
+        '}\n'
+        'trap cleanup_remote_stages EXIT\n'
+        '[[ "${expected_sha256}" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "ERROR: expected SOAR TGZ SHA-256 is invalid." >&2; exit 1; }\n'
+        '[[ "${safe_extractor}" == "${staging_dir}/safe_extract_tar.py" && -f "${safe_extractor}" && ! -L "${safe_extractor}" ]] || { echo "ERROR: remote safe extractor is missing." >&2; exit 1; }\n'
+        'python3 "${safe_extractor}" --containment-root "${staging_dir}" \\\n'
+        '  --expected-sha256 "${expected_sha256}" \\\n'
+        '  --expected-root splunk-soar --require-exact-roots \\\n'
+        '  "${archive}" "${staging_dir}/validated"\n'
+        '[[ -f "${staging_dir}/validated/splunk-soar/soar-prepare-system" \\\n'
+        '   && ! -L "${staging_dir}/validated/splunk-soar/soar-prepare-system" \\\n'
+        '   && -f "${staging_dir}/validated/splunk-soar/soar-install" \\\n'
+        '   && ! -L "${staging_dir}/validated/splunk-soar/soar-install" ]] || { echo "ERROR: archive is missing non-symlink SOAR installer entrypoints." >&2; exit 1; }\n'
+        '[[ ! -L "${soar_home}" ]] || { echo "ERROR: SOAR home must not be a symbolic link: ${soar_home}" >&2; exit 1; }\n'
+        '[[ ! -e "${soar_home}/splunk-soar" && ! -L "${soar_home}/splunk-soar" ]] || { echo "ERROR: refusing to replace existing ${soar_home}/splunk-soar" >&2; exit 1; }\n'
         'sudo mkdir -p "${soar_home}"\n'
         'sudo chown "$(id -un):$(id -gn)" "${soar_home}"\n'
-        'tar -xzf "${archive}" -C "${soar_home}"\n'
+        'install_stage="$(mktemp -d "${soar_home}/.install-stage.XXXXXX")"\n'
+        'mv -- "${staging_dir}/validated/splunk-soar" "${install_stage}/splunk-soar"\n'
+        'mv -- "${install_stage}/splunk-soar" "${soar_home}/splunk-soar"\n'
         'cd "${soar_home}/splunk-soar"\n'
         'sudo ./soar-prepare-system --splunk-soar-home "${soar_home}" --https-port "${https_port}"\n'
         './soar-install --splunk-soar-home "${soar_home}" --https-port "${https_port}"\n'
@@ -875,6 +966,7 @@ def render_metadata(args: argparse.Namespace) -> str:
             "soar_platform": args.soar_platform,
             "soar_home": args.soar_home,
             "soar_https_port": args.soar_https_port,
+            "soar_tgz_sha256": args.soar_tgz_sha256.lower(),
             "soar_hosts": csv_list(args.soar_hosts),
             "soar_tenant_url": args.soar_tenant_url,
             "automation_broker": kv_dict(args.automation_broker),
@@ -944,10 +1036,12 @@ def render_readme(args: argparse.Namespace) -> str:
         f"Platform: `{args.soar_platform}`\n"
         f"SOAR home: `{args.soar_home}`\n"
         f"HTTPS port: `{args.soar_https_port}`\n"
+        f"Package SHA-256: `{args.soar_tgz_sha256 or '(not supplied; on-prem mutation will fail closed)'}`\n"
         f"Tenant URL: `{args.soar_tenant_url or '(n/a)'}`\n\n"
         "## Files\n\n"
         "- `onprem-single/{prepare-system.sh, install-soar.sh, post-install-checklist.md}`\n"
         "- `onprem-cluster/{make-cluster-node.sh, backup.sh, restore.sh, external-services/...}`\n"
+        "- `shared/safe_extract_tar.py`\n"
         "- `cloud/{onboarding-checklist.md, jwt-token-helper.sh, ip-allowlist.json, apply-allowlist.sh, automation-user.sh}`\n"
         "- `automation-broker/{docker-compose.yml | podman-compose.yml, install.sh, add-ca-certificate.sh, preflight.sh}`\n"
         "- `splunk-side/{install-app-for-soar.sh, install-app-for-soar-export.sh, configure-phantom-endpoint.sh}`\n"
@@ -975,11 +1069,20 @@ def render_handoffs(args: argparse.Namespace) -> dict:
 def render_all(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir).expanduser().resolve()
     files = []
+    extractor = safe_extractor_path()
+    if not extractor.is_file():
+        die(f"safe archive extractor is missing: {extractor}")
 
     write_file(output_dir / "README.md", render_readme(args))
     files.append("README.md")
     write_file(output_dir / "metadata.json", render_metadata(args))
     files.append("metadata.json")
+    write_file(
+        output_dir / "shared" / "safe_extract_tar.py",
+        extractor.read_text(encoding="utf-8"),
+        executable=True,
+    )
+    files.append("shared/safe_extract_tar.py")
     write_file(output_dir / "validate.sh", render_validate(args), executable=True)
     files.append("validate.sh")
 

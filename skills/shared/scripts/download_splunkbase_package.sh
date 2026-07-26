@@ -8,6 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 source "${SCRIPT_DIR}/../lib/credential_helpers.sh"
+SAFE_EXTRACTOR="${SCRIPT_DIR}/safe_extract_tar.py"
 
 APP_ID=""
 APP_VERSION=""
@@ -48,6 +49,43 @@ die() {
     exit 1
 }
 
+validate_component() {
+    local value="$1" label="$2" pattern="$3"
+    [[ "${#value}" -le 255 ]] || die "${label} is too long"
+    [[ "${value}" =~ ${pattern} ]] || die "${label} contains unsupported characters: ${value}"
+    [[ "${value}" != "." && "${value}" != ".." ]] || die "${label} must be a single safe path component"
+}
+
+normalize_root() {
+    python3 - "$1" <<'PY'
+from pathlib import Path
+import sys
+
+print(Path(sys.argv[1]).expanduser().resolve(strict=False), end="")
+PY
+}
+
+contained_path() {
+    python3 - "$1" "$2" <<'PY'
+import os
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).expanduser().resolve(strict=False)
+candidate_input = Path(sys.argv[2]).expanduser()
+if candidate_input.is_symlink():
+    raise SystemExit(f"ERROR: refusing symbolic-link target path: {candidate_input}")
+candidate = candidate_input.resolve(strict=False)
+try:
+    common = Path(os.path.commonpath((root, candidate)))
+except ValueError as exc:
+    raise SystemExit(f"ERROR: path is not below the requested root: {exc}")
+if common != root or candidate == root:
+    raise SystemExit(f"ERROR: refusing path outside the requested root: {candidate}")
+print(candidate, end="")
+PY
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --app-id) require_arg "$1" $# || exit 1; APP_ID="$2"; shift 2 ;;
@@ -65,31 +103,48 @@ done
 [[ -n "${APP_ID}" ]] || die "--app-id is required"
 [[ "${APP_ID}" =~ ^[0-9]+$ ]] || die "--app-id must be numeric"
 [[ -n "${APP_VERSION}" ]] || die "--version is required"
+validate_component "${APP_VERSION}" "--version" '^[A-Za-z0-9][A-Za-z0-9._+-]*$'
 clean_expected_apps=()
 for app_name in "${EXPECTED_APP_NAMES[@]}"; do
     app_name="${app_name#"${app_name%%[![:space:]]*}"}"
     app_name="${app_name%"${app_name##*[![:space:]]}"}"
-    [[ -n "${app_name}" ]] && clean_expected_apps+=("${app_name}")
+    if [[ -n "${app_name}" ]]; then
+        validate_component "${app_name}" "--app-name" '^[A-Za-z0-9][A-Za-z0-9_.-]*$'
+        clean_expected_apps+=("${app_name}")
+    fi
 done
 EXPECTED_APP_NAMES=("${clean_expected_apps[@]}")
 [[ "${#EXPECTED_APP_NAMES[@]}" -gt 0 ]] || die "--app-name or --app-names is required"
 EXPECTED_APP_KEY="${EXPECTED_APP_NAMES[0]}"
 
+[[ -f "${SAFE_EXTRACTOR}" && -r "${SAFE_EXTRACTOR}" ]] || die "Safe archive extractor is missing: ${SAFE_EXTRACTOR}"
+TA_DIR="$(normalize_root "${TA_DIR}")"
+UNPACK_ROOT="$(normalize_root "${UNPACK_ROOT}")"
 mkdir -p "${TA_DIR}" "${UNPACK_ROOT}"
+TA_DIR="$(normalize_root "${TA_DIR}")"
+UNPACK_ROOT="$(normalize_root "${UNPACK_ROOT}")"
 
 log "Resolving Splunkbase app ${APP_ID} version ${APP_VERSION}..."
 get_splunkbase_release_metadata "${APP_ID}" "${APP_VERSION}" || exit 1
 
 RESOLVED_VERSION="${SB_DOWNLOAD_VERSION:-${APP_VERSION}}"
 ARCHIVE_NAME="${SB_DOWNLOAD_FILENAME:-splunkbase_${APP_ID}_${RESOLVED_VERSION}.tgz}"
-ARCHIVE_PATH="${TA_DIR}/${ARCHIVE_NAME}"
-TARGET_DIR="${UNPACK_ROOT}/${EXPECTED_APP_KEY}-${RESOLVED_VERSION}"
 
 if [[ "${RESOLVED_VERSION}" != "${APP_VERSION}" ]]; then
     die "Resolved version ${RESOLVED_VERSION} did not match requested version ${APP_VERSION}"
 fi
+validate_component "${RESOLVED_VERSION}" "resolved Splunkbase version" '^[A-Za-z0-9][A-Za-z0-9._+-]*$'
+validate_component "${ARCHIVE_NAME}" "Splunkbase metadata filename" '^[A-Za-z0-9][A-Za-z0-9._+-]*$'
+case "${ARCHIVE_NAME}" in
+    *.tgz|*.tar.gz|*.tar|*.spl) ;;
+    *) die "Splunkbase metadata filename must end in .tgz, .tar.gz, .tar, or .spl" ;;
+esac
+
+ARCHIVE_PATH="$(contained_path "${TA_DIR}" "${TA_DIR}/${ARCHIVE_NAME}")"
+TARGET_DIR="$(contained_path "${UNPACK_ROOT}" "${UNPACK_ROOT}/${EXPECTED_APP_KEY}-${RESOLVED_VERSION}")"
 
 if [[ -f "${ARCHIVE_PATH}" ]]; then
+    [[ ! -L "${ARCHIVE_PATH}" ]] || die "Cached archive must not be a symbolic link: ${ARCHIVE_PATH}"
     if _is_splunk_package "${ARCHIVE_PATH}"; then
         log "Using cached archive: ${ARCHIVE_PATH}"
     else
@@ -98,35 +153,41 @@ if [[ -f "${ARCHIVE_PATH}" ]]; then
 else
     log "Downloading ${EXPECTED_APP_KEY} ${APP_VERSION} to ${ARCHIVE_PATH}..."
     load_splunkbase_credentials || exit 1
+    ARCHIVE_PATH="$(contained_path "${TA_DIR}" "${ARCHIVE_PATH}")"
     download_splunkbase_release "${APP_ID}" "${APP_VERSION}" "${ARCHIVE_PATH}" || exit 1
 fi
+[[ -f "${ARCHIVE_PATH}" && ! -L "${ARCHIVE_PATH}" ]] || die "Downloaded archive is not a non-symlink regular file: ${ARCHIVE_PATH}"
 
+VALIDATE_DIR="${TARGET_DIR}"
 if [[ -d "${TARGET_DIR}" && "${FORCE}" != "true" ]]; then
     log "Using existing extraction: ${TARGET_DIR}"
 else
-    if [[ -d "${TARGET_DIR}" ]]; then
-        rm -rf "${TARGET_DIR}"
-    fi
-    TMP_EXTRACT="$(mktemp -d "${UNPACK_ROOT}/.${EXPECTED_APP_KEY}-${RESOLVED_VERSION}.XXXXXX")"
+    TMP_PARENT="$(mktemp -d "${UNPACK_ROOT}/.${EXPECTED_APP_KEY}-${RESOLVED_VERSION}.XXXXXX")"
+    TMP_PARENT="$(contained_path "${UNPACK_ROOT}" "${TMP_PARENT}")"
+    TMP_EXTRACT="$(contained_path "${TMP_PARENT}" "${TMP_PARENT}/extracted")"
     cleanup() {
-        rm -rf "${TMP_EXTRACT:-}"
+        if [[ -n "${TMP_PARENT:-}" ]]; then
+            local safe_tmp
+            safe_tmp="$(contained_path "${UNPACK_ROOT}" "${TMP_PARENT}")" || return
+            rm -rf -- "${safe_tmp}"
+        fi
     }
     trap cleanup EXIT
-    tar -xf "${ARCHIVE_PATH}" -C "${TMP_EXTRACT}"
-    mkdir -p "${TARGET_DIR}"
-    shopt -s dotglob nullglob
-    extracted=("${TMP_EXTRACT}"/*)
-    if [[ "${#extracted[@]}" -eq 0 ]]; then
-        die "Package extraction produced no files"
-    fi
-    mv "${extracted[@]}" "${TARGET_DIR}/"
-    shopt -u dotglob nullglob
-    cleanup
-    trap - EXIT
-    log "Extracted to: ${TARGET_DIR}"
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    extract_args=()
+    for app_name in "${EXPECTED_APP_NAMES[@]}"; do
+        extract_args+=(--expected-root "${app_name}")
+    done
+    python3 "${SAFE_EXTRACTOR}" \
+        --containment-root "${TMP_PARENT}" \
+        "${extract_args[@]}" \
+        "${ARCHIVE_PATH}" \
+        "${TMP_EXTRACT}"
+    VALIDATE_DIR="${TMP_EXTRACT}"
 fi
 
-python3 - "${TARGET_DIR}" "${APP_VERSION}" "${EXPECTED_APP_NAMES[@]}" <<'PY'
+python3 - "${VALIDATE_DIR}" "${APP_VERSION}" "${EXPECTED_APP_NAMES[@]}" <<'PY'
 import configparser
 import json
 import sys
@@ -185,6 +246,19 @@ for expected_app in expected_apps:
 
     print(f"OK: {expected_app} {expected_version} verified at {app_dir}")
 PY
+
+if [[ "${VALIDATE_DIR}" != "${TARGET_DIR}" ]]; then
+    safe_target="$(contained_path "${UNPACK_ROOT}" "${TARGET_DIR}")"
+    if [[ -e "${safe_target}" || -L "${safe_target}" ]]; then
+        [[ "${FORCE}" == "true" ]] || die "Extraction target already exists: ${safe_target}"
+        rm -rf -- "${safe_target}"
+    fi
+    mv -- "${TMP_EXTRACT}" "${safe_target}"
+    VALIDATE_DIR="${safe_target}"
+    cleanup
+    trap - EXIT INT TERM
+    log "Extracted to: ${safe_target}"
+fi
 
 log "Package ready."
 echo "ARCHIVE_PATH=${ARCHIVE_PATH}"

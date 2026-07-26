@@ -207,6 +207,12 @@ Creates six indexes:
 | `thousandeyes_alerts` | Alert notifications | `cisco:thousandeyes:alerts` |
 | `thousandeyes_pathvis` | Path visualization | `cisco:thousandeyes:path-vis` |
 
+The metrics and event collectors also write account-group metadata as
+`cisco:thousandeyes:account-group` into their configured metrics or events
+index. The token-refresh input writes operational logs to `_internal` as
+`cisco:thousandeyes:refresh-tokens`; neither sourcetype needs a separate
+customer index.
+
 When you enable metrics inputs, the setup script now enables related path
 collection into `thousandeyes_pathvis` by default. Although it is configured on
 the metrics stream input, path visualization data is collected via API polling
@@ -290,6 +296,8 @@ input, data inputs, data flow, settings, and optional ITSI status.
 | `cisco:thousandeyes:event` | API polling | ThousandEyes events |
 | `cisco:thousandeyes:activity` | HEC stream | Activity/audit logs |
 | `cisco:thousandeyes:alerts` | HEC webhook | Alert notifications |
+| `cisco:thousandeyes:account-group` | API metadata | Account-group metadata written by metrics and event collectors |
+| `cisco:thousandeyes:refresh-tokens` | Internal monitor | Token-refresh operational logs in `_internal` |
 
 ## Dashboards
 
@@ -303,7 +311,8 @@ Configuration Status views.
 
 **Prerequisites for dashboards to show data:**
 
-1. The `thousandeyes` index must exist and inputs must be enabled (Steps 2–4).
+1. The applicable `thousandeyes_*` indexes must exist and inputs must be
+   enabled (Steps 2–4).
 2. HEC must be reachable from ThousandEyes for streaming inputs (metrics,
    traces, activity, alerts). Validate the HEC target URL format — see
    Known Issue #6 below.
@@ -369,5 +378,6 @@ bash skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh
 
 Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
 to require indexes, an OAuth account, token refresh, an enabled data input,
-nonzero app data, and visible shipped dashboards. A confirmed HEC token is
-required when streaming inputs are present.
+nonzero app data, expected account-group metadata when metrics or event data is
+present, and visible shipped dashboards. A confirmed HEC token is required
+when streaming inputs are present.
