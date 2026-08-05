@@ -13,6 +13,7 @@
 # Create secret temp files only when you are ready to run the configure script:
 # bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_device_password
 # bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_cybervision_api_token
+# bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_iosxe_cli_password
 #
 # Then pass:
 #   --password-file /tmp/catalyst_device_password
@@ -22,14 +23,17 @@
 # need more than one account of the same type.
 #
 # `stanza_name` is the account name that will appear in Splunk.
-# `use_ca_cert=true` means trust the server certificate with the local/system
-# trust store. The current setup script does not upload a custom CA bundle.
+# `verify_ssl=true` validates the remote certificate and is the secure default.
+# `use_ca_cert=true` selects an account-provided custom CA certificate; the
+# current setup script does not upload that certificate, so use the TA UI for
+# custom-CA accounts.
 
 # Catalyst Center / DNAC account
 [catalyst_center_account]
 stanza_name = DNAC_PROD
 host = https://dnac.example.local
 username =
+verify_ssl = true
 use_ca_cert = false
 
 # Cisco ISE account
@@ -37,6 +41,7 @@ use_ca_cert = false
 stanza_name = ISE_PROD
 host = https://ise.example.local
 username =
+verify_ssl = true
 use_ca_cert = false
 
 # Cisco SD-WAN account
@@ -44,10 +49,22 @@ use_ca_cert = false
 stanza_name = SDWAN_PROD
 host = https://vmanage.example.local
 username =
+verify_ssl = true
 use_ca_cert = false
 
 # Cisco Cyber Vision account
 [cyber_vision_account]
 stanza_name = CYBERVISION_PROD
 host = https://cybervision.example.local
+verify_ssl = true
 use_ca_cert = false
+
+# Cisco IOS-XE CLI account (Beta)
+# One account targets one device. Obtain and verify the SHA-256 host-key
+# fingerprint through a trusted channel before configuring the account.
+[iosxe_cli_account]
+stanza_name = EDGE_01
+host = edge01.example.local
+port = 22
+username =
+host_key_fingerprint = SHA256:REPLACE_WITH_VERIFIED_DEVICE_FINGERPRINT

@@ -138,6 +138,14 @@ release section when cutting a release.
 
 ### Changed
 
+- Synced `cisco-catalyst-ta-setup` to the TA `3.2.44` source contract with 29
+  modular inputs, device-scoped SD-WAN BFD API guidance, editable SD-WAN and
+  Cyber Vision intervals, account-scoped TLS validation, and the bounded beta
+  IOS-XE CLI collector. Added explicit SD-WAN text-syslog guidance and checks
+  for `cisco:firewall:logs`, UTD over UDP 514 on affected releases, traditional
+  ZBFW syslog rate limits, SC4S/HEC routing, and the separate HSL/Unified
+  Logging NetFlow/IPFIX path.
+
 - Hardened the repo-local skills MCP server for an execution-enabled,
   mutation-off registration: added product-first paginated discovery,
   subprocess-free Cisco resolution, curated no-follow resource reads, strict
