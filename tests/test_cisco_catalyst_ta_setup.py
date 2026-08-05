@@ -44,6 +44,8 @@ def test_setup_covers_current_parameter_complete_inputs_and_intervals() -> None:
 
     assert "utd_health,link_health,sse_tunnel_health" in setup
     assert "site_health,tunnel_health,sse_tunnels" in setup
+    assert 'ta_handler_available "data/inputs/${optional_type}"' in setup
+    assert "the installed TA does not expose this 3.2.44 source-contract handler" in setup
 
 
 def test_setup_does_not_guess_environment_specific_input_parameters() -> None:
@@ -72,6 +74,10 @@ def test_completion_validation_requires_recent_product_data() -> None:
         "cisco:cybervision:*",
     ):
         assert sourcetype_family in validator
+    assert "sdwan_ingress_count" in validator
+    assert "Recent SD-WAN text events satisfy ingest readiness" in validator
+    assert "TA Data Collection Health dashboard search has" in validator
+    assert "event=poll-complete" in validator
 
 
 def test_account_tls_verification_is_scoped_per_account() -> None:
@@ -109,6 +115,9 @@ def test_beta_iosxe_cli_account_and_input_match_current_allowlist() -> None:
     ):
         assert command_id in setup
     assert 'rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_cli_command"' in setup
+    assert 'ta_handler_available "TA_cisco_catalyst_cli_account"' in configurator
+    assert 'ta_handler_available "data/inputs/cisco_catalyst_cli_command"' in setup
+    assert 'input_name="CLI_${account}_${command_id}"' in setup
     assert "host_key_fingerprint" in template
 
 

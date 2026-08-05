@@ -71,6 +71,14 @@ check_prereqs() {
     fi
 }
 
+ta_handler_available() {
+    local handler_path="$1" http_code
+    http_code=$(splunk_curl "${SK}" --connect-timeout 5 --max-time 15 \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/${handler_path}?output_mode=json&count=0" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+    [[ "${http_code}" == "200" ]]
+}
+
 create_indexes() {
     log "Creating indexes..."
     local failed=0 idx
@@ -106,21 +114,33 @@ enable_catalyst_center_inputs() {
 
     log "Enabling Catalyst Center inputs for account='${account}' index='${index}'..."
 
-    local input_specs=(
+    local baseline_input_specs=(
         "cisco_catalyst_dnac_clienthealth|300|Client_Health"
         "cisco_catalyst_dnac_devicehealth|300|Device_Health"
         "cisco_catalyst_dnac_compliance|900|Compliance"
         "cisco_catalyst_dnac_issue|300|Issue"
         "cisco_catalyst_dnac_networkhealth|300|Network_Health"
         "cisco_catalyst_dnac_securityadvisory|3600|Security_Advisory"
-        "cisco_catalyst_dnac_swim|3600|SWIM"
-        "cisco_catalyst_dnac_application_traffic|900|Application_Traffic"
         "cisco_catalyst_dnac_audit_logs|300|Audit_Logs"
         "cisco_catalyst_dnac_client|3600|Client"
         "cisco_catalyst_dnac_site_topology|3600|Site_Topology"
     )
+    local source_contract_input_specs=(
+        "cisco_catalyst_dnac_swim|3600|SWIM"
+        "cisco_catalyst_dnac_application_traffic|900|Application_Traffic"
+    )
+    local input_specs=("${baseline_input_specs[@]}")
+    local optional_spec optional_type
+    for optional_spec in "${source_contract_input_specs[@]}"; do
+        optional_type="${optional_spec%%|*}"
+        if ta_handler_available "data/inputs/${optional_type}"; then
+            input_specs+=("${optional_spec}")
+        else
+            log "  INFO: Skipping ${optional_type}; the installed TA does not expose this 3.2.44 source-contract handler."
+        fi
+    done
 
-    local failures=0 input_spec input_type interval input_name
+    local failures=0 created=0 input_spec input_type interval input_name
     for input_spec in "${input_specs[@]}"; do
         IFS="|" read -r input_type interval input_name <<< "${input_spec}"
         local body
@@ -133,6 +153,8 @@ enable_catalyst_center_inputs() {
         if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$body"; then
             log "  ERROR: Failed to enable ${input_type}://${input_name}"
             failures=$((failures + 1))
+        else
+            created=$((created + 1))
         fi
     done
 
@@ -141,7 +163,7 @@ enable_catalyst_center_inputs() {
         return 1
     fi
 
-    log "Catalyst Center inputs enabled (11 dedicated inputs)."
+    log "Catalyst Center inputs enabled (${created} dedicated inputs supported by the installed TA)."
     log "Generic endpoint and scheduled-report inputs require explicit endpoint/report selections and were not created."
 }
 
@@ -293,10 +315,15 @@ enable_iosxe_cli_input() {
             ;;
     esac
 
-    [[ -n "${input_name}" ]] || input_name="CLI_${command_id}"
+    [[ -n "${input_name}" ]] || input_name="CLI_${account}_${command_id}"
     [[ -n "${interval}" ]] || interval="${recommended_interval}"
     if [[ ! "${interval}" =~ ^[0-9]+$ ]] || [[ "${interval}" == "0" ]]; then
         log "ERROR: --interval must be a positive integer"
+        return 1
+    fi
+    if ! ta_handler_available "data/inputs/cisco_catalyst_cli_command"; then
+        log "ERROR: The installed ${APP_NAME} does not expose the IOS-XE CLI input handler."
+        log "IOS-XE CLI automation requires a package that implements the 3.2.44 source contract; the default package-verified 3.1.0 install does not."
         return 1
     fi
 

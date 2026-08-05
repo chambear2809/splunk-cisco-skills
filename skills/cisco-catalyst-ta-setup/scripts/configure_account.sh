@@ -93,6 +93,14 @@ SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to
 
 log "Authenticated to Splunk REST API."
 
+ta_handler_available() {
+    local handler="$1" http_code
+    http_code=$(splunk_curl "${SK}" --connect-timeout 5 --max-time 15 \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/${handler}?output_mode=json&count=0" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+    [[ "${http_code}" == "200" ]]
+}
+
 configure_catalyst_center() {
     if [[ -z "${HOST}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
         log "ERROR: --host, --username, and --password-file are required for catalyst_center"
@@ -242,6 +250,11 @@ configure_iosxe_cli() {
     fi
     if [[ ! "${HOST_KEY_FINGERPRINT}" =~ ^SHA256:[A-Za-z0-9+/]{43}=?$ ]]; then
         log "ERROR: --host-key-fingerprint must use SHA256:<base64> format"
+        exit 1
+    fi
+    if ! ta_handler_available "TA_cisco_catalyst_cli_account"; then
+        log "ERROR: The installed ${APP_NAME} does not expose the IOS-XE CLI account handler."
+        log "IOS-XE CLI automation requires a package that implements the 3.2.44 source contract; the default package-verified 3.1.0 install does not."
         exit 1
     fi
 

@@ -335,9 +335,11 @@ Configured in `local/ta_cisco_catalyst_settings.conf`:
 ## Completion Validation
 
 `validate.sh --completion` (alias `--strict`) exits nonzero when no Catalyst
-product account, enabled input, recent canonical event evidence, required index,
-or TA Data Collection Health dashboard view is available. It also reports
-SD-WAN text-syslog receiver/event readiness and includes IOS-XE CLI accounts,
-inputs, internal poll status, and `cisco:iosxe:cli:*` event evidence. The
-optional Cisco Enterprise Networking companion app is macro-validated only
+product account, enabled TA input or recent external SD-WAN syslog evidence,
+recent canonical event evidence, required index, or usable TA Data Collection
+Health dashboard is available. Dashboard usability requires both a visible view
+and recent `poll-complete` events from its collection-health search. The check
+also reports SD-WAN text-syslog receiver/event readiness and includes IOS-XE CLI
+accounts, inputs, internal poll status, and `cisco:iosxe:cli:*` event evidence.
+The optional Cisco Enterprise Networking companion app is macro-validated only
 when installed. The no-flag form remains diagnostic.

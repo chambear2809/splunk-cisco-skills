@@ -110,6 +110,9 @@ package-verified `3.1.0`; only `--accept-unverified-release` follows the public
 release selected by the registry. After that explicit override, compare the
 installed UCC REST handlers, account/input schemas, source types, and dashboard
 views with the `3.2.44` source contract before applying automation.
+The setup scripts capability-probe 3.2.44-only input and IOS-XE CLI handlers
+before mutation. Missing optional Catalyst Center handlers are skipped; missing
+IOS-XE CLI handlers fail closed with an upgrade/verification message.
 
 ### Source Contract Highlights
 
@@ -394,10 +397,11 @@ when ACS reports `restartRequired=true`.
 bash skills/cisco-catalyst-ta-setup/scripts/validate.sh --completion
 ```
 
-Checks: app installation, indexes, accounts, inputs, canonical events from the
-last 24 hours, TLS verification settings, and the TA's shipped Data Collection
-Health dashboard. If the optional Cisco Enterprise Networking app is installed,
-its views and index macro are checked too.
+Checks: app installation, indexes, accounts, a TA-owned input or evidenced
+external SD-WAN syslog path, canonical events from the last 24 hours, TLS
+verification settings, and the TA's shipped Data Collection Health dashboard
+plus recent `poll-complete` search data. If the optional Cisco Enterprise
+Networking app is installed, its views and index macro are checked too.
 
 ## Sourcetypes
 
@@ -481,7 +485,8 @@ bash skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh
 ## Validation Modes
 
 Run `scripts/validate.sh` for diagnostics. Run it with `--completion` (alias
-`--strict`) to require at least one configured product account, an enabled
-input, recent canonical Cisco event flow, required indexes, and the visible TA
-Data Collection Health dashboard. Companion-app checks apply only when the
-optional Cisco Enterprise Networking app is installed.
+`--strict`) to require at least one configured product account, an enabled TA
+input or recent external SD-WAN syslog evidence, recent canonical Cisco event
+flow, required indexes, and a visible TA Data Collection Health dashboard with
+recent collection-health data. Companion-app checks apply only when the optional
+Cisco Enterprise Networking app is installed.

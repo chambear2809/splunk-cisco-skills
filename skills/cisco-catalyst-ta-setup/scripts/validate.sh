@@ -117,10 +117,10 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        completion_issue "${input_count} input stanza(s) exist but all are disabled"
+        warn "${input_count} TA input stanza(s) exist but all are disabled; checking for an external SD-WAN syslog path"
     fi
 else
-    completion_issue "No inputs configured"
+    warn "No TA modular inputs configured; checking for an external SD-WAN syslog path"
 fi
 
 log ""
@@ -155,10 +155,11 @@ fi
 log ""
 log "--- SD-WAN Text-Syslog Readiness ---"
 sdwan_receiver_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| rest /services/data/inputs/all count=0 | search sourcetype="cisco:firewall:logs" | stats count as count' "count" 2>/dev/null || echo "0")
+sdwan_ingress_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype="cisco:firewall:logs"' "count" 2>/dev/null || echo "0")
 sdwan_utd_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype="cisco:sdwan:utd:logs"' "count" 2>/dev/null || echo "0")
 sdwan_zbfw_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype IN ("cisco:sdwan:session:audit:trail:start","cisco:sdwan:session:audit:trail","cisco:sdwan:pass:pkt","cisco:sdwan:drop:pkt","cisco:sdwan:log:summary","cisco:sdwan:block:host","cisco:sdwan:unblock:host","cisco:sdwan:alert:on","cisco:sdwan:alert:off","cisco:sdwan:host:tcp:alert:on","cisco:sdwan:sessions:maximum")' "count" 2>/dev/null || echo "0")
 sdwan_system_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype IN ("cisco:sdwan:syslog","cisco:sdwan:system:logs","cisco:sdwan:acl:logs","cisco:sdwan:sgacl:logs")' "count" 2>/dev/null || echo "0")
-sdwan_text_count=$((sdwan_utd_count + sdwan_zbfw_count + sdwan_system_count))
+sdwan_text_count=$((sdwan_ingress_count + sdwan_utd_count + sdwan_zbfw_count + sdwan_system_count))
 
 if [[ "${sdwan_receiver_count}" -gt 0 ]]; then
     pass "${sdwan_receiver_count} local input(s) use the required cisco:firewall:logs SD-WAN ingress sourcetype"
@@ -169,9 +170,16 @@ else
 fi
 
 if [[ "${sdwan_text_count}" -gt 0 ]]; then
-    pass "SD-WAN text syslog found: UTD=${sdwan_utd_count}, ZBFW=${sdwan_zbfw_count}, system/ACL=${sdwan_system_count}"
+    pass "SD-WAN text syslog found: ingress=${sdwan_ingress_count}, UTD=${sdwan_utd_count}, ZBFW=${sdwan_zbfw_count}, system/ACL=${sdwan_system_count}"
 else
     warn "No recent UTD, ZBFW, or ordinary SD-WAN text-syslog events were found; a listener alone does not enable Cisco-side producers"
+fi
+if [[ "${enabled_inputs}" -gt 0 ]]; then
+    pass "TA-owned ingest path is enabled"
+elif [[ "${sdwan_text_count}" -gt 0 ]]; then
+    pass "Recent SD-WAN text events satisfy ingest readiness through an external SC4S/HEC or upstream path"
+else
+    completion_issue "No enabled TA input or recent external SD-WAN text-syslog evidence was found"
 fi
 log "  INFO: HSL and Unified Logging are NetFlow/IPFIX paths and are intentionally outside this text-syslog check."
 
@@ -192,6 +200,12 @@ ta_view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/d
     | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
 if [[ "${ta_view_count}" -gt 0 ]]; then
     pass "TA Data Collection Health dashboard is visible"
+    ta_dashboard_data_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| search index=_internal earliest=-24h sourcetype IN ("splunktaciscodnacenter:log","splunktaciscocybervision:log","splunktaciscoise:log","splunktaciscosdwan:log","splunktaciscocli:log") event=poll-complete | stats count as count' "count" 2>/dev/null || echo "0")
+    if [[ "${ta_dashboard_data_count}" -gt 0 ]]; then
+        pass "TA Data Collection Health dashboard search has ${ta_dashboard_data_count} recent poll-complete event(s)"
+    else
+        completion_issue "TA Data Collection Health dashboard is visible but its collection-health search returns no recent data"
+    fi
 else
     completion_issue "TA Data Collection Health dashboard is not visible"
 fi
