@@ -1,6 +1,6 @@
 # Deployment Role Matrix
 
-_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
+_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
 
 This document defines the repo's role-based placement model across all
 supported Splunk deployment topologies.

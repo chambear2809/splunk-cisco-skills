@@ -11,6 +11,9 @@ ENABLE_INPUTS=false
 ACCOUNT=""
 INDEX=""
 INPUT_TYPE=""
+COMMAND_ID=""
+INPUT_NAME=""
+INTERVAL=""
 
 usage() {
     cat >&2 <<EOF
@@ -23,7 +26,10 @@ Options:
   --enable-inputs         Enable data inputs
   --account NAME          Account name for input enablement
   --index INDEX           Target index for inputs
-  --input-type TYPE       Input type: catalyst_center, ise, sdwan, cybervision
+  --input-type TYPE       Input type: catalyst_center, ise, sdwan, cybervision, iosxe_cli
+  --command-id ID         Cataloged command ID for iosxe_cli
+  --input-name NAME       Optional iosxe_cli input name
+  --interval SECONDS      Optional iosxe_cli polling interval override
   --help                  Show this help
 
 With no flags, runs full setup (indexes).
@@ -38,6 +44,9 @@ while [[ $# -gt 0 ]]; do
         --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
+        --command-id) require_arg "$1" $# || exit 1; COMMAND_ID="$2"; shift 2 ;;
+        --input-name) require_arg "$1" $# || exit 1; INPUT_NAME="$2"; shift 2 ;;
+        --interval) require_arg "$1" $# || exit 1; INTERVAL="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -60,6 +69,14 @@ check_prereqs() {
         log "ERROR: Cisco Catalyst TA not found. Install it first."
         exit 1
     fi
+}
+
+ta_handler_available() {
+    local handler_path="$1" http_code
+    http_code=$(splunk_curl "${SK}" --connect-timeout 5 --max-time 15 \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/${handler_path}?output_mode=json&count=0" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+    [[ "${http_code}" == "200" ]]
 }
 
 create_indexes() {
@@ -97,41 +114,47 @@ enable_catalyst_center_inputs() {
 
     log "Enabling Catalyst Center inputs for account='${account}' index='${index}'..."
 
-    local input_types=(
-        "cisco_catalyst_dnac_issue"
-        "cisco_catalyst_dnac_clienthealth"
-        "cisco_catalyst_dnac_devicehealth"
-        "cisco_catalyst_dnac_compliance"
-        "cisco_catalyst_dnac_networkhealth"
-        "cisco_catalyst_dnac_securityadvisory"
-        "cisco_catalyst_dnac_client"
-        "cisco_catalyst_dnac_audit_logs"
-        "cisco_catalyst_dnac_site_topology"
+    local baseline_input_specs=(
+        "cisco_catalyst_dnac_clienthealth|300|Client_Health"
+        "cisco_catalyst_dnac_devicehealth|300|Device_Health"
+        "cisco_catalyst_dnac_compliance|900|Compliance"
+        "cisco_catalyst_dnac_issue|300|Issue"
+        "cisco_catalyst_dnac_networkhealth|300|Network_Health"
+        "cisco_catalyst_dnac_securityadvisory|3600|Security_Advisory"
+        "cisco_catalyst_dnac_audit_logs|300|Audit_Logs"
+        "cisco_catalyst_dnac_client|3600|Client"
+        "cisco_catalyst_dnac_site_topology|3600|Site_Topology"
     )
-    local input_names=(
-        "Issue"
-        "Client_Health"
-        "Device_Health"
-        "Compliance"
-        "Network_Health"
-        "Security_Advisory"
-        "Client"
-        "Audit_Logs"
-        "Site_Topology"
+    local source_contract_input_specs=(
+        "cisco_catalyst_dnac_swim|3600|SWIM"
+        "cisco_catalyst_dnac_application_traffic|900|Application_Traffic"
     )
+    local input_specs=("${baseline_input_specs[@]}")
+    local optional_spec optional_type
+    for optional_spec in "${source_contract_input_specs[@]}"; do
+        optional_type="${optional_spec%%|*}"
+        if ta_handler_available "data/inputs/${optional_type}"; then
+            input_specs+=("${optional_spec}")
+        else
+            log "  INFO: Skipping ${optional_type}; the installed TA does not expose this 3.2.44 source-contract handler."
+        fi
+    done
 
-    local failures=0
-    for i in "${!input_types[@]}"; do
+    local failures=0 created=0 input_spec input_type interval input_name
+    for input_spec in "${input_specs[@]}"; do
+        IFS="|" read -r input_type interval input_name <<< "${input_spec}"
         local body
         body=$(form_urlencode_pairs \
             cisco_dna_center_account "${account}" \
             index "${index}" \
-            interval "3600" \
+            interval "${interval}" \
             logging_level "INFO" \
             disabled "0")
-        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
-            log "  ERROR: Failed to enable ${input_types[$i]}://${input_names[$i]}"
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$body"; then
+            log "  ERROR: Failed to enable ${input_type}://${input_name}"
             failures=$((failures + 1))
+        else
+            created=$((created + 1))
         fi
     done
 
@@ -140,7 +163,8 @@ enable_catalyst_center_inputs() {
         return 1
     fi
 
-    log "Catalyst Center inputs enabled (9 inputs)."
+    log "Catalyst Center inputs enabled (${created} dedicated inputs supported by the installed TA)."
+    log "Generic endpoint and scheduled-report inputs require explicit endpoint/report selections and were not created."
 }
 
 enable_ise_inputs() {
@@ -149,19 +173,22 @@ enable_ise_inputs() {
 
     log "Enabling ISE inputs for account='${account}' index='${index}'..."
 
-    local body
+    local input_spec="cisco_catalyst_ise_administrative_input|3600|ISE_Inputs"
+    local input_type interval input_name body
+    IFS="|" read -r input_type interval input_name <<< "${input_spec}"
     body=$(form_urlencode_pairs \
         ise_account "${account}" \
         data_type "security_group_tags,authz_policy_hit,ise_tacacs_rule_hit" \
         index "${index}" \
-        interval "3600" \
+        interval "${interval}" \
         logging_level "INFO" \
         disabled "0")
-    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_ise_administrative_input" "ISE_Inputs" "$body"; then
-        log "  ERROR: Failed to enable cisco_catalyst_ise_administrative_input://ISE_Inputs"
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$body"; then
+        log "  ERROR: Failed to enable ${input_type}://${input_name}"
         return 1
     fi
     log "ISE inputs enabled (1 input with 3 data types)."
+    log "Generic Open API and analytics-report inputs require explicit endpoint/repository selections and were not created."
 }
 
 enable_sdwan_inputs() {
@@ -170,12 +197,17 @@ enable_sdwan_inputs() {
 
     log "Enabling SD-WAN inputs for account='${account}' index='${index}'..."
 
-    local health_body site_tunnel_body
+    local health_spec="cisco_catalyst_sdwan_health|900|SDWAN_Health"
+    local site_tunnel_spec="cisco_catalyst_sdwan_site_and_tunnel_health|3600|SDWAN_Site_Tunnel_Health"
+    local audit_spec="cisco_catalyst_sdwan_audit_logs|300|SDWAN_Audit_Logs"
+    local energy_spec="cisco_catalyst_sdwan_energy_stats|300|SDWAN_Energy_Stats"
+    local input_type interval input_name health_body site_tunnel_body audit_body energy_body
+    IFS="|" read -r input_type interval input_name <<< "${health_spec}"
     health_body=$(form_urlencode_pairs \
         sdwan_account "${account}" \
-        health_type "utd_health,link_health" \
+        health_type "utd_health,link_health,sse_tunnel_health" \
         index "${index}" \
-        interval "3600" \
+        interval "${interval}" \
         logging_level "INFO" \
         disabled "0")
     site_tunnel_body=$(form_urlencode_pairs \
@@ -185,15 +217,43 @@ enable_sdwan_inputs() {
         interval "3600" \
         logging_level "INFO" \
         disabled "0")
-    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$health_body"; then
-        log "  ERROR: Failed to enable cisco_catalyst_sdwan_health://SDWAN_Health"
+    audit_body=$(form_urlencode_pairs \
+        sdwan_account "${account}" \
+        index "${index}" \
+        interval "300" \
+        initial_backfill_days "7" \
+        audit_log_details "0" \
+        config_difference "0" \
+        logging_level "INFO" \
+        disabled "0")
+    energy_body=$(form_urlencode_pairs \
+        sdwan_account "${account}" \
+        index "${index}" \
+        interval "300" \
+        logging_level "INFO" \
+        disabled "0")
+
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$health_body"; then
+        log "  ERROR: Failed to enable ${input_type}://${input_name}"
         return 1
     fi
-    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_site_and_tunnel_health" "SDWAN_Site_Tunnel_Health" "$site_tunnel_body"; then
-        log "  ERROR: Failed to enable cisco_catalyst_sdwan_site_and_tunnel_health://SDWAN_Site_Tunnel_Health"
+    IFS="|" read -r input_type interval input_name <<< "${site_tunnel_spec}"
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$site_tunnel_body"; then
+        log "  ERROR: Failed to enable ${input_type}://${input_name}"
         return 1
     fi
-    log "SD-WAN inputs enabled (2 inputs)."
+    IFS="|" read -r input_type interval input_name <<< "${audit_spec}"
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$audit_body"; then
+        log "  ERROR: Failed to enable ${input_type}://${input_name}"
+        return 1
+    fi
+    IFS="|" read -r input_type interval input_name <<< "${energy_spec}"
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$energy_body"; then
+        log "  ERROR: Failed to enable ${input_type}://${input_name}"
+        return 1
+    fi
+    log "SD-WAN inputs enabled (4 dedicated inputs)."
+    log "SD-WAN API Endpoint Collection inputs require an explicit endpoint and device-scope selection and were not created."
 }
 
 enable_cybervision_inputs() {
@@ -202,34 +262,27 @@ enable_cybervision_inputs() {
 
     log "Enabling Cyber Vision inputs for account='${account}' index='${index}'..."
 
-    local input_types=(
-        "cisco_catalyst_cybervision_activities"
-        "cisco_catalyst_cybervision_components"
-        "cisco_catalyst_cybervision_devices"
-        "cisco_catalyst_cybervision_events"
-        "cisco_catalyst_cybervision_flows"
-        "cisco_catalyst_cybervision_vulnerabilities"
-    )
-    local input_names=(
-        "CV_Activities"
-        "CV_Components"
-        "CV_Devices"
-        "CV_Events"
-        "CV_Flows"
-        "CV_Vulnerabilities"
+    local input_specs=(
+        "cisco_catalyst_cybervision_activities|300|CV_Activities"
+        "cisco_catalyst_cybervision_components|900|CV_Components"
+        "cisco_catalyst_cybervision_devices|900|CV_Devices"
+        "cisco_catalyst_cybervision_events|300|CV_Events"
+        "cisco_catalyst_cybervision_flows|300|CV_Flows"
+        "cisco_catalyst_cybervision_vulnerabilities|900|CV_Vulnerabilities"
     )
 
-    local body
-    body=$(form_urlencode_pairs \
-        cyber_vision_account "${account}" \
-        index "${index}" \
-        logging_level "INFO" \
-        page_size "100" \
-        disabled "0")
-    local failures=0
-    for i in "${!input_types[@]}"; do
-        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
-            log "  ERROR: Failed to enable ${input_types[$i]}://${input_names[$i]}"
+    local failures=0 input_spec input_type interval input_name body
+    for input_spec in "${input_specs[@]}"; do
+        IFS="|" read -r input_type interval input_name <<< "${input_spec}"
+        body=$(form_urlencode_pairs \
+            cyber_vision_account "${account}" \
+            index "${index}" \
+            interval "${interval}" \
+            logging_level "INFO" \
+            page_size "100" \
+            disabled "0")
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_type}" "${input_name}" "$body"; then
+            log "  ERROR: Failed to enable ${input_type}://${input_name}"
             failures=$((failures + 1))
         fi
     done
@@ -240,6 +293,59 @@ enable_cybervision_inputs() {
     fi
 
     log "Cyber Vision inputs enabled (6 inputs)."
+    log "Generic Classic API inputs require an explicit endpoint selection and were not created."
+}
+
+enable_iosxe_cli_input() {
+    local account="$1"
+    local index="$2"
+    local command_id="$3"
+    local input_name="$4"
+    local interval="$5"
+    local recommended_interval
+
+    case "${command_id}" in
+        dspfarm_profile) recommended_interval="900" ;;
+        sdwan_bfd_sessions) recommended_interval="300" ;;
+        sdwan_bfd_history) recommended_interval="900" ;;
+        version|inventory) recommended_interval="3600" ;;
+        *)
+            log "ERROR: Unknown CLI command ID '${command_id}'. Use: dspfarm_profile, sdwan_bfd_sessions, sdwan_bfd_history, version, inventory"
+            return 1
+            ;;
+    esac
+
+    [[ -n "${input_name}" ]] || input_name="CLI_${account}_${command_id}"
+    [[ -n "${interval}" ]] || interval="${recommended_interval}"
+    if [[ ! "${interval}" =~ ^[0-9]+$ ]] || [[ "${interval}" == "0" ]]; then
+        log "ERROR: --interval must be a positive integer"
+        return 1
+    fi
+    if ! ta_handler_available "data/inputs/cisco_catalyst_cli_command"; then
+        log "ERROR: The installed ${APP_NAME} does not expose the IOS-XE CLI input handler."
+        log "IOS-XE CLI automation requires a package that implements the 3.2.44 source contract; the default package-verified 3.1.0 install does not."
+        return 1
+    fi
+
+    log "Enabling Beta IOS-XE CLI input for account='${account}' command_id='${command_id}' index='${index}'..."
+    if (( 10#${interval} < 10#${recommended_interval} )); then
+        log "  WARN: interval ${interval}s is below the catalog recommendation of ${recommended_interval}s; validate device load before production use."
+    fi
+
+    local body
+    body=$(form_urlencode_pairs \
+        cli_account "${account}" \
+        command_id "${command_id}" \
+        index "${index}" \
+        interval "${interval}" \
+        logging_level "INFO" \
+        disabled "0")
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_cli_command" "${input_name}" "$body"; then
+        log "  ERROR: Failed to enable cisco_catalyst_cli_command://${input_name}"
+        return 1
+    fi
+
+    log "IOS-XE CLI input enabled. This feature remains Beta; verify Test Connection, privilege, output shape, and event delivery."
 }
 
 main() {
@@ -257,7 +363,14 @@ main() {
             ise) enable_ise_inputs "${ACCOUNT}" "${INDEX}" ;;
             sdwan) enable_sdwan_inputs "${ACCOUNT}" "${INDEX}" ;;
             cybervision) enable_cybervision_inputs "${ACCOUNT}" "${INDEX}" ;;
-            *) log "ERROR: Unknown input type '${INPUT_TYPE}'. Use: catalyst_center, ise, sdwan, cybervision"; exit 1 ;;
+            iosxe_cli)
+                if [[ -z "${COMMAND_ID}" ]]; then
+                    log "ERROR: --input-type iosxe_cli requires --command-id"
+                    exit 1
+                fi
+                enable_iosxe_cli_input "${ACCOUNT}" "${INDEX}" "${COMMAND_ID}" "${INPUT_NAME}" "${INTERVAL}"
+                ;;
+            *) log "ERROR: Unknown input type '${INPUT_TYPE}'. Use: catalyst_center, ise, sdwan, cybervision, iosxe_cli"; exit 1 ;;
         esac
         log_live_input_summary
         log "$(log_platform_restart_guidance "input changes")"

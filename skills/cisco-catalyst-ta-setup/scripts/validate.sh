@@ -85,12 +85,15 @@ done
 log ""
 log "--- Account Configuration ---"
 account_total=0
-for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_catalyst_ise_account" "SD-WAN:TA_cisco_catalyst_sdwan_account" "Cyber Vision:TA_cisco_catalyst_cyber_vision_account"; do
+tls_disabled_accounts=0
+for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_catalyst_ise_account" "SD-WAN:TA_cisco_catalyst_sdwan_account" "Cyber Vision:TA_cisco_catalyst_cyber_vision_account" "IOS-XE CLI (Beta):TA_cisco_catalyst_cli_account"; do
     label="${label_handler%%:*}"
     handler="${label_handler#*:}"
     json=$(rest_list_ta_stanzas "$SK" "$SPLUNK_URI" "$APP_NAME" "$handler" 2>/dev/null || true)
     if [[ -n "${json}" ]]; then
         count=$(echo "${json}" | python3 -c "import json,sys; d=json.load(sys.stdin); e=d.get('entry',[]); print(len(e))" 2>/dev/null || echo "0")
+        insecure_count=$(echo "${json}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(sum(str(e.get('content',{}).get('verify_ssl','')).strip().lower() in ('0','false','no','off') for e in d.get('entry',[])))" 2>/dev/null || echo "0")
+        tls_disabled_accounts=$((tls_disabled_accounts + insecure_count))
         if [[ "${count}" -gt 0 ]]; then
             account_total=$((account_total + count))
             pass "${label} account conf exists with ${count} account(s)"
@@ -101,7 +104,7 @@ for label_handler in "Catalyst Center:TA_cisco_catalyst_account" "ISE:TA_cisco_c
         warn "No ${label} account conf found"
     fi
 done
-[[ "${account_total}" -gt 0 ]] || completion_issue "No Cisco Catalyst product account is configured"
+[[ "${account_total}" -gt 0 ]] || completion_issue "No Cisco Catalyst or IOS-XE CLI product account is configured"
 
 log ""
 log "--- Data Inputs ---"
@@ -114,37 +117,101 @@ if [[ "${input_count}" -gt 0 ]]; then
     elif [[ "${enabled_inputs}" -gt 0 ]]; then
         warn "${enabled_inputs} input(s) enabled, ${disabled_inputs} disabled"
     else
-        completion_issue "${input_count} input stanza(s) exist but all are disabled"
+        warn "${input_count} TA input stanza(s) exist but all are disabled; checking for an external SD-WAN syslog path"
     fi
 else
-    completion_issue "No inputs configured"
+    warn "No TA modular inputs configured; checking for an external SD-WAN syslog path"
 fi
 
 log ""
 log "--- Data Flow Check ---"
 event_total=0
-for idx in "catalyst" "ise" "sdwan" "cybervision"; do
-    event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
+product_specs=(
+    "Catalyst Center|catalyst|(sourcetype=cisco:dnac:* OR sourcetype=cisco:catalyst:center:*)"
+    "ISE|ise|sourcetype=cisco:ise:*"
+    "SD-WAN|sdwan|sourcetype=cisco:sdwan:*"
+    "Cyber Vision|cybervision|sourcetype=cisco:cybervision:*"
+)
+for product_spec in "${product_specs[@]}"; do
+    IFS="|" read -r product idx sourcetype_filter <<< "${product_spec}"
+    event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx} earliest=-24h ${sourcetype_filter}" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
         event_total=$((event_total + event_count))
-        pass "Index '${idx}' has ${event_count} events"
+        pass "${product} index '${idx}' has ${event_count} canonical events in the last 24 hours"
     else
-        warn "Index '${idx}' has no events (may be normal if just configured)"
+        warn "${product} index '${idx}' has no canonical events in the last 24 hours"
     fi
 done
-[[ "${event_total}" -gt 0 ]] || completion_issue "No Catalyst, ISE, SD-WAN, or Cyber Vision events were found"
+
+cli_event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype=cisco:iosxe:cli:*' "count" 2>/dev/null || echo "0")
+if [[ "${cli_event_count}" -gt 0 ]]; then
+    event_total=$((event_total + cli_event_count))
+    pass "IOS-XE CLI (Beta) has ${cli_event_count} canonical events in the last 24 hours"
+else
+    warn "IOS-XE CLI (Beta) has no cisco:iosxe:cli:* events in the last 24 hours"
+fi
+[[ "${event_total}" -gt 0 ]] || completion_issue "No recent Catalyst Center, ISE, SD-WAN, Cyber Vision, or IOS-XE CLI events were found"
+
+log ""
+log "--- SD-WAN Text-Syslog Readiness ---"
+sdwan_receiver_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| rest /services/data/inputs/all count=0 | search sourcetype="cisco:firewall:logs" | stats count as count' "count" 2>/dev/null || echo "0")
+sdwan_ingress_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype="cisco:firewall:logs"' "count" 2>/dev/null || echo "0")
+sdwan_utd_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype="cisco:sdwan:utd:logs"' "count" 2>/dev/null || echo "0")
+sdwan_zbfw_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype IN ("cisco:sdwan:session:audit:trail:start","cisco:sdwan:session:audit:trail","cisco:sdwan:pass:pkt","cisco:sdwan:drop:pkt","cisco:sdwan:log:summary","cisco:sdwan:block:host","cisco:sdwan:unblock:host","cisco:sdwan:alert:on","cisco:sdwan:alert:off","cisco:sdwan:host:tcp:alert:on","cisco:sdwan:sessions:maximum")' "count" 2>/dev/null || echo "0")
+sdwan_system_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| tstats count where index=* earliest=-24h sourcetype IN ("cisco:sdwan:syslog","cisco:sdwan:system:logs","cisco:sdwan:acl:logs","cisco:sdwan:sgacl:logs")' "count" 2>/dev/null || echo "0")
+sdwan_text_count=$((sdwan_ingress_count + sdwan_utd_count + sdwan_zbfw_count + sdwan_system_count))
+
+if [[ "${sdwan_receiver_count}" -gt 0 ]]; then
+    pass "${sdwan_receiver_count} local input(s) use the required cisco:firewall:logs SD-WAN ingress sourcetype"
+elif [[ "${sdwan_text_count}" -gt 0 ]]; then
+    pass "SD-WAN text events are arriving without a local cisco:firewall:logs input (consistent with an external SC4S/HEC or upstream parsing path)"
+else
+    warn "No local cisco:firewall:logs receiver or recent SD-WAN text-syslog event evidence was found"
+fi
+
+if [[ "${sdwan_text_count}" -gt 0 ]]; then
+    pass "SD-WAN text syslog found: ingress=${sdwan_ingress_count}, UTD=${sdwan_utd_count}, ZBFW=${sdwan_zbfw_count}, system/ACL=${sdwan_system_count}"
+else
+    warn "No recent UTD, ZBFW, or ordinary SD-WAN text-syslog events were found; a listener alone does not enable Cisco-side producers"
+fi
+if [[ "${enabled_inputs}" -gt 0 ]]; then
+    pass "TA-owned ingest path is enabled"
+elif [[ "${sdwan_text_count}" -gt 0 ]]; then
+    pass "Recent SD-WAN text events satisfy ingest readiness through an external SC4S/HEC or upstream path"
+else
+    completion_issue "No enabled TA input or recent external SD-WAN text-syslog evidence was found"
+fi
+log "  INFO: HSL and Unified Logging are NetFlow/IPFIX paths and are intentionally outside this text-syslog check."
 
 log ""
 log "--- Settings ---"
 ssl_verify="$(get_verify_ssl_setting)"
-if [[ "${ssl_verify}" == "1" || "${ssl_verify}" == "True" || "${ssl_verify}" == "true" ]]; then
-    pass "SSL verification is enabled"
+if [[ "${tls_disabled_accounts}" -gt 0 ]]; then
+    warn "${tls_disabled_accounts} account(s) disable TLS certificate verification"
+elif [[ "${ssl_verify}" == "1" || "${ssl_verify}" == "True" || "${ssl_verify}" == "true" ]]; then
+    pass "TLS certificate verification is enabled and no account opt-outs were found"
 else
-    warn "SSL verification is disabled (verify_ssl = ${ssl_verify})"
+    warn "Legacy global TLS verification is disabled (verify_ssl = ${ssl_verify})"
 fi
 
 log ""
-log "--- Companion App ---"
+log "--- Shipped Dashboard ---"
+ta_view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views/data_collection_health?output_mode=json" 2>/dev/null \
+    | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
+if [[ "${ta_view_count}" -gt 0 ]]; then
+    pass "TA Data Collection Health dashboard is visible"
+    ta_dashboard_data_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" '| search index=_internal earliest=-24h sourcetype IN ("splunktaciscodnacenter:log","splunktaciscocybervision:log","splunktaciscoise:log","splunktaciscosdwan:log","splunktaciscocli:log") event=poll-complete | stats count as count' "count" 2>/dev/null || echo "0")
+    if [[ "${ta_dashboard_data_count}" -gt 0 ]]; then
+        pass "TA Data Collection Health dashboard search has ${ta_dashboard_data_count} recent poll-complete event(s)"
+    else
+        completion_issue "TA Data Collection Health dashboard is visible but its collection-health search returns no recent data"
+    fi
+else
+    completion_issue "TA Data Collection Health dashboard is not visible"
+fi
+
+log ""
+log "--- Optional Companion App ---"
 if rest_check_app "$SK" "$SPLUNK_URI" "cisco-catalyst-app" 2>/dev/null; then
     pass "Cisco Enterprise Networking app is installed"
     view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/cisco-catalyst-app/data/ui/views?output_mode=json&count=0" 2>/dev/null \
@@ -165,7 +232,7 @@ if rest_check_app "$SK" "$SPLUNK_URI" "cisco-catalyst-app" 2>/dev/null; then
         completion_issue "Companion dashboard macro is missing or not aligned to catalyst/ise/sdwan/cybervision"
     fi
 else
-    completion_issue "Cisco Enterprise Networking app (cisco-catalyst-app) not found; dashboard completion evidence is unavailable"
+    warn "Cisco Enterprise Networking app (cisco-catalyst-app) is not installed; optional cross-product dashboards were not checked"
 fi
 fi
 

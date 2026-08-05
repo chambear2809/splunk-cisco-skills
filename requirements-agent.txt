@@ -3,7 +3,7 @@ pip==26.1.2
 mcp==1.28.1
 PyYAML==6.0.3
 # Security-reviewed MCP runtime transitive floor, pinned after pip-audit.
-cryptography==48.0.1
+cryptography==50.0.0
 idna==3.15
 pydantic-settings==2.14.2
 PyJWT[crypto]==2.13.0

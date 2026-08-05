@@ -778,21 +778,24 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("verify_ssl=False", result.stdout)
-            self.assertIn("ta_cisco_catalyst_settings", result.stdout)
 
             log_text = curl_log.read_text(encoding="utf-8")
+            account_posts = [
+                line for line in log_text.splitlines()
+                if "CONF_POST" in line and "TA_cisco_catalyst_account" in line
+            ]
+            self.assertTrue(
+                any("verify_ssl=false" in line for line in account_posts),
+                msg=f"Expected per-account verify_ssl=false, got: {account_posts}",
+            )
             settings_posts = [
                 line for line in log_text.splitlines()
                 if "CONF_POST" in line and "ta_cisco_catalyst_settings" in line
             ]
-            self.assertTrue(
-                len(settings_posts) > 0,
-                msg="Expected a POST to ta_cisco_catalyst_settings conf",
-            )
-            self.assertTrue(
-                any("verify_ssl" in line and "False" in line for line in settings_posts),
-                msg=f"Expected verify_ssl=False in settings POST, got: {settings_posts}",
+            self.assertEqual(
+                settings_posts,
+                [],
+                msg="Per-account TLS configuration must not mutate the legacy global setting",
             )
 
 
@@ -846,7 +849,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             )
 
 
-    def test_catalyst_configure_account_without_ssl_flag_skips_setting(self):
+    def test_catalyst_configure_account_defaults_to_per_account_ssl_verification(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, curl_log = self._build_configure_account_env(tmp_path)
@@ -862,9 +865,16 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertNotIn("verify_ssl", result.stdout)
 
             log_text = curl_log.read_text(encoding="utf-8")
+            account_posts = [
+                line for line in log_text.splitlines()
+                if "CONF_POST" in line and "TA_cisco_catalyst_account" in line
+            ]
+            self.assertTrue(
+                any("verify_ssl=true" in line for line in account_posts),
+                msg=f"Expected per-account verify_ssl=true, got: {account_posts}",
+            )
             settings_posts = [
                 line for line in log_text.splitlines()
                 if "CONF_POST" in line and "ta_cisco_catalyst_settings" in line
@@ -872,6 +882,74 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             self.assertEqual(
                 len(settings_posts), 0,
                 msg="Should not POST to settings conf when --no-verify-ssl is not passed",
+            )
+
+    def test_catalyst_iosxe_account_fails_closed_when_handler_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, curl_log = self._build_configure_account_env(tmp_path)
+            env["MOCK_MISSING_CATALYST_3244_HANDLERS"] = "1"
+            password_file = tmp_path / "device_password"
+
+            result = self.run_script(
+                "skills/cisco-catalyst-ta-setup/scripts/configure_account.sh",
+                "--type", "iosxe_cli",
+                "--name", "EDGE_01",
+                "--host", "edge01.example.invalid",
+                "--username", "splunk_ro",
+                "--password-file", str(password_file),
+                "--host-key-fingerprint", f"SHA256:{'A' * 43}",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not expose the IOS-XE CLI account handler", result.stdout)
+            self.assertNotIn("CONF_POST", curl_log.read_text(encoding="utf-8"))
+
+    def test_catalyst_setup_capability_gates_new_handlers_and_names_cli_inputs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, curl_log = self._build_configure_account_env(tmp_path)
+            env["MOCK_MISSING_CATALYST_3244_HANDLERS"] = "1"
+
+            catalyst_result = self.run_script(
+                "skills/cisco-catalyst-ta-setup/scripts/setup.sh",
+                "--enable-inputs",
+                "--account", "CATC_01",
+                "--index", "catalyst",
+                "--input-type", "catalyst_center",
+                env=env,
+            )
+
+            self.assertEqual(
+                catalyst_result.returncode,
+                0,
+                msg=catalyst_result.stdout + catalyst_result.stderr,
+            )
+            self.assertIn("Skipping cisco_catalyst_dnac_swim", catalyst_result.stdout)
+            self.assertIn("Skipping cisco_catalyst_dnac_application_traffic", catalyst_result.stdout)
+            post_lines = [
+                line for line in curl_log.read_text(encoding="utf-8").splitlines()
+                if "METHOD=POST" in line
+            ]
+            self.assertFalse(any("cisco_catalyst_dnac_swim" in line for line in post_lines))
+            self.assertFalse(any("cisco_catalyst_dnac_application_traffic" in line for line in post_lines))
+
+            curl_log.write_text("", encoding="utf-8")
+            cli_result = self.run_script(
+                "skills/cisco-catalyst-ta-setup/scripts/setup.sh",
+                "--enable-inputs",
+                "--account", "EDGE_01",
+                "--index", "sdwan",
+                "--input-type", "iosxe_cli",
+                "--command-id", "version",
+                env={key: value for key, value in env.items() if key != "MOCK_MISSING_CATALYST_3244_HANDLERS"},
+            )
+
+            self.assertEqual(cli_result.returncode, 0, msg=cli_result.stdout + cli_result.stderr)
+            self.assertIn(
+                "/cisco_catalyst_cli_command/CLI_EDGE_01_version",
+                curl_log.read_text(encoding="utf-8"),
             )
 
     def test_intersight_validate_reads_vendor_settings_conf_for_ssl_validation(self):
@@ -1023,6 +1101,16 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             if "/services/auth/login" in path:
                 out("<response><sessionKey>test-session</sessionKey></response>")
+
+            if os.environ.get("MOCK_MISSING_CATALYST_3244_HANDLERS") == "1":
+                unavailable_paths = (
+                    "/TA_cisco_catalyst_cli_account",
+                    "/data/inputs/cisco_catalyst_cli_command",
+                    "/data/inputs/cisco_catalyst_dnac_swim",
+                    "/data/inputs/cisco_catalyst_dnac_application_traffic",
+                )
+                if path.endswith(unavailable_paths) and method == "GET":
+                    out("", 404)
 
             if ("_account" in path or "_settings" in path) and method == "POST":
                 log(f"CONF_POST path={path} data={data!r}")

@@ -33,7 +33,7 @@ verify shipped dashboards are visible, macro-aligned, and returning data, or
 record explicit evidence that the package ships no pre-built dashboards.
 
 <!-- BEGIN GENERATED SKILL CATALOG -->
-<!-- source: skills/catalog.yaml; schema: 1; sha256: 9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5 -->
+<!-- source: skills/catalog.yaml; schema: 1; sha256: eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f -->
 ## Skill Catalog
 
 | Skill | Target | Main purpose | Lifecycle |
@@ -43,7 +43,7 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `cisco-cloud-control-setup` | Cisco Cloud Control / AgenticOps readiness | Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, Cisco Data Fabric, MCP, AI Agent Monitoring, Observability content, and domain-readiness handoffs | Canonical |
 | `cisco-data-fabric-setup` | Cisco Data Fabric architecture | Render lifecycle-aware full product and feature coverage across data management, federation, storage/catalog, context, AI activation, governance, and Cisco/Splunk experience layers; emit a claim-level source ledger, gap doctor, and safe child-skill handoffs | Canonical |
 | `cisco-scan-setup` | `splunk-cisco-app-navigator` | Install and validate the Splunk Cisco App Navigator (SCAN) catalog app; trigger catalog sync from S3 | Canonical |
-| `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs | Canonical |
+| `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN API and text syslog, Cyber Vision, and bounded beta IOS-XE CLI collection | Canonical |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards | Canonical |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards | Canonical |
 | `splunk-appdynamics-setup` | AppDynamics suite router | Route AppDynamics requests, enforce taxonomy coverage, orchestrate child skills, and emit doctor reports | Canonical |
@@ -219,7 +219,7 @@ after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
 <!-- BEGIN GENERATED LOCAL SKILL MCP SAFETY -->
-<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: 9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5 -->
+<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f -->
 ## Local Skill MCP Server
 
 The project also exposes a local `splunk-cisco-skills` MCP server through

@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "9f416a41b581fd1e0172ab8c3e77bd4a97555bb46b7515282bf7ee15e047fbc5"
+    "sha256": "eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [

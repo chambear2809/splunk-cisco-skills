@@ -1,7 +1,9 @@
 interface:
   display_name: "Cisco Catalyst TA Setup"
-  short_description: "Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision"
+  short_description: "Configure Catalyst APIs, SD-WAN syslog, and IOS-XE CLI"
   default_prompt: >-
     Use $cisco-catalyst-ta-setup to configure TA_cisco_catalyst indexes,
     accounts, inputs, secure credential files, and validation for Catalyst
-    Center, ISE, SD-WAN, or Cyber Vision.
+    Center, ISE, SD-WAN API and text syslog, Cyber Vision, or the bounded beta
+    IOS-XE CLI collector. Keep UTD, ZBFW HSL/NetFlow, and ordinary system
+    syslog collection paths distinct.

@@ -1,21 +1,46 @@
 {
   "name": "Cisco Catalyst TA Tools",
-  "description": "MCP tools for managing and querying the Cisco Catalyst Add-on for Splunk",
-  "version": "1.0.0",
+  "description": "MCP tools for querying Cisco Catalyst Add-on API, syslog, and beta IOS-XE CLI collection",
+  "version": "2.2.0",
   "author": "cisco-catalyst-ta-setup skill",
   "tools": [
     {
       "_key": "cisco_catalyst:check_health",
       "name": "cisco_catalyst_check_health",
       "title": "Cisco Catalyst Health Check",
-      "description": "Check the health status of Cisco Catalyst TA data collection. Shows event counts per index, active inputs, and last event timestamps.",
+      "description": "Check recent Cisco Catalyst TA data by index and sourcetype, including generic endpoint and report outputs.",
       "category": "cisco_catalyst",
       "tags": ["cisco", "catalyst", "ise", "sdwan", "cybervision", "health"],
       "time_range": true,
       "row_limiter": false,
-      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"TA_cisco_catalyst\" disabled=0 | stats count as enabled_inputs | appendcols [| tstats count as catalyst_events where index=catalyst] | appendcols [| tstats count as ise_events where index=ise] | appendcols [| tstats count as sdwan_events where index=sdwan] | appendcols [| tstats count as cv_events where index=cybervision]",
+      "spl": "| tstats count as events max(_time) as last_event_epoch where index IN (catalyst,ise,sdwan,cybervision) by index sourcetype | eval last_event=strftime(last_event_epoch, \"%Y-%m-%d %H:%M:%S %Z\"), age_seconds=now()-last_event_epoch | sort index sourcetype | fields index sourcetype events last_event age_seconds",
       "arguments": [],
-      "examples": ["Check Catalyst TA health", "How many events are being collected?"]
+      "examples": [
+        "Check Catalyst TA health",
+        "How many events are being collected?"
+      ]
+    },
+    {
+      "_key": "cisco_catalyst:collection_status",
+      "name": "cisco_catalyst_collection_status",
+      "title": "Cisco Catalyst Collection Status",
+      "description": "Show the latest structured poll status for each Catalyst TA input instance.",
+      "category": "cisco_catalyst",
+      "tags": [
+        "cisco",
+        "catalyst",
+        "inputs",
+        "poll-complete",
+        "troubleshooting"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=_internal sourcetype IN (\"splunktaciscodnacenter:log\",\"splunktaciscocybervision:log\",\"splunktaciscoise:log\",\"splunktaciscosdwan:log\",\"splunktaciscocli:log\") event=poll-complete product IN (\"Cisco-Catalyst-Center\",\"Cisco-Cyber-Vision\",\"Cisco-ISE\",\"Cisco-SD-WAN\",\"Cisco-IOS-XE-CLI\") input=cisco_catalyst_* | stats latest(status) as status latest(records) as records latest(duration_ms) as duration_ms latest(_time) as last_poll_epoch by product instance input account | eval last_poll=strftime(last_poll_epoch, \"%Y-%m-%d %H:%M:%S %Z\") | sort product instance | fields product instance input account status records duration_ms last_poll",
+      "arguments": [],
+      "examples": [
+        "Show failing Catalyst inputs",
+        "Which Catalyst input polled most recently?"
+      ]
     },
     {
       "_key": "cisco_catalyst:list_inputs",
@@ -41,7 +66,10 @@
       "row_limiter": true,
       "spl": "index=catalyst sourcetype=\"cisco:dnac:issue\" | spath | stats count by name, priority, status, siteHierarchy | sort -count",
       "arguments": [],
-      "examples": ["Show Catalyst Center issues", "What network problems were detected?"]
+      "examples": [
+        "Show Catalyst Center issues",
+        "What network problems were detected?"
+      ]
     },
     {
       "_key": "cisco_catalyst:dnac_device_health",
@@ -52,9 +80,12 @@
       "tags": ["cisco", "catalyst", "dnac", "device", "health"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "index=catalyst sourcetype=\"cisco:dnac:devicehealth\" | spath | stats latest(overallHealth) as health_score by name, platformId, role, siteHierarchy | sort health_score",
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:devicehealth\" | stats latest(OverallHealth) as health_score latest(CPUUtilization) as cpu_percent latest(MemoryUtilization) as memory_percent latest(ImageVersion) as image_version by DeviceName Platform DeviceRole | sort health_score",
       "arguments": [],
-      "examples": ["Show device health", "Which devices have low health scores?"]
+      "examples": [
+        "Show device health",
+        "Which devices have low health scores?"
+      ]
     },
     {
       "_key": "cisco_catalyst:dnac_compliance",
@@ -96,6 +127,54 @@
       "examples": ["Show ISE authentication summary", "ISE event trends"]
     },
     {
+      "_key": "cisco_catalyst:sdwan_bfd",
+      "name": "cisco_catalyst_sdwan_bfd",
+      "title": "Cisco SD-WAN BFD API Collection",
+      "description": "Summarize BFD summary, synchronized-session, and history events collected through the SD-WAN API Endpoint Collection input.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "sdwan", "bfd", "sessions", "api"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=sdwan sourcetype IN (\"cisco:sdwan:custom:device_bfd_summary\",\"cisco:sdwan:custom:device_bfd_synced_sessions\",\"cisco:sdwan:custom:device_bfd_history\") | stats count latest(_time) as last_event_epoch values(endpoint_path) as endpoint_path by sourcetype target_device_id | eval last_event=strftime(last_event_epoch, \"%Y-%m-%d %H:%M:%S %Z\"), age_seconds=now()-last_event_epoch | sort sourcetype target_device_id | fields sourcetype target_device_id endpoint_path count last_event age_seconds",
+      "arguments": [],
+      "examples": [
+        "Show SD-WAN BFD data",
+        "Which WAN Edge devices have current BFD API records?"
+      ]
+    },
+    {
+      "_key": "cisco_catalyst:sdwan_syslog_status",
+      "name": "cisco_catalyst_sdwan_syslog_status",
+      "title": "Cisco SD-WAN Text-Syslog Status",
+      "description": "Summarize UTD, traditional ZBFW, and ordinary IOS-XE text-syslog events after cisco:firewall:logs ingress routing. HSL and Unified Logging are separate NetFlow/IPFIX paths.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "sdwan", "syslog", "utd", "zbfw", "sc4s"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "| tstats count as events max(_time) as last_event_epoch where index=* sourcetype IN (\"cisco:firewall:logs\",\"cisco:sdwan:utd:logs\",\"cisco:sdwan:session:audit:trail:start\",\"cisco:sdwan:session:audit:trail\",\"cisco:sdwan:pass:pkt\",\"cisco:sdwan:drop:pkt\",\"cisco:sdwan:log:summary\",\"cisco:sdwan:block:host\",\"cisco:sdwan:unblock:host\",\"cisco:sdwan:alert:on\",\"cisco:sdwan:alert:off\",\"cisco:sdwan:host:tcp:alert:on\",\"cisco:sdwan:sessions:maximum\",\"cisco:sdwan:acl:logs\",\"cisco:sdwan:sgacl:logs\",\"cisco:sdwan:syslog\",\"cisco:sdwan:system:logs\") by index sourcetype | eval collection_path=case(sourcetype=\"cisco:sdwan:utd:logs\",\"UTD external text syslog\", in(sourcetype,\"cisco:sdwan:syslog\",\"cisco:sdwan:system:logs\",\"cisco:sdwan:acl:logs\",\"cisco:sdwan:sgacl:logs\"),\"IOS-XE system/ACL text syslog\", sourcetype=\"cisco:firewall:logs\",\"Unsplit ingress\", true(),\"Traditional ZBFW text syslog\") | eval last_event=strftime(last_event_epoch, \"%Y-%m-%d %H:%M:%S %Z\"), age_seconds=now()-last_event_epoch | sort collection_path sourcetype | fields index collection_path sourcetype events last_event age_seconds",
+      "arguments": [],
+      "examples": [
+        "Show SD-WAN syslog status",
+        "Are UTD and ZBFW text events reaching Splunk?"
+      ]
+    },
+    {
+      "_key": "cisco_catalyst:iosxe_cli_status",
+      "name": "cisco_catalyst_iosxe_cli_status",
+      "title": "Cisco IOS-XE CLI Beta Status",
+      "description": "Show recent bounded direct-device CLI snapshots by command and device.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "iosxe", "cli", "beta", "ssh"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=* sourcetype=cisco:iosxe:cli:* | stats count latest(_time) as last_event_epoch latest(exit_status) as exit_status by index host sourcetype command_id command | eval last_event=strftime(last_event_epoch, \"%Y-%m-%d %H:%M:%S %Z\"), age_seconds=now()-last_event_epoch | sort host command_id | fields index host sourcetype command_id command exit_status count last_event age_seconds",
+      "arguments": [],
+      "examples": [
+        "Show IOS-XE CLI collection status",
+        "Which cataloged commands have returned data?"
+      ]
+    },
+    {
       "_key": "cisco_catalyst:cybervision_vulnerabilities",
       "name": "cisco_catalyst_cybervision_vulnerabilities",
       "title": "Cyber Vision Vulnerabilities",
@@ -106,7 +185,10 @@
       "row_limiter": true,
       "spl": "index=cybervision sourcetype=\"cisco:cybervision:vulnerabilities\" | spath | stats count by cveId, severity, component | sort -severity",
       "arguments": [],
-      "examples": ["Show OT vulnerabilities", "Cyber Vision vulnerability report"]
+      "examples": [
+        "Show OT vulnerabilities",
+        "Cyber Vision vulnerability report"
+      ]
     }
   ]
 }
