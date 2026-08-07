@@ -1,4 +1,4 @@
-pytest>=9.0.3,<10
+pytest>=9.1.1,<10
 jsonschema>=4.25,<5
 pip-audit==2.10.1
 PyYAML>=6,<7
