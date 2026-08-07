@@ -120,7 +120,7 @@ jobs:
             --requirement "${requirements}"
 
       - name: Assume read-only staging role with OIDC
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_STAGING_ROLE_ARN }}
           role-session-name: o11y-staging-${{ github.run_id }}
