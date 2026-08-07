@@ -82,7 +82,7 @@ jobs:
       KUBECONFIG: ${{ runner.temp }}/aws-eks-o11y-kubeconfig
     steps:
       - name: Check out repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -120,7 +120,7 @@ jobs:
             --requirement "${requirements}"
 
       - name: Assume read-only staging role with OIDC
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_STAGING_ROLE_ARN }}
           role-session-name: o11y-staging-${{ github.run_id }}
@@ -223,7 +223,7 @@ jobs:
 
       - name: Upload sanitized acceptance report
         if: ${{ always() }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: aws-eks-o11y-staging-${{ github.run_id }}
           path: ${{ runner.temp }}/aws-eks-o11y-staging-report.json
