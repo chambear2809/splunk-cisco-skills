@@ -1,13 +1,13 @@
 ---
 name: galileo-platform-setup
-description: "Use when configuring Galileo-to-Splunk Platform or Splunk Observability Cloud setup, including
-  multimodal traces and multi-model experiment comparison evidence. Render, validate, and optionally apply
-  Galileo platform readiness, object lifecycle, Observe export/runtime, Evaluate, Luna, Controls,
+description: "Use when configuring an already-running Galileo instance for Splunk Platform or Splunk
+  Observability Cloud, including multimodal traces and multi-model experiment comparison evidence. Render,
+  validate, and optionally apply Galileo application readiness, object lifecycle, Observe export/runtime, Evaluate, Luna, Controls,
   multimodal, and Splunk wiring for Galileo SaaS or Enterprise deployments. Covers projects, log streams,
   datasets, prompts, experiments, metrics, annotations, feedback, RBAC, provider handoffs, trace
   maintenance/metrics APIs, Luna Studio training, metadata-only media export, AI Assistant beta readiness,
   global dashboards, generic alert webhook relay, SDK experiment groups, large-dataset batching,
-  HEC/OTLP/OTel handoffs, dashboards, and detectors."
+  HEC/OTLP/OTel handoffs, dashboards, and detectors; delegate On-Prem Kubernetes deployment and packaged services."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
@@ -74,9 +74,10 @@ skill supports them; help exits without mutation.
 | Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
 | Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
-This skill is the repo-owned automation home for Galileo platform to Splunk
-workflows. It composes existing Splunk skills rather than reimplementing their
-logic.
+This skill is the repo-owned automation home for application and Splunk
+workflows on an already-running Galileo instance. It does not install or
+upgrade Galileo On-Prem, its data services, packaged Agent Control, or Luna
+Studio. Route those requests through `galileo-on-prem-kubernetes-setup`.
 
 ## Required Intake
 
@@ -92,6 +93,10 @@ console URL unless the user provides explicit endpoint overrides.
 
 ## Supported Paths
 
+Read the tracked [product feature matrix](references/product-feature-matrix.json)
+before claiming full application coverage. It is the semantic source consumed
+by both the renderer and repository coverage audit.
+
 1. **Platform readiness**: render endpoint derivation, `/v2/healthcheck`,
    auth mode inventory, RBAC/group/project-sharing checklist, Luna Enterprise
    readiness, metric sampling/filtering coverage, Protect invoke readiness, and
@@ -103,7 +108,7 @@ console URL unless the user provides explicit endpoint overrides.
    Agent Control targets using `scripts/galileo_object_lifecycle.py`. The
    rendered coverage matrix also tracks auth/RBAC, integrations, costs,
    dataset query/preview/content maintenance, prompt rendering, custom scorers,
-   scorer governance, Evaluate workflow runs and experiment metrics APIs, trace
+   scorer governance, Evaluate experiments and agentic workflow runs, experiment metrics APIs, trace
    maintenance and trace metrics APIs, annotation and feedback templates,
    Trends dashboards, run insights, multimodal logging,
    distributed tracing, tags/metadata, enterprise retention/TTL/privacy,
