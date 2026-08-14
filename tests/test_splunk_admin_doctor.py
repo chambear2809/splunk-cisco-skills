@@ -488,6 +488,25 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertEqual(route["id"], "galileo-agent-control")
         self.assertEqual(route["handoff_skills"], ["galileo-agent-control-setup"])
 
+        for label in (
+            "Galileo On-Prem",
+            "Galileo On-Prem Kubernetes",
+            "Galileo Agent Control On-Prem",
+            "Galileo Luna Studio",
+        ):
+            on_prem = doctor.build_product_coverage(
+                {"products": {"detected": [label]}},
+                "enterprise",
+            )
+            on_prem_route = next(
+                item for item in on_prem["routes"] if item["detected"]
+            )
+            self.assertEqual(on_prem_route["id"], "galileo-on-prem")
+            self.assertEqual(
+                on_prem_route["handoff_skills"][0],
+                "galileo-on-prem-kubernetes-setup",
+            )
+
         soar = doctor.build_product_coverage(
             {"products": {"detected": ["SOAR"]}},
             "enterprise",

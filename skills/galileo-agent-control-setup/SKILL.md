@@ -71,9 +71,11 @@ skill supports them; help exits without mutation.
 | Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
 | Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
 
-This skill renders Agent Control setup assets without exposing secret values.
-It owns the Agent Control runtime and sink examples, and delegates Splunk-side
+This skill renders Agent Control runtime assets without exposing secret values.
+It owns external/open-source runtime and sink examples, and delegates Splunk-side
 HEC, OTel Collector, dashboard, and detector work to the existing Splunk skills.
+Use `galileo-on-prem-agent-control-setup` for Galileo's packaged Kubernetes
+chart, database migrations, service, feature flag, routing, or UI integration.
 
 ## Required Intake
 

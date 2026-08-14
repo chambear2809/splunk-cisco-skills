@@ -16,7 +16,9 @@ SDK snippets, or sink configuration.
 This skill owns standalone/external Agent Control runtime, server, and sink
 assets. It does not own the Galileo Agent Observability `Controls` console tab
 or Log stream control attachment workflow; use `galileo-platform-setup`
-`observability-controls` for that platform surface.
+`observability-controls` for that platform surface. It also does not own the
+packaged Galileo On-Prem Agent Control chart, migrations, route, or UI proxy;
+use `galileo-on-prem-agent-control-setup` for that deployment lifecycle.
 
 | Section | Owner | Purpose |
 | --- | --- | --- |
