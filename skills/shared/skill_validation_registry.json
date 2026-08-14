@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f"
+    "sha256": "66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -35,6 +35,11 @@
     "galileo-agent-control-setup",
     "galileo-lemonade-instrumentation-setup",
     "galileo-mcp-server-setup",
+    "galileo-on-prem-agent-control-setup",
+    "galileo-on-prem-air-gap-setup",
+    "galileo-on-prem-kubernetes-setup",
+    "galileo-on-prem-luna-studio-setup",
+    "galileo-on-prem-stack-setup",
     "galileo-platform-setup",
     "lemonade-splunk-otel",
     "splunk-admin-doctor",
@@ -238,6 +243,93 @@
           "skills/shared/references/galileo_mcp_server_validation_evidence.json"
         ],
         "notes": "Direct authenticated HTTP and the rendered dependency-free stdio bridge both initialized successfully. Nine-tool discovery and schema checks plus two read-only calls passed without retaining tenant results or secrets. Write-capable tools were intentionally not invoked in this read-only dimension."
+      }
+    },
+    "galileo-on-prem-agent-control-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Pinned standalone and umbrella-owned Agent Control lifecycle fixtures"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "tests/test_galileo_on_prem_optional.py"
+        ],
+        "notes": "Immutable render and validation, parent ownership binding, stable-version lifecycle gates, target-bound preflight, private input snapshots, exact rendered-image evidence, final rechecks, uninstall safety, and adversarial secret, path, and bundle-integrity cases passed without a live cluster mutation."
+      }
+    },
+    "galileo-on-prem-air-gap-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Synthetic OCI-layout, chart, binary, model, and no-egress air-gap fixtures"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "tests/test_galileo_on_prem_optional.py"
+        ],
+        "notes": "Immutable offline assembly and verification, safe extraction, exact chart and digest inventory, Stack seed/final and optional-child evidence binding, endpoint allowlisting, architecture checks, and adversarial tamper, symlink, extra-file, missing-image, and tag-only cases passed without registry writes or a live cluster mutation."
+      }
+    },
+    "galileo-on-prem-kubernetes-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Full-coverage Galileo On-Prem orchestration and immutable router fixtures"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "tests/test_galileo_on_prem_router.py"
+        ],
+        "notes": "The source ledger, stable-ID deployment matrix, exact nine-category runtime inventory contract, immutable render and semantic recomputation, URL and domain consistency, secret-shaped input rejection, mutation rejection, and adversarial bundle-tamper cases passed."
+      },
+      "live_read_only": {
+        "status": "partial",
+        "targets": [
+          "Three-node MicroK8s CPU-only lab"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "skills/shared/references/galileo_on_prem_kubernetes_validation_evidence.json"
+        ],
+        "notes": "Read-only discovery confirmed Kubernetes 1.31.14, Helm 3.14.4, MicroK8s HA, and three Ready nodes. Production readiness remains false because required node pools, storage, routing, TLS, RBAC enforcement, GPUs, Galileo artifacts, backups, vendor approval, application validation, and soak evidence were absent."
+      }
+    },
+    "galileo-on-prem-luna-studio-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Pinned standalone and umbrella-owned Luna Studio lifecycle fixtures"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "tests/test_galileo_on_prem_optional.py"
+        ],
+        "notes": "Immutable render and validation, parent ownership binding, stable-version lifecycle gates, target-bound preflight, private input snapshots, exact rendered-image evidence, final rechecks, uninstall safety, and adversarial secret, path, and bundle-integrity cases passed without a live cluster mutation."
+      }
+    },
+    "galileo-on-prem-stack-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Offline synthetic pinned Stack and galileoctl render, parser, validation, and handoff-contract fixtures"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "tests/test_galileo_on_prem_stack.py"
+        ],
+        "notes": "Offline fixtures exercised immutable bundle identity, pinned chart and values checks, exact runtime classification, static Helm rendering, CRD/storage/route/TLS/topology/Wizard/monitoring/air-gap evidence parsing, read-only command policy, and Galileo/CSE handoff generation. This is static/mock coverage only: no real Galileo chart was supplied, no connected server dry-run or workload validation was completed, and install, upgrade, rollback, uninstall, bootstrap, registry, cloud, storage, Helm, and Kubernetes mutation are not implemented by the skill."
+      },
+      "live_read_only": {
+        "status": "partial",
+        "targets": [
+          "Three-node MicroK8s CPU-only lab"
+        ],
+        "last_verified": "2026-08-13",
+        "evidence": [
+          "skills/shared/references/galileo_on_prem_stack_validation_evidence.json"
+        ],
+        "notes": "Read-only discovery confirmed Kubernetes 1.31.14, Helm 3.14.4, MicroK8s HA, and three Ready nodes. No Galileo chart or workload was present, so connected Stack rendering/preflight, CRD and release observation, production storage/routing/TLS, backup/restore, GPU inference, application smoke tests, and soak remain unverified. Install, upgrade, rollback, uninstall, bootstrap, registry, cloud, storage, Helm, and Kubernetes mutation were neither attempted nor authorized and are Galileo/CSE joint-session handoffs."
       }
     },
     "galileo-platform-setup": {

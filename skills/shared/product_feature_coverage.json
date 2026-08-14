@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "router_count": 8,
+  "router_count": 10,
   "maximum_source_age_days": 180,
   "allowed_coverage_statuses": [
     "delegated_apply",
@@ -446,6 +446,112 @@
           "automation_boundary": "No package or configuration workflow is claimed until a reviewed route is added."
         }
       }
+    },
+    {
+      "id": "galileo-platform",
+      "product_area": "Galileo application and integration surfaces for an already-running instance",
+      "router_skill": "galileo-platform-setup",
+      "inventory_classification": "coverage_owner",
+      "adapter": "galileo_platform_json_matrix",
+      "source_path": "skills/galileo-platform-setup/references/product-feature-matrix.json",
+      "reference_path": "skills/galileo-platform-setup/reference.md",
+      "validation_path": "skills/galileo-platform-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "docs.galileo.ai",
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/galileo-platform-setup/references/product-feature-matrix.json",
+          "format": "json",
+          "date_field": "last_verified",
+          "url_fields": [
+            "source_urls"
+          ]
+        }
+      ],
+      "require_row_boundary_statuses": [
+        "delegated_apply",
+        "direct_apply",
+        "render_runbook",
+        "validate_only"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "delegated_apply": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "Delegate only to the canonical owner named by the feature row and preserve that child workflow's mutation and completion gates."
+        },
+        "direct_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Only the exact documented file-secret-backed Galileo application operation named by the feature row may mutate behind its explicit gate."
+        },
+        "render_runbook": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "Render review and operator handoff evidence without claiming an undocumented or UI-only Galileo mutation API."
+        },
+        "validate_only": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "Perform read-only validation and retain sanitized evidence without changing Galileo or Splunk state."
+        }
+      },
+      "feature_count": 57,
+      "feature_ids_sha256": "50b3ae7c73b3787f7a867a9c4a2bd27dd65b0f4dc353f3e62730ed86616a4951",
+      "feature_contracts_sha256": "8fbfeb9db76734771ab53e8317e5ad8ce6cfde9a1c67cd13828d50a5480d8904"
+    },
+    {
+      "id": "galileo-on-prem",
+      "product_area": "Galileo On-Prem Kubernetes deployment surfaces",
+      "router_skill": "galileo-on-prem-kubernetes-setup",
+      "inventory_classification": "catalog_explicit_router",
+      "adapter": "galileo_on_prem_json_matrix",
+      "source_path": "skills/galileo-on-prem-kubernetes-setup/references/deployment-feature-matrix.json",
+      "reference_path": "skills/galileo-on-prem-kubernetes-setup/reference.md",
+      "validation_path": "skills/galileo-on-prem-kubernetes-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "helm.galileo.ai"
+      ],
+      "provenance": [
+        {
+          "path": "skills/galileo-on-prem-kubernetes-setup/references/source-ledger.md",
+          "format": "text",
+          "date_pattern": "Verified (?P<date>\\d{4}-\\d{2}-\\d{2})",
+          "extract_https_urls": true
+        }
+      ],
+      "require_row_boundary_statuses": [
+        "delegated_apply",
+        "handoff",
+        "render_runbook",
+        "unsupported",
+        "validate_only"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "delegated_apply": {
+          "coverage_status": "delegated_apply",
+          "automation_boundary": "The non-mutating parent delegates only to the exact canonical lifecycle owner named by the row; the child approval, safety, and completion gates remain authoritative."
+        },
+        "handoff": {
+          "coverage_status": "handoff",
+          "automation_boundary": "Render the documented decision or operator handoff and do not claim mutation where the source or exact package does not provide a safe executable contract."
+        },
+        "render_runbook": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "Render a reviewed deployment decision, conflict, or operational runbook without mutating Kubernetes or external infrastructure."
+        },
+        "unsupported": {
+          "coverage_status": "unsupported",
+          "automation_boundary": "Fail closed, state why generic automation is unsupported, and require an owned Galileo/customer procedure before any mutation."
+        },
+        "validate_only": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "Perform read-only or offline validation, retain sanitized evidence, and never convert validation into mutation authority."
+        }
+      },
+      "feature_count": 110,
+      "feature_ids_sha256": "48600479ce66b0b0ad3df3db968f446038f4748dac816aeca3b8f997e994319c",
+      "feature_contracts_sha256": "cd19e65aa639cb966d4ef4604bf6d95c43929d42f29ac409139303ed047e05c8"
     }
   ]
 }

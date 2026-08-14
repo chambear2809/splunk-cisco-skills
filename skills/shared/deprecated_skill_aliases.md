@@ -1,6 +1,6 @@
 # Deprecated Skill Alias Migration Guide
 
-_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f`) by `skills/shared/scripts/generate_skill_catalog.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26`) by `skills/shared/scripts/generate_skill_catalog.py`; do not edit manually._
 
 Deprecated names are help-only compatibility aliases. Their setup, validation,
 and renderer entrypoints fail closed and name the canonical replacement.

@@ -40,6 +40,39 @@ def test_marketplace_workflow_diagram_rejects_weak_or_unfenced_markers() -> None
         assert not metadata_check.has_marketplace_workflow_diagram(workflow)
 
 
+def test_skill_resource_links_accept_existing_relative_and_external_targets(
+    tmp_path: Path,
+) -> None:
+    skill_dir = tmp_path / "sample-skill"
+    references_dir = skill_dir / "references"
+    references_dir.mkdir(parents=True)
+    (references_dir / "guide.md").write_text("# Guide\n", encoding="utf-8")
+
+    text = """\
+[guide](references/guide.md#details)
+[encoded](references%2Fguide.md)
+[external](https://agentskills.io/specification)
+[section](#validation)
+"""
+
+    assert metadata_check.check_skill_resource_links(skill_dir, text) == []
+
+
+def test_skill_resource_links_reject_missing_and_absolute_local_targets(
+    tmp_path: Path,
+) -> None:
+    skill_dir = tmp_path / "sample-skill"
+    skill_dir.mkdir()
+
+    errors = metadata_check.check_skill_resource_links(
+        skill_dir,
+        "[missing](references/missing.md)\n[absolute](/tmp/guide.md)\n",
+    )
+
+    assert any("does not exist" in error for error in errors)
+    assert any("must be relative" in error for error in errors)
+
+
 def test_fallback_parser_supports_nested_skill_and_interface_metadata(
     monkeypatch,
 ) -> None:

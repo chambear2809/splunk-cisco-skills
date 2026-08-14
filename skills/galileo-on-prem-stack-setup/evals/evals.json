@@ -1,0 +1,59 @@
+{
+  "skill": "galileo-on-prem-stack-setup",
+  "version": 1,
+  "evaluations": [
+    {
+      "id": "inspect-coverage-first",
+      "prompt": "Inspect my pinned Galileo stack chart, emit exact full-feature runtime inventory for review, then require those reviewed IDs before an immutable handoff render.",
+      "should_trigger": true
+    },
+    {
+      "id": "render-pinned-stack",
+      "prompt": "Render an immutable deployment bundle from my Galileo On-Prem questionnaire values and pinned galileo-stack archive, without contacting Kubernetes.",
+      "should_trigger": true
+    },
+    {
+      "id": "retirement-handoff",
+      "prompt": "Plan a retention-safe Galileo On-Prem uninstall without deleting PVCs, CRDs, namespaces, buckets, or databases.",
+      "should_trigger": true
+    },
+    {
+      "id": "upgrade-stack",
+      "prompt": "Preflight an existing Galileo umbrella release and prepare an exact backup- and approval-bound Galileo/CSE upgrade handoff without executing Helm.",
+      "should_trigger": true
+    },
+    {
+      "id": "wizard-gpu",
+      "prompt": "Validate the Kubernetes node labels, taints, NVIDIA capacity, and Helm resources for Galileo Wizard local inference.",
+      "should_trigger": true
+    },
+    {
+      "id": "microk8s-lab",
+      "prompt": "Prepare a non-production MicroK8s hostpath, MetalLB, and Galileo node-label bootstrap plan.",
+      "should_trigger": true
+    },
+    {
+      "id": "galileoctl-recommended-install-method",
+      "prompt": "Prepare Galileo's galileoctl Method A first-install handoff, documenting the UI path and current-release/CSE-controlled workstation or CI CLI alternative without executing it.",
+      "should_trigger": true
+    },
+    {
+      "id": "platform-project-near-miss",
+      "prompt": "Create a Galileo project, dataset, scorer, and Evaluate experiment in an already-running instance.",
+      "should_trigger": false,
+      "expected_skill": "galileo-platform-setup"
+    },
+    {
+      "id": "agent-control-near-miss",
+      "prompt": "Configure Galileo Agent Control runtime policies and export control spans to Splunk.",
+      "should_trigger": false,
+      "expected_skill": "galileo-agent-control-setup"
+    },
+    {
+      "id": "luna-near-miss",
+      "prompt": "Deploy standalone Luna Studio with its dedicated database and remote training cluster.",
+      "should_trigger": false,
+      "expected_skill": "galileo-on-prem-luna-studio-setup"
+    }
+  ]
+}

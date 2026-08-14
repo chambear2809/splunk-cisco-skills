@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "skill": "galileo-on-prem-kubernetes-setup",
+  "sanitization": "No target address, SSH username, credential, kube context, API endpoint, CA material, cluster or node name, UID, namespace, release, StorageClass name, local path, raw command output, or secret value is recorded.",
+  "runs": [
+    {
+      "id": "2026-08-13-three-node-cpu-lab-read-only",
+      "date": "2026-08-13",
+      "environment": {
+        "runtime": "three-node MicroK8s CPU-only lab",
+        "kubernetes": "1.31.14",
+        "architecture": "linux/amd64",
+        "helm": "3.14.4",
+        "node_count": 3,
+        "node_readiness": "3/3 Ready",
+        "per_node_capacity": "8 CPU, approximately 16 GiB RAM, approximately 40 GB ephemeral storage",
+        "high_availability": true,
+        "rbac": "lab distribution reports RBAC disabled; the authenticated identity was effectively cluster-admin"
+      },
+      "targets": [
+        "Galileo On-Prem Kubernetes router and production-readiness preflight surfaces"
+      ],
+      "result": "partial",
+      "evidence": {
+        "read_only_cluster_discovery_passed": true,
+        "three_node_topology_confirmed": true,
+        "all_nodes_ready": true,
+        "kubernetes_default_floor_satisfied": true,
+        "galileo_releases_present": 0,
+        "galileo_namespace_present": false,
+        "galileo_node_pool_labels_present": false,
+        "gpu_allocatable": 0,
+        "storage_class_count": 0,
+        "ingress_class_count": 0,
+        "gateway_api_available": false,
+        "production_readiness": false,
+        "gpu_live_validation": false
+      },
+      "limitations": [
+        "No entitled Galileo chart, version-matched questionnaire values, secret-values file, Galileo approval, external data services, DNS, TLS, load balancer, or backup evidence was supplied; no chart was rendered or installed.",
+        "The nodes are smaller than the documented production core-node profile and do not provide the documented dedicated core, runner, or optional ML node pools.",
+        "No production StorageClass, ingress or Gateway API implementation, Galileo node labels, or GPU resources are present.",
+        "The lab distribution's RBAC-disabled state cannot provide production least-privilege evidence.",
+        "No cluster mutation, package acquisition, Helm operation, GPU test, model load, application smoke test, backup/restore test, upgrade, rollback, uninstall, or production soak was performed."
+      ],
+      "mutation": {
+        "performed": false,
+        "reason": "The validation was deliberately read-only and required production inputs were absent."
+      }
+    }
+  ]
+}
