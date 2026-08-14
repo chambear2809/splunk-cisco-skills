@@ -188,6 +188,12 @@ def boolean(value: dict, key: str, where: str) -> bool:
     return result
 
 
+def integer_gpu_count(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        fail("training.gpu.count must be an integer, not a boolean")
+    return value
+
+
 def origin(raw: str) -> str:
     parsed = urlsplit(raw.strip())
     if (
@@ -1513,7 +1519,7 @@ def render(spec_artifact: SecureInput, output: Path, console_arg: str) -> None:
         "training.gpu",
     )
     gpu_enabled = boolean(gpu, "enabled", "training.gpu")
-    count = gpu.get("count")
+    count = integer_gpu_count(gpu.get("count"))
     selector = gpu.get("node_selector")
     tolerations = gpu.get("tolerations")
     if gpu_enabled:
@@ -1541,7 +1547,6 @@ def render(spec_artifact: SecureInput, output: Path, console_arg: str) -> None:
         )
         if (
             training_provider != "kubernetes"
-            or not isinstance(count, int)
             or count < 1
             or gpu.get("resource") != "nvidia.com/gpu"
             or not valid_selector

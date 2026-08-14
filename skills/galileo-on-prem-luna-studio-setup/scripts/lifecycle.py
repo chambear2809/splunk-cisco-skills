@@ -251,6 +251,25 @@ def tools() -> None:
         fail("missing required executable(s): " + ", ".join(missing))
 
 
+def validate_kubeconfig_user_auth(auth: object) -> None:
+    if not isinstance(auth, dict):
+        fail("kubeconfig user authentication must be a mapping")
+    if "exec" in auth or "auth-provider" in auth:
+        fail(
+            "exec/auth-provider kubeconfig authentication is not supported in the "
+            "isolated lifecycle; generate a short-lived mode-0600 static kubeconfig "
+            "with embedded credential material out of band"
+        )
+    if (
+        auth.get("client-certificate")
+        or auth.get("client-key")
+        or auth.get("tokenFile")
+    ):
+        fail(
+            "kubeconfig authentication file references are forbidden; embed credentials"
+        )
+
+
 def target(context: str, namespace: str) -> dict:
     tools()
     if KUBECONFIG_SNAPSHOT is None:
@@ -291,15 +310,7 @@ def target(context: str, namespace: str) -> dict:
     if user_name and len(user_matches) != 1:
         fail("explicit kube context does not resolve one user")
     if user_matches:
-        auth = user_matches[0].get("user", {})
-        if (
-            auth.get("client-certificate")
-            or auth.get("client-key")
-            or auth.get("tokenFile")
-        ):
-            fail(
-                "kubeconfig authentication file references are forbidden; embed credentials"
-            )
+        validate_kubeconfig_user_auth(user_matches[0].get("user", {}))
     server = cluster.get("server")
     parsed_server = urlsplit(server) if isinstance(server, str) else None
     try:
@@ -425,6 +436,17 @@ def release_identity(state: dict | None, metadata: dict) -> None:
         or str(state.get("app_version", "")) != str(chart["app_version"])
     ):
         fail("existing Luna release does not match the immutable chart/version")
+
+
+def validate_observed_release_ownership(state: dict | None, metadata: dict) -> None:
+    if state is None:
+        return
+    if metadata["ownership"] == "umbrella-overlay":
+        fail(
+            "umbrella-owned Luna Studio conflicts with a standalone luna-studio "
+            "Helm release"
+        )
+    release_identity(state, metadata)
 
 
 def state_version(state: dict, chart_name: str) -> str:
@@ -2247,8 +2269,7 @@ def main() -> int:
         state = release(
             args.kube_context, metadata["namespace"], metadata["release_name"]
         )
-        if state is not None and metadata["ownership"] == "standalone":
-            release_identity(state, metadata)
+        validate_observed_release_ownership(state, metadata)
         print(
             json.dumps({"status": "observed", "release_state": state}, sort_keys=True)
         )

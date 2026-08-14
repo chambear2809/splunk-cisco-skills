@@ -453,9 +453,18 @@ def validate_spec(spec: dict[str, Any]) -> None:
 
     routing = require_dict(spec, "routing")
     route_mode = require_enum(routing, "mode", "routing", {"ingress", "gateway-api", "private"})
-    require_enum(routing, "tls_mode", "routing", {"customer-certificate", "cert-manager", "external-termination"})
+    tls_mode = require_enum(
+        routing,
+        "tls_mode",
+        "routing",
+        {"customer-certificate", "cert-manager", "external-termination"},
+    )
     for key in ("certificate_secret", "ingress_class", "gateway_class", "load_balancer_address"):
         require_string(routing, key, "routing", allow_empty=True)
+    if tls_mode == "customer-certificate" and not routing["certificate_secret"]:
+        raise ContractError(
+            "routing.certificate_secret is required for customer-certificate TLS mode"
+        )
     if route_mode == "ingress" and not routing["ingress_class"]:
         raise ContractError("routing.ingress_class is required for ingress mode")
     if route_mode == "gateway-api" and not routing["gateway_class"]:
@@ -1047,9 +1056,15 @@ def build_gaps(spec: dict[str, Any], spec_dir: Path, coverage: dict[str, Any]) -
     features = spec["features"]
     environment = spec["metadata"]["environment"]
     evidence: dict[str, Any] = {}
+    galileoctl_required = spec["installation"]["method"] == "galileoctl"
     artifact_contracts = (
         ("galileo-stack-chart", "galileo_stack_chart", "galileo_stack_sha256", True),
-        ("galileoctl-chart", "galileoctl_chart", "galileoctl_sha256", True),
+        (
+            "galileoctl-chart",
+            "galileoctl_chart",
+            "galileoctl_sha256",
+            galileoctl_required,
+        ),
         ("questionnaire-values", "questionnaire_values_file", "", True),
         ("image-manifest", "image_manifest", "", spec["air_gap"]["enabled"]),
     )

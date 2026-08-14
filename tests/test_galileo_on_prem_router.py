@@ -401,6 +401,8 @@ def test_other_official_installation_methods_have_exact_ownership_handoffs(
     spec, output, _ = build_fixture(tmp_path)
     payload = json.loads(spec.read_text(encoding="utf-8"))
     payload["installation"]["method"] = method
+    payload["artifacts"]["galileoctl_chart"] = ""
+    payload["artifacts"]["galileoctl_sha256"] = ""
     spec.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     spec.chmod(0o600)
 
@@ -422,6 +424,31 @@ def test_other_official_installation_methods_have_exact_ownership_handoffs(
     stack = next(row for row in plan["nodes"] if row["id"] == "stack")
     assert stack["installation_method"] == method
     assert expected in stack["requested_action"]
+
+
+def test_customer_certificate_tls_requires_secret_name(tmp_path: Path) -> None:
+    spec, output, _ = build_fixture(tmp_path)
+    payload = json.loads(spec.read_text(encoding="utf-8"))
+    payload["routing"]["certificate_secret"] = ""
+    spec.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    spec.chmod(0o600)
+
+    result = run(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--spec",
+        str(spec),
+        "--galileo-console-url",
+        CONSOLE_URL,
+        "--output-dir",
+        str(output),
+    )
+    assert result.returncode != 0
+    assert "routing.certificate_secret" in result.stdout + result.stderr
+    assert not output.exists()
 
 
 def test_complete_runtime_inventory_renders_deterministically_and_without_secrets(tmp_path: Path) -> None:

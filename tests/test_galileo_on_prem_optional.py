@@ -254,6 +254,32 @@ def test_minimal_tool_environments_do_not_repurpose_home(tmp_path: Path) -> None
         holder.cleanup()
 
 
+@pytest.mark.parametrize("lifecycle", (AC_LIFECYCLE, LUNA_LIFECYCLE))
+@pytest.mark.parametrize("auth_key", ("exec", "auth-provider"))
+def test_child_lifecycles_reject_external_kubeconfig_auth(
+    lifecycle, auth_key: str
+) -> None:
+    rejects(lambda: lifecycle.validate_kubeconfig_user_auth({auth_key: {}}))
+
+
+@pytest.mark.parametrize("lifecycle", (AC_LIFECYCLE, LUNA_LIFECYCLE))
+def test_umbrella_owned_child_rejects_standalone_release(lifecycle) -> None:
+    metadata = {"ownership": "umbrella-overlay"}
+    lifecycle.validate_observed_release_ownership(None, metadata)
+    rejects(
+        lambda: lifecycle.validate_observed_release_ownership(
+            {"name": "conflicting-release"}, metadata
+        )
+    )
+
+
+def test_luna_gpu_count_rejects_booleans() -> None:
+    assert LUNA_RENDER.integer_gpu_count(0) == 0
+    assert LUNA_RENDER.integer_gpu_count(1) == 1
+    rejects(lambda: LUNA_RENDER.integer_gpu_count(False))
+    rejects(lambda: LUNA_RENDER.integer_gpu_count(True))
+
+
 @pytest.mark.parametrize(
     "reader",
     (AC_RENDER.secure_read, LUNA_RENDER.secure_read, AIR_GAP.secure_read),
