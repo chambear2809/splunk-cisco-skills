@@ -1,5 +1,10 @@
 # Galileo Platform Setup Reference
 
+This reference covers an already-running Galileo application platform. Use
+`galileo-on-prem-kubernetes-setup` for Kubernetes installation, upgrades,
+rollback, uninstall, CRDs, storage, routing, registry, Wizard GPU
+infrastructure, packaged Agent Control, or Luna Studio deployment.
+
 ## Official References
 
 - Galileo overview: `https://docs.galileo.ai/what-is-galileo`
@@ -181,7 +186,7 @@ Product coverage surfaces tracked in the matrix:
 - Playground and experiment processing for datasets with thousands of rows,
   using Galileo-managed batching, async progress evidence, and paginated reads
   without an invented client batch-size control or maximum
-- Evaluate workflow runs
+- Evaluate experiments and agentic workflow runs
 - Python and TypeScript SDK parity, Observe/Evaluate workflow classes, package
   versioning, and runtime package handoffs
 - Metric taxonomy across agentic, RAG, response-quality, safety/compliance,

@@ -1,0 +1,22 @@
+{
+  "skill": "galileo-on-prem-agent-control-setup",
+  "version": 1,
+  "evaluations": [
+    {
+      "id": "standalone-lifecycle",
+      "prompt": "Render and preflight the standalone Galileo Agent Control chart with its dedicated database, route, UI proxy, and feature flag, then prepare the exact Galileo/CSE install handoff.",
+      "should_trigger": true
+    },
+    {
+      "id": "umbrella-overlay",
+      "prompt": "Generate an Agent Control overlay for an exact galileo-stack bundle that already owns the component, without installing a second Helm release.",
+      "should_trigger": true
+    },
+    {
+      "id": "runtime-policy-near-miss",
+      "prompt": "Configure Agent Control policies and export control spans from an already-running Galileo tenant.",
+      "should_trigger": false,
+      "expected_skill": "galileo-agent-control-setup"
+    }
+  ]
+}

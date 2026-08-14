@@ -1,0 +1,22 @@
+{
+  "skill": "galileo-on-prem-luna-studio-setup",
+  "version": 1,
+  "evaluations": [
+    {
+      "id": "standalone-luna",
+      "prompt": "Render and preflight standalone Luna Studio with its four required Secrets, asyncpg database, S3-compatible object storage, UI, and Kubernetes training Jobs, then prepare the Galileo/CSE install handoff.",
+      "should_trigger": true
+    },
+    {
+      "id": "remote-gpu-luna",
+      "prompt": "Preflight Luna Studio against an exact remote training cluster with NVIDIA GPUs, selectors, taints, and target-bound evidence.",
+      "should_trigger": true
+    },
+    {
+      "id": "tenant-finetune-near-miss",
+      "prompt": "Create a fine-tuning job in an already-running Galileo Luna Studio workspace.",
+      "should_trigger": false,
+      "expected_skill": "galileo-platform-setup"
+    }
+  ]
+}

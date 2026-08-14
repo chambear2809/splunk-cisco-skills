@@ -1,0 +1,1790 @@
+{
+  "schema_version": 1,
+  "product_area": "Galileo On-Prem Kubernetes deployment surfaces",
+  "reviewed_on": "2026-08-13",
+  "feature_count": 110,
+  "supported_statuses": [
+    "delegated_apply",
+    "handoff",
+    "render_runbook",
+    "unsupported",
+    "validate_only"
+  ],
+  "runtime_inventory_contract": {
+    "required_categories": [
+      "dependency",
+      "schema_or_enable_flag",
+      "image",
+      "crd",
+      "hook_or_migration",
+      "cluster_scoped_object",
+      "api_kind",
+      "service_or_route",
+      "persistence"
+    ],
+    "required_item_fields": [
+      "id",
+      "category",
+      "classification_id",
+      "owners"
+    ],
+    "classification_rule": "Every item discovered from the exact chart archive must reference one feature id in this matrix and exactly the matrix-declared canonical owner set. Empty categories require an explicit observed-empty entry in the runtime inventory."
+  },
+  "official_source_inventory": [
+    {
+      "url": "https://helm.galileo.ai/docs/getting-started/overview/",
+      "title": "Galileo Helm Charts Overview",
+      "scope": "Chart groups, prerequisites, supported installation paths, and cross-guide routing."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/getting-started/installation/",
+      "title": "Installation Guide",
+      "scope": "Four platform installation methods, including recommended galileoctl UI or CLI control of the umbrella chart, values layouts, ordering, and verification."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/getting-started/deployment-readiness/",
+      "title": "Deployment Readiness",
+      "scope": "People, access, infrastructure, security, storage, networking, data-service, and optional GPU readiness."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/architecture/overview/",
+      "title": "Architecture Overview",
+      "scope": "Platform component, dependency, data-flow, trust-boundary, and persistence architecture."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+      "title": "Deployment Guide and Process Overview",
+      "scope": "Joint delivery phases, ownership, on-premises sizing, deployment, and production completion."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+      "title": "Galileo Umbrella Chart",
+      "scope": "Recommended single-release chart, dependencies, values, CRDs, resources, and lifecycle."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/aws-deployment/",
+      "title": "AWS Deployment",
+      "scope": "EKS, RDS, ElastiCache, S3, IRSA, networking, TLS, DNS, and production sizing."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/gcp-deployment/",
+      "title": "GCP Deployment",
+      "scope": "GKE, Cloud SQL, Memorystore, GCS, Workload Identity, networking, TLS, DNS, and production sizing."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/azure-deployment/",
+      "title": "Azure Deployment",
+      "scope": "AKS, Azure data services or in-cluster alternatives, MinIO boundary, identity, networking, TLS, DNS, and sizing."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/deployment/airgapped-deployment/",
+      "title": "Air-Gapped Deployment",
+      "scope": "Offline chart, image, CLI, model, registry, architecture, and no-egress supply chain."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/post-deployment/overview/",
+      "title": "Post-Deployment Overview",
+      "scope": "Monitoring, validation, diagnostics, integrations, and production handoff."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/post-deployment/cicd-setup-first-deploy/",
+      "title": "CI/CD Setup and First Deploy",
+      "scope": "Source control, secret delivery, immutable promotion, GitOps/CI ownership, and first deployment."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/",
+      "title": "Upgrades and Ongoing Operations",
+      "scope": "Upgrade, backup, rollback, retirement, uninstall, and operational constraints."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/post-deployment/gcp-disaster-recovery/",
+      "title": "GCP Disaster Recovery",
+      "scope": "GCS, Cloud SQL, Memorystore, ClickHouse recovery, same-region restore, and cross-region failover."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/post-deployment/aws-disaster-recovery/",
+      "title": "AWS Disaster Recovery",
+      "scope": "S3, RDS, ElastiCache, ClickHouse recovery, same-region restore, and cross-region failover."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/configuration/",
+      "title": "Configuration",
+      "scope": "Version-matched values, services, storage, routing, flags, providers, identity, email, and Wizard."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/values-anchors/",
+      "title": "Migrating to YAML Anchors",
+      "scope": "Values deduplication, anchor migration, merge behavior, and rendered-equivalence validation."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/aws-secrets-manager/",
+      "title": "AWS Secrets Manager",
+      "scope": "Current chart integration behavior, limits, customer synchronization, and native Secret boundary."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/agent-control/",
+      "title": "Agent Control",
+      "scope": "Packaged service, database, migrations, resilience, routing, feature flag, and UI integration."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/luna-studio/",
+      "title": "Luna Studio",
+      "scope": "Dedicated service, database, Secrets, storage, backend/UI, routing, and training topologies."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/monitoring/",
+      "title": "Monitoring: Dashboards and Alerts",
+      "scope": "Metrics, dashboards, alerts, logs, ownership, and operational validation."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/user-onboarding/",
+      "title": "Onboarding Users",
+      "scope": "First administrator, invitations, direct links, signup, and offboarding boundaries."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/email-configuration/",
+      "title": "Email Configuration",
+      "scope": "SMTP, STARTTLS, SendGrid, sender behavior, precedence, and delivery validation."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/galileoctl/",
+      "title": "galileoctl",
+      "scope": "Privileged in-cluster console and optional CLI for platform install or upgrade, pre/post checks, audit, diagnostics, and support bundles."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/guides/sso-integration/",
+      "title": "SSO Integration",
+      "scope": "OIDC, SAML, claims, JIT roles, callbacks, tokens, and access lifecycle."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/overview/",
+      "title": "Troubleshooting Overview",
+      "scope": "Bounded diagnostic routing and safe evidence collection."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/deployment/",
+      "title": "Deployment Troubleshooting",
+      "scope": "Helm, image pull, timeout, CRD, hook, route, and rollout failure diagnosis."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/infra/",
+      "title": "Infrastructure Troubleshooting",
+      "scope": "Kubernetes, networking, storage, queue, cache, ClickHouse, and platform infrastructure diagnosis."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/api/",
+      "title": "API Troubleshooting",
+      "scope": "API initialization, connectivity, schema, internal triggers, and ingress diagnosis."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/jobs/",
+      "title": "Jobs Troubleshooting",
+      "scope": "Runner, queue, backlog, execution, and job lifecycle diagnosis."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/wizard/",
+      "title": "Wizard Troubleshooting",
+      "scope": "Model serving, GPU, Triton, image, storage, and startup diagnosis."
+    },
+    {
+      "url": "https://helm.galileo.ai/docs/troubleshooting/database/",
+      "title": "Database Troubleshooting",
+      "scope": "PostgreSQL, ClickHouse, Redis, backup, restore, and connectivity diagnosis."
+    }
+  ],
+  "features": [
+    {
+      "id": "install.method.galileoctl",
+      "domain": "installation",
+      "name": "Recommended galileoctl umbrella installation",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pinned galileoctl and Stack identities, successful pre-deploy checks, reviewed dry run, explicit UI apply evidence for first install or documented CLI lifecycle evidence, Helm release status, and post-deploy validation.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "galileoctl.interface.browser",
+      "domain": "galileoctl",
+      "name": "galileoctl browser install and operations workflow",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pinned release, namespace/RBAC plan, authenticated access, audit settings, pre-deploy result, reviewed dry run, explicit install evidence, and post-deploy report.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "galileoctl.interface.cli",
+      "domain": "galileoctl",
+      "name": "galileoctl CLI install and operations workflow",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate CLI evidence only after the required first-install UI workflow; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pinned CLI/chart capability inventory, target binding, pre-deploy result, dry-run review, action-specific approval, Helm status, and redacted post-deploy evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "install.method.helm-cli",
+      "domain": "installation",
+      "name": "Method B Galileo Stack Helm CLI installation",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Stack child render, preflight, Helm status, jobs, workloads, routes, PVCs, and smoke evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "install.method.deployment-script",
+      "domain": "installation",
+      "name": "Method C vendor helm-deploy.sh and charts-config.yaml workflow",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Artifact hash, script static review, chart/config inventory, and operator completion evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/"
+      ]
+    },
+    {
+      "id": "install.method.step-by-step",
+      "domain": "installation",
+      "name": "Method D ordered chart-by-chart installation",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pinned chart order, ownership map, per-release status, and Galileo approval.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/"
+      ]
+    },
+    {
+      "id": "install.values.questionnaire",
+      "domain": "configuration",
+      "name": "CSE questionnaire and version-specific values",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Values provenance, umbrella-versus-sequential layout, exact chart association, schema validation, and CSE approval reference.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "install.values.secrets",
+      "domain": "configuration",
+      "name": "External secret values file",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Secret-file metadata and private digest in child preflight evidence; sentinel absent from outputs.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "install.release-identity",
+      "domain": "configuration",
+      "name": "Explicit namespace and release identity",
+      "status": "render_runbook",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Require explicit names and discover/reuse existing identity; never guess between documented examples.",
+      "validation_evidence": "Normalized deployment spec and target-bound orchestration plan.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.base",
+      "domain": "core-stack",
+      "name": "Galileo base resources",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Chart dependency, resource inventory, RBAC review, and child workload validation.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.api",
+      "domain": "core-stack",
+      "name": "Galileo API service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ready workload, service port 8088, /healthcheck, authenticated API and route evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.data-service",
+      "domain": "core-stack",
+      "name": "Galileo data service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Workload readiness, dependencies, service metrics, logs, and smoke evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.ingest-service",
+      "domain": "core-stack",
+      "name": "Galileo ingest service and OTLP trace endpoint",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ready workload, service port 8081, /otel/v1/traces route, and persisted trace test.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.runners",
+      "domain": "core-stack",
+      "name": "Galileo runner workloads",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Node placement, capacity, queue execution, HPA/PDB, and job completion evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.comet",
+      "domain": "core-stack",
+      "name": "Galileo Comet component",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Classified chart dependency, ready workload, service and monitoring evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.authz",
+      "domain": "core-stack",
+      "name": "Galileo authorization service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ready workload, authorization health, audit/RBAC checks, and dependent-service smoke tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "stack.ui",
+      "domain": "core-stack",
+      "name": "Galileo UI service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ready workload, service port 3000, /api/healthcheck, TLS, login, and proxy checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "data.postgresql",
+      "domain": "data-services",
+      "name": "PostgreSQL 13+ and preferred version 16",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Connectivity, migration jobs, version, HA, performance settings, backup, and restore-drill evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "data.postgresql-migrations",
+      "domain": "data-services",
+      "name": "PostgreSQL schema migrations",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Hook/job inventory, logs, completion, schema health, release notes, and backup evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/",
+        "https://helm.galileo.ai/docs/getting-started/installation/"
+      ]
+    },
+    {
+      "id": "data.redis",
+      "domain": "data-services",
+      "name": "Redis 6+ non-cluster topology",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Version, topology, replication, persistence and support-exception evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "data.clickhouse-operator",
+      "domain": "data-services",
+      "name": "ClickHouse operator",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Operator readiness, CRD schema hash, webhook, cluster scope and ownership evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "data.clickhouse-keeper",
+      "domain": "data-services",
+      "name": "ClickHouse Keeper",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Keeper quorum, storage, pod placement, alerts and failure-recovery evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "data.clickhouse",
+      "domain": "data-services",
+      "name": "ClickHouse cluster",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Cluster health, replicas, PVCs, disk alerts, backup and restore evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "data.rabbitmq-operator",
+      "domain": "data-services",
+      "name": "RabbitMQ operator",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Operator readiness, CRD schema, webhook, cluster scope and ownership evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "data.rabbitmq-cluster",
+      "domain": "data-services",
+      "name": "RabbitMQ cluster",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Cluster health, queues, PVCs, alerts, credentials, UI exposure and recovery evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "data.messaging-topology",
+      "domain": "data-services",
+      "name": "RabbitMQ messaging topology operator and resources",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Runtime dependency inventory, CRDs, operator readiness and topology-resource status.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "data.minio",
+      "domain": "object-storage",
+      "name": "Bundled MinIO object storage",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Credential policy, PVC/reclaim policy, five application buckets, optional buckets, TLS, backup and restore evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "data.external-object-storage",
+      "domain": "object-storage",
+      "name": "External S3-compatible object storage",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Endpoint/TLS/auth method, required bucket inventory, access, lifecycle, encryption, backup and restore checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "data.azure-core-boundary",
+      "domain": "object-storage",
+      "name": "Core Azure Blob support conflict",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Fail closed because current umbrella and Azure guidance conflict; require exact chart schema plus written Galileo confirmation or use MinIO.",
+      "validation_evidence": "Conflict recorded in doctor report and exact package/CSE decision attached.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "crd.helm-directory",
+      "domain": "crd-ownership",
+      "name": "Helm crds directory ownership",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pinned CRD inventory, normalized schema hashes and Established conditions.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "crd.operator-templates",
+      "domain": "crd-ownership",
+      "name": "Operator-template CRD controls",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Rendered inventory proves all required controls and contains no unowned CRD mutation.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "crd.sequencing-hook",
+      "domain": "crd-ownership",
+      "name": "Sequencing-hook CRD management",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Hook inventory and rendered sequencing value prove CRD mutation is disabled or explicitly approved.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.cert-manager",
+      "domain": "routing-tls",
+      "name": "cert-manager dependency",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "CRD/RBAC ownership, issuer readiness, certificate status and approved egress evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.galileo-tls",
+      "domain": "routing-tls",
+      "name": "Galileo TLS resources",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Certificate chain, SAN, expiry, hostname and trust validation without insecure flags.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.ingress-nginx",
+      "domain": "routing-tls",
+      "name": "Ingress NGINX controller",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "IngressClass/controller readiness, load-balancer reachability, annotations and route checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.envoy-gateway",
+      "domain": "routing-tls",
+      "name": "Envoy Gateway",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "GatewayClass, controller, Gateway/HTTPRoute conditions, TLS and route checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.gateway-routes",
+      "domain": "routing-tls",
+      "name": "Gateway API routes",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Accepted/ResolvedRefs conditions and authenticated end-to-end path tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.ingress-resources",
+      "domain": "routing-tls",
+      "name": "Ingress resources",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ingress address, TLS, route ordering, health and authorization checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "routing.console-proxy",
+      "domain": "routing-tls",
+      "name": "Console API proxy and path stripping",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Browser login, proxy path, API response, CORS and callback tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "routing.trace-order",
+      "domain": "routing-tls",
+      "name": "Trace ingest route ordering",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Rendered route order and a persisted OTLP test trace.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "routing.streaming-timeout",
+      "domain": "routing-tls",
+      "name": "Streaming export timeout",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Rendered proxy settings and timed export test without gateway timeout.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "routing.metrics-protection",
+      "domain": "routing-tls",
+      "name": "Public API metrics route protection",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "External negative test and internal scrape success.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "monitoring.prometheus",
+      "domain": "monitoring",
+      "name": "Prometheus monitoring stack",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Targets, storage, retention, scrape errors and metric availability.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/monitoring/"
+      ]
+    },
+    {
+      "id": "monitoring.grafana",
+      "domain": "monitoring",
+      "name": "Grafana and provisioned dashboards",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Authentication, datasource health and every documented dashboard folder/panel smoke test.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/monitoring/"
+      ]
+    },
+    {
+      "id": "monitoring.fluent-bit",
+      "domain": "monitoring",
+      "name": "Fluent Bit log collection",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Daemon coverage, delivery success, backpressure and secret-sentinel absence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "monitoring.prometheus-adapter",
+      "domain": "monitoring",
+      "name": "Prometheus Adapter metrics",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "APIService Available, custom/external metrics and HPA query evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "monitoring.kube-state-metrics",
+      "domain": "monitoring",
+      "name": "kube-state-metrics",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Ready deployment, scrape target, required Kubernetes metrics and RBAC review.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "monitoring.alertmanager",
+      "domain": "monitoring",
+      "name": "Alertmanager and notification ownership",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Runtime inventory, routing tree, inhibited/test alert and accountable receiver evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "monitoring.service-dashboards",
+      "domain": "monitoring",
+      "name": "Galileo service and product dashboards",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Dashboard inventory and nonempty representative panels for every enabled component.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/monitoring/"
+      ]
+    },
+    {
+      "id": "monitoring.alert-rules",
+      "domain": "monitoring",
+      "name": "Service, database, scheduling and capacity alerts",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Rule inventory, evaluation health, test notification, runbook and ownership evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/monitoring/"
+      ]
+    },
+    {
+      "id": "monitoring.victorialogs-conflict",
+      "domain": "monitoring",
+      "name": "VictoriaLogs documentation/inventory conflict",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Do not assert deployment from overview text alone; classify only if the exact package contains the component.",
+      "validation_evidence": "Conflict in doctor report plus pinned runtime dependency/image/resource inventory.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "autoscaling.cluster-autoscaler",
+      "domain": "scaling",
+      "name": "Cluster Autoscaler optional chart",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Provider integration, RBAC, node-group discovery, scale-up/down and PDB safety tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "scaling.hpa-pdb",
+      "domain": "scaling",
+      "name": "HPA and PodDisruptionBudget behavior",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "HPA targets, PDB allowed disruptions, drain and availability tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "wizard.service",
+      "domain": "wizard-local-inference",
+      "name": "Wizard local inference service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Exact enable flags, workload/service health, model endpoint and Galileo integration test.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "wizard.triton",
+      "domain": "wizard-local-inference",
+      "name": "Triton model serving",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Triton readiness, model-loaded status, inference result and up-to-40-minute startup evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "wizard.gpu-scheduling",
+      "domain": "wizard-local-inference",
+      "name": "NVIDIA GPU scheduling",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Static fixture plus live node/device-plugin, placement and inference evidence; CPU labs remain static-only.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "wizard.multi-deployment-hpa",
+      "domain": "wizard-local-inference",
+      "name": "Multiple Wizard deployments, HPA and network policy",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Per-deployment workload, HPA, policy and endpoint isolation tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "wizard.offline-models",
+      "domain": "wizard-local-inference",
+      "name": "Offline model bundle and optional Wizard bucket",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Validate checksum-bound model artifacts and prepare the optional Wizard-bucket handoff from exact pinned evidence; any registry, object-storage, Helm, or Kubernetes change is a Galileo/CSE joint-session handoff and this skill performs no mutation.",
+      "validation_evidence": "Model manifest, digest and safe-extraction evidence; completion remains stack_model_evidence_missing until Stack emits versioned model mount, configuration and checksum-verifier evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "wizard.multi-gpu",
+      "domain": "wizard-local-inference",
+      "name": "Multi-GPU model serving",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Resource allocation, topology, model initialization and multi-GPU inference evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "agent-control.deployment",
+      "domain": "agent-control",
+      "name": "Packaged Agent Control service",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-agent-control-setup"
+      ],
+      "automation_boundary": "Render and validate exactly one standalone or umbrella ownership path from pinned package evidence; deployment is a Galileo/CSE joint-session handoff and this skill performs no Helm or Kubernetes mutation.",
+      "validation_evidence": "Static ownership and release/overlay identity plus connected read-only workload, service-port 8000 and /health evidence supplied to the joint session.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/agent-control/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "agent-control.database-migrations",
+      "domain": "agent-control",
+      "name": "Agent Control database bootstrap and Alembic migrations",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-agent-control-setup"
+      ],
+      "automation_boundary": "Render and read-only validate database/bootstrap prerequisites; bootstrap and Alembic migration execution is a Galileo/CSE joint-session handoff after backup review, and this skill performs no mutation.",
+      "validation_evidence": "Read-only database readiness, existing migration job/init status and logs, schema-health observations, backup evidence and a joint-session migration plan; never assume schema rollback.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/agent-control/"
+      ]
+    },
+    {
+      "id": "agent-control.resilience",
+      "domain": "agent-control",
+      "name": "Agent Control HPA, PDB and NetworkPolicy",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-agent-control-setup"
+      ],
+      "automation_boundary": "Render and read-only validate package-supported HPA, PDB and NetworkPolicy resources aligned to stack dependencies and cluster policy; every change is a Galileo/CSE joint-session handoff.",
+      "validation_evidence": "Rendered resilience inventory and connected read-only HPA, PDB, NetworkPolicy, metrics and service-health observations; disruption or policy mutation remains a joint-session procedure.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/agent-control/"
+      ]
+    },
+    {
+      "id": "agent-control.ui-routing",
+      "domain": "agent-control",
+      "name": "Agent Control feature flag, UI proxy and optional direct route",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-agent-control-setup"
+      ],
+      "automation_boundary": "Render and read-only validate the feature flag, private-default route, UI proxy and dependencies; enablement or route/UI change is a Galileo/CSE joint-session handoff after service health.",
+      "validation_evidence": "Static feature-flag, proxy, CORS and route evidence plus connected read-only authentication, service health and existing end-to-end workflow observations.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/agent-control/"
+      ]
+    },
+    {
+      "id": "agent-control.runtime-handoff",
+      "domain": "agent-control",
+      "name": "Agent Control runtime controls and Splunk sinks",
+      "status": "handoff",
+      "owners": [
+        "galileo-agent-control-setup"
+      ],
+      "automation_boundary": "Delegate runtime/control and Splunk sink work only after packaged service health; do not duplicate deployment ownership.",
+      "validation_evidence": "Existing runtime child render/validation and packaged release contract hash.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/agent-control/"
+      ]
+    },
+    {
+      "id": "luna.release",
+      "domain": "luna-studio",
+      "name": "Luna Studio release topology",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render and validate a pinned standalone release or exact-evidence umbrella overlay while rejecting duplicate ownership; release mutation is a Galileo/CSE joint-session handoff.",
+      "validation_evidence": "Static ownership and release/overlay identity plus connected read-only backend/UI health and duplicate-owner evidence supplied to the joint session.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "luna.database-migrations",
+      "domain": "luna-studio",
+      "name": "Luna Studio database and asyncpg migrations",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render and read-only validate the dedicated database and asyncpg migration prerequisites; database or migration mutation is a Galileo/CSE joint-session handoff after backup review.",
+      "validation_evidence": "Read-only connectivity, existing migration status/logs and schema-health observations plus backup, restore-plan and joint-session migration evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/"
+      ]
+    },
+    {
+      "id": "luna.secrets",
+      "domain": "luna-studio",
+      "name": "Luna Studio mandatory out-of-band Secrets",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render only references to the four exact native Secrets and read-only validate metadata without reading values; Secret creation or synchronization is a Galileo/CSE joint-session handoff.",
+      "validation_evidence": "Secret names and key-name metadata, provider-auth method, sentinel result and connected read-only workload-reference observations; no secret values are retained.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/"
+      ]
+    },
+    {
+      "id": "luna.object-storage",
+      "domain": "luna-studio",
+      "name": "Luna Studio dedicated object storage",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render and read-only validate exactly one documented GCS, S3, Azure or MinIO provider/auth variant; bucket, container, policy or credential mutation is a Galileo/CSE joint-session handoff.",
+      "validation_evidence": "Static provider/auth and TLS evidence plus connected read-only encryption, backup and existing lifecycle observations; any write test is reserved for the joint session.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/"
+      ]
+    },
+    {
+      "id": "luna.resilience-routing",
+      "domain": "luna-studio",
+      "name": "Luna Studio backend/UI, HPA, PDB, network policy and routing",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render and read-only validate backend/UI, HPA, PDB, NetworkPolicy, host, TLS, NextAuth and CORS contracts without exposing admin paths; every change is a Galileo/CSE joint-session handoff.",
+      "validation_evidence": "Rendered contracts plus connected read-only workload, service/route, HPA/PDB, policy, certificate, login, callback and CORS observations supplied to the joint session.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/"
+      ]
+    },
+    {
+      "id": "luna.training-modes",
+      "domain": "luna-studio",
+      "name": "In-cluster GPU, Vertex AI, remote and hybrid training",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-luna-studio-setup"
+      ],
+      "automation_boundary": "Render and read-only validate exactly one supported in-cluster GPU, Vertex AI, remote or hybrid training topology; job submission, cancellation and infrastructure change are Galileo/CSE joint-session handoffs.",
+      "validation_evidence": "Topology-specific static contract and connected read-only identity, storage, compute and existing-job observations; GPU completion requires live joint-session GPU evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/luna-studio/"
+      ]
+    },
+    {
+      "id": "airgap.artifact-manifest",
+      "domain": "air-gap",
+      "name": "Air-gap chart, CLI, image and model manifest",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Read and validate CSE-supplied manifests and exact local archives without fetching, copying, publishing or changing them; require every ordinary, init, hook, test, job and optional model artifact.",
+      "validation_evidence": "Complete manifest, origin, digest, size, architecture and classification report.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/"
+      ]
+    },
+    {
+      "id": "airgap.registry-mirror",
+      "domain": "air-gap",
+      "name": "Private registry mirroring",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Prepare a digest-bound source-to-destination copy plan and validate existing metadata; registry push is a Galileo/CSE operator handoff, this skill performs no registry write, and the operator must reject tag overwrite.",
+      "validation_evidence": "Pre-copy source digest and destination-collision evidence plus joint-session source/destination digest equality, registry TLS/auth, immutable retention and pull-test results.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/"
+      ]
+    },
+    {
+      "id": "airgap.image-architecture",
+      "domain": "air-gap",
+      "name": "Container image architecture and scanning",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Read-only validate exact image manifests and supplied scan attestations; reject missing target architecture, mutable-only tags, latest, digest mismatch, unsafe extraction or policy-blocking scan results.",
+      "validation_evidence": "Per-platform manifest digest, SBOM/scan policy and safe-archive report.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/"
+      ]
+    },
+    {
+      "id": "airgap.sequencing-kubectl",
+      "domain": "air-gap",
+      "name": "Sequencing kubectl image pinning",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Read-only validate that the versioned Stack evidence replaces unsafe mutable defaults such as bitnami/kubectl:latest with a reviewed digest and internal mirror; this skill performs no rewrite or registry mutation.",
+      "validation_evidence": "Rendered Stack image inventory contains no latest or unmirrored sequencing image and binds the exact internal digest.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/"
+      ]
+    },
+    {
+      "id": "airgap.no-egress",
+      "domain": "air-gap",
+      "name": "Network-denied installation and runtime",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-air-gap-setup"
+      ],
+      "automation_boundary": "Read-only validate that all declared pulls and runtime dependencies resolve internally; fail on public registry, ACME, email, telemetry, feature-sync or model API egress and perform no network-policy mutation.",
+      "validation_evidence": "Approved-endpoint scan and supplied network-denied install/runtime results; completion remains endpoint_rewrite_evidence_missing until Stack binds every source scheme, host and port to its internal rewrite.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/airgapped-deployment/"
+      ]
+    },
+    {
+      "id": "security.secret-manager-boundary",
+      "domain": "security",
+      "name": "External secret manager synchronization boundary",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Provider-owned sync design, native Secret name/key metadata and workload reference checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "security.helm-release-secrets",
+      "domain": "security",
+      "name": "Helm release Secret confidentiality",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Encryption-at-rest attestation, RBAC review and secret-sentinel tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/"
+      ]
+    },
+    {
+      "id": "identity.sso",
+      "domain": "identity-email",
+      "name": "OIDC and SAML single sign-on",
+      "status": "handoff",
+      "owners": [
+        "galileo-platform-setup"
+      ],
+      "automation_boundary": "Render deployment-side URL/Secret prerequisites, then delegate provider, claim, PKCE and access-token validation to the running-platform workflow.",
+      "validation_evidence": "Login/callback, claim/group/role mapping, token validation and break-glass evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/sso-integration/"
+      ]
+    },
+    {
+      "id": "identity.user-bootstrap",
+      "domain": "identity-email",
+      "name": "First administrator, invitations and signup",
+      "status": "handoff",
+      "owners": [
+        "galileo-platform-setup"
+      ],
+      "automation_boundary": "Use a named operator and approved bootstrap path; record that first user becomes system administrator and claim removal alone may not revoke access.",
+      "validation_evidence": "First-admin ownership, invitation/signup policy, offboarding and break-glass tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/user-onboarding/",
+        "https://helm.galileo.ai/docs/guides/sso-integration/"
+      ]
+    },
+    {
+      "id": "email.smtp-sendgrid",
+      "domain": "identity-email",
+      "name": "SMTP and SendGrid email delivery",
+      "status": "handoff",
+      "owners": [
+        "galileo-platform-setup"
+      ],
+      "automation_boundary": "Prefer approved custom SMTP with STARTTLS and no SMTP AUTH assumption; preserve documented SendGrid fallback/precedence and gate real sends.",
+      "validation_evidence": "Configuration precedence, sender, TLS connection and explicitly approved test-email evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/email-configuration/",
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "features.flags",
+      "domain": "configuration",
+      "name": "Feature flag precedence and air-gap behavior",
+      "status": "handoff",
+      "owners": [
+        "galileo-platform-setup"
+      ],
+      "automation_boundary": "Inventory Helm environment overrides, local ConfigMap and central JSON precedence; disable central sync for air-gap and review security-sensitive flags.",
+      "validation_evidence": "Effective flag inventory for Agent Control, IdP provisioning, credential login, invitations, signup and email verification.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "galileoctl.rbac",
+      "domain": "galileoctl",
+      "name": "galileoctl privileged RBAC and management roles",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "RBAC diff, auth/route, audit log and post-install privilege-removal evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "galileoctl.validation",
+      "domain": "galileoctl",
+      "name": "galileoctl pre/post validation and smoke tests",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Pre/post report, smoke/SDK results, model integration and approved email-test evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "galileoctl.support-bundle",
+      "domain": "galileoctl",
+      "name": "galileoctl support bundles",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Collection approval, scope/window, file metadata, secret scan, redaction and custody record.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/galileoctl/"
+      ]
+    },
+    {
+      "id": "operations.upgrade",
+      "domain": "day-two",
+      "name": "Version-pinned upgrade",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Preflight, migration inventory, Helm/jobs/workloads/PVC/routes and post-upgrade smoke evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/",
+        "https://helm.galileo.ai/docs/getting-started/installation/"
+      ]
+    },
+    {
+      "id": "operations.rollback",
+      "domain": "day-two",
+      "name": "Migration-aware rollback",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Compatibility decision, backups, approval, exact target/revision and post-rollback health evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/"
+      ]
+    },
+    {
+      "id": "operations.uninstall",
+      "domain": "day-two",
+      "name": "Retention-safe uninstall handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Reviewed pre-uninstall inventory, typed operator confirmations, retention decisions, and Galileo-owned completion/orphan evidence; no automated deletion claim.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/"
+      ]
+    },
+    {
+      "id": "operations.backup-restore",
+      "domain": "day-two",
+      "name": "Data-service backup and restore drills",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Recent backups, restore drill, RPO/RTO, restored application health and data-persistence checks.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/"
+      ]
+    },
+    {
+      "id": "operations.onprem-dr",
+      "domain": "day-two",
+      "name": "On-premises disaster-recovery automation",
+      "status": "unsupported",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "The provider DR runbooks do not define a generic bare-metal/on-premises failover path; render a Galileo/customer design handoff and never transpose cloud commands or invent recovery automation.",
+      "validation_evidence": "Explicit unsupported status, owned DR architecture decision, RPO/RTO, protected dependencies, and customer/Galileo runbook reference.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/",
+        "https://helm.galileo.ai/docs/post-deployment/gcp-disaster-recovery/",
+        "https://helm.galileo.ai/docs/post-deployment/aws-disaster-recovery/"
+      ]
+    },
+    {
+      "id": "operations.troubleshooting",
+      "domain": "day-two",
+      "name": "Redacted deployment and service troubleshooting",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Redacted diagnostic report, exact release-owned object scope, time window, command result, and secret-sentinel absence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/upgrades-ongoing-operations/",
+        "https://helm.galileo.ai/docs/troubleshooting/overview/",
+        "https://helm.galileo.ai/docs/troubleshooting/deployment/",
+        "https://helm.galileo.ai/docs/troubleshooting/infra/",
+        "https://helm.galileo.ai/docs/troubleshooting/api/",
+        "https://helm.galileo.ai/docs/troubleshooting/jobs/",
+        "https://helm.galileo.ai/docs/troubleshooting/wizard/",
+        "https://helm.galileo.ai/docs/troubleshooting/database/"
+      ]
+    },
+    {
+      "id": "production.sizing",
+      "domain": "production-readiness",
+      "name": "CSE-approved resource and topology sizing",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Expose conflicting public estimates and bind deployment to the exact questionnaire; never promote the three-node functional lab to production.",
+      "validation_evidence": "Version-specific CSE sizing, node/pool/storage capacity report and approved exceptions.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "production.kubernetes-version",
+      "domain": "production-readiness",
+      "name": "Kubernetes compatibility floor",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Server version, chart constraint and exception evidence when applicable.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "production.node-pools",
+      "domain": "production-readiness",
+      "name": "Core, runner and optional ML node pools",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Node inventory, allocatable resources, pool labels/taints, scheduling simulation, drain and failure tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/"
+      ]
+    },
+    {
+      "id": "production.storage",
+      "domain": "production-readiness",
+      "name": "Persistent storage, snapshots, expansion and retention",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "PVC inventory, size/access/class, binding, reclaim, expansion, snapshots, performance and restore tests.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "production.completion",
+      "domain": "production-readiness",
+      "name": "Joint deployment and production completion gate",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Consolidate but never self-attest Galileo approval, SSO, one model integration, persisted traces, monitoring, smoke tests and three incident-free days.",
+      "validation_evidence": "CSE/joint-session evidence, child release contract, SSO/model/trace/monitoring tests and dated three-day soak.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "platform.postdeploy",
+      "domain": "product-handoff",
+      "name": "Running-platform product and feature configuration",
+      "status": "handoff",
+      "owners": [
+        "galileo-platform-setup"
+      ],
+      "automation_boundary": "Delegate projects, datasets, providers, scorers, Observe/Evaluate/Protect, application monitoring and Splunk wiring only after Stack health.",
+      "validation_evidence": "Platform child coverage/completion report bound to the verified release contract.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "platform.mcp",
+      "domain": "product-handoff",
+      "name": "Galileo MCP integration",
+      "status": "handoff",
+      "owners": [
+        "galileo-mcp-server-setup"
+      ],
+      "automation_boundary": "Delegate MCP configuration after the running instance is healthy; deployment does not imply telemetry ingestion.",
+      "validation_evidence": "MCP child connectivity/tool validation plus separate trace-ingest evidence when required.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "platform.lemonade",
+      "domain": "product-handoff",
+      "name": "Lemonade local instrumentation",
+      "status": "handoff",
+      "owners": [
+        "galileo-lemonade-instrumentation-setup"
+      ],
+      "automation_boundary": "Delegate local instrumentation after endpoint, project and log-stream readiness; do not couple it to Helm success.",
+      "validation_evidence": "Instrumentation child validation and persisted Galileo trace evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/overview/"
+      ]
+    },
+    {
+      "id": "deployment.readiness-checklist",
+      "domain": "production-readiness",
+      "name": "Deployment readiness people, access, security, network, storage, data-service, and GPU checklist",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Consolidate source-backed readiness evidence and delegate executable checks; never self-attest customer ownership, approvals, access, image procurement, or external-service readiness.",
+      "validation_evidence": "Named owners, target identity, access/RBAC, network/DNS/TLS, storage, PostgreSQL, Redis, object store, image pull, optional GPU, and exception evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/deployment-readiness/",
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/"
+      ]
+    },
+    {
+      "id": "architecture.component-dataflow",
+      "domain": "architecture",
+      "name": "Component, dependency, data-flow, trust-boundary, and persistence architecture",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Map the exact chart and deployment topology to the official architecture, but let the pinned archive override descriptive component lists and never infer undocumented network or data flows.",
+      "validation_evidence": "Exact dependency/resource inventory, service and route graph, persistence map, secret/trust boundaries, external dependency inventory, and architecture exceptions.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/overview/",
+        "https://helm.galileo.ai/docs/architecture/overview/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    },
+    {
+      "id": "provider.aws-infrastructure",
+      "domain": "provider-infrastructure",
+      "name": "AWS EKS, RDS, ElastiCache, S3, IRSA, networking, DNS, and TLS handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Validate provider prerequisites and render an owned infrastructure handoff; this Kubernetes deployment family does not run example AWS provisioning or accept literal cloud/database credentials.",
+      "validation_evidence": "EKS/node-pool/storage inventory, private RDS HA/backups, non-cluster ElastiCache HA, versioned/encrypted S3 buckets, IRSA least privilege, registry pull, network, DNS, TLS, and CSE sizing evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/aws-deployment/"
+      ]
+    },
+    {
+      "id": "provider.gcp-infrastructure",
+      "domain": "provider-infrastructure",
+      "name": "GCP GKE, Cloud SQL, Memorystore, GCS, Workload Identity, networking, DNS, and TLS handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Validate provider prerequisites and render an owned infrastructure handoff; this Kubernetes deployment family does not run example GCP provisioning or accept literal cloud/database credentials.",
+      "validation_evidence": "GKE/node-pool/storage inventory, private Cloud SQL HA/backups, non-cluster Memorystore HA, protected GCS buckets and exact roles, Workload Identity, registry pull, network, DNS, TLS, and CSE sizing evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/gcp-deployment/"
+      ]
+    },
+    {
+      "id": "provider.azure-infrastructure",
+      "domain": "provider-infrastructure",
+      "name": "Azure AKS, managed or in-cluster data services, MinIO, identity, networking, DNS, and TLS handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Validate provider prerequisites and render an owned infrastructure handoff; this Kubernetes deployment family does not run example Azure provisioning, and core object storage must follow the exact chart/CSE-supported MinIO or provider decision.",
+      "validation_evidence": "AKS/node-pool/storage inventory, PostgreSQL/Redis HA and backups, retained MinIO or written alternative, workload identity, registry pull, network, DNS, TLS, and CSE sizing evidence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/azure-deployment/"
+      ]
+    },
+    {
+      "id": "operations.cicd-gitops",
+      "domain": "day-two",
+      "name": "CI/CD, GitOps, immutable promotion, and first-deploy handoff",
+      "status": "render_runbook",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Render a secret-free pipeline contract that invokes immutable child phases; never commit secret-values, use unpinned charts, collapse install and upgrade, bypass review gates, or claim an undocumented vendor API.",
+      "validation_evidence": "Pinned bundle/chart digests, protected environment, file-backed secret delivery, render/preflight/approval/apply separation, target binding, concurrency control, promotion record, and post-deploy validation.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/cicd-setup-first-deploy/",
+        "https://helm.galileo.ai/docs/getting-started/installation/"
+      ]
+    },
+    {
+      "id": "configuration.yaml-anchors",
+      "domain": "configuration",
+      "name": "Values migration to YAML anchors and merge semantics",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Private source/target hashes, duplicate-key rejection, parsed semantic diff, exact Helm manifest diff, schema validation, and secret-sentinel absence.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/values-anchors/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "security.aws-secrets-manager",
+      "domain": "security",
+      "name": "AWS Secrets Manager chart integration and native Kubernetes Secret boundary",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-stack-setup"
+      ],
+      "automation_boundary": "Inventory and validate this feature from exact pinned artifacts and connected read-only evidence; any change is a Galileo/CSE joint-session handoff and this skill performs no live mutation.",
+      "validation_evidence": "Exact chart-version behavior, IRSA/provider identity, SecretProvider/ESO sync ownership, native Secret name/key metadata, workload references, rotation test, and no plaintext in bundles or output.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/guides/aws-secrets-manager/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "operations.aws-disaster-recovery",
+      "domain": "day-two",
+      "name": "AWS same-region recovery and cross-region disaster-recovery handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Render and validate a customer/Galileo-owned runbook for S3, RDS, ElastiCache, ClickHouse, EKS, traffic freeze, restore ordering, and DNS cutover; never execute destructive restore/failover commands or use upgrade --install as generic recovery automation.",
+      "validation_evidence": "RPO/RTO, versioned/replicated S3, RDS PITR/cross-region copy, restorable ClickHouse backups, Redis rebuild decision, secondary EKS plan, immutable values/secrets custody, rehearsal, and Galileo approval.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/aws-disaster-recovery/",
+        "https://helm.galileo.ai/docs/deployment/aws-deployment/"
+      ]
+    },
+    {
+      "id": "operations.gcp-disaster-recovery",
+      "domain": "day-two",
+      "name": "GCP same-region recovery and cross-region disaster-recovery handoff",
+      "status": "handoff",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Render and validate a customer/Galileo-owned runbook for GCS, Cloud SQL, Memorystore, ClickHouse, GKE, traffic freeze, restore ordering, and DNS cutover; never execute destructive restore/failover commands or use upgrade --install as generic recovery automation.",
+      "validation_evidence": "RPO/RTO, protected/replicated GCS, Cloud SQL PITR/cross-region copy, restorable ClickHouse backups, Redis rebuild decision, secondary GKE plan, immutable values/secrets custody, rehearsal, and Galileo approval.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/post-deployment/gcp-disaster-recovery/",
+        "https://helm.galileo.ai/docs/deployment/gcp-deployment/"
+      ]
+    },
+    {
+      "id": "coverage.runtime-inventory",
+      "domain": "coverage-governance",
+      "name": "Pinned chart runtime inventory classification",
+      "status": "validate_only",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Require classification of dependencies, schemas/flags, all image contexts, CRDs, hooks, migrations, cluster objects, API kinds, routes and persistence from the exact package.",
+      "validation_evidence": "Stack child runtime inventory reports unclassified_runtime_inventory as an empty list and binds the chart hash.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/",
+        "https://helm.galileo.ai/docs/guides/configuration/"
+      ]
+    },
+    {
+      "id": "coverage.documentation-conflicts",
+      "domain": "coverage-governance",
+      "name": "Documentation conflict ledger",
+      "status": "render_runbook",
+      "owners": [
+        "galileo-on-prem-kubernetes-setup"
+      ],
+      "automation_boundary": "Keep every material conflict explicit and fail closed until the exact package or written Galileo decision resolves it.",
+      "validation_evidence": "Doctor report tracks version, release, timeout, chart count, topology, storage, monitoring, sizing, secrets and DR conflicts.",
+      "source_urls": [
+        "https://helm.galileo.ai/docs/getting-started/installation/",
+        "https://helm.galileo.ai/docs/deployment/deployment-guide/",
+        "https://helm.galileo.ai/docs/deployment/galileo-stack/"
+      ]
+    }
+  ]
+}

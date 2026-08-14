@@ -1,4 +1,4 @@
-<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: a7bbaceecf6b8203c912b381fb090207571bc87fd1a30c89020b4dec3de4efa6. -->
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 7e7548ae999e799eff3a2b6a47bea6da9c90073ba7a66019684a37b4c6c0544c. -->
 
 Render, validate, and optionally apply Agent Control server/auth/control/runtime/sink assets plus Splunk Platform and Splunk Observability handoffs.
 

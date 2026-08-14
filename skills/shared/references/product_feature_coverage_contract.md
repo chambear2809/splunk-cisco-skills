@@ -38,6 +38,8 @@ presence of headings or other marker strings as coverage evidence.
 | WideField Security adoption | Every delegated child and capability bullet in the parent reference, backed by the parent source-boundary ledger |
 | Coding-agent telemetry | Every agent and destination row in the coding-agent router reference, backed by official Codex, Claude Code, and Splunk telemetry sources |
 | Splunk Supported Add-ons | Every official glossary entry, including implicit generic install-only handoffs and explicit first-class/delegated routes |
+| Galileo On-Prem Kubernetes | Every stable deployment row plus the exact pinned chart's dynamically classified dependencies, images, hooks, CRDs, cluster-scoped objects, API kinds, routes, PVCs, and enable flags |
+| Galileo application platform | Every tracked product and integration row for an already-running instance, with Kubernetes deployment delegated to the On-Prem router |
 
 Structured product keys and taxonomy IDs are used directly. Data Fabric and
 Observability matrix IDs use a deterministic lowercase slug of the `Surface`
@@ -55,6 +57,14 @@ row; their normalized `row_source_urls` are therefore empty, while router
 provenance is independently host-checked and freshness-gated. Other catalog
 rows without a claim-level URL similarly fall back to their router's reviewed
 provenance. Do not describe those rows as having claim-level sourcing.
+
+The two Galileo adapters consume reviewed JSON matrices with row-level owners,
+status, automation boundary, validation evidence, and official source URLs.
+The On-Prem matrix is a documentation baseline: its router validator must also
+compare a pinned entitled chart archive against the runtime inventory and fail
+on any unclassified dependency or Kubernetes surface. The application matrix
+is consumed directly by `galileo-platform-setup` so renderer and audit coverage
+cannot drift.
 
 ## Reviewing catalog changes
 

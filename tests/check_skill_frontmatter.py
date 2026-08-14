@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Validate SKILL.md and agents/openai.yaml metadata contracts."""
+"""Validate SKILL.md, local resource links, and OpenAI metadata contracts."""
 
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 try:
     import yaml
@@ -24,6 +25,8 @@ SKILLS_DIR = REPO_ROOT / "skills"
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 WORD_RE = re.compile(r"\S+")
+MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 SPEC_FRONTMATTER_KEYS = {
     "name",
@@ -260,6 +263,52 @@ def has_marketplace_workflow_diagram(workflow: str) -> bool:
         if len(structural_markers) >= 2 and has_flow_direction:
             return True
     return False
+
+
+def check_skill_resource_links(skill_dir: Path, text: str) -> list[str]:
+    """Validate local Markdown resource links in a SKILL.md.
+
+    The Agent Skills specification requires file references to be relative to
+    the skill root. External URLs and in-document anchors are intentionally
+    excluded; local relative targets must exist.
+    """
+
+    errors: list[str] = []
+    skill_name = skill_dir.name
+    for match in MARKDOWN_LINK_RE.finditer(text):
+        raw_target = match.group(1).strip()
+        if raw_target.startswith("<"):
+            closing = raw_target.find(">")
+            if closing < 0:
+                continue
+            target = raw_target[1:closing]
+        else:
+            # Markdown permits an optional quoted title after the destination.
+            target = raw_target.split(maxsplit=1)[0]
+
+        if not target or target.startswith("#"):
+            continue
+        if target.startswith("//") or URI_SCHEME_RE.match(target):
+            continue
+
+        line = text.count("\n", 0, match.start()) + 1
+        decoded_target = unquote(target)
+        path_text = decoded_target.split("#", 1)[0].split("?", 1)[0]
+        if not path_text:
+            continue
+        if path_text.startswith(("/", "~")) or Path(path_text).is_absolute():
+            errors.append(
+                f"{skill_name}: SKILL.md line {line} local resource "
+                f"reference must be relative to the skill root: {target}"
+            )
+            continue
+
+        if not (skill_dir / path_text).exists():
+            errors.append(
+                f"{skill_name}: SKILL.md line {line} local resource "
+                f"reference does not exist: {target}"
+            )
+    return errors
 
 
 def check_openai_metadata(
@@ -547,6 +596,8 @@ def check_skill(skill_dir: Path, record: SkillRecord | None = None) -> list[str]
             "detailed reference material to references/"
         )
 
+    errors.extend(check_skill_resource_links(skill_dir, text))
+
     if record is not None:
         for section in MARKETPLACE_REQUIRED_BODY_SECTIONS:
             if not re.search(rf"^## {re.escape(section)}", body, re.MULTILINE):
@@ -599,8 +650,8 @@ def main() -> int:
         return 1
 
     print(
-        f"All {checked_count} skills pass SKILL.md frontmatter and "
-        "agents/openai.yaml checks."
+        f"All {checked_count} skills pass SKILL.md frontmatter, local resource "
+        "link, and agents/openai.yaml checks."
     )
     return 0
 

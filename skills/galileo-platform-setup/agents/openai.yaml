@@ -1,4 +1,4 @@
 interface:
   display_name: "Galileo Platform Setup"
-  short_description: "Operate current Galileo and Splunk workflows"
-  default_prompt: "Use $galileo-platform-setup to render, validate, and optionally apply Galileo platform workflows: readiness, project/log stream/dataset/prompt lifecycle, SDK experiment groups, large-dataset batched-processing readiness/handoffs, AI Assistant beta readiness, cross-project global-dashboard handoffs, generic alert webhook relay to Splunk HEC, export_records, OpenTelemetry/OpenInference, Agent Observability Controls, multimodal image/audio/document logging and metrics, legacy Protect, Evaluate, SSO/RBAC, Luna-2, tags/metadata, retention/privacy, Agent Graph, MCP tool-call logging, async jobs, release compatibility, Splunk HEC/OTLP/Collector, dashboards/detectors, and --o11y-only mode. Before tenant-specific work, ask for the Galileo instance console URL and pass it as --galileo-console-url."
+  short_description: "Operate a running Galileo application platform"
+  default_prompt: "Use $galileo-platform-setup to operate application and Splunk workflows on an already-running Galileo instance; delegate On-Prem Kubernetes and packaged-service deployment to $galileo-on-prem-kubernetes-setup. Before tenant-specific work, ask for the Galileo instance console URL and pass it as --galileo-console-url."
