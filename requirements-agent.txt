@@ -1,5 +1,5 @@
 # MCP SDK 2.x is still pre-release; pin the current stable 1.x contract.
-pip==26.1.2
+pip==26.2.1
 mcp==1.28.1
 PyYAML==6.0.3
 # Security-reviewed MCP runtime transitive floor, pinned after pip-audit.
