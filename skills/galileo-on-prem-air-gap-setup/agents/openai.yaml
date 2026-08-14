@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo On-Prem Air Gap"
+  short_description: "Verify Galileo air-gap supply-chain artifacts"
+  default_prompt: "Use $galileo-on-prem-air-gap-setup to inventory and structurally verify exact Galileo On-Prem offline artifacts, surface model and endpoint-rewrite gates, and prepare a non-mutating registry handoff."

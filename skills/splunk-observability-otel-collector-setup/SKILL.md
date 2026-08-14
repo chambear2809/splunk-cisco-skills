@@ -140,35 +140,20 @@ routing, not collector pre-ingest processing.
 Installing a Collector is not the same as proving a product is ready. Route and
 validate each requested product explicitly:
 
-| Product or signal | Base-skill responsibility | Required completion evidence |
-|---|---|---|
-| Infrastructure Monitoring | Host/Kubernetes metrics, metadata, internal health | Collector healthy and host/cluster visible in Observability |
-| APM | OTLP trace receiver/export, optional gateway | Instrumented workload plus a trace visible in APM |
-| AlwaysOn Profiling | Explicit opt-in and supported language agent | Profile data visible for the intended service |
-| Secure Application | Chart destination only; workload instrumentation still required | Supported workload annotated/instrumented and security trace visible |
-| Kubernetes container/journald/extra-file logs | Separate typed Platform pipeline plus HEC `/services/collector/event` or Splunk Connect for OTLP | Target index receives expected source types and fields; source scope is reviewed |
-| Kubernetes events/entities | Explicit experimental gates | Event/entity visible; maturity warning recorded |
-| Fleet Management / OpAMP | TA feature-gate handoff only | Account entitlement and managed Collector visible in Fleet Management |
-| Kubernetes zero-code instrumentation | Delegate to `splunk-observability-k8s-auto-instrumentation-setup` | Child-skill workload rollout and trace evidence |
-| Database Monitoring | Delegate to `splunk-observability-database-monitoring-setup` | DBMon receiver and UI evidence |
-| AI Agent / AI Infrastructure Monitoring | Delegate to `splunk-observability-ai-agent-monitoring-setup` | Instrumented AI workload, evaluation/metric evidence |
-| AI Security Monitoring | Delegate Cisco AI Defense instrumentation to `splunk-observability-ai-agent-monitoring-setup` | Security span correlation, licensed integration, and risk UI evidence |
-| Browser RUM / Session Replay | Delegate general setup to `splunk-observability-browser-rum-setup`; use `splunk-observability-k8s-frontend-rum-setup` only for Kubernetes frontend injection | Browser beacon and UI evidence |
-| Mobile RUM | Delegate to `splunk-observability-mobile-rum-setup`; mobile beacons bypass this Collector | Mobile session/beacon and UI evidence |
-| Synthetics | Delegate to `splunk-observability-synthetics-setup` | Test run, result, and detector evidence |
-| SLOs | Delegate to `splunk-observability-slo-setup` | SLI data, SLO calculation, and alert evidence |
-| Dashboards and detectors | Delegate to `splunk-observability-dashboard-builder` and `splunk-observability-native-ops` | Dashboard population and detector state |
-| DXA, AI Assistant, Observability Mobile, Related Content, and deep product UI | Delegate to `splunk-observability-deep-native-workflows` | Product-specific navigation and populated UI evidence |
-| SignalFlow and data tools | Delegate native operations to `splunk-observability-native-ops` / `splunk-observability-deep-native-workflows` | Executed analytics or metadata workflow evidence |
-| ITSI / ITE Work / App for Content Packs | Separate Splunk Platform workflows: `splunk-itsi-setup` and `splunk-itsi-config` | Platform app/content-pack and ITSI object evidence |
-| Metrics Pipeline Management | Delegate to `splunk-observability-metrics-pipeline-setup` | Rule-set and post-rule metric evidence |
-| AWS Lambda APM | Delegate to `splunk-observability-aws-lambda-apm-setup` | Instrumented invocation and trace evidence |
-| Coding agents | Delegate to `splunk-observability-coding-agent-instrumentation-setup` | Agent telemetry at every requested destination |
-| ThousandEyes | Delegate to `splunk-observability-thousandeyes-integration` | Linked test/metric and dashboard evidence |
-| Splunk Connect for OTLP | Delegate receiver-side setup to `splunk-connect-for-otlp-setup` | OTLP receiver health and target-index evidence |
-| Network Explorer | `--enable-network-explorer` enforces the supported one-replica gateway profile and renders the separate upstream eBPF-chart handoff | eBPF DaemonSet, representative `tcp.*`/`udp.*`/`dns.*`/`http.*` metrics, and populated Network Explorer UI evidence |
+- This skill owns Collector health, host/Kubernetes metrics and metadata, OTLP
+  transport, supported log routing, opt-in profiling/security destinations,
+  experimental event/entity gates, and the bounded Network Explorer handoff.
+- Workload proof remains mandatory: Infrastructure Monitoring needs a visible
+  host or cluster; APM needs an instrumented workload and visible trace; logs
+  need expected events in the target index; every opt-in feature needs its
+  product-specific UI evidence.
+- Delegate zero-code Kubernetes instrumentation, DB Monitoring, AI monitoring,
+  RUM, Synthetics, SLOs, dashboards/detectors, native product workflows,
+  Metrics Pipeline Management, AWS Lambda APM, coding agents, ThousandEyes,
+  Splunk Connect for OTLP, and ITSI to their named repository skills.
 
-See `references/coverage.md` for deployment-method and feature classification.
+Use the routing table in [references/coverage.md](references/coverage.md#product-coverage)
+for the exact owner skill and required completion evidence for every product.
 
 ## Non-negotiable safety rules
 

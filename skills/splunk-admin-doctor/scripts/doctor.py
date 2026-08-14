@@ -485,6 +485,11 @@ PRODUCT_ROUTE_CATALOG = [
             "galileo-lemonade-instrumentation-setup",
         ],
         "covered_skill_names": [
+            "galileo-on-prem-agent-control-setup",
+            "galileo-on-prem-air-gap-setup",
+            "galileo-on-prem-kubernetes-setup",
+            "galileo-on-prem-luna-studio-setup",
+            "galileo-on-prem-stack-setup",
             "galileo-platform-setup",
             "galileo-lemonade-instrumentation-setup",
         ],

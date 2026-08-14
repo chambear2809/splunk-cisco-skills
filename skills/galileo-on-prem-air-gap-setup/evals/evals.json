@@ -1,0 +1,22 @@
+{
+  "skill": "galileo-on-prem-air-gap-setup",
+  "version": 1,
+  "evaluations": [
+    {
+      "id": "offline-supply-chain",
+      "prompt": "Build a verified Galileo On-Prem offline bundle with exact charts, OCI digests, all image-use categories, scan attestations, models, galileoctl, and no-egress evidence.",
+      "should_trigger": true
+    },
+    {
+      "id": "registry-push",
+      "prompt": "Prepare an operator-controlled, digest-exact registry handoff for an already-verified Galileo air-gap bundle without allowing this skill to push or overwrite tags.",
+      "should_trigger": true
+    },
+    {
+      "id": "connected-install-near-miss",
+      "prompt": "Install the Galileo umbrella chart into our connected Kubernetes cluster.",
+      "should_trigger": false,
+      "expected_skill": "galileo-on-prem-stack-setup"
+    }
+  ]
+}

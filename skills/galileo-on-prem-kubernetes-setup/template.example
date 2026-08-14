@@ -1,0 +1,178 @@
+{
+  "api_version": "galileo.ai/on-prem-deployment/v1",
+  "kind": "GalileoOnPremDeploymentPlan",
+  "metadata": {
+    "deployment_id": "example-nonproduction-review",
+    "environment": "lab",
+    "profile": "connected-cpu",
+    "owner": "platform-engineering",
+    "change_ticket": "LAB-REVIEW"
+  },
+  "galileo": {
+    "console_url": "https://console.demo-v2.galileocloud.io/",
+    "api_url": "https://api.demo-v2.galileocloud.io/",
+    "domain": "demo-v2.galileocloud.io"
+  },
+  "target": {
+    "kube_context": "microk8s",
+    "api_server": "https://127.0.0.1:16443",
+    "ca_sha256": "",
+    "kube_system_uid": "",
+    "namespace": "galileo",
+    "namespace_uid": "",
+    "distribution": "microk8s",
+    "kubernetes_version": "1.31.14"
+  },
+  "artifacts": {
+    "galileo_stack_chart": "./customer-artifacts/galileo-stack.tgz",
+    "galileo_stack_sha256": "",
+    "galileoctl_chart": "./customer-artifacts/galileoctl.tgz",
+    "galileoctl_sha256": "",
+    "agent_control_chart": "./customer-artifacts/agent-control.tgz",
+    "agent_control_sha256": "",
+    "agent_control_ownership_evidence": "./customer-artifacts/agent-control-ownership.json",
+    "luna_studio_chart": "./customer-artifacts/luna-studio.tgz",
+    "luna_studio_sha256": "",
+    "luna_studio_ownership_evidence": "./customer-artifacts/luna-studio-ownership.json",
+    "questionnaire_values_file": "./customer-artifacts/values-example-umbrella.yaml",
+    "secret_values_file": "./customer-secrets/secret-values.yaml",
+    "repository_credentials_file": "./customer-secrets/helm-repository-credentials",
+    "image_manifest": "./customer-artifacts/image-manifest.json",
+    "model_bundle": "",
+    "stack_runtime_inventory": ""
+  },
+  "installation": {
+    "method": "galileoctl",
+    "stack_release": "galileo",
+    "galileoctl_release": "galileoctl",
+    "timeout": "120m",
+    "namespace_create": false,
+    "shared_cluster": false,
+    "crd_ownership": "dedicated",
+    "child_ownership": {
+      "agent_control": "standalone",
+      "luna_studio": "standalone"
+    }
+  },
+  "routing": {
+    "mode": "ingress",
+    "tls_mode": "customer-certificate",
+    "certificate_secret": "galileo-tls",
+    "ingress_class": "nginx",
+    "gateway_class": "",
+    "load_balancer_address": "",
+    "public_hosts": {
+      "console": "console.demo-v2.galileocloud.io",
+      "api": "api.demo-v2.galileocloud.io",
+      "galileoctl": "",
+      "agent_control": "",
+      "luna_studio": ""
+    }
+  },
+  "node_pools": {
+    "core": {
+      "minimum_nodes": 4,
+      "labels": ["galileo-node-type=galileo-core"],
+      "taints": []
+    },
+    "runner": {
+      "minimum_nodes": 1,
+      "labels": ["galileo-node-type=galileo-runner"],
+      "taints": []
+    },
+    "ml": {
+      "minimum_nodes": 0,
+      "labels": ["galileo-node-type=galileo-ml"],
+      "taints": []
+    }
+  },
+  "storage": {
+    "default_class": "",
+    "require_explicit_class": true,
+    "data_class": "",
+    "object_store_class": "",
+    "snapshot_class": "",
+    "reclaim_policy": "Retain"
+  },
+  "data_services": {
+    "postgres": {
+      "mode": "external",
+      "version": "16",
+      "ha": false,
+      "backup_evidence": ""
+    },
+    "redis": {
+      "mode": "external",
+      "version": "7",
+      "ha": false,
+      "cluster_mode": false
+    },
+    "object_storage": {
+      "provider": "s3-compatible",
+      "mode": "external",
+      "backup_evidence": "",
+      "support_exception": ""
+    },
+    "clickhouse": {
+      "backup_evidence": ""
+    },
+    "rabbitmq": {
+      "queue_purge_allowed": false
+    }
+  },
+  "monitoring": {
+    "prometheus": true,
+    "grafana": true,
+    "fluent_bit": true,
+    "alerts": true,
+    "owner": "platform-engineering"
+  },
+  "features": {
+    "wizard": {
+      "enabled": false,
+      "gpu_enabled": false,
+      "offline_models": false
+    },
+    "agent_control": {
+      "enabled": true,
+      "topology": "standalone"
+    },
+    "luna_studio": {
+      "enabled": true,
+      "topology": "standalone",
+      "training_mode": "remote"
+    },
+    "platform_postdeploy": {"enabled": true},
+    "mcp": {"enabled": false},
+    "lemonade": {"enabled": false}
+  },
+  "identity": {
+    "sso_mode": "oidc",
+    "first_admin_owner": "platform-admin@example.invalid",
+    "break_glass_documented": false
+  },
+  "email": {
+    "mode": "smtp",
+    "sender": "galileo@example.invalid",
+    "test_requires_approval": true
+  },
+  "air_gap": {
+    "enabled": false,
+    "registry": "",
+    "no_egress": false,
+    "architectures": ["amd64"]
+  },
+  "operations": {
+    "backups_verified": false,
+    "restore_drill": false,
+    "rollback_approved": false,
+    "soak_days": 0,
+    "production_gate": false
+  },
+  "approvals": {
+    "cse_values_approved": false,
+    "cse_ticket": "",
+    "cluster_change_approved": false,
+    "exceptions": ["Non-production example; no live deployment is authorized."]
+  }
+}

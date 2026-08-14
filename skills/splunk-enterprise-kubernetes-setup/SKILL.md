@@ -279,53 +279,20 @@ APIs, then runs the combined server dry-run before Helm install.
 
 POD assumes Cisco CVD infrastructure already exists. The installer preflight
 does not replace Cisco Intersight, network, RAID, RHEL, DNS, certificate, or
-capacity ownership. Review [coverage.md](coverage.md) and the current CVD before
-live work.
+capacity ownership. Review [coverage.md](coverage.md), the current CVD, and the
+complete [POD reference](reference.md#pod-104-profiles) before live work.
 
-Accepted selectors are:
+Select `pod-small`, `pod-medium`, `pod-large`, or `pod-xlarge`, optionally with
+the first-class `-es` or `-itsi` suffix. Do not infer capacity, rack resilience,
+storage behavior, or retention solely from the rendered node count; retain the
+external Cisco/Splunk infrastructure evidence described in
+[reference.md](reference.md#pod-cisco-cvd-prerequisites).
 
-- `pod-small`, `pod-medium`, `pod-large`, `pod-xlarge`
-- the same names with `-es` or `-itsi`
-
-The suffix is a skill selector. `cluster-config.yaml` always contains the
-official base profile. Base worker counts are 8, 11, 15, and 30; an ES or ITSI
-secondary search tier makes them 9, 14, 18, and 33. Every profile has exactly
-three controllers.
-
-Do not infer capacity or high availability from those counts alone. The POD SOK
-workloads allocate/limit each indexer pod at 36 CPU/96 GB and each search-head
-pod at 24 CPU/96 GB; the infrastructure must provide those allocatable
-resources plus system and failure headroom. The design also requires
-profile-specific disk/RAID layouts, three SeaweedFS managers, at least three
-filers, one volume process per volume worker, and three-way volume replication
-(two-volume-node failure tolerance). Small, Medium, and Large use a
-90-day local cache with one-year SmartStore retention; X-Large uses a 60-day
-cache with 180-day SmartStore retention. X-Large spans two racks/four switches
-and requires complete cross-rack reachability. The renderer checks node counts
-and addresses, not rack placement, CPU/RAM, RAID, SeaweedFS process placement,
-retention behavior, or failure tolerance; retain Cisco/Splunk infrastructure
-evidence for each. There is a product-documentation conflict for custom indexes:
-the Manage guide says POD injects `frozenTimePeriodInSecs=31536000` (one year),
-while the architecture gives X-Large 180-day retention. Do not assume which wins
-for an X-Large custom index; require post-deploy readback and Splunk guidance.
-
-The POD schema supports up to two standalone search heads on Small and two SHCs
-on Medium, Large, and X-Large. This skill renders a second tier only for the
-first-class `-es` and `-itsi` selectors. A second generic search tier, or generic
-apps assigned specifically to that secondary tier, requires a reviewed manual
-configuration and Cisco/Splunk vendor handoff; do not relabel it as ES or ITSI.
-The selectors always retain a primary core search tier. A sole ES/ITSI premium
-search tier without that primary tier is not represented and is a manual/vendor
-handoff.
-
-A bundle intended for live use requires exact, unique controller/worker IPs,
-the executable installer, license and SSH-key files, and an explicit immutable
-primary search-tier name. ES and ITSI profiles also require an immutable
-secondary name. Existing-bundle phases reuse these reviewed values and reject
-bundle or external-file drift rather than accepting render inputs again.
-An automated first deployment additionally requires
-`--confirm-new-pod-install`, a one-time reviewed attestation that the exact
-configuration and node set do not contain an existing POD deployment.
+A live bundle requires exact unique controller and worker IPs, the reviewed
+installer and SHA-256, license and SSH-key files, and immutable search-tier
+names. A first deployment also requires `--confirm-new-pod-install`; it is a
+narrow attestation for the exact reviewed node set, not permission to overwrite
+an existing or partial deployment.
 
 ```bash
 bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
@@ -343,111 +310,18 @@ bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
   --ssh-private-key-file /secure/path/pod-ssh-key
 ```
 
-### POD App Scopes
+App archives, ES/ITSI versions and license separation, app scopes, and optional
+customer TLS material are all strict validation gates. Follow the exact
+requirements in [reference.md](reference.md#pod-static-configuration-and-app-scopes)
+and [reference.md](reference.md#pod-tls-routing-and-access); do not infer package
+identity from filenames.
 
-- `--indexer-apps`: `clustermanager.apps.cluster`
-- `--cluster-manager-apps`: `clustermanager.apps.local`
-- `--search-apps`: primary SHC `apps.cluster`
-- `--search-deployer-apps`: primary SHC deployer `apps.local`
-- `--standalone-apps`: primary Small standalone `apps.local`
-- `--premium-apps`: secondary ES tier `apps.premium`; ES only
-- `--itsi-apps`: secondary ITSI standalone local scope or SHC cluster scope
-- `--license-manager-apps`: `licensemanager.apps.local`
-
-Strict validation inspects every supplied app archive by internal top-level app
-directory, not by filename. Unsafe tar paths and member types, multiple roots,
-duplicate internal names, and mismatched optional `[package] id` values fail.
-The skill does not provide a separate generic-secondary-tier app list.
-
-### Enterprise Security on POD
-
-ES requires `SplunkEnterpriseSecuritySuite` in `--premium-apps` and the matching
-`Splunk_TA_ForIndexers` in `--indexer-apps`. Their internal versions must match
-and must be one of the current Splunk Enterprise 10.4-compatible releases:
-`8.3.0`, `8.4.1`, or `8.5.1`. The `8.1.1` package shown in an older POD YAML
-example is not in the current compatibility matrix and is intentionally
-rejected. A live ES profile also requires two physically distinct `.lic` files
-for Enterprise and ES; duplicate paths or hard links to the same inode fail.
-
-Source:
-<https://help.splunk.com/en/splunk-enterprise/release-notes-and-updates/compatibility-matrix/splunk-products-version-compatibility/splunk-products-version-compatibility-matrix>
-
-### ITSI on POD
-
-POD 10.4 requires ITSI `4.21.2`, distinct Enterprise/ITSI licenses, the original
-bundle plus reviewed SHA-256, the reviewed OpenJDK 17 x86-64 app, and exact
-search/indexer/License Manager package placement. Validation checks internal
-app roots and canonical content against the source bundle, not filenames;
-`SA-ITSI-Licensechecker` belongs on the License Manager and is forbidden on the
-search tier. The target-specific inventory deliberately resolves omissions in
-the generic package page. Use the complete list and input contract in
-[reference.md](reference.md#pod-static-configuration-and-app-scopes).
-
-### POD Name-Based Routing and Certificates
-
-IP-based routing is the default and needs no domain or custom ingress material.
-Name-based routes can use POD's product certificate without a customer
-certificate; pass `--ingress-domain` to record the reviewed DNS suffix and
-expect browser trust warnings unless that product certificate is trusted.
-POD's default Splunk UI ingress certificates are Cert Manager certificates that
-automatically renew every 90 days.
-
-A customer-provided wildcard certificate is optional and is the path for
-trusted name-based TLS. When used, all four inputs are required together:
-`--ingress-domain`, `--ingress-certificate-file`,
-`--ingress-private-key-file`, and `--ingress-ca-file`. The customer owns DNS,
-certificate issuance, trust distribution, renewal, and the official
-certificate-redeployment handoff. Strict validation requires:
-
-- a PEM chain and a non-interactively readable matching PEM private key
-- explicit CA-bundle path validation with server purpose and hostname checks
-- a wildcard DNS SAN, `CA:FALSE`, `serverAuth`, and TLS-compatible key usage
-- RSA 2048-bit or stronger, or `prime256v1`, `secp384r1`, or `secp521r1` EC
-- no MD5/SHA-1 certificate signatures and at least 30 days validity remaining
-- private-key permissions of `0600` or stricter
-
-Configure forward and reverse DNS for POD servers and a wildcard `A` record
-containing every worker IP. The installer flags expired custom certificates and
-certificates within 30 days of expiry. Name-based routing and this certificate
-stanza require POD `10.4.0_1.6.0` or later.
-
-Sources:
-
-- <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/network-routing-and-ingress-for-splunk-pod>
-- <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/splunk-pod-requirements>
-- <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/splunk-pod-release-notes>
-
-### POD First Deploy and Day-2 Handoffs
-
-The official docs define installer `-status` as listing pods and
-`-status.workers` as listing workers. They do not define exit codes or output
-for a cluster that has never been deployed. The generated fresh-deploy helper
-therefore requires the reviewed `--confirm-new-pod-install` attestation, blocks
-when `-status` succeeds, blocks every unrecognized status failure, and proceeds
-only when the attestation is present with a narrow recognized no-cluster
-message. The attestation is mutually exclusive with `--allow-upgrade`; it does
-not authorize reuse against a partial or existing deployment. Do not broaden
-the text match to treat arbitrary SSH, configuration, or installer errors as
-proof that no cluster exists.
-
-Automated POD upgrade and day-2 app reconciliation are intentionally disabled.
-Rendering with `--allow-upgrade` records reviewed intent and permits preflight
-evidence, but `deploy.sh` fails closed instead of invoking an upgrade. Follow
-the official lockstep upgrade or certificate-redeployment runbook with backup,
-release-note review, the exact coupled installer, and Cisco/Splunk vendor
-review. App removal, downgrade, mutation of an existing cluster, and POD
-destruction are manual/vendor handoffs and are not exposed by this skill.
-
-Universal Forwarder rollout is also a separate handoff. For UF `9.4.1` or
-later, the POD multi-worker receiver path requires
-`forcedTimeBasedAutoLB=true`; configure and validate it through
-`splunk-universal-forwarder-setup` or `splunk-agent-management-setup` rather
-than treating POD installation as forwarder onboarding.
-
-Sources:
-
-- <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/deploy-splunk-pod>
-- <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/troubleshoot-splunk-pod>
+Automated POD upgrade, day-2 app reconciliation, removal, downgrade,
+certificate redeployment, and destruction are intentionally disabled. Keep
+these as documented Cisco/Splunk operator handoffs. Universal Forwarder rollout
+is also separate and must use `splunk-universal-forwarder-setup` or
+`splunk-agent-management-setup`. The full fresh-deploy and handoff lifecycle is
+in [reference.md](reference.md#pod-rendered-files-and-lifecycle).
 
 ## Validation
 

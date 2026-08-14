@@ -130,37 +130,24 @@ Galileo key to the Lemonade service.
   show both `/otel/v1/traces` for raw OTLP POST and `/otel/traces` for several
   exporter/SDK integrations. Do not derive one from the client type or let the
   collector append a path.
-- Stock Collector v0.156 follows HTTP redirects and can copy custom headers to
-  the redirect target. Pin the endpoint to a separately discovered
-  `GALILEO_EXPECTED_ORIGIN`, then route only `otlp_http/galileo_lemonade`
-  through the literal Collector v0.156 `proxy_url` field. The proxy must be a
-  dedicated loopback tinyproxy with `FilterDefaultDeny Yes`; its only filter
-  rule is the anchored, regex-escaped exact host derived from that pinned
-  origin. Production revalidates protected binary/config/filter path identity,
-  inode, metadata, and SHA-256, then runs bounded credential-free CONNECT
-  probes that require HTTP 403 for an unlisted host and 2xx for the exact
-  Galileo host. All Splunk exporters remain direct. Ambient proxy variables
-  are stripped and are never part of this contract. Install evidence as
-  root-owned, collector-group-readable mode `0440`; a root `0400` file cannot
-  be read by the non-root collector wrapper.
+- Because Collector v0.156 can forward headers across redirects, pin
+  `GALILEO_EXPECTED_ORIGIN` and route only the Galileo exporter through the
+  dedicated loopback allow-list proxy. Splunk exporters stay direct. Production
+  must validate proxy identity, hashes, permissions, and allow/deny probes
+  exactly as defined in
+  [references/proxy-bundle-transaction.md](references/proxy-bundle-transaction.md).
 - Use the current collector component type `otlp_http`, not legacy
   `otlphttp`. This skill names its instance `otlp_http/galileo_lemonade` so it
   cannot overwrite another application's Galileo exporter.
 - Keep Galileo credentials in a dedicated service-user-owned `0600` file
   (root-owned only when the collector runs as root).
   Generated YAML contains only `${env:...}` placeholders.
-- Use `scripts/galileo_bootstrap_transaction.py` when a broad bootstrap key
-  must create or adopt the exact target and mint the project-scoped runtime
-  key. The bootstrap secret is accepted only from a current-user-owned,
-  single-link protected file; it is never accepted through argv or the
-  environment. Keep the private journal and one-time runtime-key output until
-  the transaction is finalized or rolled back.
-- Bootstrap stops at `RUNTIME_KEY_CREATED`. Never revoke the old key in that
-  invocation. Record fresh, exact cutover evidence and run the separate
-  `finalize` command with a distinct reviewed unscoped revoker credential only
-  after host cutover, Galileo API trace/hierarchy and
-  privacy readback, and unchanged Splunk backend readback all pass. Console UI
-  review is not inferred from API evidence and is not a revocation gate.
+- When bootstrapping a project-scoped runtime key, use the phased transaction,
+  protected secret files, private journal, separate revoker, and post-cutover
+  evidence gates in
+  [references/runtime-credentials.md](references/runtime-credentials.md).
+  Bootstrap must stop at `RUNTIME_KEY_CREATED`; never revoke the old key in the
+  same invocation.
 - Use `GALILEO_API_KEY_FILE` with the packaged collector runtime wrapper. Do
   not source a plaintext key into an interactive shell or store it in the
   non-secret collector environment file.
@@ -172,9 +159,9 @@ Galileo key to the Lemonade service.
   its shared-receiver replay risk explicitly during production validation.
 - Use the persistent Galileo queue for production. The memory queue is an
   accepted-loss development option and cannot pass `--production` validation.
-- Bind every persistent queue to the SHA-256 of its validated endpoint and
-  selector pair. The queue directory's final component must be that fingerprint;
-  never reuse, rename, or copy it to a different destination.
+- Bind each persistent queue to the validated destination fingerprint; never
+  reuse it for another destination. Follow
+  [references/queue-directory-transaction.md](references/queue-directory-transaction.md).
 - Delete every `galileo.*` resource, span, and event attribute immediately
   before the Galileo exporter so in-band project, Log stream, experiment, or
   dataset fields cannot override the fixed exporter headers.

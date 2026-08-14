@@ -274,21 +274,17 @@ Static checks cover:
   metadata contract exactly matches the rendered ServiceAccount/DaemonSet/SCC.
 
 `--live --check-apm <service>` runs the complete production gate. It enables
-webhook, Instrumentation CR, injection, backup, optional OBI, and scoped APM checks. A caller
-may explicitly omit only the APM or backup gate with `--skip-apm-check` or
-`--skip-backup-check`; those named skips are valid only with `--live`. Individual
-`--check-*` flags remain available as narrow diagnostics.
+webhook, Instrumentation CR, injection, backup, optional OBI, and scoped APM
+checks. Only the named `--skip-apm-check` and `--skip-backup-check` omissions are
+accepted, and only with `--live`. Individual diagnostic checks are
+`--check-webhook`, `--check-instrumentation`, `--check-injection`, `--check-obi`,
+`--check-apm <service>`, and `--check-backup`.
 
-- `--check-webhook` — exact pinned pod-admission webhook policy/route, CA bundle,
-  Service and ready 9443/TCP EndpointSlice (with a legacy Endpoints fallback
-  only when EndpointSlice is unavailable or empty), Ready Operator pods, and recent webhook
-  error log scan. This proves Kubernetes routing state but does not synthesize
-  an admission request or perform a separate TLS handshake.
-- `--check-instrumentation` — `kubectl get otelinst -A` shows the rendered CRs with expected fields.
-- `--check-injection` — iterate annotated workloads and namespace contracts. Workload controllers must have observed their current generation and completed rollout; all intended active pods must be Running and Ready with exact language injection evidence, the exact rendered `@sha256` init/sidecar image, and expected `OTEL_*` env. Namespace opt-outs and terminal/deleting exclusions follow the contract above.
-- `--check-obi` — prove the owned OBI manifest contract, digest/config identity, DaemonSet rollout, supported kernel/architecture coverage, Ready pods, and bounded fatal-rule recent logs.
-- `--check-apm <service>` — allow only a service/realm pair bound to a rendered workload in `metadata.json`, then probe the scoped topology for that service, deployment environment, and Kubernetes cluster.
-- `--check-backup` — every rendered workload has a versioned, owned, structurally complete managed-key snapshot.
+These checks prove the exact rendered webhook route, CR fields, completed
+workload rollout and digest-pinned injection, owned OBI rollout, metadata-bound
+APM topology, and versioned managed-key backups. They do not infer success from
+resource existence alone. Follow the exact evidence semantics in
+[reference.md](reference.md#validation).
 
 Every requested live check is fail-closed: a missing tool, credential,
 resource, injected pod, backup, API response, or exact APM service is a

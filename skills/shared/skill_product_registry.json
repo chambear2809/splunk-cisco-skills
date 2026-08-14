@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f"
+    "sha256": "66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26"
   },
   "skill_records": [
     {
@@ -687,6 +687,31 @@
       "replaced_by": null
     },
     {
+      "name": "galileo-on-prem-kubernetes-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-on-prem-stack-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-on-prem-agent-control-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-on-prem-luna-studio-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
+      "name": "galileo-on-prem-air-gap-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
       "name": "galileo-mcp-server-setup",
       "status": "canonical",
       "replaced_by": null
@@ -1103,6 +1128,11 @@
             "galileo-agent-control-setup",
             "galileo-lemonade-instrumentation-setup",
             "galileo-mcp-server-setup",
+            "galileo-on-prem-agent-control-setup",
+            "galileo-on-prem-air-gap-setup",
+            "galileo-on-prem-kubernetes-setup",
+            "galileo-on-prem-luna-studio-setup",
+            "galileo-on-prem-stack-setup",
             "galileo-platform-setup"
           ]
         },

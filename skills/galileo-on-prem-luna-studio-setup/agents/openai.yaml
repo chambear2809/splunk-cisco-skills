@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo On-Prem Luna Studio"
+  short_description: "Validate Luna Studio and prepare a CSE handoff"
+  default_prompt: "Use $galileo-on-prem-luna-studio-setup to render, preflight, validate, and prepare the Luna Studio Galileo/CSE lifecycle handoff without mutating Kubernetes."

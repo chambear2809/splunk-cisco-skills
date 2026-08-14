@@ -85,132 +85,40 @@ shim for secret-safe direct-mode authentication.
 
 ## Required Intake
 
-Before enabling Galileo, ask the user for the exact Galileo instance console
-URL and use the value they provide, for example
-`https://console.demo-v2.galileocloud.io/`. Do not assume the public Galileo
-Cloud tenant. Pass the answer as `--galileo-console-url`; an explicitly supplied
-`--galileo-otel-endpoint` is also accepted when the deployment does not follow
-Galileo's documented console-to-API hostname convention. The renderer fails
-closed when Galileo is enabled without either URL.
+Collect the destination mode, Splunk realm, environment, and service identity.
+For Galileo, also collect the exact user-confirmed console URL and project; do
+not assume a tenant. Never collect secret values directly—collect only the
+paths to the operator-owned token or API-key files.
 
-Claude Code exposes exactly one global `OTEL_EXPORTER_OTLP_HEADERS` value. That
-means the CLI itself cannot fan out to two destinations that require different
-auth headers. To send telemetry to both Splunk Observability Cloud and Galileo
-Observe at the same time, Claude Code must ship to a local OTel Collector, and
-the collector must fan out. The skill defaults to that mode.
+Choose one destination model:
 
-The skill renders three destination modes:
+- `local-collector` (default) sends Claude Code to loopback and lets the
+  collector export to Splunk and optionally Galileo.
+- `splunk-direct` sends OTLP/HTTP to Splunk with `otelHeadersHelper`; it cannot
+  fan out to Galileo or feed the transformed AI Agent Monitoring view.
+- `external-collector` uses operator-specified OTLP endpoints and does not
+  render the collector overlay.
 
-- `local-collector` (default): Claude Code emits OTLP to
-  `http://127.0.0.1:14318`. A rendered collector overlay exports metrics via the
-  SignalFx exporter (`send_otlp_histograms: true`), traces via OTLP APM ingest,
-  and fans traces out to Galileo Observe when Galileo is enabled.
-- `splunk-direct`: Claude Code emits OTLP/HTTP directly to
-  `https://ingest.<realm>.observability.splunkcloud.com/v2/{trace,datapoint,log}/otlp`,
-  authenticated by a `otelHeadersHelper` script that reads the token from
-  `SPLUNK_O11Y_TOKEN_FILE`. No collector is required. Galileo is not
-  reachable in this mode.
-- `external-collector`: Operator-specified OTLP endpoints; the collector
-  overlay is not rendered. Header values must be safe literals or
-  environment placeholders.
+Claude Code has one global OTLP header value, so destinations with different
+credentials require collector fan-out. Logs needed for search should be routed
+to Splunk Platform through HEC; the Observability Cloud OTLP logs path is only
+best-effort. In collector mode, the rendered transform maps Claude signals to
+the GenAI conventions and histogram types expected by AI Agent Monitoring. It
+requires a collector build containing `signal_to_metrics`; use the validated
+contrib build or a custom build, never a sum-connector substitute.
 
-**Galileo is optional for collector-capable destinations**
-(`local-collector`, `external-collector`, `all`). Passing `--galileo-project`
-enables it automatically; pass `--galileo-enabled` when using a spec-driven
-render that already contains the project/log-stream values. Use
-`--disable-galileo` for a Splunk-only render. `--galileo-project` is required
-whenever Galileo is enabled, and the user-confirmed instance URL is required
-regardless of project or log-stream values.
+For shared collectors, route using span, metric/datapoint, and log context—not
+resource attributes alone. For Docker, distinguish the host-side loopback port
+from the receiver's container bind address. Detailed beta tracing and any
+content-bearing attributes require both the relevant trace controls and
+`--accept-content-capture`.
 
-Note on logs: the Splunk Observability logs OTLP path is included in the overlay,
-but Splunk Observability Cloud ingests logs through Log Observer / HEC rather
-than the O11y OTLP logs endpoint. Treat the O11y logs pipeline as best-effort;
-route Claude Code log events to Splunk Platform via HEC when you need them
-searchable.
-
-Note on where data appears: Claude Code metrics land as the native
-`claude_code.*` namespace — find them under Metrics → Metric Finder (search
-`claude_code`). The prebuilt Splunk "AI overview" (AI Agent Monitoring)
-dashboard instead reads GenAI-convention APM spans, so the `local-collector`
-overlay includes a `transform/claude_code_genai` processor that maps Claude
-Code's `llm_request` spans to `gen_ai.operation.name=chat` + `gen_ai.usage.*` +
-Client span kind, stamps `gen_ai.agent.name` onto Claude spans, and marks root
-`claude_code.interaction` spans as `gen_ai.operation.name=invoke_workflow`. The
-overlay derives `gen_ai.client.operation.duration` in seconds with a spanmetrics
-connector. Claude Code's reliable native `claude_code.token.usage` sum is first
-normalized, converted from cumulative to delta when necessary, and observed by
-`signal_to_metrics/claude_code_token_histogram` as the required
-`gen_ai.client.token.usage` histogram. The old sum-connector path is invalid for
-the prebuilt Tokens/Cost tiles because it creates a counter with the right name
-but the wrong metric type. The rendered settings and collector also stamp `sf_environment`
-because the AI overview Environment picker filters on Splunk's
-`sf_environment`, not only OTel `deployment.environment`. The derived GenAI
-metrics are exported through Splunk OTLP metric ingest so those Splunk
-dimensions are preserved. These transforms run only in collector modes;
-`splunk-direct` cannot feed the AI overview.
-
-When Galileo fan-out is enabled, a second, Galileo-only
-`transform/claude_code_galileo` maps Claude's detailed `user_prompt`,
-`new_context`, and `response.model_output` attributes to OpenInference
-input/output fields. It also promotes the parent `claude_code.tool` span to an
-`execute_tool` operation, copies tool arguments/results, advertises Claude's
-`tools` inventory on LLM spans, and filters duplicate permission/execution
-children. This transform must run after `transform/claude_code_genai` and before
-the Galileo filter. It is intentionally absent from the Splunk trace branch.
-
-The token histogram requires a collector build containing the alpha
-`signal_to_metrics` connector. `otel/opentelemetry-collector-contrib:0.154.0`
-is validated with this overlay. The stock Splunk Distribution v0.154.2 does not
-include that connector, even though the rest of the overlay starts there. Use a
-matching contrib build or a custom collector that includes the connector; do
-not silently fall back to a sum connector. Start the collector before the new
-Claude process so cumulative-to-delta can retain the first counter value using
-its normal gateway heuristic.
-
-Diagnostic boundary: if Splunk contains `traces.count` for `chat <model>`, a
-HISTOGRAM `gen_ai.client.operation.duration`, and a HISTOGRAM
-`gen_ai.client.token.usage` under the intended `sf_environment`, but the AI
-overview's internal `count(agents)` stream remains zero, the collector path is
-healthy. Check **Settings -> AI agent monitoring** and confirm the organization
-stores AI conversation data in **Splunk Observability Cloud**. The AI overview
-is not supported when that data source is set to Splunk logs; this is an
-organization-level product setting, not a Claude Code exporter failure.
-
-Galileo fan-out uses a separate filtered trace pipeline. Splunk receives full
-Claude traces; Galileo receives only spans with GenAI semantic-convention
-attributes so root workflow spans do not create `partialSuccess` warnings.
-
-Shared-collector warning: when Claude Code shares one OTLP receiver with Codex
-or other agents, do not route Claude signals only by resource-level
-`service.name` or `data.source`. Claude Code can place those identifiers on
-spans and metric datapoints instead of the resource envelope. Use the rendered
-`runtime/shared-collector-routing.md` pattern: `context: span` for traces,
-`context: metric` / `context: datapoint` for metrics, and `context: log` for
-logs.
-
-For a Docker collector, `http://127.0.0.1:14318` is Claude's host-side client
-endpoint, not the receiver bind address inside the container. Publish
-`127.0.0.1:14318:4318`, pass
-`--collector-receiver-endpoint 0.0.0.0:4318` for a standalone rendered
-overlay, or merge the processors, connectors, exporters, and routes into an
-existing receiver bound to `0.0.0.0:4318`.
-
-Traces are a Claude Code beta. They require `OTEL_TRACES_EXPORTER=otlp` plus
-`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. Base and **detailed** beta tracing are
-separate controls. Base traces are on by default; detailed tracing
-is off because it can emit experimental content-bearing attributes. Enable it
-only with `--enable-detailed-traces --accept-content-capture`. Current Claude
-Code emits `claude_code.llm_request` and `claude_code.tool` under base beta tracing;
-detailed tracing adds `claude_code.hook` and experimental content-bearing span
-attributes. Interactive detailed tracing can require Anthropic allowlisting.
-
-### Detailed Tracing and Galileo Ingest
-
-Detailed tracing requires its separate endpoint variable and explicit content
-acceptance; base beta tracing still owns current LLM and tool spans. Galileo
-accepts only spans carrying `gen_ai.*` attributes. Use the exact variables,
-diagnostic order, and ingest contract in [reference.md](reference.md#traces-beta-catalog)
-and [reference.md](reference.md#galileo-integration).
+Use [reference.md](reference.md) for the authoritative destination behavior,
+signal catalogs, GenAI transforms, shared-collector routing, header helper,
+Galileo contract, secrets, privacy, and cardinality controls. In particular,
+follow the exact beta trace and Galileo ingest requirements in
+[reference.md](reference.md#traces-beta-catalog) and
+[reference.md](reference.md#galileo-integration).
 
 ## Safety Rules
 

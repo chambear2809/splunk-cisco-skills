@@ -50,6 +50,9 @@ projects/tmp-*
 # --- Local TA intake templates ---
 **/template.local
 
+# --- Local demo scripts ---
+/DEMO_SCRIPTS.md
+
 # --- Local ITSI config workflow reports ---
 /skills/splunk-itsi-config/reports/
 
@@ -62,6 +65,7 @@ projects/tmp-*
 /cisco-thousandeyes-mcp-rendered/
 /galileo-agent-control-rendered/
 /galileo-mcp-rendered/
+/galileo-on-prem-rendered/
 /galileo-platform-rendered/
 /sc4s-rendered/
 /sc4snmp-rendered/
