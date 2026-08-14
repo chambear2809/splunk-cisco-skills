@@ -50,9 +50,6 @@ projects/tmp-*
 # --- Local TA intake templates ---
 **/template.local
 
-# --- Local demo scripts ---
-/DEMO_SCRIPTS.md
-
 # --- Local ITSI config workflow reports ---
 /skills/splunk-itsi-config/reports/
 

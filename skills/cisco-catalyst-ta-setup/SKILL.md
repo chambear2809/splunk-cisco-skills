@@ -220,57 +220,188 @@ bash skills/shared/scripts/setup_credentials.sh
 
 ## Setup Workflow
 
-1. Create the `catalyst`, `ise`, `sdwan`, and `cybervision` indexes:
+### Step 1: Create Indexes
 
-   ```bash
-   bash skills/cisco-catalyst-ta-setup/scripts/setup.sh
-   ```
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/setup.sh
+```
 
-2. Collect the account type, account name, host, and username. Have the operator
-   write passwords or API tokens to a temporary secret file; never accept a
-   secret in an argument or environment variable. Configure one of
-   `catalyst_center`, `ise`, `sdwan`, `cybervision`, or `iosxe_cli` through
-   `scripts/configure_account.sh`. The TA's REST handler encrypts the stored
-   credential. Consult the product-specific account-field tables in
-   [reference.md](reference.md) before invoking the script.
+Creates four indexes. No `sudo` required when running as the `splunk` user.
+In Splunk Cloud, the setup script creates these indexes through ACS.
 
-3. Enable only the selected input family:
+| Index | Purpose | Max Size |
+|-------|---------|----------|
+| `catalyst` | Catalyst Center (DNAC) data | 512 GB |
+| `ise` | ISE authentication/admin data | 512 GB |
+| `sdwan` | SD-WAN health/tunnel data | 512 GB |
+| `cybervision` | Cyber Vision OT data | 512 GB |
 
-   ```bash
-   bash skills/cisco-catalyst-ta-setup/scripts/setup.sh --enable-inputs \
-     --account "MY_CATC" --index "catalyst" --input-type catalyst_center
-   ```
+Partial runs: `--indexes-only`.
 
-   Preserve the TA's tuned polling intervals. Generic endpoints, reports, ISE
-   analytics repositories, and SD-WAN API Endpoint Collection require explicit
-   operator selections and are not created automatically. Use the detailed
-   input inventories and fields in [reference.md](reference.md).
+### Step 2: Configure Account
 
-4. For SD-WAN, prefer structured vManage REST collection. Treat ordinary
-   IOS-XE/ZBFW syslog, UTD syslog, and NetFlow/IPFIX High Speed Logging (HSL)
-   as distinct paths.
-   A text-syslog path entering this TA must use ingress sourcetype
-   `cisco:firewall:logs`, and the TA must be installed on the first full parsing
-   tier. UTD may require UDP 514; HSL requires Splunk Stream plus
-   `cisco-catalyst-enhanced-netflow-setup`. Use beta IOS-XE CLI only when a
-   structured API is unsuitable, with a verified host-key fingerprint and one
-   of the collector's allow-listed commands. The structured BFD API path
-   does not execute `show sdwan bfd session`. The complete BFD, syslog, UTD,
-   HSL, and CLI contracts are in [reference.md](reference.md).
+Before running, the agent must obtain from the user (non-secret values only):
+- Account type (catalyst_center, ise, sdwan, cybervision, iosxe_cli)
+- Account name (e.g., "CVF_Cat_Center")
+- Connection details (host, username)
+- Device password or API token — user writes to temp file; agent passes `--password-file` or `--api-token-file`
 
-5. Do not restart Splunk. If a restart is required, hand it to the operator; on
-   Splunk Cloud, first confirm ACS reports `restartRequired=true`.
+Accounts are created via the Splunk REST API, which handles password encryption
+automatically through the TA's custom REST handlers:
 
-6. Run completion validation:
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
+  --type catalyst_center \
+  --name "MY_CATC" \
+  --host "https://10.100.0.60" \
+  --username "device_user" \
+  --password-file /tmp/device_pass
+```
 
-   ```bash
-   bash skills/cisco-catalyst-ta-setup/scripts/validate.sh --completion
-   ```
+Copy/paste secret-file prep commands:
 
-   Completion requires the app, indexes, accounts, a TA-owned input or evidenced
-   external SD-WAN syslog path, recent canonical data, secure TLS settings, and
-   the shipped Data Collection Health dashboard. See the completion contract in
-   [reference.md](reference.md).
+```bash
+bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_center_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/ise_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/sdwan_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/cybervision_api_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/iosxe_cli_password
+```
+
+Account types and their required fields:
+
+| Type | Required Fields | Conf File |
+|------|----------------|-----------|
+| `catalyst_center` | `--host`, `--username`, `--password-file` | `ta_cisco_catalyst_account.conf` |
+| `ise` | `--host`, `--username`, `--password-file` | `ta_cisco_catalyst_ise_account.conf` |
+| `sdwan` | `--host`, `--username`, `--password-file` | `ta_cisco_catalyst_sdwan_account.conf` |
+| `cybervision` | `--host`, `--api-token-file` | `ta_cisco_catalyst_cyber_vision_account.conf` |
+| `iosxe_cli` | `--host`, `--port`, `--username`, `--password-file`, `--host-key-fingerprint` | `ta_cisco_catalyst_cli_account.conf` |
+
+REST endpoints used (password encryption handled automatically):
+- `/servicesNS/nobody/TA_cisco_catalyst/TA_cisco_catalyst_account`
+- `/servicesNS/nobody/TA_cisco_catalyst/TA_cisco_catalyst_ise_account`
+- `/servicesNS/nobody/TA_cisco_catalyst/TA_cisco_catalyst_sdwan_account`
+- `/servicesNS/nobody/TA_cisco_catalyst/TA_cisco_catalyst_cyber_vision_account`
+- `/servicesNS/nobody/TA_cisco_catalyst/TA_cisco_catalyst_cli_account`
+
+### Step 3: Enable Inputs
+
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/setup.sh --enable-inputs \
+  --account "MY_CATC" --index "catalyst" --input-type catalyst_center
+```
+
+| Input Type | Inputs Enabled | Index | Account Field |
+|------------|---------------|-------|---------------|
+| `catalyst_center` | 11 dedicated inputs | `catalyst` | `cisco_dna_center_account` |
+| `ise` | 1 (administrative_input with 3 data_types) | `ise` | `ise_account` |
+| `sdwan` | 4 (health, site/tunnel health, audit logs, energy stats) | `sdwan` | `sdwan_account` |
+| `cybervision` | 6 | `cybervision` | `cyber_vision_account` |
+| `iosxe_cli` | 1 selected cataloged command | Operator-selected network index | `cli_account` |
+
+The Catalyst Center inputs cover client/device/network health, compliance,
+issues, advisories, SWIM, application traffic, clients, audit logs, and site
+topology. Cyber Vision covers activities, components, devices, events, flows,
+and vulnerabilities. Setup preserves the TA's tuned 300, 900, and 3600-second
+polling intervals instead of applying a uniform interval.
+
+The six environment-specific input families are not created automatically:
+Catalyst Center, ISE, and Cyber Vision generic endpoint inputs and the SD-WAN
+**API Endpoint Collection** input require an explicit allow-listed endpoint;
+Catalyst Center reports require report selection; ISE analytics reports require
+repository settings. Configure those through the TA UI after reviewing endpoint
+support and polling load.
+
+#### SD-WAN BFD API example
+
+Use three SD-WAN API Endpoint Collection stanzas for a focused BFD
+outage-readiness example. Select one, selected, or all reachable WAN Edge
+devices through **Device Scope**; do not put `deviceId` in Query Parameters.
+
+| Data | Endpoint | Sourcetype |
+|---|---|---|
+| Summary | `/dataservice/device/bfd/summary` | `cisco:sdwan:custom:device_bfd_summary` |
+| Current synchronized sessions | `/dataservice/device/bfd/synced/sessions` | `cisco:sdwan:custom:device_bfd_synced_sessions` |
+| Session history | `/dataservice/device/bfd/history` | `cisco:sdwan:custom:device_bfd_history` |
+
+Start broad all-device fan-out at 900 seconds or longer unless controller
+capacity testing supports a lower interval. This is structured vManage REST
+collection—the API-based equivalent for the BFD operational-data requirement.
+It does not execute `show sdwan bfd session`, expose CLI Template Exec, or
+provide arbitrary CLI access for commands without a supported API equivalent.
+
+#### Catalyst SD-WAN text syslog
+
+Treat the Cisco logging paths separately:
+
+| Data family | Preferred collection | Important behavior |
+|---|---|---|
+| Ordinary IOS-XE system syslog | SC4S/HEC or a TA-managed local receiver | Transport and destination port are configurable. Generic `%FAC-SEV-MNEM:` events route to `cisco:sdwan:syslog`; unmatched content falls back to `cisco:sdwan:system:logs`. |
+| Traditional ZBFW text syslog | Supported for light/diagnostic use | `%FW-*` events route to named `cisco:sdwan:*` sourcetypes, but Cisco rate-limits firewall text syslog. |
+| UTD external text syslog | UDP 514 on affected releases/templates | IPS/IDS, URL filtering, AMP/file inspection, and TLS-decryption events route to `cisco:sdwan:utd:logs`. The affected UTD `logging host` surface exposes no alternate port or transport. |
+| ZBFW High Speed Logging (HSL) / Unified Logging | Splunk Stream plus `cisco-catalyst-enhanced-netflow-setup` | This is NetFlow/IPFIX, not text syslog, and is not collected by the TA's UDP listener. HSL is the preferred production ZBFW export path when text-syslog rate limiting matters. |
+
+For a single text-syslog receiver that must include UTD, use UDP 514. Opening
+the listener does not enable Cisco-side producers: separately enable ordinary
+system logging, the relevant ZBFW rule logging, and UTD flow/external logging.
+HSL does not disable ordinary IOS-XE or UTD syslog, but equivalent `%FW-*`
+duplicates must not be assumed for every HSL record.
+
+Do not confuse UTD events with UTD health: `cisco:sdwan:utd:logs` contains the
+external text-syslog security events, while `cisco:sdwan:utdhealth` is an HTTPS
+vManage API snapshot of the per-device UTD engine health.
+
+Use `cisco:firewall:logs` as the dedicated SD-WAN **ingress** sourcetype for
+TA-managed listeners and SC4S-to-HEC delivery. Do not leave SC4S events as
+`cisco:viptela`, `cisco:ios`, or generic `syslog`; those do not enter this TA's
+SD-WAN split chain. Install the TA on the first full parsing tier receiving the
+raw events. See [reference.md](reference.md) for the receiver, parsing, and
+validation contract.
+
+#### Beta IOS-XE CLI command example
+
+Use the direct-device CLI input only after confirming that a structured API is
+not suitable or that raw output is specifically required:
+
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
+  --type iosxe_cli \
+  --name EDGE_01 \
+  --host edge01.example.local \
+  --port 22 \
+  --username splunk_ro \
+  --password-file /tmp/iosxe_cli_password \
+  --host-key-fingerprint 'SHA256:<verified-device-key>'
+
+bash skills/cisco-catalyst-ta-setup/scripts/setup.sh --enable-inputs \
+  --input-type iosxe_cli --account EDGE_01 --index sdwan \
+  --command-id sdwan_bfd_sessions
+```
+
+The login must already reach sufficient privilege; the collector does not send
+an interactive `enable`. The backend allows only `dspfarm_profile`,
+`sdwan_bfd_sessions`, `sdwan_bfd_history`, `version`, and `inventory`. For
+normal BFD monitoring, prefer the structured SD-WAN API Endpoint Collection.
+
+### Step 4: Operator-Controlled Restart If Required
+
+Index or app changes can require a restart. The agent must not restart Splunk;
+ask the operator to perform any required Splunk Enterprise restart. On Splunk
+Cloud, inspect `acs status current-stack` and ask the operator to restart only
+when ACS reports `restartRequired=true`.
+
+### Step 5: Validate
+
+```bash
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh --completion
+```
+
+Checks: app installation, indexes, accounts, a TA-owned input or evidenced
+external SD-WAN syslog path, canonical events from the last 24 hours, TLS
+verification settings, and the TA's shipped Data Collection Health dashboard
+plus recent `poll-complete` search data. If the optional Cisco Enterprise
+Networking app is installed, its views and index macro are checked too.
 
 ## Sourcetypes
 

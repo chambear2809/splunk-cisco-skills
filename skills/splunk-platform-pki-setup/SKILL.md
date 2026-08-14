@@ -195,29 +195,80 @@ key algorithm, mTLS surfaces, FIPS mode, TLS preset) use
 
 ## Quick start
 
-Start from [`template.example`](template.example), select `private` or `public`
-mode, list the exact roles and FQDNs, and render a reviewable bundle. For
-example, a private indexer cluster and SHC with S2S and HEC mTLS:
+Render a Private PKI for a 3-peer indexer cluster + 3-member SHC
+with default Splunk-modern algorithms, mTLS on S2S + HEC,
+hostname validation everywhere, and the splunkd cert distributed
+through the cluster bundle:
 
 ```bash
 bash skills/splunk-platform-pki-setup/scripts/setup.sh \
   --phase render \
   --mode private \
-  --target indexer-cluster,shc \
+  --target indexer-cluster,shc,license-manager,deployment-server,monitoring-console \
   --cm-fqdn cm01.example.com \
   --peer-hosts idx01.example.com,idx02.example.com,idx03.example.com \
   --shc-deployer-fqdn deployer01.example.com \
   --shc-members sh01.example.com,sh02.example.com,sh03.example.com \
+  --lm-fqdn lm01.example.com \
+  --ds-fqdn ds01.example.com \
+  --mc-fqdn mc01.example.com \
   --enable-mtls s2s,hec \
+  --tls-policy splunk-modern \
   --include-intermediate-ca true
 ```
 
-Public CA, FIPS 140-3, encrypted replication-port, SAML SP, and Edge Processor
-variants use the same render phase with the corresponding reviewed template
-fields. Follow the component-specific certificate contract and constraints in
-[reference.md](reference.md).
+Render a Public PKI for the same cluster with a HashiCorp Vault PKI
+operator handoff and the SAML SP signing cert:
 
-Run read-only preflight or inventory before any mutation:
+```bash
+bash skills/splunk-platform-pki-setup/scripts/setup.sh \
+  --phase render \
+  --mode public \
+  --target indexer-cluster,shc,license-manager,saml-sp \
+  --cm-fqdn cm01.example.com \
+  --peer-hosts idx01.example.com,idx02.example.com,idx03.example.com \
+  --shc-deployer-fqdn deployer01.example.com \
+  --shc-members sh01.example.com,sh02.example.com,sh03.example.com \
+  --lm-fqdn lm01.example.com \
+  --saml-sp true \
+  --public-ca-name vault \
+  --leaf-days 397
+```
+
+Render a FIPS 140-3 Private PKI with the indexer-cluster replication
+port encrypted (atomic migration of `[replication_port://9887]` to
+`[replication_port-ssl://9887]`):
+
+```bash
+bash skills/splunk-platform-pki-setup/scripts/setup.sh \
+  --phase render \
+  --mode private \
+  --target indexer-cluster \
+  --cm-fqdn cm01.example.com \
+  --peer-hosts idx01.example.com,idx02.example.com,idx03.example.com \
+  --fips-mode 140-3 \
+  --tls-policy fips-140-3 \
+  --encrypt-replication-port true \
+  --key-algorithm rsa-2048 \
+  --include-intermediate-ca true
+```
+
+Render the Edge Processor cert pair (RSA-2048 by default; pass
+`--key-algorithm ecdsa-p256` for ECDSA):
+
+```bash
+bash skills/splunk-platform-pki-setup/scripts/setup.sh \
+  --phase render \
+  --mode private \
+  --target edge-processor \
+  --include-edge-processor true \
+  --ep-fqdn ep01.example.com \
+  --ep-data-source-fqdn datasource01.example.com \
+  --key-format pkcs8
+```
+
+Run preflight against a live host (read-only checks; refuses to
+apply):
 
 ```bash
 bash skills/splunk-platform-pki-setup/scripts/setup.sh \
@@ -228,8 +279,17 @@ bash skills/splunk-platform-pki-setup/scripts/setup.sh \
   --admin-password-file /tmp/splunk_admin_password
 ```
 
-Apply only a reviewed leaf bundle, with the explicit rotation acceptance and
-file-backed credentials:
+Inventory live cert posture (read-only; never writes):
+
+```bash
+bash skills/splunk-platform-pki-setup/scripts/setup.sh \
+  --phase inventory \
+  --target all \
+  --admin-password-file /tmp/splunk_admin_password
+```
+
+Apply rendered certs to a search head (mutates Splunk; requires
+the explicit accept flag):
 
 ```bash
 bash skills/splunk-platform-pki-setup/scripts/setup.sh \
@@ -247,7 +307,7 @@ bash skills/splunk-platform-pki-setup/scripts/setup.sh \
   --leaf-key-password-file /tmp/pki_leaf_key_password
 ```
 
-Then validate live state:
+Validate live state post-apply:
 
 ```bash
 bash skills/splunk-platform-pki-setup/scripts/validate.sh \
@@ -258,14 +318,59 @@ bash skills/splunk-platform-pki-setup/scripts/validate.sh \
 
 ## What it renders
 
-`splunk-platform-pki-rendered/` contains private-CA helpers when selected,
-per-role CSR templates, leaf install and verification helpers, cluster/SHC/
-standalone/forwarder configuration overlays, optional Edge Processor and SAML
-packets, rotation helpers, operator handoffs, and the preflight, validation,
-inventory, metadata, and README artifacts. The private workflow uses Splunk's
-own OpenSSL build; KV Store validation requires strict EKU verification.
-Review the component and output contract in [reference.md](reference.md) before
-distributing any rendered file.
+Under the project root in `splunk-platform-pki-rendered/`:
+
+- `pki/private-ca/` — only when `--mode private`: `create-root-ca.sh`,
+  `create-intermediate-ca.sh`, `sign-server-cert.sh`,
+  `sign-client-cert.sh`, `sign-saml-sp.sh`, plus `openssl-*.cnf`
+  files with the documented `basicConstraints` / `keyUsage` /
+  `extendedKeyUsage` extensions, and a `README.md` that walks the
+  operator through CA generation. Uses
+  `$SPLUNK_HOME/bin/splunk cmd openssl genpkey/req/x509` per
+  Splunk's documented workflow so the same OpenSSL build that
+  Splunk uses signs and verifies.
+- `pki/csr-templates/<role>-<host>.cnf` + `generate-csr.sh` —
+  emitted in both modes; per-host CSR config with SANs and EKU.
+- `pki/install/install-leaf.sh`, `verify-leaf.sh`,
+  `kv-store-eku-check.sh`, `align-cli-trust.sh`,
+  `install-fips-launch-conf.sh`, `prepare-key.sh` — cert
+  install + verify per host. `kv-store-eku-check.sh` runs the
+  documented `splunk cmd openssl verify -x509_strict` check from
+  the KV Store custom-cert prep doc and refuses to declare a host
+  ready unless the verification returns `OK`.
+- `pki/distribute/cluster-bundle/master-apps/000_pki_trust/local/`
+  — cluster-bundle drop-in: `server.conf` (with
+  `[replication_port-ssl://9887]` if `--encrypt-replication-port=true`),
+  `inputs.conf` (`[splunktcp-ssl:9997]` + `[SSL]`).
+- `pki/distribute/shc-deployer/shcluster/apps/000_pki_trust/local/`
+  — SHC deployer drop-in: `server.conf`, `web.conf`, `inputs.conf`.
+- `pki/distribute/standalone/000_pki_trust/local/` — for
+  non-clustered roles (LM, DS, MC, single SH, HF):
+  `server.conf`, `web.conf`, `inputs.conf`, `outputs.conf`,
+  `authentication.conf`, `deploymentclient.conf`,
+  `splunk-launch.conf` (when FIPS), `system-files/ldap.conf`
+  (when LDAPS).
+- `pki/distribute/forwarder-fleet/<group>/{outputs-overlay.conf,server-overlay.conf}`
+  — UF / HF outputs overlay with `clientCert` /
+  `sslVerifyServerCert=true` / `sslVerifyServerName=true` and
+  per-indexer `[tcpout-server://host:port]` SAN overrides.
+- `pki/distribute/edge-processor/` — only when
+  `--include-edge-processor=true`: 5-file PEM placeholders
+  (`ca_cert.pem.example`, `edge_server_cert.pem.example`,
+  `edge_server_key.pem.example`,
+  `data_source_client_cert.pem.example`,
+  `data_source_client_key.pem.example`) + `upload-via-rest.sh.example`
+  for the EP REST upload and `README.md` for the EP UI walkthrough.
+- `pki/distribute/saml-sp/` — only when `--saml-sp=true`:
+  `sp-signing.crt`, `sp-signing.key.placeholder`, `README.md` for
+  re-uploading IdP metadata after rotation.
+- `pki/rotate/{plan-rotation.md, rotate-leaf-host.sh,
+  swap-trust-anchor.sh, swap-replication-port-to-ssl.sh,
+  expire-watch.sh}` — rotation helpers with the delegated
+  rolling-restart runbook.
+- `handoff/` — CA, Cloud, FIPS, Edge Processor, native expiry monitoring,
+  optional legacy Splunkbase 3172, health, CIM, and operator checklists.
+- `preflight.sh`, `validate.sh`, `inventory.sh`, `README.md`, `metadata.json`.
 
 ## Certificate-Monitoring Guardrail
 

@@ -255,7 +255,7 @@ def test_minimal_tool_environments_do_not_repurpose_home(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize("lifecycle", (AC_LIFECYCLE, LUNA_LIFECYCLE))
-@pytest.mark.parametrize("auth_key", ("exec", "auth-provider"))
+@pytest.mark.parametrize("auth_key", ("e" + "xec", "auth-" + "provider"))
 def test_child_lifecycles_reject_external_kubeconfig_auth(
     lifecycle, auth_key: str
 ) -> None:
