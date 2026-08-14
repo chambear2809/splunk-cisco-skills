@@ -1,0 +1,65 @@
+# Copy to a private file and replace CHANGE_ME. No credentials belong here.
+api_version: galileo-on-prem-air-gap-setup/v1
+galileo:
+  console_url: ""
+release:
+  id: "CHANGE_ME"
+  environment: "production"
+  target_architectures:
+    - "amd64"
+  optional_components:
+    agent-control: "disabled" # disabled | umbrella | standalone
+    luna-studio: "disabled" # disabled | umbrella | standalone
+registry:
+  destination: "registry.internal.example/galileo"
+  internal_dns_suffixes: ["internal.example"]
+  exact_internal_hosts: ["registry.internal.example"]
+artifacts:
+  # The Stack seed must already render the final internal mirror refs at these digests.
+  # image_manifest_file retains distinct CSE/vendor source refs for acquisition provenance.
+  image_manifest_file: "/CHANGE_ME/image-manifest.json"
+  image_manifest_sha256: "CHANGE_ME_SHA256"
+  chart_inventory_file: "/CHANGE_ME/chart-image-inventory.json"
+  chart_inventory_sha256: "CHANGE_ME_SHA256"
+  stack_bundle: "/CHANGE_ME/verified-stack-bundle"
+  stack_bundle_sha256: "CHANGE_ME_SHA256"
+  stack_image_evidence_file: "/CHANGE_ME/rendered-image-inventory-evidence.json"
+  stack_image_evidence_sha256: "CHANGE_ME_SHA256"
+  stack_endpoint_evidence_file: "/CHANGE_ME/rendered-endpoint-inventory-evidence.json"
+  stack_endpoint_evidence_sha256: "CHANGE_ME_SHA256"
+  # This host-only observation cannot close no-egress by itself. Completion
+  # remains endpoint_rewrite_evidence_missing until Stack emits the versioned
+  # source-to-mirror scheme+host[:port] and seed-to-final evidence contract.
+  # Exactly one entry is required for each optional component classified standalone.
+  child_image_evidence: []
+  # - component: "agent-control"
+  #   bundle: "/CHANGE_ME/agent-control-bundle"
+  #   bundle_sha256: "CHANGE_ME_SHA256"
+  #   evidence_file: "/CHANGE_ME/agent-control-rendered-image-evidence.json"
+  #   evidence_sha256: "CHANGE_ME_SHA256"
+  #   endpoint_evidence_file: "/CHANGE_ME/agent-control-rendered-endpoint-evidence.json"
+  #   endpoint_evidence_sha256: "CHANGE_ME_SHA256"
+  charts:
+    - name: "galileo-stack"
+      version: "CHANGE_ME"
+      file: "/CHANGE_ME/galileo-stack.tgz"
+      sha256: "CHANGE_ME_SHA256"
+  galileoctl:
+    version: "CHANGE_ME"
+    file: "/CHANGE_ME/galileoctl"
+    sha256: "CHANGE_ME_SHA256"
+    os: "linux"
+    architecture: "amd64"
+  models: []
+  # Any model entry is copied and hash-verified as a transfer artifact, but
+  # completion remains stack_model_evidence_missing until Stack binds that
+  # checksum to the rendered mount/config and checksum-verifier workload.
+no_egress:
+  strict: true
+  internal_dns_suffixes: ["internal.example"]
+  exact_internal_hosts: ["registry.internal.example"]
+  allowed_endpoints:
+    - "registry.internal.example"
+approval:
+  cse_reference: "CHANGE_ME"
+  release_manifest_approved: false # set true only from recorded CSE approval

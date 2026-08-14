@@ -1,0 +1,52 @@
+# Copy to a private file; replace CHANGE_ME. Never add secret values.
+api_version: galileo-on-prem-luna-studio-setup/v1
+galileo:
+  console_url: ""
+deployment:
+  id: "CHANGE_ME"
+  environment: "production"
+  namespace: "galileo"
+  release_name: "luna-studio"
+  ownership: "standalone" # standalone | umbrella-overlay
+  timeout: "120m"
+chart:
+  archive: "/CHANGE_ME/luna-studio.tgz"
+  sha256: "CHANGE_ME_SHA256"
+  version: "CHANGE_ME"
+umbrella:
+  parent_contract_file: "/CHANGE_ME/parent-stack-contract.json"
+  parent_contract_sha256: "CHANGE_ME_SHA256"
+  ownership_evidence_file: ""
+  ownership_evidence_sha256: ""
+values:
+  base_file: "/CHANGE_ME/approved-nonsecret-values.yaml"
+  base_sha256: "CHANGE_ME_SHA256"
+secrets:
+  jwt: {name: "luna-studio-jwt", keys: ["jwt-secret-key"]}
+  admin: {name: "luna-studio-admin", keys: ["username", "password"]}
+  database: {name: "luna-studio-database", keys: ["connection-string", "host", "port", "database", "username", "password"]}
+  nextauth: {name: "luna-studio-nextauth", keys: ["secret"]}
+  galileo_api: {enabled: false, name: "", keys: []}
+database:
+  preprovisioned: false # set true only after independent DB verification
+  asyncpg: false # set true only after driver compatibility verification
+  startup_migrations: false # set true only after migration-permission verification
+object_store:
+  provider: "aws" # gcp | aws | azure | minio
+  auth_mode: "irsa"
+  bucket: "CHANGE_ME"
+  auth_secret: {name: "", keys: []}
+routing:
+  mode: "ingress" # ingress | gateway | customer
+  public_url: "https://CHANGE_ME"
+  tls_secret_name: "CHANGE_ME"
+  ingress_class: "nginx"
+training:
+  provider: "kubernetes" # kubernetes | vertex_ai
+  remote_cluster: {enabled: false, api_server: "", ca_sha256: "", kube_system_uid: "", namespace: "", namespace_uid: "", secret_name: "", secret_key: "token"}
+  gpu: {enabled: false, count: 0, resource: "nvidia.com/gpu", node_selector: {}, tolerations: []}
+  vertex_ai: {project_id: "", location: "", pipeline_name: "", pipeline_root: ""}
+resilience: {hpa: true, pdb: true, network_policy: true}
+approval: {cse_reference: "CHANGE_ME", production_values_approved: false}
+# This skill renders/preflights only. All --apply-* modes are fail-closed;
+# execute the exact lifecycle.json + fresh evidence packet in a Galileo/CSE session.

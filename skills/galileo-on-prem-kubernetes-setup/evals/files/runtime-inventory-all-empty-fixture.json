@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "chart_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generated_by": "galileo-on-prem-stack-setup",
+  "observed_categories": [
+    "dependency",
+    "schema_or_enable_flag",
+    "image",
+    "crd",
+    "hook_or_migration",
+    "cluster_scoped_object",
+    "api_kind",
+    "service_or_route",
+    "persistence"
+  ],
+  "observed_empty_categories": {
+    "dependency": "Synthetic unit fixture intentionally contains no chart dependencies.",
+    "schema_or_enable_flag": "Synthetic unit fixture intentionally contains no schema or enable flags.",
+    "image": "Synthetic unit fixture intentionally contains no images.",
+    "crd": "Synthetic unit fixture intentionally contains no CRDs.",
+    "hook_or_migration": "Synthetic unit fixture intentionally contains no hooks or migrations.",
+    "cluster_scoped_object": "Synthetic unit fixture intentionally contains no cluster-scoped objects.",
+    "api_kind": "Synthetic unit fixture intentionally contains no API kinds.",
+    "service_or_route": "Synthetic unit fixture intentionally contains no services or routes.",
+    "persistence": "Synthetic unit fixture intentionally contains no persistence resources."
+  },
+  "items": []
+}

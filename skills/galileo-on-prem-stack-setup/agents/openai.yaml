@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo On-Prem Stack"
+  short_description: "Render and preflight Galileo Kubernetes handoffs"
+  default_prompt: "Use $galileo-on-prem-stack-setup to inspect, render, connected-preflight, observe, and prepare a Galileo/CSE joint-session handoff for the Galileo On-Prem stack without performing live mutation."

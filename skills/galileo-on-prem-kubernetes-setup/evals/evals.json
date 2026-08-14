@@ -1,0 +1,76 @@
+{
+  "skill_name": "galileo-on-prem-kubernetes-setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Plan a production Galileo On-Prem deployment on our Kubernetes cluster, including Galileo Stack, Agent Control, Luna Studio, GPU inference, monitoring, SSO, and an air-gapped registry. Do not change the cluster yet.",
+      "expected_output": "A non-mutating intake and immutable parent orchestration packet that routes each deployment surface to exactly one canonical child and keeps production readiness blocked until chart-runtime, infrastructure, approval, model, trace, backup/restore, and soak evidence exists.",
+      "files": ["template.example", "references/deployment-feature-matrix.json", "references/source-ledger.md"],
+      "assertions": [
+        "Selects galileo-on-prem-kubernetes-setup as the deployment router.",
+        "Asks for or uses the Galileo instance console URL and exact entitled artifact paths/digests.",
+        "Routes Stack, Agent Control, Luna Studio, and air-gap work to their distinct on-prem child skills.",
+        "Does not call Helm, Kubernetes, SSH, registries, Galileo APIs, or child mutation commands.",
+        "Does not claim production readiness from a render or Helm success."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run full Galileo On-Prem deployment coverage against this Stack child runtime-inventory JSON and tell me what is unclassified.",
+      "expected_output": "Runs the parent --coverage path, compares all nine required chart-runtime categories against stable matrix IDs and exact owners, and returns the four coverage arrays with a nonzero result if any item/category is missing, unowned, duplicated, or unclassified.",
+      "files": ["references/deployment-feature-matrix.json", "scripts/setup.sh", "scripts/render_router.py"],
+      "assertions": [
+        "Requires the runtime inventory to bind the exact Stack chart SHA-256.",
+        "Checks dependency, schema/flag, image, CRD, hook/migration, cluster object, API kind, service/route, and persistence categories.",
+        "Returns uncovered, unowned, duplicate_mutation_owners, and unclassified_runtime_inventory arrays.",
+        "Does not treat static documentation rows as complete runtime coverage."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Use the Galileo Kubernetes parent to install the Stack now with --atomic and --reuse-values, then roll back automatically if a migration fails.",
+      "expected_output": "Rejects the request at the parent boundary and routes any later approved lifecycle work to galileo-on-prem-stack-setup without executing it.",
+      "files": ["SKILL.md", "scripts/setup.sh"],
+      "assertions": [
+        "Rejects install/apply/upgrade/rollback as parent mutation modes.",
+        "Does not use --atomic, --reuse-values, automatic rollback, or upgrade --install.",
+        "Explains that failures must remain available for diagnosis and migrations require compatibility review."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Configure projects, datasets, scorers, model providers, and Galileo Observe dashboards on our already-running instance.",
+      "expected_output": "Does not activate the Kubernetes deployment router; routes to galileo-platform-setup because the request is running-tenant product configuration.",
+      "files": [],
+      "assertions": [
+        "Does not select galileo-on-prem-kubernetes-setup.",
+        "Routes to galileo-platform-setup.",
+        "Does not request Kubernetes chart or CRD inputs."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Our three-node CPU-only MicroK8s lab has no StorageClass or load balancer. Can you mark the Galileo deployment production ready because all three nodes are Ready?",
+      "expected_output": "Refuses the production-ready claim, renders or explains a blocked doctor result, and identifies storage, routing, capacity/topology, exact-chart runtime, approval, persistence, GPU-live, and production completion evidence gaps.",
+      "files": ["SKILL.md", "reference.md", "template.example"],
+      "assertions": [
+        "Ready Kubernetes nodes alone do not satisfy Galileo readiness.",
+        "Keeps the CPU-only lab GPU result static-only.",
+        "Uses the documented runner label galileo-node-type=galileo-runner.",
+        "Requires a production-like topology and three-day incident-free soak before production-ready."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Use the recommended galileoctl browser UI installation method for the Galileo platform, but do not change the cluster from the parent workflow.",
+      "expected_output": "Recognizes galileoctl UI/CLI as official Method A and renders a non-mutating, source-backed handoff for the pinned galileoctl and umbrella releases with preflight, dry-run, RBAC, approval, audit, and post-deploy gates.",
+      "files": ["SKILL.md", "references/deployment-feature-matrix.json", "references/source-ledger.md"],
+      "assertions": [
+        "Classifies galileoctl UI and CLI together as recommended official Method A, one of four platform installation methods.",
+        "Keeps pinned galileo-stack Helm CLI as the deterministic directly automated method and retains galileoctl, deployment-script, and step-by-step paths as reviewed alternatives.",
+        "Routes galileoctl installation and validation to galileo-on-prem-stack-setup with separate console-release, RBAC, authentication, dry-run, and audit gates.",
+        "Does not execute any live install from the parent skill."
+      ]
+    }
+  ]
+}

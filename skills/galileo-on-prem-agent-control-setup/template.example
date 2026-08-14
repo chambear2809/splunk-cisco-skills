@@ -1,0 +1,54 @@
+# Copy to a private local file and replace every CHANGE_ME value.
+# Secret values are forbidden; only Kubernetes Secret names and keys belong here.
+api_version: galileo-on-prem-agent-control-setup/v1
+galileo:
+  console_url: ""
+deployment:
+  id: "CHANGE_ME"
+  environment: "production"
+  namespace: "galileo"
+  release_name: "agent-control"
+  ownership: "standalone" # standalone | umbrella-overlay
+  timeout: "120m"
+chart:
+  archive: "/CHANGE_ME/agent-control.tgz"
+  sha256: "CHANGE_ME_SHA256"
+  version: "CHANGE_ME"
+umbrella:
+  parent_contract_file: "/CHANGE_ME/parent-stack-contract.json"
+  parent_contract_sha256: "CHANGE_ME_SHA256"
+  ownership_evidence_file: ""
+  ownership_evidence_sha256: ""
+values:
+  base_file: "/CHANGE_ME/approved-nonsecret-values.yaml"
+  base_sha256: "CHANGE_ME_SHA256"
+database:
+  name: "agent_control"
+  bootstrap: false
+  preprovisioned_and_granted: false # set true only after independent DB verification
+secrets:
+  postgres:
+    name: "postgres"
+    user_key: "GALILEO_POSTGRES_USER"
+    password_key: "GALILEO_POSTGRES_PASSWORD"
+  api:
+    name: "api-secret"
+    key: "GALILEO_API_SECRET_KEY"
+  runtime_auth_enabled: true
+routing:
+  mode: "none" # none | nginx | gateway | customer
+  external_url: ""
+  tls_secret_name: ""
+  ui_proxy_enabled: true
+feature_flag:
+  enabled: true
+  source: "central" # central | helm-env
+resilience:
+  hpa: true
+  pdb: true
+  network_policy: true
+approval:
+  cse_reference: "CHANGE_ME"
+  production_values_approved: false # set true only from recorded Galileo approval
+# This skill renders/preflights only. All --apply-* modes are fail-closed;
+# execute the exact lifecycle.json + fresh evidence packet in a Galileo/CSE session.
