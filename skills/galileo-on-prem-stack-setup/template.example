@@ -1,0 +1,210 @@
+# Copy this file, replace every angle-bracket value, and obtain Galileo/CSE review.
+schema_version: 1
+deployment_id: <customer-environment>
+environment: staging # lab | staging | production
+# Official methods: galileoctl, helm-cli, deployment-script, or step-by-step.
+# Galileo's table requires the galileoctl UI for first install; its CLI is a
+# workstation/CI alternative only with exact release/CSE authorization. Every
+# method is inspected here and executed only through a reviewed handoff.
+installation_method: helm-cli
+# Galileo instance console URL; example: https://console.demo-v2.galileocloud.io/
+galileo_console_url: https://console.galileo.example.com/
+
+target:
+  kube_context: <exact-kube-context>
+  api_server: https://<kubernetes-api>:6443
+  ca_sha256: <64-lowercase-hex>
+  cluster_uid: <kube-system-namespace-uid>
+  namespace: galileo
+  namespace_create: false
+  namespace_uid: <existing-namespace-uid>
+
+stack:
+  release_name: galileo
+  chart_archive: /secure/artifacts/galileo-stack-<version>.tgz
+  chart_sha256: <64-lowercase-hex>
+  chart_version: <exact-version>
+  nonsecret_values_file: /secure/questionnaire/values-customer-umbrella.yaml
+  # Exact CSE-reviewed dotted leaves. Each must independently change only
+  # classified rendered Secret payload values.
+  runtime_secret_value_paths: [global.runtimeSecret, postgresql.auth.password]
+  timeout: 120m
+
+# Set enabled:true with the full fields from reference.md only for the
+# nonmutating galileoctl review/handoff workflow. Every apply flag rejects.
+galileoctl:
+  enabled: false
+
+crds:
+  mode: shared # shared | dedicated
+  upgrade_compatibility_evidence: ""
+  conversion_evidence: ""
+  stored_versions_evidence: ""
+
+storage:
+  default_class: <storage-class>
+  classes:
+    - name: <storage-class>
+      minimum_size_gib: 500
+      reclaim_policy: Retain
+      allow_expansion: true
+      snapshots: false # attestation: answer only after validation
+  restore_tested: false # attestation: answer only after a restore drill
+  snapshot_evidence: "" # immutable job/report/ticket reference; never credentials
+  restore_evidence: "" # immutable restore-drill reference
+  snapshot_evidence_observed_at: null # RFC3339; production requires current capability proof
+  restore_evidence_observed_at: null # RFC3339 periodic restore drill
+  restore_evidence_max_age_days: 90 # CSE-reviewed policy, 1..365
+  # Rows bind kind/name/claim_name, expected_pvc_names, and one exact
+  # {pvc_name,kind,name} direct controller owner for every generated claim.
+  operator_claims: []
+
+data_services:
+  postgres: external-ha
+  redis: managed # managed | external-ha | in-cluster-exception
+  redis_support_exception: null
+  object_store: external-s3 # external-s3 | external-gcs | external-s3-compatible | in-cluster-minio | external-azure-blob-exception
+  object_store_support_exception: null # written Galileo/CSE evidence required for Azure conflict exception
+  clickhouse_backup_verified: false
+  clickhouse_restore_verified: false
+  postgres_backup_verified: false
+  postgres_restore_verified: false
+  postgres_backup_frequency_hours: 24
+  object_store_backup_verified: false
+  object_store_restore_verified: false
+  object_store_nondefault_secret: false # required for in-cluster-minio
+  postgres_backup_evidence: ""
+  postgres_restore_evidence: ""
+  clickhouse_backup_evidence: ""
+  clickhouse_restore_evidence: ""
+  object_store_backup_evidence: ""
+  object_store_restore_evidence: ""
+  object_store_backup_bucket: "" # bucket identifier only; no credential-bearing URL
+  backup_evidence_observed_at: null # RFC3339; must meet configured daily frequency
+  restore_evidence_observed_at: null # RFC3339 periodic restore drill
+  restore_evidence_max_age_days: 90 # CSE-reviewed policy, 1..365
+  readiness:
+    observed_at: null # RFC3339; production requires <=30 minute observation
+    postgres: {ownership: external, reachable: false, tls: false, authenticated: false, ha_ready: false, version: "", reference: ""}
+    redis: {ownership: external, reachable: false, tls: false, authenticated: false, ha_ready: false, version: "", reference: "", persistence_or_rebuild_decision: ""}
+    object_store: {ownership: external, reachable: false, tls: false, authenticated: false, ha_ready: false, bucket_exists: false, version: "", reference: ""}
+    clickhouse: {ownership: release-managed, reachable: false, tls: false, authenticated: false, ha_ready: false, version: "", reference: ""}
+    rabbitmq: {ownership: release-managed, reachable: false, tls: false, authenticated: false, ha_ready: false, persistence_ready: false, version: "", reference: "", queue_recovery_reference: ""}
+
+node_pools:
+  autoscaler_validated: false
+  cse_sizing_reference: ""
+  production_count_exception: null
+  pools:
+    - role: core
+      label_value: galileo-core
+      min_nodes: 1 # production default: 4
+      max_nodes: 10
+      min_cpu: "4"
+      min_memory: 16Gi
+      min_ephemeral_storage: 100Gi
+      architecture: amd64
+      failure_domains: []
+      taints: []
+    - role: runner
+      label_value: galileo-runner
+      min_nodes: 1
+      max_nodes: 5
+      min_cpu: "8"
+      min_memory: 32Gi
+      min_ephemeral_storage: 200Gi
+      architecture: amd64
+      failure_domains: []
+      taints: []
+
+routing:
+  domain: galileo.example.com
+  console_host: console.galileo.example.com
+  api_host: api.galileo.example.com
+  grafana_host: grafana.galileo.example.com
+  tls_secret_names: [galileo-console-tls, galileo-api-tls, galileo-grafana-tls]
+  tls_bindings:
+    - {host: console.galileo.example.com, secret: galileo-console-tls}
+    - {host: api.galileo.example.com, secret: galileo-api-tls}
+    - {host: grafana.galileo.example.com, secret: galileo-grafana-tls}
+  ingress_class: nginx
+  gateway_class: null
+  load_balancer_lifecycle: external-preinstalled # or release-managed-staged-handoff (manual only)
+  # Exact LoadBalancer Services rendered by the Galileo releases. These are
+  # handoff evidence and are never created by this skill.
+  load_balancer_services: []
+  prerequisite_load_balancers:
+    - namespace: ingress-nginx
+      name: ingress-nginx-controller
+      uid: <exact-live-service-uid>
+      addresses: [192.0.2.200]
+  load_balancer_addresses: [192.0.2.200]
+  dns_validated: false # attestation plus live convergence is required
+  certificate_min_valid_days: 30
+  tls_required: true
+  streaming_timeout_seconds: 120
+  streaming_timeout_controls:
+    - {kind: Ingress, name: galileo-routes, annotation: nginx.ingress.kubernetes.io/proxy-read-timeout, minimum_seconds: 120}
+  public_metrics_blocked: false # attestation: verify before changing
+  metrics_protection_resources:
+    - {kind: NetworkPolicy, name: galileo-metrics-deny-public}
+  trace_route_before_api_catchall: false # attestation: verify before changing
+  routes:
+    - https://api.galileo.example.com/healthcheck
+    - https://console.galileo.example.com/api/healthcheck
+    - https://grafana.galileo.example.com/
+
+monitoring:
+  enabled: false # attestation: change only after monitoring validation
+  alert_owner: <team-or-on-call-service>
+  # Exact name/workloads/services/required_kinds/resources[{kind,name}]/
+  # persistence_required rows. Empty services are allowed for Fluent Bit.
+  expected_components: []
+
+authorization:
+  rbac_enforced: false # attestation: change only with evidence
+  evidence: ""
+
+wizard:
+  enabled: false
+  expected_deployments: [] # exact named Wizard model deployments
+  triton_required: false
+  hpa_required: false
+  network_policy_required: false
+  gpu_enabled: false
+  gpu_resource: nvidia.com/gpu
+  gpu_node_label: galileo-node-type=galileo-ml
+  startup_timeout_minutes: 40
+  offline_model_sha256: null
+  multi_gpu_cse_reference: ""
+  multi_gpu_model_support_evidence: ""
+
+air_gap:
+  enabled: false
+  verified_contract_file: null
+  verified_contract_sha256: null
+
+coverage:
+  enforce_runtime_inventory: true
+  # Replace these lists with the exact inventory emitted for the entitled chart.
+  reviewed_components: []
+  reviewed_schema_or_enable_flags: []
+  reviewed_kinds: []
+  reviewed_images: []
+  reviewed_crds: []
+  reviewed_hooks: []
+  reviewed_cluster_scoped_kinds: []
+  reviewed_pvcs: []
+  reviewed_routes: []
+
+exceptions: []
+
+lab_bootstrap:
+  enabled: false
+  enable_hostpath_storage: false
+  metallb_address_pool: null # documentation example: 192.0.2.200-192.0.2.220
+  service_cidrs: [] # exact canonical cluster Service CIDRs; mandatory with MetalLB
+  pod_cidrs: [] # exact canonical cluster Pod CIDRs; mandatory with MetalLB
+  network_nonoverlap_evidence: ""
+  network_evidence_observed_at: null
+  node_labels: {} # node-name: galileo-core | galileo-runner | galileo-ml

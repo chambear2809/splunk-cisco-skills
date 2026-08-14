@@ -62,6 +62,7 @@ projects/tmp-*
 /cisco-thousandeyes-mcp-rendered/
 /galileo-agent-control-rendered/
 /galileo-mcp-rendered/
+/galileo-on-prem-rendered/
 /galileo-platform-rendered/
 /sc4s-rendered/
 /sc4snmp-rendered/

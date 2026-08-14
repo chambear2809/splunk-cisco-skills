@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo On-Prem Kubernetes"
+  short_description: "Plan and doctor Galileo Kubernetes deployments"
+  default_prompt: "Use $galileo-on-prem-kubernetes-setup to render and doctor a non-mutating, full-coverage Galileo On-Prem Kubernetes deployment plan."

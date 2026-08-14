@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galileo On-Prem Agent Control"
+  short_description: "Validate Agent Control and prepare a CSE handoff"
+  default_prompt: "Use $galileo-on-prem-agent-control-setup to render, preflight, validate, and prepare the packaged Agent Control Galileo/CSE lifecycle handoff without mutating Kubernetes."

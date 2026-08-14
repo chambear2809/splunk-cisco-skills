@@ -101,6 +101,7 @@ LOCAL_ARTIFACT_ROOTS = [
     "cisco-secure-email-web-gateway-rendered",
     "cisco-thousandeyes-mcp-rendered",
     "galileo-agent-control-rendered",
+    "galileo-on-prem-rendered",
     "galileo-platform-rendered",
     "sc4s-rendered",
     "sc4snmp-rendered",

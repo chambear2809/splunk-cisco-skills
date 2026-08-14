@@ -1,4 +1,4 @@
-<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 80588ce434f6741bc619102ca1e3e9eb562cc4270382a6801b00ccf59343fcff. -->
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 15bae612b9aa6677b5c08af5d86708302cd982c9686d89866135a8e5e4544003. -->
 
 Render, validate, and optionally apply Galileo SaaS/Enterprise readiness and Splunk wiring for Observe, Evaluate, Protect, Luna, metrics, experiments, datasets, annotations, and feedback.
 

@@ -1,6 +1,6 @@
 # Splunk 10.5 Skill Compatibility
 
-_Generated from `skills/catalog.yaml` (SHA-256 `eeccc49998e22e82bf516770c9c536602f8ebae98850d36b28219f03eeb9da3f`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
+_Generated from `skills/catalog.yaml` (SHA-256 `66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
 
 This matrix classifies every repository skill against Splunk Cloud Platform
 `10.5.2605`. It does not invent a self-managed Splunk Enterprise 10.5 runtime:
@@ -14,7 +14,7 @@ self-managed workflows retain the current public 10.4 baseline.
 | Conditional | 89 | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | Blocked | 0 | Splunk Cloud Platform 10.5.2605: blocked for the primary package because no repo-selected or otherwise approved release has 10.5 compatibility evidence; render or hand off only unless an explicit approved override is recorded. |
 | Self-managed 10.4 | 9 | Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline. |
-| Not applicable | 56 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| Not applicable | 61 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | Delegated | 13 | Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package. |
 
 `Blocked` means no repo-selected or otherwise approved primary package
@@ -55,6 +55,11 @@ topology, customer-managed runtime, or product-specific prerequisites.
 | `galileo-agent-control-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `galileo-lemonade-instrumentation-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `galileo-mcp-server-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `galileo-on-prem-agent-control-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `galileo-on-prem-air-gap-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `galileo-on-prem-kubernetes-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `galileo-on-prem-luna-studio-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| `galileo-on-prem-stack-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `galileo-platform-setup` | Canonical | Conditional | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `lemonade-splunk-otel` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `splunk-admin-doctor` | Canonical | Supported | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable. |
