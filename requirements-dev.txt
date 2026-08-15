@@ -1,5 +1,5 @@
 pytest>=9.1.1,<10
-jsonschema>=4.25,<5
+jsonschema>=4.26.0,<5
 pip-audit==2.10.1
 PyYAML>=6,<7
 # Pin until the repository's legacy lint baseline is intentionally migrated;
