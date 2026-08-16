@@ -79,7 +79,6 @@ jobs:
       COLLECTOR_RELEASE: ${{ inputs.collector_release }}
       INSTRUMENTATION_NAME: splunk-otel-staging
       WORKLOAD_LANGUAGE: ${{ inputs.language }}
-      KUBECONFIG: ${{ runner.temp }}/aws-eks-o11y-kubeconfig
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,6 +98,13 @@ jobs:
           [[ "${STAGING_WORKLOAD}" =~ ^(Deployment|StatefulSet|DaemonSet)/[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]]
           [[ ! "${STAGING_APM_SERVICE}" =~ [[:cntrl:]] ]]
           [[ "${STAGING_APM_SERVICE}" =~ ^[^[:space:][:cntrl:]](.*[^[:space:][:cntrl:]])?$ ]]
+
+      - name: Initialize private runtime paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'KUBECONFIG=%s\n' \
+            "${RUNNER_TEMP}/aws-eks-o11y-kubeconfig" >> "${GITHUB_ENV}"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

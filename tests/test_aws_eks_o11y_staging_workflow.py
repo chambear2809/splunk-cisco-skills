@@ -116,7 +116,12 @@ def test_workflow_is_manual_approved_read_only_and_immutably_pinned() -> None:
     assert "36e2f4ac66259232341dd7866952d64a958846470f6a9a6a813b9117bd965207" in text
     assert "scripts/staging/validate-aws-eks-o11y.sh" in text
     assert "SPLUNK_O11Y_TOKEN_FILE" in text
-    assert "KUBECONFIG: ${{ runner.temp }}/aws-eks-o11y-kubeconfig" in text
+    assert "KUBECONFIG: ${{ runner.temp }}/aws-eks-o11y-kubeconfig" not in text
+    runtime_path_step = next(
+        step for step in job["steps"] if step["name"] == "Initialize private runtime paths"
+    )
+    assert '"${RUNNER_TEMP}/aws-eks-o11y-kubeconfig"' in runtime_path_step["run"]
+    assert '>> "${GITHUB_ENV}"' in runtime_path_step["run"]
     assert 'chmod 600 "${KUBECONFIG}"' in text
     assert "rm -f --" in text
     cleanup_index = next(
