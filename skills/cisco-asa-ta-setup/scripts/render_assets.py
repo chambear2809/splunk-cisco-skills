@@ -47,18 +47,18 @@ CONFIG = {
     "metadata": {
         "app_name": "Splunk_TA_cisco-asa",
         "splunkbase_id": "1620",
-        "latest_verified_version": "6.0.1",
+        "latest_verified_version": "6.1.2",
         "index": "{{index}}",
         "sourcetype": "{{sourcetype}}",
         "syslog_owner": "{{syslog_owner}}",
         "sc4s_vendor_product": "{{sc4s_vendor_product}}",
         "include_ftd": "{{include_ftd}}",
-        "source_package": "splunk-ta/_unpacked/Splunk_TA_cisco-asa-6.0.1/Splunk_TA_cisco-asa",
+        "source_package": "splunk-ta/_unpacked/Splunk_TA_cisco-asa-6.1.2/Splunk_TA_cisco-asa",
         "cim_models": ["Network_Traffic", "Intrusion_Detection"],
     },
     "plan_md": """# Cisco ASA TA Setup Plan
 
-Add-on: `Splunk_TA_cisco-asa` (Splunkbase `1620`, verified `6.0.1`)
+Add-on: `Splunk_TA_cisco-asa` (Splunkbase `1620`, verified `6.1.2`)
 Index: `{{index}}`
 Source type: `{{sourcetype}}`
 Syslog owner: `{{syslog_owner}}`

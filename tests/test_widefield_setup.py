@@ -6,10 +6,14 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WIDEFIELD_PARENT = REPO_ROOT / "skills/widefield-security-setup/scripts/setup.sh"
 WIDEFIELD_OKTA = REPO_ROOT / "skills/widefield-okta-integration-setup/scripts/setup.sh"
+WIDEFIELD_SAVIYNT = REPO_ROOT / "skills/widefield-saviynt-integration-setup/scripts/setup.sh"
+WIDEFIELD_GOOGLE = REPO_ROOT / "skills/widefield-google-secops-setup/scripts/setup.sh"
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -88,3 +92,40 @@ def test_widefield_setup_rejects_inline_secret_values_without_echoing_value() ->
     assert result.returncode != 0
     assert "--okta-token is not allowed" in combined
     assert "INLINE_SECRET_SHOULD_NOT_ECHO" not in combined
+
+
+# Saviynt and Google SecOps have no documented mutation API, so the shared
+# dispatch routes them to widefield_apply_unsupported. Neither skill has any
+# other behavioral coverage, and the extra flags below are the plausible
+# escalation attempts, so assert the refusal rather than trusting the prose.
+@pytest.mark.parametrize(
+    ("setup_script", "extra_args"),
+    [
+        (WIDEFIELD_SAVIYNT, ()),
+        (WIDEFIELD_SAVIYNT, ("--accept-saviynt-remediation",)),
+        (WIDEFIELD_SAVIYNT, ("--dry-run",)),
+        (WIDEFIELD_GOOGLE, ()),
+        (WIDEFIELD_GOOGLE, ("--dry-run",)),
+    ],
+)
+def test_widefield_apply_is_refused_without_documented_mutation_api(
+    tmp_path: Path,
+    setup_script: Path,
+    extra_args: tuple[str, ...],
+) -> None:
+    result = run_cmd(
+        "bash",
+        str(setup_script),
+        "--apply",
+        "--accept-apply",
+        "--output-dir",
+        str(tmp_path / "rendered"),
+        *extra_args,
+        check=False,
+    )
+
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "no documented live mutation path" in combined
+    # --dry-run must not soften the refusal into a "would apply" claim.
+    assert "would apply" not in combined.lower()

@@ -403,8 +403,25 @@ splunk_export_python_tls_env() {
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 # Guard for flag parsers: validates that a flag's required value is present.
+# Takes the ARGUMENT COUNT ($#), not the value, and returns non-zero so the
+# caller controls the exit.
 # Usage (inside a while/case arg loop):
 #   --flag) require_arg "$1" $# || exit 1; VAR="$2"; shift 2 ;;
+#
+# Also grep for `require_value`, the other name this guard travels under.
+# The two are related but NOT interchangeable, which is why a grep for either
+# name alone undercounts the guarded call sites:
+#   - Delegating form (setup.sh in cisco-cloud-control, cisco-data-fabric,
+#     galileo-agent-control, galileo-platform, splunk-connect-for-otlp):
+#       require_value() { require_arg "$1" "$2" || exit 1; }
+#     Same count-based contract as require_arg, but it exits instead of
+#     returning, so callers write `require_value "$1" $#` with no `|| exit 1`.
+#   - Standalone form (cisco-collaboration, cisco-security-cloud,
+#     galileo-on-prem-kubernetes, shared/scripts/validate_render_first_skill.sh):
+#     locally defined and value-based -- it inspects "$2" as the flag's VALUE
+#     and may also reject a following `--flag`. Passing $# to those variants,
+#     or a value to require_arg, silently misvalidates.
+# Confirm which contract a script uses before copying a call site between them.
 require_arg() {
     if [[ "$2" -lt 2 ]]; then
         log "ERROR: Option '$1' requires a value."

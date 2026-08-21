@@ -394,7 +394,7 @@ if [[ "${CHECK_UPSTREAM}" == "true" ]]; then
     command -v curl >/dev/null 2>&1 || { log "ERROR: curl is required for --check-upstream."; exit 1; }
     if [[ "${CHECK_K8S}" == "true" ]]; then
         read -r chart_version release_name namespace < <(python3 -c 'import json,sys; data=json.load(open(sys.argv[1]))["kubernetes"]; print(data["chart_version"], data["release_name"], data["namespace"])' "${OUTPUT_DIR}/metadata.json")
-        [[ "${chart_version}" == "0.154.0" ]] || { log "ERROR: chart version is outside the audited archive contract."; exit 1; }
+        [[ "${chart_version}" == "0.158.0" ]] || { log "ERROR: chart version is outside the audited archive contract."; exit 1; }
         chart_archive="$(bash "${OUTPUT_DIR}/k8s/fetch-chart.sh")"
         helm_args=(-f "${OUTPUT_DIR}/k8s/values.yaml")
         while IFS= read -r file; do helm_args+=(-f "${file}"); done < <(find "${OUTPUT_DIR}/k8s" -maxdepth 1 -name 'extra-values-*.yaml' | sort)

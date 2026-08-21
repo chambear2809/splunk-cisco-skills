@@ -1730,7 +1730,7 @@ def render(spec_artifact: SecureInput, output: Path, console_arg: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--spec")
     parser.add_argument("--output-dir")
     parser.add_argument("--galileo-console-url")

@@ -138,6 +138,31 @@ release section when cutting a release.
 
 ### Changed
 
+- Resolved an AppDynamics On-Premises version contradiction in
+  `splunk-appdynamics-platform-setup`. The `help.splunk.com` sitemap confirms
+  the On-Premises platform manuals (Enterprise Console, Controller deployment,
+  and eleven others) publish through `26.8.0`, with `26.9.0` returning 404,
+  while the Virtual Appliance manual runs a separate cadence topping out at
+  `26.1.0`. `SKILL.md` still claimed `26.4`, so it now states `26.8.0` for the
+  Enterprise Console and Controller manuals and records the Virtual Appliance
+  `26.1.0` exception. `references/coverage.md` no longer describes rows as
+  `26.4`-backed, and `reference.md` regroups its 42 verified sources into
+  26.8.0-versioned, unversioned, and Virtual Appliance 26.1.0 sets so the two
+  GUI install pages are no longer filed under a "without 26.8 pathing"
+  heading they contradicted. Feature-introduction history in
+  `appdynamics-taxonomy.yaml` is left at `26.4` deliberately.
+- Refreshed the `appdynamics-suite` feature-contract snapshot in
+  `skills/shared/product_feature_coverage.json` to match the taxonomy's
+  `26.4.0` to `26.8.0` source-URL rewrite. Only `feature_contracts_sha256`
+  moved; the feature set itself is unchanged.
+- Refreshed the `galileo-mcp-server-setup` MCP drift sentinel from server
+  `1.28.1` to `1.29.0` with a catalog review date of `2026-08-20`, across
+  `probe_mcp.py`, `render_assets.py`, `validate.sh`, `deep_audit.sh`, the
+  regression test, and `references/tool-catalog.md`. A live re-probe found the
+  tool surface unchanged: the same nine tools with byte-identical required
+  arguments, property keys, and canonical input-schema SHA-256 fingerprints,
+  and still zero prompts and resources, so only the version string moved. The
+  pins remain exact-equality checks that fail on the next server move.
 - Synced `cisco-catalyst-ta-setup` to the TA `3.2.44` source contract with 29
   modular inputs, device-scoped SD-WAN BFD API guidance, editable SD-WAN and
   Cyber Vision intervals, account-scoped TLS validation, and the bounded beta

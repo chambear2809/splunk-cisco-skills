@@ -48,18 +48,28 @@ AFE_SUPPORTED_REGIONS = [
     "us-west-2",
     "eu-west-3",
 ]
+# Release notes re-checked after the announcement sweep; neither stage moved, so
+# these dates record negative findings rather than new claims.
+AI_LIFECYCLE_RECHECKED = "2026-08-20"
+RELEASE_NOTES_UPDATED = "2026-06-16"
 AI_POWERED_DATA_MANAGEMENT_LIFECYCLE = {
     "Automated Field Extraction": {
         "availability": "controlled_availability",
         "source_date": "2026-03-11",
         "access": "tenant_entitlement_and_region_gated",
         "automation": "ui_suggestion_and_human_review_only",
+        "rechecked": AI_LIFECYCLE_RECHECKED,
+        "release_notes_updated": RELEASE_NOTES_UPDATED,
+        "recheck_evidence": "Listed under the February 18, 2026 release-note entry with no release-stage label. The same table labels other features (Controlled Availability release) on May 18, 2026 and (General Availability release) on June 29, 2026, and never states that AFE is generally available, so the announced Controlled Availability label stands.",
     },
     "Guided Onboarding with Auto-Schematization": {
         "availability": "alpha",
         "source_date": "2026-03-11",
         "access": "splunk_expert_enrollment_and_tenant_feature_visibility_required",
         "automation": "ui_handoff_and_human_review_only",
+        "rechecked": AI_LIFECYCLE_RECHECKED,
+        "release_notes_updated": RELEASE_NOTES_UPDATED,
+        "recheck_evidence": "Absent from the release notes entirely: zero occurrences of Auto-Schematization or Guided Onboarding in any release section. Absence is equally consistent with still-Alpha and with withdrawal, so the announced Alpha label stands.",
     },
 }
 KNOWN_ISSUE_GUARDRAILS = [
@@ -456,10 +466,10 @@ def render_readiness(args: argparse.Namespace, findings: list[dict[str, str]]) -
         "- Roles: verify `sc_admin`, `admin_all_objects`, and service account/index access.",
         "- Connection refresh: refresh after index, lookup, or role changes.",
         "- Limits: verify pipeline count, lookup size, ingest volume, and persistent queue retention against service details.",
-        "- Automated Field Extraction: Controlled Availability as announced 2026-03-11; UI suggestion and human-review handoff only. Verify tenant entitlement and feature visibility. Documented supported regions are "
+        f"- Automated Field Extraction: Controlled Availability as announced 2026-03-11 and re-checked {AI_LIFECYCLE_RECHECKED} against the release notes updated {RELEASE_NOTES_UPDATED}; UI suggestion and human-review handoff only. Verify tenant entitlement and feature visibility. Documented supported regions are "
         + ", ".join(f"`{region}`" for region in AFE_SUPPORTED_REGIONS)
         + ".",
-        "- Guided Onboarding with Auto-Schematization: Alpha as announced 2026-03-11; verify Splunk expert enrollment and tenant feature visibility. Review any recommended CIM mappings and candidate TA or SPL2 outputs in the UI.",
+        f"- Guided Onboarding with Auto-Schematization: Alpha as announced 2026-03-11 and re-checked {AI_LIFECYCLE_RECHECKED} against the release notes updated {RELEASE_NOTES_UPDATED}; verify Splunk expert enrollment and tenant feature visibility. Review any recommended CIM mappings and candidate TA or SPL2 outputs in the UI.",
         "- AI-powered data management: this renderer does not invoke either AI workflow, enroll a tenant, generate or install a TA, or apply a suggestion. Exported candidates require human review, SPL2 lint/preview, CIM validation, and an explicit apply decision.",
         "",
         "## Known Issue Guardrails",
@@ -527,8 +537,8 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
         "5. Create pipelines from `pipelines/*.spl2` or the custom template app.",
         "6. Preview every pipeline with representative sample data.",
         "7. Confirm index routing and default destination behavior.",
-        "8. If the tenant has Automated Field Extraction Controlled Availability access in a documented region, review suggested fields and regex in the UI; this renderer cannot invoke or accept AFE suggestions.",
-        "9. If the tenant is enrolled in the Guided Onboarding with Auto-Schematization Alpha, review sample clustering, CIM recommendations, and any exported candidate TA or SPL2 output. Do not treat a recommendation as applied configuration.",
+        f"8. If the tenant has Automated Field Extraction Controlled Availability access in a documented region, review suggested fields and regex in the UI; this renderer cannot invoke or accept AFE suggestions. Stage re-checked {AI_LIFECYCLE_RECHECKED} against the release notes updated {RELEASE_NOTES_UPDATED}, which never state that AFE is generally available.",
+        f"9. If the tenant is enrolled in the Guided Onboarding with Auto-Schematization Alpha, review sample clustering, CIM recommendations, and any exported candidate TA or SPL2 output. Do not treat a recommendation as applied configuration. Stage re-checked {AI_LIFECYCLE_RECHECKED} against the release notes updated {RELEASE_NOTES_UPDATED}, which do not mention this capability at all.",
         "10. Lint and preview every exported SPL2 candidate, validate CIM and event counts, and require an explicit human apply decision. TA candidates require separate package review and installation handling.",
         "11. Confirm only one browser session is editing each pipeline.",
         "12. Apply approved pipelines and immediately run the rendered monitoring searches.",
@@ -613,17 +623,25 @@ def render_known_issues() -> str:
 
 
 def render_ai_powered_data_management_handoff() -> str:
-    return """# AI-Powered Data Management Availability And Review Handoff
+    return f"""# AI-Powered Data Management Availability And Review Handoff
 
-Release stages are source snapshots from Splunk's March 11, 2026 announcement.
-Verify current documentation, tenant entitlement, region, enrollment, and UI
-feature visibility before use.
+Release stages are source snapshots from Splunk's March 11, 2026 announcement,
+re-checked {AI_LIFECYCLE_RECHECKED} against the Ingest Processor release notes updated
+{RELEASE_NOTES_UPDATED}. Neither stage moved, so the dates below record negative evidence
+rather than a new claim. Verify current documentation, tenant entitlement,
+region, enrollment, and UI feature visibility before use.
 
 The announcement says three capabilities but publicly names only the two below.
 This packet tracks those named capabilities and does not infer a third.
 
 ## Automated Field Extraction — Controlled Availability
 
+- Announced 2026-03-11, re-checked {AI_LIFECYCLE_RECHECKED}. The release notes updated
+  {RELEASE_NOTES_UPDATED} list AFE under February 18, 2026 with no release-stage
+  label. That table does label stages when they apply — Microsoft Azure routing
+  reads "(Controlled Availability release)" on May 18, 2026 and "(General
+  Availability release)" on June 29, 2026 — and it never states that AFE is
+  generally available, so the Controlled Availability label stands.
 - AFE is a Data Management UI suggestion workflow, not a renderer or API action.
 - Confirm that the tenant is entitled and in one of the documented regions in
   `known-issues.md`.
@@ -633,6 +651,12 @@ This packet tracks those named capabilities and does not infer a third.
 
 ## Guided Onboarding With Auto-Schematization — Alpha
 
+- Announced 2026-03-11, re-checked {AI_LIFECYCLE_RECHECKED}. The release notes updated
+  {RELEASE_NOTES_UPDATED} contain zero occurrences of Auto-Schematization or Guided
+  Onboarding in any release section, so the announcement is still the only
+  source. Absence is equally consistent with still-Alpha and with quiet
+  withdrawal, so the Alpha label stands and the enrollment and review gates
+  below are unchanged.
 - Request or verify Alpha enrollment with Splunk experts; this packet does not
   enroll the tenant or invoke the workflow.
 - Review sample-event clustering and proposed CIM data-model mappings.
@@ -648,7 +672,8 @@ Feature visibility, a recommendation, or a generated candidate is not evidence
 that the tenant configuration changed. Record entitlement, source date, human
 approval, preview results, apply evidence, and post-apply validation separately.
 
-Source: https://www.splunk.com/en_us/blog/artificial-intelligence/accelerating-data-intelligence-with-ai-powered-data-management.html
+Announcement source (2026-03-11): https://www.splunk.com/en_us/blog/artificial-intelligence/accelerating-data-intelligence-with-ai-powered-data-management.html
+Re-check source (updated {RELEASE_NOTES_UPDATED}, checked {AI_LIFECYCLE_RECHECKED}): https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/introduction/release-notes-for-ingest-processor
 """
 
 

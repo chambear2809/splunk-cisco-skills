@@ -8,7 +8,7 @@ description: "Use when the user asks for Splunk Supported Add-on for Microsoft E
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Microsoft Exchange Supported Add-on Setup
@@ -83,7 +83,7 @@ doctor.
 
 Render-first workflow for the verified Microsoft Exchange packages:
 
-- Exchange bundle `4.1.0`, Splunkbase `3225`
+- Exchange bundle `4.1.1`, Splunkbase `3225`
 - Exchange Indexes `SA-ExchangeIndex` `4.0.4`, Splunkbase `5663`
 
 ## Workflow

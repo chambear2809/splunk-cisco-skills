@@ -14,7 +14,7 @@ DEFAULT_SPEC="${SKILL_DIR}/template.example"
 
 usage() {
     cat <<'EOF'
-Splunk Observability Database Monitoring setup (collector/chart 0.155.0)
+Splunk Observability Database Monitoring setup (collector/chart 0.158.0)
 
 Usage:
   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh [mode] [options]
@@ -24,7 +24,7 @@ Modes:
   --validate                Run static validation against freshly rendered output
   --live                    Add scoped, read-only Kubernetes runtime validation
   --api                     Add read-only Observability validation and require data
-  --collector-validate      Validate generated Collector config with image 0.155.0
+  --collector-validate      Validate generated Collector config with image 0.158.0
   --apply, --apply-k8s      Render, validate, then apply the Kubernetes overlay
   --apply-linux             Render, validate, then apply the Linux fragment
   --rollback-k8s            Run the generated Helm rollback helper
@@ -39,7 +39,7 @@ Mutation gates:
   --accept-k8s-rollback     REQUIRED for --rollback-k8s
   --accept-linux-rollback   REQUIRED for --rollback-linux
   --accept-collector-upgrade
-                            REQUIRED when the installed chart is not 0.155.0
+                            REQUIRED when the installed chart is not 0.158.0
   --accept-dbmon-reconfigure
                             REQUIRED to replace/remove existing DBMon receivers or pipelines
 
@@ -50,7 +50,7 @@ Options:
   --cluster-name NAME       Override spec.cluster_name
   --distribution NAME       kubernetes | aks | eks | eks/auto-mode |
                             gke | gke/autopilot | openshift | linux | windows
-  --collector-version VER   Override collector version (default: v0.155.0)
+  --collector-version VER   Override collector version (default: v0.158.0)
   --base-values PATH        Existing chart values for a review-only merged artifact
   --allow-unsupported-targets
                             Explicit lab opt-in outside the support matrix
@@ -216,7 +216,7 @@ Splunk Observability Database Monitoring -- execution plan
   Realm:              ${REALM:-<from spec or environment>}
   Cluster:            ${CLUSTER_NAME:-<from spec>}
   Distribution:       ${DISTRIBUTION:-<from spec>}
-  Collector/chart:    ${COLLECTOR_VERSION:-v0.155.0} / 0.155.0
+  Collector/chart:    ${COLLECTOR_VERSION:-v0.158.0} / 0.158.0
   Unsupported mode:   ${ALLOW_UNSUPPORTED_TARGETS}
   Render/validate:    $(bool_text "${MODE_RENDER}") / $(bool_text "${MODE_VALIDATE}")
   Live/API/config:    $(bool_text "${LIVE_VALIDATE}") / $(bool_text "${API_VALIDATE}") / $(bool_text "${COLLECTOR_VALIDATE}")

@@ -19,11 +19,13 @@ This child owns AppDynamics platform rows in the parent taxonomy:
 Run `bash skills/splunk-appdynamics-platform-setup/scripts/setup.sh --render`
 to generate `coverage-report.json` with current status and apply boundaries.
 
-The 26.4-backed rows include On-Premises overview and release references,
-deployment planning, platform quickstart, Controller CLI install, Enterprise
-Console command line, HA prerequisites, and HA Controller upgrade. Component
-deployment rows track the current Events Service, EUM Server, and Synthetic
-Server landing pages where the docs do not expose 26.4 URL pathing.
+The 26.8.0-backed rows include Controller CLI install, Enterprise Console
+command line, HA prerequisites, and HA Controller upgrade. On-Premises
+overview and release references, deployment planning, and platform quickstart
+track unversioned landing pages that the docs publish without version pathing,
+as do the Events Service, EUM Server, and Synthetic Server component
+deployment rows. Virtual Appliance rows stay on the 26.1.0 manual, which runs
+on its own release cadence.
 
 Deployment-method coverage is broader than the taxonomy row count:
 

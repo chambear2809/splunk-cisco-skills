@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -145,6 +145,7 @@ SOURCE_DOCS = {
     "smartstore": "https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.4/deploy-smartstore",
     "support_policy": "https://www.splunk.com/en_us/legal/splunk-software-support-policy.html",
     "workload_cloud": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/9.2.2406/manage-search-workloads-in-splunk-cloud-platform/workload-management-overview",
+    "workload_enterprise": "https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/workload-management-overview/about-workload-management",
 }
 
 
@@ -2109,7 +2110,7 @@ RULE_CATALOG = [
         platform="cloud",
         severity="medium",
         evidence="cmc.workload.status is degraded or cmc.workload.findings is populated.",
-        source_doc=SOURCE_DOCS["cloud_cmc"],
+        source_doc=SOURCE_DOCS["workload_cloud"],
         fix_kind="direct_fix",
         preview_command="Review CMC and Settings > Workload Management rules, admission rules, pool assignment, order, and required capabilities.",
         apply_command="Render a Cloud sc_admin workload checklist only; doctor does not modify rules or pool assignments.",
@@ -2130,7 +2131,7 @@ RULE_CATALOG = [
         platform="enterprise",
         severity="medium",
         evidence="workload_management.guardrails_missing is true or workload_management.issues is populated.",
-        source_doc=SOURCE_DOCS["splunkd_health"],
+        source_doc=SOURCE_DOCS["workload_enterprise"],
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-workload-management-setup/scripts/setup.sh --phase render --dry-run",
         apply_command="Render workload-management handoff; no WLM rule or pool is changed here.",
@@ -3077,7 +3078,9 @@ def load_json_file(path: Path) -> dict[str, Any]:
     raise AssertionError("unreachable")
 
 
-def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
+def augment_lifecycle_evidence(
+    evidence: dict[str, Any], platform: str, *, today: date | None = None
+) -> None:
     version = str(get_path(evidence, "server.version") or "").strip()
     if not version:
         return
@@ -3104,7 +3107,15 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
             str(item)
             for item in contract.get("enterprise_not_publicly_released_trains", [])
         }
-        lifecycle["supported_minor_trains"] = supported
+        reference_date = today or datetime.now(timezone.utc).date()
+        support_dates = contract.get("enterprise_support_end_dates", {})
+        lifecycle["recognized_minor_trains"] = supported
+        lifecycle["supported_minor_trains"] = [
+            train
+            for train in supported
+            if not support_dates.get(train)
+            or date.fromisoformat(str(support_dates[train])) >= reference_date
+        ]
         unsupported = False
         eos = False
         unrecognized = False
@@ -3130,11 +3141,11 @@ def augment_lifecycle_evidence(evidence: dict[str, Any], platform: str) -> None:
                 eos = True
             else:
                 unrecognized = True
-        support_end = contract.get("enterprise_support_end_dates", {}).get(minor)
+        support_end = support_dates.get(minor)
         if support_end:
             try:
-                end = datetime.fromisoformat(str(support_end)).replace(tzinfo=timezone.utc)
-                days = (end - datetime.now(timezone.utc)).days
+                end = date.fromisoformat(str(support_end))
+                days = (end - reference_date).days
                 lifecycle["support_end_date"] = support_end
                 lifecycle["support_days_remaining"] = days
                 lifecycle["near_eos"] = 0 <= days <= 90

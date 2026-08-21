@@ -7,6 +7,10 @@
   `com.splunk:rum-httpurlconnection-auto-plugin`.
 - Default runtime floor is API 24. Lower API work requires an explicit force
   flag and extra compatibility testing.
+- Agent `2.3.2` renamed the `deployment.environment` resource attribute to
+  `deployment.environment.name` and emits only the new key, so queries written
+  against the old key return nothing once an app upgrades. The
+  `deploymentEnvironment` configuration property is unchanged.
 - Enable core library desugaring.
 - Review OkHttp, HttpURLConnection, crash, ANR, slow rendering, interaction,
   network monitor, lifecycle, navigation, and WebView modules per app.

@@ -58,11 +58,15 @@ connection drops — it is **not** a polling interval.
 | Sourcetype | Content |
 |---|---|
 | `cisco:spaces:firehose` | Device presence, location updates, IoT telemetry, and contextual data from Cisco Spaces Firehose API |
-| `cisco:spaces:firehose:health` | Firehose connection and collector-health events in the pinned SCAN `2026_07_09_1837` catalog |
+| `cisco:spaces:firehose:health` | Firehose connection and collector-health events |
+| `cisco:spaces:log` | Add-on internal collector logs |
 
-The repo-local fallback package is `1.0.7` and does not contain the newer
-health sourcetype. Treat health-event presence as version-bound evidence; do
-not fail an otherwise complete `1.0.7` onboarding solely because it is absent.
+Package `2.0.1` is the first release to ship `props.conf`, and it defines all
+three source types. The `1.0.7` package shipped no `props.conf` at all, so
+health events are absent there. Treat health-event presence as version-bound
+evidence; do not fail an otherwise complete `1.0.7` onboarding solely because it
+is missing. The single `cisco_spaces_firehose` modular input is unchanged
+between `1.0.7` and `2.0.1`.
 
 ## REST API Endpoints
 

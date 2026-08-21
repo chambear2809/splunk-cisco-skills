@@ -93,7 +93,7 @@ install_selected() {
     python3 - "${PRODUCTS}" <<'PY' | while IFS=$'\t' read -r app_id version app_name; do
 import sys
 profiles = {
-    "ontap": ("3418", "3.2.0", "Splunk_TA_ontap"),
+    "ontap": ("3418", "3.2.1", "Splunk_TA_ontap"),
     "extractions": ("5615", "3.0.3", "TA-ONTAP-FieldExtractions"),
     "indexes": ("5616", "3.0.3", "SA-ONTAPIndex"),
 }

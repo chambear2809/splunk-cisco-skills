@@ -52,6 +52,7 @@ REQUIRED_RULE_FIELDS = {
     "severity",
     "evidence",
     "source_doc",
+    "supporting_docs",
     "fix_kind",
     "preview_command",
     "apply_command",
@@ -60,6 +61,11 @@ REQUIRED_RULE_FIELDS = {
     "target_impacts",
 }
 
+# Every key here must be cited by a rule, either as its `source_doc` or in its
+# `supporting_docs`. Rules are compound -- one rule fires on several unrelated
+# trigger paths -- so a curated page that answers a secondary trigger belongs in
+# `supporting_docs` rather than sitting unbound. tests/check_orphan_sources.py
+# enforces that every key is reachable.
 SOURCE_DOCS = {
     "cim_eventtypes": "https://help.splunk.com/en/splunk-enterprise-security-8/common-information-model/6.1/using-the-common-information-model/match-ta-event-types-with-cim-data-models-to-accelerate-searches",
     "cim_overview": "https://help.splunk.com/en/splunk-enterprise-security-8/common-information-model/5.1/introduction/overview-of-the-splunk-common-information-model",
@@ -76,14 +82,19 @@ SOURCE_DOCS = {
     "es_security_content_update": "https://help.splunk.com/en/splunk-enterprise-security-8/security-content-update/how-to-use-splunk-security-content/5.7/use-splunk-security-content/what-is-splunk-enterprise-security-content-update",
     "es_threat_intel": "https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.1/threat-intelligence",
     "es_assets": "https://help.splunk.com/en/splunk-enterprise-security-7/administer/7.2/asset-and-identity-overview",
-    "federated_search": "https://help.splunk.com/en/splunk-enterprise/search/federated-search/9.3/about-federated-search/about-federated-search",
-    "federated_security_lake": "https://help.splunk.com/splunk-enterprise-security-8/splunk-secured-federated-analytics/8.2/amazon-security-lake/search-amazon-security-lake-with-splunk-secured-federated-analytics",
-    "automatic_lookups": "https://help.splunk.com/en/splunk-enterprise/knowledge-manager-manual/10.0/use-the-configuration-files-to-configure-lookups/define-an-automatic-lookup-in-splunk-web",
-    "search_time_order": "https://help.splunk.com/en/splunk-enterprise/knowledge-manager-manual/9.4/get-started-with-knowledge-objects/the-sequence-of-search-time-operations",
-    "ingest_monitoring": "https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/about-ingest-monitoring",
-    "ingest_latency": "https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/metrics/review-data-ingest-latency-metrics",
-    "edge_processor_metrics": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/monitor-edge-processors/metrics-for-edge-processors",
-    "ingest_processor_destinations": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors-for-splunk-cloud-platform/9.3.2411/monitor-ingest-processors/monitor-data-destinations-pipeline-metrics",
+    "federated_search": "https://help.splunk.com/en/splunk-enterprise/search/federated-search/9.3/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform",
+    # Splunk Secured Federated Analytics 8.2 was renamed to Federated Analytics
+    # and folded into the Splunk Cloud Platform federated search manual, so the
+    # old 8.2 product version has no counterpart in the new versioning scheme.
+    "federated_security_lake": "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets/about-federated-analytics",
+    "automatic_lookups": "https://help.splunk.com/en/splunk-enterprise/manage-knowledge-objects/knowledge-management-manual/10.0/use-lookups-in-splunk-web/define-an-automatic-lookup-in-splunk-web",
+    "search_time_order": "https://help.splunk.com/en/splunk-enterprise/manage-knowledge-objects/knowledge-management-manual/9.4/get-started-with-knowledge-objects/the-sequence-of-search-time-operations",
+    "ingest_monitoring": "https://help.splunk.com/en/data-management/monitor-data-onboarding/ingest-monitoring/1.0/about-ingest-monitoring",
+    "ingest_latency": "https://help.splunk.com/en/data-management/monitor-data-onboarding/ingest-monitoring/1.0/latency-in-the-ingest-monitoring-dashboard",
+    # Edge Processor and Ingest Processor docs dropped their version segment when
+    # they moved out of the versioned Splunk Cloud Platform manual.
+    "edge_processor_metrics": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/monitor-system-health-and-activity/edge-processor-metrics-reference",
+    "ingest_processor_destinations": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors/monitor-system-health-and-activity/view-data-flow-information-about-an-ingest-processor-pipeline",
     "index_storage": "https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/9.0/indexing-overview/manage-index-storage/how-the-indexer-stores-indexes",
     "index_retention": "https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.2/troubleshooting/troubleshoot-performance-issues/change-the-index-retention-period",
     "itsi_entity": "https://help.splunk.com/splunk-it-service-intelligence/splunk-it-service-intelligence/discover-and-integrate-it-components/4.18/create-and-manage-entities/overview-of-itsi-entity-discovery-searches",
@@ -96,14 +107,14 @@ SOURCE_DOCS = {
     "metrics_search": "https://help.splunk.com/en/splunk-enterprise/get-data-in/metrics/10.0/work-with-metrics/search-and-monitor-metrics",
     "metrics_mstats": "https://help.splunk.com/en/splunk-enterprise/search/spl-search-reference/10.2/search-commands/mstats",
     "ari_indexes": "https://help.splunk.com/en/security-offerings/splunk-asset-and-risk-intelligence/install-and-upgrade/1.2/install-splunk-asset-and-risk-intelligence/create-indexes-for-splunk-asset-and-risk-intelligence",
-    "ari_sources": "https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.4/exposure-analytics/set-up-data-sources-for-splunk-asset-and-risk-intelligence",
+    "ari_sources": "https://help.splunk.com/en/security-offerings/splunk-asset-and-risk-intelligence/administer/1.2/set-up-data-sources/set-up-data-sources-for-splunk-asset-and-risk-intelligence",
     "ari_relevant_events": "https://help.splunk.com/en/security-offerings/splunk-asset-and-risk-intelligence/administer/1.2/set-up-data-sources/identify-data-sources-and-filter-by-relevant-events-in-splunk-asset-and-risk-intelligence",
     "ari_event_searches": "https://help.splunk.com/en/security-offerings/splunk-asset-and-risk-intelligence/administer/1.2/set-up-data-sources/create-and-modify-event-searches-in-splunk-asset-and-risk-intelligence",
     "ari_fields": "https://help.splunk.com/en/security-offerings/splunk-asset-and-risk-intelligence/administer/1.2/manage-data-source-field-mappings/data-source-field-mapping-reference",
     "ocsf_overview": "https://help.splunk.com/en/splunk-enterprise/common-information-model/6.3/introduction/overview-of-the-ocsf-cim-add-on",
     "ocsf_install": "https://help.splunk.com/en/splunk-enterprise-security-8/common-information-model/8.5/introduction/overview-of-the-ocsf-cim-add-on/installing-the-ocsf-cim-add-on",
     "ocsf_config": "https://help.splunk.com/en/data-management/common-information-model/6.3/introduction/overview-of-the-ocsf-cim-add-on/configuring-ocsf-cim-add-on",
-    "ocsf_platform": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security",
+    "ocsf_platform": "https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security",
     "sse_config": "https://help.splunk.com/en/splunk-enterprise-security-8/security-essentials/install-and-configure/3.7/configure-splunk-security-essentials/configure-splunk-security-essentials",
     "sse_cim_compliance": "https://help.splunk.com/en/splunk-enterprise-security-7/splunk-security-essentials/use-splunk-security-essentials/3.7/use-security-operations-in-splunk-security-essentials/check-if-your-data-is-cim-compliant-with-the-common-information-model-compliance-check-dashboard",
     "registry": "skills/shared/app_registry.json",
@@ -224,7 +235,18 @@ def rule(
     rollback_or_validation: str,
     target_impacts: dict[str, int],
     trigger: dict[str, Any],
+    supporting_docs: tuple[str, ...] = (),
 ) -> dict[str, Any]:
+    """Build one catalog rule.
+
+    Most rules in this catalog are compound: a single rule fires on several
+    unrelated trigger paths because they share a domain, a handoff skill, and a
+    remediation shape. `source_doc` names the page for the rule's headline
+    concern, which leaves the remaining triggers with no citation of their own.
+    `supporting_docs` carries those, so an operator whose finding came from
+    `itsi.entity_split_field_gaps` is pointed at the entity-split page and not
+    only at the threshold page that heads the rule.
+    """
     return {
         "id": rule_id,
         "domain": domain,
@@ -232,6 +254,7 @@ def rule(
         "severity": severity,
         "evidence": evidence,
         "source_doc": source_doc,
+        "supporting_docs": list(supporting_docs),
         "fix_kind": fix_kind,
         "preview_command": preview_command,
         "apply_command": apply_command,
@@ -271,6 +294,9 @@ RULE_CATALOG = [
         severity="high",
         evidence="ari.missing_required_fields or ari.field_mapping_errors is populated for Asset/IP/MAC/Identity/Software/Vulnerability/Cloud application processing.",
         source_doc=SOURCE_DOCS["ari_fields"],
+        # Answers the ari.event_search_errors trigger, which the field-mapping
+        # reference does not cover.
+        supporting_docs=(SOURCE_DOCS["ari_event_searches"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-asset-risk-intelligence-setup/scripts/setup.sh --help",
         apply_command="Render ARI field mapping/event-search handoff only.",
@@ -413,6 +439,9 @@ RULE_CATALOG = [
         severity="medium",
         evidence="cim.validation_errors, cim.dataset_constraint_gaps, cim.field_value_regex_failures, cim.recommended_field_gaps, or sse.cim_compliance_check_gaps indicates schema quality problems beyond required-field presence.",
         source_doc=SOURCE_DOCS["cim_reference_tables"],
+        # Answers the sse.cim_compliance_check_gaps trigger; this is the
+        # dashboard the rollback step already tells the operator to run.
+        supporting_docs=(SOURCE_DOCS["sse_cim_compliance"],),
         fix_kind="delegated_fix",
         preview_command="Review CIM validation/SSE compliance evidence and the owning TA or ES configuration skill.",
         apply_command="Render CIM validation handoff only; no TA/parser changes are performed.",
@@ -478,6 +507,13 @@ RULE_CATALOG = [
         severity="medium",
         evidence="dashboards.search_errors, dashboards.base_search_errors, dashboards.chain_search_gaps, dashboards.token_gaps, dashboards.saved_search_reference_gaps, dashboards.lookup_permission_gaps, or dashboards.concurrency_gaps is populated.",
         source_doc=SOURCE_DOCS["dashboard_chain"],
+        # The base/chain page covers only two of this rule's seven triggers.
+        # ds.search answers dashboards.search_errors and ds.savedSearch answers
+        # dashboards.saved_search_reference_gaps.
+        supporting_docs=(
+            SOURCE_DOCS["dashboard_search"],
+            SOURCE_DOCS["dashboard_savedsearch"],
+        ),
         fix_kind="diagnose_only",
         preview_command="Review dashboard data-source, base-search, chain-search, token, saved-search, lookup, and concurrency evidence.",
         apply_command="No dashboard JSON, report, token, lookup, or concurrency mutation in v1.",
@@ -569,6 +605,9 @@ RULE_CATALOG = [
         severity="high",
         evidence="ES/SSE content activation evidence shows disabled relevant correlation searches, missing adaptive response actions, stale content mapping, or missing data inventory introspection.",
         source_doc=SOURCE_DOCS["es_correlation_searches"],
+        # Answers the sse.data_inventory_missing and sse.content_mapping_stale
+        # triggers that route to splunk-security-essentials-setup.
+        supporting_docs=(SOURCE_DOCS["sse_config"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-enterprise-security-config/scripts/setup.sh --mode inventory --help",
         apply_command="Render ES content/action readiness handoff only.",
@@ -699,6 +738,9 @@ RULE_CATALOG = [
         severity="high",
         evidence="federated provider, federated-index, mode, remote-search, role-mapping, result-shape, or Amazon Security Lake mapping evidence shows the remote dataset is not reliably searchable by ES, ITSI, ARI, or dashboards.",
         source_doc=SOURCE_DOCS["federated_search"],
+        # Answers the federated.amazon_security_lake_mapping_gaps trigger; the
+        # generic federated-search overview says nothing about Security Lake.
+        supporting_docs=(SOURCE_DOCS["federated_security_lake"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-federated-search-setup/scripts/setup.sh --help",
         apply_command="Render federated-provider/index and remote-dataset handoff only; no provider, role, or federated index is changed.",
@@ -768,6 +810,13 @@ RULE_CATALOG = [
         severity="high",
         evidence="ingest pipeline, destination, drop, dead-letter, routing, latency, Edge Processor, Ingest Processor, or metadata-rewrite evidence shows events are not reaching expected indexes/sourcetypes intact.",
         source_doc=SOURCE_DOCS["ingest_monitoring"],
+        # Ingest monitoring does not cover the Edge Processor or Ingest
+        # Processor triggers, which are the ones that route to
+        # splunk-edge-processor-setup.
+        supporting_docs=(
+            SOURCE_DOCS["edge_processor_metrics"],
+            SOURCE_DOCS["ingest_processor_destinations"],
+        ),
         fix_kind="delegated_fix",
         preview_command="Review generated ingest-monitoring, Edge Processor, Ingest Processor, and HEC destination evidence.",
         apply_command="Render ingest pipeline/destination/routing handoff only; no pipeline, token, destination, or route is changed.",
@@ -817,6 +866,9 @@ RULE_CATALOG = [
         severity="high",
         evidence="ITSI entity discovery, macro, service import, KPI base search, or KPI data evidence is missing.",
         source_doc=SOURCE_DOCS["itsi_entity"],
+        # Answers the itsi.kpi_base_searches_missing and
+        # itsi.kpi_search_zero_results triggers.
+        supporting_docs=(SOURCE_DOCS["itsi_kpi"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-itsi-config/scripts/setup.sh --help",
         apply_command="Render ITSI entity/KPI handoff only.",
@@ -864,7 +916,14 @@ RULE_CATALOG = [
         scope="both",
         severity="high",
         evidence="itsi.threshold_gaps, itsi.entity_split_field_gaps, itsi.service_template_gaps, itsi.kpi_runtime_gaps, or adaptive-threshold training gaps show KPI data is not operationally usable.",
-        source_doc=SOURCE_DOCS["itsi_kpi"],
+        # Previously cited the KPI base-search page, which sends an operator
+        # holding a threshold finding to the wrong task entirely. The
+        # base-search page now supports DSRD-ITSI-ENTITY-KPI-GAP, where the
+        # base-search triggers actually live.
+        source_doc=SOURCE_DOCS["itsi_thresholds"],
+        # Answers the itsi.entity_split_field_gaps and itsi.pseudo_entity_gaps
+        # triggers.
+        supporting_docs=(SOURCE_DOCS["itsi_entity_split"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-itsi-config/scripts/setup.sh --help",
         apply_command="Render ITSI KPI threshold/entity-split/runtime handoff only.",
@@ -914,6 +973,9 @@ RULE_CATALOG = [
         severity="high",
         evidence="knowledge or lookup evidence shows automatic lookups, lookup definitions/tables, field aliases, calculated fields, KV Store collections, permissions, or search-time order are not enriching representative events.",
         source_doc=SOURCE_DOCS["automatic_lookups"],
+        # Answers the knowledge.search_time_order_gaps trigger, which is about
+        # operation sequence rather than lookup definition.
+        supporting_docs=(SOURCE_DOCS["search_time_order"],),
         fix_kind="delegated_fix",
         preview_command="Review generated lookup, field-alias, calculated-field, KV Store, and search-time enrichment evidence.",
         apply_command="Render knowledge-object enrichment handoff only; no lookup, props, transforms, KV Store, or ACL change is made.",
@@ -944,6 +1006,10 @@ RULE_CATALOG = [
         severity="high",
         evidence="metrics.indexes_missing, metrics.metric_names_missing, metrics.dimensions_missing, metrics.mstats_zero_results, metrics.default_metrics_index_gaps, metrics.case_sensitivity_gaps, metrics.high_cardinality_dimensions, or metrics.field_filter_gaps prevents metrics-backed ITSI KPIs and dashboards from returning reliable data.",
         source_doc=SOURCE_DOCS["metrics_mstats"],
+        # The mstats command reference does not explain how to discover metric
+        # names and dimensions, which is what metrics.metric_names_missing and
+        # metrics.dimensions_missing ask the operator to do.
+        supporting_docs=(SOURCE_DOCS["metrics_search"],),
         fix_kind="delegated_fix",
         preview_command="Review generated mstats/mpreview evidence and the owning metrics or ITSI setup skill.",
         apply_command="Render metrics-readiness handoff only.",
@@ -990,6 +1056,10 @@ RULE_CATALOG = [
         severity="high",
         evidence="ocsf.missing_transforms, ocsf.unsupported_classes, ocsf.mapping_errors, or ocsf.mapped_to_cim=false is present.",
         source_doc=SOURCE_DOCS["ocsf_overview"],
+        # Answers ocsf.mapped_to_cim=false: the add-on overview describes the
+        # mapping, this page describes what correctly mapped OCSF data looks
+        # like once it reaches the platform and Enterprise Security.
+        supporting_docs=(SOURCE_DOCS["ocsf_platform"],),
         fix_kind="delegated_fix",
         preview_command="bash skills/splunk-enterprise-security-config/scripts/setup.sh --mode preview --help",
         apply_command="Render OCSF transform/CIM mapping handoff only.",
@@ -1080,6 +1150,10 @@ RULE_CATALOG = [
         severity="high",
         evidence="retention, index aging, archive/searchability, raw-history, data model summary, ITSI backfill, ARI last-detect, or dashboard lookback evidence shows historical data is shorter than product content requires.",
         source_doc=SOURCE_DOCS["index_storage"],
+        # Bucket storage explains why data ages out; this page is the one an
+        # operator needs for the retention.frozen_time_too_short and
+        # indexes.retention_gaps triggers.
+        supporting_docs=(SOURCE_DOCS["index_retention"],),
         fix_kind="delegated_fix",
         preview_command="Review index retention, bucket aging, data model summary range, ITSI backfill, ARI last-detect, and dashboard lookback evidence.",
         apply_command="Render retention/lookback handoff only; no index, SmartStore, archive, summary, or backfill setting is changed.",
@@ -1392,6 +1466,15 @@ def validate_catalog() -> dict[str, Any]:
             errors.append(f"{rule_id}: direct_fix apply_command contains a blocked disruptive action")
         if not item.get("trigger"):
             errors.append(f"{rule_id}: missing trigger")
+        supporting = item.get("supporting_docs", [])
+        if not isinstance(supporting, list) or any(
+            not isinstance(doc, str) or not doc.strip() for doc in supporting
+        ):
+            errors.append(f"{rule_id}: supporting_docs must be a list of non-empty strings")
+        elif len(set(supporting)) != len(supporting):
+            errors.append(f"{rule_id}: supporting_docs contains a duplicate")
+        elif item.get("source_doc") in supporting:
+            errors.append(f"{rule_id}: supporting_docs repeats source_doc")
         impacts = item.get("target_impacts", {})
         if not isinstance(impacts, dict) or not impacts:
             errors.append(f"{rule_id}: target_impacts must be a non-empty mapping")
@@ -1400,6 +1483,17 @@ def validate_catalog() -> dict[str, Any]:
                 errors.append(f"{rule_id}: invalid target impact {target!r}")
             if not isinstance(impact, int) or impact > 0:
                 errors.append(f"{rule_id}: target impact for {target} must be a non-positive integer")
+
+    cited_docs: set[str] = set()
+    for item in RULE_CATALOG:
+        cited_docs.add(str(item.get("source_doc", "")))
+        cited_docs.update(str(doc) for doc in item.get("supporting_docs", []) or [])
+    for key, url in sorted(SOURCE_DOCS.items()):
+        if url not in cited_docs:
+            errors.append(
+                f"SOURCE_DOCS[{key!r}] is curated but no rule cites it as source_doc "
+                f"or in supporting_docs"
+            )
 
     for manifest in COVERAGE_MANIFEST:
         domain = manifest["domain"]
@@ -2097,6 +2191,12 @@ def render_report_markdown(report: dict[str, Any]) -> str:
                 f"- Fix kind: `{finding['fix_kind']}`",
                 f"- Evidence: {finding['evidence']}",
                 f"- Source: {finding['source_doc']}",
+            ]
+        )
+        for doc in finding.get("supporting_docs", []):
+            lines.append(f"- Also see: {doc}")
+        lines.extend(
+            [
                 f"- Target impacts: `{finding['target_impacts']}`",
                 f"- Preview: `{finding['preview_command']}`",
                 f"- Apply policy: {finding['apply_command']}",
@@ -2692,7 +2792,7 @@ def render_handoff_packet(output_dir: Path, finding: dict[str, Any]) -> None:
         "",
         "## Source",
         "",
-        finding["source_doc"],
+        markdown_list([finding["source_doc"], *finding.get("supporting_docs", [])]),
         "",
         "## Suggested Preview",
         "",
@@ -2725,7 +2825,7 @@ def render_support_packet(output_dir: Path, finding: dict[str, Any]) -> None:
         "",
         "## Source Anchor",
         "",
-        finding["source_doc"],
+        markdown_list([finding["source_doc"], *finding.get("supporting_docs", [])]),
         "",
         "## Operator Notes",
         "",

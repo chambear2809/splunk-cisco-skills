@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26"
+    "sha256": "3d604951119d043cb8c2a9fd0c061d3738b79969a4a4f716682bec98ed30215a"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -242,7 +242,7 @@
         "evidence": [
           "skills/shared/references/galileo_mcp_server_validation_evidence.json"
         ],
-        "notes": "Direct authenticated HTTP and the rendered dependency-free stdio bridge both initialized successfully. Nine-tool discovery and schema checks plus two read-only calls passed without retaining tenant results or secrets. Write-capable tools were intentionally not invoked in this read-only dimension."
+        "notes": "Direct authenticated HTTP and the rendered dependency-free stdio bridge both initialized successfully. Nine-tool discovery and schema checks plus two read-only calls passed without retaining tenant results or secrets. Write-capable tools were intentionally not invoked in this read-only dimension. An unauthenticated contract recheck on 2026-08-20 observed server version 1.29.0 with the same nine tools and byte-identical required arguments, property keys, and input-schema SHA-256 fingerprints, so the checked-in pins were refreshed to 1.29.0; last_verified stays 2026-07-08 because the authorized two-profile read-only dimension was not re-run."
       }
     },
     "galileo-on-prem-agent-control-setup": {

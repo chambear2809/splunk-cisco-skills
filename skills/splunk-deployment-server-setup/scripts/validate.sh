@@ -35,10 +35,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
+        --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --live) LIVE=true; shift ;;
-        --ds-uri) DS_URI="$2"; shift 2 ;;
-        --admin-password-file) ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
+        --ds-uri) require_arg "$1" $# || exit 1; DS_URI="$2"; shift 2 ;;
+        --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
         --json) JSON_OUTPUT=true; shift ;;
         --summary) SUMMARY=true; shift ;;
         --help|-h) usage 0 ;;

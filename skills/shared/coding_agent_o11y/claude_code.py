@@ -1205,9 +1205,9 @@ def render_collector_overlay(config: dict[str, Any]) -> str:
 
     return f"""# Local collector overlay for Claude Code OTel.
 # Requires a collector distribution containing the signal_to_metrics connector.
-# otel/opentelemetry-collector-contrib:0.154.0 is validated. The stock Splunk
-# Distribution v0.154.2 omits this connector and cannot produce the GenAI token
-# histogram required by Splunk AI Agent Monitoring.
+# otel/opentelemetry-collector-contrib:0.158.0 is validated. The stock Splunk
+# Distribution 0.158.0 still omits this connector and cannot produce the GenAI
+# token histogram required by Splunk AI Agent Monitoring.
 receivers:
   otlp/claude_code:
     protocols:
@@ -2039,7 +2039,7 @@ def doctor_report(config: dict[str, Any], errors: list[str], warnings: list[str]
             "",
             "- Copy or merge the rendered settings JSON into the target `.claude/settings.json`.",
             "- For splunk-direct, install the otelHeadersHelper script and set `SPLUNK_O11Y_TOKEN_FILE`.",
-            "- For local-collector, use a collector build with signal_to_metrics (validated: otel/opentelemetry-collector-contrib:0.154.0) and merge the overlay.",
+            "- For local-collector, use a collector build with signal_to_metrics (validated: otel/opentelemetry-collector-contrib:0.158.0) and merge the overlay.",
             "- For Galileo fan-out, use the user-confirmed instance URL, provision the project/log stream via `galileo-platform-setup`, and export `GALILEO_API_KEY`.",
         ]
     )
@@ -2076,8 +2076,8 @@ def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
                 "",
                 "Merge `collector/claude-code-o11y-local-collector.yaml` into a collector",
                 "gateway that includes the `signal_to_metrics` connector (validated:",
-                "`otel/opentelemetry-collector-contrib:0.154.0`). The stock Splunk",
-                "Distribution v0.154.2 omits that connector and cannot emit the required",
+                "`otel/opentelemetry-collector-contrib:0.158.0`). The stock Splunk",
+                "Distribution 0.158.0 still omits that connector and cannot emit the required",
                 "GenAI token histogram. Fan Claude Code traces to Splunk O11y and Galileo",
                 "when enabled, then start the collector before a new Claude process.",
                 "For Docker, publish `127.0.0.1:14318:4318` and bind the container's",

@@ -77,7 +77,7 @@ DIRECT_SECRET_KEYS = {
     "database_password",
 }
 DOC_SOURCES = {
-    "modern_dashboard": "https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-modern-dashboards/use-new-dashboard-experience-beta",
+    "modern_dashboard": "https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-new-dashboard-experience",
     "dashboard_api": "https://dev.splunk.com/observability/reference/api/dashboards/latest",
     "charts_api": "https://dev.splunk.com/observability/reference/api/charts/latest",
     "apm_service_map": "https://help.splunk.com/en/splunk-observability-cloud/monitor-application-performance/manage-services-spans-and-traces-in-splunk-apm/view-dependencies-among-your-services-in-the-service-map",
@@ -97,13 +97,13 @@ DOC_SOURCES = {
     "rum_errors": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/monitor-errors-and-crashes-in-tag-spotlight/monitor-browser-errors",
     "rum_url_grouping": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/write-rules-for-url-grouping",
     "rum_mobile_crashes": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/monitor-errors-and-crashes-in-tag-spotlight/monitor-mobile-crashes",
-    "dxa": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/introduction-to-digital-experience-analytics",
-    "dxa_setup": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/set-up-digital-experience-analytics",
-    "dxa_events": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-and-manage-event-definitions",
-    "dxa_funnels": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-conversion-funnel-analysis",
+    "dxa": "https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/introduction-to-digital-experience-analytics",
+    "dxa_setup": "https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/set-up-digital-experience-analytics",
+    "dxa_events": "https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/create-and-manage-event-definitions",
+    "dxa_funnels": "https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/analyses-in-digital-experience-analytics/create-conversion-funnel-analysis",
     "metric_api": "https://dev.splunk.com/observability/docs/datamodel/metrics_metadata",
-    "dbmon": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/introduction-to-splunk-database-monitoring",
-    "db_queries": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/queries",
+    "dbmon": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring",
+    "db_queries": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring/navigator/workload",
     "synthetics": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring",
     "synthetic_waterfall": "https://help.splunk.com/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring/browser-tests-for-webpages/interpret-browser-test-results",
     "synthetics_api": "https://dev.splunk.com/observability/reference/api/synthetics_tests/latest",
@@ -117,8 +117,8 @@ DOC_SOURCES = {
     "navigator_dashboards": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/use-navigators/customize-dashboards-in-splunk-infrastructure-monitoring-navigators",
     "related_content": "https://help.splunk.com/en/splunk-observability-cloud/data-tools/related-content",
     "ai_assistant": "https://help.splunk.com/en/splunk-observability-cloud/splunk-ai-assistant/ai-assistant-in-observability-cloud",
-    "mobile_app": "https://help.splunk.com/en/splunk-observability-cloud/use-splunk-observability-cloud-mobile/view-dashboards-and-alerts",
-    "logs_chart": "https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-modern-dashboards/use-new-dashboard-experience-beta",
+    "mobile_app": "https://help.splunk.com/en/splunk-observability-cloud/use-splunk-observability-cloud-mobile/introduction-to-splunk-observability-cloud-for-mobile",
+    "logs_chart": "https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-new-dashboard-experience/add-a-logs-chart",
 }
 
 
@@ -272,6 +272,7 @@ class RenderContext:
         reason: str,
         outputs: list[str] | None = None,
         source: str | None = None,
+        supporting_sources: list[str] | None = None,
     ) -> None:
         if coverage not in ALLOWED_COVERAGE:
             raise SpecError(f"Invalid coverage {coverage!r}.")
@@ -282,6 +283,7 @@ class RenderContext:
                 "outputs": sorted(outputs or []),
                 "reason": reason,
                 "source": source,
+                "supporting_sources": sorted(supporting_sources or []),
                 "surface": surface,
             }
         )
@@ -328,6 +330,7 @@ class RenderContext:
         steps: list[str],
         source: str | None = None,
         coverage: str = "handoff",
+        supporting_sources: list[str] | None = None,
     ) -> None:
         self.handoffs.append(
             {
@@ -335,11 +338,20 @@ class RenderContext:
                 "name": name,
                 "source": source,
                 "steps": steps,
+                "supporting_sources": sorted(supporting_sources or []),
                 "surface": surface,
                 "title": title,
             }
         )
-        self.add_coverage(surface, name, coverage, title, ["workflow-handoff.md"], source)
+        self.add_coverage(
+            surface,
+            name,
+            coverage,
+            title,
+            ["workflow-handoff.md"],
+            source,
+            supporting_sources,
+        )
 
 
 def prepare_output_dir(output_dir: Path) -> None:
@@ -390,6 +402,7 @@ def render_modern_dashboard(ctx: RenderContext, workflow: dict[str, Any]) -> Non
         "Classic dashboard/chart apply is delegated; modern dashboard layout remains UI-guided.",
         [rel],
         DOC_SOURCES["dashboard_api"],
+        [DOC_SOURCES["charts_api"]],
     )
 
 
@@ -454,6 +467,7 @@ def render_apm_service_view(ctx: RenderContext, workflow: dict[str, Any]) -> Non
             "When service dashboards need durable custom charts, hand off chart payloads to splunk-observability-dashboard-builder.",
         ],
         DOC_SOURCES["apm_service_view"],
+        supporting_sources=[DOC_SOURCES["apm_dashboards"]],
     )
 
 
@@ -630,6 +644,7 @@ def render_rum_error_analysis(ctx: RenderContext, workflow: dict[str, Any]) -> N
             "Pivot from representative errors to user sessions and session replay when replay is available and privacy checks are complete.",
         ],
         DOC_SOURCES["rum_errors"],
+        supporting_sources=[DOC_SOURCES["rum_session_search"]],
     )
 
 
@@ -720,6 +735,7 @@ def render_digital_experience_analytics(ctx: RenderContext, workflow: dict[str, 
         "DXA event definitions, segments, conversion funnels, and analysis views are native UI workflows.",
         [rel],
         DOC_SOURCES["dxa_events"],
+        [DOC_SOURCES["dxa_funnels"]],
     )
 
 
@@ -924,6 +940,7 @@ def render_synthetic_waterfall(ctx: RenderContext, workflow: dict[str, Any]) -> 
             "Synthetics APIs can list run history and plan artifact retrieval for waterfall review.",
             [rel, "apply-plan.json"],
             DOC_SOURCES["synthetics_api"],
+            [DOC_SOURCES["synthetics_artifacts_api"]],
         )
     url = deeplink(ctx.app_base, "/synthetics/runs", {"testId": test_id if concrete_id(test_id) else None, "runId": workflow.get("run_id")})
     ctx.add_link("synthetic_waterfall", name, url, "Open Synthetic run results and waterfall.")
@@ -1106,6 +1123,8 @@ def render_handoff(ctx: RenderContext) -> str:
         )
         if item.get("source"):
             lines.append(f"- Source: {item['source']}")
+        for supporting in item.get("supporting_sources") or []:
+            lines.append(f"- Supporting source: {supporting}")
         for step in item["steps"]:
             lines.append(f"- {step}")
         lines.append("")

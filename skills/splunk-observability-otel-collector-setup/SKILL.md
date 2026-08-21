@@ -8,7 +8,7 @@ description: "Use when rendering, preflighting, applying, validating, diagnosing
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability OTel Collector Setup
@@ -76,21 +76,23 @@ skill supports them; help exits without mutation.
 
 This workflow is pinned and tested against:
 
-- Linux Collector and auto-instrumentation packages `0.154.2`.
-- `splunk-otel-collector` Helm chart `0.154.0`, fetched as the exact GitHub
+- Linux Collector and auto-instrumentation packages `0.158.0`.
+- `splunk-otel-collector` Helm chart `0.158.0`, fetched as the exact GitHub
   release archive with SHA-256
-  `613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0`.
+  `088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274`.
 - Chart-selected Collector and auxiliary images are rewritten to the audited
   manifest digests recorded in `references/sources.md`; unknown custom images
   are accepted only when already pinned with `@sha256:<64 lowercase hex>`.
-- Splunkbase apps `7125`, `8698`, and `8699`, version `0.154.2`, published
-  June 17, 2026 and rechecked July 2, 2026. App `7125` is the multi-OS/root
+- Splunkbase apps `7125`, `8698`, and `8699`, version `0.158.0`, published
+  August 7, 2026 and inspected August 20, 2026. App `7125` is the multi-OS/root
   artifact; `8698` and `8699` are the Linux and Windows x86_64 split artifacts.
+  These Splunkbase pins are a separate artifact chain from the Linux collector,
+  auto-instrumentation, and Helm chart pins above and do not move together.
 - Splunk Platform versions explicitly listed for this TA release: `9.0`
-  through `10.4`. When the caller supplies `--splunk-version`, a `10.5` value is
-  rejected until the package listings certify that train. Omitting
-  `--splunk-version` skips that optional compatibility assertion; it allows
-  package audit/rendering but does not certify the package for `10.5`.
+  through `10.5`, so `--splunk-version 10.5` is accepted. A value outside the
+  listed trains is still rejected. Omitting `--splunk-version` skips that
+  optional compatibility assertion entirely; package audit/rendering on its own
+  does not certify the package for any specific train.
 
 Treat a newer release as unaudited until `--check-upstream`, the regression
 suite, and the source ledger in `references/sources.md` have been updated.
@@ -308,7 +310,7 @@ bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \
   --render-k8s \
   --realm us0 \
   --cluster-name production-cluster \
-  --chart-version 0.154.0 \
+  --chart-version 0.158.0 \
   --o11y-token-file /secure/splunk_o11y_token
 ```
 

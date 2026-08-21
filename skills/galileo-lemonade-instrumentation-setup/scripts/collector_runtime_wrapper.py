@@ -360,6 +360,17 @@ def descriptor_exec_supported() -> bool:
     )
 
 
+def exec_platform_supported() -> bool:
+    """Report whether the root-owned path proof can be made on this platform.
+
+    The ancestor sweep in ``trusted_executable_path`` and the uid/mode check in
+    ``open_trusted_executable`` are Linux-only, so exec mode refuses elsewhere
+    rather than running a collector with those checks skipped.
+    """
+
+    return sys.platform.startswith("linux")
+
+
 def trusted_executable_path(path: Path) -> Path:
     """Require a canonical executable path with a trusted Linux path chain."""
 
@@ -521,8 +532,21 @@ def descriptor_exec(
 def open_pinned_collector_command(
     command: list[str], environment: dict[str, str]
 ) -> int:
-    """Open the one reviewed collector command that may receive the API key."""
+    """Open the one reviewed collector command that may receive the API key.
 
+    This is the only caller on the exec path, so it carries the single platform
+    refusal. The root-owned ancestor sweep in ``trusted_executable_path`` and
+    the uid/mode check in ``open_trusted_executable`` are Linux-only, so on any
+    other platform a collector would be executed with those checks skipped.
+    Refuse instead of degrading silently. ``--check`` and
+    ``--print-destination-fingerprint`` never reach this function and stay
+    available everywhere, which is why the refusal is not pushed down into
+    those two helpers: ``validate_tinyproxy_contract`` calls them during
+    ``--check`` and must keep working off Linux.
+    """
+
+    if not exec_platform_supported():
+        raise ValueError("collector exec requires Linux")
     if not command:
         raise ValueError("a collector command is required")
     raw_path = environment.get("GALILEO_COLLECTOR_BINARY", "")

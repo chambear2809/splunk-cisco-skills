@@ -4,7 +4,7 @@ Package source of truth:
 
 | Selector | App | Splunkbase | Verified |
 | --- | --- | --- | --- |
-| `ontap` | `Splunk_TA_ontap` | `3418` | `3.2.0` |
+| `ontap` | `Splunk_TA_ontap` | `3418` | `3.2.1` |
 | `extractions` | `TA-ONTAP-FieldExtractions` | `5615` | `3.0.3` |
 | `indexes` | `SA-ONTAPIndex` | `5616` | `3.0.3` |
 

@@ -7,11 +7,11 @@ source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 APP_NAME="cisco-catalyst-app"
 APP_ID="7539"
-VERIFIED_APP_VERSION="3.1.0"
-PUBLIC_APP_VERSION="3.2.0"
+VERIFIED_APP_VERSION="3.2.20"
 CATALYST_TA_APP="TA_cisco_catalyst"
 ENHANCED_NETFLOW_TA_APP="splunk_app_stream_ipfix_cisco_hsl"
-SOURCETYPE_MACRO_DEFINITION='sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", "cisco:catalyst:center:*", "stream:netflow", "cisco:cybervision:*", "meraki:*", "cisco:ios", "cisco:thousandeyes:*")'
+# Mirrors the cisco_catalyst_app_sourcetypes definition shipped in 3.2.20.
+SOURCETYPE_MACRO_DEFINITION='sourcetype IN ("cisco:ise*", "cisco:sdwan*", "cisco:dnac*", "stream:netflow", "cisco:cybervision:*", "meraki:*", "cisco:ios", "cisco:thousandeyes:metric", "cisco:sgacl:logs", "cisco:catalyst:center:*", "cisco:ise:analytics*", "tenable:sc*")'
 
 MACROS_ONLY=false
 ACCELERATE=false
@@ -60,9 +60,6 @@ require_configuration_version_compatible() {
     fi
 
     log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
-    if [[ "${selected_version}" == "${PUBLIC_APP_VERSION}" ]]; then
-        log "The public ${PUBLIC_APP_VERSION} release does not advertise Splunk 10.5 compatibility."
-    fi
     log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
     return 1
 }
@@ -134,7 +131,8 @@ check_prereqs() {
     fi
     verify_installed_package_before_mutation || exit 1
     if ! rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
-        log "WARNING: Cisco Catalyst Add-on (${CATALYST_TA_APP}) not found — dashboards may not show Catalyst, ISE, SD-WAN, or Cyber Vision data"
+        log "ERROR: Cisco Catalyst Add-on (${CATALYST_TA_APP}) not found. Install it before configuring dashboard macros and the SD-WAN index eventtype."
+        exit 1
     fi
     if ! rest_check_app "$SK" "$SPLUNK_URI" "${ENHANCED_NETFLOW_TA_APP}" 2>/dev/null; then
         log "WARNING: Optional Cisco Catalyst Enhanced Netflow Add-on (${ENHANCED_NETFLOW_TA_APP}) not found — additional NetFlow-focused dashboards may not show data"
@@ -173,9 +171,40 @@ update_macros() {
 
     log "  cisco_catalyst_app_index = ${index_list}"
 
+    # SD-WAN raw dashboards (notably audit logs) read cisco_catalyst_sdwan_index
+    # independently of the shared data-model macro.
+    local sdwan_index_list
+    if [[ -n "${CUSTOM_INDEXES}" ]]; then
+        sdwan_index_list="${index_list}"
+    else
+        sdwan_index_list='index IN ("sdwan")'
+    fi
+    body=$(form_urlencode_pairs \
+        definition "${sdwan_index_list}" \
+        description "Definition for Cisco SD-WAN-only indexes used by SD-WAN raw dashboards, especially audit logs" \
+        iseval "0")
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_sdwan_index" "${body}"; then
+        log "ERROR: Failed to update macro 'cisco_catalyst_sdwan_index'."
+        return 1
+    fi
+
+    log "  cisco_catalyst_sdwan_index = ${sdwan_index_list}"
+
+    # TA transition eventtypes such as cisco_sdwan_firewall and
+    # cisco_sdwan_sgacl_logs are scoped through cisco_sdwan_index. Keep that
+    # eventtype aligned with the app's SD-WAN macro; the package default is the
+    # intentionally empty () placeholder.
+    body=$(form_urlencode_pairs search "${sdwan_index_list}")
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$CATALYST_TA_APP" "eventtypes" "cisco_sdwan_index" "${body}"; then
+        log "ERROR: Failed to update TA eventtype 'cisco_sdwan_index'."
+        return 1
+    fi
+
+    log "  ${CATALYST_TA_APP} eventtype cisco_sdwan_index = ${sdwan_index_list}"
+
     body=$(form_urlencode_pairs \
         definition "${SOURCETYPE_MACRO_DEFINITION}" \
-        description "Current SCAN-aligned Cisco sourcetypes used by Enterprise Networking dashboards" \
+        description "Cisco sourcetypes shipped in the Enterprise Networking 3.2.20 package contract" \
         iseval "0")
     if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_app_sourcetypes" "${body}"; then
         log "ERROR: Failed to update macro 'cisco_catalyst_app_sourcetypes'."

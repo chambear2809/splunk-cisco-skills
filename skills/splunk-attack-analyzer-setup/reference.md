@@ -9,8 +9,8 @@
 | Splunk Add-on for Splunk Attack Analyzer | `Splunk_TA_SAA` | `6999` | `splunk-add-on-for-splunk-attack-analyzer_*` |
 | Splunk App for Splunk Attack Analyzer | `Splunk_App_SAA` | `7000` | `splunk-app-for-splunk-attack-analyzer_*` |
 
-Both researched versions were `1.2.1`, unrestricted, and Cloud compatible for
-Splunk platform versions 9.0 through 10.5.
+Both researched versions were `1.3.0`, unrestricted, and Cloud compatible for
+Splunk platform versions `9.4` through `10.5`.
 
 The `10.5` entry is used here for the repository's current Splunk Cloud target.
 Self-managed Splunk Enterprise remains on the `10.4.1` default, so this

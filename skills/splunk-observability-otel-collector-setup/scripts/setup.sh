@@ -185,9 +185,9 @@ Linux options:
   --metrics-exporter LIST       SDK metrics exporter list, or none
   --logs-exporter EXPORTER      SDK logs exporter, or none
   --instrumentation-version VER splunk-otel-auto-instrumentation version
-                                (audited executable pin: 0.154.2; other versions rejected)
+                                (audited executable pin: 0.158.0; other versions rejected)
   --enable-logs                 Enable SDK log export when auto-instrumentation is active
-  --collector-version VERSION   Collector package version (audited-only: 0.154.2)
+  --collector-version VERSION   Collector package version (audited-only: 0.158.0)
   --godebug VALUE               GODEBUG value for collector service
   --obi-version VERSION         OBI version when enabled (audited-only: v0.6.0)
   --obi-install-dir PATH        OBI install directory
@@ -373,7 +373,7 @@ RELEASE_NAME="splunk-otel-collector"
 CLUSTER_NAME=""
 DISTRIBUTION=""
 CLOUD_PROVIDER=""
-CHART_VERSION="0.154.0"
+CHART_VERSION="0.158.0"
 KUBE_CONTEXT=""
 PLATFORM_HEC_URL=""
 PLATFORM_HEC_INDEX="k8s_logs"
@@ -455,13 +455,13 @@ OTLP_ENDPOINT=""
 OTLP_ENDPOINT_PROTOCOL=""
 METRICS_EXPORTER=""
 LOGS_EXPORTER=""
-INSTRUMENTATION_VERSION="0.154.2"
-COLLECTOR_VERSION="0.154.2"
+INSTRUMENTATION_VERSION="0.158.0"
+COLLECTOR_VERSION="0.158.0"
 GODEBUG_VALUE=""
 OBI_VERSION=""
 OBI_INSTALL_DIR=""
-INSTALLER_URL="https://raw.githubusercontent.com/signalfx/splunk-otel-collector/v0.154.2/packaging/installer/install.sh"
-INSTALLER_SHA256="16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29"
+INSTALLER_URL="https://raw.githubusercontent.com/signalfx/splunk-otel-collector/v0.158.0/packaging/installer/install.sh"
+INSTALLER_SHA256="cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b"
 
 TA_TARGET="deployment-server"
 TA_PACKAGE_PATHS=()

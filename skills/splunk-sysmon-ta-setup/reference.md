@@ -1,6 +1,6 @@
 # Splunk_TA_microsoft_sysmon Reference
 
-Package source of truth: `splunk-ta/_unpacked/Splunk_TA_microsoft_sysmon-5.0.0/Splunk_TA_microsoft_sysmon`.
+Package source of truth: `splunk-ta/_unpacked/Splunk_TA_microsoft_sysmon-5.0.1/Splunk_TA_microsoft_sysmon`.
 
 ## Package Defaults
 

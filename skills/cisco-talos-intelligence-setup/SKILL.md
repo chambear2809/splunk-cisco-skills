@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Talos Intelligence Setup
@@ -94,12 +94,11 @@ This is not a normal polling input add-on. The package provides:
 ## Package Verification Boundary
 
 This skill's package-derived capability, REST-handler, and alert-action model
-was verified against `1.0.1`. The current public release is `1.0.3` and
-advertises Splunk 10.5 support, but this repository has not inspected that
-newer package. The shared installer defaults to verified `1.0.1`; only
-`--accept-unverified-release` follows public `1.0.3`. After that explicit
-override, repeat the capability, action, configuration-stanza, and
-dashboard/package-evidence checks before declaring readiness.
+was verified against `1.0.3`, the current public release, which advertises
+Splunk 10.5. The package was downloaded, unpacked, and inspected here, so the
+shared installer's default pin needs no review override. Still repeat the
+capability, action, configuration-stanza, and threatlist-state checks against
+the live stack before declaring readiness.
 
 ## Support Posture
 

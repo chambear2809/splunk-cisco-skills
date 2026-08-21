@@ -132,12 +132,19 @@ def test_ai_powered_data_management_lifecycle_is_explicit_and_ui_only(tmp_path: 
     assert afe["source_date"] == "2026-03-11"
     assert afe["coverage_status"] == "ui_handoff"
     assert afe["automation"] == "ui_suggestion_and_human_review_only"
+    assert afe["rechecked"] == "2026-08-20"
+    assert afe["release_notes_updated"] == "2026-06-16"
+    assert "no release-stage label" in afe["recheck_evidence"]
+    assert "never states that AFE is generally available" in afe["recheck_evidence"]
 
     guided = by_feature["Guided Onboarding with Auto-Schematization"]
     assert guided["availability"] == "alpha"
     assert guided["source_date"] == "2026-03-11"
     assert guided["coverage_status"] == "ui_handoff"
     assert guided["automation"] == "ui_handoff_and_human_review_only"
+    assert guided["rechecked"] == "2026-08-20"
+    assert guided["release_notes_updated"] == "2026-06-16"
+    assert "zero occurrences" in guided["recheck_evidence"]
 
     plan = json.loads((out / "apply-plan.json").read_text())
     ai_plan = plan["ai_powered_data_management"]
@@ -163,6 +170,60 @@ def test_ai_powered_data_management_lifecycle_is_explicit_and_ui_only(tmp_path: 
         "does not infer a third",
     ):
         assert phrase in normalized_handoff
+
+
+def test_ai_powered_data_management_records_dated_negative_evidence(tmp_path: Path) -> None:
+    out = run_renderer(tmp_path)
+    handoff = " ".join(
+        (out / "control-plane-handoffs/ai-powered-data-management.md").read_text().split()
+    )
+    readiness = " ".join((out / "readiness-report.md").read_text().split())
+    ui_handoff = " ".join(
+        (out / "control-plane-handoffs/ingest-processor-ui.md").read_text().split()
+    )
+
+    for phrase in (
+        "re-checked 2026-08-20",
+        "release notes updated 2026-06-16",
+        "Neither stage moved",
+        "negative evidence rather than a new claim",
+        "list AFE under February 18, 2026 with no release-stage label",
+        '"(Controlled Availability release)" on May 18, 2026',
+        '"(General Availability release)" on June 29, 2026',
+        "never states that AFE is generally available",
+        "zero occurrences of Auto-Schematization or Guided Onboarding",
+        "equally consistent with still-Alpha and with quiet withdrawal",
+    ):
+        assert phrase in handoff
+
+    assert (
+        "https://help.splunk.com/en/data-management/process-data-at-ingest-time"
+        "/use-ingest-processor/introduction/release-notes-for-ingest-processor" in handoff
+    )
+
+    for surface in (readiness, ui_handoff):
+        assert "re-checked 2026-08-20" in surface
+        assert "release notes updated 2026-06-16" in surface
+
+
+def test_ai_powered_data_management_stages_stay_conservative() -> None:
+    module = load_renderer()
+    lifecycle = module.AI_POWERED_DATA_MANAGEMENT_LIFECYCLE
+
+    assert lifecycle["Automated Field Extraction"]["availability"] == "controlled_availability"
+    assert lifecycle["Guided Onboarding with Auto-Schematization"]["availability"] == "alpha"
+    assert module.AI_LIFECYCLE_RECHECKED == "2026-08-20"
+    assert module.RELEASE_NOTES_UPDATED == "2026-06-16"
+
+    ledger = (SKILL_DIR / "references" / "research-ledger.md").read_text()
+    reference = (SKILL_DIR / "reference.md").read_text()
+    skill_doc = (SKILL_DIR / "SKILL.md").read_text()
+
+    for text in (ledger, reference, skill_doc):
+        assert "2026-08-20" in text
+        assert "2026-06-16" in text
+    assert "Negative evidence re-check" in ledger
+    assert "Announced `2026-03-11`, re-checked `2026-08-20`" in reference
 
 
 def test_rendered_artifacts_do_not_claim_private_crud_or_render_secrets(tmp_path: Path) -> None:

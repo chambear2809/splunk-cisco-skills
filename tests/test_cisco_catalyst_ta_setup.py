@@ -155,9 +155,16 @@ def test_docs_record_current_ta_source_contract_without_overstating_package_evid
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     reference = (SKILL_ROOT / "reference.md").read_text(encoding="utf-8")
 
-    assert "TA source-contract baseline is `3.2.44`" in skill
-    assert "Splunkbase package-evidence baseline remains `3.1.0`" in skill
+    # The source contract and the package evidence now agree on 3.2.44, which is
+    # also the current public release. The docs must say so explicitly rather
+    # than leave a stale evidence-behind-contract claim in place.
+    assert "now the same release, `3.2.44`" in skill
     assert "29 modular input types" in reference
+
+    # Closing that gap must not turn into overstated evidence: the one surviving
+    # package gap still has to be recorded rather than silently dropped.
+    assert "no public release through `3.2.44` ships" in skill
+    assert "IOS-XE CLI" in skill
 
 
 def test_docs_cover_sdwan_device_scope_and_bfd_example() -> None:

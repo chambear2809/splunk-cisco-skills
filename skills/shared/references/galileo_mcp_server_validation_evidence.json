@@ -98,6 +98,55 @@
         "defenseclaw_repository_mutations": 0,
         "baseline_restored": true
       }
+    },
+    {
+      "id": "2026-08-20-hosted-galileo-mcp-contract-recheck",
+      "date": "2026-08-20",
+      "environment": {
+        "runtime": "Local unauthenticated Streamable HTTP client against the hosted MCP endpoint",
+        "galileo": "hosted MCP service, no tenant profile and no credential presented",
+        "source_repository_access": "repository remained read-only apart from the recorded pin refresh"
+      },
+      "targets": [
+        "Galileo EvalsInIDEServer 1.29.0",
+        "Checked-in tool catalog schema fingerprints"
+      ],
+      "result": "pass",
+      "evidence": {
+        "live_server_contract": {
+          "authorized_profile_count": 0,
+          "server_name": "EvalsInIDEServer",
+          "server_version": "1.29.0",
+          "protocol_version": "2025-06-18",
+          "expected_tool_count": 9,
+          "unexpected_tools": 0,
+          "missing_tools": 0,
+          "tool_schema_drift": 0,
+          "prompts_reported": 0,
+          "resources_reported": 0
+        },
+        "catalog_fingerprint_comparison": {
+          "baseline_review": "2026-07-08 at server version 1.28.1",
+          "comparison_method": "probe_mcp.schema_drift against the checked-in EXPECTED_TOOLS",
+          "tool_names_changed": 0,
+          "required_argument_changes": 0,
+          "property_key_changes": 0,
+          "input_schema_sha256_changes": 0,
+          "server_version_string_changed": true
+        }
+      },
+      "limitations": [
+        "This run re-verified the unauthenticated server contract only; no credential or tenant profile was presented.",
+        "Authenticated read-only tool calls and the rendered stdio bridge were not re-exercised, so the 2026-07-08 runs remain the evidence for those dimensions.",
+        "Write-capable MCP tools were not invoked."
+      ],
+      "cleanup": {
+        "temporary_mcp_bridge_processes_remaining": 0,
+        "temporary_port_forwards_remaining": 0,
+        "temporary_local_artifacts_remaining": 0,
+        "defenseclaw_repository_mutations": 0,
+        "baseline_restored": true
+      }
     }
   ]
 }

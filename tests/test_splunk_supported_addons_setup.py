@@ -99,7 +99,7 @@ class SplunkSupportedAddonsSetupTests(unittest.TestCase):
         self.assertEqual(routes["carbon-black"]["readiness_source_pack"], "carbon_black")
         self.assertEqual(routes["symantec-endpoint-protection"]["handoff_skill"], "splunk-security-appliance-ta-setup")
         self.assertEqual(profiles["unix-linux-os-scripts"]["add_on"]["splunkbase_id"], "833")
-        self.assertEqual(profiles["unix-linux-os-scripts"]["add_on"]["latest_verified_version"], "10.2.0")
+        self.assertEqual(profiles["unix-linux-os-scripts"]["add_on"]["latest_verified_version"], "10.3.3")
         self.assertEqual(profiles["linux-collectd-auditd"]["add_on"]["splunkbase_id"], "3412")
         self.assertEqual(profiles["linux-collectd-auditd"]["add_on"]["latest_verified_version"], "2.1.1")
         self.assertIn("linux:collectd:http:metrics", profiles["linux-collectd-auditd"]["metric_source_types"])

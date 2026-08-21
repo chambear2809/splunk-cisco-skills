@@ -7,7 +7,7 @@ description: "Use when the user asks about Cisco DC networking, ACI, APIC, Nexus
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco DC Networking TA Setup Automation
@@ -271,7 +271,7 @@ For Nexus Dashboard, use the current SCAN-advertised `cisco:dc:nd:*` family
 documented in [reference.md](reference.md). The local `1.2.0` package still
 contains version-bound `fabrics` and `switches` inputs, but those two
 sourcetypes are no longer advertised by pinned SCAN catalog
-`2026_07_09_1837` and therefore require direct event/dashboard evidence.
+`2026_08_01_2130` and therefore require direct event/dashboard evidence.
 
 ## MCP Server Integration
 

@@ -13,7 +13,7 @@ description: "Use when the user asks for AppDynamics Smart Agent, Agent Manageme
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk AppDynamics Agent Management Setup
@@ -104,9 +104,10 @@ bash skills/splunk-appdynamics-agent-management-setup/scripts/validate.sh
 - Large-scale operations: deployment groups, per-host assignment, Java and
   Node.js auto-attach, application process auto-discovery, and generated
   `ld_preload.json` planning.
-- Deprecated standalone Smart Agent CLI: retained only as a compatibility
-  runbook because the 26.4 docs mark it deprecated with a documented end of
-  support date of February 2, 2026.
+- Standalone Smart Agent CLI: past End of Support since February 2, 2026, so it
+  is retained only as a migration runbook off the CLI and onto `smartagentctl`.
+  The 26.8.0 page still states the date in the future tense; that is unrevised
+  vendor wording, not continuing support.
 - Software supply chain: download portal/cURL plan, binary transfer warning,
   checksums, PGP or code-signing validation where published, release-note link,
   package inventory, and rollback package confirmation.

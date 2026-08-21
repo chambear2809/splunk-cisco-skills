@@ -13,8 +13,9 @@ SETUP_SCRIPT = "skills/splunk-ai-assistant-setup/scripts/setup.sh"
 VALIDATE_SCRIPT = "skills/splunk-ai-assistant-setup/scripts/validate.sh"
 APP_NAME = "Splunk_AI_Assistant_Cloud"
 SPLUNKBASE_ID = "7245"
-LATEST_VERIFIED_APP_VERSION = "2.0.0"
-CURRENT_PUBLIC_APP_VERSION = "2.1.1"
+LATEST_VERIFIED_APP_VERSION = "2.2.0"
+# Prior reviewed pin, withdrawn from the public Splunkbase release API.
+PRIOR_REVIEWED_APP_VERSION = "2.0.0"
 
 
 def shell_join(parts: list[str]) -> str:
@@ -76,12 +77,12 @@ def cloud_plan(args: argparse.Namespace) -> dict[str, Any]:
         "app": APP_NAME,
         "splunkbase_id": SPLUNKBASE_ID,
         "latest_verified_version": LATEST_VERIFIED_APP_VERSION,
-        "current_public_version": CURRENT_PUBLIC_APP_VERSION,
-        "package_verification_status": "current_public_release_unverified",
+        "prior_reviewed_version": PRIOR_REVIEWED_APP_VERSION,
+        "package_verification_status": "verified_pin_is_current_public_release",
         "steps": steps,
         "notes": [
             "Splunk AI Assistant for SPL was renamed to Splunk AI Assistant in the 2.0.0 documentation.",
-            "The shared installer pins verified 2.0.0; public 2.1.1 requires its explicit unverified-release override.",
+            "The shared installer pins verified 2.2.0, which is also the current public release; the prior 2.0.0 pin is no longer published on Splunkbase.",
             "This plan does not collect secrets and does not drive browser-only Cloud onboarding screens.",
             "Cloud installs remain ACS/public Splunkbase only; Enterprise cloud-connected activation uses setup.sh handlers instead.",
             "After install, use the app UI to review Context settings and Model Runtime.",
@@ -143,13 +144,13 @@ def enterprise_plan(args: argparse.Namespace) -> dict[str, Any]:
         "app": APP_NAME,
         "splunkbase_id": SPLUNKBASE_ID,
         "latest_verified_version": LATEST_VERIFIED_APP_VERSION,
-        "current_public_version": CURRENT_PUBLIC_APP_VERSION,
-        "package_verification_status": "current_public_release_unverified",
+        "prior_reviewed_version": PRIOR_REVIEWED_APP_VERSION,
+        "package_verification_status": "verified_pin_is_current_public_release",
         "steps": steps,
         "notes": [
             "Splunk AI Assistant for SPL was renamed to Splunk AI Assistant in the 2.0.0 documentation.",
-            "The shared installer pins verified 2.0.0; public 2.1.1 requires its explicit unverified-release override.",
-            "Confirm current public release requirements instead of inheriting the verified 2.0.0 Enterprise 9.3+ baseline.",
+            "The shared installer pins verified 2.2.0, which is also the current public release; the prior 2.0.0 pin is no longer published on Splunkbase.",
+            "Confirm release-specific requirements rather than inheriting the Splunkbase Enterprise 9.3+ listing statement.",
             "Activation codes and proxy passwords must be stored in local files, never chat or command-line arguments.",
             "The search head must be able to reach Splunk-managed cloud services on HTTPS.",
             "Agent Mode is not enabled by this Cloud Connected workflow; it is Cloud-region gated.",
@@ -163,7 +164,7 @@ def render_text(plan: dict[str, Any]) -> str:
         f"Platform: {plan['platform']}",
         f"App: {plan['app']} ({plan['splunkbase_id']})",
         f"Latest verified version: {plan['latest_verified_version']}",
-        f"Current public version: {plan['current_public_version']} (package not verified here)",
+        f"Prior reviewed version: {plan['prior_reviewed_version']} (withdrawn from Splunkbase)",
         "",
         "Steps:",
     ]

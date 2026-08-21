@@ -5,7 +5,13 @@
 - `COVERAGE_MANIFEST` declares every readiness domain.
 - `RULE_CATALOG` declares every finding, target impact, fix kind, handoff
   skill, and trigger.
-- `validate_catalog()` fails when a readiness domain lacks rule coverage.
+- `SOURCE_DOCS` holds every curated documentation URL. Rules here are compound
+  -- one rule fires on several unrelated trigger paths -- so `source_doc` cites
+  the page for the rule's headline concern and `supporting_docs` cites the
+  pages that answer its remaining triggers. Both reach the operator in the
+  report, the handoff packet, and the support packet.
+- `validate_catalog()` fails when a readiness domain lacks rule coverage, and
+  when a curated `SOURCE_DOCS` entry is cited by no rule at all.
 - `build_scores()` turns active findings into ES/ITSI/ARI readiness scores.
 
 ## What This Doctor Covers
@@ -183,8 +189,8 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   Edge Processor and Ingest Processor documentation expose pipeline, processor,
   and destination metrics that determine whether expected events reach searchable
   indexes and sourcetypes:
-  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.2/about-ingest-monitoring`
-  `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.2/latency-in-the-ingest-monitoring-dashboard`
+  `https://help.splunk.com/en/data-management/monitor-data-onboarding/ingest-monitoring/1.2/about-ingest-monitoring`
+  `https://help.splunk.com/en/data-management/monitor-data-onboarding/ingest-monitoring/1.2/latency-in-the-ingest-monitoring-dashboard`
   `https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/monitor-system-health-and-activity/edge-processor-metrics-reference`
   and
   `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors/monitor-system-health-and-activity/view-data-flow-information-about-an-ingest-processor-pipeline`

@@ -260,12 +260,19 @@ notified so it accepts the new signing key. Operator-driven:
 
 ## Edge Processor cert rotation
 
-Out of band of the indexer cluster rotation. Use the EP UI / REST
-to upload the new cert pair, then restart the EP instance:
+Out of band of the indexer cluster rotation. Use the PKI packet's
+`pki/distribute/edge-processor/upload-via-rest.sh.example` or the EP UI to
+upload the new cert pair, then use the tenant's **Manage instances** workflow
+to restart the matching instance. The Edge Processor skill can render and
+validate the exact host inventory, but its `apply` phase manages control-plane
+objects and does not claim certificate upload or host restart:
 
 ```bash
 bash skills/splunk-edge-processor-setup/scripts/setup.sh \
-    --phase apply --ep-fqdn ep01.example.com ...
+  --phase render \
+  --ep-control-plane cloud \
+  --ep-tenant-url https://example.scs.splunk.com \
+  --ep-instances "ep01.example.com=systemd"
 ```
 
 ## Splunk Cloud forwarder fleet

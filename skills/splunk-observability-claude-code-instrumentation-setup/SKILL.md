@@ -11,7 +11,7 @@ description: "Use when instrumenting Claude Code to emit metrics, log events, an
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Claude Code Instrumentation Setup
@@ -159,9 +159,11 @@ children. This transform must run after `transform/claude_code_genai` and before
 the Galileo filter. It is intentionally absent from the Splunk trace branch.
 
 The token histogram requires a collector build containing the alpha
-`signal_to_metrics` connector. `otel/opentelemetry-collector-contrib:0.154.0`
-is validated with this overlay. The stock Splunk Distribution v0.154.2 does not
-include that connector, even though the rest of the overlay starts there. Use a
+`signal_to_metrics` connector. `otel/opentelemetry-collector-contrib:0.158.0`
+is validated with this overlay. The stock Splunk Distribution 0.158.0 still does
+not include that connector, even though the rest of the overlay starts there
+(`otelcol validate` rejects the overlay on the Splunk build with
+`unknown type: "signal_to_metrics"`). Use a
 matching contrib build or a custom collector that includes the connector; do
 not silently fall back to a sum connector. Start the collector before the new
 Claude process so cumulative-to-delta can retain the first counter value using

@@ -8,6 +8,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -38,8 +39,8 @@ def test_mcp_snapshot_matches_renderer_and_live_review_metadata() -> None:
     probe = load_script(PROBE, "galileo_mcp_probe_catalog")
 
     assert render.EXPECTED_SERVER_NAME == probe.EXPECTED_SERVER_NAME == "EvalsInIDEServer"
-    assert render.EXPECTED_SERVER_VERSION == probe.EXPECTED_SERVER_VERSION == "1.28.1"
-    assert render.CATALOG_REVIEW_DATE == "2026-07-08"
+    assert render.EXPECTED_SERVER_VERSION == probe.EXPECTED_SERVER_VERSION == "1.29.0"
+    assert render.CATALOG_REVIEW_DATE == "2026-08-20"
     assert {item["name"] for item in render.TOOL_CATALOG} == set(probe.EXPECTED_TOOLS)
     assert {
         item["name"]: item["schema_sha256"] for item in render.TOOL_CATALOG
@@ -316,7 +317,7 @@ def test_authenticated_probe_rejects_non_loopback_cleartext_before_reading_key(
         )
 
 
-def test_july_release_has_explicit_mcp_product_boundary_rules() -> None:
+def test_reviewed_releases_have_explicit_mcp_product_boundary_rules() -> None:
     audit = load_script(AUDIT, "galileo_mcp_product_audit")
     ids = {rule["id"] for rule in audit.PRODUCT_RULES}
     assert {
@@ -325,6 +326,11 @@ def test_july_release_has_explicit_mcp_product_boundary_rules() -> None:
         "generic_alert_webhooks",
         "experiment_groups_playgrounds_ci",
         "large_dataset_batched_experiments",
+        "splunk_agent_observability_docs_epoch",
+        "annotation_queues_ga",
+        "ai_metric_authoring_and_billing",
+        "trace_count_and_multimodal_metrics",
+        "hosted_models_and_console_theme",
     } <= ids
 
     matrix = (SKILL_DIR / "references/product-gap-matrix.md").read_text(encoding="utf-8")
@@ -334,6 +340,11 @@ def test_july_release_has_explicit_mcp_product_boundary_rules() -> None:
         "Generic alert webhooks, payload v1.0",
         "Python SDK >=2.2.0",
         "Large-dataset batched Playground",
+        "Splunk Agent Observability naming and pre-/post-August 7 documentation epoch",
+        "Annotation Queues GA, templates, users, records",
+        "AI-assisted custom-code metrics, organization billing usage",
+        "Trace Count alerts and multimodal out-of-the-box evaluation metrics",
+        "Hosted-model availability and light, dark, or system console themes",
     ):
         assert marker in matrix
 
@@ -341,16 +352,134 @@ def test_july_release_has_explicit_mcp_product_boundary_rules() -> None:
 def test_product_audit_fails_on_a_newer_unreviewed_release() -> None:
     audit = load_script(AUDIT, "galileo_mcp_product_audit_future_release")
     matrix = (SKILL_DIR / "references/product-gap-matrix.md").read_text(encoding="utf-8")
-    docs = f'{audit.FALLBACK_DOCS_INDEX}\n<Update label="2026-07-08">'
+    docs = f'{audit.FALLBACK_DOCS_INDEX}\n<Update label="2026-08-08">'
 
     failures = audit.missing_coverage(docs, matrix)
 
     assert {
         "id": "unreviewed_release",
         "reason": "newer_release_note_detected",
-        "latest_documented_release": "2026-07-08",
-        "latest_reviewed_release": "2026-07-07",
+        "latest_documented_release": "2026-08-08",
+        "latest_reviewed_release": "2026-08-07",
     } in failures
+
+
+def test_product_audit_json_cli_exits_nonzero_on_drift(tmp_path: Path) -> None:
+    audit = load_script(AUDIT, "galileo_mcp_product_audit_json_exit")
+    docs_path = tmp_path / "llms-full.txt"
+    docs_path.write_text(
+        f'{audit.FALLBACK_DOCS_INDEX}\n<Update label="2026-08-08">',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(AUDIT),
+            "--docs-index-file",
+            str(docs_path),
+            "--matrix",
+            str(SKILL_DIR / "references/product-gap-matrix.md"),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["ok"] is False
+
+
+def test_product_audit_detects_release_present_only_in_new_era_index(
+    tmp_path: Path,
+) -> None:
+    audit = load_script(AUDIT, "galileo_mcp_product_audit_dual_index")
+    legacy_path = tmp_path / "legacy-llms-full.txt"
+    new_era_path = tmp_path / "new-era-llms-full.txt"
+    legacy_path.write_text(audit.FALLBACK_DOCS_INDEX, encoding="utf-8")
+    new_era_path.write_text(
+        f'{audit.FALLBACK_DOCS_INDEX}\n<Update label="2026-08-08">',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(AUDIT),
+            "--docs-index-file",
+            str(legacy_path),
+            "--new-era-docs-index-file",
+            str(new_era_path),
+            "--matrix",
+            str(SKILL_DIR / "references/product-gap-matrix.md"),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    report = json.loads(result.stdout)
+    assert report["latest_documented_release"] == "2026-08-08"
+    assert report["docs_sources"] == {
+        "legacy": {
+            "latest_documented_release": "2026-08-07",
+            "source": str(legacy_path),
+        },
+        "new_era": {
+            "latest_documented_release": "2026-08-08",
+            "source": str(new_era_path),
+        },
+    }
+    assert {
+        "id": "unreviewed_release",
+        "reason": "newer_release_note_detected",
+        "latest_documented_release": "2026-08-08",
+        "latest_reviewed_release": "2026-08-07",
+    } in report["missing_coverage"]
+
+
+def test_product_audit_checks_release_markup_in_each_docs_epoch(tmp_path: Path) -> None:
+    audit = load_script(AUDIT, "galileo_mcp_product_audit_per_epoch_release")
+    legacy_path = tmp_path / "legacy-llms-full.txt"
+    new_era_path = tmp_path / "new-era-llms-full.txt"
+    legacy_path.write_text(audit.FALLBACK_DOCS_INDEX, encoding="utf-8")
+    new_era_path.write_text(
+        audit.RELEASE_LABEL_RE.sub("", audit.FALLBACK_DOCS_INDEX),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(AUDIT),
+            "--docs-index-file",
+            str(legacy_path),
+            "--new-era-docs-index-file",
+            str(new_era_path),
+            "--matrix",
+            str(SKILL_DIR / "references/product-gap-matrix.md"),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    report = json.loads(result.stdout)
+    assert {
+        "id": "release_label_not_found",
+        "reason": "release_note_date_markup_not_found",
+        "docs_epoch": "new_era",
+        "docs_source": str(new_era_path),
+        "latest_reviewed_release": "2026-08-07",
+    } in report["missing_coverage"]
 
 
 def test_product_audit_fails_when_release_date_markup_disappears() -> None:
@@ -363,7 +492,7 @@ def test_product_audit_fails_when_release_date_markup_disappears() -> None:
     assert {
         "id": "release_label_not_found",
         "reason": "release_note_date_markup_not_found",
-        "latest_reviewed_release": "2026-07-07",
+        "latest_reviewed_release": "2026-08-07",
     } in failures
 
 

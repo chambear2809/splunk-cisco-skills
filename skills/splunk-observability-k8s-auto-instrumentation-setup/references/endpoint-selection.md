@@ -31,8 +31,17 @@ http://$(SPLUNK_OTEL_AGENT):4317
 ### Gateway-only
 
 ```
-http://<release>-splunk-otel-collector-gateway.<base-namespace>.svc.cluster.local:4317
+http://<release>-splunk-otel-collector.<base-namespace>.svc.cluster.local:4317
 ```
+
+The gateway Service has no `-gateway` suffix. Chart `0.158.0` names the gateway
+workload and its Service after the release only (`component: otel-collector`),
+and Helm collapses the name when the release is already called
+`splunk-otel-collector` — which is this repository's default release name. So
+with the default release the gateway Service is simply `splunk-otel-collector`,
+and with release `my-release` it is `my-release-splunk-otel-collector`. Confirm
+with `kubectl -n <base-namespace> get svc -l component=otel-collector` before
+committing an endpoint.
 
 Required when:
 
@@ -40,7 +49,7 @@ Required when:
 - You disabled the agent DaemonSet in the base collector chart values.
 - You run a multi-tenant cluster where the gateway is in a different namespace with tighter RBAC.
 
-Use `--gateway-endpoint http://splunk-otel-collector-gateway.splunk-otel.svc.cluster.local:4317`.
+Use `--gateway-endpoint http://splunk-otel-collector.splunk-otel.svc.cluster.local:4317`.
 
 ## Running in a different namespace
 
@@ -50,7 +59,7 @@ If the Instrumentation CR is in `splunk-otel` but the annotated pods live in `pa
 
 | Distribution | Gateway Service DNS |
 |--------------|---------------------|
-| EKS / GKE / AKS / generic | `<release>-splunk-otel-collector-gateway.<ns>.svc.cluster.local:4317` |
+| EKS / GKE / AKS / generic | `<release>-splunk-otel-collector.<ns>.svc.cluster.local:4317` |
 | OpenShift | Same as above; Service type defaults to ClusterIP |
 | EKS Fargate | Same; ensure Fargate profile includes the gateway namespace |
 
@@ -76,4 +85,9 @@ The Splunk OTel Collector exposes all three by default on port 4318.
 http://$(SPLUNK_OTEL_AGENT):9943/v2/datapoint
 ```
 
-This is only read by Java and Node.js runtime metrics. If you use gateway-only, override to `http://<release>-splunk-otel-collector-gateway.<ns>.svc.cluster.local:9943/v2/datapoint`.
+This is only read by Java and Node.js runtime metrics. If you use gateway-only, override to `http://<release>-splunk-otel-collector.<ns>.svc.cluster.local:9943/v2/datapoint`.
+
+Chart `0.158.0` is the first audited chart whose gateway Service actually
+publishes port `9943`; chart `0.154.0` exposed only `4317`, `4318`, `4320`,
+`6060`, `9411`, `14250`, and `14268` on that Service, so a gateway-only
+`SPLUNK_METRICS_ENDPOINT` override could not connect before this upgrade.

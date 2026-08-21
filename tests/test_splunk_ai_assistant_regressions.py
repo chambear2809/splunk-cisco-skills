@@ -25,14 +25,20 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
         reference_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/reference.md").read_text(encoding="utf-8")
 
         self.assertEqual(app["label"], "Splunk AI Assistant")
-        self.assertEqual(app["latest_verified_version"], "2.0.0")
-        self.assertEqual(app["latest_release_version"], "2.1.1")
+        # 2.2.0 was downloaded, unpacked, and inspected, so the verified pin is the
+        # current public release and the skill must not advertise a review override.
+        self.assertEqual(app["latest_verified_version"], "2.2.0")
+        self.assertEqual(app["latest_release_version"], "2.2.0")
         self.assertEqual(app["min_splunk_version"], "9.3")
         self.assertIn("formerly", skill_text)
         self.assertIn("Splunk AI Assistant for SPL", skill_text)
         self.assertIn("Agent Mode", reference_text)
         self.assertIn("FedRAMP IL2", reference_text)
-        self.assertIn("not package-verified", skill_text)
+        self.assertNotIn("--accept-unverified-release", skill_text)
+        # The withdrawn 2.0.0 pin must stay documented so operators do not try to
+        # pin a release Splunkbase no longer publishes.
+        self.assertIn("2.0.0", skill_text)
+        self.assertIn("no longer published", skill_text)
 
     def test_activation_code_is_not_passed_to_python_argv(self) -> None:
         script_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/scripts/setup.sh").read_text(encoding="utf-8")
@@ -82,10 +88,10 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
                     print(json.dumps({"apps": []}))
                     raise SystemExit(0)
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.2.0", "status": "installed"}))
                     raise SystemExit(0)
                 if cmd == "apps describe Splunk AI Assistant for SPL":
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.2.0", "status": "installed"}))
                     raise SystemExit(0)
                 if cmd == "status current-stack":
                     print(json.dumps({"infrastructure": {"status": "Ready"}, "messages": {"restartRequired": False}}))
@@ -150,6 +156,8 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
             env["SPLUNK_SKIP_ALLOWLIST"] = "true"
 
+            # The verified pin is now current public 2.2.0, so the default path
+            # reaches ACS with no version override.
             result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/setup.sh",
                 "--install",

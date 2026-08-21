@@ -8,7 +8,7 @@ This skill covers the first supported-addons router domain:
 
 | Profile | Add-on | App folder | Splunkbase | Latest researched |
 | --- | --- | --- | --- | --- |
-| `unix-linux-os-scripts` | Splunk Add-on for Unix and Linux | `Splunk_TA_nix` | `833` | `10.2.0`, October 8, 2025 |
+| `unix-linux-os-scripts` | Splunk Add-on for Unix and Linux | `Splunk_TA_nix` | `833` | `10.3.3`, August 11, 2026 |
 | `linux-collectd-auditd` | Splunk Add-on for Linux | `Splunk_TA_Linux` | `3412` | `2.1.1`, March 30, 2026 |
 
 `Splunk_TA_nix` is the broader *nix scripted-input and file-monitoring add-on.
@@ -71,13 +71,14 @@ extracted and verified.
   Linux and says it can collect data from Unix and Linux hosts through a
   forwarder, and can feed ITSI and Enterprise Security.
 - The Splunkbase listing for Splunk Add-on for Unix and Linux shows version
-  `10.2.0`, released October 8, 2025, with Splunk Enterprise/Splunk Cloud,
-  platform versions `10.5`, `10.4`, `10.3`, `10.2`, `10.1`, `10.0`, `9.4`,
-  `9.3`, and `9.2`, and CIM `6.x`.
-- The Unix and Linux release notes list version `10.2.0` compatibility as
-  Splunk platform `9.3.x`, `9.4.x`, and `10.x`, CIM `6.2.0`, and supported
-  Unix operating systems. The Splunkbase compatibility table is broader for
-  platform `9.2`.
+  `10.3.3`, released August 11, 2026, with Splunk Enterprise/Splunk Cloud,
+  platform versions `10.5`, `10.4`, `10.3`, `10.2`, `10.1`, `10.0`, and `9.4`,
+  and CIM `6.x`. The `10.3.x` line dropped the `9.3` and `9.2` platform entries
+  that `10.2.0` advertised.
+- The Unix and Linux release notes reviewed for the earlier `10.2.0` pin list
+  its compatibility as Splunk platform `9.3.x`, `9.4.x`, and `10.x`, CIM
+  `6.2.0`, and supported Unix operating systems. Re-read the release notes for
+  the current `10.3.3` listing before relying on version-specific behavior.
 - The Unix and Linux docs require inputs to be enabled after install. The setup
   page is available only on heavy forwarders and full Splunk Enterprise
   instances. Universal Forwarders require configuration files.

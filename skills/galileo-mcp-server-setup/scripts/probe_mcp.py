@@ -20,7 +20,7 @@ from urllib.parse import urlparse, urlunparse
 DEFAULT_MCP_URL = "https://api.galileo.ai/mcp/http/mcp"
 MAX_SECRET_FILE_BYTES = 64 * 1024
 EXPECTED_SERVER_NAME = "EvalsInIDEServer"
-EXPECTED_SERVER_VERSION = "1.28.1"
+EXPECTED_SERVER_VERSION = "1.29.0"
 EXPECTED_TOOLS: dict[str, dict[str, Any]] = {
     "integrate_galileo_with_langchain": {
         "risk_group": "guidance_public",

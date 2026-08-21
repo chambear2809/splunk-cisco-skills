@@ -288,6 +288,10 @@ def test_setup_help_lists_apply_sections() -> None:
 
     assert "--o11y-only" in combined
     assert "--luna-list-only" in combined
+    assert "--tenant-onboarding-date" in combined
+    template = (SKILL_DIR / "template.example").read_text(encoding="utf-8")
+    assert 'onboarding_date: ""' in template
+    assert "render-only" in template
     for section in [
         "readiness",
         "object-lifecycle",
@@ -304,6 +308,122 @@ def test_setup_help_lists_apply_sections() -> None:
         "detectors",
     ]:
         assert section in combined
+
+
+@pytest.mark.parametrize(
+    ("onboarding_date", "expected_epoch", "apply_supported"),
+    [
+        (None, "unconfirmed", False),
+        ("2026-08-06", "legacy_galileo_pre_2026_08_07", True),
+        ("2026-08-07", "boundary_2026_08_07_unverified", False),
+        ("2026-08-08", "splunk_agent_observability_post_2026_08_07", False),
+    ],
+)
+def test_apply_dry_run_classifies_documentation_epoch_without_writes(
+    tmp_path: Path,
+    onboarding_date: str | None,
+    expected_epoch: str,
+    apply_supported: bool,
+) -> None:
+    output_dir = tmp_path / "rendered"
+    date_args = (
+        ["--tenant-onboarding-date", onboarding_date] if onboarding_date else []
+    )
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--apply",
+        "readiness",
+        "--dry-run",
+        "--json",
+        *GALILEO_CONSOLE_ARGS,
+        *date_args,
+        "--output-dir",
+        str(output_dir),
+    )
+    payload = json.loads(result.stdout)
+
+    assert not output_dir.exists()
+    assert payload["apply_gate"]["documentation_epoch"] == expected_epoch
+    assert payload["apply_gate"]["apply_supported"] is apply_supported
+    assert payload["apply_gate"]["blocked_sections"] == (
+        [] if apply_supported else ["readiness"]
+    )
+
+
+@pytest.mark.parametrize("onboarding_date", ["2026-02-30", "2026-8-6", "20260806"])
+def test_invalid_tenant_onboarding_date_fails_before_writes(
+    tmp_path: Path, onboarding_date: str
+) -> None:
+    output_dir = tmp_path / "rendered"
+    result = run_cmd(
+        sys.executable,
+        str(RENDER),
+        "--output-dir",
+        str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
+        "--tenant-onboarding-date",
+        onboarding_date,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "valid YYYY-MM-DD" in (result.stdout + result.stderr)
+    assert not output_dir.exists()
+
+
+def test_cli_onboarding_date_overrides_spec_epoch(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "api_version": "galileo-platform-setup/v1",
+                "galileo": {
+                    "console_url": "https://console.demo-v2.galileocloud.io/",
+                    "onboarding_date": "2026-08-08",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_only = run_cmd(
+        sys.executable,
+        str(RENDER),
+        "--output-dir",
+        str(tmp_path / "spec-only-rendered"),
+        "--spec",
+        str(spec),
+        "--apply",
+        "readiness",
+        "--dry-run",
+        "--json",
+    )
+    spec_gate = json.loads(spec_only.stdout)["apply_gate"]
+    assert spec_gate["tenant_onboarding_date"] == "2026-08-08"
+    assert spec_gate["documentation_epoch"] == (
+        "splunk_agent_observability_post_2026_08_07"
+    )
+    assert spec_gate["apply_supported"] is False
+
+    result = run_cmd(
+        sys.executable,
+        str(RENDER),
+        "--output-dir",
+        str(tmp_path / "rendered"),
+        "--spec",
+        str(spec),
+        "--tenant-onboarding-date",
+        "2026-08-06",
+        "--apply",
+        "readiness",
+        "--dry-run",
+        "--json",
+    )
+    gate = json.loads(result.stdout)["apply_gate"]
+
+    assert gate["tenant_onboarding_date"] == "2026-08-06"
+    assert gate["documentation_epoch"] == "legacy_galileo_pre_2026_08_07"
+    assert gate["apply_supported"] is True
 
 
 def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) -> None:
@@ -325,6 +445,8 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "handoff.md").is_file()
     assert (output_dir / "readiness/readiness-report.json").is_file()
     assert (output_dir / "readiness/galileo-2026-07-07-readiness.json").is_file()
+    assert (output_dir / "readiness/galileo-2026-08-07-readiness.json").is_file()
+    assert (output_dir / "readiness/galileo-2026-08-07-handoff.md").is_file()
     assert (output_dir / "lifecycle/object-lifecycle-manifest.example.json").is_file()
     assert (output_dir / "lifecycle/luna-scorer-map.example.json").is_file()
     assert (output_dir / "lifecycle/product-coverage-matrix.json").is_file()
@@ -349,6 +471,19 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "dashboards/galileo-global-dashboard-handoff.md").is_file()
     assert (output_dir / "scripts/galileo_alert_webhook_relay.py").is_file()
     matrix = json.loads((output_dir / "lifecycle/product-coverage-matrix.json").read_text(encoding="utf-8"))
+    for item in matrix:
+        for asset in item["rendered_assets"]:
+            assert (output_dir / asset).exists(), (item["surface"], asset)
+    rows = {item["surface"]: item for item in matrix}
+    for surface in (
+        "Custom scorers and scorer validation",
+        "Provider integrations, model aliases, costs, and pricing",
+        "Multimodal observability",
+        "Galileo alerts and notifications",
+        "Annotation templates, ratings, and queues",
+        "AI Assistant (beta) investigations",
+    ):
+        assert "https://docs.galileo.ai/release-notes" in rows[surface]["source_urls"]
     surfaces = {item["surface"] for item in matrix}
     for surface in [
         "API keys, auth, users, groups, and RBAC",
@@ -417,6 +552,78 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert assistant["grounding_inputs"]
     webhook_readiness = release["features"]["generic_alert_webhooks"]
     assert webhook_readiness["relay_delivery"] == "at_least_once_downstream_search_dedup"
+    current_release = json.loads(
+        (output_dir / "readiness/galileo-2026-08-07-readiness.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert current_release["release_date"] == "2026-08-07"
+    assert current_release["reviewed_at"] == "2026-08-20"
+    assert current_release["release_window"] == [
+        "2026-07-21",
+        "2026-08-04",
+        "2026-08-07",
+    ]
+    assert set(current_release["features"]) == {
+        "splunk_agent_observability_naming_and_docs_epoch",
+        "annotation_queues_ga",
+        "ai_assistant_expansion",
+        "ai_assisted_custom_code_metrics",
+        "cost_and_billing_surfaces",
+        "trace_count_alerts",
+        "multimodal_out_of_the_box_metrics",
+        "hosted_models_and_console_theme",
+    }
+    naming = current_release["features"][
+        "splunk_agent_observability_naming_and_docs_epoch"
+    ]
+    assert naming["boundary"]["on_boundary_date"] == "verify_tenant_linked_documentation"
+    multimodal_release = current_release["features"][
+        "multimodal_out_of_the_box_metrics"
+    ]
+    assert multimodal_release["modalities"] == ["text", "image_or_pdf", "audio"]
+    assert multimodal_release["metrics"] == [
+        "Action Completion",
+        "Context Adherence",
+        "Correctness",
+        "Ground Truth Adherence",
+        "Reasoning Coherence",
+        "Input Toxicity",
+        "Output Toxicity",
+        "User Intent Change",
+    ]
+    assert current_release["features"]["annotation_queues_ga"]["operations"] == [
+        "queue_query",
+        "template_review",
+        "user_assignment",
+        "record_review",
+        "record_export",
+    ]
+    assistant_expansion = current_release["features"]["ai_assistant_expansion"]
+    assert assistant_expansion["scope"] == "all_galileo_debugging_surfaces"
+    assert assistant_expansion["enhancements"] == [
+        "signal_criticality_ordering",
+        "collapsed_tool_calls",
+    ]
+    assert current_release["features"]["cost_and_billing_surfaces"][
+        "billing_usage_dimensions"
+    ] == ["traces", "spans", "luna_tokens"]
+    assert current_release["features"]["trace_count_alerts"]["system_metric"] == (
+        "Trace Count"
+    )
+    hosted = current_release["features"]["hosted_models_and_console_theme"]
+    assert hosted["hosted_models"] == [
+        "GPT 5.6 Sol",
+        "GPT 5.6 Terra",
+        "GPT 5.6 Luna",
+    ]
+    assert hosted["model_surfaces"] == [
+        "Playground",
+        "Prompt store",
+        "Synthetic Data Generation",
+        "Metrics Hub",
+    ]
+    assert hosted["console_themes"] == ["light", "dark", "system"]
     manifest = json.loads(
         (output_dir / "lifecycle/object-lifecycle-manifest.example.json").read_text(
             encoding="utf-8"
@@ -447,7 +654,71 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         (output_dir / "readiness/readiness-report.json").read_text(encoding="utf-8")
     )
     assert readiness["galileo"]["api_base"] == "https://api.demo-v2.galileocloud.io"
-    assert readiness["latest_release"]["target"] == "2026-07-07"
+    assert readiness["latest_release"]["target"] == "2026-08-07"
+    assert (
+        readiness["latest_release"]["asset"]
+        == "readiness/galileo-2026-08-07-readiness.json"
+    )
+    apply_plan = json.loads((output_dir / "apply-plan.json").read_text(encoding="utf-8"))
+    assert apply_plan["apply_gate"]["apply_supported"] is False
+    assert apply_plan["apply_gate"]["blocked_sections"] == apply_plan["selected_sections"]
+    assert apply_plan["apply_gate"]["boundary"] == "2026-08-07"
+    assert apply_plan["apply_gate"]["documentation_epoch"] == "unconfirmed"
+    assert apply_plan["apply_gate"]["reason"] == (
+        "Tenant onboarding date is required before apply so the legacy Galileo "
+        "contract cannot be used against Splunk Agent Observability."
+    )
+    assert apply_plan["apply_gate"]["tenant_onboarding_date"] == ""
+    assert readiness["apply_gate"] == {
+        key: value
+        for key, value in apply_plan["apply_gate"].items()
+        if key != "blocked_sections"
+    }
+    current_naming = current_release["features"][
+        "splunk_agent_observability_naming_and_docs_epoch"
+    ]
+    assert current_naming["documentation_epoch"] == "unconfirmed"
+    assert current_naming["apply_supported"] is False
+    handoff = (output_dir / "handoff.md").read_text(encoding="utf-8")
+    assert "Derived documentation epoch: `unconfirmed`" in handoff
+    assert "Operational apply supported: `false`" in handoff
+    assert (
+        apply_plan["paths"]["latest_release"]
+        == "readiness/galileo-2026-08-07-readiness.json"
+    )
+    assert apply_plan["paths"]["release_history"] == [
+        "readiness/galileo-2026-07-07-readiness.json",
+        "readiness/galileo-2026-08-07-readiness.json",
+    ]
+    coverage = json.loads(
+        (output_dir / "coverage-report.json").read_text(encoding="utf-8")
+    )
+    assert coverage["coverage"]["galileo_release_2026_08_07"]["status"] == (
+        "guarded_console_api_and_validation_handoffs"
+    )
+    assert len(coverage["coverage"]["galileo_release_2026_08_07"]["covers"]) == 8
+    rendered_evaluate = (output_dir / "evaluate/evaluate-assets.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "annotation_queues_ga:" in rendered_evaluate
+    assert "ai_assisted_custom_code_metrics: evaluate/experiment-handoff.md" in (
+        rendered_evaluate
+    )
+    annotation_handoff = (
+        output_dir / "evaluate/annotation-feedback-handoff.md"
+    ).read_text(encoding="utf-8")
+    assert "Annotation Queues are generally available" in annotation_handoff
+    multimodal_handoff = (
+        output_dir / "evaluate/multimodal-metrics-handoff.yaml"
+    ).read_text(encoding="utf-8")
+    assert "supported_modalities: [\"text\", \"image_or_pdf\", \"audio\"]" in multimodal_handoff
+    assert "User Intent Change" in multimodal_handoff
+    alert_handoff = (output_dir / "alerts/generic-webhook-handoff.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Trace Count" in alert_handoff
+    assert "RENDER-ONLY — DO NOT START THE LEGACY RELAY" in alert_handoff
+    assert "python3 scripts/galileo_alert_webhook_relay.py" not in alert_handoff
     otel = (output_dir / "otel/collector-galileo-fanout.yaml").read_text(encoding="utf-8")
     assert (
         "traces_endpoint: https://api.demo-v2.galileocloud.io/otel/traces" in otel
@@ -495,6 +766,151 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert "| dedup event_id" not in alert_searches
 
     run_cmd("bash", str(VALIDATE), "--output-dir", str(output_dir))
+
+
+def test_validator_rejects_matrix_asset_that_is_missing_after_render(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
+    )
+    missing_asset = output_dir / "evaluate/experiment-handoff.md"
+    missing_asset.unlink()
+
+    result = run_cmd(
+        "bash",
+        str(VALIDATE),
+        "--output-dir",
+        str(output_dir),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "product coverage matrix references missing rendered asset" in (
+        result.stdout + result.stderr
+    )
+
+
+def test_validator_rejects_tampered_documentation_epoch_gate(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--output-dir",
+        str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
+    )
+    readiness_path = output_dir / "readiness/readiness-report.json"
+    readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+    readiness["apply_gate"]["documentation_epoch"] = "tampered"
+    readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+
+    result = run_cmd(
+        "bash",
+        str(VALIDATE),
+        "--output-dir",
+        str(output_dir),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "documentation epoch gate mismatch" in (result.stdout + result.stderr)
+
+
+def test_validator_rejects_apply_wrapper_missing_epoch_guard(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--tenant-onboarding-date",
+        "2026-08-08",
+        "--output-dir",
+        str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
+    )
+    wrapper = output_dir / "scripts/apply-object-lifecycle.sh"
+    text = wrapper.read_text(encoding="utf-8")
+    tampered = re.sub(
+        r"(?m)^(echo .*Operational apply is blocked.*)$\n^(exit 2)$",
+        r"# \1\n# \2",
+        text,
+        count=1,
+    )
+    assert tampered != text
+    wrapper.write_text(tampered, encoding="utf-8")
+
+    result = run_cmd(
+        "bash",
+        str(VALIDATE),
+        "--output-dir",
+        str(output_dir),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "apply wrapper is missing its guard" in (result.stdout + result.stderr)
+
+
+@pytest.mark.parametrize(
+    ("onboarding_date", "wrapper_name", "expected_error"),
+    [
+        (
+            "2026-08-06",
+            "apply-object-lifecycle.sh",
+            "legacy apply wrapper has an unexpected epoch guard",
+        ),
+        (
+            "2026-08-08",
+            "cleanup-object-lifecycle.sh",
+            "cleanup wrapper must remain available for recovery",
+        ),
+    ],
+)
+def test_validator_rejects_stale_active_epoch_guard(
+    tmp_path: Path,
+    onboarding_date: str,
+    wrapper_name: str,
+    expected_error: str,
+) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--tenant-onboarding-date",
+        onboarding_date,
+        "--output-dir",
+        str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
+    )
+    wrapper = output_dir / "scripts" / wrapper_name
+    text = wrapper.read_text(encoding="utf-8")
+    insertion_point = 'PROJECT_ROOT="${PROJECT_ROOT:-'
+    line_end = text.index("\n", text.index(insertion_point)) + 1
+    stale_guard = (
+        "echo 'ERROR: Operational apply is blocked for documentation epoch "
+        "unconfirmed: stale guard' >&2\nexit 2\n"
+    )
+    wrapper.write_text(text[:line_end] + stale_guard + text[line_end:], encoding="utf-8")
+
+    result = run_cmd(
+        "bash",
+        str(VALIDATE),
+        "--output-dir",
+        str(output_dir),
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert expected_error in (result.stdout + result.stderr)
 
 
 def test_render_forwards_current_export_records_options(tmp_path: Path) -> None:
@@ -687,6 +1103,8 @@ def test_o11y_only_apply_all_uses_cloud_sections_before_apply(tmp_path: Path) ->
         "--o11y-only",
         "--realm",
         "us0",
+        "--tenant-onboarding-date",
+        "2026-08-06",
         *GALILEO_CONSOLE_ARGS,
         "--output-dir",
         str(tmp_path / "rendered"),
@@ -697,6 +1115,115 @@ def test_o11y_only_apply_all_uses_cloud_sections_before_apply(tmp_path: Path) ->
     assert result.returncode != 0
     assert "Unknown apply section: all" not in combined
     assert "--galileo-api-key-file is required" in combined
+
+
+@pytest.mark.parametrize(
+    ("onboarding_date", "expected_epoch"),
+    [
+        (None, "unconfirmed"),
+        ("2026-08-07", "boundary_2026_08_07_unverified"),
+        ("2026-08-08", "splunk_agent_observability_post_2026_08_07"),
+    ],
+)
+def test_real_apply_renders_packet_then_blocks_unsupported_epoch(
+    tmp_path: Path, onboarding_date: str | None, expected_epoch: str
+) -> None:
+    output_dir = tmp_path / "rendered"
+    date_args = (
+        ["--tenant-onboarding-date", onboarding_date] if onboarding_date else []
+    )
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--apply",
+        "readiness",
+        *GALILEO_CONSOLE_ARGS,
+        *date_args,
+        "--output-dir",
+        str(output_dir),
+        check=False,
+    )
+    combined = result.stdout + result.stderr
+
+    assert result.returncode == 2
+    assert expected_epoch in combined
+    assert "Operational apply is blocked" in combined
+    assert "Galileo healthcheck endpoint" not in combined
+    assert (output_dir / "apply-plan.json").is_file()
+    assert (output_dir / "readiness/readiness-report.json").is_file()
+    assert (output_dir / "handoff.md").is_file()
+    run_cmd("bash", str(VALIDATE), "--output-dir", str(output_dir))
+
+
+def test_legacy_apply_reaches_existing_secret_guard(tmp_path: Path) -> None:
+    result = run_cmd(
+        "bash",
+        str(SETUP),
+        "--apply",
+        "object-lifecycle",
+        "--tenant-onboarding-date",
+        "2026-08-06",
+        *GALILEO_CONSOLE_ARGS,
+        "--output-dir",
+        str(tmp_path / "rendered"),
+        check=False,
+    )
+    combined = result.stdout + result.stderr
+
+    assert result.returncode != 0
+    assert "Operational apply is blocked" not in combined
+    assert "--galileo-api-key-file is required" in combined
+    relay_handoff = (
+        tmp_path / "rendered/alerts/generic-webhook-handoff.md"
+    ).read_text(encoding="utf-8")
+    assert "python3 scripts/galileo_alert_webhook_relay.py" in relay_handoff
+    assert "RENDER-ONLY" not in relay_handoff
+
+
+def test_post_boundary_rendered_apply_wrappers_cannot_bypass_epoch_gate(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd(
+        "bash",
+        str(SETUP),
+        "--render",
+        "--tenant-onboarding-date",
+        "2026-08-08",
+        *GALILEO_CONSOLE_ARGS,
+        "--output-dir",
+        str(output_dir),
+    )
+    safe_env = {"PATH": "/usr/bin:/bin"}
+    for wrapper in sorted((output_dir / "scripts").glob("apply-*.sh")):
+        result = subprocess.run(
+            ["bash", str(wrapper)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+            env=safe_env,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode == 2, (wrapper.name, combined)
+        assert "Operational apply is blocked" in combined, wrapper.name
+        assert "splunk_agent_observability_post_2026_08_07" in combined
+
+    cleanup = output_dir / "scripts/cleanup-object-lifecycle.sh"
+    cleanup_result = subprocess.run(
+        ["bash", str(cleanup)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+        env=safe_env,
+    )
+    cleanup_output = cleanup_result.stdout + cleanup_result.stderr
+    assert cleanup_result.returncode != 0
+    assert "Operational apply is blocked" not in cleanup_output
+    assert "--galileo-api-key-file is required" in cleanup_output
 
 
 def test_o11y_only_rejects_explicit_platform_sections(tmp_path: Path) -> None:

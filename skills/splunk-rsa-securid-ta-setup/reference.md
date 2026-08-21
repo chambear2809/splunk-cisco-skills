@@ -5,7 +5,7 @@
 | Product | App directory | Splunkbase | Verified | Path |
 | --- | --- | --- | --- | --- |
 | RSA SecurID AM | `Splunk_TA_rsa-securid` | `2958` | `1.5.0` | Syslog/parser |
-| RSA SecurID CAS | `Splunk_TA_rsa_securid_cas` | `5210` | `1.2.2` | API modular input |
+| RSA SecurID CAS | `Splunk_TA_rsa_securid_cas` | `5210` | `1.2.3` | API modular input |
 
 ## CAS Inputs And Source Types
 

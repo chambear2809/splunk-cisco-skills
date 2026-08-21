@@ -1658,6 +1658,7 @@
         "cisco:sdwan:alert:on",
         "cisco:sdwan:audit:logs",
         "cisco:sdwan:block:host",
+        "cisco:sdwan:custom:*",
         "cisco:sdwan:dmi:cli:engine:write:fail",
         "cisco:sdwan:drop:pkt",
         "cisco:sdwan:energy:stats",
@@ -1673,6 +1674,7 @@
         "cisco:sdwan:smart:lic:platform:error",
         "cisco:sdwan:ssetunnelhealth",
         "cisco:sdwan:ssetunnels",
+        "cisco:sdwan:syslog",
         "cisco:sdwan:system:logs",
         "cisco:sdwan:tunnelhealth",
         "cisco:sdwan:unblock:host",
@@ -2651,7 +2653,8 @@
         "cisco:cybervision:events",
         "cisco:cybervision:flows",
         "cisco:cybervision:syslog",
-        "cisco:cybervision:vulnerabilities"
+        "cisco:cybervision:vulnerabilities",
+        "cisco:cybervision:custom:*"
       ],
       "status": "active",
       "subcategory": "campus_wireless",
@@ -3005,7 +3008,6 @@
         "skey"
       ],
       "sourcetypes": [
-        "cisco:duo",
         "cisco:duo:*",
         "cisco:duo:account",
         "cisco:duo:activity",
@@ -3223,7 +3225,10 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
+        "cisco:evm:authentication",
+        "cisco:evm:dns_activity",
         "cisco:evm:file_activity",
+        "cisco:evm:http_activity",
         "cisco:evm:process_activity",
         "cisco:evm:registry_key_activity",
         "cisco:evm:registry_value_activity",
@@ -4619,7 +4624,6 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
-        "cisco:isovalent",
         "cisco:isovalent:alert",
         "cisco:isovalent:processconnect",
         "cisco:isovalent:processexec",
@@ -4726,7 +4730,6 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
-        "cisco:isovalent:edge_processor",
         "cisco:isovalent:edge_processor:alert",
         "cisco:isovalent:edge_processor:processconnect",
         "cisco:isovalent:edge_processor:processexec",
@@ -5295,8 +5298,7 @@
         "cisco:multicloud:defense:tls_log",
         "cisco:multicloud:defense:urlfilter",
         "cisco:multicloud:defense:valtix_internal",
-        "cisco:multicloud:defense:waf",
-        "gateway"
+        "cisco:multicloud:defense:waf"
       ],
       "status": "active",
       "subcategory": "cloud_security",
@@ -7283,9 +7285,7 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
-        "cisco:ips:input",
-        "cisco:ips:syslog",
-        "sdee_connection"
+        "cisco:ips:syslog"
       ],
       "status": "retired",
       "subcategory": "network_security",
@@ -9912,13 +9912,13 @@
     }
   ],
   "scan_source": {
-    "catalog_version": "2026_07_09_1837",
+    "catalog_version": "2026_08_01_2130",
     "kind": "scan_public_catalog",
     "minimum_scan_version": "1.0.29",
     "normalized_fixture": "scan_products.fixture.json",
-    "normalized_fixture_sha256": "b715def93bf01b59e0a422e53054d9f4c69b25f78701ee17a0df776c259df5c7",
-    "retrieved_date": "2026-07-25",
-    "sha256": "e1c8866f66f8936413685f3336ef80c361d6b2cb1c8834572872868da2cba5ce",
+    "normalized_fixture_sha256": "fc78f41e41892cdded95a871a0b4f9749354e0131cd3f5508bb9cc96d73d06cd",
+    "retrieved_date": "2026-08-20",
+    "sha256": "a5b95860d65736f51c7d9f388e0717b5bf45a80e8f51fa2956597ba4f43a9a71",
     "url": "https://is4s.s3.amazonaws.com/scan/products.conf"
   }
 }

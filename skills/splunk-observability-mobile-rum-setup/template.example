@@ -4,13 +4,13 @@ rum_token_ref: SPLUNK_O11Y_RUM_TOKEN_FILE
 org_access_token_ref: SPLUNK_O11Y_TOKEN_FILE
 source_mode: render-snippets
 versions:
-  ios_agent: 2.2.3
-  android_agent: 2.3.0
-  android_gradle_plugins: 2.3.0
-  react_native_agent: 1.0.0
-  react_native_session_replay: 1.0.0
-  flutter_agent: 1.0.1
-  flutter_session_replay: 1.0.1
+  ios_agent: 2.4.1
+  android_agent: 2.3.3
+  android_gradle_plugins: 2.3.3
+  react_native_agent: 1.2.0
+  react_native_session_replay: 1.2.0
+  flutter_agent: 1.2.0
+  flutter_session_replay: 1.2.0
 privacy:
   redact_query_strings: true
   user_tracking_mode: anonymousTracking

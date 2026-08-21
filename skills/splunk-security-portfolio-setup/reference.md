@@ -59,7 +59,7 @@ separate Splunk Security Essentials app.
 - ES 8.5 compatibility and regional availability: https://help.splunk.com/en/splunk-enterprise-security-8/release-notes-and-resources/8.5/splunk-enterprise-security-release-notes/compatibility-and-regional-availability
 - ES editions overview: https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions/overview-of-splunk-enterprise-security-editions
 - Automated Threat Analysis agents: https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.6/ai-assistant-in-security-and-agentic-capabilities/analyze-scripts-using-the-ai-powered-malware-reversing-agent-and-phishing-analysis-agent-in-splunk-enterprise-security
-- Security offerings help index: https://help.splunk.com/en/release-notes-and-updates/about-the-help-portal/splunk-enterprise-security-and-security-offerings
+- Security offerings help index: https://help.splunk.com/en/security-offerings
 - AI Assistant model settings in ES: https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.3/ai-assistant-in-security-and-agentic-capabilities/choose-which-models-the-ai-assistant-uses-in-splunk-enterprise-security
 - Federated Analytics with ES for ASL: https://help.splunk.com/en/splunk-enterprise-security-8/user-guide/8.4/introduction/use-federated-analytics-with-splunk-enterprise-security-for-threat-detection-in-amazon-security-lake-asl-datasets
 - About Federated Analytics: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/ingest-and-search-amazon-security-lake-datasets (previous Cloud train: `10.4.2604`)

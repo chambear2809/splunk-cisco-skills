@@ -51,22 +51,22 @@ if [[ "${cmd_name}" == "kubectl" && "$*" == *"get pods"* && "$*" == *"-o name"* 
 fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get pod mock-collector -o json"* ]]; then
   cat <<'JSON'
-{"apiVersion":"v1","kind":"Pod","metadata":{"name":"mock-collector","ownerReferences":[{"apiVersion":"apps/v1","kind":"DaemonSet","name":"splunk-otel-collector-agent","controller":true}]},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"}]},"status":{"phase":"Running","conditions":[{"type":"Ready","status":"True"}]}}
+{"apiVersion":"v1","kind":"Pod","metadata":{"name":"mock-collector","ownerReferences":[{"apiVersion":"apps/v1","kind":"DaemonSet","name":"splunk-otel-collector-agent","controller":true}]},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]},"status":{"phase":"Running","conditions":[{"type":"Ready","status":"True"}]}}
 JSON
 fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get daemonset splunk-otel-collector-agent -o json"* ]]; then
   cat <<'JSON'
-{"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"name":"splunk-otel-collector-agent"},"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"}]}}}}
+{"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"name":"splunk-otel-collector-agent"},"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}}}
 JSON
 fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get deployment splunk-otel-collector-k8s-cluster-receiver -o json"* ]]; then
   cat <<'JSON'
-{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"splunk-otel-collector-k8s-cluster-receiver"},"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"}]}}}}
+{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"splunk-otel-collector-k8s-cluster-receiver"},"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}}}
 JSON
 fi
 if [[ "${cmd_name}" == "kubectl" && "$*" == *"get pods"* && "$*" == *"-o json"* ]]; then
   cat <<'JSON'
-{"apiVersion":"v1","kind":"List","items":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"mock-collector"},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"}]}}]}
+{"apiVersion":"v1","kind":"List","items":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"mock-collector"},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}]}
 JSON
 fi
 
@@ -81,7 +81,7 @@ spec:
     spec:
       containers:
       - name: otel-collector
-        image: quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410
+        image: quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -92,7 +92,7 @@ spec:
     spec:
       containers:
       - name: otel-collector
-        image: quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410
+        image: quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
 ---
 apiVersion: v1
 kind: Pod
@@ -110,26 +110,26 @@ fi
 if [[ "${cmd_name}" == "helm" && "${1:-}" == "list" ]]; then
   if grep -q '^helm upgrade --install ' "${OTEL_CMD_LOG}"; then
     cat <<'JSON'
-[{"name":"splunk-otel-collector","namespace":"splunk-otel","revision":"1","status":"deployed","chart":"splunk-otel-collector-0.154.0","app_version":"0.154.0"}]
+[{"name":"splunk-otel-collector","namespace":"splunk-otel","revision":"1","status":"deployed","chart":"splunk-otel-collector-0.158.0","app_version":"0.158.0"}]
 JSON
   else
     printf '[]\n'
   fi
 fi
 if [[ "${cmd_name}" == "helm" && "${1:-}" == "get" && "${2:-}" == "all" ]]; then
-  printf 'splunk-otel-collector\tsplunk-otel\t1\tdeployed\tsplunk-otel-collector\t0.154.0\n'
+  printf 'splunk-otel-collector\tsplunk-otel\t1\tdeployed\tsplunk-otel-collector\t0.158.0\n'
 fi
 if [[ "${cmd_name}" == "helm" && "${1:-}" == "status" ]]; then
   printf '%s\n' '{"info":{"status":"deployed"}}'
 fi
 
 if [[ "${cmd_name}" == "sha256sum" ]]; then
-  if [[ "${1:-}" == *"splunk-otel-collector-0.154.0.tgz"* ]]; then
-    printf '613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0  %s\n' "${1}"
+  if [[ "${1:-}" == *"splunk-otel-collector-0.158.0.tgz"* ]]; then
+    printf '088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274  %s\n' "${1}"
     exit 0
   fi
   if [[ -f "${1:-}" ]] && grep -q "printf 'installer" "${1}" 2>/dev/null; then
-    printf '16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29  %s\n' "${1}"
+    printf 'cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b  %s\n' "${1}"
     exit 0
   fi
   if [[ -f "${1:-}" ]]; then
@@ -142,7 +142,7 @@ print(f"{hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest()}  {sys.argv[
 PY
     exit 0
   fi
-  printf '16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29  %s\n' "${1:-installer}"
+  printf 'cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b  %s\n' "${1:-installer}"
   exit 0
 fi
 
@@ -406,7 +406,7 @@ spec:
     spec:
       containers:
       - name: otel-collector
-        image: quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410
+        image: quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -417,7 +417,7 @@ spec:
     spec:
       containers:
       - name: otel-collector
-        image: quay.io/signalfx/splunk-otel-collector@sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410
+        image: quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
 ---
 apiVersion: v1
 kind: Pod

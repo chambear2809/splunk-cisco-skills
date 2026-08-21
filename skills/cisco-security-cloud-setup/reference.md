@@ -11,12 +11,21 @@ Reference for the Cisco Security Cloud package and its configurable input types.
 | Local package pattern | `cisco-security-cloud_*` |
 | Local package in repo | `splunk-ta/cisco-security-cloud_363.tar.gz` |
 | Packaged version inspected | `3.6.3` |
-| Repo-verified Splunkbase version | `3.6.6` |
-| Latest public listing observed July 2, 2026 | `3.6.7` |
-| Repo-verified `3.6.6` platforms | `9.1` through `10.5`; Cloud-compatible |
-| Public `3.6.7` platforms | `9.1` through `10.4`; no advertised `10.5` support |
+| Repo-verified Splunkbase version | `3.6.10` |
+| Latest public listing observed August 20, 2026 | `3.6.10` |
+| Repo-verified `3.6.10` platforms | `9.1` through `10.5`; Cloud-compatible |
+| Superseded `3.6.6` platforms | `9.1` through `10.5`; Cloud-compatible |
+| Superseded `3.6.7` platforms | `9.1` through `10.4`; no advertised `10.5` support |
 
-On Splunk Cloud `10.5`, pin repo-verified `3.6.6`. The setup wrapper delegates
+The `10.5` platform gap that previously motivated a `3.6.6` pin was specific to
+`3.6.7`. The `3.6.x` line re-advertises `10.5` from `3.6.8` onward, and `3.6.10`
+was downloaded, unpacked, and inspected here, so the verified pin and the current
+public release are now the same version and no review override is needed.
+Splunkbase also publishes a parallel `4.0.x` line, most recently `4.0.2`, which
+the listing does not designate as the current release; do not install `4.0.x`
+without vendor approval and review.
+
+On Splunk Cloud `10.5`, pin repo-verified `3.6.10`. The setup wrapper delegates
 the default install to the shared installer without forcing the public-latest
 release. `--target-splunk-version` and optional `--app-version` make the
 release contract explicit. Before any post-install mutation it reads the actual
@@ -58,11 +67,59 @@ This repo exposes them through product keys in `products.json` and
 | `secure_client_nvm` | `sbg_nvm_input` | Cisco Secure Client NVM | none | none | `index=main`, `interval=300`, `sourcetype=cisco:nvm:*` |
 | `secure_workload` | `sbg_sw_input` | Cisco Secure Workload | `type`, `port` | none | `index=cisco_secure_workload`, `interval=60`, `sourcetype=cisco:secure:workload` |
 
-For Multicloud Defense, pinned SCAN catalog `2026_07_09_1837` corrects the
-derived FQDN-resolution sourcetype to
-`cisco:multicloud:defense:fqdn_resolve`. The misspelled
-`cisco:multicloud:defense:fqdn_resoleve` value belongs only to older catalog
-metadata and must not be used in new searches or validation.
+For Multicloud Defense, the correct FQDN-resolution sourcetype is
+`cisco:multicloud:defense:fqdn_resolve`. Package `3.6.10` renames the
+`props.conf` stanza from the misspelled `cisco:multicloud:defense:fqdn_resoleve`
+used through `3.6.6`, confirming the pinned SCAN catalog `2026_08_01_2130`
+correction. The misspelling belongs only to older catalog metadata and to
+migration notes for stacks still running `3.6.6` or earlier; never use it in new
+searches or validation.
+
+Package `3.6.10` also adds `props.conf` coverage for granular Duo sourcetypes
+(`cisco:duo:account`, `cisco:duo:activity`, `cisco:duo:administrator`,
+`cisco:duo:endpoint`, `cisco:duo:telephony`, `cisco:duo:telephony_v2`,
+`cisco:duo:trust_monitor`, `cisco:duo:user`) and for Email Verdict/Message
+sourcetypes (`cisco:evm:authentication`, `cisco:evm:dns_activity`,
+`cisco:evm:http_activity`). The modular input inventory is unchanged from
+`3.6.6`, so no input stanza, parameter, or handler path changes with this
+upgrade.
+
+## SCAN August 1, 2026 sourcetype boundary
+
+SCAN catalog `2026_08_01_2130` reflects both current canonical search families
+and the separately published Cisco Security Cloud `4.0.x` line. It must not be
+used to pretend that every one of those families is emitted by the repo-pinned
+`3.6.10` package:
+
+- Duo no longer lists the aggregate `cisco:duo` label, but `3.6.10` still uses
+  it as the modular-input ingress value and routes records into the retained
+  `cisco:duo:*` family. Preserve existing input stanzas; use the granular
+  family for data and dashboard completion checks.
+- EVM adds `cisco:evm:authentication`, `cisco:evm:dns_activity`, and
+  `cisco:evm:http_activity`. These are parser-backed in `3.6.10`; EVM remains
+  an install-and-ingest handoff because the package exposes no EVM modular
+  input.
+- Isovalent removes the aggregate `cisco:isovalent` and
+  `cisco:isovalent:edge_processor` catalog labels while retaining their child
+  families, including `cisco:isovalent:alert`,
+  `cisco:isovalent:telemetry:network`,
+  `cisco:isovalent:edge_processor:alert`, and
+  `cisco:isovalent:edge_processor:telemetry:network`. Package `3.6.10` still
+  contains the two aggregate parser stanzas, so they remain ingress/version
+  compatibility rather than completion targets.
+- Multicloud Defense removes the generic `gateway` parser label. That stanza
+  can remain in installed packages, but it is not an MCD product-completion
+  sourcetype; validate `cisco:multicloud:defense:*` instead.
+- Secure Firewall replaces the catalog-level `cisco:ftd:syslog` label with the
+  `4.0.x` granular families: `cisco:ftd:adv:conn`, `cisco:ftd:adv:dns`,
+  `cisco:ftd:adv:ftp`, `cisco:ftd:adv:http`, `cisco:ftd:adv:notice`,
+  `cisco:ftd:adv:weird`, `cisco:ftd:connection`,
+  `cisco:ftd:connection:security`, `cisco:ftd:correlation`,
+  `cisco:ftd:discovery`, `cisco:ftd:file`, `cisco:ftd:intrusion`,
+  `cisco:ftd:intrusionpacket`, `cisco:ftd:malware`, and
+  `cisco:ftd:useractivity`. The repo-pinned `3.6.10` line still parses
+  `cisco:ftd:syslog`; validate that value on `3.6.x` and require the granular
+  families only after an explicitly reviewed `4.0.x` deployment.
 
 ## Endpoint Pattern
 

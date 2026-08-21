@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Security Cloud Setup
@@ -90,10 +90,11 @@ Use the setup script with `--install` to install app ID `7404`. The script uses
 the shared installer, which defaults to the verified package, and falls back
 to the local package `cisco-security-cloud_*.tar.gz` when needed.
 
-The repo-verified `3.6.6` release explicitly advertises `10.5` and is
-Cloud-compatible. The newer public `3.6.7` listing advertises versions only
-through `10.4`. On Splunk Cloud `10.5`, the setup wrapper lets the shared
-installer select verified `3.6.6` instead of forcing public-latest. Before any
+The repo-verified `3.6.10` release is also the current public release, advertises
+`10.5`, and is Cloud-compatible, so the default install path needs no review
+override. Do not select `3.6.7` on a `10.5` stack: that release advertises
+versions only through `10.4`, and the `3.6.x` line re-advertises `10.5` from
+`3.6.8` onward. Before any
 post-install REST mutation it reads the actual installed version and refuses
 an unverified selection unless `--accept-unsupported-platform` is backed by
 documented vendor approval for the exact package and stack; the override is

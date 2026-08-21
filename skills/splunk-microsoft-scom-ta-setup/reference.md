@@ -1,6 +1,6 @@
 # Microsoft SCOM Supported Add-on Reference
 
-Package source of truth: `Splunk_TA_microsoft-scom` `4.5.0`, Splunkbase
+Package source of truth: `Splunk_TA_microsoft-scom` `4.5.1`, Splunkbase
 `2729`.
 
 ## Package-Derived Inputs And Source Types

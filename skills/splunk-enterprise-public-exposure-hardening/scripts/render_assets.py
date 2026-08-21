@@ -21,6 +21,7 @@ _SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
 if str(_SHARED_LIB) not in sys.path:
     sys.path.insert(0, str(_SHARED_LIB))
 from platform_versions import (  # noqa: E402
+    enterprise_support_status,
     platform_default,
     require_supported_enterprise_version,
     svd_enterprise_floors,
@@ -118,15 +119,20 @@ EMBEDDED_SG_FLOOR: dict[str, str] = {
 # and outputs.conf.
 # ---------------------------------------------------------------------------
 
+# AEAD only. This must stay identical to the splunk-modern cipher_suite in
+# splunk-platform-pki-setup/references/algorithm-policy.json; a public-facing
+# search head is the last place the two skills should disagree about the wire
+# crypto. The four trailing non-AEAD ECDHE suites that used to be here
+# (ECDHE-*-AES256-SHA384, ECDHE-*-AES128-SHA256) are CBC mode -- the names do
+# not say so, which is exactly why the old substring guardrails never caught
+# them. Removed rather than kept "for compatibility": on an internet-exposed
+# instance, an older client is a reason to front the host with a proxy that
+# terminates its own TLS, not a reason to weaken Splunk's own listener.
 CIPHER_SUITE = (
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:"
     "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-    "ECDHE-ECDSA-AES256-SHA384:"
-    "ECDHE-RSA-AES256-SHA384:"
-    "ECDHE-ECDSA-AES128-SHA256:"
-    "ECDHE-RSA-AES128-SHA256"
+    "ECDHE-RSA-AES128-GCM-SHA256"
 )
 
 ECDH_CURVES = "prime256v1, secp384r1, secp521r1"
@@ -351,6 +357,10 @@ def die(message: str) -> None:
     raise SystemExit(f"ERROR: {message}")
 
 
+def warn(message: str) -> None:
+    print(f"WARNING: {message}", file=sys.stderr)
+
+
 def shell_quote(value: object) -> str:
     return shlex.quote(str(value))
 
@@ -534,6 +544,25 @@ def load_svd_floor(args: argparse.Namespace) -> dict[str, str]:
 def check_svd_floor(args: argparse.Namespace, floor: dict[str, str]) -> None:
     running = parse_version(args.splunk_version)
     series = f"{running[0]}.{running[1]}"
+
+    # End-of-support is checked BEFORE the floor comparison, because a branch
+    # that has passed its support end date keeps its last published floor
+    # forever. Comparing against that floor alone reports "current" for a
+    # runtime that will never receive another fix -- the gate passes exactly
+    # the host it exists to stop. There is deliberately no override flag: see
+    # the note below.
+    support = enterprise_support_status(args.splunk_version)
+    if support["eos"]:
+        die(
+            f"Splunk version {args.splunk_version} is on the {series} train, "
+            f"whose support ended {support['support_end_date']}. An "
+            "end-of-support train receives no further security fixes, so "
+            f"meeting the {series} SVD floor does not make this host "
+            "patchable. Refusing to render public-exposure assets. Upgrade to "
+            "a supported train first; this refusal has no override because no "
+            "amount of hardening closes a gap that will never be patched."
+        )
+
     fixed = floor.get(series)
     if fixed is None:
         die(
@@ -545,6 +574,14 @@ def check_svd_floor(args: argparse.Namespace, floor: dict[str, str]) -> None:
             f"Splunk version {args.splunk_version} is below the SVD floor "
             f"for the {series}.x series ({fixed}). Upgrade before applying "
             "public-exposure hardening."
+        )
+    if support["near_eos"]:
+        warn(
+            f"Splunk {args.splunk_version} meets the {series} SVD floor, but "
+            f"the {series} train reaches end of support on "
+            f"{support['support_end_date']} "
+            f"({support['days_remaining']} days). Plan the upgrade now: after "
+            "that date this renderer will refuse to run for this host."
         )
 
 
@@ -1092,7 +1129,9 @@ def render_splunk_launch_conf(args: argparse.Namespace) -> str:
         "# This file MUST be placed at $SPLUNK_HOME/etc/splunk-launch.conf\n"
         "# (NOT inside an app's local/) and Splunk MUST be cold-started after\n"
         "# the change. The host kernel must also be in FIPS mode.\n"
-        "# See https://docs.splunk.com/Documentation/Splunk/latest/Security/SecuringSplunkEnterprisewithFIPs\n"
+        "# See https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4"
+        "/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise"
+        "/secure-splunk-enterprise-with-fips\n"
         f"SPLUNK_FIPS=1\nSPLUNK_FIPS_VERSION={args.fips_version}\n"
     )
 

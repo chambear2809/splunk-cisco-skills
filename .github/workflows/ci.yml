@@ -12,6 +12,7 @@ jobs:
   # ── Python tests ──────────────────────────────────────────────────────
   python-tests:
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,6 +30,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip==26.1.2
           python -m pip install -r requirements-dev.txt -r requirements-agent.txt
+
+      - name: Audit Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for requirements_file in requirements-dev.txt requirements-agent.txt; do
+            PIP_CONFIG_FILE=/dev/null PIP_INDEX_URL=https://pypi.org/simple \
+              pip-audit -r "${requirements_file}" --progress-spinner off \
+              --index-url https://pypi.org/simple
+          done
 
       - name: Run Python tests
         shell: bash
@@ -65,15 +76,10 @@ jobs:
       - name: Import local MCP agent server
         run: python3 -c "import agent.splunk_cisco_skills_mcp.server; print('local MCP agent import ok')"
 
-      - name: Audit MCP runtime dependencies
-        run: >-
-          PIP_CONFIG_FILE=/dev/null PIP_INDEX_URL=https://pypi.org/simple
-          pip-audit -r requirements-agent.txt --progress-spinner off
-          --index-url https://pypi.org/simple
-
   # Exercise the MCP stdio contract at both ends of the supported Python range.
   mcp-protocol-compatibility:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -102,6 +108,7 @@ jobs:
   # ── Bats tests ────────────────────────────────────────────────────────
   bats-tests:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -117,6 +124,7 @@ jobs:
   # ── Secret scanning ──────────────────────────────────────────────────
   secret-scan:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       GITLEAKS_VERSION: "8.30.1"
       # SHA256 from the official v8.30.1 release checksum manifest:
@@ -149,6 +157,7 @@ jobs:
   # ── ShellCheck + syntax ───────────────────────────────────────────────
   shellcheck:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       SHELLCHECK_VERSION: "0.10.0"
       # SHA256 of shellcheck-v0.10.0.linux.x86_64.tar.xz from
@@ -203,6 +212,7 @@ jobs:
   # ── Validation (lints, schema checks, freshness) ─────────────────────
   validation:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -236,15 +246,12 @@ jobs:
         run: |
           "${RUNNER_TEMP}/actionlint"
 
-      - name: Validate all tracked JSON and YAML
-        run: python3 scripts/validate_tracked_configs.py --yamllint
+      - name: Run all pre-commit hooks
+        run: pre-commit run --all-files
 
-      - name: Lint Python with ruff
-        run: ruff check skills/ tests/ agent/ scripts/
-
-      - name: Check catalog freshness
-        run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
-
+      # Keep the generated-surface checks explicit here as well as in
+      # pre-commit. Their ordering is part of the catalog dependency contract,
+      # and named CI failures are much easier to diagnose than a combined hook.
       - name: Check canonical skill manifest surfaces
         run: python3 skills/shared/scripts/generate_skill_catalog.py --check
 
@@ -258,8 +265,14 @@ jobs:
           python3 skills/shared/scripts/audit_skill_compatibility.py
           python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
 
-      - name: Check SKILL.md frontmatter
-        run: python3 tests/check_skill_frontmatter.py
+      - name: Check catalog freshness
+        run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
 
-      - name: Check repository readiness
-        run: python3 tests/check_repo_readiness.py
+      - name: Check shared-library helper resolution
+        run: python3 tests/check_shared_library_calls.py
+
+      - name: Check documented command flags
+        run: python3 tests/check_documented_flags.py
+
+      - name: Check orphaned source references
+        run: python3 tests/check_orphan_sources.py

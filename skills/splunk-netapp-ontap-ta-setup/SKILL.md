@@ -7,7 +7,7 @@ description: "Use when the user asks to onboard or validate NetApp Data ONTAP, O
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # NetApp ONTAP Supported Add-ons Setup
@@ -82,7 +82,7 @@ doctor.
 
 Render-first workflow for verified ONTAP packages:
 
-- `Splunk_TA_ontap` `3.2.0`, Splunkbase `3418`
+- `Splunk_TA_ontap` `3.2.1`, Splunkbase `3418`
 - `TA-ONTAP-FieldExtractions` `3.0.3`, Splunkbase `5615`
 - `SA-ONTAPIndex` `3.0.3`, Splunkbase `5616`
 

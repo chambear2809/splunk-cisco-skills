@@ -205,13 +205,19 @@ def ai_pod_overlay_additions(spec: dict[str, Any], cluster_name: str, distributi
 
     if distribution == "openshift":
         # OpenShift defaults validated in atl-ocp2 production.
+        # Chart 0.157.0 renamed the kubeletstats receiver to kubelet_stats and
+        # fails the install on the legacy alias.
         additions.setdefault("agent", {}).setdefault("config", {}).setdefault("receivers", {}).setdefault(
-            "kubeletstats", {"collection_interval": "30s", "insecure_skip_verify": True}
+            "kubelet_stats", {"collection_interval": "30s", "insecure_skip_verify": True}
         )
-        additions["certmanager"] = {"enabled": False}
+        # No certmanager block: chart 0.158.0 removed the bundled cert-manager
+        # subchart, and the values schema forbids unknown top-level keys, so
+        # emitting "certmanager" here would fail validation outright. OpenShift
+        # continues to manage webhook certs outside the chart, and the operator
+        # is disabled below regardless.
         additions["cloudProvider"] = ""
         additions["operator"] = {"enabled": False}
-        additions["operatorcrds"] = {"installed": False}
+        additions["operatorcrds"] = {"install": False}
         additions["gateway"] = {"enabled": False}
 
     receivers: dict[str, Any] = {}
@@ -454,13 +460,13 @@ def ai_pod_overlay_additions(spec: dict[str, Any], cluster_name: str, distributi
         if pipeline_receivers["metrics/nvidianim-metrics"]:
             pipelines["metrics/nvidianim-metrics"] = {
                 "exporters": ["signalfx"],
-                "processors": ["memory_limiter", "k8s_attributes/nim", "batch", "resourcedetection", "resource"],
+                "processors": ["memory_limiter", "k8s_attributes/nim", "batch", "resource_detection", "resource"],
                 "receivers": pipeline_receivers["metrics/nvidianim-metrics"],
             }
         if pipeline_receivers["metrics/cisco-ai-pods"]:
             pipelines["metrics/cisco-ai-pods"] = {
                 "exporters": ["signalfx"],
-                "processors": ["memory_limiter", "batch", "resourcedetection", "resource"],
+                "processors": ["memory_limiter", "batch", "resource_detection", "resource"],
                 "receivers": pipeline_receivers["metrics/cisco-ai-pods"],
             }
 
@@ -979,8 +985,10 @@ def warnings(spec: dict[str, Any], distribution: str, nim_scrape_mode: str, dcgm
         )
     if distribution == "openshift":
         items.append(
-            "OpenShift defaults applied: kubeletstats.insecure_skip_verify=true (REQUIRED), certmanager.enabled=false, "
-            "cloudProvider='', operator/operatorcrds disabled, gateway disabled. SCC helper rendered."
+            "OpenShift defaults applied: kubelet_stats.insecure_skip_verify=true (REQUIRED), "
+            "cloudProvider='', operator/operatorcrds disabled, gateway disabled. SCC helper rendered. "
+            "cert-manager is no longer a chart value (chart 0.158.0 removed the bundled subchart); "
+            "OpenShift manages webhook certs outside the chart."
         )
     return items
 

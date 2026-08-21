@@ -9,6 +9,7 @@ import json
 import re
 import sys
 from collections import Counter
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,6 @@ PLATFORM_VERSIONS_PATH = (
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
 STATUS_KEY = "splunk_cloud_10_5"
 VERIFIED_KEY = "compatibility_verified"
-VERIFIED_DATE = "2026-07-02"
 BLOCKING_PACKAGE_RELATIONSHIPS = {"primary", "private-primary"}
 
 COMPATIBILITY_TEXT = {
@@ -135,6 +135,7 @@ def audit() -> dict[str, Any]:
     catalog = load_catalog()
     registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
     versions = json.loads(PLATFORM_VERSIONS_PATH.read_text(encoding="utf-8"))
+    verified_date = str(versions.get("compatibility_verified_date", "")).strip()
     expected_target = str(
         (versions.get("defaults") or {}).get("splunkbase_compatibility_target", "")
     )
@@ -197,6 +198,17 @@ def audit() -> dict[str, Any]:
                 "message": f"expected 10.5, found {expected_target or '<missing>'}",
             }
         )
+    try:
+        if date.fromisoformat(verified_date).isoformat() != verified_date:
+            raise ValueError
+    except ValueError:
+        findings.append(
+            {
+                "skill": "shared-contract",
+                "field": "compatibility_verified_date",
+                "message": "must be a valid YYYY-MM-DD date",
+            }
+        )
     if str(registry.get("compatibility_target", "")) != expected_target:
         findings.append(
             {
@@ -253,12 +265,12 @@ def audit() -> dict[str, Any]:
                     "message": "text does not match the declared compatibility profile",
                 }
             )
-        if verified != VERIFIED_DATE:
+        if verified != verified_date:
             findings.append(
                 {
                     "skill": skill,
                     "field": f"metadata.{VERIFIED_KEY}",
-                    "message": f"expected {VERIFIED_DATE}, found {verified or '<missing>'}",
+                    "message": f"expected {verified_date}, found {verified or '<missing>'}",
                 }
             )
         if unsupported and status == "supported":
@@ -345,7 +357,7 @@ def audit() -> dict[str, Any]:
     return {
         "catalog_sha256": catalog.checksum,
         "target": "10.5.2605",
-        "verified": VERIFIED_DATE,
+        "verified": verified_date,
         "skill_count": len(rows),
         "status_counts": {
             status: counts.get(status, 0) for status in COMPATIBILITY_TEXT

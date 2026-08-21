@@ -14,10 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = REPO_ROOT / "splunk-microsoft-exchange-ta-rendered"
 
 APPS = [
-    {"app": "TA-Exchange-ClientAccess", "id": "3225", "version": "4.1.0"},
-    {"app": "TA-Exchange-Mailbox", "id": "3225", "version": "4.1.0"},
-    {"app": "TA-SMTP-Reputation", "id": "3225", "version": "4.1.0"},
-    {"app": "TA-Windows-Exchange-IIS", "id": "3225", "version": "4.1.0"},
+    {"app": "TA-Exchange-ClientAccess", "id": "3225", "version": "4.1.1"},
+    {"app": "TA-Exchange-Mailbox", "id": "3225", "version": "4.1.1"},
+    {"app": "TA-SMTP-Reputation", "id": "3225", "version": "4.1.1"},
+    {"app": "TA-Windows-Exchange-IIS", "id": "3225", "version": "4.1.1"},
     {"app": "SA-ExchangeIndex", "id": "5663", "version": "4.0.4"},
 ]
 
@@ -169,7 +169,7 @@ def render_install_commands(args: argparse.Namespace) -> str:
 set -euo pipefail
 
 # Review before running. No secrets are embedded in this file.
-bash skills/splunk-app-install/scripts/install_app.sh --source splunkbase --app-id 3225 --app-version 4.1.0 --no-update  # Exchange component bundle
+bash skills/splunk-app-install/scripts/install_app.sh --source splunkbase --app-id 3225 --app-version 4.1.1 --no-update  # Exchange component bundle
 bash skills/splunk-app-install/scripts/install_app.sh --source splunkbase --app-id 5663 --app-version 4.0.4 --no-update  # SA-ExchangeIndex
 
 bash skills/splunk-windows-ta-setup/scripts/setup.sh --help

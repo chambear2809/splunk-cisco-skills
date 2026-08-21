@@ -126,7 +126,7 @@ installed before validating production event-log coverage.
 
 ## SCAN Sourcetype Contract
 
-The pinned SCAN catalog version `2026_07_09_1837` identifies these current
+The pinned SCAN catalog version `2026_08_01_2130` identifies these current
 Secure Access sourcetypes:
 
 ```text

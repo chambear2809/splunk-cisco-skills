@@ -7,7 +7,7 @@ Primary sources:
 - SAP monitoring architecture: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/sap-monitoring-using-cisco-appdynamics
 - Install SAP NetWeaver systems: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/install-sap-netweaver-systems
 - SAP supported environments: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/sap-supported-environments
-- SAP authorizations: https://help.splunk.com/appdynamics-sap-agent/sap-monitoring/install-sap-netweaver-systems/sap-authorizations
+- SAP authorizations: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/install-sap-netweaver-systems/sap-authorizations
 - Monitor SAP business processes: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/monitor-sap-business-processes
 - Monitoring integration: https://help.splunk.com/en/appdynamics-sap-agent/sap-monitoring/monitoring-integration
 

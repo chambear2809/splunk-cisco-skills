@@ -2,6 +2,27 @@
 
 The cisco_os receiver lives in upstream `opentelemetry-collector-contrib` and connects to Cisco network devices over SSH to scrape system + interface metrics. The skill targets receiver version **v0.149.0+** (multi-device + global-scrapers format from PR #45562, merged Feb 2026).
 
+## Why the v0.149.0 floor is held, not bumped
+
+This is a *minimum*, and it is deliberately left at v0.149.0 even though the
+base collector skill now pins Collector/chart 0.158.0. Re-verified against
+contrib v0.158.0:
+
+- `receiver/ciscoosreceiver/README.md` is byte-identical to v0.149.0 apart from
+  one blank line, so the documented config surface did not change.
+- `receiver/ciscoosreceiver/metadata.yaml` is byte-identical to v0.149.0, so no
+  metric was renamed, added, or removed and `stability: alpha [metrics]` still
+  holds. The rendered dashboards and detectors keep working unchanged.
+- The rendered `clusterReceiver.config.receivers.cisco_os` block (multi-device
+  `devices:` list plus global `scrapers:`) passes `otelcol validate` on the
+  Splunk Distribution 0.158.0 image, and `cisco_os` is registered in both that
+  build and upstream contrib 0.158.0.
+
+Because nothing in the receiver's config or metric contract moved, raising the
+floor would only invalidate otherwise-working operator deployments on
+v0.149.0–v0.157.x. Raise it only if a future contrib release adds a required
+field or renames a metric this skill emits.
+
 ## Where it lives in the OTel collector
 
 The receiver runs in the **clusterReceiver** (one-instance Deployment), not the agent (DaemonSet). This matters because:

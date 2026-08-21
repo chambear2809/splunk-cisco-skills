@@ -21,6 +21,9 @@ from skills.shared.skill_catalog import SkillRecord, load_catalog  # noqa: E402
 
 
 SKILLS_DIR = REPO_ROOT / "skills"
+PLATFORM_VERSIONS_PATH = (
+    REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
+)
 
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -69,7 +72,11 @@ COMPATIBILITY_STATUSES = {
     "not-applicable",
     "delegated",
 }
-COMPATIBILITY_VERIFIED_DATE = "2026-07-02"
+COMPATIBILITY_VERIFIED_DATE = str(
+    json.loads(PLATFORM_VERSIONS_PATH.read_text(encoding="utf-8"))[
+        "compatibility_verified_date"
+    ]
+)
 OPENAI_TOP_LEVEL_KEYS = {"interface", "dependencies", "policy"}
 OPENAI_INTERFACE_KEYS = {
     "display_name",

@@ -6,6 +6,9 @@ api_version: splunk-oncall-setup/v1
 org_slug: acme-corp
 api_base: https://api.victorops.com
 default_routing_key: catchall
+# Splunk Observability realm. Required when splunk_side.observability_handoff
+# is set, because that deeplink is realm-specific.
+realm: us1
 
 users:
   - kind: create

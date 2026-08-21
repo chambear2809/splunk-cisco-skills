@@ -106,6 +106,27 @@ def test_installer_rejects_cleartext_non_loopback_endpoint(tmp_path: Path) -> No
     assert "HTTPS unless it is loopback" in result.stderr
 
 
+def test_installer_rejects_flag_as_missing_value_without_writing(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    result = subprocess.run(
+        [
+            "bash",
+            str(INSTALLER),
+            "--codex-home",
+            str(codex_home),
+            "--service-name",
+            "--dry-run",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "Option '--service-name' requires a value" in result.stderr
+    assert not codex_home.exists()
+
+
 def test_incomplete_turn_is_not_selected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runtime = load_runtime_module()
     codex_home = tmp_path / ".codex"

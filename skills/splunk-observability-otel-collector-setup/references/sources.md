@@ -4,34 +4,72 @@ Last audited: **2026-07-02**.
 
 ## Executable release sources
 
-- Collector `0.154.2` release:
-  <https://github.com/signalfx/splunk-otel-collector/releases/tag/v0.154.2>
+- Collector `0.158.0` release:
+  <https://github.com/signalfx/splunk-otel-collector/releases/tag/v0.158.0>
 - Tagged Linux installer:
-  <https://github.com/signalfx/splunk-otel-collector/blob/v0.154.2/packaging/installer/install.sh>
+  <https://github.com/signalfx/splunk-otel-collector/blob/v0.158.0/packaging/installer/install.sh>
 - Tagged Linux auto-instrumentation source:
-  <https://github.com/signalfx/splunk-otel-collector/tree/v0.154.2/instrumentation>
+  <https://github.com/signalfx/splunk-otel-collector/tree/v0.158.0/instrumentation>
 - Audited Linux-host OBI release `v0.6.0`:
   <https://github.com/open-telemetry/opentelemetry-ebpf-instrumentation/releases/tag/v0.6.0>
 - Tagged Collector component catalog:
-  <https://github.com/signalfx/splunk-otel-collector/blob/v0.154.2/docs/components.md>
+  <https://github.com/signalfx/splunk-otel-collector/blob/v0.158.0/docs/components.md>
 - Tagged agent configuration:
-  <https://github.com/signalfx/splunk-otel-collector/blob/v0.154.2/cmd/otelcol/config/collector/agent_config.yaml>
-- Helm chart `0.154.0` release:
-  <https://github.com/signalfx/splunk-otel-collector-chart/releases/tag/splunk-otel-collector-0.154.0>
+  <https://github.com/signalfx/splunk-otel-collector/blob/v0.158.0/cmd/otelcol/config/collector/agent_config.yaml>
+- Helm chart `0.158.0` release:
+  <https://github.com/signalfx/splunk-otel-collector-chart/releases/tag/splunk-otel-collector-0.158.0>
 - Exact chart release asset:
-  <https://github.com/signalfx/splunk-otel-collector-chart/releases/download/splunk-otel-collector-0.154.0/splunk-otel-collector-0.154.0.tgz>
+  <https://github.com/signalfx/splunk-otel-collector-chart/releases/download/splunk-otel-collector-0.158.0/splunk-otel-collector-0.158.0.tgz>
 - GitHub release API record carrying the asset digest:
-  <https://api.github.com/repos/signalfx/splunk-otel-collector-chart/releases/tags/splunk-otel-collector-0.154.0>
+  <https://api.github.com/repos/signalfx/splunk-otel-collector-chart/releases/tags/splunk-otel-collector-0.158.0>
 - Tagged chart values/schema source:
-  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.154.0/helm-charts/splunk-otel-collector/values.yaml>
+  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/helm-charts/splunk-otel-collector/values.yaml>
 - Tagged chart upgrade guide:
-  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.154.0/UPGRADING.md>
+  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/UPGRADING.md>
 - Tagged auto-instrumentation installation guide:
-  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.154.0/docs/auto-instrumentation-install.md>
+  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/docs/auto-instrumentation-install.md>
+- Operator maturity. Two vendor statements apply at different layers and the
+  rendered advisory deliberately states both; `OPERATOR_MATURITY_ADVISORY` is
+  duplicated verbatim in
+  `splunk-observability-k8s-auto-instrumentation-setup/scripts/render_assets.py`
+  because that overlay uses the Operator this chart deploys, and the two skills
+  are required to agree.
+  - Packaging layer, alpha/experimental. `values.yaml` says Operator-related
+    features "should be considered to have an alpha maturity level and be
+    experimental. There may be breaking changes or Operator features may be
+    replaced entirely with a better alternative in the future." Present
+    unchanged in charts 0.152.0 and 0.154.0 (line 993) and 0.158.0 (line 1060).
+    Note this notice is in `values.yaml` and *not* in the installation guide
+    above, which mentions "alpha" only as the `opentelemetry.io/v1alpha1` CRD
+    apiVersion — checking only that guide is what produced the earlier
+    incorrect finding that the claim was a `v1alpha1` misreading:
+    <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/helm-charts/splunk-otel-collector/values.yaml>
+  - Chart layer, production tested. The chart README "Current Status" says the
+    chart "is production tested; it is in use by a number of customers in their
+    production environments" and that customers "can receive direct help from
+    official Splunk support within SLA's". Scope this precisely: the statement
+    is about the chart, and the adjacent bullet scopes stability to "metrics,
+    traces and logs collection", which does not name auto-instrumentation:
+    <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/README.md>
+  - Actionable risk and mitigation. The same README's "Versioning and breaking
+    changes" section warns that bundled subcharts "such as the OpenTelemetry
+    Operator (and its CRDs)" can on upgrade "change operator behavior or
+    injected auto-instrumentation even when your chart values are unchanged",
+    and that a minor version bump can contain breaking changes. This is the
+    source for the advisory's pin-exactly / review-subchart-notes / diff-
+    rendered-manifests guidance:
+    <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/README.md>
+  - Product documentation. Splunk's zero-code Kubernetes page documents the
+    capability as a normal supported feature and carries no maturity qualifier
+    of any kind, so it is cited as corroborating support status rather than as
+    a source for the phrase "production tested". It also records the
+    Operator-free alternative the advisory points at, deploying zero-code
+    instrumentation per language runtime independently of the Collector:
+    <https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/automatic-discovery-of-apps-and-services/kubernetes/language-runtimes>
 - Tagged OBI guide:
-  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.154.0/docs/zero-code-ebpf-instrumentation.md>
+  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/docs/zero-code-ebpf-instrumentation.md>
 - FIPS Collector image tag and manifest:
-  <https://quay.io/repository/signalfx/splunk-otel-collector-fips?tab=tags&tag=0.154.0>
+  <https://quay.io/repository/signalfx/splunk-otel-collector-fips?tab=tags&tag=0.158.0>
 - Helm 4 post-renderer migration and plugin contract:
   <https://helm.sh/docs/plugins/migrate/>,
   <https://helm.sh/docs/plugins/developer/tutorial-postrenderer-plugin/>
@@ -60,7 +98,7 @@ Last audited: **2026-07-02**.
 - Kubernetes installation:
   <https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-for-kubernetes>
 - Tagged Kubernetes advanced configuration, including EKS Auto Mode and Fargate:
-  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.154.0/docs/advanced-configuration.md>
+  <https://github.com/signalfx/splunk-otel-collector-chart/blob/splunk-otel-collector-0.158.0/docs/advanced-configuration.md>
 - Collector deployment modes:
   <https://help.splunk.com/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/get-started-understand-and-use-the-collector/deployment-modes>
 - Other deployment tools (ECS, EC2, Fargate, Nomad, PCF):
@@ -91,29 +129,28 @@ Last audited: **2026-07-02**.
 - Splunk Add-On for OpenTelemetry Collector for Windows `x86_64`, app `8699`:
   <https://splunkbase.splunk.com/app/8699>
 - Tagged TA source:
-  <https://github.com/signalfx/splunk-otel-collector/tree/v0.154.2/packaging/ta-v2>
+  <https://github.com/signalfx/splunk-otel-collector/tree/v0.158.0/packaging/ta-v2>
 - TA installation documentation:
   <https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/splunk-add-on-for-opentelemetry-collector/install-the-technical-add-on>
 
 ## Audited facts
 
 - Linux installer SHA-256:
-  `16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29`.
+  `cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b`.
 - Chart release archive SHA-256:
-  `613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0`
-  (296,029 bytes). The renderer binds the URL, filename, and digest and does
+  `088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274`
+  (162,326 bytes). The renderer binds the URL, filename, and digest and does
   not combine this local archive with Helm `--version` resolution.
 - Audited Collector manifest-list pins are standard Linux
-  `sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410`,
+  `sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357`,
   FIPS multi-platform
-  `sha256:b11a6e592248a2281cf95a765d30660a9951f04b0935f91d9ae93db5839b3b52`,
+  `sha256:e60b7721a2be509cd71d6594387d437ce4996dba1804c6ff774fbb4e7ef3ba8d`,
   and Windows
-  `sha256:aedfa35fcbff3dcf92bbcc195e9631ed2648d83e836ee2f9f0a2536d3a1a1e9a`.
-  The Collector `v0.154.0` GitHub release text reports the FIPS `b11a…` digest
-  for the standard repository, but the standard Quay tag currently resolves to
-  `b371…` and the standard repository does not serve `b11a…`; the renderer uses
-  the independently resolved repository/tag digest and records this discrepancy
-  rather than silently trusting the release-note line.
+  `sha256:5d1cb3cf0c7608b8ac6f25444c3e23d49096f39e35e466a345025a7f3054952c`.
+  Every digest above is resolved independently from the `quay.io` registry for
+  the exact repository and tag rather than copied from GitHub release text: the
+  `v0.154.0` release notes previously misreported the FIPS digest against the
+  standard repository, so release-note lines are not treated as authoritative.
 - The chart's mutable Fargate node-discoverer source
   `public.ecr.aws/amazonlinux/amazonlinux:latest` was resolved on 2026-07-02 to
   immutable AL2023 release `2023.12.20260629.0` and manifest-list digest
@@ -124,22 +161,31 @@ Last audited: **2026-07-02**.
 - The remaining chart sources are allowlisted and rewritten as follows:
   UBI9 `sha256:8bf0e8f20737e9c8a68c8a498299e9504ab397b1b1f2837acb2fef12ec698f0e`,
   BusyBox `sha256:fd8d9aa63ba2f0982b5304e1ee8d3b90a210bc1ffb5314d980eb6962f1a9715d`,
-  OTel Operator `sha256:71c80734e698e0a38039aeb5a6fad7129ca68eaa31eb262752c1e5015b319a24`,
+  OTel Operator `sha256:e6f4503cade002bc2797b937e51801e1013abafb734933f35b67168448659dfe`,
   kubectl `sha256:c93e4fb811b3217ef69ee7a79a9a15fb277887cd1c3002fbe154e676037a274a`,
   Go instrumentation `sha256:664715c04cb854ffdbb920ea1289a86b0717f39e46b18e6584caa9e1f2e4d83f`,
-  Apache instrumentation `sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d`,
-  .NET `sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910`,
-  Java `sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9`,
-  Java CSA `sha256:6c2c1d95c3753a4bcd9ea51c27498a242ea3de9a72345bb64d7c836fcf1c2abb`,
-  JavaScript `sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a`,
+  Apache instrumentation `sha256:a86df0699bf53228588d8e08dbd95e763b7bb377a02fe1d9e68806ef954d04f8`,
+  .NET `sha256:1b8d96528c8138ef40a20fa0a58db423d653a9bcb7e1fa0fa5ecb83293b8e5bc`,
+  Java `sha256:812ad3b45675ef90043020c10e9ed21a3f11ba0903a848e78e3fe71654ae622c`,
+  Java CSA `sha256:8b7e4f33254915fd657d1cc8a18288b6fbdd6392fac2912cb27d60df4fc383ea`,
+  JavaScript `sha256:55f93be18e545d98a981bba124fe94a02fdbbb88f1fc471aa08793f7ccba4d78`,
   Python `sha256:d488c507e0cacc64b81423b96f6e53b30f2602a0e4bcc614658182f6aa13d5b4`,
-  Secure Application Python `sha256:f47a8f0f7362da98f0e0ac0f5ac83492555b495c6c37c411680bb055bd1f2dbe`,
-  OBI `sha256:26f82b148dfe8cb0530561ab72a3cb5490b3ae5df556a33c27984af2e28542cf`,
+  Secure Application Python `sha256:db4c6d848af4b46c89f48584b18030f00677495a0f0f26f13de67f84fc758191`,
+  OBI `sha256:9c66cdb920202b9502e6f1b8e9b238757848eded40a0aad262976d6ebea23b02`,
   and Target Allocator
-  `sha256:85a08d334a480c33aff1f0e9d9e432202c1e0bf23f58f8bd11aececa5506a4c6`.
-- Linux Collector and Linux auto-instrumentation are independently pinned to
-  `0.154.2`. The Kubernetes Helm chart and its default/FIPS/Windows Collector
-  image tag are pinned to `0.154.0`; these version lines must not be conflated.
+  `sha256:feeedb038f075d2e29e420ccbd9329c72396f44d28aefae859a19f07ee4a31a4`.
+- Upstream re-pushed the mutable Apache instrumentation tag `1.0.4` between
+  chart `0.154.0` and `0.158.0`. Chart `0.158.0` still declares `1.0.4`, so the
+  audited digest advanced from `sha256:c519018e…` to `sha256:a86df069…`; the
+  superseded digest remains pullable, so already-applied deployments are
+  unaffected. This is exactly the substitution that digest pinning exists to
+  make visible.
+- Linux Collector, Linux auto-instrumentation, the Kubernetes Helm chart, and
+  the chart's default/FIPS/Windows Collector image tag all land on `0.158.0`.
+  Chart `0.158.0` sets `appVersion: 0.158.0`, so the chart and Collector version
+  lines coincide at this release; they were split at `0.154.x` (installer
+  `0.154.2` against chart/`appVersion` `0.154.0`) and must not be assumed equal
+  in future bumps.
 - The tagged Linux installer's `ensure_not_installed()` guard rejects an
   existing Collector. The generated installer wrappers are fresh-install
   paths, not package upgrade/downgrade automation.
@@ -158,25 +204,26 @@ Last audited: **2026-07-02**.
   `72903f7dda88d9ad70263d7c749064ede26aaa8040490807c518c62dc581aa6b`
   (`arm64`). Generated install and status helpers enforce the extracted-binary
   digest for the live architecture after the upstream archive verification.
-- App `7125` `0.154.2` package filename:
-  `splunk-add-on-for-opentelemetry-collector_01542.tgz`.
+- App `7125` `0.158.0` package filename:
+  `splunk-add-on-for-opentelemetry-collector_01580.tgz`.
 - App `7125` package SHA-256:
-  `928e66efb5591c3e9c07e2eae2008b605aa7cf10ae9cc48acff88f417811a7da`.
-- App `8698` `0.154.2` package filename and SHA-256:
-  `splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01542.tgz`,
-  `efd048ae1c30fa81adbe05f9e3de0dced90cfe8a89dc750b116ca812bb3471de`.
-- App `8699` `0.154.2` package filename and SHA-256:
-  `splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01542.tgz`,
-  `c66825ef1020c53237767d643953a8e6033c51cda92aad875a54fefcf51aea63`.
+  `b50a495b44577f7a4b80f9a300fce8ea2b9e0711e074d5b1be01c5c8395a44b5`.
+- App `8698` `0.158.0` package filename and SHA-256:
+  `splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01580.tgz`,
+  `6fb7e34553f59b803bf1e01d3b191e6314a431f2a6a640a50080012b100575ba`.
+- App `8699` `0.158.0` package filename and SHA-256:
+  `splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01580.tgz`,
+  `b9100e0171558bd12d8cc244569fcd5709013aac438113f92ee7397da60a822c`.
 - App roots are `Splunk_TA_otel`, `Splunk_TA_otel_linux_x86_64`, and
   `Splunk_TA_otel_windows_x86_64`. App `7125` is Cloud-compatible; the audited
   metadata for split apps `8698` and `8699` reports Cloud compatibility false.
 - The audited TA source/package variants have no `data/ui/views` directory and
   do not ship pre-built Splunk dashboards; the renderer records this per
   supplied package rather than inferring dashboard completion from install.
-- The `quay.io/signalfx/splunk-otel-collector-fips:0.154.0` manifest contains
-  Linux `amd64`, Linux `arm64`, and Windows `amd64` variants. This Kubernetes
-  image fact is separate from the TA FIPS-compatibility metadata.
+- The `quay.io/signalfx/splunk-otel-collector-fips:0.158.0` manifest contains
+  Linux `amd64`, Linux `arm64`, and two Windows `amd64` variants (Windows Server
+  `10.0.17763` and `10.0.20348` base images). This Kubernetes image fact is
+  separate from the TA FIPS-compatibility metadata.
 - Splunk documents its Collector container images as signed. This workflow
   pins and verifies every rendered and live workload image by digest;
   organization signature or admission-policy enforcement remains a separate
@@ -191,8 +238,12 @@ Last audited: **2026-07-02**.
   and the compliance owner at deployment time.
 - The installer has no `--trace-url` option. `--hec-url` is deprecated and the
   installer announces removal in September 2026.
-- Chart `0.154.0` rejects an unknown `gateway.mode` value; its gateway is a
-  Deployment with a default of three replicas.
+- Chart `0.158.0` accepts `gateway.mode` values `deployment` and `statefulset`
+  and rejects anything else; chart `0.154.0` had no `gateway.mode` key at all and
+  rejected the field outright. Chart `0.155.0` added StatefulSet gateway mode
+  alongside `gateway.statefulsetSpec` and `gateway.headlessService.enabled`. This
+  workflow still renders only the Deployment gateway with its default of three
+  replicas; StatefulSet gateway mode is an unrendered chart capability.
 
 ## Refresh procedure
 

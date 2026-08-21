@@ -112,7 +112,7 @@ Mission Control / ITSI dashboards can hang off the data model.
 ## Splunk Health Assistant Add-on
 
 For FIPS migrations and major version upgrades, install the
-[Splunk Health Assistant Add-on](https://splunkbase.splunk.com/app/6589)
+[Splunk Health Assistant Add-on](https://splunkbase.splunk.com/app/4603)
 to discover SSL / TLS issues that would block the upgrade. Run it
 in Monitoring Console with the **Security** category and the
 `ssl` / `upgrades` tags.

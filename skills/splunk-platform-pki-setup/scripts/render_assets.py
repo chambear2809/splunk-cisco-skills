@@ -29,6 +29,7 @@ from pathlib import Path
 _SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
 if str(_SHARED_LIB) not in sys.path:
     sys.path.insert(0, str(_SHARED_LIB))
+from cipher_policy import check_policy_document  # noqa: E402
 from platform_versions import (  # noqa: E402
     platform_default,
     require_supported_enterprise_version,
@@ -330,7 +331,24 @@ def _load_algorithm_policy(args: argparse.Namespace) -> dict:
     if not path.exists():
         sys.exit(f"ERROR: algorithm policy file not found: {path}")
     with path.open() as f:
-        return json.load(f)
+        policy = json.load(f)
+
+    # Enforce each preset's cipher_policy against its own cipher lists. This
+    # runs for the bundled policy AND for an operator-supplied
+    # --algorithm-policy-file, which is the case that matters: the operator
+    # who hands over a custom cipher list is entitled to assume it was
+    # checked. Previously nothing read these guardrails at all, so a
+    # non-compliant custom list was accepted in silence.
+    violations = check_policy_document(policy)
+    if violations:
+        detail = "\n  - ".join(violations)
+        sys.exit(
+            f"ERROR: algorithm policy {path} violates its own cipher guardrails:\n"
+            f"  - {detail}\n"
+            "Fix the cipher list or relax the preset's cipher_policy. A preset "
+            "must validate against the guardrails it declares."
+        )
+    return policy
 
 
 def _key_bits_or_curve(key_algorithm: str) -> dict:
@@ -1738,7 +1756,7 @@ echo "OK: $CERT does not use any default Splunk subject token."
 
 def _kv_store_eku_check_sh(args: argparse.Namespace) -> str:
     return _sh(f"""# Run the KV Store custom-cert prep check from the Splunk doc:
-#   https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore
+#   https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store
 #
 # Refuses success unless openssl verify -x509_strict returns OK AND the
 # cert carries both serverAuth and clientAuth EKU values.
@@ -2366,7 +2384,7 @@ def _ep_readme(args: argparse.Namespace) -> str:
 
 This directory holds the five-file cert pair Splunk Edge Processor
 expects per
-[Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
+[Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
 
 | File | Role |
 |---|---|

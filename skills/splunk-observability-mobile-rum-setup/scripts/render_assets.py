@@ -38,14 +38,22 @@ SUPPORTED_SOURCE_MODES = {"render-snippets", "render-patches", "apply-patches"}
 SUPPORTED_REALMS = {"us0", "us1", "us2", "eu0", "eu1", "eu2", "au0", "jp0"}
 
 DEFAULT_VERSIONS = {
-    "ios_agent": "2.2.3",
-    "android_agent": "2.3.0",
-    "android_gradle_plugins": "2.3.0",
-    "react_native_agent": "1.0.0",
-    "react_native_session_replay": "1.0.0",
-    "flutter_agent": "1.0.1",
-    "flutter_session_replay": "1.0.1",
+    "ios_agent": "2.4.1",
+    "android_agent": "2.3.3",
+    "android_gradle_plugins": "2.3.3",
+    "react_native_agent": "1.2.0",
+    "react_native_session_replay": "1.2.0",
+    "flutter_agent": "1.2.0",
+    "flutter_session_replay": "1.2.0",
 }
+
+VERSIONS_VERIFIED_ON = "2026-08-20"
+
+# iOS 2.4.1 and Android 2.3.2 renamed the deployment environment resource
+# attribute and emit only the new key. Agents older than those pins emit only
+# the old key, so a query spanning a rollout must accept both.
+DEPLOYMENT_ENVIRONMENT_ATTRIBUTE = "deployment.environment.name"
+LEGACY_DEPLOYMENT_ENVIRONMENT_ATTRIBUTE = "deployment.environment"
 
 VERSION_KEYS_BY_PLATFORM = {
     "ios": ("ios_agent",),
@@ -610,7 +618,7 @@ def flutter_global_attribute_lines(mapping: dict[str, str], indent: str = "  ") 
 def common_attributes(platform: dict[str, Any]) -> dict[str, str]:
     release = platform.get("release") or {}
     attrs = {
-        "deployment.environment": str(platform["deployment_environment"]),
+        DEPLOYMENT_ENVIRONMENT_ATTRIBUTE: str(platform["deployment_environment"]),
         "app.version": str(platform["app_version"]),
         "release.name": str(release.get("name") or platform["app_version"]),
         "release.build": str(release.get("build") or "local"),
@@ -1049,7 +1057,7 @@ export function InstrumentedWebView(props) {
     native = f"""# React Native Native-Side Setup
 
 - Requires React Native {platform['requirements'].get('react_native', '0.75.0')}+ and React {platform['requirements'].get('react', '18.2.0')}+.
-- iOS requires iOS 15+ and `USE_FRAMEWORKS=dynamic` when the app uses the SDK pod path.
+- iOS requires iOS 15+. From agent 1.0.1 the native iOS SDK ships as vendored xcframeworks, so the pod path needs no Podfile linkage change and `use_frameworks! :linkage => :static` is supported.
 - Android runtime default is API {platform['requirements'].get('android_min_api', 24)}+.
 - Bare React Native apps wire native iOS dSYM and Android mapping upload through the native helpers.
 - Expo apps require a development build; Expo Go cannot load custom native modules.
@@ -1359,10 +1367,16 @@ def render_preflight(spec: dict[str, Any], warnings: list[str]) -> str:
             "",
             "## Advisories",
             "",
+            f"- Defaults verified against upstream registries on {VERSIONS_VERIFIED_ON}; every default is the current release.",
             f"- Default iOS agent: {DEFAULT_VERSIONS['ios_agent']}.",
             f"- Default Android agent and Gradle plugins: {DEFAULT_VERSIONS['android_agent']}.",
             f"- Default React Native agent: {DEFAULT_VERSIONS['react_native_agent']}; Session Replay: {DEFAULT_VERSIONS['react_native_session_replay']}.",
             f"- Default Flutter agent: {DEFAULT_VERSIONS['flutter_agent']}; Session Replay: {DEFAULT_VERSIONS['flutter_session_replay']}.",
+            "- Flutter agent and Flutter Session Replay must stay on the same minor line; 1.2.0 pins both platform interfaces to >=1.2.0 <1.3.0.",
+            f"- These agents emit {DEPLOYMENT_ENVIRONMENT_ATTRIBUTE}, not {LEGACY_DEPLOYMENT_ENVIRONMENT_ATTRIBUTE}"
+            " (renamed in iOS 2.4.1 and Android 2.3.2, with no transitional dual-emit).",
+            f"- Update dashboards, detectors, and saved searches that filter or group on {LEGACY_DEPLOYMENT_ENVIRONMENT_ATTRIBUTE}."
+            " While a fleet straddles the rename, accept both keys rather than switching outright.",
             "- React Native and Flutter native symbols route to iOS dSYM and Android mapping workflows.",
             "- JS/browser source maps are only for Browser RUM inside WebViews.",
         ]
@@ -1501,10 +1515,12 @@ def render_assets(spec: dict[str, Any], output_dir: Path, warnings: list[str]) -
         output_dir / "version-lock.json",
         json.dumps(
             {
-                "verified_on": "2026-05-19",
+                "verified_on": VERSIONS_VERIFIED_ON,
                 "defaults": DEFAULT_VERSIONS,
+                "deployment_environment_attribute": DEPLOYMENT_ENVIRONMENT_ATTRIBUTE,
+                "legacy_deployment_environment_attribute": LEGACY_DEPLOYMENT_ENVIRONMENT_ATTRIBUTE,
                 "sources": {
-                    "ios": "https://github.com/signalfx/splunk-otel-ios/releases/tag/2.2.3",
+                    "ios": f"https://github.com/signalfx/splunk-otel-ios/releases/tag/{DEFAULT_VERSIONS['ios_agent']}",
                     "android": "https://central.sonatype.com/artifact/com.splunk/splunk-otel-android",
                     "react_native": "https://registry.npmjs.org/%40splunk%2Fotel-react-native/latest",
                     "react_native_session_replay": "https://registry.npmjs.org/%40splunk%2Fotel-session-replay-react-native/latest",

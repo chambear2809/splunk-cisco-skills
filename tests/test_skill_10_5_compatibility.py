@@ -45,9 +45,8 @@ def test_latest_release_gaps_use_verified_10_5_pins() -> None:
     payload = load_audit_module().audit()
     statuses = {row["skill"]: row["status"] for row in payload["skills"]}
     release_specific = {
-        "cisco-enterprise-networking-setup",
         "cisco-intersight-setup",
-        "cisco-security-cloud-setup",
+        "splunk-google-workspace-ta-setup",
     }
     assert {skill: statuses[skill] for skill in release_specific} == {
         skill: "conditional" for skill in release_specific
@@ -56,9 +55,21 @@ def test_latest_release_gaps_use_verified_10_5_pins() -> None:
         (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
     )
     by_skill = {app["skill"]: app for app in registry["apps"]}
+    # Each release-specific skill keeps a reviewed pin behind public latest, so the
+    # registry must record both releases and explain the gap in notes.
     for skill in release_specific:
-        assert "10.5" not in by_skill[skill]["platform_versions"]
-        assert "10.5" in by_skill[skill]["verified_platform_versions"]
+        app = by_skill[skill]
+        assert app["latest_verified_version"] != app["latest_release_version"], skill
+        assert "10.5" in app["notes"], skill
+        assert app["latest_verified_version"] in app["notes"], skill
+        assert app["latest_release_version"] in app["notes"], skill
+
+    # Both remaining holds are pure platform gates: the verified pin advertises 10.5
+    # and public latest does not, so advancing the pin would regress the target.
+    for skill in release_specific:
+        app = by_skill[skill]
+        assert "10.5" not in app["platform_versions"], skill
+        assert "10.5" in app["verified_platform_versions"], skill
 
 
 def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> None:

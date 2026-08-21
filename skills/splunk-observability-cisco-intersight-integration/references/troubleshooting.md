@@ -86,7 +86,10 @@ If the intersight-otel collector pod is hitting its memory limit (default 500Mi)
 
 - A large org (10k+ servers) with the default `batch.send_batch_size: 1024`. Bump to 4096 to reduce buffering.
 - A long backlog from a paused agent OTLP receiver. Restart the main agent to drain.
-- A leaking older receiver version. Pin to v0.149.0+.
+- A leak in an older `ghcr.io/intersight/intersight-otel` build. Pull a current
+  image and pin it by digest. This runtime is versioned by Cisco, not by the
+  upstream contrib or Splunk Distribution collector release train, so it does
+  not track the `0.158.0` collector pin used elsewhere in this repo.
 
 ## Coordination with cisco-intersight-setup
 

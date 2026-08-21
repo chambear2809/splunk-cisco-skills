@@ -10,6 +10,10 @@ galileo:
   # Required intake. Ask the user for their Galileo instance URL before
   # rendering, for example https://console.demo-v2.galileocloud.io/.
   console_url: ""
+  # Required before apply. Tenants onboarded before 2026-08-07 use the legacy
+  # Galileo contract implemented here. Boundary/newer tenants are render-only
+  # until the Splunk Agent Observability API/SDK contract is implemented.
+  onboarding_date: ""
   # Leave blank to derive from console_url, or set an explicit override.
   api_base: ""
   otel_endpoint: ""

@@ -1,22 +1,30 @@
 {
   "_comment": "Machine-readable companion to algorithm-presets.md. Consumed by render_assets.py and preflight.sh. The same cipher_suite + ecdh_curves constants appear in the splunk-enterprise-public-exposure-hardening renderer so the two skills agree on the on-the-wire crypto.",
+  "_cipher_policy_comment": "cipher_policy replaced the former forbidden_cipher_substrings lists. Substring matching could not express these rules: OpenSSL cipher names contain no 'CBC' token (ECDHE-RSA-AES256-SHA384 is CBC mode), and SHA-1 suites are spelled '-SHA' not '-SHA1', so both of those entries were permanent no-ops; meanwhile the STIG preset's 'SHA256' entry matched AEAD suites it was never meant to touch. Rules are now expressed against a parsed classification of each suite (skills/shared/lib/cipher_policy.py), and forbidden_tokens compares whole hyphen/underscore-delimited tokens rather than substrings. Enforcement runs at policy load for every preset AND for any operator-supplied --algorithm-policy-file, so a custom cipher list is actually validated rather than merely accepted.",
   "tls_version_floor": "tls1.2",
   "tls_version_supported": ["tls1.2", "tls1.3"],
   "tls_version_forbidden": ["ssl3", "tls1.0", "tls1.1"],
   "tls13_minimum_splunk_version": "10.4.0",
   "presets": {
     "splunk-modern": {
-      "description": "Splunk's documented modern cipher set per https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites",
+      "description": "AEAD-only modern cipher set. Derived from Splunk's documented set per https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/install-splunk-enterprise-securely/about-tls-encryption-and-cipher-suites, with the four non-AEAD ECDHE suites removed; see _cbc_removal_note.",
+      "_cbc_removal_note": "Previously ended with ECDHE-ECDSA-AES256-SHA384, ECDHE-RSA-AES256-SHA384, ECDHE-ECDSA-AES128-SHA256, and ECDHE-RSA-AES128-SHA256. Those four are CBC mode (the names do not say so; openssl ciphers -v reports Enc=AES(n) with no AEAD token) and CBC is listed as deprecated by this repository's own cryptography rules. A preset named 'splunk-modern' offering them contradicted its own name, and because splunk-modern is the default --tls-policy, every operator who did not explicitly choose otherwise got them. Operators with clients that genuinely cannot do AEAD must NOT re-add these here: that silently weakens the default for everyone. Use a separate --algorithm-policy-file carrying a compatibility preset, so the exception is explicit, reviewable, and scoped to the deployment that needs it. See algorithm-presets.md for the concrete procedure.",
       "ssl_versions": "tls1.2,tls1.3",
       "ssl_versions_for_client": "tls1.2,tls1.3",
       "tls13_cipher_suite": "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256",
       "tls13_groups": "prime256v1, secp384r1",
-      "cipher_suite": "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256",
+      "cipher_suite": "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256",
       "ecdh_curves": "prime256v1, secp384r1, secp521r1",
       "allowed_key_algorithms": ["rsa-2048", "rsa-3072", "rsa-4096", "ecdsa-p256", "ecdsa-p384", "ecdsa-p521"],
       "allowed_signature_algorithms": ["RSA-SHA256", "RSA-SHA384", "RSA-SHA512", "ECDSA-SHA256", "ECDSA-SHA384", "ECDSA-SHA512"],
       "minimum_rsa_bits": 2048,
       "minimum_ecdsa_curve": "secp256r1",
+      "cipher_policy": {
+        "require_aead": true,
+        "forbid_cbc_mode": true,
+        "forbid_sha1_mac": true,
+        "forbidden_tokens": ["NULL", "EXPORT", "RC4", "DES", "3DES", "IDEA", "SEED", "MD5", "ADH", "AECDH", "ANON"]
+      },
       "ldap_tls_protocol_min": "3.3",
       "ldap_tls_cipher_suite": "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
     },
@@ -33,7 +41,12 @@
       "minimum_rsa_bits": 2048,
       "minimum_ecdsa_curve": "secp256r1",
       "forbidden_signature_algorithms": ["RSA-SHA1", "MD5", "DSA"],
-      "forbidden_cipher_substrings": ["NULL", "EXPORT", "RC4", "DES", "3DES", "MD5", "anon", "CBC", "SHA1"],
+      "cipher_policy": {
+        "require_aead": true,
+        "forbid_cbc_mode": true,
+        "forbid_sha1_mac": true,
+        "forbidden_tokens": ["NULL", "EXPORT", "RC4", "DES", "3DES", "IDEA", "SEED", "MD5", "ADH", "AECDH", "ANON"]
+      },
       "ldap_tls_protocol_min": "3.3",
       "ldap_tls_cipher_suite": "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256",
       "splunk_launch_conf": {
@@ -53,7 +66,13 @@
       "minimum_rsa_bits": 3072,
       "minimum_ecdsa_curve": "secp384r1",
       "forbidden_signature_algorithms": ["RSA-SHA1", "RSA-SHA256", "MD5", "DSA"],
-      "forbidden_cipher_substrings": ["NULL", "EXPORT", "RC4", "DES", "3DES", "MD5", "anon", "CBC", "SHA1", "SHA256"],
+      "_sha256_scope_note": "RSA-SHA256 is forbidden as a certificate SIGNATURE algorithm (above), which is the actual STIG requirement. It is deliberately NOT forbidden in cipher_policy. The previous forbidden_cipher_substrings list carried a bare 'SHA256' entry, which conflated two different uses of the same hash name: the signature hash on a certificate, and the PRF/KDF hash of an AEAD cipher suite. As a substring it matched this preset's own ECDHE-ECDSA-AES128-GCM-SHA256 and TLS_AES_128_GCM_SHA256, so the moment enforcement went live the STIG preset would have rejected its own rendered output. Keeping the two concerns in separate fields is what prevents that recurring.",
+      "cipher_policy": {
+        "require_aead": true,
+        "forbid_cbc_mode": true,
+        "forbid_sha1_mac": true,
+        "forbidden_tokens": ["NULL", "EXPORT", "RC4", "DES", "3DES", "IDEA", "SEED", "MD5", "ADH", "AECDH", "ANON"]
+      },
       "ldap_tls_protocol_min": "3.3",
       "ldap_tls_cipher_suite": "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
     }

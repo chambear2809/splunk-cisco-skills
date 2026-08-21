@@ -4,19 +4,35 @@
 
 | Product | App directory | Splunkbase | Verified | Support note |
 | --- | --- | --- | --- | --- |
-| CyberArk EPM | `Splunk_TA_cyberark_epm` | `5160` | `4.0.0` reviewed pin (`5.0.0` public current) | Supported API collection path; review the new major release before changing the default pin |
+| CyberArk EPM | `Splunk_TA_cyberark_epm` | `5160` | `5.0.0` | Supported API collection path |
 | CyberArk EPV/PTA | `Splunk_TA_cyberark` | `2891` | `1.2.0` | Archived/not-supported parser-only path |
 
 ## EPM Inputs And Source Types
 
-Inputs verified from the package include `application_events`, `inbox_events`,
-`admin_audit_logs`, `account_admin_audit_logs`, `policy_audit`,
-`policy_audit_events`, `threat_detection`, and `policies_and_computers`.
+Inputs verified from the `5.0.0` package are `inbox_events`,
+`policy_audit_events`, `policies_and_computers`, `admin_audit_logs`, and
+`account_admin_audit_logs`.
 
-Package source types include `cyberark:epm:raw:events`,
-`cyberark:epm:raw:policy:events`, `cyberark:epm:admin:audit`,
-`cyberark:epm:account:admin:audit`, `cyberark:epm:application:events`,
-`cyberark:epm:policy:audit`, and `cyberark:epm:threat:detection`.
+Package source types are `cyberark:epm:raw:events`,
+`cyberark:epm:aggregated:events`, `cyberark:epm:raw:policy:audit`,
+`cyberark:epm:aggregated:policy:audit`, `cyberark:epm:policies`,
+`cyberark:epm:computers`, `cyberark:epm:computer:groups`,
+`cyberark:epm:admin:audit`, and `cyberark:epm:account:admin:audit`.
+
+### 4.0.0 To 5.0.0 Migration
+
+`5.0.0` is a breaking major release. It removes the `application_events`,
+`policy_audit`, and `threat_detection` modular inputs together with their
+`splunk_ta_cyberark_epm_application_events`,
+`splunk_ta_cyberark_epm_policy_audit`, and
+`splunk_ta_cyberark_epm_threat_detection` REST handlers, drops the
+`cyberark:epm:application:events`, `cyberark:epm:policy:audit`, and
+`cyberark:epm:threat:detection` source types, and renames
+`cyberark:epm:raw:policy:events` to `cyberark:epm:raw:policy:audit`. Retune any
+saved search, dashboard, or CIM mapping that still references the removed or
+renamed names before upgrading. `5.0.0` adds the
+`splunk_ta_cyberark_epm_settings` and `splunk_ta_cyberark_epm_fetch_set_ids`
+handlers.
 
 ## EPV/PTA Parser Source Types
 

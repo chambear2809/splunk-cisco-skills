@@ -57,7 +57,7 @@ By default, assets are written under `splunk-observability-cisco-ai-pod-rendered
 2. **receiver_creator naming**: the GPU child uses `receiver_creator/dcgm-cisco`, NOT `receiver_creator/nvidia`. The umbrella's validate.sh fails if `receiver_creator/nvidia` shows up in the composed overlay.
 3. **DCGM dual-label discovery**: the GPU child's discovery rule matches both `app` and `app.kubernetes.io/name`.
 4. **Dual-pipeline filtering**: smarter than the canonical single-pipeline pattern.
-5. **OpenShift requirements**: kubeletstats TLS skip, no certmanager, empty cloudProvider.
+5. **OpenShift requirements**: `kubelet_stats` TLS skip, no certmanager value at all (chart 0.158.0 removed the bundled subchart), empty cloudProvider.
 6. **Helm token pattern**: `--reuse-values --set-file splunkObservability.accessToken="$TOKEN_FILE"` so the token never lands in a tracked values file or process arguments.
 
 ## Hand-offs

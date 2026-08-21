@@ -29,6 +29,24 @@ DEFAULT_ENDPOINT = "http://$(SPLUNK_OTEL_AGENT):4317"
 DEFAULT_METRICS_ENDPOINT = "http://$(SPLUNK_OTEL_AGENT):9943/v2/datapoint"
 DEFAULT_BACKUP_CONFIGMAP = "splunk-otel-auto-instrumentation-annotations-backup"
 DISCOVERY_COMMAND_TIMEOUT_SECONDS = 5
+# Two vendor statements apply at different layers, so state both rather than
+# collapsing them: the chart is production tested (chart README "Current
+# Status"), while Operator-related features carry an alpha/experimental notice
+# (chart values.yaml). This overlay depends on the Operator the base chart
+# deploys, so the caveat applies here too. Keep this text identical to the copy
+# in splunk-observability-otel-collector-setup; the two skills are required to
+# agree. Sources are recorded in that skill's references/sources.md.
+OPERATOR_MATURITY_ADVISORY = (
+    "Auto-instrumentation is a supported capability on a production-tested chart, but the chart's "
+    "bundled OpenTelemetry Operator packaging carries the vendor's alpha/experimental notice: "
+    "breaking changes or outright replacement are reserved, and Operator subchart upgrades can "
+    "change injected instrumentation even when your values are unchanged. The chart is the "
+    "supported route for injection-based auto-instrumentation, so treat this as a stability "
+    "caveat, not a reason to avoid it: keep the chart version pinned exactly, review the Operator "
+    "subchart release notes before every upgrade, and diff rendered manifests. To avoid the "
+    "Operator dependency entirely, instrument each language runtime directly instead of by "
+    "injection."
+)
 SUPPORTED_LANGUAGES = {
     "java",
     "nodejs",
@@ -48,17 +66,17 @@ LANGUAGE_SPEC_KEYS = {
     "nginx": "nginx",
 }
 # These exact manifest digests are shared with the base Collector skill's
-# chart-0.154.0 supply-chain audit. Do not replace them with tags: even a
+# chart-0.158.0 supply-chain audit. Do not replace them with tags: even a
 # concrete-looking registry tag is mutable. Nginx intentionally has no default
 # because this repository has no audited Nginx image digest yet.
 LANGUAGE_IMAGE_DEFAULTS: dict[str, str | None] = {
     "java": (
         "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@"
-        "sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9"
+        "sha256:812ad3b45675ef90043020c10e9ed21a3f11ba0903a848e78e3fe71654ae622c"
     ),
     "nodejs": (
         "ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@"
-        "sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a"
+        "sha256:55f93be18e545d98a981bba124fe94a02fdbbb88f1fc471aa08793f7ccba4d78"
     ),
     "python": (
         "quay.io/signalfx/splunk-otel-instrumentation-python@"
@@ -66,7 +84,7 @@ LANGUAGE_IMAGE_DEFAULTS: dict[str, str | None] = {
     ),
     "dotnet": (
         "ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@"
-        "sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910"
+        "sha256:1b8d96528c8138ef40a20fa0a58db423d653a9bcb7e1fa0fa5ecb83293b8e5bc"
     ),
     "go": (
         "ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go@"
@@ -74,7 +92,7 @@ LANGUAGE_IMAGE_DEFAULTS: dict[str, str | None] = {
     ),
     "apache-httpd": (
         "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@"
-        "sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d"
+        "sha256:a86df0699bf53228588d8e08dbd95e763b7bb377a02fe1d9e68806ef954d04f8"
     ),
     "nginx": None,
 }
@@ -1306,6 +1324,7 @@ def collect_preflights(config: dict[str, Any], mode: str) -> tuple[list[str], li
     errors: list[str] = []
     warnings: list[str] = []
     advisories = [
+        OPERATOR_MATURITY_ADVISORY,
         "Instrumentation CR image or env changes require a pod restart to take effect.",
         "Re-running annotation apply/uninstall intentionally starts another workload rollout.",
     ]

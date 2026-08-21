@@ -10,7 +10,7 @@ description: "Use when the user asks to connect Splunk Observability Cloud to GC
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Cloud — GCP Integration Setup
@@ -90,11 +90,9 @@ require explicit `--apply`; `--discover`, `--quickstart-from-live`, and
 ## Splunk Platform Add-on Verification Boundary
 
 The separate log-ingestion handoff uses Splunkbase `3088`. Its package-derived
-baseline is `5.0.2`; the current public release is `5.0.3` and advertises
-Splunk 10.5 support, but this repository has not inspected the `5.0.3` package.
-The shared installer defaults to verified `5.0.2`; if the handoff explicitly
-uses `--accept-unverified-release`, verify the `5.0.3` manifest, modular-input
-schema, source types, and dashboards before completion. This warning does not
+baseline is now `5.1.1`, which is also the current public release and advertises
+Splunk 10.5 support; that package was downloaded, unpacked, and inspected here,
+so the shared installer's default pin needs no review override. This does not
 change the Observability Cloud GCP metrics REST integration owned by this skill.
 
 ## Coverage Model

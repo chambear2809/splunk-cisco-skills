@@ -16,7 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised in shell wrappers
 
 
 API_VERSION = "splunk-ai-ml-toolkit-setup/v1"
-RESEARCH_VERIFIED = "2026-07-03"
+RESEARCH_VERIFIED = "2026-08-20"
 ALLOWED_STATUSES = {
     "planned",
     "validated",
@@ -34,21 +34,63 @@ ALLOWED_PRODUCT_STAGES = {
     "ga",
 }
 
+DOC_BASE_CLOUD = "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2"
+DOC_BASE_ENTERPRISE = "https://help.splunk.com/en/splunk-enterprise/apply-machine-learning/use-ai-toolkit/6.0.2"
+
 AI_TOOLKIT = {
     "app_id": "2890",
     "app_name": "Splunk_ML_Toolkit",
-    "version": "5.7.4",
-    "date": "May 20, 2026",
+    "version": "6.0.2",
+    "date": "August 10, 2026",
+    "required_psc_version": "4.3.4",
+    "python_version": "3.13",
+    "platform_versions": "Splunk Enterprise 9.3.x-10.5.x or Splunk Cloud Platform",
     "source_url": "https://splunkbase.splunk.com/app/2890",
-    "install_doc_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit",
-    "release_notes_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
-    "cdtsm_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-models/feature-preview-cisco-deep-time-series-model",
-    "cdtsm_on_prem_url": "https://help.splunk.com/en/splunk-enterprise/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-models/cisco-deep-time-series-model-on--premises-installation",
-    "connections_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-commands-macros-and-visualizations/connections-in-the-ai-toolkit",
-    "agent_builder_status_url": "https://www.splunk.com/en_us/blog/platform/new-splunk-platform-innovations-cisco-live-2026.html",
-    "agent_builder_preview_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.6.4/ai-toolkit-commands-macros-and-visualizations/feature-preview-ai-toolkit-agent-builder",
+    "docs_root_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit",
+    "install_doc_url": f"{DOC_BASE_CLOUD}/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit",
+    "version_dependencies_url": f"{DOC_BASE_CLOUD}/install-and-upgrade-the-ai-toolkit/splunk-ai-toolkit-version-dependencies",
+    "release_notes_url": f"{DOC_BASE_CLOUD}/release-notes/whats-new-in-the-ai-toolkit",
+    "cdtsm_url": f"{DOC_BASE_CLOUD}/ai-toolkit-models/cisco-deep-time-series-model",
+    "cdtsm_on_prem_url": f"{DOC_BASE_ENTERPRISE}/ai-toolkit-models/cisco-deep-time-series-model-on--premises-installation",
+    "connections_url": f"{DOC_BASE_CLOUD}/ai-toolkit-connections-containers-and-agents/connections-in-the-ai-toolkit",
+    "container_management_url": f"{DOC_BASE_CLOUD}/ai-toolkit-connections-containers-and-agents/container-management-in-the-ai-toolkit",
+    "ml_spl_commands_url": f"{DOC_BASE_CLOUD}/ai-toolkit-commands-macros-and-visualizations/search-commands-for-machine-learning",
+    "permissions_url": f"{DOC_BASE_CLOUD}/ai-toolkit-commands-macros-and-visualizations/permissions-for-machine-learning-commands",
+    "safeguards_url": f"{DOC_BASE_CLOUD}/ai-toolkit-commands-macros-and-visualizations/search-commands-for-machine-learning-safeguards",
+    "ai_command_url": f"{DOC_BASE_CLOUD}/ai-toolkit-commands-macros-and-visualizations/about-the-ai-command",
+    "onnx_url": f"{DOC_BASE_CLOUD}/ai-toolkit-models/upload-and-inference-pre-trained-onnx-models-in-the-ai-toolkit",
+    "model_permissions_url": f"{DOC_BASE_CLOUD}/ai-toolkit-models/model-permissions-in-the-ai-toolkit",
+    "assistants_url": f"{DOC_BASE_CLOUD}/smart-assistant-guided-workflows",
+    "experiments_url": f"{DOC_BASE_CLOUD}/experiment-assistant-guided-workflows",
+    "agent_launchpad_url": f"{DOC_BASE_CLOUD}/ai-toolkit-connections-containers-and-agents/ai-toolkit-agent-launchpad",
+    "agent_launchpad_on_prem_url": f"{DOC_BASE_CLOUD}/ai-toolkit-connections-containers-and-agents/agent-launchpad-for-on-premises-users",
     "product_url": "https://www.splunk.com/en_us/products/ai-toolkit.html",
 }
+
+# Package-derived command surface from Splunk_ML_Toolkit 6.0.2
+# `default/commands.conf`. DOCUMENTED_ML_SPL_COMMANDS is the operator-facing set
+# listed in the 6.0.2 "Search commands for machine learning" table.
+# PACKAGE_ONLY_ML_SPL_COMMANDS also ship in commands.conf but are absent from
+# that table, so they back app internals rather than documented operator use.
+DOCUMENTED_ML_SPL_COMMANDS = (
+    "ai",
+    "aiagent",
+    "apply",
+    "deletemodel",
+    "fit",
+    "listmodels",
+    "sample",
+    "score",
+    "summary",
+)
+PACKAGE_ONLY_ML_SPL_COMMANDS = (
+    "agentstatus",
+    "externalendpointinventory",
+    "kvstorelookup",
+    "logexperiment",
+    "mltkmanage",
+)
+RISKY_ML_SPL_COMMANDS = ("agentstatus", "ai", "aiagent", "apply", "deletemodel", "fit", "mltkmanage")
 
 TIME_SERIES_MODELS = {
     "ctsm_open_1_0": {
@@ -62,18 +104,29 @@ TIME_SERIES_MODELS = {
     },
     "cdtsm_integrated": {
         "name": "Cisco Deep Time Series Model",
-        "product_stage": "feature_preview",
+        "product_stage": "ga",
+        "ga_since": "6.0.0",
         "source_url": AI_TOOLKIT["cdtsm_url"],
+        "on_prem_url": AI_TOOLKIT["cdtsm_on_prem_url"],
+        "rate_limit": "50 model requests per minute, managed by the AI Toolkit",
+        "opt_out_setting": "mlspl.conf [CTSM] ctsm_opt_out with the aitk_ctsm_opt_out capability",
     },
 }
 
-AGENT_BUILDER = {
-    "name": "Splunk AI Toolkit Agent Builder",
-    "product_stage": "alpha",
+AGENT_LAUNCHPAD = {
+    "name": "Splunk AI Toolkit Agent Launchpad",
+    "product_stage": "ga",
+    "ga_since": "6.0.0",
     "status_as_of": RESEARCH_VERIFIED,
-    "status_url": AI_TOOLKIT["agent_builder_status_url"],
-    "preview_doc_url": AI_TOOLKIT["agent_builder_preview_url"],
-    "planned_ga": "Fall 2026",
+    "doc_url": AI_TOOLKIT["agent_launchpad_url"],
+    "on_prem_doc_url": AI_TOOLKIT["agent_launchpad_on_prem_url"],
+    "release_notes_url": AI_TOOLKIT["release_notes_url"],
+    "supported_llm_providers": "OpenAI, Anthropic, Azure OpenAI, Amazon Bedrock, or Splunk-hosted models",
+    "unsupported_llm_providers": "custom LLM and Ollama connections",
+    "unsupported_llm_sentence": "Custom LLM and Ollama connections are not supported by Agent Launchpad, even though the Connections tab can hold them.",
+    "supported_mcp_providers": "Splunk, Atlassian, Slack, PagerDuty, GitHub, and GitLab, plus custom MCP with Basic Auth, API key, Bearer Token, or OAuth 2.0",
+    "run_history_index_setting": "mlspl.conf [ai:AgentIntegrations] agent_run_index, which the package ships as _audit",
+    "allowed_domains_setting": "mlspl.conf [ai:AllowedDomains] allowed_domains with enforce_domain_validation",
     "cloud_control_studio_url": "https://www.cisco.com/site/us/en/solutions/artificial-intelligence/agentic-ops/cloud-control-studio/index.html",
 }
 
@@ -91,8 +144,8 @@ PSC_TARGETS = {
         "app_id": "2882",
         "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
         "label": "PSC Linux 64-bit",
-        "version": "4.3.2",
-        "date": "May 20, 2026",
+        "version": "4.3.4",
+        "date": "July 22, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2882",
         "legacy": False,
     },
@@ -100,8 +153,8 @@ PSC_TARGETS = {
         "app_id": "2883",
         "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
         "label": "PSC Windows 64-bit",
-        "version": "4.3.2",
-        "date": "May 20, 2026",
+        "version": "4.3.4",
+        "date": "July 22, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2883",
         "legacy": False,
     },
@@ -109,8 +162,8 @@ PSC_TARGETS = {
         "app_id": "2881",
         "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
         "label": "PSC Mac Intel",
-        "version": "4.3.2",
-        "date": "May 20, 2026",
+        "version": "4.3.4",
+        "date": "July 22, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2881",
         "legacy": False,
     },
@@ -118,8 +171,8 @@ PSC_TARGETS = {
         "app_id": "6785",
         "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
         "label": "PSC Mac Apple Silicon",
-        "version": "4.3.2",
-        "date": "May 20, 2026",
+        "version": "4.3.4",
+        "date": "July 22, 2026",
         "source_url": "https://splunkbase.splunk.com/app/6785",
         "legacy": False,
     },
@@ -317,7 +370,13 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
     include_dsdl = ctx["include_dsdl"]
     dsdl_runtime = ctx["dsdl_runtime"]
     legacy_audit = ctx["legacy_anomaly_audit"]
-    agent_builder_repo_status = "manual_handoff" if ctx["platform"] == "cloud" else "not_applicable"
+    # Agent Launchpad is GA on Splunk Cloud Platform in supported regions. On
+    # Splunk Enterprise it is reached through the Splunk Cloud Connect app, so
+    # Enterprise is a documented handoff rather than an unavailable surface.
+    agent_launchpad_repo_status = "manual_handoff"
+    agent_launchpad_doc_url = (
+        AGENT_LAUNCHPAD["doc_url"] if ctx["platform"] == "cloud" else AGENT_LAUNCHPAD["on_prem_doc_url"]
+    )
     coverage: list[dict[str, str]] = []
 
     coverage.append(
@@ -335,8 +394,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.compatibility",
             "AI Toolkit and PSC compatibility",
             "manual_handoff",
-            AI_TOOLKIT["install_doc_url"],
-            f"Validate AI Toolkit {AI_TOOLKIT['version']} with PSC 4.3.2 and supported Splunk platform versions before upgrade.",
+            AI_TOOLKIT["version_dependencies_url"],
+            f"AI Toolkit {AI_TOOLKIT['version']} requires PSC {AI_TOOLKIT['required_psc_version']} (Python {AI_TOOLKIT['python_version']}) on {AI_TOOLKIT['platform_versions']}. Remove earlier PSC versions and perform a clean install; custom algorithms that link PSC libraries need refitting after the upgrade.",
         )
     )
     coverage.append(
@@ -344,8 +403,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.ml_spl_commands",
             "ML-SPL command surface",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit",
-            "Validate fit/apply/summary/score/listmodels/deletemodel/sample and app-owned ML-SPL metadata after install.",
+            AI_TOOLKIT["ml_spl_commands_url"],
+            f"Validate the documented {AI_TOOLKIT['version']} ML-SPL commands ({', '.join(DOCUMENTED_ML_SPL_COMMANDS)}) after install. The package also ships {', '.join(PACKAGE_ONLY_ML_SPL_COMMANDS)} in commands.conf without listing them in the documented command table; treat those as app internals rather than supported operator syntax.",
         )
     )
     coverage.append(
@@ -353,8 +412,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.permissions_and_safeguards",
             "ML command permissions and safeguards",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
-            "Review ML command permissions, algorithm access, search safeguards, and performance-cost settings for production users.",
+            AI_TOOLKIT["permissions_url"],
+            f"Review ML command permissions, algorithm access, and performance-cost settings for production users. The package marks {', '.join(RISKY_ML_SPL_COMMANDS)} as is_risky, so each one triggers SPL safeguards and needs an explicit run-anyway decision or a role that carries the safeguard capability.",
         )
     )
     coverage.append(
@@ -362,18 +421,18 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.assistants",
             "AI Toolkit assistants and experiments",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit",
+            AI_TOOLKIT["assistants_url"],
             "Cover prediction, clustering, forecasting, outlier, anomaly, and experiment-management workflows.",
         )
     )
     coverage.append(
         coverage_entry(
             "ai_toolkit.anomaly_cisco_deep_time_series",
-            "Cisco Deep Time Series Model integrated feature preview",
+            "Cisco Deep Time Series Model",
             "manual_handoff",
             AI_TOOLKIT["cdtsm_url"],
-            "AI Toolkit 5.7.4 documents CDTSM forecasting, anomaly detection, and predictive alerting as a feature preview. Cloud uses the hosted integration; Enterprise requires a separately self-hosted model service. Do not treat the integrated preview as the open model release itself.",
-            product_stage="feature_preview",
+            f"CDTSM forecasting, anomaly detection, and predictive alerting are generally available as of AI Toolkit {TIME_SERIES_MODELS['cdtsm_integrated']['ga_since']} and are no longer a feature preview. Cloud uses the Splunk-hosted model in a supported region; Enterprise requires a separately self-hosted open Cisco Time Series Model service. Invoke it as `apply CDTSM <fields_to_forecast>`, with wildcard forecast fields supported from 6.0.0. Usage is limited to {TIME_SERIES_MODELS['cdtsm_integrated']['rate_limit']}, and the opt-out is {TIME_SERIES_MODELS['cdtsm_integrated']['opt_out_setting']}. Do not treat the integrated experience as the open model release itself.",
+            product_stage="ga",
         )
     )
     coverage.append(
@@ -382,7 +441,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "Cisco Time Series Model 1.0 open-weight release",
             "manual_handoff",
             TIME_SERIES_MODELS["ctsm_open_1_0"]["source_url"],
-            "Cisco Time Series Model 1.0 is an available Apache-2.0 open-weight model on Hugging Face, with source and self-hosting assets on GitHub. Model/runtime deployment is separate from enabling the AI Toolkit CDTSM feature preview.",
+            "Cisco Time Series Model 1.0 is an available Apache-2.0 open-weight model on Hugging Face, with source and self-hosting assets on GitHub. Model/runtime deployment is separate from enabling the AI Toolkit CDTSM integration.",
             product_stage="available",
         )
     )
@@ -392,58 +451,68 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "Hosted foundation model readiness",
             "manual_handoff",
             AI_TOOLKIT["connections_url"],
-            "Review Splunk-hosted LLM availability for Foundation-Sec and GPT-OSS in the Connections tab. CDTSM is a separate time-series feature-preview integration and is not an LLM connection option. No external API keys are rendered by this skill.",
+            "Review Splunk-hosted LLM availability for Foundation-Sec and GPT-OSS in the Connections tab. CDTSM is a separate time-series integration and is not an LLM connection option. No external API keys are rendered by this skill.",
             product_stage="ga",
         )
     )
     coverage.append(
         coverage_entry(
-            "ai_toolkit.agent_builder",
-            "Splunk AI Toolkit Agent Builder",
-            agent_builder_repo_status,
-            AGENT_BUILDER["status_url"],
-            "AI Toolkit Agent Builder is Alpha/private preview for Splunk Cloud Platform, with a public Fall 2026 GA target that is not GA evidence. It is distinct from Cisco Cloud Control Studio Agent Builder.",
-            product_stage="alpha",
+            "ai_toolkit.agent_launchpad",
+            "Splunk AI Toolkit Agent Launchpad",
+            agent_launchpad_repo_status,
+            agent_launchpad_doc_url,
+            f"Agent Launchpad replaced the Agent Builder feature preview and is generally available as of AI Toolkit {AGENT_LAUNCHPAD['ga_since']}. Splunk Cloud Platform requires a supported AWS region plus the documented per-region egress IP in the stack apiAllowlistIP; Splunk Enterprise reaches it through the Splunk Cloud Connect app. It is distinct from Cisco Cloud Control Studio Agent Builder.",
+            product_stage="ga",
         )
     )
     coverage.append(
         coverage_entry(
-            "ai_toolkit.agent_builder_knowledge_base_connections",
-            "Agent Builder knowledge-base connections",
-            agent_builder_repo_status,
-            AGENT_BUILDER["preview_doc_url"],
-            "The documented preview requires at least one knowledge-base connection before agent creation. Validate preview enrollment, edit_agent_connections permission, region and knowledge-base identifiers, and credential handling in the UI; render no credential values.",
-            product_stage="alpha",
+            "ai_toolkit.agent_launchpad_knowledge_base_connections",
+            "Agent Launchpad LLM and knowledge connections",
+            agent_launchpad_repo_status,
+            AI_TOOLKIT["connections_url"],
+            f"Agent creation requires at least one supported LLM connection: {AGENT_LAUNCHPAD['supported_llm_providers']}. {AGENT_LAUNCHPAD['unsupported_llm_sentence']} Adding knowledge-base and MCP connections requires the edit_agent_connections capability, which the package grants to mltk_admin. Validate provider, region, and identifier values in the UI or secret store; render no credential values.",
+            product_stage="ga",
         )
     )
     coverage.append(
         coverage_entry(
-            "ai_toolkit.agent_builder_mcp_connections",
-            "Agent Builder MCP server connections",
-            agent_builder_repo_status,
-            AGENT_BUILDER["preview_doc_url"],
-            "The documented preview requires at least one MCP server connection and supports selecting approved MCP tools for an agent. Validate endpoint consent, provider, URL, token handling, tool scope, and edit_agent_connections permission without rendering authorization tokens.",
-            product_stage="alpha",
+            "ai_toolkit.agent_launchpad_mcp_connections",
+            "Agent Launchpad MCP server connections",
+            agent_launchpad_repo_status,
+            agent_launchpad_doc_url,
+            f"Supported MCP providers are {AGENT_LAUNCHPAD['supported_mcp_providers']}. A single agent can hold multiple connections of the same provider type. Validate endpoint consent, tool scope, the edit_agent_connections capability, and the {AGENT_LAUNCHPAD['allowed_domains_setting']} egress allowlist without rendering authorization tokens.",
+            product_stage="ga",
+        )
+    )
+    coverage.append(
+        coverage_entry(
+            "ai_toolkit.agent_skills",
+            "Agent Launchpad Agent Skills",
+            agent_launchpad_repo_status,
+            agent_launchpad_doc_url,
+            "Agent Skills are reusable named instruction sets that grant agents specialized capabilities. Validate skill naming, instruction review, and ownership before attaching a skill to a production agent.",
+            product_stage="ga",
         )
     )
     coverage.append(
         coverage_entry(
             "ai_toolkit.aiagent_command",
-            "Agent Builder aiagent ML-SPL command",
-            agent_builder_repo_status,
-            AGENT_BUILDER["preview_doc_url"],
-            "Where the Alpha is enabled, validate the aiagent command with agent_name and an optional prompt, run_agents permission, per-row invocation limits, timeouts, and representative non-sensitive input. Do not claim this command exists on public AI Toolkit 5.7.4 solely because the package is installed.",
-            product_stage="alpha",
+            "aiagent ML-SPL command",
+            agent_launchpad_repo_status,
+            AI_TOOLKIT["ml_spl_commands_url"],
+            f"The aiagent command is generally available as of AI Toolkit {AGENT_LAUNCHPAD['ga_since']} and ships in the public package; it is no longer preview-gated. Documented parameters are agent_name (required) and prompt (optional when the agent defines a task prompt). Invocation needs the run_agents capability and an agent in the Available and enabled state. The command is marked is_risky, so it trips SPL safeguards. Validate against representative non-sensitive input.",
+            product_stage="ga",
         )
     )
     coverage.append(
         coverage_entry(
             "ai_toolkit.agent_run_history",
-            "Agent Builder run-history surface",
-            agent_builder_repo_status,
-            AGENT_BUILDER["preview_doc_url"],
-            "The documented preview run-history page requires an ai_agent_run_history_index. Review the documented 100 MB/30-day starting settings, then obtain index-owner approval for retention, ACLs, sensitive content, and capacity; this skill does not create the index.",
-            product_stage="alpha",
+            "Agent Launchpad run history",
+            agent_launchpad_repo_status,
+            agent_launchpad_doc_url,
+            f"Run history is an in-product page filtered by time range, agent name, and owner, and it is visible only to the agent owner or a shared role. The package stores run history through {AGENT_LAUNCHPAD['run_history_index_setting']}, so no customer-created run-history index is required. If the index is redirected away from the default, review capacity, retention, ACLs, and sensitive prompt or tool content with the index owner; this skill does not create or modify indexes.",
+            product_stage="ga",
         )
     )
     coverage.append(
@@ -451,8 +520,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.llm_ai_command",
             "LLM and ai command readiness",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit",
-            "Render provider setup handoffs for OpenAI-compatible, AWS Bedrock, AWS SageMaker, and private model endpoints; secrets stay file-backed.",
+            AI_TOOLKIT["ai_command_url"],
+            "Render provider setup handoffs for OpenAI-compatible, AWS Bedrock, AWS SageMaker, GCP Vertex AI, and private model endpoints; secrets stay file-backed.",
         )
     )
     coverage.append(
@@ -460,8 +529,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.connections_tab",
             "Connections tab readiness",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
-            "Validate AI Toolkit Connections entries for LLM providers and DSDL container endpoints without exposing provider secrets.",
+            AI_TOOLKIT["connections_url"],
+            "Validate AI Toolkit Connections entries for LLM providers and DSDL container endpoints without exposing provider secrets. In 6.0.2 this page lives under the Connections, containers, and agents documentation section.",
         )
     )
     coverage.append(
@@ -469,7 +538,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.container_management",
             "Container Management tab readiness",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
+            AI_TOOLKIT["container_management_url"],
             "Confirm container connection visibility, DSDL linkage, and runtime ownership before enabling container-backed workflows.",
         )
     )
@@ -478,8 +547,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.onnx",
             "ONNX model upload and apply",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit",
-            "Validate ONNX upload/apply readiness and multi-output model behavior in AI Toolkit.",
+            AI_TOOLKIT["onnx_url"],
+            "Validate ONNX upload/apply readiness and multi-output model behavior in AI Toolkit. Uploads require the upload_onnx_model_file capability alongside upload_lookup_files.",
         )
     )
     coverage.append(
@@ -487,8 +556,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.model_inventory",
             "Model inventory and retraining risk",
             "manual_handoff",
-            "https://splunkbase.splunk.com/app/2890",
-            "Inventory trained models and flag MLTK pre-5.3 models for retraining compatibility review.",
+            AI_TOOLKIT["model_permissions_url"],
+            "Inventory trained models and flag MLTK pre-5.3 models for retraining compatibility review. Refit models built against an earlier PSC release after upgrading to PSC 4.3.4.",
         )
     )
     coverage.append(
@@ -496,8 +565,8 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.alerting",
             "Alerts from ML and anomaly outputs",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
-            "Review saved searches, scheduled retraining, adaptive thresholds, alert ownership, and downstream ITSI/ES/SOAR handoffs.",
+            AI_TOOLKIT["experiments_url"],
+            "Review saved searches, scheduled retraining, adaptive thresholds, alert ownership, and downstream ITSI/ES/SOAR handoffs. Agents can also be wired as a Run AI Agent alert trigger action, which needs the same alert-ownership review.",
         )
     )
 
@@ -744,9 +813,10 @@ def write_doctor_report(path: Path, ctx: dict[str, Any], coverage: list[dict[str
             "",
             "## Next Checks",
             "- Run live validation after package install.",
+            f"- Confirm the AI Toolkit `{AI_TOOLKIT['version']}` and PSC `{AI_TOOLKIT['required_psc_version']}` pairing, then refit models built against an earlier PSC release.",
             "- Confirm AI Toolkit model permissions and retraining risk.",
-            "- Treat AI Toolkit Agent Builder as Alpha/private preview until current product evidence says otherwise; its Fall 2026 target is not GA evidence.",
-            "- Keep open Cisco Time Series Model 1.0 deployment separate from the AI Toolkit Cisco Deep Time Series Model feature preview.",
+            "- Confirm Agent Launchpad region eligibility, egress allowlist, and supported LLM provider before treating agent workflows as ready.",
+            "- Keep open Cisco Time Series Model 1.0 deployment separate from the AI Toolkit Cisco Deep Time Series Model integration.",
             "- Confirm any DSDL runtime through the rendered handoff before production use.",
         ]
     )
@@ -772,42 +842,58 @@ def write_dsdl_handoff(path: Path, ctx: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_agent_builder_handoff(path: Path, ctx: dict[str, Any]) -> None:
-    repo_status = "manual_handoff" if ctx["platform"] == "cloud" else "not_applicable"
+def write_agent_launchpad_handoff(path: Path, ctx: dict[str, Any]) -> None:
+    is_cloud = ctx["platform"] == "cloud"
     lines = [
-        "# Splunk AI Toolkit Agent Builder Handoff",
+        "# Splunk AI Toolkit Agent Launchpad Handoff",
         "",
-        f"- Product stage: `{AGENT_BUILDER['product_stage']}` as of `{AGENT_BUILDER['status_as_of']}`",
-        "- Lifecycle label: Alpha/private preview",
+        f"- Product stage: `{AGENT_LAUNCHPAD['product_stage']}` as of `{AGENT_LAUNCHPAD['status_as_of']}`",
+        f"- Lifecycle label: generally available since AI Toolkit `{AGENT_LAUNCHPAD['ga_since']}`; it replaced the Agent Builder feature preview.",
         f"- Target platform: `{ctx['platform']}`",
-        f"- Repo status: `{repo_status}`",
-        f"- Public target: `{AGENT_BUILDER['planned_ga']}`; this roadmap target is not GA evidence.",
+        "- Repo status: `manual_handoff`",
         "- Product boundary: this is an AI Toolkit feature inside Splunk, not Cisco Cloud Control Studio Agent Builder.",
-        f"- Current lifecycle source: {AGENT_BUILDER['status_url']}",
-        f"- Preview workflow source: {AGENT_BUILDER['preview_doc_url']}",
-        f"- Cloud Control Studio boundary source: {AGENT_BUILDER['cloud_control_studio_url']}",
+        f"- Agent Launchpad source: {AGENT_LAUNCHPAD['doc_url']}",
+        f"- Splunk Enterprise source: {AGENT_LAUNCHPAD['on_prem_doc_url']}",
+        f"- GA release note source: {AGENT_LAUNCHPAD['release_notes_url']}",
+        f"- Cloud Control Studio boundary source: {AGENT_LAUNCHPAD['cloud_control_studio_url']}",
         "",
         "## Availability Gate",
-        "- The documented preview is for Splunk Cloud Platform and requires private-preview enrollment; a public AI Toolkit package install alone does not enable it.",
-        "- Confirm the preview build and its matching PSC dependency with Splunk onboarding. Do not downgrade the public AI Toolkit 5.7.4 and PSC 4.3.2 pair based on older preview documentation.",
-        "- Require `edit_agent_connections` to add knowledge-base or MCP connections and `run_agents` to create or invoke agents; the `mltk_admin` role includes both in the preview documentation.",
+        f"- Installing public AI Toolkit `{AI_TOOLKIT['version']}` ships the Agent Launchpad views and the `aiagent` command. Enrolling in a preview program is not part of the path.",
+        "- Splunk Cloud Platform must be in a documented supported AWS region, and the region's Agent Launchpad egress IP must be added to the stack spec `accessRules.apiAllowlistIP`.",
+        "- Splunk Enterprise reaches Agent Launchpad through the Splunk Cloud Connect app rather than the AI Toolkit package alone.",
+        f"- Confirm the PSC pairing: AI Toolkit `{AI_TOOLKIT['version']}` requires PSC `{AI_TOOLKIT['required_psc_version']}` on Python `{AI_TOOLKIT['python_version']}`.",
+        "- Require `edit_agent_connections` to add knowledge-base or MCP connections and `run_agents` to create or invoke agents; the package grants both to `mltk_admin`.",
         "",
         "## Connection Gate",
-        "- Configure and test at least one approved knowledge-base connection and one approved MCP server connection before agent creation.",
-        "- Review knowledge-base region and identifier, MCP provider and URL, endpoint-call consent, tool scope, LLM selection, and least-privilege ownership.",
+        f"- Configure at least one supported LLM connection before creating an agent: {AGENT_LAUNCHPAD['supported_llm_providers']}.",
+        f"- Agent Launchpad does not support {AGENT_LAUNCHPAD['unsupported_llm_providers']}; pick a supported provider instead of reusing an unsupported Connections entry.",
+        f"- Supported MCP providers are {AGENT_LAUNCHPAD['supported_mcp_providers']}.",
+        "- A single agent can use multiple MCP connections of the same provider type; confirm which environment each connection targets before sharing the agent.",
+        f"- Review the {AGENT_LAUNCHPAD['allowed_domains_setting']} egress allowlist so agent traffic is constrained to approved domains.",
         "- Enter authorization tokens and provider credentials only in the approved UI or secret store. This renderer never writes those values.",
         "",
         "## Agent and Invocation Gate",
-        "- Agents are private by default in the preview. Review ownership and sharing before broader use.",
-        "- Validate objective/prompt, system guardrails, approved MCP servers, knowledge bases, LLM, timeout, and maximum invocations per row; the documented maximum is 25.",
-        "- Where the Alpha is enabled, test `aiagent` with `agent_name` and an optional `prompt` on representative non-sensitive data.",
-        "- Do not claim `aiagent` is available merely because public AI Toolkit 5.7.4 is installed.",
+        "- Agents are private by default. Review ownership and sharing before broader use.",
+        "- Validate agent name, description, LLM connection, temperature, max tokens, reasoning effort, system prompt, default prompt, attached Agent Skills, and MCP connections.",
+        "- An agent must reach the `Available` state and stay enabled before `aiagent` can invoke it.",
+        "- Test `aiagent` with `agent_name` and an optional `prompt` on representative non-sensitive data; the command is `is_risky`, so expect the SPL safeguard prompt.",
+        "- Review any `Run AI Agent` alert trigger action the same way as the search that carries it, because alert name, time, results, and search are passed to the agent automatically.",
         "",
         "## Run-History Gate",
-        "- The preview run-history page requires an event index named `ai_agent_run_history_index`.",
-        "- The preview documentation gives 100 MB maximum raw data size and 30 days searchable retention as starting settings; obtain index-owner approval for capacity, retention, ACLs, and sensitive prompt/tool content.",
-        "- This skill does not create the run-history index or mutate private-preview agent state.",
+        f"- Run history is an in-product page, not a customer-provisioned index. The package stores it through {AGENT_LAUNCHPAD['run_history_index_setting']}.",
+        "- Run history is visible only to the agent owner or a role the agent is shared with; confirm that matches the intended review audience.",
+        "- If the run-history index is redirected away from the package default, obtain index-owner approval for capacity, retention, ACLs, and sensitive prompt or tool content.",
+        "- This skill does not create or modify indexes and does not mutate agent state.",
     ]
+    if not is_cloud:
+        lines.extend(
+            [
+                "",
+                "## Splunk Enterprise Gate",
+                "- Treat Splunk Cloud Connect as a separate product decision with its own install, connectivity, and data-governance review.",
+                "- Do not report Agent Launchpad as ready on Splunk Enterprise until Splunk Cloud Connect is installed and its region is confirmed.",
+            ]
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -830,16 +916,18 @@ def write_time_series_model_handoff(path: Path, ctx: dict[str, Any]) -> None:
         "- The open model can be self-hosted or used through a reviewed DSDL runtime. Installing AI Toolkit does not itself install the open model weights or runtime.",
         "",
         "## Cisco Deep Time Series Model",
-        f"- Product stage: `{cdtsm['product_stage']}` in AI Toolkit 5.7.4 documentation",
+        f"- Product stage: `{cdtsm['product_stage']}` since AI Toolkit `{cdtsm['ga_since']}`; earlier releases documented it as a feature preview.",
         f"- Feature documentation: {cdtsm['source_url']}",
-        f"- Enterprise self-hosting documentation: {AI_TOOLKIT['cdtsm_on_prem_url']}",
+        f"- Enterprise self-hosting documentation: {cdtsm['on_prem_url']}",
         "- This is the AI Toolkit-integrated forecasting, anomaly-detection, and predictive-alerting experience powered by Cisco time-series model technology.",
-        "- Splunk Cloud uses the hosted integration where enabled. Splunk Enterprise requires a separately deployed model service, endpoint configuration, and a matching bearer token stored in Splunk encrypted storage.",
-        "- Preview availability, region, `list_tokens_scs` permission, model-server health, capacity, TLS, and air-gapped model provenance require validation.",
+        "- Splunk Cloud uses the Splunk-hosted model on dedicated GPU capacity in a supported region. Splunk Enterprise requires a separately deployed open Cisco Time Series Model service, endpoint configuration, and a matching bearer token stored in Splunk encrypted storage.",
+        "- Invoke it as `apply CDTSM <fields_to_forecast>`; wildcard forecast fields are supported from `6.0.0`, and `by` plus `fill_null` are supported from `5.7.4`.",
+        f"- Usage control: {cdtsm['rate_limit']}. Opt out with {cdtsm['opt_out_setting']}.",
+        "- Region, model-server health, capacity, TLS, and air-gapped model provenance require validation.",
         "",
         "## No-Conflation Gate",
-        "- Open model availability does not make the AI Toolkit CDTSM integration generally available.",
-        "- CDTSM feature-preview access does not grant a generic hosted-LLM connection or install DSDL.",
+        "- Open model availability and the AI Toolkit CDTSM integration are still separately governed layers, even though both are now generally available.",
+        "- CDTSM access does not grant a generic hosted-LLM connection or install DSDL; the hosted LLM list in Connections does not include CDTSM.",
         "- Keep model weights, model service, DSDL container execution, hosted Splunk execution, and AI Toolkit UI/command availability as separately validated layers.",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -870,12 +958,15 @@ def discover() -> dict[str, Any]:
         "api_version": API_VERSION,
         "research_verified": RESEARCH_VERIFIED,
         "ai_toolkit": AI_TOOLKIT,
-        "agent_builder": AGENT_BUILDER,
+        "agent_launchpad": AGENT_LAUNCHPAD,
         "time_series_models": TIME_SERIES_MODELS,
         "psc_targets": PSC_TARGETS,
         "dsdl": DSDL,
         "legacy_apps": LEGACY_APPS,
         "dsdl_runtimes": DSDL_RUNTIME_NOTES,
+        "documented_ml_spl_commands": list(DOCUMENTED_ML_SPL_COMMANDS),
+        "package_only_ml_spl_commands": list(PACKAGE_ONLY_ML_SPL_COMMANDS),
+        "risky_ml_spl_commands": list(RISKY_ML_SPL_COMMANDS),
         "allowed_statuses": sorted(ALLOWED_STATUSES),
         "allowed_product_stages": sorted(ALLOWED_PRODUCT_STAGES),
     }
@@ -902,7 +993,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     write_json(output_dir / "apply-plan.json", apply_plan)
     write_doctor_report(output_dir / "doctor-report.md", ctx, coverage)
     write_dsdl_handoff(output_dir / "dsdl-runtime-handoff.md", ctx)
-    write_agent_builder_handoff(output_dir / "agent-builder-handoff.md", ctx)
+    write_agent_launchpad_handoff(output_dir / "agent-launchpad-handoff.md", ctx)
     write_time_series_model_handoff(output_dir / "time-series-model-handoff.md", ctx)
     write_legacy_migration(output_dir / "legacy-anomaly-migration.md", ctx)
     return {

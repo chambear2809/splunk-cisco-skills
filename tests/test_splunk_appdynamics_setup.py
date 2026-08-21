@@ -609,7 +609,7 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             assert (out / filename).is_file(), f"{skill}/{filename}"
 
 
-def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
+def test_platform_onprem_26_8_artifacts_render_and_gate(tmp_path: Path) -> None:
     out = render_skill("splunk-appdynamics-platform-setup", tmp_path / "platform")
     expected = [
         "platform-topology-inventory.yaml",
@@ -633,7 +633,7 @@ def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
         assert (out / name).is_file(), name
 
     topology = (out / "platform-topology-inventory.yaml").read_text(encoding="utf-8")
-    assert "doc_version: 26.4.0" in topology
+    assert "doc_version: 26.8.0" in topology
     assert "controller-1.example.com" in topology
     assert "events-1.example.com" in topology
 
@@ -647,7 +647,7 @@ def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
     assert "mysqlRootPassword=" not in command_plan
 
     runbook = (out / "controller-install-upgrade-runbook.md").read_text(encoding="utf-8")
-    assert "AppDynamics On-Premises 26.4.0" in runbook
+    assert "AppDynamics On-Premises 26.8.0" in runbook
     assert "Back up the Controller" in runbook
 
     component = (out / "component-deployment-runbook.md").read_text(encoding="utf-8")
@@ -1122,8 +1122,13 @@ def test_smart_agent_remote_command_rendering_and_gate(tmp_path: Path) -> None:
     assert "UI at least once" in ui
 
     deprecation = (out / "smart-agent-cli-deprecation-runbook.md").read_text(encoding="utf-8")
-    assert "February 2, 2026" in deprecation
-    assert "does not support Database Agent" in deprecation
+    assert "reached End of Support on February 2, 2026" in deprecation
+    assert "date has passed" in deprecation
+    assert "never supported Database Agent" in deprecation
+    # The vendor page still says "will reach End of Support". The runbook may quote
+    # that, but only alongside the note that the wording is unrevised.
+    assert "future tense" in deprecation
+    assert "smartagentctl" in deprecation
 
     plan = (out / "smart-agent-remote-command-plan.sh").read_text(encoding="utf-8")
     assert "--accept-remote-execution" in plan
@@ -1173,7 +1178,10 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     assert "OTEL_EXPORTER_OTLP_ENDPOINT" in patches
     dual_env = (out / "dual-signal-workload-env.yaml").read_text(encoding="utf-8")
     assert "AGENT_DEPLOYMENT_MODE" in dual_env
-    assert "DOTNET_STARTUP_HOOKS" in dual_env
+    # 26.8.0 documents AGENT_DEPLOYMENT_MODE as the only mode variable for .NET
+    # combined mode, so the startup-hook variables are no longer rendered.
+    for stale in ("DOTNET_STARTUP_HOOKS", "DOTNET_ADDITIONAL_DEPS", "DOTNET_SHARED_STORE"):
+        assert stale not in dual_env
     rollout = (out / "cluster-agent-rollout-plan.sh").read_text(encoding="utf-8")
     assert "--set-file splunk-otel-collector.splunkObservability.accessToken" in rollout
     assert "K8S_APPLY=1" in rollout
@@ -1188,7 +1196,7 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     assert "dual" in runbook
     assert "Splunk Observability Cloud" in runbook
     rbac = (out / "cluster-agent-rbac-review.md").read_text(encoding="utf-8")
-    assert "26.4" in rbac
+    assert "26.8" in rbac
     cluster_release = (out / "cluster-agent-26-4-release-runbook.md").read_text(encoding="utf-8")
     assert "enhanced visibility" in cluster_release
     assert "Kubernetes alerting" in cluster_release

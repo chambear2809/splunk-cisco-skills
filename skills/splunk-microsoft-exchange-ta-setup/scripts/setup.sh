@@ -88,7 +88,7 @@ validate_request() {
 
 install_apps() {
     local commands=(
-        "3225 4.1.0 Exchange_bundle"
+        "3225 4.1.1 Exchange_bundle"
         "5663 4.0.4 SA-ExchangeIndex"
     )
     local spec app_id version label

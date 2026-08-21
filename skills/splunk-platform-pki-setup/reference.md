@@ -144,7 +144,7 @@ cipherSuite            = <from --tls-policy>
 ### KV Store
 
 KV Store consumes the splunkd `[sslConfig]` certs. Per
-[Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore),
+[Preparing custom certificates for use with KV store](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store),
 KV Store 7.0+ enforces a CA verification check at startup. The
 renderer:
 
@@ -292,7 +292,7 @@ Aligned with the new trust anchor; handed off to
 ### Splunk Edge Processor
 
 EP TLS / mTLS uses a separate file naming convention per
-[Edge Processor: Obtain TLS certificates](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
+[Edge Processor: Obtain TLS certificates](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
 
 | File | Role |
 |---|---|
@@ -355,7 +355,7 @@ Coexists with the public-exposure skill's `--ldap-ssl-enabled`.
 
 | Preset | Cipher set summary | TLS versions | Key algos | Sig algos | Source |
 |---|---|---|---|---|---|
-| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2 + tls1.3 on 10.4+ | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites) |
+| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2 + tls1.3 on 10.4+ | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/install-splunk-enterprise-securely/about-tls-encryption-and-cipher-suites) |
 | `fips-140-3` | NIST AEAD only (no CBC, no SHA-1, no RSA-1024, no anonymous DH) | tls1.2 + tls1.3 on 10.4+ | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips) |
 | `stig` | DISA-STIG-aligned subset of `splunk-modern` | tls1.2 + tls1.3 on 10.4+ | RSA-3072+, ECDSA P-384+ | RSA-SHA384+, ECDSA-SHA384+ | `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md` |
 
@@ -366,11 +366,22 @@ Splunk versions. SSLv3/TLS 1.0/TLS 1.1 are never rendered; the legacy
 
 ### FIPS lifecycle
 
-`--fips-mode {none|140-2|140-3}` writes to `splunk-launch.conf`:
+`--fips-mode {none|140-2|140-3}` writes **both** lines to
+`splunk-launch.conf`:
 
 ```
+SPLUNK_FIPS = 1
 SPLUNK_FIPS_VERSION = 140-3
 ```
+
+Both are required. `SPLUNK_FIPS` is the master enable switch and
+[defaults to `0`](https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.4/configuration-file-reference/10.4.2-configuration-file-reference/splunk-launch.conf);
+FIPS does not engage without it. `SPLUNK_FIPS_VERSION` only selects
+which validated module is used and defaults to `140-2`. Writing
+`SPLUNK_FIPS_VERSION` alone on an instance that was never FIPS-enabled
+leaves the host in non-FIPS mode while looking configured. Note also
+that `SPLUNK_FIPS` is one-time-only: it must be set before the instance
+starts for the first time, or the instance has to be reinstalled.
 
 Splunk 10.0+ ships both modules. Phase 1 (upgrade to 10.0 in
 140-2) and Phase 2 (flip to 140-3) per the
@@ -394,8 +405,13 @@ echo "SPLUNK_FIPS_VERSION = 140-3" >> $SPLUNK_HOME/etc/splunk-launch.conf
 $SPLUNK_HOME/bin/splunk start
 ```
 
-The renderer's `install-fips-launch-conf.sh` performs this exact
-edit idempotently.
+Phase 2 is the only case where editing `SPLUNK_FIPS_VERSION` on its own
+is correct, because a host already running in FIPS 140-2 mode already
+carries `SPLUNK_FIPS = 1`. On a host that has never had FIPS turned on,
+this snippet is not sufficient — see the note above. The renderer's
+`install-fips-launch-conf.sh` covers both cases: it sets `SPLUNK_FIPS = 1`
+and `SPLUNK_FIPS_VERSION` idempotently, and `preflight.sh` fails the run
+if only one of the two is present.
 
 ### Validity-day caps
 

@@ -7,7 +7,7 @@ description: "Use when the user asks about SCAN, Cisco App Navigator, product ca
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Cisco App Navigator (SCAN) Setup Automation
@@ -111,14 +111,13 @@ to verify the catalog, run the initial sync, and validate the deployment.
 
 ### Package Verification Boundary
 
-The repository's reviewed SCAN baseline is `1.0.27`. The current public
-release is `1.0.29` and advertises Splunk 10.5 support, but its package content
-has not been verified here. The shared installer defaults to verified
-`1.0.27`; only `--accept-unverified-release` follows public `1.0.29`. After
-that explicit override, re-check `products.conf`, lookup/sync behavior, saved
-searches, and shipped dashboards before completion. Local catalog generation
-does not upgrade or approve the app package: fixture refresh and package review
-remain separate controls.
+The reviewed SCAN baseline is `1.0.30`, which is also the current public
+release. That package was downloaded, unpacked, and inspected here, so the
+shared installer's default pin needs no review override. Local catalog
+generation still does not upgrade or approve the app package: fixture refresh
+and package review remain separate controls. When Splunkbase publishes a newer
+release, re-check `products.conf`, lookup/sync behavior, saved searches, and
+shipped dashboards before advancing the pin.
 
 ## Agent Behavior — Credentials
 

@@ -21,7 +21,7 @@ Each block has the same sub-structure: `image`, `env`, and `resourceRequirements
 
 ```yaml
 java:
-  image: ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9
+  image: ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@sha256:812ad3b45675ef90043020c10e9ed21a3f11ba0903a848e78e3fe71654ae622c
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4317
@@ -44,7 +44,7 @@ AlwaysOn Profiling requires JDK 8u262+; Oracle JDK 8 and IBM J9 are unsupported.
 
 ```yaml
 nodejs:
-  image: ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a
+  image: ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@sha256:55f93be18e545d98a981bba124fe94a02fdbbb88f1fc471aa08793f7ccba4d78
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4317
@@ -72,7 +72,7 @@ Python's auto-instrumentation uses `PYTHONPATH` to load `opentelemetry-bootstrap
 
 ```yaml
 dotnet:
-  image: ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910
+  image: ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@sha256:1b8d96528c8138ef40a20fa0a58db423d653a9bcb7e1fa0fa5ecb83293b8e5bc
   env:
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: http://$(SPLUNK_OTEL_AGENT):4318
@@ -100,7 +100,7 @@ Go uses eBPF, NOT bytecode rewriting — it requires an explicit target binary o
 
 ```yaml
 apacheHttpd:
-  image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d
+  image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@sha256:a86df0699bf53228588d8e08dbd95e763b7bb377a02fe1d9e68806ef954d04f8
   configPath: /usr/local/apache2/conf
   version: "2.4"
 ```
@@ -117,7 +117,7 @@ nginx:
 
 Works like the Apache block but injects an `otel_ngx_module.so` directive into `configFile`.
 
-Nginx has no default because the repository's audited chart-0.154.0 image
+Nginx has no default because the repository's audited chart-0.158.0 image
 ledger contains no Nginx entry. Rendering Nginx therefore fails closed unless
 the operator supplies a reviewed digest-pinned override.
 

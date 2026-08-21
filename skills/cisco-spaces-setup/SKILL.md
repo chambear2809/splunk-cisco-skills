@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Spaces TA Setup Automation
@@ -257,12 +257,13 @@ Checks: app installation, index, stream configuration, inputs, data flow, settin
 | Sourcetype | Content |
 |---|---|
 | `cisco:spaces:firehose` | Cisco Spaces firehose events (device presence, location updates, IoT telemetry, etc.) |
-| `cisco:spaces:firehose:health` | Firehose connection and collector-health events in current SCAN catalog releases |
+| `cisco:spaces:firehose:health` | Firehose connection and collector-health events |
+| `cisco:spaces:log` | Add-on internal collector logs |
 
-The pinned SCAN `2026_07_09_1837` catalog adds the health sourcetype. The
-repo-local fallback package `1.0.7` predates that catalog entry, so validation
-requires primary firehose data and reports health data separately instead of
-claiming that every installed package must emit it.
+Package `2.0.1` defines all three source types; `1.0.7` shipped no `props.conf`
+and therefore no health sourcetype. Validation requires primary firehose data
+and reports health data separately rather than claiming that every installed
+package must emit it.
 
 ## Key Learnings / Known Issues
 

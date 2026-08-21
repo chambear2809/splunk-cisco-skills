@@ -1,7 +1,7 @@
 # KV Store EKU Requirements
 
 Anchored to
-[Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore).
+[Preparing custom certificates for use with KV store](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store).
 
 ## What KV Store 7.0+ requires
 

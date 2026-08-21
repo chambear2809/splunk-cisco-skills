@@ -457,7 +457,7 @@ def test_codex_local_collector_pins_splunk_distribution_native_histograms(tmp_pa
     runner = (out / "collector/run-codex-o11y-local-collector.sh").read_text(encoding="utf-8")
     image = (
         "quay.io/signalfx/splunk-otel-collector"
-        "@sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2"
+        "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
     )
 
     assert image in overlay
@@ -478,8 +478,8 @@ def test_codex_validate_rejects_upstream_collector_runner(tmp_path: Path) -> Non
     runner.write_text(
         runner.read_text(encoding="utf-8").replace(
             "quay.io/signalfx/splunk-otel-collector"
-            "@sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2",
-            "otel/opentelemetry-collector-contrib:0.154.0",
+            "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357",
+            "otel/opentelemetry-collector-contrib:0.158.0",
         ),
         encoding="utf-8",
     )

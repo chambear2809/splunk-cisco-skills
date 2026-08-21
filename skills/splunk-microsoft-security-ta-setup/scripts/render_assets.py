@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-microsoft-security-ta-rendered"
 
 APP_NAME = "Splunk_TA_MS_Security"
 SPLUNKBASE_ID = "6207"
-LATEST_VERIFIED_VERSION = "3.0.0"
+LATEST_VERIFIED_VERSION = "4.0.0"
 
 STREAMING_EVENT_TYPES = (
     "AlertInfo,AlertEvidence,DeviceInfo,DeviceNetworkInfo,DeviceProcessEvents,"

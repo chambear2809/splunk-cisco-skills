@@ -254,7 +254,7 @@ configure_iosxe_cli() {
     fi
     if ! ta_handler_available "TA_cisco_catalyst_cli_account"; then
         log "ERROR: The installed ${APP_NAME} does not expose the IOS-XE CLI account handler."
-        log "IOS-XE CLI automation requires a package that implements the 3.2.44 source contract; the default package-verified 3.1.0 install does not."
+        log "No public TA_cisco_catalyst release through 3.2.44 exposes the IOS-XE CLI handlers; this Beta path needs a package that ships them."
         exit 1
     fi
 

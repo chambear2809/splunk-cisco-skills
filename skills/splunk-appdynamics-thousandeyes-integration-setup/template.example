@@ -1,5 +1,5 @@
 api_version: splunk-appdynamics-thousandeyes-integration/v1
-doc_version: 26.4.0
+doc_version: 26.8.0
 
 deployment_model: saas          # saas | on_premises | virtual_appliance
 controller_url: https://example.saas.appdynamics.com

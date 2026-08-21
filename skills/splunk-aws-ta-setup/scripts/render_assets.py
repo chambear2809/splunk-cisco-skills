@@ -20,7 +20,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-aws-ta-rendered"
 
 APP_NAME = "Splunk_TA_aws"
 SPLUNKBASE_ID = "1876"
-LATEST_VERIFIED_VERSION = "8.1.2"
+LATEST_VERIFIED_VERSION = "8.2.2"
 
 # Feeds the user most commonly onboards. Each maps to a real modular input and
 # the source type the add-on assigns. GuardDuty findings are exported to S3 and

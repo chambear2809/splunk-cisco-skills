@@ -19,8 +19,10 @@ infrastructure, packaged Agent Control, or Luna Studio deployment.
 - Galileo AI Assistant beta: `https://docs.galileo.ai/concepts/ai-assistant`
 - Galileo generic alert webhooks:
   `https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs#generic-webhook-notifications`
-- Galileo July 7, 2026 release:
-  `https://docs.galileo.ai/release-notes#2026-07-07`
+- Galileo release notes through August 7, 2026:
+  `https://docs.galileo.ai/release-notes`
+- Splunk Agent Observability documentation for customers onboarded after
+  August 7, 2026: `https://agent-observability-docs.splunk.com`
 - Galileo OpenTelemetry/OpenInference: `https://docs.galileo.ai/sdk-api/third-party-integrations/opentelemetry-and-openinference`
 - Galileo multimodal observability:
   `https://docs.galileo.ai/concepts/logging/multimodal-observability`
@@ -41,6 +43,21 @@ Re-check these docs before changing endpoint paths, header names, exporter
 schema, HEC envelope shape, or collector handoff flags.
 
 ## Apply Sections
+
+Operational apply is supported only when `--tenant-onboarding-date` (or
+`galileo.onboarding_date`) is a valid date before `2026-08-07`. A missing date,
+the exact boundary date, or a later date produces a complete render/validation
+packet but blocks all apply sections. The post-boundary product uses Splunk
+Agent Observability names and contracts that are not implemented by these
+legacy Galileo helpers. The generated wrappers enforce the same gate even when
+run directly. `cleanup-object-lifecycle.sh` is the sole exception so an
+existing exact-ID ownership ledger remains recoverable.
+
+The copied Python lifecycle, export, and Luna helpers are internal
+implementation details behind the guarded wrappers; do not treat them as
+independent public apply entry points. The alert relay is a standalone helper:
+its handoff emits a runnable launch command only for a verified pre-boundary
+tenant and is explicitly render-only for every blocked epoch.
 
 | Section | Owner | Purpose |
 | --- | --- | --- |
@@ -175,8 +192,9 @@ Product coverage surfaces tracked in the matrix:
 - Experiments, experiment groups, tags, comparison, search, metric settings,
   available columns, metrics APIs, paginated search, and optional experiment
   runs
-- AI Assistant beta enterprise/LLM-integration readiness, evidence-link
-  verification, read-only limitations, and reviewed remediation handoff
+- AI Assistant beta enterprise/LLM-integration readiness, organization-wide
+  debugging, signal criticality ordering, evidence-link verification,
+  read-only limitations, and reviewed remediation handoff
 - Organization-wide global dashboards across projects and Log streams, with a
   console evidence workflow and explicit public global-CRUD API gap
 - Generic alert webhooks with auth-mode review, payload v1.0 schema,
@@ -196,8 +214,8 @@ Product coverage surfaces tracked in the matrix:
   scorer settings
 - Scorer governance including Autogen LLM scorers, multipart validation, scorer
   RBAC/scope, version restore, and scorer health-score read/write handoffs
-- Luna Enterprise, model/provider integrations, model aliases, costs, and
-  pricing readiness
+- Luna Enterprise, model/provider integrations, model aliases, Model Pricing,
+  Integration Costs, organization Billing Usage, and pricing readiness
 - Luna-2 fine-tuning, Luna metric evaluation, experiment use, and feature
   availability readiness
 - Luna Studio UI and SDK training lifecycle across datasets, test/training sets,
@@ -220,7 +238,8 @@ Product coverage surfaces tracked in the matrix:
 - Distributed tracing and multi-service trace propagation
 - Multimodal observability for images, audio, and documents
 - Multimodal quality metrics for Visual Quality, Visual Fidelity, and
-  Interruption Detection
+  Interruption Detection, plus the eight out-of-the-box text, image/PDF, and
+  audio metric variants released July 21, 2026
 - Third-party framework integrations and wrappers including A2A, CrewAI,
   Google ADK, LangChain/LangGraph, Microsoft Agent Framework, OpenAI,
   OpenAI Agents SDK, Mastra, Pydantic AI, Strands Agents, Vercel AI SDK,
@@ -228,8 +247,9 @@ Product coverage surfaces tracked in the matrix:
   Enterprise credentials, LangGraph Command/Send, LangChain middleware, and
   LangChain/LangGraph runtime protection
 - MCP tool-call logging and tool spans
-- Galileo alerts, email notifications, Slack webhooks, and Splunk detector
-  mapping, plus generic webhook delivery through the rendered HEC relay
+- Galileo alerts, email notifications, Slack webhooks, Trace Count system
+  metric alerts, and Splunk detector mapping, plus generic webhook delivery
+  through the rendered HEC relay
 - Protect stages, rules, rulesets, actions, notifications, and invocation
   runtime
 - Agent Control log stream target resolution
@@ -237,8 +257,9 @@ Product coverage surfaces tracked in the matrix:
   span evidence, and Splunk field mapping. Public Galileo v2 OpenAPI does not
   currently expose documented control CRUD endpoints, so control creation and
   attachment remain console/operator actions in this skill.
-- Annotation templates, ratings, queues, feedback templates, feedback ratings,
-  Signals, and Trends dashboards/widgets/sections
+- Annotation templates, ratings, generally available Annotation Queues,
+  feedback templates, feedback ratings, Signals, and Trends
+  dashboards/widgets/sections
 - Run insights, health scores, token usage, search, runs, traces SDK utilities,
   decorators, handlers, and wrappers
 - Jobs, async tasks, validation status, and progress polling
@@ -302,7 +323,34 @@ computed `metrics/…` columns remain eligible for the metadata-only path. The
 terminal sample is always metadata-only, even when raw fields are approved for
 delivery to Splunk.
 
-## Galileo July 7, 2026 Release Assets
+## Current Release Assets Through August 7, 2026
+
+The latest readiness contract is
+`readiness/galileo-2026-08-07-readiness.json`, with the operator summary in
+`readiness/galileo-2026-08-07-handoff.md`. It covers the July 21, August 4, and
+August 7 releases:
+
+- Select `docs.galileo.ai` for customers onboarded before August 7, 2026.
+  Exact-boundary, later, and unknown tenants are render-only: use
+  `agent-observability-docs.splunk.com` to assess the implementation gap, but
+  do not run this skill's legacy operational apply path.
+- Treat Annotation Queues as generally available and validate queue,
+  template, reviewer, record, and export access through
+  `evaluate/annotation-feedback-handoff.md`.
+- Keep AI Assistant beta read-only across its expanded debugging surfaces and
+  verify signal criticality and evidence against the underlying records.
+- Review, test, and version every AI-generated custom code scorer before
+  publishing it.
+- Reconcile Model Pricing, Integration Costs, and organization Billing Usage
+  for traces, spans, and Luna tokens.
+- Configure Trace Count alerts per Log stream and validate trigger and clear
+  delivery through the rendered notification path.
+- Validate all eight out-of-the-box metric variants across text, image/PDF,
+  and audio using `evaluate/multimodal-metrics-handoff.yaml`.
+- Treat GPT 5.6 Sol, Terra, and Luna availability as tenant state and the
+  light/dark/system theme as an operator preference.
+
+## Historical July 7, 2026 Release Assets
 
 The release-specific readiness contract is
 `readiness/galileo-2026-07-07-readiness.json`. Companion assets are:

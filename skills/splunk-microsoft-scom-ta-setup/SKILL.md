@@ -7,7 +7,7 @@ description: "Use when the user asks to onboard, configure, or validate Microsof
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Microsoft SCOM Supported Add-on Setup
@@ -80,7 +80,7 @@ data. If the package ships no dashboards, record that evidence explicitly and
 hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
 doctor.
 
-Render-first workflow for `Splunk_TA_microsoft-scom` `4.5.0`, Splunkbase
+Render-first workflow for `Splunk_TA_microsoft-scom` `4.5.1`, Splunkbase
 `2729`.
 
 ## Workflow

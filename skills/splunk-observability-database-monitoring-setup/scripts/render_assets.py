@@ -17,22 +17,35 @@ from typing import Any
 
 
 SKILL_NAME = "splunk-observability-database-monitoring-setup"
-DEFAULT_COLLECTOR_VERSION = "v0.155.0"
+DEFAULT_COLLECTOR_VERSION = "v0.158.0"
 SUPPORTED_COLLECTOR_VERSIONS = {DEFAULT_COLLECTOR_VERSION}
 AUDITED_COLLECTOR_REPOSITORY = "quay.io/signalfx/splunk-otel-collector"
 AUDITED_COLLECTOR_MANIFEST_DIGEST = (
-    "sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"
+    "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
 )
 AUDITED_COLLECTOR_IMAGE = (
-    f"{AUDITED_COLLECTOR_REPOSITORY}:0.155.0@{AUDITED_COLLECTOR_MANIFEST_DIGEST}"
+    f"{AUDITED_COLLECTOR_REPOSITORY}:0.158.0@{AUDITED_COLLECTOR_MANIFEST_DIGEST}"
 )
+# Per-platform sub-manifest digests behind the 0.158.0 manifest list, in the
+# order linux/amd64, linux/arm64, linux/ppc64le. A running pod reports the
+# platform digest rather than the list digest, so apply-time image verification
+# has to accept either form.
 AUDITED_LINUX_IMAGE_DIGESTS = {
-    "sha256:4e2c6177302abd3c1146388d4aaf7c1ef9a2f91e0a2aad98e8662b4c559cb15c",
-    "sha256:cad9da35f789acae44643db6773059f732e10befcf899bba511122c733271332",
-    "sha256:77c6fc369e34127d3a3cc20cfc35bfe28aca717150cae1630faa0330410f7a15",
+    "sha256:16f784e3966cf9ced03ea3765a39f44c3e6395d04d4885e55fde6fc83328b2f0",
+    "sha256:90aeaa8d2ab3ddf7ed5f0758660daccdd99ce4f7cfb0d74d6a7d975613eebb6a",
+    "sha256:af49079eaf5dc79fd957f00171653703f3c044ae0fd5777c4cefa38d037d47fd",
 }
 AUDITED_CHART_SHA256 = (
-    "33989dd964afbceaff1db2035467b00cae4ae4868bdd89abbf9a7c68166bbc5a"
+    "088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274"
+)
+# Rendered as the shell `case` arm that accepts the audited runtime image, built
+# from the constants above so the two can never drift apart.
+AUDITED_IMAGE_DIGEST_CASE_PATTERN = ("|\\\n" + " " * 8).join(
+    f"*@{digest}"
+    for digest in (
+        AUDITED_COLLECTOR_MANIFEST_DIGEST,
+        *sorted(AUDITED_LINUX_IMAGE_DIGESTS),
+    )
 )
 ALLOWED_REALMS = {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
 TARGET_TYPES = {"postgresql", "sqlserver", "oracledb", "mysql", "mariadb"}
@@ -2002,7 +2015,7 @@ def collector_config(
             "limit_mib": max(128, int(memory_mib * 0.8)),
         },
         "batch/dbmon": {},
-        "resourcedetection/dbmon": {
+        "resource_detection/dbmon": {
             "detectors": ["system"],
             "system": {"hostname_sources": ["os"]},
         },
@@ -2040,7 +2053,7 @@ def collector_config(
             "processors": [
                 "memory_limiter/dbmon",
                 "batch/dbmon",
-                "resourcedetection/dbmon",
+                "resource_detection/dbmon",
                 "resource/mysql_service_instance_id",
             ],
             "exporters": ["signalfx/dbmon"],
@@ -2933,7 +2946,7 @@ PY
     fi
 }}
 
-# Chart 0.155.0 fails template rendering when custom role config retains any
+# Chart 0.158.0 fails template rendering when custom role config retains any
 # deprecated component alias.  These renames can also imply a topology change
 # (for example, an old agent-to-gateway path), so this action never rewrites
 # them mechanically.  Report only the public base-name mapping and counts.
@@ -2948,11 +2961,17 @@ import sys
 
 aliases = {{
     "exporters": (("otlp", "otlp_grpc"), ("otlphttp", "otlp_http")),
-    "processors": (("k8sattributes", "k8s_attributes"),),
+    "processors": (
+        ("k8sattributes", "k8s_attributes"),
+        # Added by chart 0.158.0.
+        ("resourcedetection", "resource_detection"),
+    ),
     "receivers": (
         ("filelog", "file_log"),
         ("hostmetrics", "host_metrics"),
         ("k8sobjects", "k8s_objects"),
+        # Added by chart 0.157.0.
+        ("kubeletstats", "kubelet_stats"),
     ),
 }}
 roles = ("agent", "gateway", "clusterReceiver")
@@ -3029,7 +3048,7 @@ PY
         status=$?
     fi
     if [[ "${{status}}" == "2" && -s "${{report}}" ]]; then
-        echo 'ERROR: chart 0.155.0 rejects deprecated collector component aliases in the merged release config.' >&2
+        echo 'ERROR: chart 0.158.0 rejects deprecated collector component aliases in the merged release config.' >&2
         while IFS= read -r migration_summary; do
             printf '  %s\n' "${{migration_summary}}" >&2
         done < "${{report}}"
@@ -3037,7 +3056,7 @@ PY
         echo '       Use splunk-observability-otel-collector-setup for a reviewed full-release topology migration, then rerun DBMon apply.' >&2
         exit 1
     fi
-    echo 'ERROR: could not safely audit merged collector config for chart 0.155.0 deprecated aliases; details suppressed.' >&2
+    echo 'ERROR: could not safely audit merged collector config for chart 0.158.0 deprecated aliases; details suppressed.' >&2
     exit 1
 }}
 
@@ -3278,7 +3297,7 @@ managed_components = {{
     "processors": {{
         "memory_limiter/dbmon",
         "batch/dbmon",
-        "resourcedetection/dbmon",
+        "resource_detection/dbmon",
         "resource/mysql_service_instance_id",
     }},
 }}
@@ -3800,10 +3819,7 @@ PY
     [[ -n "${{image_id}}" ]] \
         || rollback_failed_apply 'Exactly one ready DBMon pod did not remain after Recreate rollout convergence.'
     case "${{image_id}}" in
-        *@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa|\
-        *@sha256:4e2c6177302abd3c1146388d4aaf7c1ef9a2f91e0a2aad98e8662b4c559cb15c|\
-        *@sha256:cad9da35f789acae44643db6773059f732e10befcf899bba511122c733271332|\
-        *@sha256:77c6fc369e34127d3a3cc20cfc35bfe28aca717150cae1630faa0330410f7a15) ;;
+        {AUDITED_IMAGE_DIGEST_CASE_PATTERN}) ;;
         *) rollback_failed_apply "Runtime imageID ${{image_id}} is not the audited manifest or a Linux platform digest." ;;
     esac
     sleep 15
@@ -4507,7 +4523,7 @@ for section, names in (
         {
             "memory_limiter/dbmon",
             "batch/dbmon",
-            "resourcedetection/dbmon",
+            "resource_detection/dbmon",
             "resource/mysql_service_instance_id",
         },
     ),
@@ -4537,7 +4553,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "Populate ${HERE}/dbmon.env.template into a separate owner-only secret file (for example chmod 0400 or 0600)."
 echo "Do not source that file. Apply with:"
 echo "  setup.sh --apply-linux --db-credentials-env-file /secure/path/dbmon.env --accept-linux-apply ..."
-echo "The action validates collector 0.155.0, both configs, service health, and writes rollback state."
+echo "The action validates collector 0.158.0, both configs, service health, and writes rollback state."
 echo "If the service is absent, first use splunk-observability-otel-collector-setup to install and validate the pinned Linux collector."
 """
 
@@ -6813,7 +6829,7 @@ def merge_base_values(
         "processors": {
             "memory_limiter/dbmon",
             "batch/dbmon",
-            "resourcedetection/dbmon",
+            "resource_detection/dbmon",
             "resource/mysql_service_instance_id",
         },
     }
@@ -7104,7 +7120,7 @@ def build_plan(
             )
         if distribution not in K8S_DISTRIBUTIONS:
             raise RenderError(
-                f"distribution {distribution!r} is not supported by Splunk OTel chart 0.155.0. "
+                f"distribution {distribution!r} is not supported by Splunk OTel chart 0.158.0. "
                 f"Allowed: {', '.join(sorted(key for key in K8S_DISTRIBUTIONS if key))}."
             )
         if distribution == "eks/fargate":

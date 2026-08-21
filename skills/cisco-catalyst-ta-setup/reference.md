@@ -9,7 +9,7 @@ recommended index mapping from the inspected TA `3.2.44` source contract.
 
 ## SCAN Canonicalization Boundary
 
-The pinned SCAN `2026_07_09_1837` source treats `cisco:dnac:*`,
+The pinned SCAN `2026_08_01_2130` source treats `cisco:dnac:*`,
 `cisco:ise:*`, and `cisco:sdwan:*` as the current output families. It no
 longer advertises the older Catalyst Center `cisco:catalyst:*` aliases,
 unqualified `cisco:dnac:custom` (the current wildcard is
@@ -21,6 +21,13 @@ stanzas for several old inputs and normalizes them to canonical outputs such as
 `cisco:ise:syslog`, `cisco:sdwan:system:logs`, and
 `cisco:sdwan:sgacl:logs`. Treat those old names as parser compatibility, not as
 current dashboard or completion-search contracts.
+
+The August 1 catalog adds the already package-backed
+`cisco:sdwan:custom:*`, `cisco:sdwan:syslog`, and
+`cisco:cybervision:custom:*` families. Treat the custom wildcards as the
+families produced by their bounded REST inputs, not as literal sourcetypes to
+assign to events. Text syslog completion remains source constrained and must
+confirm `cisco:sdwan:syslog` or the more specific routed SD-WAN types.
 
 ## Catalyst Center (DNAC) Inputs
 

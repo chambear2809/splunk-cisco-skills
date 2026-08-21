@@ -4,13 +4,21 @@
 
 | Artifact | Audited version | Supply-chain control |
 |---|---:|---|
-| Linux Splunk Distribution of OpenTelemetry Collector | `0.154.2` | Installer package version pinned |
-| Linux Splunk OTel auto-instrumentation | `0.154.2` | Explicit installer argument; empty and `latest` are rejected |
+| Linux Splunk Distribution of OpenTelemetry Collector | `0.158.0` | Installer package version pinned |
+| Linux Splunk OTel auto-instrumentation | `0.158.0` | Explicit installer argument; empty and `latest` are rejected |
 | Linux-host standalone OBI binary | `v0.6.0` | Exact version; upstream archive checksum plus audited architecture-specific extracted-binary SHA-256; runtime remains a handoff |
-| Linux installer | `v0.154.2` tagged script | HTTPS plus SHA-256 `16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29` |
-| Kubernetes Helm chart | `0.154.0` | Exact release archive SHA-256; one verified local cache is reused by preflight and install |
-| Kubernetes chart images | chart `0.154.0` image set | Helm post-renderer rewrites the audited image map to manifest digests; unknown custom images must already use `@sha256` |
-| Splunkbase apps `7125`, `8698`, and `8699` | `0.154.2` | Artifact-specific filename, app root, SHA-256, OS, and Cloud-compatibility audit |
+| Linux installer | `v0.158.0` tagged script | HTTPS plus SHA-256 `cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b` |
+| Kubernetes Helm chart | `0.158.0` | Exact release archive SHA-256; one verified local cache is reused by preflight and install |
+| Kubernetes chart images | chart `0.158.0` image set | Helm post-renderer rewrites the audited image map to manifest digests; unknown custom images must already use `@sha256` |
+| Splunkbase apps `7125`, `8698`, and `8699` | `0.158.0` | Artifact-specific filename, app root, SHA-256, OS, and Cloud-compatibility audit |
+
+The Splunkbase TA family and the collector runtime are two separate artifact
+chains and do not have to share a version. The TA rows are pinned from
+Splunkbase releases that were downloaded, unpacked, and inspected here. The
+Linux installer, collector package, auto-instrumentation, and Helm chart rows
+are pinned from the upstream `signalfx/splunk-otel-collector` and
+`splunk-otel-collector-chart` releases and move only with a separate runtime
+audit of the tagged installer script and chart schema.
 
 The executable tagged installer and chart schema are authoritative for emitted
 flags/values. Product-support claims use the stricter current product
@@ -24,7 +32,7 @@ operator-supplied digest is rejected and cannot create an executable packet.
 `k8s/` contains:
 
 - `values.yaml`: guarded chart values with no secret values.
-- `fetch-chart.sh`: downloads the official `0.154.0` release archive with
+- `fetch-chart.sh`: downloads the official `0.158.0` release archive with
   HTTPS/TLS restrictions, verifies its fixed SHA-256, and reuses only that
   non-symlink cached file. Helm never resolves this packet through a repository.
 - `k8s-image-post-renderer.py` and
@@ -147,11 +155,11 @@ Core identity/topology:
 
 - `--namespace`, `--release-name`, `--cluster-name`, `--distribution`, and
   `--cloud-provider` map to official chart values.
-- `--chart-version` defaults to audited `0.154.0`.
+- `--chart-version` defaults to audited `0.158.0`.
 - `--agent-enabled false`, `--disable-cluster-receiver`, and `--gateway` select
   topology. The renderer rejects a zero-workload release.
 - Gateway replica default is `3`, matching the chart. Stateful gateway is not a
-  chart `0.154.0` feature and is classified as an external/custom deployment.
+  chart `0.158.0` feature and is classified as an external/custom deployment.
 - `--enable-network-explorer` is the exception to that default: it enables the
   gateway and forces exactly one replica because Network Explorer cannot send
   to multiple gateway replicas. It renders `network-explorer-handoff.md` for
@@ -175,7 +183,7 @@ Observability signals:
 - Events, entities, Operator auto-instrumentation, and OBI retain their upstream
   maturity/privilege warnings. Product UI readiness still requires workload
   instrumentation and observed telemetry.
-- Chart `0.154.0` requires every Splunk Observability destination to enable at
+- Chart `0.158.0` requires every Splunk Observability destination to enable at
   least one of metrics, traces, profiling, or Secure Application. Kubernetes
   events, object collection, and entity emission are secondary features, not
   standalone Observability destinations. Events and objects may instead use a
@@ -227,7 +235,7 @@ Splunk Platform destinations:
 - Platform traces fail closed unless all destination values and
   `--accept-experimental-platform-traces` are present. This records the current
   chart/product-documentation conflict rather than claiming support. Chart
-  `0.154.0` also rejects a traces-only Platform destination, so a reviewed
+  `0.158.0` also rejects a traces-only Platform destination, so a reviewed
   Platform metrics or logs pipeline must be enabled in the same release.
 - HEC and OTLP client certificate/private-key files must be paired. Every PEM
   certificate in a CA bundle is parsed and checked for expiry, client
@@ -239,7 +247,7 @@ Splunk Platform destinations:
   require an `http://` or `https://` URL; gRPC endpoints require `HOST:PORT`.
 - Persistent queue and fsync settings are available for the Platform exporter
   only with Platform logs on a non-Autopilot Linux agent DaemonSet when the
-  gateway is disabled. Chart `0.154.0` does not mount or wire persistent queue
+  gateway is disabled. Chart `0.158.0` does not mount or wire persistent queue
   storage into the gateway; the operator remains responsible for storage sizing
   and lifecycle.
 
@@ -313,7 +321,7 @@ custom collector configuration, instrumentation mode/SDK/version, SDK OTLP
 endpoint/protocol, SDK metric/log exporters, GODEBUG, and OBI.
 
 - Linux Collector and Linux auto-instrumentation are independently restricted
-  to the audited `0.154.2` executable pin. Auto-instrumentation requires
+  to the audited `0.158.0` executable pin. Auto-instrumentation requires
   `preload` or `systemd`; an empty, moving, or different exact version is
   rejected. OBI is likewise restricted to audited `v0.6.0` (the equivalent
   `0.6.0` spelling is accepted). Upgrade or downgrade planning uses the
@@ -342,7 +350,7 @@ endpoint/protocol, SDK metric/log exporters, GODEBUG, and OBI.
 - SSH install, status, doctor, support-bundle, and uninstall helpers validate
   host, user, port, optional mode-600 key, and remote temporary paths. Install
   streams the access token over stdin and does not copy it to the remote host.
-- Native Linux OBI uses the verified `0.154.2` installer to download and
+- Native Linux OBI uses the verified `0.158.0` installer to download and
   checksum an exact standalone binary; empty input resolves to the audited
   `v0.6.0`, while ranges and moving tags are rejected. The installer does not
   configure or run an OBI service, so configuration, privileges, startup, and
@@ -351,7 +359,7 @@ endpoint/protocol, SDK metric/log exporters, GODEBUG, and OBI.
 
 Removed/deprecated controls:
 
-- `--trace-url` is not accepted by installer `0.154.2` and is rejected.
+- `--trace-url` is not accepted by installer `0.158.0` and is rejected.
 - `--hec-url` is deprecated upstream with announced removal in September 2026
   and is rejected. Use a reviewed custom Collector config for Observability log
   endpoint overrides.
@@ -375,15 +383,23 @@ that rerunning `install-local.sh` or `install-ssh.sh` performs an upgrade.
 
 ## TA `7125` / `8698` / `8699` contract
 
-Current audited metadata, rechecked July 2, 2026:
+Current audited metadata, rechecked August 20, 2026:
 
-- Version `0.154.2`, June 17, 2026.
-- Exact listed Splunk versions `9.0` through `10.4`. If
-  `--splunk-version 10.5` is supplied, the renderer rejects it until apps
-  `7125`, `8698`, and `8699` list that train. When `--splunk-version` is
-  omitted, the renderer does not run the optional platform compatibility
-  assertion; successful package audit/rendering is not evidence of `10.5`
-  support.
+- Version `0.158.0`, August 7, 2026. All three packages were downloaded,
+  unpacked, and inspected at this version. The prior reviewed pin was `0.154.2`.
+- Exact listed Splunk versions `9.0` through `10.5`. `--splunk-version 10.5` is
+  therefore accepted. A version outside the listed trains is still rejected, and
+  when `--splunk-version` is omitted the renderer does not run the optional
+  platform compatibility assertion at all; successful package audit/rendering is
+  not by itself evidence of support for any particular train.
+- Package inspection at `0.158.0` confirms the modular input surface is
+  unchanged from `0.154.2`: one `[Splunk_TA_otel]` stanza with
+  `splunk_access_token`, `splunk_realm`, `splunk_config`,
+  `splunk_collector_log_level`, `splunk_collector_env_vars`, and
+  `splunk_collector_cmd_args`, the current `splunk_access_token` spelling rather
+  than the legacy `splunk_access_token_file`, and the same
+  `configs/agent_config.yaml` and `configs/gateway_config.yaml` pair. The
+  rendered TA `inputs.conf` needed no change.
 - App `7125`, root `Splunk_TA_otel`: multi-OS package, Splunk Cloud compatible.
 - App `8698`, root `Splunk_TA_otel_linux_x86_64`: Linux `x86_64` package,
   Splunk Cloud compatibility metadata false.
@@ -514,7 +530,7 @@ Use `validate.sh --check-upstream` for the networked artifact contract and
   guidance still points to Universal Forwarder; the skill uses the stricter
   support interpretation.
 - Windows mode normally selects the dedicated Windows repository. The audited
-  `0.154.0` FIPS manifest also contains Windows `amd64`, so FIPS mode correctly
+  `0.158.0` FIPS manifest also contains Windows `amd64`, so FIPS mode correctly
   selects the FIPS repository for Windows instead of the normal Windows image.
   This Kubernetes image capability does not make TA apps FIPS-compatible.
 - EKS Fargate cluster-name guidance differs between Help and tagged chart paths;

@@ -15,13 +15,24 @@ The skill therefore renders:
 - `manifests/namespace.yaml` — `intersight-otel` namespace (configurable via `spec.namespace`).
 - `manifests/intersight-secret.yaml` — placeholder Secret manifest with no values; operator fills in `keyId` and `key` after rendering.
 - `manifests/intersight-otel-config.yaml` — ConfigMap with the OTel collector config tuned for Intersight.
-- `manifests/intersight-otel-deployment.yaml` — Deployment that mounts the ConfigMap + Secret and runs `otel/opentelemetry-collector-contrib:<version>`.
+- `manifests/intersight-otel-deployment.yaml` — Deployment that mounts the ConfigMap + Secret and runs Cisco's `ghcr.io/intersight/intersight-otel` image.
 
-## Why upstream contrib instead of Splunk distribution?
+## Why Cisco's intersight-otel image instead of the Splunk distribution?
 
-The Intersight integration uses the upstream `opentelemetry-collector-contrib` image (`otel/opentelemetry-collector-contrib`) instead of the Splunk distribution (`quay.io/signalfx/splunk-otel-collector`) for two reasons:
+The Intersight integration uses Cisco's own `intersight-otel` distribution
+(`ghcr.io/intersight/intersight-otel`, overridable via `intersight_otel.image`)
+instead of the Splunk distribution (`quay.io/signalfx/splunk-otel-collector`)
+for two reasons:
 
-1. The Cisco Intersight receiver lives in upstream contrib (`receiver/cisco_intersight`); it is not in the Splunk distribution as of v0.149.0.
+1. There is no Intersight receiver in the Splunk distribution *or* in upstream
+   `opentelemetry-collector-contrib`. Verified against contrib v0.149.0 and
+   v0.158.0: there is no `receiver/cisco_intersight` (or similarly named)
+   directory, and neither the contrib 0.158.0 image nor the Splunk Distribution
+   0.158.0 image registers a `cisco_intersight` receiver. Only `cisco_os` (the
+   Nexus/NX-OS receiver used by `splunk-observability-cisco-nexus-integration`)
+   exists upstream. Cisco's image is therefore the only runtime that can scrape
+   Intersight, and it is configured with a TOML file
+   (`intersight-otel.toml`), not a collector YAML config.
 2. The integration does NOT export to Splunk Observability Cloud directly. It exports OTLP gRPC to the **agent DaemonSet** of the main Splunk OTel collector (running in `splunk-otel` namespace), which then handles all O11y ingest authentication, batching, and retry. The Intersight collector itself never sees the O11y access token.
 
 The hand-off endpoint is `<release>-splunk-otel-collector-agent.<splunk-otel-namespace>.svc.cluster.local:4317`. The agent DaemonSet exposes OTLP gRPC on port 4317 by default in the chart; if you've disabled it, re-enable via `agent.config.receivers.otlp.protocols.grpc` in the main collector's values.yaml.
@@ -42,8 +53,7 @@ spec:
     spec:
       containers:
         - name: collector
-          image: otel/opentelemetry-collector-contrib:v0.149.0
-          args: ["--config=/conf/config.yaml"]
+          image: ghcr.io/intersight/intersight-otel:latest
           env:
             - name: INTERSIGHT_KEY_ID
               valueFrom:

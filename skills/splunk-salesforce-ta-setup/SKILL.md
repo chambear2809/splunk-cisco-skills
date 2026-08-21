@@ -8,7 +8,7 @@ description: "Use when the user asks to onboard, configure, render, or validate 
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Add-on for Salesforce Setup
@@ -82,18 +82,18 @@ hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
 doctor.
 
 Render-first automation for `Splunk_TA_salesforce` (Splunkbase `3549`, verified
-`6.0.2`). The renderer emits reviewable object/event-log inputs, an OAuth or
+`7.0.0`). The renderer emits reviewable object/event-log inputs, an OAuth or
 connected-app account runbook, install commands, metadata, and validation SPL.
 It never handles Salesforce secret values.
 
 ## Package Verification Boundary
 
-The current public release is `6.0.3` and advertises Splunk 10.5 support;
-this repository's package-derived baseline remains `6.0.2`. The shared
-installer defaults to verified `6.0.2`; only `--accept-unverified-release`
-follows public `6.0.3`. After that explicit override, re-check its input
-schema, REST handlers, source types, and shipped views before applying the
-rendered `6.0.2`-based templates.
+The package-derived baseline is `7.0.0`, the current public release, which
+advertises Splunk 10.5. Both `6.0.2` and `7.0.0` were unpacked and diffed here,
+and the rendered templates follow `7.0.0`, so the shared installer's default pin
+needs no review override. When Splunkbase publishes a newer release, re-check
+its input schema, REST handlers, source types, and shipped views before
+advancing the pin.
 
 ## Workflow
 

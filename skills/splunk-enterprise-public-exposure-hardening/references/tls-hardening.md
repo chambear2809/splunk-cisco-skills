@@ -1,15 +1,24 @@
 # TLS Hardening Reference
 
-Splunk Enterprise's documented TLS 1.2 baseline:
+Splunk Enterprise's documented TLS 1.2 baseline, restricted to AEAD:
 
 ```
 sslVersions = tls1.2
 cipherSuite = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:\
-              ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:\
-              ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:\
-              ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256
+              ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256
 ecdhCurves  = prime256v1, secp384r1, secp521r1
 ```
+
+Splunk's published list also contains four non-AEAD suites
+(`ECDHE-ECDSA-AES256-SHA384`, `ECDHE-RSA-AES256-SHA384`,
+`ECDHE-ECDSA-AES128-SHA256`, `ECDHE-RSA-AES128-SHA256`). These are CBC
+mode — the suite name does not say so, but `openssl ciphers -v` reports
+`Enc=AES(n)` with no AEAD token. This renderer omits them: on an
+internet-exposed instance an old client is a reason to front the host
+with a proxy that terminates its own TLS, not a reason to weaken
+Splunk's listener. See
+[`splunk-platform-pki-setup/references/algorithm-presets.md`](../../splunk-platform-pki-setup/references/algorithm-presets.md)
+for the supported compatibility paths if a client truly cannot do AEAD.
 
 The renderer applies this in five places, all driven from the same source
 of truth in `scripts/render_assets.py`:

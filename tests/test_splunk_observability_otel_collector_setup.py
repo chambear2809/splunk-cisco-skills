@@ -153,7 +153,7 @@ def make_linux_diagnostic_test_bin(
     sudo.chmod(0o755)
 
     package_body = (
-        "printf '%s\\n' 'splunk-otel-collector-0.154.2'; exit 0\n"
+        "printf '%s\\n' 'splunk-otel-collector-0.158.0'; exit 0\n"
         if package_installed
         else "printf '%s\\n' 'package splunk-otel-collector is not installed'; exit 1\n"
     )
@@ -185,7 +185,7 @@ def make_ta_package(
     tmp_path: Path,
     *,
     root: str = "Splunk_TA_otel",
-    version: str = "0.154.2",
+    version: str = "0.158.0",
     token_style: str = "current",
     token_default: str = "",
     linux: bool = True,
@@ -261,6 +261,33 @@ def make_ta_package(
             tar.add(source, arcname=name)
     shutil.rmtree(tmp_path / root, ignore_errors=True)
     return package
+
+
+def read_support_bundle(bundle: Path) -> dict[str, bytes]:
+    """Read a support bundle's regular files, keyed by basename.
+
+    BSD tar on macOS writes an AppleDouble `._<name>` sidecar beside every member
+    that carries extended attributes, and one `._.` for the archive root. GNU tar
+    on the CI runner never emits them, so they appear only in bundles produced
+    locally on a developer's machine. They hold xattr metadata rather than file
+    content, and their binary payload is not decodable as UTF-8.
+
+    Dropping them makes a local run see exactly the member set CI sees. Every
+    real member is still returned and still decoded strictly, so genuine binary
+    content in a bundle the Collector actually publishes remains a failure.
+    """
+    files: dict[str, bytes] = {}
+    with tarfile.open(bundle, "r:gz") as archive:
+        for member in archive.getmembers():
+            if not member.isfile():
+                continue
+            name = Path(member.name).name
+            if name.startswith("._"):
+                continue
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            files[name] = extracted.read()
+    return files
 
 
 def make_unsafe_ta_package(path: Path) -> Path:
@@ -491,7 +518,7 @@ if "get" in args and "pod" in args and "-o" in args:
         container_name = "otel-collector"
         image = (
             "quay.io/signalfx/splunk-otel-collector@sha256:"
-            "b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"
+            "27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
         )
     if os.environ.get("BAD_IMAGE_POD") == name:
         image = "registry.example.test/fixture:latest"
@@ -1170,8 +1197,8 @@ def test_kubernetes_supply_chain_uses_verified_chart_and_digest_image_policy(tmp
     )
     renderer_text = renderer.read_text(encoding="utf-8")
 
-    assert "613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0" in fetch_chart
-    assert "splunk-otel-collector-0.154.0.tgz" in fetch_chart
+    assert "088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274" in fetch_chart
+    assert "splunk-otel-collector-0.158.0.tgz" in fetch_chart
     assert "curl -q --proto '=https' --tlsv1.2" in fetch_chart
     assert "helm repo add" not in preflight + install
     assert 'chart_archive="$(bash "${script_dir}/fetch-chart.sh")"' in preflight
@@ -1191,10 +1218,10 @@ def test_kubernetes_supply_chain_uses_verified_chart_and_digest_image_policy(tmp
     ).read_text(encoding="utf-8")
     ast.parse(renderer_text, feature_version=(3, 8))
 
-    standard_source = "quay.io/signalfx/splunk-otel-collector:0.154.0"
+    standard_source = "quay.io/signalfx/splunk-otel-collector:0.158.0"
     standard_pin = (
         "quay.io/signalfx/splunk-otel-collector@"
-        "sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"
+        "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
     )
     ubi_source = "registry.access.redhat.com/ubi9/ubi"
     ubi_pin = (
@@ -1447,7 +1474,7 @@ spec:
     supply = metadata["kubernetes"]["image_supply_chain"]
     assert supply["collector_pins"][standard_source] == standard_pin
     assert metadata["kubernetes"]["chart_archive"]["sha256"] == (
-        "613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0"
+        "088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274"
     )
     for relative, expected in supply["support_asset_sha256"].items():
         assert hashlib.sha256((k8s / relative).read_bytes()).hexdigest() == expected
@@ -2067,7 +2094,7 @@ def test_linux_install_wrappers_keep_tokens_off_argv(tmp_path: Path) -> None:
         "--logs-exporter",
         "otlp",
         "--instrumentation-version",
-        "0.154.2",
+        "0.158.0",
         "--godebug",
         "fips140=on",
         "--enable-obi",
@@ -2127,7 +2154,7 @@ def test_linux_install_wrappers_keep_tokens_off_argv(tmp_path: Path) -> None:
     assert "--otlp-endpoint\n    127.0.0.1:4317" in combined
     assert "--metrics-exporter\n    'otlp,prometheus'" in combined
     assert "--logs-exporter\n    otlp" in combined
-    assert "--instrumentation-version\n    0.154.2" in combined
+    assert "--instrumentation-version\n    0.158.0" in combined
     assert 'health_endpoint=http://127.0.0.1:13134/health' in combined
     assert "--godebug\n    fips140=on" in combined
     assert "--with-obi" in combined
@@ -2567,7 +2594,7 @@ def test_linux_support_bundle_is_privileged_redacted_and_atomically_published(
         ),
         "curl": "exit 0\n",
         "ss": "printf '%s\\n' 'LISTEN 0 128 127.0.0.1:4317'\n",
-        "rpm": "printf '%s\\n' 'splunk-otel-collector-0.154.2'\n",
+        "rpm": "printf '%s\\n' 'splunk-otel-collector-0.158.0'\n",
     }
     for command, body in command_bodies.items():
         shim = fake_bin / command
@@ -2588,14 +2615,7 @@ def test_linux_support_bundle_is_privileged_redacted_and_atomically_published(
     assert created.returncode == 0, created.stdout
     assert bundle.is_file() and not bundle.is_symlink()
     assert bundle.stat().st_mode & 0o777 == 0o600
-    with tarfile.open(bundle, "r:gz") as archive:
-        archive_files: dict[str, bytes] = {}
-        for member in archive.getmembers():
-            if not member.isfile():
-                continue
-            extracted = archive.extractfile(member)
-            assert extracted is not None
-            archive_files[Path(member.name).name] = extracted.read()
+    archive_files = read_support_bundle(bundle)
     content = b"\n".join(archive_files.values()).decode("utf-8")
     for secret in ("SERVICESECRET", "JOURNALSECRET", "HECSECRET"):
         assert secret not in content
@@ -2679,14 +2699,10 @@ def test_linux_doctor_complete_unhealthy_contract_and_bundle_publication(
     assert bundled.returncode == 0, bundled.stdout
     assert "diagnostics were complete" in bundled.stdout
     assert bundle.stat().st_mode & 0o777 == 0o600
-    with tarfile.open(bundle, "r:gz") as archive:
-        files: dict[str, str] = {}
-        for member in archive.getmembers():
-            if not member.isfile():
-                continue
-            extracted = archive.extractfile(member)
-            assert extracted is not None
-            files[Path(member.name).name] = extracted.read().decode("utf-8")
+    files = {
+        name: payload.decode("utf-8")
+        for name, payload in read_support_bundle(bundle).items()
+    }
     assert files["diagnostic-state.txt"] == (
         "schema_version=1\n"
         "diagnostics_complete=true\n"
@@ -3443,7 +3459,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
     assert "'two words'" in template
 
     audit = (output_dir / "ta/package-audit.md").read_text(encoding="utf-8")
-    assert "Latest audited release: `0.154.2`" in audit
+    assert "Latest audited release: `0.158.0`" in audit
     assert "Published" not in audit
     assert "Package flavor: `multi-os`" in audit
     assert "Token field style: `current`" in audit
@@ -3453,7 +3469,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
 
     metadata = json.loads((output_dir / "ta/metadata.json").read_text(encoding="utf-8"))
     assert metadata["splunkbase"]["splunkbase_app_id"] == "7125"
-    assert metadata["splunkbase"]["latest_version"] == "0.154.2"
+    assert metadata["splunkbase"]["latest_version"] == "0.158.0"
     assert metadata["splunkbase"]["fips_compatible"] is False
     assert metadata["splunkbase"]["fedramp_status"] == "not_documented"
     assert metadata["packages"][0]["dashboard_evidence"]["ships_prebuilt_dashboards"] is False
@@ -4301,7 +4317,9 @@ def test_ta_universal_forwarder_target_and_metadata_rejections(tmp_path: Path) -
     )
     assert version_104_accepted.returncode == 0, version_104_accepted.stdout
 
-    version_105_rejected = run_setup(
+    # 0.158.0 lists 10.5, so the top listed train is now accepted. The
+    # post-ceiling case below still proves an unlisted train is refused.
+    version_105_accepted = run_setup(
         "--render-ta",
         "--realm",
         "us0",
@@ -4312,8 +4330,7 @@ def test_ta_universal_forwarder_target_and_metadata_rejections(tmp_path: Path) -
         "--output-dir",
         str(output_dir),
     )
-    assert version_105_rejected.returncode != 0
-    assert "not in the TA family's audited compatibility trains" in version_105_rejected.stdout
+    assert version_105_accepted.returncode == 0, version_105_accepted.stdout
 
     version_post_ceiling = run_setup(
         "--render-ta",
@@ -4628,7 +4645,7 @@ def test_release_versions_must_be_exact_pins(tmp_path: Path) -> None:
     cases = (
         ("--render-k8s", "--chart-version", ""),
         ("--render-k8s", "--chart-version", "latest"),
-        ("--render-k8s", "--chart-version", ">=0.154.0"),
+        ("--render-k8s", "--chart-version", ">=0.158.0"),
         ("--render-linux", "--collector-version", ""),
         ("--render-linux", "--collector-version", "latest"),
         ("--render-linux", "--collector-version", "0.154.x"),
@@ -4674,7 +4691,7 @@ def test_linux_executable_packets_reject_exact_but_unaudited_versions(
         (
             "collector",
             ("--collector-version", "0.155.0"),
-            "--collector-version 0.154.2",
+            "--collector-version 0.158.0",
         ),
         (
             "instrumentation",
@@ -4685,7 +4702,7 @@ def test_linux_executable_packets_reject_exact_but_unaudited_versions(
                 "--instrumentation-version",
                 "0.155.0",
             ),
-            "--instrumentation-version 0.154.2",
+            "--instrumentation-version 0.158.0",
         ),
         (
             "obi",
@@ -4714,9 +4731,9 @@ def test_linux_executable_packets_reject_exact_but_unaudited_versions(
         "--instrumentation-mode",
         "systemd",
         "--instrumentation-version",
-        "0.154.2",
+        "0.158.0",
         "--collector-version",
-        "0.154.2",
+        "0.158.0",
         "--enable-obi",
         "--obi-version",
         "0.6.0",
@@ -4749,7 +4766,7 @@ def test_linux_installer_mirror_must_retain_audited_digest(tmp_path: Path) -> No
         "--installer-url",
         "https://mirror.example.test/install.sh",
         "--installer-sha256",
-        "16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29",
+        "cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b",
         "--output-dir",
         str(accepted_dir),
     )
@@ -4757,7 +4774,7 @@ def test_linux_installer_mirror_must_retain_audited_digest(tmp_path: Path) -> No
     install = (accepted_dir / "linux/install-local.sh").read_text(encoding="utf-8")
     assert "INSTALLER_URL=https://mirror.example.test/install.sh" in install
     assert (
-        "INSTALLER_SHA256=16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29"
+        "INSTALLER_SHA256=cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b"
         in install
     )
 

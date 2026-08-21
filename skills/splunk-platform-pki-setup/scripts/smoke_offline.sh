@@ -558,19 +558,22 @@ else
     fail "install-leaf.sh missing --ssl-password-file support"
 fi
 
-# --- 28. authoritative-sources.md references key Splunk URLs
+# --- 28. authoritative-sources.md still cites a source for every claim
+# The contract lives in references/required-citations.json and is enforced by
+# the same validator tests/test_platform_pki.py uses, so the two cannot drift.
+# This deliberately replaced a hardcoded list of Splunk URL slugs: that list
+# had to be edited here, in the test, and in the markdown every time Splunk
+# renamed a page, and it reported vendor-side renames as local failures.
 src_md="$(dirname "$SCRIPT_DIR")/references/authoritative-sources.md"
-for url_keyword in "configure-tls-certificates-for-inter-splunk-communication" \
-                   "how-to-create-and-sign-your-own-tls-certificates" \
-                   "CustomCertsKVstore" \
-                   "secure-splunk-enterprise-with-fips" \
-                   "configure-tls-protocol-version-support" \
-                   "Forwarder_Forwarder_ConfigSCUFCredentials"; do
-    if ! grep -q "$url_keyword" "$src_md"; then
-        fail "authoritative-sources.md missing reference: $url_keyword"
-    fi
-done
-ok "authoritative-sources.md references the key upstream Splunk doc URLs"
+citation_manifest="$(dirname "$SCRIPT_DIR")/references/required-citations.json"
+citation_validator="$(cd "$SCRIPT_DIR/../../.." && pwd)/skills/shared/lib/doc_citations.py"
+if [[ ! -f "$citation_validator" ]]; then
+    fail "citation validator not found: $citation_validator"
+elif citation_errors="$(python3 "$citation_validator" "$src_md" "$citation_manifest" 2>&1)"; then
+    ok "authoritative-sources.md satisfies its citation contract"
+else
+    fail "authoritative-sources.md citation contract failed: $citation_errors"
+fi
 
 if [[ "$failed" -gt 0 ]]; then
     echo

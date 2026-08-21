@@ -4,7 +4,7 @@ The skill scrapes Prometheus metrics from the NVIDIA Data Center GPU Manager (DC
 
 ## What is DCGM?
 
-DCGM is NVIDIA's official tool for monitoring datacenter GPUs. It exposes hundreds of metrics: utilization, memory, temperature, power, ECC errors, NVLink, processes, MIG (Multi-Instance GPU), and more. The full canonical metric list lives at https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/group__dcgmFieldIdentifiers.html.
+DCGM is NVIDIA's official tool for monitoring datacenter GPUs. It exposes hundreds of metrics: utilization, memory, temperature, power, ECC errors, NVLink, processes, MIG (Multi-Instance GPU), and more. The full canonical metric list lives at https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-field-ids.html.
 
 The DCGM Exporter packages DCGM as a Prometheus exporter. It runs as a DaemonSet (one pod per GPU node) on port `9400` (default) and exposes metrics at `/metrics`.
 

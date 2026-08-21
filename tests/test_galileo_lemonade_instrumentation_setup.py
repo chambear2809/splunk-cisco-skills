@@ -1022,7 +1022,17 @@ def test_collector_runtime_wrapper_uses_protected_key_file(tmp_path: Path) -> No
             check=False,
             env=environment,
         )
-        assert executed.returncode == 0, executed.stderr
+        assert executed.returncode == 1, executed.stderr
+        # Exec mode fails closed either way: off Linux it refuses outright,
+        # on Linux it stops on the missing collector pin. Neither path may
+        # reach the API key.
+        expected_refusal = (
+            "GALILEO_COLLECTOR_BINARY is required"
+            if sys.platform.startswith("linux")
+            else "collector exec requires Linux"
+        )
+        assert expected_refusal in executed.stderr
+        assert "test-only-value" not in executed.stdout + executed.stderr
         environment["GALILEO_OTLP_TRACES_ENDPOINT"] = (
             "http://api.example.com/otel/v1/traces"
         )

@@ -85,7 +85,7 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
             self.assertEqual(metadata["app"]["splunkbase_id"], "2686")
             self.assertIn("6150", metadata["install_ids"])
             self.assertIn("6152", metadata["install_ids"])
-            self.assertEqual(inventory["db_connect"]["latest_verified_version"], "4.2.4")
+            self.assertEqual(inventory["db_connect"]["latest_verified_version"], "4.3.0")
             self.assertIn("skills/splunk-app-install/scripts/install_app.sh", install_script)
             self.assertIn("--app-id 2686", install_script)
             self.assertIn("--app-id 6150", install_script)

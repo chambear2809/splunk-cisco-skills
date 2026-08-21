@@ -14,6 +14,7 @@ import re
 import shutil
 import stat
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -51,6 +52,7 @@ O11Y_ONLY_SECTIONS = [
     "detectors",
 ]
 SPLUNK_PLATFORM_SECTIONS = {"observe-export", "splunk-hec", "splunk-otlp"}
+DOCUMENTATION_EPOCH_BOUNDARY = date(2026, 8, 7)
 DIRECT_SECRET_FLAGS = {
     "--access-token",
     "--api-key",
@@ -164,6 +166,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--luna-recompute-limit", default="")
     parser.add_argument("--galileo-api-base", default="")
     parser.add_argument("--galileo-console-url", default="")
+    parser.add_argument("--tenant-onboarding-date", default="")
     parser.add_argument("--galileo-otel-endpoint", default="")
     parser.add_argument("--experiment-id", default="")
     parser.add_argument("--metrics-testing-id", default="")
@@ -322,6 +325,57 @@ def get_nested(spec: dict[str, Any], dotted: str, default: Any) -> Any:
     return current
 
 
+def classify_documentation_epoch(value: str) -> dict[str, Any]:
+    """Derive the only operational contract this renderer can safely apply."""
+
+    raw = value.strip()
+    if not raw:
+        return {
+            "tenant_onboarding_date": "",
+            "documentation_epoch": "unconfirmed",
+            "apply_supported": False,
+            "reason": (
+                "Tenant onboarding date is required before apply so the legacy "
+                "Galileo contract cannot be used against Splunk Agent Observability."
+            ),
+        }
+    try:
+        onboarding_date = date.fromisoformat(raw)
+    except ValueError as exc:
+        raise SystemExit(
+            "ERROR: --tenant-onboarding-date must be a valid YYYY-MM-DD date"
+        ) from exc
+    if onboarding_date.isoformat() != raw:
+        raise SystemExit(
+            "ERROR: --tenant-onboarding-date must be a valid YYYY-MM-DD date"
+        )
+    if onboarding_date < DOCUMENTATION_EPOCH_BOUNDARY:
+        return {
+            "tenant_onboarding_date": raw,
+            "documentation_epoch": "legacy_galileo_pre_2026_08_07",
+            "apply_supported": True,
+            "reason": "Tenant predates the Splunk Agent Observability documentation boundary.",
+        }
+    if onboarding_date == DOCUMENTATION_EPOCH_BOUNDARY:
+        epoch = "boundary_2026_08_07_unverified"
+        reason = (
+            "The August 7 boundary is ambiguous; verify tenant-linked documentation "
+            "and use this packet as render-only evidence."
+        )
+    else:
+        epoch = "splunk_agent_observability_post_2026_08_07"
+        reason = (
+            "Post-boundary tenants use the newer Splunk Agent Observability contract, "
+            "which this legacy Galileo apply implementation does not yet support."
+        )
+    return {
+        "tenant_onboarding_date": raw,
+        "documentation_epoch": epoch,
+        "apply_supported": False,
+        "reason": reason,
+    }
+
+
 def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, Any]:
     def arg_or_spec(arg_name: str, spec_key: str, default: str = "") -> str:
         value = getattr(args, arg_name)
@@ -335,6 +389,9 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
         allowed = index
     api_base = arg_or_spec("galileo_api_base", "galileo.api_base", "")
     console_url = arg_or_spec("galileo_console_url", "galileo.console_url", "")
+    epoch = classify_documentation_epoch(
+        arg_or_spec("tenant_onboarding_date", "galileo.onboarding_date", "")
+    )
     if not api_base and not console_url:
         raise SystemExit(
             "ERROR: Galileo instance URL intake is required. Pass --galileo-console-url "
@@ -379,6 +436,7 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
             "ERROR: export_computed_metrics_only is not supported with jsonl_flat"
         )
     return {
+        **epoch,
         "project_id": arg_or_spec("project_id", "galileo.project_id", ""),
         "project_name": arg_or_spec("project_name", "galileo.project_name", "galileo-project"),
         "log_stream_id": arg_or_spec("log_stream_id", "galileo.log_stream_id", ""),
@@ -665,14 +723,21 @@ def csv_values(value: Any) -> list[str]:
     return [item.strip() for item in str(value or "").split(",") if item.strip()]
 
 
-def script_header() -> str:
-    return """#!/usr/bin/env bash
+def script_header(config: dict[str, Any], *, enforce_epoch: bool = True) -> str:
+    header = """#!/usr/bin/env bash
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-__SOURCE_PROJECT_ROOT__}"
 """.replace("__SOURCE_PROJECT_ROOT__", shell_double_default(str(SOURCE_PROJECT_ROOT)))
+    if enforce_epoch and not config["apply_supported"]:
+        message = (
+            "ERROR: Operational apply is blocked for documentation epoch "
+            f"{config['documentation_epoch']}: {config['reason']}"
+        )
+        header += f"\necho {shell_quote(message)} >&2\nexit 2\n"
+    return header
 
 
 def require_file_var(var_name: str, default_path: str, label: str) -> str:
@@ -694,7 +759,7 @@ def render_scripts(output_dir: Path, config: dict[str, Any], sections: list[str]
     scripts: dict[str, str] = {}
     scripts_dir = output_dir / "scripts"
 
-    readiness = f"""{script_header()}
+    readiness = f"""{script_header(config)}
 HEALTH_URL="${{GALILEO_HEALTH_URL:-{shell_double_default(config["galileo_api_base"].rstrip("/") + "/v2/healthcheck")}}}"
 echo "Galileo healthcheck endpoint: ${{HEALTH_URL}}"
 if ! command -v curl >/dev/null 2>&1; then
@@ -707,7 +772,7 @@ echo
     write_text(scripts_dir / "apply-readiness.sh", readiness, executable=True)
     scripts["readiness"] = "scripts/apply-readiness.sh"
 
-    object_lifecycle = f"""{script_header()}
+    object_lifecycle = f"""{script_header(config)}
 {require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
 cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py"
   --galileo-api-key-file "${{GALILEO_API_KEY_FILE}}"
@@ -741,7 +806,7 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_ob
     write_text(scripts_dir / "apply-object-lifecycle.sh", object_lifecycle, executable=True)
     scripts["object-lifecycle"] = "scripts/apply-object-lifecycle.sh"
 
-    cleanup_object_lifecycle = f"""{script_header()}
+    cleanup_object_lifecycle = f"""{script_header(config, enforce_epoch=False)}
 {require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
 cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py"
   --cleanup-created
@@ -761,7 +826,7 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_ob
         executable=True,
     )
 
-    luna_scorers = f"""{script_header()}
+    luna_scorers = f"""{script_header(config)}
 {require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
 cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_luna_scorers.py"
   --galileo-api-key-file "${{GALILEO_API_KEY_FILE}}"
@@ -787,7 +852,7 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_lu
     write_text(scripts_dir / "apply-luna-scorers.sh", luna_scorers, executable=True)
     scripts["luna-scorers"] = "scripts/apply-luna-scorers.sh"
 
-    splunk_hec = f"""{script_header()}
+    splunk_hec = f"""{script_header(config)}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 exec bash "${{PROJECT_ROOT}}/skills/splunk-hec-service-setup/scripts/setup.sh" \\
   --platform {shell_quote(config["splunk_platform"])} \\
@@ -803,7 +868,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-hec-service-setup/scripts/setup.sh" \
     write_text(scripts_dir / "apply-splunk-hec.sh", splunk_hec, executable=True)
     scripts["splunk-hec"] = "scripts/apply-splunk-hec.sh"
 
-    observe_export = f"""{script_header()}
+    observe_export = f"""{script_header(config)}
 {require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 SPLUNK_HEC_URL="${{SPLUNK_HEC_URL:-{shell_double_default(config["splunk_hec_url"])}}}"
@@ -843,7 +908,7 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_to
     write_text(scripts_dir / "apply-observe-export.sh", observe_export, executable=True)
     scripts["observe-export"] = "scripts/apply-observe-export.sh"
 
-    splunk_otlp = f"""{script_header()}
+    splunk_otlp = f"""{script_header(config)}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 exec bash "${{PROJECT_ROOT}}/skills/splunk-connect-for-otlp-setup/scripts/setup.sh" \\
   --render \\
@@ -860,7 +925,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-connect-for-otlp-setup/scripts/setup.
     scripts["splunk-otlp"] = "scripts/apply-splunk-otlp.sh"
 
     if config["o11y_only"]:
-        otel_collector = f"""{script_header()}
+        otel_collector = f"""{script_header(config)}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
 REALM={shell_quote(config["realm"])}
 if [[ -z "${{REALM}}" ]]; then
@@ -878,7 +943,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/sc
   --output-dir "${{OUTPUT_DIR}}/delegated/splunk-otel-collector"
 """
     else:
-        otel_collector = f"""{script_header()}
+        otel_collector = f"""{script_header(config)}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 SPLUNK_HEC_URL="${{SPLUNK_HEC_URL:-{shell_double_default(config["splunk_hec_url"])}}}"
@@ -904,7 +969,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/sc
     write_text(scripts_dir / "apply-otel-collector.sh", otel_collector, executable=True)
     scripts["otel-collector"] = "scripts/apply-otel-collector.sh"
 
-    observe_runtime = f"""{script_header()}
+    observe_runtime = f"""{script_header(config)}
 TARGET_DIR="${{RUNTIME_TARGET_DIR:-{shell_double_default(config["runtime_target_dir"])}}}"
 if [[ -n "${{TARGET_DIR}}" ]]; then
   mkdir -p "${{TARGET_DIR}}"
@@ -930,7 +995,7 @@ kubectl -n "${{NAMESPACE}}" annotate deployment "${{WORKLOAD}}" instrumentation.
     write_text(scripts_dir / "apply-observe-runtime.sh", observe_runtime, executable=True)
     scripts["observe-runtime"] = "scripts/apply-observe-runtime.sh"
 
-    protect_runtime = f"""{script_header()}
+    protect_runtime = f"""{script_header(config)}
 TARGET_DIR="${{RUNTIME_TARGET_DIR:-{shell_double_default(config["runtime_target_dir"])}}}"
 if [[ -z "${{TARGET_DIR}}" ]]; then
   echo "Set RUNTIME_TARGET_DIR to copy runtime/python-galileo-protect.py into an app tree." >&2
@@ -944,7 +1009,7 @@ echo "Installed Galileo Protect runtime snippet into ${{TARGET_DIR}}/galileo_pro
     write_text(scripts_dir / "apply-protect-runtime.sh", protect_runtime, executable=True)
     scripts["protect-runtime"] = "scripts/apply-protect-runtime.sh"
 
-    evaluate_assets = f"""{script_header()}
+    evaluate_assets = f"""{script_header(config)}
 echo "ERROR: evaluate-assets is a render-only handoff; use object-lifecycle for documented API mutations." >&2
 echo "Review ${{OUTPUT_DIR}}/evaluate/ and complete the documented console/API handoff." >&2
 exit 2
@@ -952,7 +1017,7 @@ exit 2
     write_text(scripts_dir / "apply-evaluate-assets.sh", evaluate_assets, executable=True)
     scripts["evaluate-assets"] = "scripts/apply-evaluate-assets.sh"
 
-    multimodal_assets = f"""{script_header()}
+    multimodal_assets = f"""{script_header(config)}
 echo "ERROR: multimodal-assets is a render-only handoff, not an automated apply." >&2
 echo "Review ${{OUTPUT_DIR}}/multimodal/ and the rendered validation searches." >&2
 exit 2
@@ -960,7 +1025,7 @@ exit 2
     write_text(scripts_dir / "apply-multimodal-assets.sh", multimodal_assets, executable=True)
     scripts["multimodal-assets"] = "scripts/apply-multimodal-assets.sh"
 
-    observability_controls = f"""{script_header()}
+    observability_controls = f"""{script_header(config)}
 echo "ERROR: observability-controls is a render-only console handoff; no documented CRUD API is available." >&2
 echo "Review ${{OUTPUT_DIR}}/controls/ and validate exported control-span evidence." >&2
 exit 2
@@ -972,7 +1037,7 @@ exit 2
     )
     scripts["observability-controls"] = "scripts/apply-observability-controls.sh"
 
-    dashboards = f"""{script_header()}
+    dashboards = f"""{script_header(config)}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
 REALM={shell_quote(config["realm"])}
 if [[ -z "${{REALM}}" ]]; then
@@ -989,7 +1054,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-dashboard-builder/scrip
     write_text(scripts_dir / "apply-dashboards.sh", dashboards, executable=True)
     scripts["dashboards"] = "scripts/apply-dashboards.sh"
 
-    detectors = f"""{script_header()}
+    detectors = f"""{script_header(config)}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
 REALM={shell_quote(config["realm"])}
 if [[ -z "${{REALM}}" ]]; then
@@ -1006,7 +1071,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
     write_text(scripts_dir / "apply-detectors.sh", detectors, executable=True)
     scripts["detectors"] = "scripts/apply-detectors.sh"
 
-    apply_all_lines = [script_header(), "sections=(" + " ".join(shell_quote(s) for s in sections) + ")\n"]
+    apply_all_lines = [script_header(config), "sections=(" + " ".join(shell_quote(s) for s in sections) + ")\n"]
     apply_all_lines.append(
         """for section in "${sections[@]}"; do
   case "${section}" in
@@ -1278,6 +1343,13 @@ def render_readiness(output_dir: Path, config: dict[str, Any]) -> None:
     ]
     report = {
         "api_version": f"{SKILL_NAME}/readiness/v1",
+        "apply_gate": {
+            "tenant_onboarding_date": config["tenant_onboarding_date"],
+            "documentation_epoch": config["documentation_epoch"],
+            "boundary": DOCUMENTATION_EPOCH_BOUNDARY.isoformat(),
+            "apply_supported": config["apply_supported"],
+            "reason": config["reason"],
+        },
         "galileo": {
             "api_base": config["galileo_api_base"],
             "console_url": config["galileo_console_url"],
@@ -1311,7 +1383,11 @@ def render_readiness(output_dir: Path, config: dict[str, Any]) -> None:
             "script": "scripts/apply-object-lifecycle.sh",
             "manifest": "lifecycle/object-lifecycle-manifest.example.json",
             "coverage_matrix": "lifecycle/product-coverage-matrix.json",
-            "status": "rendered_apply_ready",
+            "status": (
+                "rendered_apply_ready"
+                if config["apply_supported"]
+                else "rendered_only_documentation_epoch_blocked"
+            ),
         },
         "signals_trends_annotations": {
             "signals": "covered_by_readiness_report",
@@ -1319,15 +1395,18 @@ def render_readiness(output_dir: Path, config: dict[str, Any]) -> None:
             "annotations_feedback": "covered_by_evaluate/annotation-feedback-handoff.md",
         },
         "latest_release": {
-            "target": "2026-07-07",
-            "reviewed_at": "2026-07-08",
-            "asset": "readiness/galileo-2026-07-07-readiness.json",
+            "target": "2026-08-07",
+            "reviewed_at": "2026-08-20",
+            "asset": "readiness/galileo-2026-08-07-readiness.json",
             "features": [
-                "ai_assistant_beta",
-                "global_dashboards",
-                "generic_alert_webhooks",
-                "experiment_groups",
-                "large_dataset_batched_processing",
+                "splunk_agent_observability_naming_and_docs_epoch",
+                "annotation_queues_ga",
+                "ai_assistant_expansion",
+                "ai_assisted_custom_code_metrics",
+                "cost_and_billing_surfaces",
+                "trace_count_alerts",
+                "multimodal_out_of_the_box_metrics",
+                "hosted_models_and_console_theme",
             ],
         },
     }
@@ -1417,13 +1496,19 @@ def render_release_2026_07_07_assets(output_dir: Path, config: dict[str, Any]) -
         output_dir / "evaluate/ai-assistant-handoff.md",
         f"""# Galileo AI Assistant Beta Handoff
 
-Source: {release_url}
+Sources:
+- {release_url}
+- https://docs.galileo.ai/release-notes#2026-07-21
+- https://docs.galileo.ai/release-notes#2026-08-04
 
 The AI Assistant is an enterprise beta in the Galileo console. Ask Galileo
 support to enable it, then confirm the project has a configured LLM integration
 (the documented prerequisite). Review whatever relevant telemetry is available,
 such as traces, spans, sessions, Signals, or evaluation scores, to assess how
-well an investigation can be grounded. Open it from a Log stream or Experiment.
+well an investigation can be grounded. Open it from any supported debugging
+surface; the August 4 release expanded the Assistant beyond Log streams and
+Experiments. Use signal criticality ordering and collapsed tool calls to focus
+the investigation, but verify both against the underlying records.
 
 Treat every answer as read-only guidance. Follow its evidence links back to the
 source traces or sessions and independently verify the diagnosis. Conversations
@@ -1511,7 +1596,7 @@ dashboard.
             }
         ],
         "dedup_key": "alert-id:project-id:log-stream-id",
-        "deep_link": "https://console.galileo.ai/project/example/log-streams/example",
+        "deep_link": "https://app.galileo.ai/project/example/log-streams/example",
         "metadata": {
             "team": "platform",
             "env": config["deployment_environment"],
@@ -1519,6 +1604,34 @@ dashboard.
         },
     }
     write_json(output_dir / "alerts/galileo-alert-webhook-payload.example.json", webhook_payload)
+    if config["apply_supported"]:
+        relay_launch = f"""For this reviewed legacy tenant, deploy
+`scripts/galileo_alert_webhook_relay.py` behind an HTTPS reverse proxy,
+configure Galileo with **Header token**, and store that distinct shared token
+and the Splunk HEC token in separate mode-0600 files. Keep the relay on
+loopback. If a container topology requires a non-loopback listener,
+`--allow-public-http-listener` is a reviewed acknowledgement and an
+operator-managed HTTPS reverse proxy remains mandatory.
+
+```bash
+python3 scripts/galileo_alert_webhook_relay.py \
+  --listen-host 127.0.0.1 \
+  --listen-port 8787 \
+  --path /galileo/alerts \
+  --galileo-webhook-token-file /run/secrets/galileo_webhook_token \
+  --splunk-hec-url {config["splunk_hec_url"] or "https://splunk.example.com:8088/services/collector/event"} \
+  --splunk-hec-token-file /run/secrets/splunk_hec_token \
+  --splunk-index {config["splunk_index"]}
+```
+"""
+    else:
+        relay_launch = f"""**RENDER-ONLY — DO NOT START THE LEGACY RELAY**
+
+The derived documentation epoch is `{config["documentation_epoch"]}` and
+operational apply is blocked: {config["reason"]} The relay script is retained
+only as review evidence; this packet intentionally emits no runnable launch
+command. Re-render for a verified pre-`2026-08-07` tenant before operating it.
+"""
     write_json(
         output_dir / "splunk-platform/galileo-alert-hec-event.example.json",
         {
@@ -1541,28 +1654,14 @@ dashboard.
         output_dir / "alerts/generic-webhook-handoff.md",
         f"""# Galileo Generic Alert Webhook To Splunk
 
-Source: https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs#generic-webhook-notifications
+Sources:
+- https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs#generic-webhook-notifications
+- https://docs.galileo.ai/release-notes#2026-07-21
 
 Galileo configures generic webhooks in the console with no auth, a Bearer
 header token, or HTTP Basic. Credentials are write-only. Splunk HEC requires
 its own `Splunk` authorization scheme, so Galileo's Bearer mode cannot call HEC directly.
-Deploy `scripts/galileo_alert_webhook_relay.py` behind an HTTPS reverse proxy,
-configure Galileo with **Header token**, and store that distinct shared token
-and the Splunk HEC token in separate mode-0600 files.
-Keep the relay on loopback. If a container topology requires a non-loopback
-listener, `--allow-public-http-listener` is a reviewed acknowledgement and an
-operator-managed HTTPS reverse proxy remains mandatory.
-
-```bash
-python3 scripts/galileo_alert_webhook_relay.py \
-  --listen-host 127.0.0.1 \
-  --listen-port 8787 \
-  --path /galileo/alerts \
-  --galileo-webhook-token-file /run/secrets/galileo_webhook_token \
-  --splunk-hec-url {config["splunk_hec_url"] or "https://splunk.example.com:8088/services/collector/event"} \
-  --splunk-hec-token-file /run/secrets/splunk_hec_token \
-  --splunk-index {config["splunk_index"]}
-```
+{relay_launch}
 
 The relay accepts the documented payload version `1.0`, preserves the complete
 event, and indexes `event_id` and `dedup_key`. Relay delivery is at-least-once:
@@ -1574,6 +1673,12 @@ so do not claim either. Send a console test event and require Galileo to show **
 the relay to return HTTP 200, and Splunk to return one searchable event before
 enabling production notifications. Metadata values should carry team,
 environment, and service routing context without secrets.
+
+For ingestion-rate monitoring, create a Log stream alert on the `Trace Count`
+system metric. Review the high/low threshold and time window per Log stream,
+route it through the same tested notification path, and retain trigger plus
+clear evidence in Splunk. Do not treat a Trace Count alert as proof that every
+expected trace or span was ingested.
 """,
     )
     write_text(
@@ -1594,6 +1699,136 @@ index="{config["splunk_index"]}" sourcetype="galileo:alert:webhook:json"
 | spath path=version output=galileo_payload_version
 | where isnull(galileo_alert_event_id) OR isnull(galileo_alert_dedup_key) OR galileo_payload_version!="1.0"
 | stats count by galileo_payload_version galileo_alert_event_type
+""",
+    )
+
+
+def render_release_2026_08_07_assets(output_dir: Path, config: dict[str, Any]) -> None:
+    release_notes = "https://docs.galileo.ai/release-notes"
+    readiness_asset = "readiness/galileo-2026-08-07-readiness.json"
+    handoff_asset = "readiness/galileo-2026-08-07-handoff.md"
+    write_json(
+        output_dir / readiness_asset,
+        {
+            "api_version": f"{SKILL_NAME}/release-readiness/v1",
+            "release_date": "2026-08-07",
+            "reviewed_at": "2026-08-20",
+            "release_window": ["2026-07-21", "2026-08-04", "2026-08-07"],
+            "source": release_notes,
+            "tenant_console_url": config["galileo_console_url"],
+            "features": {
+                "splunk_agent_observability_naming_and_docs_epoch": {
+                    "status": "documentation_selection_handoff",
+                    "legacy_name": "Galileo",
+                    "current_name": "Splunk Agent Observability",
+                    "legacy_docs": "https://docs.galileo.ai",
+                    "post_boundary_docs": "https://agent-observability-docs.splunk.com",
+                    "tenant_onboarding_date": config["tenant_onboarding_date"],
+                    "documentation_epoch": config["documentation_epoch"],
+                    "apply_supported": config["apply_supported"],
+                    "reason": config["reason"],
+                    "boundary": {
+                        "legacy_docs_apply_before": "2026-08-07",
+                        "new_docs_apply_after": "2026-08-07",
+                        "on_boundary_date": "verify_tenant_linked_documentation",
+                    },
+                },
+                "annotation_queues_ga": {
+                    "status": "generally_available_platform_api_and_console_handoff",
+                    "operations": [
+                        "queue_query",
+                        "template_review",
+                        "user_assignment",
+                        "record_review",
+                        "record_export",
+                    ],
+                    "asset": "evaluate/annotation-feedback-handoff.md",
+                },
+                "ai_assistant_expansion": {
+                    "status": "beta_read_only_console_handoff",
+                    "scope": "all_galileo_debugging_surfaces",
+                    "enhancements": ["signal_criticality_ordering", "collapsed_tool_calls"],
+                    "automation": "no_public_assistant_api_documented",
+                    "asset": "evaluate/ai-assistant-handoff.md",
+                },
+                "ai_assisted_custom_code_metrics": {
+                    "status": "console_generated_code_review_handoff",
+                    "requirements": [
+                        "review_generated_scorer_source",
+                        "test_against_representative_data",
+                        "record_metric_version_and_evidence",
+                    ],
+                    "asset": "evaluate/experiment-handoff.md",
+                },
+                "cost_and_billing_surfaces": {
+                    "status": "console_governance_handoff",
+                    "model_pricing": "generally_available",
+                    "integration_costs": "generally_available",
+                    "billing_usage_dimensions": ["traces", "spans", "luna_tokens"],
+                    "asset": handoff_asset,
+                },
+                "trace_count_alerts": {
+                    "status": "log_stream_alert_handoff",
+                    "system_metric": "Trace Count",
+                    "asset": "alerts/generic-webhook-handoff.md",
+                },
+                "multimodal_out_of_the_box_metrics": {
+                    "status": "platform_metric_configuration_handoff",
+                    "modalities": ["text", "image_or_pdf", "audio"],
+                    "metrics": [
+                        "Action Completion",
+                        "Context Adherence",
+                        "Correctness",
+                        "Ground Truth Adherence",
+                        "Reasoning Coherence",
+                        "Input Toxicity",
+                        "Output Toxicity",
+                        "User Intent Change",
+                    ],
+                    "asset": "evaluate/multimodal-metrics-handoff.yaml",
+                },
+                "hosted_models_and_console_theme": {
+                    "status": "tenant_state_and_operator_preference_handoff",
+                    "hosted_models": ["GPT 5.6 Sol", "GPT 5.6 Terra", "GPT 5.6 Luna"],
+                    "model_surfaces": [
+                        "Playground",
+                        "Prompt store",
+                        "Synthetic Data Generation",
+                        "Metrics Hub",
+                    ],
+                    "console_themes": ["light", "dark", "system"],
+                    "asset": handoff_asset,
+                },
+            },
+        },
+    )
+    write_text(
+        output_dir / handoff_asset,
+        f"""# Galileo / Splunk Agent Observability July 21-August 7 Readiness
+
+Source: {release_notes}
+
+As of August 7, 2026, Galileo is named Splunk Agent Observability. Select the
+documentation set from the tenant onboarding epoch: `docs.galileo.ai` applies
+before August 7 and `agent-observability-docs.splunk.com` applies after August
+7. For onboarding exactly on August 7, use the documentation linked by the
+tenant; the release note does not assign that boundary case.
+
+Operator review checklist:
+
+- Treat Annotation Queues as GA; review queue/template/user/record access and
+  export evidence before human-feedback operations.
+- Keep AI Assistant beta read-only, verify its evidence links, and account for
+  organization-wide debugging scope and signal criticality ordering.
+- Review and test every AI-generated custom-code scorer before publishing it.
+- Reconcile Model Pricing, Integration Costs, and organization Billing Usage
+  for traces, spans, and Luna tokens with the owning cost controls.
+- Validate Trace Count alert thresholds and notification routing on each Log
+  stream where ingestion-rate alerts are required.
+- Enable and validate the documented image/PDF/audio variants of the eight
+  out-of-the-box multimodal metrics listed in `{readiness_asset}`.
+- Treat GPT 5.6 Sol/Terra/Luna availability as tenant state and light/dark/system
+  theme as an operator preference, not an API or MCP configuration guarantee.
 """,
     )
 
@@ -1619,6 +1854,7 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "rendered_assets": row["rendered_assets"],
             "apply_script": row["apply_script"],
             "docs": row["source_url"],
+            "source_urls": row.get("source_urls") or [row["source_url"]],
         }
         for row in features
     ]
@@ -1864,11 +2100,14 @@ coverage:
     multimodal_quality: {json.dumps(multimodal_metrics)}
   datasets: operator_review
   annotations_feedback: rendered_handoff
+  annotation_queues_ga: evaluate/annotation-feedback-handoff.md
   signals_trends: rendered_handoff
   ai_assistant_beta: evaluate/ai-assistant-handoff.md
+  ai_assisted_custom_code_metrics: evaluate/experiment-handoff.md
   experiment_groups_and_scaling: evaluate/experiment-groups-and-scaling-handoff.md
   global_dashboards: dashboards/galileo-global-dashboard-handoff.md
   generic_alert_webhooks: alerts/generic-webhook-handoff.md
+  current_release_readiness: readiness/galileo-2026-08-07-readiness.json
   product_coverage_matrix: lifecycle/product-coverage-matrix.json
 """,
     )
@@ -1882,6 +2121,8 @@ coverage:
 - Export API: `POST {config["galileo_api_base"].rstrip("/")}/v2/projects/{{project_id}}/export_records`
 - Export format default: `{config["export_format"]}`
 - Redaction default: `{str(config["redact"]).lower()}`
+- Current release source: `https://docs.galileo.ai/release-notes#2026-07-21`
+- AI-assisted metric source: `https://docs.galileo.ai/concepts/metrics/custom-metrics/custom-metrics-ui-code#ai-assisted-code-generation`
 
 Review metric sampling, filtering, dataset lineage, and experiment comparison
 coverage before enabling production dashboards or detectors. For multi-model
@@ -1895,14 +2136,31 @@ For Galileo 2.2.0 and later, set `experiment_group` or
 grouping, weighted ranking, and the large-dataset batched-processing readiness workflow.
 This asset is a readiness and evidence handoff; it does not itself execute a
 thousand-row experiment or implement Galileo's server-managed batch polling.
+
+When using **Help me write** for a custom code-based metric, treat the generated
+scorer as untrusted source: review it, test it against representative positive,
+negative, boundary, and malformed cases, record the scorer version and test
+evidence, and only then publish it to a shared project.
 """,
     )
     write_text(
         output_dir / "evaluate/annotation-feedback-handoff.md",
-        """# Galileo Annotation And Feedback Handoff
+        """# Galileo Annotation Queues, Annotations, And Feedback Handoff
+
+Source: https://docs.galileo.ai/release-notes#2026-08-04
+
+Annotation Queues are generally available. Organize sessions, traces, and spans
+into queues for structured subject-matter review, then record the queue,
+template, assigned users or groups, record scope, and completion criteria.
+
+Before production review, verify that authorized reviewers can query the queue,
+open assigned records, apply the intended annotation template, and export only
+the approved fields. Retain sanitized evidence for assignment, completed versus
+remaining counts, and export reconciliation. Do not claim automated queue
+mutation from this render-only handoff.
 
 Track annotation coverage, feedback completeness, fully annotated filters, and
-reviewer group ownership alongside the exported Observe records. Keep free-form
+reviewer group ownership alongside exported Observe records. Keep free-form
 feedback text redacted unless the destination Splunk index is approved for it.
 """,
     )
@@ -1916,8 +2174,20 @@ log_stream:
   id: {json.dumps(config["log_stream_id"])}
   name: {json.dumps(config["log_stream"])}
 enabled: {json.dumps(config["multimodal_enabled"])}
+source: "https://docs.galileo.ai/release-notes#2026-07-21"
 quality_metrics:
   configured: {json.dumps(multimodal_metrics)}
+  out_of_the_box_variants:
+    supported_modalities: ["text", "image_or_pdf", "audio"]
+    metrics:
+      - "Action Completion"
+      - "Context Adherence"
+      - "Correctness"
+      - "Ground Truth Adherence"
+      - "Reasoning Coherence"
+      - "Input Toxicity"
+      - "Output Toxicity"
+      - "User Intent Change"
   visual_quality:
     modalities: ["image", "document"]
     level: "llm_span"
@@ -2508,6 +2778,14 @@ def build_apply_plan(
         "api_version": f"{SKILL_NAME}/v1",
         "output_dir": str(output_dir),
         "selected_sections": sections,
+        "apply_gate": {
+            "tenant_onboarding_date": config["tenant_onboarding_date"],
+            "documentation_epoch": config["documentation_epoch"],
+            "boundary": DOCUMENTATION_EPOCH_BOUNDARY.isoformat(),
+            "apply_supported": config["apply_supported"],
+            "blocked_sections": [] if config["apply_supported"] else list(sections),
+            "reason": config["reason"],
+        },
         "sections": [
             {
                 "name": section,
@@ -2532,7 +2810,11 @@ def build_apply_plan(
             "handoff": "handoff.md",
             "runtime": "runtime/",
             "readiness": "readiness/",
-            "latest_release": "readiness/galileo-2026-07-07-readiness.json",
+            "latest_release": "readiness/galileo-2026-08-07-readiness.json",
+            "release_history": [
+                "readiness/galileo-2026-07-07-readiness.json",
+                "readiness/galileo-2026-08-07-readiness.json",
+            ],
             "lifecycle": "lifecycle/",
             "evaluate": "evaluate/",
             "alerts": "alerts/",
@@ -2613,6 +2895,23 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
                     "large_dataset_batched_processing_readiness_handoff",
                 ],
             },
+            "galileo_release_2026_08_07": {
+                "status": "guarded_console_api_and_validation_handoffs",
+                "assets": [
+                    "readiness/galileo-2026-08-07-readiness.json",
+                    "readiness/galileo-2026-08-07-handoff.md",
+                ],
+                "covers": [
+                    "splunk_agent_observability_naming_and_docs_epoch",
+                    "annotation_queues_ga",
+                    "ai_assistant_expansion",
+                    "ai_assisted_custom_code_metrics",
+                    "cost_and_billing_surfaces",
+                    "trace_count_alerts",
+                    "multimodal_out_of_the_box_metrics",
+                    "hosted_models_and_console_theme",
+                ],
+            },
             "galileo_export_records_to_splunk_hec": {
                 "status": "automated",
                 "script": "scripts/galileo_to_splunk_hec.py",
@@ -2684,13 +2983,33 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
                 "",
             ]
         )
+    onboarding_date = config["tenant_onboarding_date"] or "not provided"
+    lines.extend(
+        [
+            "## Documentation Epoch / Apply Gate",
+            f"- Tenant onboarding date: `{onboarding_date}`",
+            f"- Derived documentation epoch: `{config['documentation_epoch']}`",
+            f"- Documentation boundary: `{DOCUMENTATION_EPOCH_BOUNDARY.isoformat()}`",
+            f"- Operational apply supported: `{str(config['apply_supported']).lower()}`",
+            f"- Reason: {config['reason']}",
+            "",
+        ]
+    )
     lines.append("## Apply Sections")
     for section in APPLY_SECTIONS:
         lines.append(f"- `{section}`: `{scripts[section]}`")
     lines.extend(
         [
             "",
-            "## Galileo 2026-07-07 Release",
+            "## Current Release Readiness (through 2026-08-07)",
+            "- Product naming and documentation epoch: `readiness/galileo-2026-08-07-handoff.md`",
+            "- Annotation Queues GA: `evaluate/annotation-feedback-handoff.md`",
+            "- Expanded AI Assistant and custom metric review: `evaluate/`",
+            "- Trace Count alerts: `alerts/generic-webhook-handoff.md`",
+            "- Multimodal metric variants: `evaluate/multimodal-metrics-handoff.yaml`",
+            "- Machine-readable readiness: `readiness/galileo-2026-08-07-readiness.json`",
+            "",
+            "## Historical 2026-07-07 Release Readiness",
             "- AI Assistant beta: `evaluate/ai-assistant-handoff.md`",
             "- Global dashboards: `dashboards/galileo-global-dashboard-handoff.md`",
             "- Generic alert webhook relay: `alerts/generic-webhook-handoff.md`",
@@ -2746,6 +3065,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     render_readiness(output_dir, config)
     render_release_2026_07_07_assets(output_dir, config)
+    render_release_2026_08_07_assets(output_dir, config)
     render_object_lifecycle(output_dir, config)
     render_runtime(output_dir, config)
     render_evaluate_assets(output_dir, config)
@@ -2761,6 +3081,13 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     write_json(output_dir / "apply-plan.json", apply_plan)
     write_json(output_dir / "coverage-report.json", coverage)
     render_handoff(output_dir, config, scripts)
+    if args.apply and not config["apply_supported"]:
+        print(
+            "ERROR: Operational apply is blocked for documentation epoch "
+            f"{config['documentation_epoch']}: {config['reason']}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     return {
         "output_dir": str(output_dir),
         "apply_plan": str(output_dir / "apply-plan.json"),

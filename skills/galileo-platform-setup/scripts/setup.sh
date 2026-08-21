@@ -72,6 +72,8 @@ Configuration:
   --luna-recompute-limit NUM    Log-record recompute batch limit (default: 100)
   --galileo-api-base URL        Galileo REST API base (default: https://api.galileo.ai)
   --galileo-console-url URL     Galileo console URL; used to derive API base when supplied
+  --tenant-onboarding-date DATE Tenant onboarding date (YYYY-MM-DD). Operational apply
+                                is supported only before the 2026-08-07 docs boundary.
   --galileo-otel-endpoint URL   Galileo OTLP traces endpoint
   --experiment-id ID            Galileo experiment ID for export/evaluation assets
   --metrics-testing-id ID       Galileo metrics testing ID for export/evaluation assets
@@ -177,7 +179,7 @@ while [[ $# -gt 0 ]]; do
         --allow-raw-media-in-splunk) RENDER_ARGS+=("$1"); shift ;;
         --spec) require_value "$1" "$#"; SPEC="$2"; shift 2 ;;
         --output-dir) require_value "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
-        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--luna-scorer-map|--luna-list-only|--luna-recompute|--luna-strict|--luna-recompute-limit|--galileo-api-base|--galileo-console-url|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--export-computed-metrics-only|--include-code-metric-metadata|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
+        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--luna-scorer-map|--luna-list-only|--luna-recompute|--luna-strict|--luna-recompute-limit|--galileo-api-base|--galileo-console-url|--tenant-onboarding-date|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--export-computed-metrics-only|--include-code-metric-metadata|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
             require_value "$1" "$#"
             RENDER_ARGS+=("$1" "$2")
             shift 2

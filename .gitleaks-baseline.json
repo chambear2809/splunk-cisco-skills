@@ -137,7 +137,7 @@
     },
     {
       "path": "skills/splunk-observability-cisco-nexus-integration/scripts/render_assets.py",
-      "line": 284,
+      "line": 294,
       "rule_id": "private-key",
       "line_sha256": "5bea9c27b2ad8218764b472468502cd57e5216e5f37e2e87a6e7f81e327ae11d",
       "category": "literal-guardrail-or-renderer-syntax"
@@ -263,21 +263,21 @@
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3200,
+      "line": 3216,
       "rule_id": "private-key",
       "line_sha256": "673a0a9100129e94f2d983c24a2c8429ed90e77243a8dccc34f7acb193204f57",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3202,
+      "line": 3218,
       "rule_id": "private-key",
       "line_sha256": "adaad9d9280d7199d1a8507e2b972789ed7aa0e87f15feab619ebbc80193a4cc",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3204,
+      "line": 3220,
       "rule_id": "private-key",
       "line_sha256": "4915d3d567984166387437262abbaa7731c2e7d061bb2466e79576aa770c90f8",
       "category": "synthetic-security-test"

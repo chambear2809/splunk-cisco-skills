@@ -271,7 +271,7 @@
       "status": "helm_apply",
       "apply_section": "bgp",
       "disruptive": true,
-      "source_url": "https://docs.cilium.io/en/stable/network/bgp-control-plane/",
+      "source_url": "https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/",
       "reason": "Scoped apply enables the BGP control plane. Customer-specific BGP peer CRs must still be reviewed and supplied separately."
     },
     {
@@ -371,7 +371,7 @@
       "status": "helm_apply",
       "apply_section": "tetragon",
       "disruptive": false,
-      "source_url": "https://tetragon.io/docs/getting-started/install/",
+      "source_url": "https://tetragon.io/docs/getting-started/install-k8s/",
       "reason": "Rendered Helm values and install scripts install the public Tetragon chart."
     },
     {
@@ -501,7 +501,7 @@
       "status": "cli_apply",
       "apply_section": "tetragon",
       "disruptive": false,
-      "source_url": "https://tetragon.io/docs/reference/tetra-cli/",
+      "source_url": "https://tetragon.io/docs/installation/tetra-cli/",
       "reason": "Live modes discover tetra availability and record the operator CLI path."
     },
     {
@@ -551,7 +551,7 @@
       "status": "helm_apply",
       "apply_section": "bgp",
       "disruptive": true,
-      "source_url": "https://docs.cilium.io/en/stable/network/bgp-control-plane/",
+      "source_url": "https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/",
       "reason": "BGP and L2 advertisement support exists through Cilium; private Isovalent LB packaging remains gated."
     },
     {

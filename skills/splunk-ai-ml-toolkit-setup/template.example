@@ -21,13 +21,15 @@ legacy_anomaly_audit: true      # add legacy anomaly-migration guidance
 #   llm_ai_command: true
 #   connections_tab: true
 #   container_management: true
-#   agent_builder_alpha: false       # private-preview handoff; Splunk Cloud only
-#   agent_builder_knowledge_base: false
-#   agent_builder_mcp: false
+#   agent_launchpad: false           # GA since AI Toolkit 6.0.0; Cloud region + egress allowlist,
+#                                    # or Splunk Cloud Connect on Enterprise
+#   agent_launchpad_connections: false
+#   agent_launchpad_mcp: false
+#   agent_skills: false
 #   aiagent_command: false
-#   agent_run_history: false         # requires approved ai_agent_run_history_index
+#   agent_run_history: false         # in-product page; mlspl.conf agent_run_index defaults to _audit
 #   cisco_time_series_model_open_1_0: true
-#   cisco_deep_time_series_preview: true
+#   cisco_deep_time_series: true
 #   onnx: true
 #   alerts: true
 # dsdl:

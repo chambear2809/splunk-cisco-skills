@@ -227,21 +227,21 @@ if metadata["expected_tool_count"] != catalog["tool_count"]:
     raise SystemExit("metadata/tool-catalog tool counts differ")
 if metadata.get("expected_server") != {
     "name": "EvalsInIDEServer",
-    "version_observed": "1.28.1",
+    "version_observed": "1.29.0",
 }:
     raise SystemExit("metadata server identity/version is stale")
-if metadata.get("tool_catalog_reviewed") != "2026-07-08":
+if metadata.get("tool_catalog_reviewed") != "2026-08-20":
     raise SystemExit("metadata catalog review date is stale")
 if catalog.get("observed_server") != {
     "name": "EvalsInIDEServer",
-    "version": "1.28.1",
+    "version": "1.29.0",
 }:
     raise SystemExit("tool catalog server identity/version is stale")
-if catalog.get("reviewed_on") != "2026-07-08":
+if catalog.get("reviewed_on") != "2026-08-20":
     raise SystemExit("tool catalog review date is stale")
 if catalog.get("tool_count") != 9:
     raise SystemExit("observed MCP tool count changed")
-if len(gap.get("product_gap_matrix") or []) < 32:
+if len(gap.get("product_gap_matrix") or []) < 37:
     raise SystemExit("product gap matrix is unexpectedly narrow")
 for tool in catalog["tools"]:
     if len(tool["schema_sha256"]) != 64:
@@ -249,12 +249,15 @@ for tool in catalog["tools"]:
 
 readme = (root / "mcp" / "README.md").read_text(encoding="utf-8")
 for marker in [
-    "July 7, 2026 product boundaries",
+    "July 7-August 7, 2026 product boundaries",
     "AI Assistant beta",
     "Global dashboards",
     "Generic alert webhooks",
     "Python SDK >=2.2.0",
     "Large-dataset Playground",
+    "Annotation Queues",
+    "Splunk Agent Observability",
+    "agent-observability-docs.splunk.com",
     "galileo-platform-setup",
 ]:
     if marker not in readme:
@@ -365,7 +368,7 @@ responses = {
     if (message := json.loads(line)).get("id") is not None
 }
 server = responses.get(1, {}).get("result", {}).get("serverInfo", {})
-if server != {"name": "EvalsInIDEServer", "version": "1.28.1"}:
+if server != {"name": "EvalsInIDEServer", "version": "1.29.0"}:
     raise SystemExit(f"rendered bridge server identity drift: {server!r}")
 if len(responses.get(2, {}).get("result", {}).get("tools", [])) != 9:
     raise SystemExit("rendered bridge live tools/list count changed")

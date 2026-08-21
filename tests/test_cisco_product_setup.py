@@ -86,7 +86,7 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(manifest["schema_version"], 1)
         self.assertEqual(manifest["source"]["kind"], "scan_public_catalog")
         self.assertEqual(manifest["source"]["url"], self.module.SCAN_SOURCE_URL)
-        self.assertEqual(manifest["source"]["catalog_version"], "2026_07_09_1837")
+        self.assertEqual(manifest["source"]["catalog_version"], "2026_08_01_2130")
         self.assertEqual(manifest["source"]["minimum_scan_version"], "1.0.29")
         self.assertEqual(
             date.fromisoformat(manifest["source"]["retrieved_date"]).isoformat(),
@@ -137,16 +137,15 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(
             {entry["product_id"] for entry in reconciliation["entries"]},
             {
-                "cisco_catalyst_center",
                 "cisco_catalyst_sdwan",
-                "cisco_ise",
+                "cisco_cyber_vision",
+                "cisco_duo",
+                "cisco_evm",
+                "cisco_isovalent",
+                "cisco_isovalent_edge_processor",
                 "cisco_multicloud_defense",
-                "cisco_nexus_dashboard",
-                "cisco_secure_access",
-                "cisco_spaces",
-                "cisco_talos",
-                "cisco_thousandeyes",
-                "cisco_umbrella",
+                "cisco_secure_firewall",
+                "cisco_secure_ips",
             },
         )
 

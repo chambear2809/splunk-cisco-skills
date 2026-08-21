@@ -86,7 +86,10 @@ SOURCE_URLS = {
     "cisco_data_fabric_press": "https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html",
     "splunk_data_management": "https://www.splunk.com/en_us/blog/platform/the-complete-guide-to-splunk-data-management.html",
     "federated_options": "https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.5.2605/welcome-to-splunk-federated-search/overview-of-the-federated-search-options-for-the-splunk-platform",
-    "ai_toolkit": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
+    "ai_toolkit": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/release-notes/whats-new-in-the-ai-toolkit",
+    "ai_toolkit_dependencies": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/install-and-upgrade-the-ai-toolkit/splunk-ai-toolkit-version-dependencies",
+    "agent_launchpad": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-connections-containers-and-agents/ai-toolkit-agent-launchpad",
+    "cdtsm": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-models/cisco-deep-time-series-model",
     "splunk_ai_canvas": "https://lantern.splunk.com/Splunk_and_Cisco_Use_Cases/Connecting_the_Splunk_platform_to_Cisco_Cloud_Control_and_AI_Canvas/Integrating_Splunk_Cloud_Platform_with_AI_Canvas",
 }
 DATA_FABRIC_2026_SURFACES = [
@@ -127,8 +130,8 @@ DATA_FABRIC_2026_SURFACES = [
         "title": "Machine-data AI activation",
         "status": "delegated_render",
         "owner": "cisco-data-fabric-setup",
-        "source": "cisco_data_fabric_press",
-        "summary": "Delegate AI Toolkit, open CTSM, hosted CDTSM preview, both Agent Builder products, DSDL, MCP, and agent-governance coverage to cisco-data-fabric-setup.",
+        "source": "ai_toolkit",
+        "summary": "Delegate AI Toolkit, open CTSM, GA hosted CDTSM, Splunk AI Toolkit Agent Launchpad, the separate Cloud Control Studio Agent Builder, DSDL, MCP, and agent-governance coverage to cisco-data-fabric-setup.",
     },
 ]
 PRODUCT_INTEGRATION_MATRIX = [
@@ -950,7 +953,10 @@ def render_data_fabric_handoffs(output_dir: Path, config: dict[str, Any]) -> Non
             "- Federation coverage keeps Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake lifecycle and entitlement boundaries separate.",
             "- Catalog coverage distinguishes the global Splunk Catalog, Splunk-native dataset catalogs, AWS Glue, Iceberg REST, Databricks Unity Catalog, and Machine Data Lake cataloging.",
             "- Storage coverage distinguishes indexed data, Machine Data Lake alpha, external stores, DDSS, DDAA, SmartStore, and S3 Promote.",
-            "- AI coverage distinguishes AI Toolkit, open Cisco Time Series Model 1.0, hosted Cisco Deep Time Series Model preview, Splunk Agent Builder alpha, Cloud Control Studio Agent Builder, MCP Server, and AI Canvas CA.",
+            "- AI coverage distinguishes AI Toolkit, open Cisco Time Series Model 1.0, the GA hosted Cisco Deep Time Series Model, GA Splunk AI Toolkit Agent Launchpad, the separate Cloud Control Studio Agent Builder, MCP Server, and AI Canvas CA.",
+            f"- The audited AI Toolkit pair is `6.0.2` with Python for Scientific Computing `4.3.4`; `6.0.2` with `4.3.2` is an unsupported pairing. See {SOURCE_URLS['ai_toolkit_dependencies']}.",
+            f"- Cisco Deep Time Series Model ({SOURCE_URLS['cdtsm']}) and Splunk AI Toolkit Agent Launchpad ({SOURCE_URLS['agent_launchpad']}) are both generally available as of AI Toolkit `6.0.0`. Treat supported region, allowlisted egress IP, a supported LLM connection, and an enabled agent as reachability gates rather than lifecycle stage.",
+            "- Cloud Control Studio Agent Builder is a different Cisco product from Splunk AI Toolkit Agent Launchpad. Splunk GA is not evidence for the Cisco capability, and the dedicated Data Fabric parent owns its separately verified stage.",
             "- Machine Data Lake and built-in Data Catalog remain readiness handoffs; no undocumented provisioning API is called.",
         ]
     )
@@ -989,7 +995,7 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
         ("cloud_control_platform", "platform", "render", "cisco-cloud-control-setup", SOURCE_URLS["getting_started"], "Render adoption and readiness artifacts only; no direct Cloud Control API mutation."),
         ("cloud_control_launch_context", "platform", "render", "cisco-cloud-control-setup", SOURCE_URLS["press"], "Track launch context and product boundary in docs."),
         ("cloud_control_studio_agent_builder", "studio", "ui_handoff", "Cisco Cloud Control Studio", SOURCE_URLS["studio"], "Agent Builder actions are operator UI handoffs."),
-        ("cloud_control_studio_app_builder", "studio", "ui_handoff", "Cisco Cloud Control Studio", SOURCE_URLS["studio"], "App Builder actions are operator UI handoffs."),
+        ("cloud_control_studio_app_builder", "studio", "ui_handoff", "Cisco Cloud Control Studio", SOURCE_URLS["app_builder"], "App Builder actions are operator UI handoffs."),
         ("ai_defense_guardrails", "governance", "render", "cisco-cloud-control-setup", SOURCE_URLS["ai_defense"], "Render guardrail review prompts; AI Defense configuration is a Cisco-side handoff."),
         ("ai_canvas_boards", "ai-canvas", "ca_handoff", "Cisco AI Canvas", SOURCE_URLS["ai_canvas_doc"], "Render board templates only."),
         ("data_fabric_prerequisites", "data-fabric", "delegated_render" if config["data_fabric_enabled"] else "not_applicable", "cisco-data-fabric-setup", SOURCE_URLS["splunk"], "Dedicated parent owns lifecycle-aware architecture coverage, child routing, and validation; this parent delegates render only."),

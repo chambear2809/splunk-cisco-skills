@@ -636,6 +636,27 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertTrue(enterprise["lifecycle"]["version_unsupported"])
         self.assertIn("not in the current public Enterprise release contract", enterprise["lifecycle"]["upgrade_path_issues"][0])
 
+    def test_support_end_date_remains_supported_for_the_full_published_day(self) -> None:
+        from datetime import date
+
+        last_day = {"server": {"version": "9.3.11"}}
+        next_day = {"server": {"version": "9.3.11"}}
+        doctor.augment_lifecycle_evidence(
+            last_day, "enterprise", today=date(2026, 7, 24)
+        )
+        doctor.augment_lifecycle_evidence(
+            next_day, "enterprise", today=date(2026, 7, 25)
+        )
+
+        self.assertEqual(last_day["lifecycle"]["support_days_remaining"], 0)
+        self.assertFalse(last_day["lifecycle"]["version_unsupported"])
+        self.assertFalse(last_day["lifecycle"]["eos"])
+        self.assertIn("9.3", last_day["lifecycle"]["supported_minor_trains"])
+        self.assertEqual(next_day["lifecycle"]["support_days_remaining"], -1)
+        self.assertTrue(next_day["lifecycle"]["version_unsupported"])
+        self.assertTrue(next_day["lifecycle"]["eos"])
+        self.assertNotIn("9.3", next_day["lifecycle"]["supported_minor_trains"])
+
     def test_lifecycle_derivation_cannot_be_suppressed_and_timestamps_are_consistent(self) -> None:
         evidence = {
             "server": {"version": "9.2.5"},

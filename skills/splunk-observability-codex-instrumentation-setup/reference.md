@@ -48,7 +48,7 @@ Rendered file:
   when native logs are enabled, binds its OTLP HTTP receiver to
   `local_collector_receiver_endpoint`, and reads the token with
   `${env:SPLUNK_ACCESS_TOKEN}` in the collector process
-- the rendered runner uses the Splunk Distribution `0.154.2` multi-platform
+- the rendered runner uses the Splunk Distribution `0.158.0` multi-platform
   digest; it does not use the upstream contrib image
 - native GenAI histograms do not require a `splunk_otlp_histograms` application
   resource marker

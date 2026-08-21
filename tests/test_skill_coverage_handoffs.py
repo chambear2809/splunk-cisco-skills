@@ -63,9 +63,11 @@ def test_ai_assistant_cloud_onboarding_plan_keeps_cloud_ui_gate_explicit() -> No
     payload = json.loads(result.stdout)
     assert payload["workflow"] == "splunk-ai-assistant-cloud-onboarding"
     assert payload["platform"] == "cloud"
-    assert payload["latest_verified_version"] == "2.0.0"
-    assert payload["current_public_version"] == "2.1.1"
-    assert payload["package_verification_status"] == "current_public_release_unverified"
+    # 2.2.0 was downloaded, unpacked, and inspected, so the verified pin is now the
+    # current public release. 2.0.0 is retained only as the withdrawn prior pin.
+    assert payload["latest_verified_version"] == "2.2.0"
+    assert payload["prior_reviewed_version"] == "2.0.0"
+    assert payload["package_verification_status"] == "verified_pin_is_current_public_release"
     assert any(step["automation"] == "manual-gate" for step in payload["steps"])
     assert any("app ID 7245" in detail for step in payload["steps"] for detail in step.get("details", []))
 

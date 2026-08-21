@@ -10,7 +10,7 @@ compatibility: >-
   APIs or handoffs.
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco DefenseClaw Deskside Setup

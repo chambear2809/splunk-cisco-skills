@@ -1,9 +1,12 @@
 # Galileo MCP Tool Catalog
 
 Source of truth: live `tools/list` from
-`https://api.galileo.ai/mcp/http/mcp`, reviewed July 8, 2026.
+`https://api.galileo.ai/mcp/http/mcp`, reviewed August 20, 2026.
 
-The server reported `EvalsInIDEServer` version `1.28.1` and 9 tools. Treat
+The server reported `EvalsInIDEServer` version `1.29.0` and 9 tools. The nine
+tool names, required arguments, property keys, and canonical input-schema
+SHA-256 fingerprints below were all unchanged from the `1.28.1` review on
+July 8, 2026; only the server version string moved. Treat
 unknown future tools, prompts, resources, or schema changes as
 manual-approval-only until this catalog is updated. The renderer also emits
 `coverage/tool-catalog.json` so `probe_mcp.py --fail-on-drift` can compare live
@@ -49,10 +52,11 @@ default.
   experiment, experiment-group, scorer, Luna Studio, annotation, feedback,
   trends, Agent Graph, saved-view, SDK-reference, metric recomputation,
   SQL/Text-to-SQL metric, Protect, Agent Control, or Splunk wiring APIs.
-- The July 7 AI Assistant beta, global dashboards, generic alert webhooks, and
-  large-dataset batched experiment execution are platform capabilities, not new
-  live MCP tools. `search_docs` can locate documentation; it does not turn
-  those features into MCP lifecycle APIs.
+- The July 7-August 7 AI Assistant, global dashboard, alert webhook, batched
+  experiment, Annotation Queue, metric/cost, hosted-model, console-theme, and
+  product-documentation changes are platform capabilities or documentation
+  boundaries, not new live MCP tools. `search_docs` can locate documentation;
+  it does not turn those features into MCP lifecycle APIs.
 - `setup_galileo_experiment` remains guidance-only. Experiment groups require
   Galileo Python SDK 2.2.0 or later, and group lifecycle/ranking is not exposed
   by the MCP server.

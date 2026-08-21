@@ -20,7 +20,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-windows-ta-rendered"
 
 APP_NAME = "Splunk_TA_windows"
 SPLUNKBASE_ID = "742"
-LATEST_VERIFIED_VERSION = "10.0.1"
+LATEST_VERIFIED_VERSION = "11.0.2"
 
 # WinEventLog channels shipped by Splunk_TA_windows default/inputs.conf, with
 # the source type the add-on assigns and the CIM data model it maps to.

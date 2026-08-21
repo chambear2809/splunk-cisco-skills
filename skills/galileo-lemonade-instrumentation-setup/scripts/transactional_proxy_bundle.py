@@ -2957,6 +2957,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             error["rollback"] = exc.rollback
         emit({"status": "error", "error": error}, stream=sys.stderr)
         return 1
+    except SystemExit:
+        raise
     except BaseException:
         emit(
             {

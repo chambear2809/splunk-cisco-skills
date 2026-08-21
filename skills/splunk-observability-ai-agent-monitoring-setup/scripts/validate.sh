@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+require_arg() {
+    local flag="$1"
+    local remaining="$2"
+    if [[ "${remaining}" -lt 2 ]]; then
+        echo "ERROR: Option '${flag}' requires a value." >&2
+        exit 1
+    fi
+}
+
 OUTPUT_DIR=""
 JSON_OUTPUT=false
 DOCTOR=false
@@ -16,7 +25,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
+        --output-dir) require_arg "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
         --json) JSON_OUTPUT=true; shift ;;
         --doctor) DOCTOR=true; shift ;;
         --help|-h) usage; exit 0 ;;

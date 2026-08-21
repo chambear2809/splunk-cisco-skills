@@ -7,7 +7,7 @@ description: "Use when the user asks to install, configure, prepare, or validate
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk InfoSec App Setup
@@ -85,12 +85,12 @@ it does not change dashboards, macros, lookups, or data-source configuration.
 
 ## Package Verification Boundary
 
-The repository's reviewed InfoSec App baseline is `1.7.1`. The current public
-release is `1.7.2` and advertises Splunk 10.5 support, but this repository has
-not inspected that package. The shared installer defaults to verified `1.7.1`;
-only `--accept-unverified-release` follows public `1.7.2`. After that explicit
-override, inventory its dashboards, macros, lookups, and prerequisites before
-declaring the app ready.
+The reviewed InfoSec App baseline is `1.7.2`, the current public release, which
+advertises Splunk 10.5. The package was downloaded, unpacked, and inspected
+here, so the shared installer's default pin needs no review override. Still
+inventory the shipped dashboards, macros, lookups, and prerequisites against
+your own data before declaring the app ready — package verification does not
+prove the dashboards return results in your environment.
 
 ## Workflow
 

@@ -1730,6 +1730,58 @@ def build_handoff_md(spec: dict[str, Any], coverage: list[dict[str, Any]]) -> st
     return "\n".join(lines) + "\n"
 
 
+O11Y_REALMS = frozenset(
+    {
+        "us0",
+        "us1",
+        "us2",
+        "us3",
+        "eu0",
+        "eu1",
+        "eu2",
+        "au0",
+        "jp0",
+        "sg0",
+        "us2-gcp",
+    }
+)
+
+
+def o11y_app_base(realm: str) -> str:
+    """Splunk Observability app host for a realm.
+
+    Mirrors the deeplink base used by splunk-observability-native-ops and
+    splunk-observability-deep-native-workflows, plus the us2-gcp host rewrite
+    that splunk-observability-cloud-integration-setup applies: us2-gcp is
+    served from the us2 hostname, and app.us2-gcp.* resolves on neither the
+    observability.splunkcloud.com nor the legacy signalfx.com domain.
+    """
+    host_realm = "us2" if realm == "us2-gcp" else realm
+    return f"https://app.{host_realm}.observability.splunkcloud.com"
+
+
+def resolve_o11y_realm(spec: dict[str, Any]) -> str:
+    """Read and validate the realm backing Observability deeplinks.
+
+    Required rather than defaulted. A deeplink into the wrong realm still looks
+    plausible and still loads, but shows a UI in which the operator's org does
+    not exist, so a silent default is worse than a refusal to render.
+    """
+    realm = str(spec.get("realm") or "").strip()
+    if not realm:
+        raise SpecError(
+            "splunk_side.observability_handoff requires a top-level 'realm' "
+            "(for example 'realm: us1'). Splunk Observability deeplinks are "
+            "realm-specific and there is no safe default."
+        )
+    if realm not in O11Y_REALMS:
+        raise SpecError(
+            f"realm {realm!r} is not a recognized Splunk Observability realm. "
+            f"Allowed: {', '.join(sorted(O11Y_REALMS))}."
+        )
+    return realm
+
+
 def build_deeplinks(spec: dict[str, Any], coverage: list[dict[str, Any]]) -> dict[str, Any]:
     org = str(spec.get("org_slug") or "")
     portal = "https://portal.victorops.com"
@@ -1751,9 +1803,9 @@ def build_deeplinks(spec: dict[str, Any], coverage: list[dict[str, Any]]) -> dic
         elif otype.startswith("integration_"):
             url = f"{portal}/client/{quote(org)}/integrations"
         elif otype == "sso":
-            url = f"{portal}/auth/sso/<companyId>"
+            url = f"{portal}/auth/sso/{quote(org)}"
         elif otype == "splunk_side_observability_handoff":
-            url = "https://app.us0.signalfx.com/#/me"
+            url = f"{o11y_app_base(resolve_o11y_realm(spec))}/#/me"
         elif otype == "webhook":
             url = f"{portal}/client/{quote(org)}/integrations/outgoing-webhooks"
         elif otype == "mobile_setup":

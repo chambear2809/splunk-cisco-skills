@@ -1,10 +1,26 @@
 # DISA STIG Cross-Reference
 
-The DISA Splunk Enterprise 8.x for Linux STIG (V2R2) is the closest
-formal hardening benchmark for Splunk Enterprise. The renderer's
-configuration maps to the STIG controls in the V-251680..V-251692
-series. This document is a cross-reference; it does NOT certify STIG
-compliance — your assessor owns that.
+The DISA Splunk Enterprise 8.x for Linux STIG is the closest formal
+hardening benchmark for Splunk Enterprise. The renderer's configuration
+maps to the STIG controls in the V-251680..V-251692 series. This
+document is a cross-reference; it does NOT certify STIG compliance —
+your assessor owns that.
+
+**Revision and sunset status.** The final release is **V2R3**
+(2025-05-14), not V2R2. NIST's National Checklist Program lists it as
+[Sunset](https://ncp.nist.gov/checklist/revision/4564), and no
+successor STIG has been published for Splunk Enterprise 9.x or 10.x.
+Two consequences for anyone using the `stig` TLS preset or this table:
+
+- The mapping below is against a benchmark written for Splunk 8.x. It
+  does not cover anything introduced since — TLS 1.3 and the
+  `[tls1.3]` stanza (10.4.0+), dual FIPS 140-2/140-3 mode (10.x), or
+  the current SVD floor. Treat those as additive requirements this
+  table cannot speak to.
+- For a current accreditation, the applicable authority is the DISA
+  **Central Log Server SRG** rather than a Splunk-specific STIG.
+  Confirm with your assessor which one they will score against before
+  relying on the `stig` preset as evidence.
 
 ## Mapping table
 
