@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk Platform Dashboard Studio"
-  short_description: "Deprecated alias for Dashboard Studio"
-  default_prompt: "Use $splunk-dashboard-studio only for compatibility; route new work to $splunk-dashboard-studio-setup."
-policy:
-  allow_implicit_invocation: false

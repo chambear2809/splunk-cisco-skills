@@ -2950,18 +2950,6 @@
       "notes": "Search-tier / SHC KV Store administration: backup, restore, clean, storage-engine migration, server-version upgrade, maintenance mode, and collections/lookup-definition governance."
     },
     {
-      "skill": "splunk-kvstore-admin",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-kvstore-admin-setup; retained here only to classify historical placement, not as an operational peer."
-    },
-    {
       "skill": "splunk-cim-data-model-setup",
       "role_support": {
         "search-tier": "required",
@@ -2974,18 +2962,6 @@
       "notes": "CIM data model governance authored on the search tier (acceleration, cim_<model>_indexes constraints, eventtype/tag mapping); acceleration summaries build on indexers."
     },
     {
-      "skill": "splunk-cim-data-model",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-cim-data-model-setup; retained here only to classify historical placement, not as an operational peer."
-    },
-    {
       "skill": "splunk-knowledge-objects-setup",
       "role_support": {
         "search-tier": "required",
@@ -2996,18 +2972,6 @@
       },
       "cloud_pairing": [],
       "notes": "Search-tier knowledge object governance: saved searches, macros, lookups, eventtypes, tags, and sharing/ownership ACLs."
-    },
-    {
-      "skill": "splunk-knowledge-objects",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-knowledge-objects-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-ingest-actions-setup",
@@ -3024,18 +2988,6 @@
       "notes": "Eval, mask, and drop rules are applied through target-app props/transforms REST endpoints on indexers or customer-managed heavy forwarders. Route-s3 applies only RFS destination staging through conf-outputs, then requires the Splunk Web or supported rulesets-API rule handoff; retain the topology-appropriate deploy step."
     },
     {
-      "skill": "splunk-ingest-actions",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-ingest-actions-setup; retained here only to classify historical placement, not as an operational peer."
-    },
-    {
       "skill": "splunk-ddaa-archive-setup",
       "role_support": {
         "search-tier": "none",
@@ -3046,18 +2998,6 @@
       },
       "cloud_pairing": [],
       "notes": "Splunk Cloud ACS control-plane workflow for Dynamic Data Active Archive retention; restore and disable are Splunk Web-only. No Splunk Enterprise role placement."
-    },
-    {
-      "skill": "splunk-ddaa-archive",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-ddaa-archive-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-secure-gateway-setup",
@@ -3072,18 +3012,6 @@
       "notes": "Only Splunk Enterprise search-tier app enable/disable is live-applied. The workflow renders an Enterprise egress check plus Private Spacebridge/instance-ID placeholder skeleton and MDM/device-registration runbooks; Splunk Cloud is render/support-only with no local probe or live REST."
     },
     {
-      "skill": "splunk-secure-gateway",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-secure-gateway-setup; retained here only to classify historical placement, not as an operational peer."
-    },
-    {
       "skill": "splunk-dashboard-studio-setup",
       "role_support": {
         "search-tier": "required",
@@ -3094,18 +3022,6 @@
       },
       "cloud_pairing": [],
       "notes": "Search-tier Dashboard Studio dashboards created and updated through the data/ui/views REST endpoint with ACL governance."
-    },
-    {
-      "skill": "splunk-dashboard-studio",
-      "role_support": {
-        "search-tier": "none",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "cloud_pairing": [],
-      "notes": "Deprecated help-only compatibility alias for splunk-dashboard-studio-setup; retained here only to classify historical placement, not as an operational peer."
     },
     {
       "skill": "splunk-okta-ta-setup",

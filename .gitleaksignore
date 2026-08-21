@@ -45,7 +45,6 @@
 52243e07737a62427350ea1a324b389277fa5517:skills/shared/app_registry.json:generic-api-key:355
 553176ccc43c99904a16c2a62eebad408e1a6505:skills/splunk-ingest-actions-setup/scripts/render_assets.py:curl-auth-user:184
 553176ccc43c99904a16c2a62eebad408e1a6505:skills/splunk-ingest-actions-setup/scripts/setup.sh:generic-api-key:25
-553176ccc43c99904a16c2a62eebad408e1a6505:skills/splunk-ingest-actions/scripts/setup.sh:generic-api-key:29
 5bb4cbd6a67ecb84d90b6c12cdd7b71d9c86dbe6:skills/splunk-platform-pki-setup/references/edge-processor-pki.md:curl-auth-user:109
 5bb4cbd6a67ecb84d90b6c12cdd7b71d9c86dbe6:skills/splunk-platform-pki-setup/references/key-format-and-permissions.md:private-key:11
 71d2db9917be46c26a8b0240d00e8fee190d1255:skills/splunk-enterprise-security-config/scripts/es_config_engine.py:generic-api-key:1649
@@ -78,7 +77,6 @@ c2ada7dc9473779893d137ae2e53bee3e578fa86:tests/test_agent_mcp_core.py:jwt:505
 c2ada7dc9473779893d137ae2e53bee3e578fa86:tests/test_agent_mcp_core.py:private-key:513
 cd9a426bc86e5befcac2968f5dc9576a239433c6:skills/splunk-ingest-actions-setup/scripts/render_assets.py:curl-auth-user:184
 cd9a426bc86e5befcac2968f5dc9576a239433c6:skills/splunk-ingest-actions-setup/scripts/setup.sh:generic-api-key:25
-cd9a426bc86e5befcac2968f5dc9576a239433c6:skills/splunk-ingest-actions/scripts/setup.sh:generic-api-key:29
 f1fb27d5287805a21f3847e253620c313d415cda:skills/splunk-mcp-server-setup/scripts/validate.sh:generic-api-key:9
 f3a34d31d662e635727f5bb194b235a90e5d6d51:skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh:generic-api-key:33
 f3a34d31d662e635727f5bb194b235a90e5d6d51:skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh:generic-api-key:37

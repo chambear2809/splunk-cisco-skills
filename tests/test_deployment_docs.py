@@ -72,6 +72,10 @@ class DeploymentDocRegressionTests(unittest.TestCase):
                     self.role_matrix,
                 )
 
+        if not catalog.aliases:
+            self.assertFalse(catalog.aliases)
+            return
+
         legacy = next(iter(catalog.aliases))
         bad_registry = copy.deepcopy(self.registry)
         bad_topology = next(

@@ -21,7 +21,8 @@ MARKER_NAME = ".splunk-skill-bundle.json"
 MARKER_SCHEMA = 2
 
 # Optional compatibility data, keyed only by the active canonical renderer.
-# The retired alias identity is derived from manifest replaced_by edges.
+# These file-shape checks protect against stale bundles without keeping retired
+# skill identities in the active catalog.
 _BUNDLE_COMPATIBILITY: dict[str, dict[str, set[str]]] = {
     "splunk-cim-data-model-setup": {
         "canonical_files": {
@@ -124,11 +125,6 @@ def _build_compatibility_contracts(
     contracts: dict[str, LegacyBundleCompatibility] = {}
     for canonical, raw in configured.items():
         candidates = aliases_by_canonical.get(canonical, [])
-        if len(candidates) != 1:
-            raise CatalogError(
-                f"legacy-bundle compatibility owner {canonical!r} must have exactly one "
-                "manifest alias replaced_by edge"
-            )
         if set(raw) != {"canonical_files", "retired_alias_files"}:
             raise CatalogError(
                 f"legacy-bundle compatibility for {canonical} must contain exactly "
@@ -144,9 +140,14 @@ def _build_compatibility_contracts(
             raise CatalogError(
                 f"legacy-bundle compatibility for {canonical} has no retired-only files"
             )
+        if extension is not None and len(candidates) != 1:
+            raise CatalogError(
+                f"legacy-bundle compatibility owner {canonical!r} must have exactly one "
+                "manifest alias replaced_by edge"
+            )
         contracts[canonical] = LegacyBundleCompatibility(
             canonical=canonical,
-            retired_alias=candidates[0],
+            retired_alias=candidates[0] if candidates else "retired-renderer",
             canonical_files=canonical_files,
             retired_alias_files=retired_files,
         )

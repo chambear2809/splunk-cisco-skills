@@ -94,13 +94,12 @@ def _run_renderer(canonical: str, output_dir: Path) -> subprocess.CompletedProce
 
 
 def test_compatibility_extension_is_canonical_only_and_manifest_validated() -> None:
-    catalog = load_catalog()
     contracts = _build_compatibility_contracts()
 
     assert set(contracts) == set(RENDERERS)
     assert set(contracts) == set(_BUNDLE_COMPATIBILITY)
     for canonical, contract in contracts.items():
-        assert catalog.aliases[contract.retired_alias] == canonical
+        assert contract.retired_alias == "retired-renderer"
         assert contract.canonical == canonical
 
 

@@ -33,7 +33,7 @@ verify shipped dashboards are visible, macro-aligned, and returning data, or
 record explicit evidence that the package ships no pre-built dashboards.
 
 <!-- BEGIN GENERATED SKILL CATALOG -->
-<!-- source: skills/catalog.yaml; schema: 1; sha256: 3d604951119d043cb8c2a9fd0c061d3738b79969a4a4f716682bec98ed30215a -->
+<!-- source: skills/catalog.yaml; schema: 1; sha256: 4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff -->
 ## Skill Catalog
 
 | Skill | Target | Main purpose | Lifecycle |
@@ -144,13 +144,6 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `splunk-connect-for-otlp-setup` | `splunk-connect-for-otlp` | Install, configure, validate, diagnose, and repair Splunk Connect for OTLP app `8704`; render OTLP sender configs and HEC-token handoffs without exposing token values | Canonical |
 | `splunk-federated-search-setup` | Splunk Federated Search | Render and validate self-managed Splunk-to-Splunk standard or transparent providers, standard-mode federated indexes, and SHC replication assets | Canonical |
 | `splunk-index-lifecycle-smartstore-setup` | Splunk Index Lifecycle / SmartStore | Render and validate SmartStore `indexes.conf`, `server.conf`, and `limits.conf` assets for indexers or cluster managers | Canonical |
-| `splunk-kvstore-admin` | Deprecated compatibility alias for `splunk-kvstore-admin-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-kvstore-admin`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-kvstore-admin-setup` as replaced_by | Deprecated -> `splunk-kvstore-admin-setup` |
-| `splunk-cim-data-model` | Deprecated compatibility alias for `splunk-cim-data-model-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-cim-data-model`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-cim-data-model-setup` as replaced_by | Deprecated -> `splunk-cim-data-model-setup` |
-| `splunk-knowledge-objects` | Deprecated compatibility alias for `splunk-knowledge-objects-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-knowledge-objects`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-knowledge-objects-setup` as replaced_by | Deprecated -> `splunk-knowledge-objects-setup` |
-| `splunk-ingest-actions` | Deprecated compatibility alias for `splunk-ingest-actions-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-ingest-actions`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-ingest-actions-setup` as replaced_by | Deprecated -> `splunk-ingest-actions-setup` |
-| `splunk-ddaa-archive` | Deprecated compatibility alias for `splunk-ddaa-archive-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-ddaa-archive`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-ddaa-archive-setup` as replaced_by | Deprecated -> `splunk-ddaa-archive-setup` |
-| `splunk-secure-gateway` | Deprecated compatibility alias for `splunk-secure-gateway-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-secure-gateway`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-secure-gateway-setup` as replaced_by | Deprecated -> `splunk-secure-gateway-setup` |
-| `splunk-dashboard-studio` | Deprecated compatibility alias for `splunk-dashboard-studio-setup` | Provide a help-only, fail-closed exact-name compatibility handoff from `splunk-dashboard-studio`; reject every operational setup, validation, and renderer invocation before I/O and name `splunk-dashboard-studio-setup` as replaced_by | Deprecated -> `splunk-dashboard-studio-setup` |
 | `splunk-kvstore-admin-setup` | Splunk App Key Value Store | Back up, restore, clean, migrate (WiredTiger), and upgrade the KV Store, manage maintenance mode, and govern collections/lookup definitions for standalone or SHC | Canonical |
 | `splunk-cim-data-model-setup` | `Splunk_SA_CIM` + `datamodels.conf` | Accelerate CIM data models, constrain `cim_<model>_indexes`, and map sourcetypes into CIM with eventtypes/tags, with tstats validation (distinct from ES-context acceleration) | Canonical |
 | `splunk-knowledge-objects-setup` | Knowledge object governance | Render and apply saved searches, macros, CSV/KV Store lookups with optional automatic lookup binding, eventtypes, and tags with sharing/ownership (ACL) governance | Canonical |
@@ -224,7 +217,7 @@ after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
 <!-- BEGIN GENERATED LOCAL SKILL MCP SAFETY -->
-<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: 3d604951119d043cb8c2a9fd0c061d3738b79969a4a4f716682bec98ed30215a -->
+<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: 4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff -->
 ## Local Skill MCP Server
 
 The project also exposes a local `splunk-cisco-skills` MCP server through

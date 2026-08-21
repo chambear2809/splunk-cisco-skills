@@ -125,25 +125,16 @@ class DiscoveryRepositoryTests(unittest.TestCase):
         )
         self.assertEqual(exact["skills"][0]["skill"], "cisco-product-setup")
 
-    def test_generic_search_prefers_canonical_but_exact_alias_still_resolves(
-        self,
-    ) -> None:
+    def test_removed_deprecated_alias_does_not_resolve(self) -> None:
         generic = discovery.search_skills(query="kvstore", limit=10)
         generic_names = [item["skill"] for item in generic["skills"]]
         exact = discovery.search_skills(query="splunk-kvstore-admin", limit=10)
-        legacy_manifest = discovery.get_skill_manifest("splunk-kvstore-admin")
 
         self.assertIn("splunk-kvstore-admin-setup", generic_names)
         self.assertNotIn("splunk-kvstore-admin", generic_names)
-        self.assertEqual(exact["skills"][0]["skill"], "splunk-kvstore-admin")
-        self.assertEqual(exact["skills"][0]["status"], "deprecated")
-        self.assertEqual(
-            exact["skills"][0]["replaced_by"], "splunk-kvstore-admin-setup"
-        )
-        self.assertEqual(legacy_manifest["status"], "deprecated")
-        self.assertEqual(
-            legacy_manifest["replaced_by"], "splunk-kvstore-admin-setup"
-        )
+        self.assertEqual(exact["skills"][0]["skill"], "splunk-kvstore-admin-setup")
+        with self.assertRaises(discovery.DiscoveryNotFound):
+            discovery.get_skill_manifest("splunk-kvstore-admin")
 
     def test_search_rejects_bad_limits_filters_and_cursors(self) -> None:
         with self.assertRaises(discovery.InvalidDiscoveryRequest):

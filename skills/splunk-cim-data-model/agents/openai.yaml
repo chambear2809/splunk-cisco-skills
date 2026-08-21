@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk CIM Data-Model Management"
-  short_description: "Deprecated alias for CIM data-model management"
-  default_prompt: "Use $splunk-cim-data-model only for compatibility; route new work to $splunk-cim-data-model-setup."
-policy:
-  allow_implicit_invocation: false

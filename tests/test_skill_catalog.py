@@ -29,17 +29,6 @@ from tests.check_skill_frontmatter import check_openai_metadata, parse_frontmatt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = REPO_ROOT / "skills/shared/scripts/generate_skill_catalog.py"
-MIGRATED_SETUP_ALIASES = {
-    "splunk-kvstore-admin": "splunk-kvstore-admin-setup",
-    "splunk-cim-data-model": "splunk-cim-data-model-setup",
-    "splunk-knowledge-objects": "splunk-knowledge-objects-setup",
-    "splunk-ingest-actions": "splunk-ingest-actions-setup",
-    "splunk-ddaa-archive": "splunk-ddaa-archive-setup",
-    "splunk-secure-gateway": "splunk-secure-gateway-setup",
-    "splunk-dashboard-studio": "splunk-dashboard-studio-setup",
-}
-
-
 def _quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -225,12 +214,34 @@ def _replace_skill_field(text: str, name: str, field: str, value: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _append_fixture_alias(text: str) -> str:
+    lines = text.rstrip().splitlines()
+    lines.extend(
+        [
+            '  - name: "fixture-alias"',
+            '    path: "skills/fixture-alias/SKILL.md"',
+            '    target: "Fixture compatibility alias"',
+            '    purpose: "Fixture compatibility alias for generator tests"',
+            '    command_summary: "Fixture compatibility alias."',
+            '    product: "shared-and-cross-product"',
+            '    capability: "cisco-cross-product-routing"',
+            '    status: "deprecated"',
+            '    replaced_by: "cisco-product-setup"',
+            '    migration: "Fixture migration boundary."',
+        ]
+    )
+    result = "\n".join(lines) + "\n"
+    result = result.replace("skill_count: 168", "skill_count: 169", 1)
+    result = result.replace("alias_count: 0", "alias_count: 1", 1)
+    return result
+
+
 def _increment_alias_count(text: str) -> str:
-    catalog = load_catalog()
-    return text.replace(
-        f"alias_count: {catalog.declared_alias_count}",
-        f"alias_count: {catalog.declared_alias_count + 1}",
-        1,
+    return re.sub(
+        r"alias_count: (\d+)",
+        lambda match: f"alias_count: {int(match.group(1)) + 1}",
+        text,
+        count=1,
     )
 
 
@@ -246,9 +257,7 @@ def test_repository_manifest_is_the_complete_versioned_identity_source() -> None
     assert catalog.declared_skill_count == len(catalog.skills)
     assert catalog.declared_alias_count == len(catalog.aliases)
     assert set(catalog.by_name) == disk_skills
-    # Phase-2 migration snapshot: these seven historical duplicates must stay
-    # setup-suffixed canonical, without preventing future manifest aliases.
-    assert MIGRATED_SETUP_ALIASES.items() <= catalog.aliases.items()
+    assert not catalog.aliases
     for legacy, canonical in catalog.aliases.items():
         assert catalog.by_name[legacy].deprecated
         assert catalog.by_name[legacy].replaced_by == canonical
@@ -371,7 +380,7 @@ def test_one_entry_drives_all_identity_outputs_and_migration_is_idempotent(
         root / "skills/shared/deprecated_skill_aliases.md"
     ).read_text(encoding="utf-8")
     assert catalog.checksum in migration_doc
-    assert "No deprecated aliases are declared" not in migration_doc
+    assert "No deprecated aliases are currently declared." in migration_doc
     command = (root / ".claude/commands/sample-skill.md").read_text(encoding="utf-8")
     assert "Unique generated command summary." in command
     assert "skills/sample-skill/SKILL.md" in command
@@ -609,9 +618,9 @@ def test_duplicate_and_omitted_entries_fail_closed(tmp_path: Path) -> None:
 
 
 def test_alias_chains_cycles_and_invalid_targets_fail_closed(tmp_path: Path) -> None:
-    original = CATALOG_PATH.read_text(encoding="utf-8")
-    legacy = "splunk-kvstore-admin"
-    canonical = load_catalog().aliases[legacy]
+    original = _append_fixture_alias(CATALOG_PATH.read_text(encoding="utf-8"))
+    legacy = "fixture-alias"
+    canonical = "cisco-product-setup"
 
     missing = _replace_skill_field(original, legacy, "replaced_by", "missing-skill")
     with pytest.raises(CatalogError, match="does not exist"):
@@ -619,7 +628,7 @@ def test_alias_chains_cycles_and_invalid_targets_fail_closed(tmp_path: Path) -> 
 
     chain = _replace_skill_field(original, canonical, "status", "deprecated")
     chain = _replace_skill_field(
-        chain, canonical, "replaced_by", "cisco-product-setup"
+        chain, canonical, "replaced_by", "cisco-collaboration-setup"
     )
     chain = _replace_skill_field(
         chain, canonical, "migration", "Fixture migration boundary."
@@ -1006,6 +1015,9 @@ def test_generated_alias_migration_guide_covers_every_manifest_alias() -> None:
     ).read_text(encoding="utf-8")
 
     assert catalog.checksum in text
+    if not catalog.aliases:
+        assert "No deprecated aliases are currently declared." in text
+        return
     for legacy, canonical in catalog.aliases.items():
         record = catalog.by_name[legacy]
         assert record.migration
@@ -1109,10 +1121,17 @@ def test_requirements_rows_use_exact_manifest_lifecycle_suffix() -> None:
     text = (REPO_ROOT / "SKILL_REQUIREMENTS.md").read_text(encoding="utf-8")
 
     assert set(parse_requirement_skill_rows(text, catalog)) == set(catalog.by_name)
-    legacy, canonical = next(iter(catalog.aliases.items()))
+    canonical = next(record.name for record in catalog.skills if not record.deprecated)
+    row = next(
+        line for line in text.splitlines() if line.startswith(f"| `{canonical}` |")
+    )
     malformed = text.replace(
-        f"`{legacy}` (**Deprecated** -> `{canonical}`)",
-        f"`{legacy}` (**Deprecated** -> `cisco-product-setup`)",
+        row,
+        row.replace(
+            f"| `{canonical}` |",
+            f"| `{canonical}` (**Deprecated** -> `fixture-alias`) |",
+            1,
+        ),
         1,
     )
     with pytest.raises(CatalogError, match="lifecycle suffix"):

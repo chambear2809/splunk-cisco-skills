@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk Cloud DDAA Archive Lifecycle"
-  short_description: "Deprecated alias for DDAA archive lifecycle"
-  default_prompt: "Use $splunk-ddaa-archive only for compatibility; route new work to $splunk-ddaa-archive-setup."
-policy:
-  allow_implicit_invocation: false

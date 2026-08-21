@@ -443,12 +443,20 @@ def render_alias_migration_doc(catalog: SkillCatalog) -> str:
             "`skills/shared/scripts/generate_skill_catalog.py`; do not edit manually._"
         ),
         "",
+    ]
+    if not catalog.aliases:
+        lines.extend([
+            "No deprecated aliases are currently declared.",
+            "",
+        ])
+        return "\n".join(lines)
+    lines.extend([
         "Deprecated names are help-only compatibility aliases. Their setup, validation,",
         "and renderer entrypoints fail closed and name the canonical replacement.",
         "",
         "| Deprecated name | Canonical replacement | Migration / omission boundary |",
         "| --- | --- | --- |",
-    ]
+    ])
     for record in catalog.skills:
         if not record.deprecated:
             continue
