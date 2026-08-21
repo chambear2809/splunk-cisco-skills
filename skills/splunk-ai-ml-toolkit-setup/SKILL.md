@@ -2,7 +2,8 @@
 name: splunk-ai-ml-toolkit-setup
 description: "Use when the user asks about MLTK, Splunk AI Toolkit, Machine Learning Toolkit, PSC, Python for
   Scientific Computing, DSDL, Deep Learning Toolkit, Splunk anomaly detection assistants, AI Toolkit Agent
-  Builder, the `aiagent` command, Cisco Time Series Model, Cisco Deep Time Series Model, Smart Alerts
+  Launchpad or the earlier Agent Builder preview, the `aiagent` command, Cisco Time Series Model, Cisco Deep
+  Time Series Model, Smart Alerts
   Assistant, or AI/ML product coverage outside Splunk AI Assistant, including Cisco Data Fabric requests
   about AI Toolkit or machine-data model workflows. Install, render, validate, and audit Cisco Data Fabric
   AI Toolkit and Splunk-owned AI and machine-learning workflows beyond Splunk AI Assistant: Splunk AI
@@ -12,7 +13,7 @@ description: "Use when the user asks about MLTK, Splunk AI Toolkit, Machine Lear
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk AI/ML Toolkit Setup
@@ -36,8 +37,8 @@ metadata:
 ## When to Activate
 
 - MLTK, Splunk AI Toolkit, Machine Learning Toolkit, PSC, Python for Scientific Computing, DSDL, Deep Learning
-  Toolkit, Splunk anomaly detection assistants, AI Toolkit Agent Builder, the `aiagent` command, Cisco Time Series
-  Model, Cisco Deep.
+  Toolkit, Splunk anomaly detection assistants, AI Toolkit Agent Launchpad, the `aiagent` command, Cisco Time
+  Series Model, Cisco Deep.
 - Preview and review the splunk ai ml toolkit setup workflow before any live apply phase.
 - Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
 
@@ -93,10 +94,10 @@ For newer Cisco Data Fabric wording, this is the AI Toolkit / model-workflow
 route. Federated search, edge/ingest pipelines, and MCP server setup remain in
 their dedicated skills.
 
-AI Toolkit Agent Builder is an Alpha/private-preview feature owned here. It is
-not Cisco Cloud Control Studio Agent Builder, which belongs to
-`cisco-cloud-control-setup`. A Fall 2026 public GA target is roadmap guidance,
-not evidence that the feature is generally available.
+AI Toolkit Agent Launchpad is owned here. It became generally available in AI
+Toolkit `6.0.0`, replacing the earlier Agent Builder feature preview. It is not
+Cisco Cloud Control Studio Agent Builder, which belongs to
+`cisco-cloud-control-setup`.
 
 ## Coverage Boundary
 
@@ -115,13 +116,14 @@ This skill covers Splunk-owned and Splunk-supported AI/ML products:
   LLM `ai` command readiness, Connections tab, Container Management tab,
   external LLM/provider connection handoffs, ML alerting, and Cisco Deep Time
   Series forecasting/anomaly detection readiness
-- AI Toolkit Agent Builder Alpha/private-preview readiness, including its
-  knowledge-base and MCP connection prerequisites, `edit_agent_connections`
-  and `run_agents` capabilities, the preview `aiagent` ML-SPL surface, and the
-  `ai_agent_run_history_index` run-history prerequisite
+- AI Toolkit Agent Launchpad readiness, generally available since `6.0.0`,
+  including supported LLM and MCP providers, Agent Skills, the
+  `edit_agent_connections` and `run_agents` capabilities, the `aiagent` ML-SPL
+  command, the in-product run-history surface, and the Splunk Cloud region and
+  egress-allowlist prerequisites
 - Cisco Time Series Model 1.0 as an available Apache-2.0 open-weight model,
   kept distinct from the AI Toolkit-integrated Cisco Deep Time Series Model
-  feature preview and its hosted Splunk Cloud or self-hosted Enterprise paths
+  and its hosted Splunk Cloud or self-hosted Enterprise paths
 - Hosted foundation model readiness where available in the Splunk Platform
   boundary, including Foundation-Sec and GPT-OSS review handoffs; CDTSM is not
   represented as an LLM connection, and this skill never renders external
@@ -157,15 +159,19 @@ coverage.
 - Do not claim DSDL runtime automation for Docker, Kubernetes, OpenShift, HPC,
   GPU, air-gapped images, Jupyter notebooks, or model governance unless the
   workflow is rendered as a handoff or an owning runtime skill applies it.
-- Do not claim Agent Builder or `aiagent` availability from a public AI Toolkit
-  package install. Confirm Alpha enrollment and the preview build with Splunk;
-  never downgrade the current public AI Toolkit/PSC pair based on older preview
-  documentation.
+- Do not report Agent Launchpad as ready from a package install alone. The
+  public package ships the views and the `aiagent` command, but Splunk Cloud
+  still needs a supported AWS region plus the region's egress IP in the stack
+  allowlist, and Splunk Enterprise needs the Splunk Cloud Connect app.
+- Do not pair AI Toolkit `6.0.2` with a PSC release below `4.3.4`, and do not
+  downgrade the audited AI Toolkit/PSC pair based on older documentation.
 - Do not conflate the open Cisco Time Series Model 1.0 release with the Cisco
-  Deep Time Series Model integration. Open model availability does not change
-  the integrated feature preview into GA.
-- Do not create the Agent Builder run-history index or save knowledge-base,
-  MCP, LLM, or model-server credentials from this render-only handoff.
+  Deep Time Series Model integration. Both are available, but the open model
+  weights, the model service, and the AI Toolkit experience remain separately
+  validated layers.
+- Do not create or redirect the agent run-history index, and do not save
+  knowledge-base, MCP, LLM, or model-server credentials from this render-only
+  handoff.
 
 ## Primary Workflow
 
@@ -236,9 +242,9 @@ Validation must fail for:
 - Direct-secret flags such as `--token`, `--api-token`, `--password`,
   `--client-secret`, or `--llm-api-key`
 - Missing or unsupported upstream `product_stage` values in the rendered
-  coverage report, including any report that fails to keep Agent Builder at
-  `alpha`, open CTSM 1.0 at `available`, and integrated CDTSM at
-  `feature_preview` for the verified 2026-07-03 source baseline
+  coverage report, including any report that fails to keep the Agent Launchpad
+  surfaces and integrated CDTSM at `ga` and open CTSM 1.0 at `available` for
+  the verified 2026-08-20 source baseline
 
 Validation must warn for:
 
@@ -249,8 +255,8 @@ Validation must warn for:
   Alerts Assistant beta
 - MLTK model objects created before the MLTK 5.3 compatibility break, which
   may need retraining
-- Agent Builder requests on Splunk Enterprise or without confirmed private
-  preview enrollment
+- Agent Launchpad requests without a confirmed supported Splunk Cloud region
+  and egress allowlist entry, or without Splunk Cloud Connect on Enterprise
 
 ## References
 

@@ -9,7 +9,7 @@ description: "Use when the user asks about Splunk_TA_snow, the Splunk Add-on for
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Add-on for ServiceNow Setup
@@ -94,12 +94,11 @@ on a single node to avoid duplicate collection.
 ## Package Verification Boundary
 
 This skill's package-derived inputs and handlers were verified against
-`10.0.1`. The current public release is `11.0.0` and advertises Splunk 10.5
-support, but its package contents have not been verified by this repository.
-The shared installer defaults to verified `10.0.1`; only
-`--accept-unverified-release` follows public `11.0.0`. After that explicit
-override, inspect its input/account schema and repeat the completion-gate
-validation before applying these templates.
+`11.0.2`, the current public release, which advertises Splunk 10.5. The package
+was downloaded, unpacked, and inspected here, so the shared installer's default
+pin needs no review override. When Splunkbase publishes a newer release, inspect
+its input/account schema and repeat the completion-gate validation before
+advancing the pin.
 
 ## Tables And Source Types
 

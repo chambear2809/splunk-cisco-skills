@@ -7,7 +7,7 @@ description: "Use when the user asks to install, upgrade, bootstrap, post-instal
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Enterprise Security Install
@@ -102,6 +102,19 @@ The public ES `8.5.1` listing includes platform `10.5`. In this repository,
 Enterprise default from `10.4.1`. Confirm the target-specific ES compatibility
 matrix and supported Cloud installation process rather than presenting the
 cross-product listing as self-managed Enterprise `10.5` validation.
+
+### Package Verification Boundary
+
+The reviewed pin is `8.5.1`; the current public release is `8.6.1`, which also
+advertises `10.5`. The pin stays on `8.5.1` because the Splunkbase download for
+`263` is entitlement-gated and returns HTTP 403 without an Enterprise Security
+entitlement, so `8.6.1` could not be downloaded, unpacked, or inspected here.
+Nothing about that hold blocks the default install path, which still resolves a
+`10.5`-capable release. To install `8.6.1`, supply it explicitly with
+`--app-version` (or a local package under `splunk-ta/`) after reviewing the
+`8.6.1` release notes and app contents yourself; the app names, indexes, and
+post-install steps in this skill are derived from the `8.5.1` package and have
+not been re-derived against `8.6.1`.
 
 ## Environment
 

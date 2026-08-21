@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -109,16 +110,16 @@ def test_render_template_example_produces_expected_files(tmp_path: Path) -> None
     assert not expected - rendered
 
     corpus = "\n".join(p.read_text(encoding="utf-8") for p in out.rglob("*") if p.is_file())
-    assert 'exact: "2.2.3"' in corpus
-    assert "com.splunk:splunk-otel-android:2.3.0" in corpus
-    assert "com.splunk:rum-mapping-file-plugin:2.3.0" in corpus
-    assert 'id("com.splunk.rum-mapping-file-plugin") version "2.3.0"' in corpus
-    assert 'id("com.splunk.rum-okhttp3-auto-plugin") version "2.3.0"' in corpus
-    assert 'id("com.splunk.rum-httpurlconnection-auto-plugin") version "2.3.0"' in corpus
+    assert 'exact: "2.4.1"' in corpus
+    assert "com.splunk:splunk-otel-android:2.3.3" in corpus
+    assert "com.splunk:rum-mapping-file-plugin:2.3.3" in corpus
+    assert 'id("com.splunk.rum-mapping-file-plugin") version "2.3.3"' in corpus
+    assert 'id("com.splunk.rum-okhttp3-auto-plugin") version "2.3.3"' in corpus
+    assert 'id("com.splunk.rum-httpurlconnection-auto-plugin") version "2.3.3"' in corpus
     assert "com.splunk.rum.mapping" not in corpus
-    assert '"@splunk/otel-react-native": "1.0.0"' in corpus
-    assert "splunk_otel_flutter: 1.0.1" in corpus
-    assert "splunk_otel_flutter_session_replay: 1.0.1" in corpus
+    assert '"@splunk/otel-react-native": "1.2.0"' in corpus
+    assert "splunk_otel_flutter: 1.2.0" in corpus
+    assert "splunk_otel_flutter_session_replay: 1.2.0" in corpus
     assert "splunk-rum ios upload" in corpus
     assert "splunk-rum android upload" in corpus
     assert "--app-id=" in corpus
@@ -130,6 +131,18 @@ def test_render_template_example_produces_expected_files(tmp_path: Path) -> None
     assert "EndpointConfiguration(" in corpus
     assert "SplunkRumConfiguration" not in corpus
     assert "SplunkRum.init" not in corpus
+    assert "USE_FRAMEWORKS=dynamic" not in corpus
+
+    # iOS 2.4.1 and Android 2.3.2 emit only deployment.environment.name, so no
+    # rendered snippet may set the pre-rename key. The preflight advisories and
+    # version-lock legacy field name it deliberately and are excluded here.
+    snippets = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in out.rglob("*")
+        if p.is_file() and p.relative_to(out).parts[0] in {"ios", "android", "react_native", "flutter"}
+    )
+    assert "deployment.environment.name" in snippets
+    assert not re.search(r"deployment\.environment(?!\.name)", snippets)
     assert "SplunkRum.install(agentConfiguration, moduleConfigurations)" in corpus
     assert "EndpointConfiguration.forRum" in corpus
     assert "SplunkRum.instance.install" in corpus
@@ -137,7 +150,7 @@ def test_render_template_example_produces_expected_files(tmp_path: Path) -> None
 
 @pytest.mark.parametrize("platform, expected", [
     ("ios", "SplunkAgent"),
-    ("android", "com.splunk:splunk-otel-android:2.3.0"),
+    ("android", "com.splunk:splunk-otel-android:2.3.3"),
     ("react_native", "@splunk/otel-react-native"),
     ("flutter", "splunk_otel_flutter"),
 ])
@@ -279,7 +292,7 @@ def test_session_replay_gate_and_sampling(tmp_path: Path) -> None:
     session_text = (out / "react_native/react_native-rn-demo/SessionReplayControls.ts").read_text()
     assert "samplingRate: 0.2" in session_text
     package_text = (out / "react_native/react_native-rn-demo/package.json.snippet").read_text()
-    assert '"@splunk/otel-session-replay-react-native": "1.0.0"' in package_text
+    assert '"@splunk/otel-session-replay-react-native": "1.2.0"' in package_text
     provider_text = (out / "react_native/react_native-rn-demo/SplunkRumProvider.tsx").read_text()
     assert "new SessionReplayModuleConfiguration(true, 0.2)" in provider_text
     assert "agentConfiguration" in provider_text
@@ -331,7 +344,7 @@ def test_session_replay_gate_and_sampling(tmp_path: Path) -> None:
     )
     assert flutter_ok.returncode == 0, combined(flutter_ok)
     pubspec = (flutter_out / "flutter/flutter-flutter-demo/pubspec.yaml.snippet").read_text()
-    assert "splunk_otel_flutter_session_replay: 1.0.1" in pubspec
+    assert "splunk_otel_flutter_session_replay: 1.2.0" in pubspec
     flutter_dart = (flutter_out / "flutter/flutter-flutter-demo/splunk_rum.dart").read_text()
     assert "SessionReplayModuleConfiguration" in flutter_dart
     assert "samplingRate: 0.2" in flutter_dart

@@ -8,7 +8,12 @@
 | Dataset versioning, content update, download, sharing, and collaborators | Not MCP server setup | `galileo-platform-setup` for dataset lifecycle and access governance |
 | Prompt template creation | Partial MCP coverage | `galileo-platform-setup` for prompt manifests/versioning |
 | Experiment setup | Guidance only | `galileo-platform-setup` for create/run assets |
-| AI Assistant beta, evidence-linked investigation, and enterprise enablement | Docs-search only; no public Assistant API or MCP tool documented | `galileo-platform-setup` for AI Assistant readiness, enablement, and console evidence |
+| AI Assistant beta, evidence-linked investigation, criticality, and organization-wide debugging | Docs-search only; no public Assistant API or MCP tool documented | `galileo-platform-setup` for AI Assistant readiness, enablement, and console evidence |
+| Splunk Agent Observability naming and pre-/post-August 7 documentation epoch | Docs-search only; the correct documentation set depends on onboarding date | Select `docs.galileo.ai` for customers onboarded before August 7, 2026 and `agent-observability-docs.splunk.com` for later onboarding; do not mix product-era assumptions |
+| Annotation Queues GA, templates, users, records, and human-feedback operations | Docs-search only; no observed MCP lifecycle tool | `galileo-platform-setup` for queue access, assignment, annotation, export, and validation workflows |
+| AI-assisted custom-code metrics, organization billing usage, model pricing, and integration costs | Docs-search only; no observed MCP lifecycle or billing tool | `galileo-platform-setup` for scorer review, cost governance, and console evidence |
+| Trace Count alerts and multimodal out-of-the-box evaluation metrics | Docs-search only; no observed MCP alert or metric-configuration tool | `galileo-platform-setup` for alert and metric configuration/validation |
+| Hosted-model availability and light, dark, or system console themes | Docs-search only; no observed MCP configuration tool | `galileo-platform-setup` for model availability checks; console theme remains an operator preference |
 | Global dashboards across projects and log streams | Docs-search only; public Trends API remains log-stream scoped | `galileo-platform-setup` for global-dashboard UI readiness and evidence |
 | Generic alert webhooks, payload v1.0, authentication, testing, and deduplication | Docs-search only; no public alert/webhook CRUD API or MCP tool documented | `galileo-platform-setup` for webhook runbooks, receiver/relay design, and validation |
 | Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates | Guidance or docs-search only | `galileo-platform-setup` for experiment group and CI workflow handoffs |

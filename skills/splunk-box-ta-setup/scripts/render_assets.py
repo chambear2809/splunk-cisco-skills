@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-box-ta-rendered"
 
 APP_NAME = "Splunk_TA_box"
 SPLUNKBASE_ID = "2679"
-LATEST_VERIFIED_VERSION = "4.0.0"
+LATEST_VERIFIED_VERSION = "5.0.0"
 INPUTS = ["historical", "live", "file"]
 SOURCETYPES = [
     "box:events",

@@ -83,7 +83,7 @@ service:
   embed PEM data, private keys, or access tokens in collector YAML.
 - Run one SQL Server receiver per declared target and one active singleton
   scraper path. A gateway does not make an agent DaemonSet placement safe.
-- Validate both collector configurations with the pinned `v0.155.0` binary
+- Validate both collector configurations with the pinned `v0.158.0` binary
   before restart.
 - Confirm the receiver collector can connect to the gateway, the gateway can
   reach `https://ingest.<realm>.observability.splunkcloud.com/v3/event`, and

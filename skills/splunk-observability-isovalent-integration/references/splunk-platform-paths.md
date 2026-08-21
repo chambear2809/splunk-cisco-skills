@@ -105,9 +105,9 @@ The skill renders this path behind `--legacy-fluentd-hec` and emits a prominent 
 Regardless of which transport you pick, the Splunk Platform side is the **Cisco Security Cloud App** (Splunkbase 7404), specifically the Isovalent Runtime Security input. Configure via:
 
 ```bash
-bash skills/cisco-security-cloud-setup/scripts/setup.sh \
-    --product isovalent \
-    --install
+bash skills/cisco-security-cloud-setup/scripts/setup.sh --install
+bash skills/cisco-security-cloud-setup/scripts/configure_product.sh \
+  --product isovalent
 ```
 
 The app provides field aliases on `cisco:isovalent:processExec` events for Splunk Threat Research Team detections. See the Splunking Isovalent blog post for the field mapping table (`parent_process_id`, `pod_image_name`, `cluster_name`, etc.).

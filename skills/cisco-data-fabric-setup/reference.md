@@ -101,14 +101,34 @@ skill after package inspection or environment validation.
 
 ## AI And Experience Rules
 
-- AI Toolkit and its compatible PSC are the model-workflow foundation.
-- Keep Cisco Deep Time Series Model at its current hosted beta/feature-preview
-  boundary. Cisco Time Series Model 1.0 is separately available under Apache
-  2.0 on Hugging Face; do not infer that its hosted integration is GA.
-- Keep Splunk AI Toolkit Agent Builder at alpha with a public GA target of Fall
-  2026, and Cloud Control Studio Agent Builder at announced/roadmap until Cisco
-  establishes availability; target dates and the parent Cloud Control CA are
-  not product-stage evidence for either builder.
+- AI Toolkit and its compatible PSC are the model-workflow foundation. The
+  audited pair is AI Toolkit `6.0.2` with PSC `4.3.4` on Python `3.13`. AI
+  Toolkit `6.0.0` also accepted PSC `4.3.2` or `4.3.3`, and `4.3.2` alone only
+  goes back to `5.7.4`, so `6.0.2` with `4.3.2` is an unsupported pairing.
+  Removing the previous PSC before a clean install is a documented requirement.
+- Keep Cisco Deep Time Series Model at GA. AI Toolkit `6.0.2` documents it as a
+  shipped model integration rather than a feature preview; the `5.7.4`
+  "Feature preview: Cisco Deep Time Series Model" page is superseded and the
+  `6.0.2` slug for it redirects to the current page. Splunk Cloud uses the
+  Splunk-hosted model in a supported region and Splunk Enterprise requires a
+  separately self-hosted model service. Cisco Time Series Model 1.0 is still a
+  distinct layer: it is the Apache-2.0 open model on Hugging Face, and its
+  availability is not the same claim as the hosted AI Toolkit integration.
+- Keep Splunk AI Toolkit Agent Launchpad at GA. Current AI Toolkit `6.0.2`
+  documentation shows it generally available since `6.0.0`, where it replaced
+  the Agent Builder feature preview whose `5.6.4` page no longer resolves.
+  Record reachability as gates, not as lifecycle: a supported AWS region with
+  the region egress IP added to the stack `apiAllowlistIP`, at least one
+  supported LLM connection, and an enabled agent. Splunk Enterprise reaches it
+  through the Splunk Cloud Connect app.
+- Keep Cloud Control Studio Agent Builder at announced/roadmap until Cisco
+  establishes availability. It is a different Cisco product; neither the parent
+  Cloud Control CA nor Agent Launchpad GA is product-stage evidence for it. It
+  was announced on `2026-06-02` on a when-and-if-available basis, and a
+  `2026-08-20` re-check of the Cisco Cloud Control release notes updated
+  `2026-08-13` still lists no Cloud Control Studio or Agent Builder feature and
+  ships no Studio documentation, so the roadmap stage is current rather than
+  merely un-rechecked.
 - Splunk MCP Server product GA does not bypass the owning skill's package and
   production-safety findings. Use encrypted-token or documented OAuth flows,
   RBAC, tool controls, audit, and rate limits.
@@ -151,6 +171,6 @@ still records activation, scan entitlement, and premium-add-on constraints.
 ## Compatibility Baseline
 
 The current source audit targets Splunk Cloud Platform `10.5.2605`, AI Toolkit
-`5.7.4`, PSC `4.3.2`, Ingest Monitoring `1.2`, and Splunk MCP Server `1.2.1`.
+`6.0.2`, PSC `4.3.4`, Ingest Monitoring `1.2`, and Splunk MCP Server `1.2.1`.
 Self-managed configuration continues to use public Splunk Enterprise 10.4
 contracts unless a child skill has newer verified evidence.

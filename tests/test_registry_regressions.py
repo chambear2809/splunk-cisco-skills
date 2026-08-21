@@ -183,19 +183,14 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             unsupported_ids,
             {
                 "2884",
-                "2911",
                 "3172",
                 "4147",
+                "5556",
                 "5608",
                 "5863",
                 "6415",
                 "6843",
-                "7125",
-                "7404",
-                "7539",
                 "7828",
-                "8698",
-                "8699",
             },
         )
 
@@ -515,11 +510,11 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(content_library_entry["app_name"], "DA-ITSI-ContentLibrary")
         self.assertEqual(content_library_entry.get("install_requires"), ["1841"])
         self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))
-        self.assertEqual(content_library_entry["latest_verified_version"], "2.5.0")
+        self.assertEqual(content_library_entry["latest_verified_version"], "2.5.1")
         self.assertEqual(content_library_entry["latest_release_version"], "2.5.1")
         self.assertEqual(
             content_library_entry["verified_platform_versions"],
-            ["10.5", "10.4", "10.3", "10.2", "10.1", "10.0", "9.4", "9.3"],
+            ["10.5", "10.4", "10.3", "10.2"],
         )
         self.assertEqual(
             content_library_entry["platform_versions"],
@@ -748,11 +743,16 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
 
         self.assertEqual(offenders, [], msg="Invalid Splunkbase latest metadata: " + ", ".join(offenders))
 
-        ai_assistant = next(
-            app for app in registry["apps"] if app.get("splunkbase_id") == "7245"
+        # Sanity: at least one entry still separates the verified pin from the
+        # current public release, so the two fields cannot collapse into one.
+        # Intersight 3.2.0 drops Splunk 10.5, so the verified pin stays on 3.1.1.
+        intersight = next(
+            app for app in registry["apps"] if app.get("splunkbase_id") == "7828"
         )
-        self.assertEqual(ai_assistant["latest_verified_version"], "2.0.0")
-        self.assertEqual(ai_assistant["latest_release_version"], "2.1.1")
+        self.assertEqual(intersight["latest_verified_version"], "3.1.1")
+        self.assertEqual(intersight["latest_release_version"], "3.2.0")
+        self.assertIn("10.5", intersight["verified_platform_versions"])
+        self.assertNotIn("10.5", intersight["platform_versions"])
 
     def test_splunkbase_app_coverage_ids_match_latest_audit_set(self):
         """The audited public Splunkbase app set should not shrink or grow silently."""
@@ -943,11 +943,8 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertIn("10.4", payload["svd_enterprise_floors"])
         self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
         pins = payload["splunkbase_pins"]
-        self.assertEqual(pins["7125"]["latest_version"], "0.154.2")
-        self.assertEqual(pins["7125"]["max_platform_version"], "10.4")
-        self.assertEqual(pins["8698"]["max_platform_version"], "10.4")
-        self.assertEqual(pins["8699"]["max_platform_version"], "10.4")
-        for app_id in ("8704", "7180", "263"):
+        self.assertEqual(pins["7125"]["latest_version"], "0.158.0")
+        for app_id in ("7125", "8698", "8699", "8704", "7180", "263"):
             self.assertEqual(pins[app_id]["max_platform_version"], "10.5")
 
         import sys

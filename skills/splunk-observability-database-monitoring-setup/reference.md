@@ -3,21 +3,31 @@
 This reference records the production contract for the
 `splunk-observability-database-monitoring-setup` skill. It was verified against
 the official Splunk Database Monitoring documentation and the Splunk
-OpenTelemetry Collector/chart `0.155.0` pair on 2026-07-07. Repository
-frontmatter records the collector compatibility date as its 2026-07-02 release
-date; the later date is the completed chart/documentation audit.
+OpenTelemetry Collector/chart `0.158.0` pair on 2026-08-20, when the pin
+advanced from the `0.155.0` pair. Repository frontmatter's
+`compatibility_verified` date is the repository-wide Splunk Cloud Platform
+compatibility date and is deliberately not changed by a collector pin advance.
 
 ## Audited release baseline
 
-- Default Splunk Distribution of OpenTelemetry Collector: `v0.155.0`.
-- Default Splunk OTel Collector Helm chart: `0.155.0`.
-- Audited collector commit: `f8afa6bcb28ea383b3c36aa23784594d864b39e0`;
-  audited chart commit: `a03399ca43ba5bd7e3eb2665a81139e214c7f0b2`.
+- Default Splunk Distribution of OpenTelemetry Collector: `v0.158.0`.
+- Default Splunk OTel Collector Helm chart: `0.158.0`.
+- Audited collector commit: `0e8ccc7d421716d21b72fb120eb31fd2d3cd8edd`;
+  audited chart commit: `74aa92b2a5aa29b0f8ccdb3e14b6a29819225cb3`.
+- Splunk collector `v0.158.0` version-locks its upstream contrib receiver
+  modules at contrib `v0.158.0`.
 - Keep the collector and chart on matching versions unless the chart release
   explicitly adopts a different collector version.
 - Treat the per-receiver version below as a minimum, not as the recommended
-  production pin. New renders default to the audited `0.155.0` pair.
-- Review release notes before upgrading. In `v0.155.0`, for example, Oracle
+  production pin. New renders default to the audited `0.158.0` pair.
+- Review release notes before upgrading. Advancing the pin from the `0.155.0`
+  pair to the `0.158.0` pair added many opt-in receiver metrics (Oracle +67,
+  SQL Server +38, PostgreSQL +7, MySQL +0) but introduced **no** newly
+  default-enabled metric, removed no metric, and changed no default-enabled
+  set across the DBMon receivers. The rendered default receiver configuration
+  and the generated grant set are therefore unchanged by that advance; enabling
+  any of the new metrics is an explicit opt-in that may need additional grants.
+  In the earlier `v0.155.0` release, by contrast, Oracle
   query events changed `db.namespace` to the database name and moved the
   service name to `oracle.db.service`; Oracle plans added
   `oracledb.plan.first_load` plus `OBJECT_NAME`, `OBJECT_TYPE`,
@@ -28,7 +38,7 @@ date; the later date is the completed chart/documentation audit.
   Oracle also improved SQL obfuscation so approved leading-comment tags remain
   extractable while query text is anonymized, and clamps negative query and
   session-duration values to zero.
-- Upstream OpenTelemetry Collector Contrib `v0.156.0` is not the current Splunk
+- Upstream OpenTelemetry Collector Contrib `v0.159.0` is not the current Splunk
   production target. Do not adopt its additional Oracle/PostgreSQL/SQL Server
   schema or grant changes until matching Splunk collector and chart releases
   are published and audited.
@@ -38,8 +48,8 @@ date; the later date is the completed chart/documentation audit.
 | Engine | Database versions | Published platforms | Minimum collector |
 |---|---|---|---|
 | Microsoft SQL Server | 2016, 2017, 2019, 2022 | Azure Managed Instance, Azure SQL Database, AWS RDS, self-hosted | `v0.148.0` |
-| MySQL | Product floor 5.7+; pinned `v0.155.0` receiver verifies 5.7.x, 8.0.x, 8.4.x, and 9.x | AWS RDS, standalone | `v0.154.0` |
-| MariaDB | Product floor 10.5+; pinned `v0.155.0` receiver verifies 10.5.x–10.11.x and 11.x | AWS RDS, standalone | `v0.154.0` |
+| MySQL | Product floor 5.7+; pinned `v0.158.0` receiver verifies 5.7.x, 8.0.x, 8.4.x, and 9.x | AWS RDS, standalone | `v0.154.0` |
+| MariaDB | Product floor 10.5+; pinned `v0.158.0` receiver verifies 10.5.x–10.11.x and 11.x | AWS RDS, standalone | `v0.154.0` |
 | Oracle Database | 19c, 26ai | AWS RDS, Oracle RAC, self-hosted | `v0.148.0` |
 | PostgreSQL | Azure Flexible Server 14.20 or 17.7; Amazon RDS 14.15 or 17.5 | Azure Flexible Server or Amazon RDS, paired with the listed provider versions | `v0.147.0` |
 
@@ -61,7 +71,7 @@ Interpret the matrix conservatively:
 
 ### MySQL and MariaDB version-dependent gaps
 
-The upstream `v0.155.0` receiver compatibility table documents these
+The upstream `v0.158.0` receiver compatibility table documents these
 version-aware feature boundaries inside the production matrix:
 
 - MySQL 5.7+ is a supported DBMon target for metrics and query events, but does
@@ -139,7 +149,7 @@ packet or invent any other suffix.
 
 Do not emit the generic `metrics` pipeline name for DBMon or the old
 `otlphttp/dbmon` component spelling. Some Splunk examples still contain both
-spellings in one page; `otlp_http` is the canonical `v0.155.0` Splunk
+spellings in one page; `otlp_http` is the canonical `v0.158.0` Splunk
 Distribution component ID used by this skill.
 
 The event exporter must use this shape (the Kubernetes token environment is
@@ -202,7 +212,7 @@ Splunk recommends these defaults for every documented receiver:
 SQL Server's `top_query_count` default is `250`; Oracle and MySQL/MariaDB use
 `200`, while PostgreSQL exposes `top_n_query` (default `200`). Validate limits
 against the selected receiver schema rather than applying one synthetic cap to
-all engines. Keep the v0.155 MySQL receiver's audited
+all engines. Keep the v0.158 MySQL receiver's audited
 `allow_native_passwords: true` default unless the database account's actual
 authentication plugin has been reviewed; the example does not force it off.
 
@@ -219,7 +229,7 @@ ceilings remain enforced even where an upstream receiver schema has no maximum.
 Other supported advanced controls include:
 
 - PostgreSQL supports CA/client-certificate files, ciphers, curves, and the
-  system CA pool (`include_system_ca_certs_pool`), but its v0.155 receiver rejects server-name and min/max TLS
+  system CA pool (`include_system_ca_certs_pool`), but its v0.158 receiver rejects server-name and min/max TLS
   controls. MySQL and MariaDB also support server-name and TLS
   version controls. `cipher_suites` and `curve_preferences` are strict string
   lists; `include_insecure_cipher_suites` must remain false. Use file paths,
@@ -240,7 +250,7 @@ Other supported advanced controls include:
   receiver exposes them.
 - Oracle's optional `db.server.session.wait_sample` event and
   `session_wait_event_collection.max_rows_per_query`. Keep it disabled unless
-  explicitly requested: the upstream `v0.155.0` receiver documents the event
+  explicitly requested: the upstream `v0.158.0` receiver documents the event
   and extra `V_$SESSION_EVENT`/related grants, but Splunk's DBMon Oracle product
   page does not yet describe its product UI or support behavior. Mark the
   result as an explicit upstream-component coverage gap and validate it in the
@@ -248,7 +258,7 @@ Other supported advanced controls include:
 - Oracle leading-SQL-comment extraction through an allow-list of
   `allowed_comment_keys`. Review every key for sensitivity; extracted values
   become telemetry attributes.
-- Oracle `v0.155.0` query-plan/event metadata, including plan hash, SQL ID,
+- Oracle `v0.158.0` query-plan/event metadata, including plan hash, SQL ID,
   child cursor, `oracledb.plan.first_load`, the `OBJECT_NAME`, `OBJECT_TYPE`,
   `FILTER_PREDICATES`, `PARTITION_START`, and `PARTITION_STOP` plan-step
   fields, database namespace, and `oracle.db.service`, plus best-effort
@@ -267,7 +277,7 @@ certificate-verifying URL forms, for example
 `sqlserver://user:pass@host:1433?database=db&encrypt=true&trustservercertificate=false&certificate=%2Fetc%2Fdbmon%2Fsql-ca.pem`
 and
 `oracle://user:pass@host:2484/service?SSL=enable&SSL%20Verify=true&WALLET=%2Fetc%2Fdbmon%2Foracle-wallet`.
-In the `go-mssqldb` URL grammar used by Collector `v0.155.0`, the URL path is
+In the `go-mssqldb` URL grammar used by Collector `v0.158.0`, the URL path is
 a named SQL Server instance, not a database name; select the database with the
 `database` query option. A `certificate` trust-file path must end in `.pem`;
 the pinned driver rejects a PEM certificate mounted with a `.crt` suffix.
@@ -333,7 +343,7 @@ database grants or restart a database server.
   receiver account to connect.
 - Grant read access only to the documented dynamic performance and catalog
   views. AWS RDS uses `rdsadmin.rdsadmin_util.grant_sys_object`; self-hosted
-  Oracle uses direct `GRANT SELECT` statements. The generated `v0.155.0`
+  Oracle uses direct `GRANT SELECT` statements. The generated `v0.158.0`
   runbook includes the complete metric-query view set, including
   `V_$ROWCACHE`, `V_$SYSMETRIC`, `V_$PARAMETER`, `DBA_FREE_SPACE`, and
   `DBA_RECYCLEBIN`, plus the event views enabled by the target.
@@ -346,7 +356,7 @@ database grants or restart a database server.
 - Load and create `pg_stat_statements` in every database that must provide top
   queries. Azure Flexible Server also needs its documented server parameters
   and a restart.
-- Treat query-plan collection as best effort. The upstream `v0.155.0`
+- Treat query-plan collection as best effort. The upstream `v0.158.0`
   receiver deliberately logs `failed to explain statement` and `failed to
   explain query` for individual statements the read-only monitoring user
   cannot execute, caches that result to avoid log flooding, and still records
@@ -372,7 +382,7 @@ reviewed migration that removes or rolls back the previous scraper first.
 - Put all external database receivers under `clusterReceiver` and keep them out
   of the node `agent` DaemonSet. Agent placement duplicates every scrape on
   every node, inflates usage, and adds avoidable load to the database. Chart
-  `0.155.0` does not accept a `clusterReceiver.replicas` value; use its
+  `0.158.0` does not accept a `clusterReceiver.replicas` value; use its
   singleton non-Fargate mode and verify exactly one ready cluster-receiver pod
   after apply instead of rendering an invalid replicas field.
 - The generic `kubernetes` distribution renders the chart distribution value
@@ -427,12 +437,16 @@ reviewed migration that removes or rolls back the previous scraper first.
   and any unavailable receiver, processor, exporter, connector, or extension
   fails before credential Secret reads, transaction state, or Helm mutation.
   Raw configs and Collector diagnostics remain suppressed.
-- The chart `0.155.0` `failOnDeprecatedNames` contract applies these exact
+- The chart `0.158.0` `failOnDeprecatedNames` contract applies these exact
   section-specific mappings to both component definitions and pipeline
   references while preserving the meaning of any `/suffix`: exporters
-  `otlp` to `otlp_grpc` and `otlphttp` to `otlp_http`; processor
-  `k8sattributes` to `k8s_attributes`; receivers `filelog` to `file_log`,
-  `hostmetrics` to `host_metrics`, and `k8sobjects` to `k8s_objects`. The DBMon
+  `otlp` to `otlp_grpc` and `otlphttp` to `otlp_http`; processors
+  `k8sattributes` to `k8s_attributes` and `resourcedetection` to
+  `resource_detection`; receivers `filelog` to `file_log`, `hostmetrics` to
+  `host_metrics`, `k8sobjects` to `k8s_objects`, and `kubeletstats` to
+  `kubelet_stats`. The `resourcedetection` and `kubeletstats` mappings are new
+  in the `0.155.0`-to-`0.158.0` window and are why this skill's own
+  `resource_detection/dbmon` processor was renamed. The DBMon
   action reports only base-name mappings and counts, then fails before template
   rendering. It never auto-renames these aliases because a syntax rename can
   conceal an agent/gateway topology change; use
@@ -442,7 +456,7 @@ reviewed migration that removes or rolls back the previous scraper first.
   equal one, then scan scoped logs for receiver authentication, permission,
   connection, query, scrape, TLS, and Oracle failures.
 - Require `--accept-k8s-apply` for apply, the separate
-  `--accept-collector-upgrade` gate when the installed chart is not `0.155.0`,
+  `--accept-collector-upgrade` gate when the installed chart is not `0.158.0`,
   and `--accept-k8s-rollback` for rollback. Apply state lives by default under
   `${XDG_STATE_HOME:-$HOME/.local/state}/splunk-dbmon`, not in the rendered
   packet. It records prior/applied revisions, context, image identity, and an
@@ -455,7 +469,7 @@ reviewed migration that removes or rolls back the previous scraper first.
 
 - Use the rendered standalone `collector-dbmon.yaml`, environment-variable
   name template, systemd action packet, and prerequisite runbooks.
-- Preflight the exact `v0.155.0` collector binary with its configuration
+- Preflight the exact `v0.158.0` collector binary with its configuration
   validation command before changing a service.
 - Verify effective host/cgroup memory, reject any pre-existing bare or named DB
   receiver in the base config, and audit the effective systemd `ExecStart`.
@@ -627,13 +641,13 @@ Support. Do not represent a collector or API validation as AI enablement.
    memory gates, singleton placement, Secret/env references, platform outputs,
    and absence of secret values.
 2. Collector validation loads the rendered config with the pinned
-   `quay.io/signalfx/splunk-otel-collector:0.155.0` image through Docker or
+   `quay.io/signalfx/splunk-otel-collector:0.158.0` image through Docker or
    Podman and proves that the distribution contains the named receivers,
    processors, and `otlp_http` exporter. Never substitute `latest`. YAML
    parsing alone is not enough.
 3. `--live` runtime validation is a read-only, release/namespace-scoped
    Kubernetes check bound to `collector.kube_context`. It requires one desired
-   replica and exactly one ready `0.155.0` cluster-receiver pod, then scans
+   replica and exactly one ready `0.158.0` cluster-receiver pod, then scans
    recent exact DBMon component logs for critical failures. Raw log lines are
    suppressed because driver errors can contain DSNs or query text; the helper
    reports scoped counts/categories instead. Only the two upstream PostgreSQL
@@ -663,27 +677,23 @@ policy.
 
 Product and collection:
 
-- DBMon introduction: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/introduction-to-splunk-database-monitoring>
+- Use Database Monitoring: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring>
 - Architecture and deployment options: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/architecture-and-deployment-options>
 - Performance overhead and sizing: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/performance-overhead>
 - Microsoft SQL Server receiver: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/microsoft-sql-server-receiver>
 - MySQL and MariaDB DBMon receiver/product support (MySQL 5.7+, MariaDB 10.5+, AWS RDS and standalone; Collector 0.154.0+): <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/mysql-receiver>
 - Oracle Database receiver: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/oracle-database-receiver>
 - AWS RDS Oracle SYS-object grants: <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.Oracle.CommonDBATasks.TransferPrivileges.html>
-- Upstream Oracle receiver at `v0.155.0`: <https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.155.0/receiver/oracledbreceiver/README.md>
+- Upstream Oracle receiver at `v0.158.0`: <https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.158.0/receiver/oracledbreceiver/README.md>
 - PostgreSQL receiver: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/postgresql-receiver>
 - Gateway best practices: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/best-practices-for-configuring-gateway-opentelemetry-collectors>
 - Collection troubleshooting: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/troubleshoot-data-collection>
 
-Product UI, APM, and AI:
+Product UI and APM:
 
-- Monitor database instances: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances>
-- Queries and query details: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/queries>
-- Query samples: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/query-samples>
-- Query metrics: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/query-metrics>
-- Dependencies: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/dependencies>
-- Metadata: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/metadata>
-- DBMon query AI Assistant: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/ai-assistant>
+- Use Database Monitoring: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring>
+- Query workload and samples: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring/navigator/workload>
+- Query metrics: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring/navigator/query-metrics>
 - APM query correlation matrix: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/correlate-database-queries-with-splunk-apm-traces>
 - Java query correlation: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/correlate-database-queries-with-splunk-apm-traces/correlate-database-queries-with-java-traces>
 - .NET query correlation: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/correlate-database-queries-with-splunk-apm-traces/correlate-database-queries-with-.net-traces>
@@ -693,9 +703,9 @@ Product UI, APM, and AI:
 
 Release and component provenance:
 
-- Splunk OTel Collector `v0.155.0`: <https://github.com/signalfx/splunk-otel-collector/releases/tag/v0.155.0>
-- Splunk OTel Collector chart `0.155.0`: <https://github.com/signalfx/splunk-otel-collector-chart/releases/tag/splunk-otel-collector-0.155.0>
-- Upstream MySQL receiver compatibility at `v0.155.0`: <https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.155.0/receiver/mysqlreceiver/README.md>
+- Splunk OTel Collector `v0.158.0`: <https://github.com/signalfx/splunk-otel-collector/releases/tag/v0.158.0>
+- Splunk OTel Collector chart `0.158.0`: <https://github.com/signalfx/splunk-otel-collector-chart/releases/tag/splunk-otel-collector-0.158.0>
+- Upstream MySQL receiver compatibility at `v0.158.0`: <https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.158.0/receiver/mysqlreceiver/README.md>
 - Realm/component availability: <https://help.splunk.com/en/splunk-observability-cloud/get-started/service-description/splunk-observability-cloud-service-description>
 - Splunk OTel Collector repository: <https://github.com/signalfx/splunk-otel-collector>
 - Splunk OTel Collector chart repository: <https://github.com/signalfx/splunk-otel-collector-chart>

@@ -1,7 +1,7 @@
 # Splunk Add-on for Okta Identity Cloud Reference
 
 Grounded in the `Splunk_TA_okta_identity_cloud` package (Splunkbase app `6553`,
-verified version `5.0.2`).
+verified version `5.1.0`).
 
 ## Package Model
 

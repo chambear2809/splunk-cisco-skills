@@ -9,7 +9,7 @@ description: "Use when the user asks for AppDynamics On-Premises, Virtual Applia
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk AppDynamics Platform Setup
@@ -75,8 +75,11 @@ skill supports them; help exits without mutation.
 Render-first owner for AppDynamics self-managed platform workflows. Platform
 mutations are high-blast-radius and require reviewed runbooks; Enterprise
 Console changes are additionally gated by `--accept-enterprise-console-mutation`.
-The skill tracks the current AppDynamics On-Premises 26.4 Enterprise Console
-and Controller documentation for CLI-capable platform work.
+The skill tracks the current AppDynamics On-Premises 26.8.0 Enterprise Console
+and Controller deployment documentation for CLI-capable platform work. The
+Virtual Appliance manual runs on its own release cadence and currently
+publishes 26.1.0, so appliance workflows stay on that version rather than
+being relabeled to 26.8.0.
 
 ```bash
 bash skills/splunk-appdynamics-platform-setup/scripts/setup.sh --render

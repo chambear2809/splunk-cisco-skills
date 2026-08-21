@@ -15,7 +15,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-microsoft-scom-ta-rendered"
 
 APP_NAME = "Splunk_TA_microsoft-scom"
 APP_ID = "2729"
-APP_VERSION = "4.5.0"
+APP_VERSION = "4.5.1"
 SOURCE_PACK = "microsoft_scom"
 
 INPUTS: list[tuple[str, str]] = [

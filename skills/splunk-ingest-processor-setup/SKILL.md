@@ -11,7 +11,7 @@ description: "Use when the user asks to configure Ingest Processor, author Inges
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Ingest Processor Setup
@@ -100,7 +100,10 @@ source-type, destination, or SPL2 pipeline assets.
 - Read `reference.md` before changing coverage, limits, or lifecycle behavior.
 - Treat AI-powered Data Management release stages as capability-specific:
   Automated Field Extraction was announced in Controlled Availability, while
-  Guided Onboarding with Auto-Schematization was announced in Alpha. Verify
+  Guided Onboarding with Auto-Schematization was announced in Alpha. Both were
+  announced 2026-03-11 and re-checked 2026-08-20 against the Ingest Processor
+  release notes updated 2026-06-16, which promote neither capability; see
+  `references/research-ledger.md` for the recorded negative evidence. Verify
   current tenant access before presenting either workflow. The announcement
   says three capabilities but publicly names only these two; do not infer a
   third capability.
@@ -164,11 +167,19 @@ The default output directory is `splunk-ingest-processor-rendered/`:
   apply.
 - Treat Automated Field Extraction as a Controlled Availability,
   region-gated UI suggestion workflow, not an API automation path. Verify
-  tenant entitlement and current feature visibility before use.
+  tenant entitlement and current feature visibility before use. Announced
+  2026-03-11, re-checked 2026-08-20: the release notes updated 2026-06-16 list
+  AFE under February 18, 2026 with no release-stage label, label other
+  features "(Controlled Availability release)" and "(General Availability
+  release)" inline when those stages apply, and never state that AFE is
+  generally available.
 - Treat Guided Onboarding with Auto-Schematization as an Alpha, enrollment-
   gated UI workflow. It can recommend CIM mappings and candidate TA or SPL2
   outputs, but this skill does not invoke the service, enroll a tenant,
-  generate a TA, install a TA, or apply a generated pipeline.
+  generate a TA, install a TA, or apply a generated pipeline. Announced
+  2026-03-11, re-checked 2026-08-20: the release notes updated 2026-06-16
+  contain no Auto-Schematization or Guided Onboarding entry, which is equally
+  consistent with still-Alpha and with withdrawal, so the Alpha stance holds.
 - Require human review, SPL2 lint/preview, representative sample validation,
   CIM validation, and an explicit apply decision for every AI-generated
   recommendation or artifact.

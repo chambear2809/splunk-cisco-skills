@@ -189,6 +189,85 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
                 self.assertIn(item["scope"], {"global", "data_source", "both"})
                 self.assertTrue(set(item["target_impacts"]).issubset(doctor.ALL_TARGETS))
 
+    def test_every_curated_source_doc_is_cited_by_a_rule(self) -> None:
+        """No curated documentation URL may sit unbound.
+
+        Fourteen of these keys were once unreachable, and every one turned out
+        to answer a trigger on a compound rule whose single `source_doc` could
+        only cite the headline concern. An operator holding an
+        `itsi.threshold_gaps` finding was sent to the KPI base-search page.
+        """
+        cited: set[str] = set()
+        for item in doctor.RULE_CATALOG:
+            cited.add(item["source_doc"])
+            cited.update(item["supporting_docs"])
+        unbound = sorted(key for key, url in doctor.SOURCE_DOCS.items() if url not in cited)
+        self.assertEqual(unbound, [], f"SOURCE_DOCS keys cited by no rule: {unbound}")
+
+        for item in doctor.RULE_CATALOG:
+            with self.subTest(rule=item["id"]):
+                supporting = item["supporting_docs"]
+                self.assertIsInstance(supporting, list)
+                self.assertNotIn(item["source_doc"], supporting)
+                self.assertEqual(len(set(supporting)), len(supporting))
+
+        by_id = {item["id"]: item for item in doctor.RULE_CATALOG}
+        self.assertEqual(
+            by_id["DSRD-ITSI-KPI-THRESHOLD-GAP"]["source_doc"],
+            doctor.SOURCE_DOCS["itsi_thresholds"],
+        )
+        self.assertIn(
+            doctor.SOURCE_DOCS["itsi_kpi"],
+            by_id["DSRD-ITSI-ENTITY-KPI-GAP"]["supporting_docs"],
+        )
+
+    def test_supporting_docs_reach_the_report_and_handoff_packet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_doctor(
+                "--phase",
+                "doctor",
+                "--evidence-file",
+                str(UNREADY_FIXTURE),
+                "--output-dir",
+                tmpdir,
+                "--json",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            report = json.loads(result.stdout)
+            triggered = {finding["id"] for finding in report["findings"]}
+            self.assertIn("DSRD-ITSI-KPI-THRESHOLD-GAP", triggered)
+            threshold = next(
+                finding
+                for finding in report["findings"]
+                if finding["id"] == "DSRD-ITSI-KPI-THRESHOLD-GAP"
+            )
+            self.assertEqual(threshold["source_doc"], doctor.SOURCE_DOCS["itsi_thresholds"])
+            self.assertIn(
+                doctor.SOURCE_DOCS["itsi_entity_split"], threshold["supporting_docs"]
+            )
+
+            report_md = (Path(tmpdir) / "readiness-report.md").read_text(encoding="utf-8")
+            self.assertIn(f"- Also see: {doctor.SOURCE_DOCS['itsi_entity_split']}", report_md)
+
+            apply_result = self.run_doctor(
+                "--phase",
+                "apply",
+                "--evidence-file",
+                str(UNREADY_FIXTURE),
+                "--output-dir",
+                tmpdir,
+                "--fixes",
+                "DSRD-ITSI-KPI-THRESHOLD-GAP",
+            )
+            self.assertEqual(
+                apply_result.returncode, 0, msg=apply_result.stdout + apply_result.stderr
+            )
+            packets = sorted((Path(tmpdir) / "handoffs").glob("DSRD-ITSI-KPI-THRESHOLD-GAP*.md"))
+            self.assertTrue(packets, "no handoff packet rendered")
+            packet = packets[0].read_text(encoding="utf-8")
+            self.assertIn(doctor.SOURCE_DOCS["itsi_thresholds"], packet)
+            self.assertIn(doctor.SOURCE_DOCS["itsi_entity_split"], packet)
+
     def test_unready_fixture_triggers_full_readiness_stack_and_low_scores(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_doctor(

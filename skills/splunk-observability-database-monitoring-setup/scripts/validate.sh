@@ -27,7 +27,7 @@ Options:
   --output-dir DIR          Rendered output directory
   --live                    Run scoped, read-only Kubernetes checks
   --live-since DURATION     Collector log lookback (default: 5m)
-  --collector-validate      Validate config with collector image 0.155.0
+  --collector-validate      Validate config with collector image 0.158.0
   --api                     Require current DBMon metrics in Observability
   --api-metric NAME         Ad-hoc metric to require; repeatable and requires --api-filter.
   --api-filter KEY=VALUE    SignalFlow filter; repeatable and never inferred
@@ -77,10 +77,10 @@ if not metadata_path.is_file():
 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 if not isinstance(metadata, dict):
     raise SystemExit("ERROR: metadata.json must contain an object.")
-if metadata.get("collector_version") not in {"v0.155.0", "0.155.0"}:
-    raise SystemExit("ERROR: DBMon production output must pin collector v0.155.0.")
-if metadata.get("chart_version") != "0.155.0":
-    raise SystemExit("ERROR: DBMon production output must pin chart 0.155.0.")
+if metadata.get("collector_version") not in {"v0.158.0", "0.158.0"}:
+    raise SystemExit("ERROR: DBMon production output must pin collector v0.158.0.")
+if metadata.get("chart_version") != "0.158.0":
+    raise SystemExit("ERROR: DBMon production output must pin chart 0.158.0.")
 realm = str(metadata.get("realm") or "")
 if realm not in {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}:
     raise SystemExit(f"ERROR: metadata.json contains unsupported DBMon realm {realm!r}.")
@@ -326,7 +326,7 @@ def assert_dbmon_config(config: dict[str, Any], source: Path) -> None:
         raise SystemExit(f"ERROR: {source} has an invalid DBMon-owned memory limiter.")
     if processors_config.get("batch/dbmon") != {}:
         raise SystemExit(f"ERROR: {source} must define the isolated batch/dbmon processor.")
-    detection = processors_config.get("resourcedetection/dbmon") or {}
+    detection = processors_config.get("resource_detection/dbmon") or {}
     if detection.get("detectors") != ["system"]:
         raise SystemExit(f"ERROR: {source} has an invalid DBMon resource detector.")
 
@@ -355,7 +355,7 @@ def assert_dbmon_config(config: dict[str, Any], source: Path) -> None:
         metric_receivers.extend(current)
         processors = list((pipeline or {}).get("processors") or [])
         expected = (
-            ["memory_limiter/dbmon", "batch/dbmon", "resourcedetection/dbmon", "resource/mysql_service_instance_id"]
+            ["memory_limiter/dbmon", "batch/dbmon", "resource_detection/dbmon", "resource/mysql_service_instance_id"]
             if name.endswith("dbmon_mysql") or (name == "metrics/dbmon" and all(item.startswith("mysql/") for item in current))
             else ["memory_limiter/dbmon", "batch/dbmon"]
         )
@@ -423,7 +423,7 @@ if overlay_path.is_file():
     if not cluster.get("enabled"):
         raise SystemExit("ERROR: Kubernetes overlay must enable clusterReceiver.")
     if "replicas" in cluster:
-        raise SystemExit("ERROR: clusterReceiver.replicas is not valid in chart 0.155.0 values.")
+        raise SystemExit("ERROR: clusterReceiver.replicas is not valid in chart 0.158.0 values.")
     resources = cluster.get("resources") or {}
     expected_memory = f"{metadata['collector_memory_mib']}Mi"
     if (resources.get("limits") or {}).get("memory") != expected_memory:
@@ -451,7 +451,7 @@ if overlay_path.is_file():
     image = ((overlay.get("image") or {}).get("otelcol") or {})
     if image.get("repository") != "quay.io/signalfx/splunk-otel-collector":
         raise SystemExit("ERROR: Kubernetes overlay must pin the official collector repository.")
-    if image.get("tag") != "0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa":
+    if image.get("tag") != "0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357":
         raise SystemExit("ERROR: Kubernetes overlay must pin the audited collector manifest digest.")
     cluster_config = cluster.get("config") or {}
     assert_dbmon_config(cluster_config, overlay_path)
@@ -616,13 +616,13 @@ PY
     while IFS= read -r env_name; do
         [[ -n "${env_name}" ]] && env_args+=(-e "${env_name}=dbmon-static-validation")
     done < <(grep -Eo '\$\{env:[A-Z][A-Z0-9_]*\}' "${config_path}" | sed -E 's/^\$\{env:|\}$//g' | sort -u)
-    log "  Validating DBMon config with quay.io/signalfx/splunk-otel-collector:0.155.0"
+    log "  Validating DBMon config with quay.io/signalfx/splunk-otel-collector:0.158.0"
     "${runtime}" run --rm --network=none \
         -v "${config_path}:/etc/otel/collector/dbmon.yaml:ro" \
         "${env_args[@]}" \
         --entrypoint /otelcol \
         --pull=always \
-        quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa \
+        quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357 \
         validate --config=/etc/otel/collector/dbmon.yaml
     cleanup_temporary_config
 fi
@@ -690,19 +690,19 @@ containers = [
     c for c in pod.get("spec", {}).get("containers", []) if c.get("name") == "otel-collector"
 ]
 audited = (
-    "quay.io/signalfx/splunk-otel-collector:0.155.0@"
-    "sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"
+    "quay.io/signalfx/splunk-otel-collector:0.158.0@"
+    "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
 )
-if expected != "0.155.0" or len(containers) != 1 or containers[0].get("image") != audited:
+if expected != "0.158.0" or len(containers) != 1 or containers[0].get("image") != audited:
     raise SystemExit("ERROR: Scoped named DBMon collector is not the audited image reference.")
 statuses = [
     c for c in pod.get("status", {}).get("containerStatuses", []) if c.get("name") == "otel-collector"
 ]
 allowed_digests = {
-    "sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa",
-    "sha256:4e2c6177302abd3c1146388d4aaf7c1ef9a2f91e0a2aad98e8662b4c559cb15c",
-    "sha256:cad9da35f789acae44643db6773059f732e10befcf899bba511122c733271332",
-    "sha256:77c6fc369e34127d3a3cc20cfc35bfe28aca717150cae1630faa0330410f7a15",
+    "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357",
+    "sha256:16f784e3966cf9ced03ea3765a39f44c3e6395d04d4885e55fde6fc83328b2f0",
+    "sha256:90aeaa8d2ab3ddf7ed5f0758660daccdd99ce4f7cfb0d74d6a7d975613eebb6a",
+    "sha256:af49079eaf5dc79fd957f00171653703f3c044ae0fd5777c4cefa38d037d47fd",
 }
 if len(statuses) != 1 or not statuses[0].get("ready") or statuses[0].get("imageID", "").rsplit("@", 1)[-1] not in allowed_digests:
     raise SystemExit("ERROR: Scoped named DBMon collector is not ready at the audited manifest or a platform digest.")

@@ -48,11 +48,11 @@ SKILL_META: dict[str, dict[str, Any]] = {
     "splunk-appdynamics-setup": {
         "title": "Splunk AppDynamics Setup",
         "target": "AppDynamics suite router and coverage doctor",
-        "purpose": "Route AppDynamics requests to the right child skill and produce a machine-readable gapless coverage report, including current 26.4 SaaS, On-Premises, API, release/reference, product-announcement, security, AI, and infrastructure families.",
+        "purpose": "Route AppDynamics requests to the right child skill and produce a machine-readable gapless coverage report, including current 26.8 SaaS, On-Premises, API, release/reference, product-announcement, security, AI, and infrastructure families.",
         "apply": "Parent does not mutate AppDynamics directly; it delegates to child skills and cisco-appdynamics-setup.",
         "validation": "Coverage taxonomy completeness plus child rendered-output validation.",
         "sources": [
-            "https://help.splunk.com/appdynamics-saas",
+            "https://help.splunk.com/en/appdynamics-saas",
             "https://help.splunk.com/en/appdynamics-on-premises",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references",
             "https://help.splunk.com/en/appdynamics-saas/product-announcements-and-alerts",
@@ -69,25 +69,25 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "sources": [
             "https://help.splunk.com/en/appdynamics-on-premises",
             "https://help.splunk.com/en/appdynamics-on-premises/release-notes-and-references",
-            "https://help.splunk.com/appdynamics-on-premises/plan-your-deployment/plan-your-deployment",
+            "https://help.splunk.com/en/appdynamics-on-premises/plan-your-deployment/plan-your-deployment",
             "https://help.splunk.com/en/appdynamics-on-premises/platform-installation-quick-start/platform-installation-quick-start",
-            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.4.0/administer-the-enterprise-console/enterprise-console-command-line",
-            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/install-the-controller-using-the-cli",
-            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/controller-high-availability/prerequisites-for-high-availability",
-            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/upgrade-the-controller-using-the-enterprise-console/before-upgrading/back-up-the-existing-controller",
-            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/25.4.0/express-install/install-the-platform-using-gui",
-            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/25.12.0/custom-install",
+            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.8.0/administer-the-enterprise-console/enterprise-console-command-line",
+            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.8.0/controller-deployment/install-the-controller-using-the-cli",
+            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.8.0/controller-deployment/controller-high-availability/prerequisites-for-high-availability",
+            "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.8.0/controller-deployment/upgrade-the-controller-using-the-enterprise-console/before-upgrading/back-up-the-existing-controller",
+            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.8.0/express-install",
+            "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.8.0/custom-install",
             "https://help.splunk.com/en/appdynamics-on-premises/platform-installation-quick-start/discovery-and-upgrade-quick-start",
             "https://help.splunk.com/en/appdynamics-on-premises/events-service-deployment",
             "https://help.splunk.com/en/appdynamics-on-premises/eum-server-deployment",
             "https://help.splunk.com/en/appdynamics-on-premises/synthetic-server-deployment/synthetic-server-deployment/installation-overview",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/get-started-with-on-premises-virtual-appliance",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/red-hat-openshift-service-in-aws-rosa",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/standard-deployment",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/hybrid-deployment",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/get-started-with-on-premises-virtual-appliance",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/red-hat-openshift-service-in-aws-rosa",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/install-splunk-appdynamics-services-using-cli/standard-deployment",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/install-splunk-appdynamics-services-using-cli/hybrid-deployment",
             "https://help.splunk.com/en/appdynamics-on-premises/secure-the-platform/secure-the-platform",
         ],
         "gate": "enterprise_console",
@@ -99,11 +99,11 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "This skill has read-only API probes and operator runbooks; it does not execute Controller administration mutations.",
         "validation": "Controller API readbacks for security, access, license, audit, and sensitive-data-control state.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index",
-            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api",
-            "https://help.splunk.com/en/appdynamics-saas/appdynamics-saas-administration",
-            "https://help.splunk.com/appdynamics-saas/licensing",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/sensitive-data-collection-and-security",
+            "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index",
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api",
+            "https://help.splunk.com/en/appdynamics-saas/accounts/global-account-administration",
+            "https://help.splunk.com/en/appdynamics-saas/licensing/26.8.0/splunk-appdynamics-licensing",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/sensitive-data-collection-and-security",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
@@ -115,23 +115,23 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "The skill emits reviewed Smart Agent and smartagentctl commands, but does not execute host or Controller mutations; operators run the selected command plan after approval.",
         "validation": "Smart Agent service status, Controller registration, UI inventory, managed-agent status, deployment-group state, smartagentctl command shape, remote.yaml security posture, package checksum/signature, and release-compatibility readbacks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/install-smart-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/configure-smart-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/validate-smart-agent-installation",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/synchronize-smart-agent-primary-host-with-the-remote-hosts",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/upgrade-smart-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-attach-java-and-nodejs-agents",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-discovery-of-application-process",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-deploy-agents-with-deployment-groups",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-database-agent-using-ui",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/ssh-configuration-for-remote-host",
-            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/before-you-begin",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/install-smart-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/configure-smart-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/validate-smart-agent-installation",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/synchronize-smart-agent-primary-host-with-the-remote-hosts",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/upgrade-smart-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-attach-java-and-nodejs-agents",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-discovery-of-application-process",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-deploy-agents-with-deployment-groups",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-ui",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-database-agent-using-ui",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/ssh-configuration-for-remote-host",
+            "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/smart-agent-command-line-utility",
             "https://help.splunk.com/en/appdynamics-on-premises/accounts/download-splunk-appdynamics-software",
-            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/agent-installer-platform-service-api",
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/agent-installer-platform-service-api",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
@@ -144,9 +144,9 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Live host mutation is supported. --apply preflight is read-only. --apply collector writes collector config and restarts the collector. --apply java writes Java startup config and restarts only when restart gates are present. --apply all runs collector first, then Java.",
         "validation": "Target inventory, file-backed secret references, OTLP receiver checks, collector exporter health, Java env/property checks, restart gate enforcement, and post-restart healthcheck commands.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
         ],
         "gate": None,
     },
@@ -157,9 +157,9 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "APM model and runtime changes are rendered as Controller/operator runbooks and delegated instrumentation handoffs; this wrapper has no live apply implementation.",
         "validation": "Controller readbacks for apps, tiers, nodes, business transactions, metrics, snapshots, and OpenTelemetry trace ingestion.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/install-app-server-agents/serverless-apm-for-aws-lambda/serverless-apm-in-the-controller",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/application-monitoring",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/install-app-server-agents/serverless-apm-for-aws-lambda/serverless-apm-in-the-controller",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry",
         ],
         "gate": None,
     },
@@ -170,15 +170,15 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Kubernetes resource changes require --accept-k8s-rollout; GitOps render remains the default.",
         "validation": "kubectl/oc checks for Cluster Agent, auto-instrumented workloads, combined-agent mode, OTel collector health, and Splunk Observability telemetry export.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/use-the-cluster-agent",
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/permissions-required-for-cluster-agent-and-infrastructure-visibility",
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/cluster-agent-and-the-operator-compatibility-matrix",
-            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/install-splunk-otel-collector-using-cluster-agent",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/monitor-applications-and-infrastructure-with-combined-agent",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-.net-agent/enable-the-combined-mode-for-.net-agent",
-            "https://help.splunk.com/en/appdynamics-on-premises/application-performance-monitoring/26.3.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-node.js-agent/dual-signal-mode-for-node.js-combined-agent",
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/machine-agent/combined-agent-for-infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/monitor-kubernetes-with-the-cluster-agent/use-the-cluster-agent",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/monitor-kubernetes-with-the-cluster-agent/permissions-required-for-cluster-agent-and-infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/cluster-agent-and-the-operator-compatibility-matrix",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.8.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/install-splunk-otel-collector-using-cluster-agent",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/monitor-applications-and-infrastructure-with-combined-agent",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-.net-agent/enable-the-combined-mode-for-.net-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-node.js-agent/dual-signal-mode-for-node.js-combined-agent",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/machine-agent/combined-agent-for-infrastructure-visibility",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
         "gate": "k8s_rollout",
@@ -190,10 +190,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Agent, host, tag, and health-rule changes are rendered as operator runbooks; this wrapper has no live apply implementation.",
         "validation": "Controller server, container, network, GPU, Prometheus, service availability, tag, and health-rule readbacks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility",
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/gpu-monitoring",
-            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/gpu-monitoring/gpu-monitoring-supported-environments",
-            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/25.12.0/prometheus-extension-for-machine-agent",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/gpu-monitoring",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.8.0/gpu-monitoring/gpu-monitoring-supported-environments",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.8.0/prometheus-extension-for-machine-agent",
         ],
         "gate": None,
     },
@@ -204,10 +204,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Live host mutation is supported. --apply preflight is read-only. --apply collector writes collector config, restarts the collector process/service/container, and validates OTLP receiver and exporter health.",
         "validation": "Install-type discovery, config path and service/container confirmation, loopback receiver defaults, file-backed destination secrets, OTLP 4317/4318 checks, exporter placeholders, backup manifest, and rollback.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/combined-agent-for-infrastructure-visibility",
-            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/configure-the-machine-agent/access-machine-agent-docker-images",
-            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/install-the-machine-agent/windows-install-using-zip-with-bundled-jre",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.8.0/machine-agent/combined-agent-for-infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.8.0/machine-agent/configure-the-machine-agent/access-machine-agent-docker-images",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.8.0/machine-agent/install-the-machine-agent/windows-install-using-zip-with-bundled-jre",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
         ],
         "gate": None,
     },
@@ -218,7 +218,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Database collector payloads and agent commands are rendered with password-file references; this wrapper does not submit them.",
         "validation": "Collector list/readback plus DB server, node, metric, and event checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api",
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
         "gate": None,
@@ -230,10 +230,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Custom event publishing requires --accept-analytics-event-publish; query and schema validation are read-only.",
         "validation": "ADQL query/readback and optional Events API publish probe.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0",
-            "https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0/analytics/using-analytics-data/business-journeys",
-            "https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0/analytics/using-analytics-data/business-journeys/experience-level-management",
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/25.4.0/end-user-monitoring/iot-monitoring/iot-analytics",
+            "https://help.splunk.com/en/appdynamics-saas/analytics/26.8.0/analytics",
+            "https://help.splunk.com/en/appdynamics-saas/analytics/26.8.0/analytics/using-analytics-data/business-journeys",
+            "https://help.splunk.com/en/appdynamics-saas/analytics/26.8.0/analytics/using-analytics-data/business-journeys/experience-level-management",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/iot-monitoring/iot-analytics",
         ],
         "gate": "analytics_event_publish",
     },
@@ -244,9 +244,9 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Browser/mobile source edits and source-map uploads remain operator/CI handoffs; this wrapper does not edit source or upload artifacts.",
         "validation": "EUM app key checks, beacon validation, source-map inventory, and session replay readiness checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/configure-the-controller-ui-for-browser-rum",
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/session-replay-for-browser-rum/enable-session-replay",
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/25.9.0/end-user-monitoring/mobile-real-user-monitoring/overview-of-the-controller-ui-for-mobile-rum/session-replay-for-mobile-rum",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/configure-the-controller-ui-for-browser-rum",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/session-replay-for-browser-rum/enable-session-replay",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/mobile-real-user-monitoring/overview-of-the-controller-ui-for-mobile-rum/session-replay-for-mobile-rum",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": "eum_source_edit",
@@ -258,7 +258,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Synthetic jobs and private-agent rollout are rendered as reviewed API/container/Kubernetes handoffs; this wrapper has no live apply implementation.",
         "validation": "Synthetic job, run, location, PSA health, and Shepherd connectivity checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/synthetic-monitoring",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
         "gate": None,
@@ -269,7 +269,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "purpose": "Render new LOC configuration, legacy Splunk integration detection, service-account handoffs, and deep-link validation.",
         "apply": "Cloud/Enterprise Splunk service-account and allow-list actions are delegated to Splunk Platform skills.",
         "validation": "Controller LOC state, Splunk service account readiness, legacy integration disabled state, and deep-link checks.",
-        "sources": ["https://help.splunk.com/en/appdynamics-saas/unified-observability-experience-with-the-splunk-platform/26.4.0/splunk-log-observer-connect-for-splunk-appdynamics"],
+        "sources": ["https://help.splunk.com/en/appdynamics-saas/unified-observability-experience-with-the-splunk-platform/26.8.0/splunk-log-observer-connect-for-splunk-appdynamics"],
         "gate": None,
     },
     "splunk-appdynamics-alerting-content-setup": {
@@ -279,10 +279,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Alerting payloads, exports, and rollback steps are rendered for operator execution; this wrapper has no live apply implementation.",
         "validation": "Readbacks for health rules, policies, actions, schedules, suppressions, exported content snapshots, baseline behavior, and AIML diagnostics.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/health-rules/how-to-set-up-health-rules",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/policies/policy-actions",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/anomaly-detection",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/aiml",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/alert-and-respond/health-rules/how-to-set-up-health-rules",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/alert-and-respond/policies/policy-actions",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/alert-and-respond/anomaly-detection",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/aiml",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
@@ -294,10 +294,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Dashboard, report, and War Room changes are rendered as operator/UI handoffs; this wrapper has no live apply implementation.",
         "validation": "Dashboard, report, schedule, ThousandEyes query/widget, and War Room existence checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports",
-            "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/dashboards-and-reports/custom-dashboards/create-custom-dashboards",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/custom-dashboards/virtual-war-rooms/war-room-templates",
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/dashboards-and-reports",
+            "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.8.0/dashboards-and-reports/custom-dashboards/create-custom-dashboards",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/dashboards-and-reports/custom-dashboards/virtual-war-rooms/war-room-templates",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
             "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
@@ -309,9 +309,9 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Default render mode does not mutate either product. AppDynamics UI-only surfaces remain runbooks. ThousandEyes API-backed assets and custom webhook plans require --accept-appd-te-mutation and still render reviewed scripts before any operator-run API calls.",
         "validation": "Readiness checks for AppDynamics deployment model, admin permissions, TE token format, Dash Studio widget constraints, EUM support boundaries, TE API asset coverage, native integration ID handoff, custom webhook payloads, alert rule bindings, and AppDynamics custom event probe shape.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
-            "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
-            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/thousandeyes-integration-with-browser-real-user-monitoring/thousandeyes-network-metrics-in-browser-rum",
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.8.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.8.0/end-user-monitoring/thousandeyes-integration-with-browser-real-user-monitoring/thousandeyes-network-metrics-in-browser-rum",
             "https://docs.thousandeyes.com/product-documentation/integration-guides/custom-built-integrations/appdynamics-for-test-recs",
             "https://docs.thousandeyes.com/product-documentation/integration-guides/custom-built-integrations/appdynamics-for-alert-notifs",
             "https://developer.cisco.com/docs/thousandeyes/integrations-api-overview/",
@@ -328,9 +328,9 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Tag, extension, and third-party connector changes are rendered as operator or owning-system handoffs; this wrapper has no live apply implementation.",
         "validation": "Tag readbacks, extension file checks, custom metric visibility, and connector readiness checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/tag-management/26.4.0",
-            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/overview-of-application-monitoring/tags/filter-entities-with-custom-tags",
-            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/integration-modules",
+            "https://help.splunk.com/en/appdynamics-saas/tag-management/26.8.0/tag-management",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/overview-of-application-monitoring/tags/filter-entities-with-custom-tags",
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/integration-modules",
         ],
         "gate": None,
     },
@@ -341,11 +341,11 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "apply": "Security and AI platform enablement is validate/runbook-first with handoffs to owning skills.",
         "validation": "Secure Application dashboard, runtime policy, API, OTel Java, GenAI framework, GPU, and AI Pod readiness checks.",
         "sources": [
-            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring",
-            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring/secure-application-policies",
-            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring/secure-application-for-opentelemetry",
-            "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/secure-application-apis",
-            "https://help.splunk.com/en/appdynamics-saas/observability-for-ai/26.4.0/splunk-appdynamics-observability-for-ai/supported-ai-components",
+            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.8.0/application-security-monitoring",
+            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.8.0/application-security-monitoring/secure-application-policies",
+            "https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.8.0/application-security-monitoring/secure-application-for-opentelemetry",
+            "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/secure-application-apis",
+            "https://help.splunk.com/en/appdynamics-saas/observability-for-ai/26.8.0/splunk-appdynamics-observability-for-ai/supported-ai-components",
         ],
         "gate": None,
     },
@@ -597,7 +597,7 @@ CLASSIC_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "classic_on_premises",
         "interface": "enterprise_console_gui",
         "best_for": "Demo, evaluation, or smallest-friction single-host Controller plus embedded Events Service.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/25.4.0/express-install/install-the-platform-using-gui",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.8.0/express-install",
         "validation": "Enterprise Console Jobs page, Controller URL, and platform-validation-probes.sh.",
         "frictionless_next_step": "Open Enterprise Console on port 9191 and choose Express Install.",
     },
@@ -606,7 +606,7 @@ CLASSIC_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "classic_on_premises",
         "interface": "enterprise_console_gui",
         "best_for": "Fresh production, distributed Controller, Controller HA, or scaled Events Service.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/25.12.0/custom-install",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.8.0/custom-install",
         "validation": "Enterprise Console Jobs page, Controller health, Events URL, and HA checks when enabled.",
         "frictionless_next_step": "Open Enterprise Console on port 9191 and choose Custom Install.",
     },
@@ -615,7 +615,7 @@ CLASSIC_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "classic_on_premises",
         "interface": "enterprise_console_cli",
         "best_for": "Script-reviewed Linux deployments where the operator wants CLI repeatability.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/install-the-controller-using-the-cli",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.8.0/controller-deployment/install-the-controller-using-the-cli",
         "validation": "platform-admin list-jobs, diagnosis job, Controller URL, and platform-validation-probes.sh.",
         "frictionless_next_step": "Review enterprise-console-command-plan.sh, then run from an approved authenticated CLI session.",
     },
@@ -633,7 +633,7 @@ CLASSIC_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "classic_on_premises",
         "interface": "enterprise_console_cli",
         "best_for": "Existing environments that need a reviewed discover-upgrade command path.",
-        "source": "https://help.splunk.com/appdynamics-on-premises/upgrade-platform-components/discover-existing-components",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/upgrade-platform-components/discover-existing-components",
         "validation": "platform-admin discover-upgrade job status, Controller version, and rollback readiness.",
         "frictionless_next_step": "Create platform, add credentials/hosts, then submit the discover-upgrade job with local secret handling.",
     },
@@ -695,7 +695,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "vmware_vsphere",
         "best_for": "vSphere environments deploying three VMs from OVA/OVF properties.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
         "validation": "Three VMs, VMware Tools OVF properties, appdctl show boot, and cluster status.",
         "frictionless_next_step": "Use the OVA and collect DNS, gateway, three host IPs, domain, and profile up front.",
     },
@@ -704,7 +704,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "vmware_esxi",
         "best_for": "Standalone ESXi environments deploying three VMs from the OVA.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
         "validation": "Three VMs, network properties, appdctl show boot, and cluster status.",
         "frictionless_next_step": "Use the ESXi Create/Register VM flow and capture the same network fields for each node.",
     },
@@ -713,7 +713,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "azure_portal_or_cli",
         "best_for": "Azure deployments using the VHD image and reference scripts.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/microsoft-azure",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/microsoft-azure",
         "validation": "Resource group, NSG, VNet, storage/image gallery, three VMs, and appdctl show boot.",
         "frictionless_next_step": "Render the ordered Azure resource checklist and config.cfg fields before running reference scripts.",
     },
@@ -722,7 +722,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "aws_console_or_cli",
         "best_for": "AWS deployments using AMI import, m5a.4xlarge instances, and reference scripts.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws",
         "validation": "VPC, S3, IAM import role, AMI ID, three EC2 instances, host init, and appdctl show boot.",
         "frictionless_next_step": "Render the AWS import/run-instances checklist and require explicit profile/region/subnet inputs.",
     },
@@ -731,7 +731,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "kvm_reference_scripts",
         "best_for": "KVM deployments using QCOW2 and three KVM hypervisors.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.4.0/deploy-cisco-appdynamics-on-premises-virtual-appliance/deploy-and-configure-virtual-appliance-in-kvm",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/kernel-based-virtual-machine-kvm",
         "validation": "NTP, kvm-ok, bridge, config.cfg, run-cluster, cluster-status, and appdctl show boot.",
         "frictionless_next_step": "Render config.cfg placeholders and preflight host virtualization checks.",
     },
@@ -740,7 +740,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_infra",
         "interface": "rosa_openshift_virtualization",
         "best_for": "ROSA HCP with OpenShift Virtualization using QCOW2-backed VMs.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/red-hat-openshift-service-in-aws-rosa",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/red-hat-openshift-service-in-aws-rosa",
         "validation": "ROSA HCP, active OpenShift Virtualization operator, PVC boot disks, NLB/firewall, and appdctl show boot.",
         "frictionless_next_step": "Render virtctl image-upload commands and VM template checks with UEFI non-secure boot.",
     },
@@ -749,7 +749,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_services",
         "interface": "appdcli",
         "best_for": "Virtual Appliance installs infrastructure plus Controller, Events, EUM, Synthetic, and optional services in Kubernetes.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/standard-deployment",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/install-splunk-appdynamics-services-using-cli/standard-deployment",
         "validation": "globals.yaml.gotmpl, secrets.yaml, license.lic, appdcli ping, and kubectl namespace checks.",
         "frictionless_next_step": "Render profile-matched appdcli start commands and DNS/SAN checks.",
     },
@@ -758,7 +758,7 @@ VIRTUAL_APPLIANCE_DEPLOYMENT_METHODS: list[dict[str, Any]] = [
         "family": "virtual_appliance_services",
         "interface": "appdcli",
         "best_for": "Hybrid VA services attached to an existing classic Controller, Events Service, and EUM Server.",
-        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/hybrid-deployment",
+        "source": "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/install-splunk-appdynamics-services-using-cli/hybrid-deployment",
         "validation": "Hybrid Controller connectivity, DNS, certs, appdcli ping, Controller restart, and agent download checks.",
         "frictionless_next_step": "Render hybrid Controller/EUM/Events connection intake before service start.",
     },
@@ -1436,7 +1436,7 @@ def render_platform_topology(spec: dict[str, Any]) -> str:
     ha = as_dict(spec.get("ha"))
     security = as_dict(spec.get("security"))
     payload = {
-        "doc_version": spec.get("doc_version", "26.4.0"),
+        "doc_version": spec.get("doc_version", "26.8.0"),
         "deployment_model": normalize_deployment_model(
             as_dict(spec.get("deployment")).get("model")
             or spec.get("deployment_model")
@@ -1444,7 +1444,7 @@ def render_platform_topology(spec: dict[str, Any]) -> str:
         ),
         "platform": {
             "name": platform.get("name", "prod-platform"),
-            "target_version": platform.get("target_version", spec.get("doc_version", "26.4.0")),
+            "target_version": platform.get("target_version", spec.get("doc_version", "26.8.0")),
             "installation_dir": platform.get("installation_dir", "/opt/appdynamics/platform"),
             "install_mode": platform.get("install_mode", "custom"),
             "controller_profile": platform.get("controller_profile", "medium"),
@@ -1514,7 +1514,7 @@ def render_enterprise_console_command_plan(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
-# Reviewed Enterprise Console 26.4 command plan.
+# Reviewed Enterprise Console 26.8 command plan.
 # Requires --accept-enterprise-console-mutation before this skill enters apply mode.
 # This script never passes Controller, MySQL, or Enterprise Console passwords as shell arguments.
 # Authenticate to the Enterprise Console CLI in an approved interactive/session wrapper first.
@@ -1615,7 +1615,7 @@ def render_controller_install_upgrade_runbook(spec: dict[str, Any]) -> str:
     platform = as_dict(spec.get("platform"))
     controller = as_dict(spec.get("controller"))
     events = as_dict(spec.get("events_service"))
-    doc_version = spec.get("doc_version", "26.4.0")
+    doc_version = spec.get("doc_version", "26.8.0")
     return f"""# Controller Install And Upgrade Runbook
 
 Documentation baseline: AppDynamics On-Premises {doc_version}.
@@ -1642,7 +1642,7 @@ Documentation baseline: AppDynamics On-Premises {doc_version}.
 2. Review `enterprise-console-hosts.txt`; every Controller and Events Service host must be reachable from the Enterprise Console host.
 3. Run `enterprise-console-command-plan.sh` only after an authenticated Enterprise Console CLI session exists.
 4. Use `list-job-parameters --service controller --job install` before constructing the local install command.
-5. Construct the Controller install job outside this rendered tree because the 26.4 CLI requires password arguments for Controller install.
+5. Construct the Controller install job outside this rendered tree because the 26.8 CLI requires password arguments for Controller install.
 6. After install, run `platform-validation-probes.sh`; then verify Controller startup, Controller login, and database health.
 
 ## Upgrade Guardrails
@@ -1831,12 +1831,12 @@ def render_virtual_appliance_vmware_inventory(spec: dict[str, Any]) -> str:
     vmware = vmware_settings_from_spec(spec)
     profile = va.get("profile", as_dict(spec.get("platform")).get("controller_profile", "small"))
     payload = {
-        "doc_version": spec.get("doc_version", "26.4.0"),
-        "documentation_note": "Use AppDynamics 26.4 On-Premises docs for platform operations. The current official Virtual Appliance VMware pages are versioned 25.10 and were last updated in November 2025.",
+        "doc_version": spec.get("doc_version", "26.8.0"),
+        "documentation_note": "Use AppDynamics 26.8 On-Premises docs for platform operations. The Virtual Appliance manual runs on its own cadence and currently publishes 26.1.0.",
         "source_docs": [
             "https://help.splunk.com/en/appdynamics-on-premises/overview/splunk-appdynamics-on-premises-and-virtual-appliance-self-hosted/splunk-appdynamics-on-premises-virtual-appliance-self-hosted",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
-            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/26.1.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
         ],
         "selection": {
             "infrastructure_platform": infra,
@@ -2319,7 +2319,7 @@ The renderer emits these VMware-specific files for vSphere and standalone ESXi h
 - `virtual-appliance-govc-plan.sh`: dry-run govc import flow that can read the VMware password from a chmod-600 file only when `VMWARE_APPLY=1`.
 - `virtual-appliance-vmware-validation.sh`: static node checks, default pod-CIDR overlap warnings, optional govc VM inventory probes, and optional SSH `appdctl show boot` checks.
 
-Do not send the OVA through chat. Place it on the workstation or automation host that has OVF Tool or govc installed, set `virtual_appliance.image_file`, and run the dry-run scripts first. The official VMware Virtual Appliance pages currently expose 25.10 URL paths; pair them with the 26.4 On-Premises platform docs for Enterprise Console and Controller lifecycle work.
+Do not send the OVA through chat. Place it on the workstation or automation host that has OVF Tool or govc installed, set `virtual_appliance.image_file`, and run the dry-run scripts first. The VMware Virtual Appliance pages are published under the Virtual Appliance manual's own 26.1.0 paths; pair them with the 26.8 On-Premises platform docs for Enterprise Console and Controller lifecycle work.
 
 ## Service Deployment
 
@@ -2950,11 +2950,11 @@ def render_smart_agent_readiness(spec: dict[str, Any]) -> str:
     smart_agent = as_dict(spec.get("smart_agent"))
     targets = agent_targets(spec)
     payload = {
-        "doc_version": spec.get("doc_version", "26.4.0"),
+        "doc_version": spec.get("doc_version", "26.8.0"),
         "controller": {
             "url": spec.get("controller_url", "https://example.saas.appdynamics.com"),
             "minimum_version": "24.7.0",
-            "target_version": smart_agent.get("controller_version", spec.get("doc_version", "26.4.0")),
+            "target_version": smart_agent.get("controller_version", spec.get("doc_version", "26.8.0")),
             "account_name": spec.get("account_name", "customer1"),
             "access_key_file": smart_agent.get("access_key_file", "/secure/appdynamics/account_access_key"),
         },
@@ -2997,7 +2997,6 @@ def render_smart_agent_config_template(spec: dict[str, Any]) -> str:
 ControllerURL    = {spec.get('controller_url', 'https://example.saas.appdynamics.com')}
 ControllerPort   = {config.get('controller_port', 443)}
 FMServicePort    = {config.get('fm_service_port', 443)}
-AgentType        =
 AccountAccessKey = <redacted:file-backed>
 AccountName      = {spec.get('account_name', 'customer1')}
 EnableSSL        = {str(config.get('enable_ssl', True)).lower()}
@@ -3342,26 +3341,50 @@ def render_auto_attach_and_discovery_runbook(spec: dict[str, Any]) -> str:
 
 
 def render_smart_agent_cli_deprecation_runbook() -> str:
-    return """# Deprecated Smart Agent CLI Runbook
+    return """# Smart Agent CLI Migration Runbook
 
-The standalone Smart Agent CLI is deprecated in the 26.4 documentation and has
-a documented end-of-support date of February 2, 2026. Treat it as legacy-only;
-new work should use the Agent Management UI or `smartagentctl`.
+The standalone Smart Agent CLI reached End of Support on February 2, 2026. That
+date has passed. This runbook exists to get existing automation off the CLI, not
+to help anyone adopt it. There is no supported path that starts here.
 
-Use this path only for legacy build-time workflows that already depend on the
-standalone CLI.
+The 26.8.0 page still reads "is deprecated and will reach End of Support on
+February 2, 2026" in the future tense, and was last updated 2026-08-13. Read that
+as the vendor not having revised the sentence, not as support continuing. The
+documented replacement is `smartagentctl`, which this skill renders by default.
 
-## Compatibility Notes
+## Why This Runbook Still Renders
 
-- The deprecated CLI can manage remote or local nodes through a standalone
-  service.
-- It does not support Database Agent.
-- Multiple-node Smart Agent install through this CLI requires Python 3.10 or
-  later.
-- Existing automation should be migrated toward `smartagentctl` command plans
-  and `remote.yaml` templates.
+Automation written against the standalone CLI does not stop working the day
+support ends, so operators keep finding it in build pipelines and golden images
+long afterward. Removing this artifact would delete the only mapping from those
+legacy invocations to their `smartagentctl` equivalents. Nothing here should be
+run as a steady-state operation.
 
-## Legacy Examples
+## Migration Targets
+
+- Local and remote agent lifecycle: use `smartagentctl-lifecycle-plan.sh` and
+  `remote.yaml.template`.
+- Install, upgrade, and rollback through the Controller: use
+  `agent-management-ui-runbook.md`.
+- Multi-host rollout: use `deployment-groups-runbook.md` instead of CLI
+  inventories.
+- Auto-attach: use `auto-attach-and-discovery-runbook.md`. The generated
+  `ld_preload.json` planning moved there.
+
+## Constraints That Still Apply While Migrating
+
+- The standalone CLI never supported Database Agent. Database Agent lifecycle is
+  UI or `smartagentctl` only.
+- Multiple-node Smart Agent install through the standalone CLI required Python
+  3.10 or later. That prerequisite is not needed once the workflow moves to
+  `smartagentctl`.
+- Expect no further CLI releases. Only critical security and bug fixes were
+  offered before End of Support, and that window has closed.
+
+## Legacy Invocations To Find And Replace
+
+Search build pipelines and images for these forms. They identify automation that
+still needs migrating; do not add new call sites.
 
 ```bash
 ./appd install smartagent --install-agent-from ARTIFACT_PATH --inventory HOSTS --connection ssh --auto-start
@@ -3751,15 +3774,7 @@ def combined_agent_env(target: dict[str, Any], collector: dict[str, Any]) -> lis
         env_entry("OTEL_EXPORTER_OTLP_ENDPOINT", collector["endpoint"]),
     ]
     language = target["language"]
-    if language == "dotnet-core-linux":
-        env.extend(
-            [
-                env_entry("DOTNET_ADDITIONAL_DEPS", "/opt/appdynamics/dotnet/additionalDeps"),
-                env_entry("DOTNET_SHARED_STORE", "/opt/appdynamics/dotnet/store"),
-                env_entry("DOTNET_STARTUP_HOOKS", "/opt/appdynamics/dotnet/startupHook/AppDynamics.AgentProfiler.dll"),
-            ]
-        )
-    elif language == "nodejs":
+    if language == "nodejs":
         env.append(env_entry("NODE_OPTIONS", "--require appdynamics"))
     elif language == "machine-agent":
         env.append(env_entry("APPD_MACHINE_AGENT_COMBINED_MODE", "true"))
@@ -4063,7 +4078,7 @@ kubectl -n "${{APPD_NAMESPACE}}" wait --for=condition=Ready pod \
 def render_k8s_rbac_review() -> str:
     return """# Cluster Agent RBAC Review
 
-- Confirm Operator, Cluster Agent, and Infrastructure Visibility RBAC from the 26.4 permissions page.
+- Confirm Operator, Cluster Agent, and Infrastructure Visibility RBAC from the 26.8 permissions page.
 - Confirm OpenShift SCC requirements before deploying on OpenShift.
 - Confirm Cluster Agent and Operator compatibility matrix versions before rollout.
 - If `installSplunkOtelCollector` is enabled, confirm the collector service account can list/watch Kubernetes metadata and write its secret-backed O11y token reference.
@@ -4130,8 +4145,17 @@ def render_combined_agent_runbook(targets: list[dict[str, Any]], collector: dict
 ## Language Notes
 
 - Java combined agent: use `AGENT_DEPLOYMENT_MODE=dual` with OTLP exporter variables and service/resource attributes.
-- .NET Core Linux combined mode is rendered with the startup hook variables required by the combined .NET agent path.
+- .NET combined mode left beta at 26.8.0 and requires .NET APM Agent 26.5 or later.
+  26.8.0 documents `AGENT_DEPLOYMENT_MODE` as the only mode variable, so no
+  `DOTNET_ADDITIONAL_DEPS`, `DOTNET_SHARED_STORE`, or `DOTNET_STARTUP_HOOKS` value is
+  rendered. Supported runtimes are .NET 8.0, 9.0, and 10.0, .NET Framework 4.7 or
+  later, and .NET Framework 4.6.2, on Windows or Linux with x86 or AMD64. The only
+  remaining exclusions are NuGet-based distributions and Azure AppService Extensions;
+  .NET 10 and self-contained applications became supported at 26.8.0.
 - Node.js combined mode uses `AGENT_DEPLOYMENT_MODE=dual` plus OTLP exporter variables; application packaging must include the AppDynamics Node.js agent runtime.
+- Python combined mode is documented from 26.8.0. This packet does not render Python
+  workloads yet; use the vendor procedure directly or hand off to
+  `splunk-observability-k8s-auto-instrumentation-setup`.
 - Machine Agent combined mode is acknowledged for infrastructure use cases; broad host/node rollout belongs in `splunk-appdynamics-infrastructure-visibility-setup`.
 
 ## Handoffs
@@ -5571,7 +5595,7 @@ def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
     if urlsplit(controller_url).scheme != "https":
         raise ValueError("AppDynamics/ThousandEyes webhook targets require an HTTPS Controller URL")
     account_name = str(spec.get("account_name") or "customer1")
-    doc_version = str(spec.get("doc_version") or "26.4.0")
+    doc_version = str(spec.get("doc_version") or "26.8.0")
     app_target = as_dict(spec.get("appdynamics_target"))
     application = str(app_target.get("application") or spec.get("application") or "Checkout")
     features = as_dict(spec.get("features"))

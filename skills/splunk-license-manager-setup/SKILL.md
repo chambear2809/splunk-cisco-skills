@@ -9,7 +9,7 @@ description: "Use when the user asks about configuring a Splunk Enterprise licen
 compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "self-managed-10.4"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk License Manager Setup

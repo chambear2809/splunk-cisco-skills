@@ -52,8 +52,10 @@ cost. The renderer FAILs render with no override flag. Enumerate explicitly.
 
 ## FedRAMP
 
-Splunk Observability Cloud is **NOT yet FedRAMP-authorized** as of early
-2026 (Splunk Cloud Platform is FedRAMP Moderate; Splunk Observability is on
-the roadmap). FedRAMP / IL5 customers cannot use this skill against a FedRAMP
-environment until Splunk publishes authorization. See:
-https://help.splunk.com/en/splunk-observability-cloud/fedramp-support/fedramp-support-for-splunk-observability-cloud
+As of 2026-08-20, no current FedRAMP Marketplace authorization for Splunk
+Observability Cloud was verified. Do not use this workflow for FedRAMP or IL5
+environments until Splunk supplies a current Marketplace listing and
+realm/boundary documentation. Current evidence:
+
+- https://www.fedramp.gov/marketplace/products/
+- https://www.splunk.com/en_us/blog/industries/govsummit-2026-recap.html

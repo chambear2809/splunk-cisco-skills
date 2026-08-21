@@ -12,8 +12,8 @@ Status meanings:
 
 | Deployment method | Status | Route / boundary |
 |---|---|---|
-| Kubernetes Helm chart | Implemented | Digest-verified chart `0.154.0` archive reused locally; Helm 3.9+/4 post-renderers pin every image; agent/cluster receiver/gateway; Linux or Windows releases, including FIPS variants |
-| Linux DEB/RPM fresh install | Implemented | Tagged installer plus audited-only Collector and auto-instrumentation `0.154.2` executable pins |
+| Kubernetes Helm chart | Implemented | Digest-verified chart `0.158.0` archive reused locally; Helm 3.9+/4 post-renderers pin every image; agent/cluster receiver/gateway; Linux or Windows releases, including FIPS variants |
+| Linux DEB/RPM fresh install | Implemented | Tagged installer plus audited-only Collector and auto-instrumentation `0.158.0` executable pins |
 | Linux DEB/RPM upgrade or downgrade | Handoff | The tagged installer rejects an existing Collector; use the package manager and upstream upgrade guidance |
 | Linux remote SSH | Implemented | Target preflight enforces the tagged distro/arch/systemd/package-tool contract, Bash/curl/Python 3.6+/tar/SHA tooling, and noninteractive root/sudo; it rejects existing installs, validates custom-config access, and streams the token over stdin |
 | TA app `7125` multi-OS package | Implemented for audit/stage | Deployment server or one Linux-capable local HF/UF package; fleet delivery/restart remains delegated |
@@ -77,11 +77,11 @@ Status meanings:
 | Non-root agent security context | Guarded extension | Use reviewed extra values; chart init-image and host-permission behavior must pass the pinned manifest/image checks |
 | OTLP token passthrough | Guarded extension | Agent/gateway receiver metadata configuration is allowed only through reviewed extra values; validate tenant/token isolation |
 | Edge Processor routing | Delegated | `splunk-edge-processor-setup`; Collector health does not prove EP pipeline readiness |
-| FIPS Kubernetes image | Implemented | Audited `0.154.0` manifest covers Linux `amd64`/`arm64` and Windows `amd64`; discovery and OBI rejected |
+| FIPS Kubernetes image | Implemented | Audited `0.158.0` manifest covers Linux `amd64`/`arm64` and two Windows `amd64` base images; discovery and OBI rejected |
 | FIPS Linux package | Handoff | Use release FIPS artifact/manual package workflow; installer does not select it |
 | Fleet Management / OpAMP | Partial/TA handoff | Entitlement and inventory evidence required |
 | Gateway HA | Implemented baseline | Three replicas; PDB/HPA/topology customization through reviewed values |
-| Gateway StatefulSet | Unsupported here | Not a chart `0.154.0` value |
+| Gateway StatefulSet | Not rendered | Chart `0.155.0` added `gateway.mode: statefulset` with `gateway.statefulsetSpec` and `gateway.headlessService`; chart `0.158.0` accepts it, but this workflow renders only the Deployment gateway |
 | Tail sampling/load balancing | Handoff | Reviewed custom pipeline/gateway design required |
 | Filtering/transform/redaction/routing | Handoff | Reviewed `collector-config` or guarded chart overlay; no untyped claim |
 | Custom receivers/processors/exporters/connectors | Handoff | Must exist in tagged component catalog and pass Collector validation |

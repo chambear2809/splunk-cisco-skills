@@ -117,7 +117,7 @@ cluster. THEN re-run this skill's `apply` phase.
 the OS doesn't support FIPS 140-3.
 
 **Fix**: confirm Splunk 10.0+ is installed and the OS is on the
-[FIPS 140-3 supported OS list](https://help.splunk.com/?resourceId=Splunk_FIPS_supported_OS).
+[FIPS-supported OS list](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips).
 On RHEL 8 / 9, the OS must be in FIPS mode (`fips-mode-setup
 --check`).
 

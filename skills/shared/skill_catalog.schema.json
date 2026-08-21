@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/chambear2809/splunk-cisco-skills/skills/shared/skill_catalog.schema.json",
+  "$id": "https://github.com/chambear2809/splunk-cisco-skills/blob/main/skills/shared/skill_catalog.schema.json",
   "title": "Splunk and Cisco canonical skill catalog",
   "type": "object",
   "additionalProperties": false,

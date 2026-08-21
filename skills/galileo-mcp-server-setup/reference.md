@@ -6,6 +6,8 @@
   `https://docs.galileo.ai/getting-started/mcp/setup-galileo-mcp`
 - Galileo docs coverage index:
   `https://docs.galileo.ai/llms-full.txt`
+- Splunk Agent Observability docs coverage index:
+  `https://agent-observability-docs.splunk.com/llms-full.txt`
 - MCP tool-call logging:
   `https://docs.galileo.ai/how-to-guides/basics/log-mcp-server-calls/log-mcp-server-calls`
 - MCP Streamable HTTP transport:
@@ -20,6 +22,14 @@
   `https://github.com/rungalileo/sdk-examples/tree/main/python/logging-samples/log-mcp-calls`
 - July 7, 2026 release notes:
   `https://docs.galileo.ai/release-notes#2026-07-07`
+- July 21, 2026 release notes:
+  `https://docs.galileo.ai/release-notes#2026-07-21`
+- August 4, 2026 release notes:
+  `https://docs.galileo.ai/release-notes#2026-08-04`
+- August 7, 2026 naming and documentation boundary:
+  `https://docs.galileo.ai/release-notes#2026-08-07`
+- Post-August 7 onboarding documentation:
+  `https://agent-observability-docs.splunk.com`
 - AI Assistant beta:
   `https://docs.galileo.ai/concepts/ai-assistant`
 - Generic alert webhooks:
@@ -130,9 +140,10 @@ Use `scripts/deep_audit.sh` before declaring the skill correct. It runs:
 - live MCP server-name/version/tool/schema/prompt/resource drift checks
 - a live rendered-bridge initialize/tools/prompts/resources catalog probe using
   a non-secret placeholder header (no tenant tool calls or mutations)
-- Galileo `llms-full.txt` docs-index to product-gap-matrix coverage checks
-- a fail-closed release-date check when the docs index contains a release newer
-  than the reviewed July 7, 2026 baseline
+- separate legacy Galileo and post-rename Splunk Agent Observability
+  `llms-full.txt` docs-index checks against the product-gap matrix
+- a fail-closed release-date check when either docs index contains a release
+  newer than the reviewed August 7, 2026 baseline
 
 `--skip-live` uses offline product markers and skips live MCP/network checks.
 `--offline-docs` keeps the live MCP check but uses embedded docs markers for
@@ -169,13 +180,15 @@ Use:
   `splunk-observability-dashboard-builder`, and
   `splunk-observability-native-ops` for Splunk-side services.
 
-### July 7, 2026 boundary details
+### July 7-August 7, 2026 boundary details
 
 - **AI Assistant beta** is a read-only console capability using Galileo
   traces, spans, sessions, evaluation scores, and evidence links. Enterprise
   support enablement and a configured LLM integration are prerequisites. No
-  public Assistant API or MCP tool is documented; use `galileo-platform-setup`
-  for readiness, enablement, and console evidence.
+  public Assistant API or MCP tool is documented. The August 4 release expands
+  it across Galileo debugging, and the July 21 release adds signal criticality
+  ordering; use `galileo-platform-setup` for readiness, enablement, and console
+  evidence.
 - **Global dashboards** provide a customizable organization view across
   projects and log streams. The documented Trends endpoints remain scoped to
   `/v2/projects/{project_id}/log_streams/{log_stream_id}/trends...`; do not
@@ -197,6 +210,25 @@ Use:
   is documented. MCP dataset creation/status is only partial coverage; hand off
   experiment execution, progress, and result validation without inventing a
   hard limit.
+- **Annotation Queues** are generally available as of August 4. Public APIs
+  cover queue, template, user, record, and export operations, but the observed
+  MCP tool catalog has no queue lifecycle tool. Use `galileo-platform-setup`
+  for access governance, assignment, annotation, export, and evidence.
+- **Metric and cost workflows** added or promoted on July 21 include
+  AI-assisted custom-code metric authoring, Model Pricing and Integration Costs
+  GA, organization Billing Usage, Trace Count log-stream alerts, and multimodal
+  out-of-the-box evaluation metrics. These remain platform/API/console
+  handoffs; MCP docs search does not configure them.
+- **Hosted models and console presentation** added on August 4 include GPT 5.6
+  Sol, Terra, and Luna in supported Galileo surfaces and light, dark, or system
+  theme selection. Treat model availability as tenant/platform state and theme
+  choice as an operator preference, not MCP server configuration.
+- **Naming and documentation epoch** changed on August 7: Galileo is now
+  Splunk Agent Observability. `docs.galileo.ai` applies to customers onboarded
+  before August 7; later onboarding uses
+  `agent-observability-docs.splunk.com`. For onboarding on August 7 itself,
+  follow the tenant's linked documentation because the release note does not
+  assign that boundary case.
 
 See `references/tool-catalog.md`, `references/client-matrix.md`,
 `references/product-gap-matrix.md`, and `references/troubleshooting.md`.

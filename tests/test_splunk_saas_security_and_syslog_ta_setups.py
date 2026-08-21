@@ -53,7 +53,7 @@ class NewTaRendererTests(unittest.TestCase):
             inputs = (out / "inputs.local.conf.template").read_text(encoding="utf-8")
             account = (out / "account-setup.md").read_text(encoding="utf-8")
             self.assertEqual(metadata["splunkbase_id"], "3549")
-            self.assertEqual(metadata["latest_verified_version"], "6.0.2")
+            self.assertEqual(metadata["latest_verified_version"], "7.0.0")
             self.assertIn("sfdc:loginhistory", metadata["sourcetypes"])
             self.assertIn("[sfdc_object://loginhistory]", inputs)
             self.assertIn("[sfdc_event_log://event_log]", inputs)
@@ -78,7 +78,7 @@ class NewTaRendererTests(unittest.TestCase):
             metadata = json.loads((out / "metadata.json").read_text(encoding="utf-8"))
             inputs = (out / "inputs.local.conf.template").read_text(encoding="utf-8")
             self.assertEqual(metadata["splunkbase_id"], "2679")
-            self.assertEqual(metadata["latest_verified_version"], "4.0.0")
+            self.assertEqual(metadata["latest_verified_version"], "5.0.0")
             self.assertIn("box:filecontent:json", metadata["sourcetypes"])
             self.assertIn("[box_service://box_historical]", inputs)
             self.assertIn("[box_live_monitoring_service://box_live]", inputs)
@@ -106,16 +106,17 @@ class NewTaRendererTests(unittest.TestCase):
             self.assertEqual(metadata["apps"]["epm"]["splunkbase_id"], "5160")
             self.assertEqual(metadata["apps"]["epv_pta"]["splunkbase_id"], "2891")
             self.assertTrue(metadata["apps"]["epv_pta"]["archived_not_supported"])
-            self.assertIn("[application_events://application_events]", inputs)
+            self.assertIn("[policy_audit_events://policy_audit_events]", inputs)
+            self.assertNotIn("application_events://", inputs)
             self.assertIn("cyberark:epv:cef", handoff)
             self.assertIn("archived/not-supported", handoff)
             self.assert_no_unscoped_validation_or(out)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = run_cmd("python3", str(render), "--output-dir", tmpdir, "--products", "epm", "--epm-inputs", "threat_detection", "--json")
+            result = run_cmd("python3", str(render), "--output-dir", tmpdir, "--products", "epm", "--epm-inputs", "policy_audit_events", "--json")
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             inputs = (Path(tmpdir) / "splunk-cyberark-ta" / "inputs.local.conf.template").read_text(encoding="utf-8")
-            self.assertIn("[threat_detection://threat_detection]", inputs)
+            self.assertIn("[policy_audit_events://policy_audit_events]", inputs)
             self.assertNotIn("application_events://", inputs)
 
     def test_rsa_cas_and_am_render(self) -> None:

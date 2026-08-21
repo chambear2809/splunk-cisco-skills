@@ -10,7 +10,7 @@ description: "Use when the user asks to onboard, configure, render, or validate 
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Add-on for Microsoft Sysmon Setup
@@ -84,7 +84,7 @@ hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
 doctor.
 
 Render-first automation for `Splunk_TA_microsoft_sysmon` (Splunkbase `5709`,
-verified `5.0.0`). The renderer emits one collection mode at a time:
+verified `5.0.1`). The renderer emits one collection mode at a time:
 endpoint direct collection or Windows Event Collector. It does not install
 Sysmon on endpoints.
 

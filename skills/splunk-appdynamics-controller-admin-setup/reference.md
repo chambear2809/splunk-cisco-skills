@@ -2,13 +2,13 @@
 
 Primary sources:
 
-- https://help.splunk.com/appdynamics-saas
-- https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index
-- https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/api-clients
-- https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api
-- https://help.splunk.com/en/appdynamics-saas/appdynamics-saas-administration
-- https://help.splunk.com/appdynamics-saas/licensing
-- https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/sensitive-data-collection-and-security
+- https://help.splunk.com/en/appdynamics-saas
+- https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index
+- https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/api-clients
+- https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api
+- https://help.splunk.com/en/appdynamics-saas/accounts/global-account-administration
+- https://help.splunk.com/en/appdynamics-saas/licensing/26.8.0/splunk-appdynamics-licensing
+- https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/sensitive-data-collection-and-security
 
 The skill covers API clients, OAuth, users, groups, roles, permissions, SAML,
 LDAP, licensing, license rules, sensitive data controls, SQL/log masking,

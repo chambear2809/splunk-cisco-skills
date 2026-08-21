@@ -21,6 +21,12 @@ import shlex
 from pathlib import Path
 from typing import Any
 
+# Chart `distribution` accepts only eks, eks/auto-mode, eks/fargate, gke,
+# gke/autopilot, aks, openshift, " ", and "" (identical in chart 0.154.0 and
+# 0.158.0). This skill's own spec vocabulary uses "kubernetes" for vanilla
+# clusters, which the chart rejects, so translate it to the empty string.
+CHART_DISTRIBUTION = {"kubernetes": "", "vanilla": "", "": ""}
+
 
 SKILL_NAME = "splunk-observability-nvidia-gpu-integration"
 
@@ -174,11 +180,13 @@ def overlay_values(spec: dict[str, Any], receiver_creator_name: str, filter_mode
         },
     }
 
-    processors: list[str] = ["memory_limiter", "batch", "resourcedetection", "resource"]
+    # Chart >= 0.158.0 rejects the legacy "resourcedetection" alias in
+    # agent.config; use the canonical chart name.
+    processors: list[str] = ["memory_limiter", "batch", "resource_detection", "resource"]
     processors_block: dict[str, Any] = {
         "memory_limiter": {"check_interval": "2s", "limit_mib": 200},
         "batch": {},
-        "resourcedetection": {"detectors": ["system"], "system": {"hostname_sources": ["os"]}},
+        "resource_detection": {"detectors": ["system"], "system": {"hostname_sources": ["os"]}},
         "resource": {"attributes": [{"action": "upsert", "key": "k8s.cluster.name", "value": cluster_name}]},
     }
 
@@ -194,11 +202,13 @@ def overlay_values(spec: dict[str, Any], receiver_creator_name: str, filter_mode
                 "include": {"match_type": "strict", "metric_names": metrics}
             }
         }
-        processors.insert(2, "filter/dcgm_strict")  # after batch, before resourcedetection
+        processors.insert(2, "filter/dcgm_strict")  # after batch, before resource_detection
 
     overlay: dict[str, Any] = {
         "clusterName": cluster_name or "lab-cluster",
-        "distribution": distribution or "kubernetes",
+        # The chart's distribution enum has no "kubernetes" member; vanilla
+        # Kubernetes is the empty string. Anything else fails values.schema.json.
+        "distribution": CHART_DISTRIBUTION.get(distribution, distribution),
         "agent": {
             "config": {
                 "extensions": {

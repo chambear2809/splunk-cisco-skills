@@ -23,7 +23,7 @@
 - Users, roles, Nexus Dashboard access, SSO, service-provider certificates, and audit logs.
 - AI Assistant, AI Canvas, Actions, Notifications, Favorites, and Help/support workflows.
 - Inventory, licensing, RBAC, topology, workflows/atomics, targets/account keys, webhooks, and Multicloud Fabric beta.
-- Cisco Data Fabric readiness is delegated to a claim-level source ledger and lifecycle matrix covering Data Inputs, processing, all current federation targets and catalogs, indexed/external/alpha storage, context, open CTSM versus hosted CDTSM, both Agent Builders, MCP, Cloud Control, AI Canvas, governance, and cross-domain consumers.
+- Cisco Data Fabric readiness is delegated to a claim-level source ledger and lifecycle matrix covering Data Inputs, processing, all current federation targets and catalogs, indexed/external/alpha storage, context, open CTSM versus the GA hosted CDTSM, Splunk AI Toolkit Agent Launchpad separately from Cloud Control Studio Agent Builder, MCP, Cloud Control, AI Canvas, governance, and cross-domain consumers.
 - Release-note open issues.
 
 ## Official Product Checklist

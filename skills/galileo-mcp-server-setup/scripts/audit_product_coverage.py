@@ -12,7 +12,10 @@ from typing import Any
 
 
 DEFAULT_DOCS_INDEX_URL = "https://docs.galileo.ai/llms-full.txt"
-LATEST_REVIEWED_RELEASE = "2026-07-07"
+DEFAULT_NEW_ERA_DOCS_INDEX_URL = (
+    "https://agent-observability-docs.splunk.com/llms-full.txt"
+)
+LATEST_REVIEWED_RELEASE = "2026-08-07"
 RELEASE_LABEL_RE = re.compile(r'<Update\s+label=["\'](\d{4}-\d{2}-\d{2})["\']')
 
 PRODUCT_RULES: list[dict[str, Any]] = [
@@ -47,7 +50,57 @@ PRODUCT_RULES: list[dict[str, Any]] = [
         "id": "ai_assistant_beta",
         "docs_markers": ["AI Assistant (Beta)", "concepts/ai-assistant"],
         "matrix_markers": [
-            "AI Assistant beta, evidence-linked investigation, and enterprise enablement"
+            "AI Assistant beta, evidence-linked investigation, criticality, and organization-wide debugging"
+        ],
+    },
+    {
+        "id": "splunk_agent_observability_docs_epoch",
+        "docs_markers": [
+            "Galileo is now Splunk Agent Observability",
+            "agent-observability-docs.splunk.com",
+        ],
+        "matrix_markers": [
+            "Splunk Agent Observability naming and pre-/post-August 7 documentation epoch"
+        ],
+    },
+    {
+        "id": "annotation_queues_ga",
+        "docs_markers": [
+            "Annotation Queues now generally available",
+            "Query Annotation Queues",
+        ],
+        "matrix_markers": [
+            "Annotation Queues GA, templates, users, records, and human-feedback operations"
+        ],
+    },
+    {
+        "id": "ai_metric_authoring_and_billing",
+        "docs_markers": [
+            "Generate custom code-based metrics with AI",
+            "View billing usage for your organization",
+        ],
+        "matrix_markers": [
+            "AI-assisted custom-code metrics, organization billing usage, model pricing, and integration costs"
+        ],
+    },
+    {
+        "id": "trace_count_and_multimodal_metrics",
+        "docs_markers": [
+            "Log stream alerts on trace count",
+            "Multimodal out-of-the-box evaluation metrics",
+        ],
+        "matrix_markers": [
+            "Trace Count alerts and multimodal out-of-the-box evaluation metrics"
+        ],
+    },
+    {
+        "id": "hosted_models_and_console_theme",
+        "docs_markers": [
+            "GPT 5.6 Sol, Terra, and Luna",
+            "Dark mode now generally available",
+        ],
+        "matrix_markers": [
+            "Hosted-model availability and light, dark, or system console themes"
         ],
     },
     {
@@ -301,12 +354,38 @@ def parse_args() -> argparse.Namespace:
         default="skills/galileo-mcp-server-setup/references/product-gap-matrix.md",
         help="Product gap matrix markdown file.",
     )
-    parser.add_argument("--docs-index-url", default=DEFAULT_DOCS_INDEX_URL)
-    parser.add_argument("--docs-index-file", default="")
+    parser.add_argument(
+        "--docs-index-url",
+        "--legacy-docs-index-url",
+        dest="docs_index_url",
+        default=DEFAULT_DOCS_INDEX_URL,
+        help="Pre-August 7 Galileo llms-full.txt URL.",
+    )
+    parser.add_argument(
+        "--docs-index-file",
+        "--legacy-docs-index-file",
+        dest="docs_index_file",
+        default="",
+        help=(
+            "Local pre-August 7 docs index. For backward-compatible fixtures, "
+            "this file is also used for the new-era index unless "
+            "--new-era-docs-index-file is set."
+        ),
+    )
+    parser.add_argument(
+        "--new-era-docs-index-url",
+        default=DEFAULT_NEW_ERA_DOCS_INDEX_URL,
+        help="Post-August 7 Splunk Agent Observability llms-full.txt URL.",
+    )
+    parser.add_argument(
+        "--new-era-docs-index-file",
+        default="",
+        help="Local post-August 7 docs index.",
+    )
     parser.add_argument(
         "--offline",
         action="store_true",
-        help="Use embedded docs markers instead of fetching Galileo llms.txt.",
+        help="Use embedded docs markers instead of fetching either docs index.",
     )
     parser.add_argument("--timeout", type=float, default=20.0)
     parser.add_argument("--json", action="store_true")
@@ -314,6 +393,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def read_docs_index(args: argparse.Namespace) -> tuple[str, str]:
+    """Read the legacy index retained for callers of the original helper."""
+
     if args.docs_index_file:
         path = Path(args.docs_index_file).expanduser()
         return path.read_text(encoding="utf-8"), str(path)
@@ -327,13 +408,61 @@ def read_docs_index(args: argparse.Namespace) -> tuple[str, str]:
         return response.read().decode("utf-8", "replace"), args.docs_index_url
 
 
-def missing_coverage(docs_index: str, matrix: str) -> list[dict[str, Any]]:
+def _read_index(*, path_value: str, url: str, offline: bool, timeout: float) -> tuple[str, str]:
+    if path_value:
+        path = Path(path_value).expanduser()
+        return path.read_text(encoding="utf-8"), str(path)
+    if offline:
+        return FALLBACK_DOCS_INDEX, "embedded-offline-markers"
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "galileo-mcp-server-setup-product-audit/1"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8", "replace"), url
+
+
+def read_docs_indices(args: argparse.Namespace) -> dict[str, tuple[str, str]]:
+    """Read the legacy and post-rename docs indices as distinct evidence sources."""
+
+    legacy_file = getattr(args, "docs_index_file", "")
+    new_era_file = getattr(args, "new_era_docs_index_file", "")
+    if legacy_file and not new_era_file:
+        # Preserve deterministic behavior for existing single-fixture callers.
+        new_era_file = legacy_file
+
+    return {
+        "legacy": _read_index(
+            path_value=legacy_file,
+            url=getattr(args, "docs_index_url", DEFAULT_DOCS_INDEX_URL),
+            offline=args.offline,
+            timeout=args.timeout,
+        ),
+        "new_era": _read_index(
+            path_value=new_era_file,
+            url=getattr(
+                args,
+                "new_era_docs_index_url",
+                DEFAULT_NEW_ERA_DOCS_INDEX_URL,
+            ),
+            offline=args.offline,
+            timeout=args.timeout,
+        ),
+    }
+
+
+def missing_coverage(
+    docs_index: str,
+    matrix: str,
+    *,
+    check_release: bool = True,
+) -> list[dict[str, Any]]:
     docs_lower = docs_index.lower()
     matrix_lower = matrix.lower()
     missing: list[dict[str, Any]] = []
     release_dates = RELEASE_LABEL_RE.findall(docs_index)
     latest_release = max(release_dates, default="")
-    if not release_dates:
+    if check_release and not release_dates:
         missing.append(
             {
                 "id": "release_label_not_found",
@@ -341,7 +470,7 @@ def missing_coverage(docs_index: str, matrix: str) -> list[dict[str, Any]]:
                 "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
             }
         )
-    elif latest_release > LATEST_REVIEWED_RELEASE:
+    elif check_release and latest_release > LATEST_REVIEWED_RELEASE:
         missing.append(
             {
                 "id": "unreviewed_release",
@@ -381,13 +510,47 @@ def missing_coverage(docs_index: str, matrix: str) -> list[dict[str, Any]]:
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-    docs_index, source = read_docs_index(args)
+    docs_indices = read_docs_indices(args)
+    docs_index = "\n".join(index for index, _source in docs_indices.values())
     matrix_path = Path(args.matrix)
     matrix = matrix_path.read_text(encoding="utf-8")
-    failures = missing_coverage(docs_index, matrix)
     release_dates = RELEASE_LABEL_RE.findall(docs_index)
+    source_evidence = {
+        epoch: {
+            "source": source,
+            "latest_documented_release": max(
+                RELEASE_LABEL_RE.findall(index),
+                default=None,
+            ),
+        }
+        for epoch, (index, source) in docs_indices.items()
+    }
+    failures = missing_coverage(docs_index, matrix, check_release=False)
+    for epoch, evidence in source_evidence.items():
+        if evidence["latest_documented_release"] is None:
+            failures.append(
+                {
+                    "id": "release_label_not_found",
+                    "reason": "release_note_date_markup_not_found",
+                    "docs_epoch": epoch,
+                    "docs_source": evidence["source"],
+                    "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
+                }
+            )
+    latest_release = max(release_dates, default="")
+    if latest_release > LATEST_REVIEWED_RELEASE:
+        failures.append(
+            {
+                "id": "unreviewed_release",
+                "reason": "newer_release_note_detected",
+                "latest_documented_release": latest_release,
+                "latest_reviewed_release": LATEST_REVIEWED_RELEASE,
+            }
+        )
     return {
-        "docs_source": source,
+        # Retain the original field for JSON consumers while exposing both epochs.
+        "docs_source": source_evidence["legacy"]["source"],
+        "docs_sources": source_evidence,
         "matrix": str(matrix_path),
         "rules_checked": len(PRODUCT_RULES),
         "latest_documented_release": max(release_dates, default=None),
@@ -418,8 +581,7 @@ def main() -> int:
             print(f"  - {item['id']}: {item['reason']}", file=sys.stderr)
             for marker in item.get("missing_matrix_markers", []):
                 print(f"    missing matrix marker: {marker}", file=sys.stderr)
-        return 2
-    return 0
+    return 0 if report["ok"] else 2
 
 
 if __name__ == "__main__":

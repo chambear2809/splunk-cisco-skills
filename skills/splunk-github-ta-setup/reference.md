@@ -1,6 +1,6 @@
 # Splunk_TA_github Reference
 
-Package source of truth: `splunk-ta/_unpacked/Splunk_TA_github-3.3.0/Splunk_TA_github`.
+Package source of truth: `splunk-ta/_unpacked/Splunk_TA_github-4.0.0/Splunk_TA_github`.
 
 ## Inputs
 

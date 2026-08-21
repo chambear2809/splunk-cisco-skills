@@ -1,4 +1,4 @@
-<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 1afbbd2fba6ea8a54474fdcea82fd428298104a4702cb2894089ed09bb385d20. -->
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 751a938891aadaa0ac16a094244dc2517f6a370f38bfeda47e8cad1bf4ddf9b8. -->
 
 Render and validate Splunk Observability Cloud Database Monitoring collector configuration for PostgreSQL, Microsoft SQL Server, and Oracle Database through the Splunk OTel Collector. Keeps secrets out of chat, argv, and rendered files; DB credentials are referenced through Kubernetes Secrets or local env vars.
 

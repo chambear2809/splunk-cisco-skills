@@ -1,44 +1,44 @@
 # Agent Management Reference
 
-Primary 26.4 sources reviewed:
+Primary 26.8 sources reviewed:
 
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/quick-start
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/install-smart-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/configure-smart-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/validate-smart-agent-installation
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/synchronize-smart-agent-primary-host-with-the-remote-hosts
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/upgrade-smart-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-attach-java-and-nodejs-agents
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-discovery-of-application-process
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-deploy-agents-with-deployment-groups
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui/install-agents
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui/upgrade-agents
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui/rollback-agents
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-database-agent-using-ui
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-database-agent-using-ui/install-database-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-database-agent-using-ui/rollback-database-agent
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/configuration-options-for-supported-agents
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/supported-agent-types
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/supported-platforms-to-install-supported-agents-using-smartagentctl
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/install-supported-agent-on-a-smart-agent-host
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/requirements-to-install-supported-agent-on-a-remote-host
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/install-supported-agents-on-remote-hosts
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/ssh-configuration-for-remote-host
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/upgrade-supported-agents-using-smartagentctl
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/uninstall-supported-agents-using-smartagentctl
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/roll-back-supported-agents-using-smartagentctl
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility/automate-smart-agent-installation-on-multiple-nodes
-- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility/configure-auto-attach
-- https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/getting-started/download-appdynamics-software
-- https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/downloads/download-options
-- https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/downloads/filter-and-search-options
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/before-you-begin
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/quick-start
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/install-smart-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/configure-smart-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/validate-smart-agent-installation
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/get-started/synchronize-smart-agent-primary-host-with-the-remote-hosts
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/upgrade-smart-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-attach-java-and-nodejs-agents
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-discovery-of-application-process
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/auto-deploy-agents-with-deployment-groups
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-ui
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-ui/install-agents
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-ui/upgrade-agents
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-ui/rollback-agents
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-database-agent-using-ui
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-database-agent-using-ui/install-database-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-database-agent-using-ui/rollback-database-agent
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/configuration-options-for-supported-agents
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/supported-agent-types
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/supported-platforms-to-install-supported-agents-using-smartagentctl
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/install-supported-agent-on-a-smart-agent-host
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/requirements-to-install-supported-agent-on-a-remote-host
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/install-supported-agents-on-remote-hosts
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/ssh-configuration-for-remote-host
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/upgrade-supported-agents-using-smartagentctl
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/uninstall-supported-agents-using-smartagentctl
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/manage-the-agents-using-smartagentctl/roll-back-supported-agents-using-smartagentctl
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/smart-agent-command-line-utility
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/smart-agent-command-line-utility/automate-smart-agent-installation-on-multiple-nodes
+- https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.8.0/smart-agent/smart-agent-command-line-utility/configure-auto-attach
+- https://help.splunk.com/en/appdynamics-on-premises/get-started/26.8.0/getting-started/download-appdynamics-software
+- https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/downloads/download-options
+- https://help.splunk.com/en/appdynamics-saas/get-started/26.8.0/downloads/filter-and-search-options
 - https://help.splunk.com/en/appdynamics-on-premises/accounts/download-splunk-appdynamics-software
-- https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/agent-installer-platform-service-api
+- https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.8.0/extend-splunk-appdynamics/splunk-appdynamics-apis/agent-installer-platform-service-api
 
 Current managed surface:
 
@@ -70,7 +70,9 @@ Consumption model:
 - `smart-agent-readiness.yaml`: prereq, platform, support matrix, permissions,
   and resource checks.
 - `smart-agent-config.ini.template`: redacted config template with proxy, TLS,
-  telemetry, polling/scanning, storage, and auto-discovery knobs.
+  telemetry, polling/scanning, storage, and auto-discovery knobs. `AgentType` is
+  no longer emitted: 26.8.0 dropped it from the documented `config.ini` sample,
+  and it was never one of the mandatory parameters.
 - `remote.yaml.template`: Linux SSH and Windows WinRM examples using file or
   environment-backed credentials only.
 - `agent-management-ui-runbook.md`: UI install, upgrade, rollback, Database
@@ -80,7 +82,10 @@ Consumption model:
   large-scale rollout guardrails.
 - `auto-attach-and-discovery-runbook.md`: Java/Node.js auto-attach and process
   discovery handling.
-- `smart-agent-cli-deprecation-runbook.md`: legacy CLI compatibility only.
+- `smart-agent-cli-deprecation-runbook.md`: migration off the standalone Smart
+  Agent CLI, which passed End of Support on February 2, 2026. Rendered by default
+  so existing pipeline call sites have a documented exit path; it is not an
+  adoption path.
 
 Remote install, upgrade, and rollback commands are rendered to
 `smart-agent-remote-command-plan.sh` and require explicit acceptance before any

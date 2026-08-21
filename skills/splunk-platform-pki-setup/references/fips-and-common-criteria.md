@@ -26,7 +26,7 @@ Per the [FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administ
 Phase 1 prerequisites:
 
 - Splunk Enterprise must already run in FIPS mode pre-upgrade.
-- OS must be on the [FIPS 140-2 supported OS list](https://help.splunk.com/?resourceId=Splunk_FIPS_supported_OS).
+- OS must be on the [FIPS-supported OS list](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips).
 - KV Store must be on MongoDB 4.2+.
 - All apps must work with Python 3.9.
 - All instances must use TLS 1.2.
@@ -96,7 +96,7 @@ on a FIPS-validated OS).
 ## Common Criteria
 
 Splunk Enterprise has historic Common Criteria evaluations (look
-for the latest at [Splunk Compliance](https://www.splunk.com/en_us/about-splunk/security-trust.html)).
+for the latest at [Splunk Compliance](https://www.splunk.com/en_us/about-splunk/splunk-data-security-and-privacy/compliance-at-splunk.html)).
 For CC-evaluated deployments, the FIPS 140-3 settings above plus:
 
 - **`splunkd.log` must be forwarded to a tamper-evident store**

@@ -36,7 +36,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "label": "NGINX",
         "app": "Splunk_TA_nginx",
         "id": "3258",
-        "version": "3.3.0",
+        "version": "3.3.1",
         "transport": "local_file_uf",
         "index_arg": "index",
         "sourcetypes": [
@@ -71,7 +71,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "label": "Tomcat",
         "app": "Splunk_TA_tomcat",
         "id": "2911",
-        "version": "4.0.0",
+        "version": "4.0.3",
         "transport": "local_file_uf",
         "index_arg": "index",
         "sourcetypes": [
@@ -146,7 +146,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "label": "F5 BIG-IP",
         "app": "Splunk_TA_f5-bigip",
         "id": "2680",
-        "version": "6.5.1",
+        "version": "7.0.0",
         "transport": "sc4s_syslog_or_api",
         "index_arg": "syslog_index",
         "sourcetypes": [
@@ -162,7 +162,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "label": "Citrix NetScaler",
         "app": "Splunk_TA_citrix-netscaler",
         "id": "2770",
-        "version": "8.2.3",
+        "version": "8.2.4",
         "transport": "sc4s_syslog_or_api",
         "index_arg": "syslog_index",
         "sourcetypes": [

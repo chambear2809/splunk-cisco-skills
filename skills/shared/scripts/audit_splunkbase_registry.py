@@ -20,7 +20,6 @@ import sys
 import tempfile
 import urllib.request
 from datetime import date, datetime, timezone
-from html import unescape
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +38,6 @@ EVIDENCE_SCOPE = (
 )
 SOURCE_VERIFIED_STATUS = "source-verified-current-release-api"
 HISTORICAL_ONLY_STATUS = "historical-review-only-not-currently-reproducible"
-VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*(?:[.-][A-Za-z0-9]+)?)\b")
-DATE_RE = re.compile(r"([A-Z][a-z]+ \d{1,2}, 20\d{2})")
 TARGET_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+)?$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 NEXT_DATA_RE = re.compile(
@@ -202,14 +199,50 @@ def canonicalize_json_arrays(value: Any) -> Any:
     return value
 
 
-def canonical_listing_payload(value: bytes) -> bytes:
-    """Extract and canonically serialize fetched Splunkbase listing JSON."""
+def parse_next_data(value: bytes) -> Any:
+    """Extract the embedded Splunkbase listing JSON source payload."""
 
     match = NEXT_DATA_RE.search(value)
     if match is None:
         raise ValueError("Splunkbase listing omitted __NEXT_DATA__ source payload")
-    payload = json.loads(match.group("payload").decode("utf-8"))
-    return canonical_json(canonicalize_json_arrays(payload))
+    return json.loads(match.group("payload").decode("utf-8"))
+
+
+def canonical_listing_payload(value: bytes) -> bytes:
+    """Extract and canonically serialize fetched Splunkbase listing JSON."""
+
+    return canonical_json(canonicalize_json_arrays(parse_next_data(value)))
+
+
+def listing_release_facts(payload: Any) -> dict[str, Any]:
+    """Return the listed current release facts from a Splunkbase listing payload.
+
+    The listing advertises one designated current release, which is not always the
+    most recently published one when a vendor maintains parallel release lines.
+    """
+
+    props = payload.get("props") if isinstance(payload, dict) else None
+    page_props = props.get("pageProps") if isinstance(props, dict) else None
+    details = page_props.get("appDetails") if isinstance(page_props, dict) else None
+    if not isinstance(details, dict):
+        raise ValueError("Splunkbase listing omitted props.pageProps.appDetails")
+    release = details.get("release")
+    if not isinstance(release, dict):
+        raise ValueError("Splunkbase listing omitted appDetails.release")
+    version = str(release.get("name", "")).strip()
+    if not version:
+        raise ValueError("Splunkbase listing release omitted a version name")
+    compatibility = release.get("versionCompatibility")
+    platform_versions = [
+        str(item.get("versionString", "")).strip()
+        for item in compatibility
+        if isinstance(item, dict) and str(item.get("versionString", "")).strip()
+    ] if isinstance(compatibility, list) else []
+    return {
+        "version": version,
+        "release_date": display_date_from_api(release.get("publishedDatetime")),
+        "platform_versions": platform_versions,
+    }
 
 
 def package_facts(app: dict[str, Any]) -> dict[str, Any]:
@@ -228,21 +261,6 @@ def registry_package_facts_sha256(apps: list[dict[str, Any]]) -> str:
         key=lambda item: int(str(item["splunkbase_id"])),
     )
     return sha256_bytes(canonical_json(facts))
-
-
-def clean_html(value: str) -> str:
-    text = unescape(re.sub(r"<[^>]+>", " ", value))
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def segment(text: str, label: str, stops: list[str]) -> str:
-    stop_pattern = "|".join(re.escape(stop) for stop in stops)
-    match = re.search(re.escape(label) + r"\s*(.*?)\s*(?=" + stop_pattern + r")", text)
-    return match.group(1).strip(" :") if match else ""
-
-
-def parse_platform_versions(value: str) -> list[str]:
-    return re.findall(r"(?<!\d)\d+\.\d+(?!\d)", value or "")
 
 
 def registry_apps(registry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -353,22 +371,11 @@ def fetch_splunkbase(
     listing_url, release_url = splunkbase_urls(app_id)
     listing_bytes = fetch_bytes(listing_url)
     release_bytes = fetch_bytes(release_url)
-    text = clean_html(listing_bytes.decode("utf-8", "replace"))
+    listing_payload = parse_next_data(listing_bytes)
     release_payload = json.loads(release_bytes.decode("utf-8", "replace"))
 
-    latest = segment(
-        text,
-        "Latest Version",
-        ["Visibility", "Rating", "Downloads", "Platform Version", "Product"],
-    )
-    platform = segment(
-        text,
-        "Platform Version",
-        ["Rating", "Downloads", "Product", "CIM Version", "Categories", "Built by"],
-    )
-    version_match = VERSION_RE.search(latest)
-    date_match = DATE_RE.search(latest)
-    latest_version = version_match.group(1) if version_match else ""
+    listing = listing_release_facts(listing_payload)
+    latest_version = listing["version"]
     latest_release = find_release(release_payload, latest_version)
     if latest_release is None:
         latest_release = next(iter(release_objects(release_payload)), None)
@@ -376,14 +383,16 @@ def fetch_splunkbase(
     result: dict[str, Any] = {
         "splunkbase_id": app_id,
         "latest_version": latest_version,
-        "latest_release_date": date_match.group(1) if date_match else "",
-        "platform_versions": parse_platform_versions(platform),
-        "platform_raw": platform,
+        "latest_release_date": listing["release_date"],
+        "platform_versions": listing["platform_versions"],
+        "platform_raw": ", ".join(listing["platform_versions"]),
         "url": listing_url,
         "sources": {
             "listing": {
                 "url": listing_url,
-                "sha256": sha256_bytes(canonical_listing_payload(listing_bytes)),
+                "sha256": sha256_bytes(
+                    canonical_json(canonicalize_json_arrays(listing_payload))
+                ),
                 "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
             },
             "release_api": {
@@ -409,7 +418,7 @@ def fetch_splunkbase(
     if include_cloud_metadata:
         result.update(normalized_release(latest_release))
         result["latest_version"] = latest_version
-        result["latest_release_date"] = date_match.group(1) if date_match else ""
+        result["latest_release_date"] = listing["release_date"]
     return result
 
 

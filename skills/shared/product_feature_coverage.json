@@ -107,8 +107,8 @@
         }
       ],
       "feature_count": 47,
-      "feature_ids_sha256": "97659825736928bbc374f2920450db835419cf25fc0ebd114e27d3d57c0bf884",
-      "feature_contracts_sha256": "fb19ec5cedbf00ec14889e348df30feff17fb22859ffb79887ea9a8da3041eb6",
+      "feature_ids_sha256": "a44d05155b9af2050f4c6d0af2bebb4ae80f68a32ece49ac5b9b57075f03fc56",
+      "feature_contracts_sha256": "40f96a61f4141ee22711afd0c4a5bb576de4e75ea9ee460a340b138ad816d261",
       "require_row_boundary_statuses": [
         "documented_boundary"
       ],
@@ -145,7 +145,7 @@
       ],
       "feature_count": 134,
       "feature_ids_sha256": "f3d5930107f8d9d4eebafa941c011aa5f6ac36db6ac85269e278f48ef72b8392",
-      "feature_contracts_sha256": "77f4c82fcdaa0a35d6cec675846c7f5f9d613e790ffea102bc287d3df2af290a",
+      "feature_contracts_sha256": "e83a4a6abec435275cea6ac342db278c635eb6d13bd367470ba723c01c633f26",
       "require_row_boundary_statuses": [
         "api_apply",
         "cli_apply",
@@ -497,7 +497,7 @@
       },
       "feature_count": 57,
       "feature_ids_sha256": "50b3ae7c73b3787f7a867a9c4a2bd27dd65b0f4dc353f3e62730ed86616a4951",
-      "feature_contracts_sha256": "8fbfeb9db76734771ab53e8317e5ad8ce6cfde9a1c67cd13828d50a5480d8904"
+      "feature_contracts_sha256": "2027c28474786b3867acf68ae6917926e07f5446abcd1bdb64e30dc4d1035ff2"
     },
     {
       "id": "galileo-on-prem",

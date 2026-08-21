@@ -16,6 +16,12 @@ from typing import Any
 SKILL_NAME = "cisco-data-fabric-setup"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RESEARCH_VERIFIED = "2026-07-03"
+# AI Toolkit 6.0.2 shipped after the 2026-07-03 sweep, so its sources carry
+# their own retrieval date instead of inheriting the skill-wide one.
+AI_TOOLKIT_VERIFIED = "2026-08-20"
+# Cisco Cloud Control Studio sources re-checked after the sweep; the stage did
+# not move, so the date records a negative finding rather than a new claim.
+CISCO_RECHECKED = "2026-08-20"
 SECTIONS = [
     "data-management",
     "federation",
@@ -217,22 +223,46 @@ SOURCE_RECORDS = {
         "source_version": "1.2",
     },
     "ai_toolkit": {
-        "title": "AI Toolkit 5.7.4 release notes",
-        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
+        "title": "AI Toolkit 6.0.2 release notes",
+        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/release-notes/whats-new-in-the-ai-toolkit",
         "source_type": "product_documentation",
-        "source_version": "5.7.4",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
     },
-    "agent_builder_preview": {
-        "title": "AI Toolkit Agent Builder feature preview",
-        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.6.4/ai-toolkit-commands-macros-and-visualizations/feature-preview-ai-toolkit-agent-builder",
+    "ai_toolkit_dependencies": {
+        "title": "Splunk AI Toolkit version dependencies",
+        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/install-and-upgrade-the-ai-toolkit/splunk-ai-toolkit-version-dependencies",
         "source_type": "product_documentation",
-        "source_version": "5.6.4-preview",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
+    },
+    "agent_launchpad": {
+        "title": "AI Toolkit Agent Launchpad",
+        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-connections-containers-and-agents/ai-toolkit-agent-launchpad",
+        "source_type": "product_documentation",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
+    },
+    "agent_launchpad_on_prem": {
+        "title": "Agent Launchpad for on-premises users",
+        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-connections-containers-and-agents/agent-launchpad-for-on-premises-users",
+        "source_type": "product_documentation",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
     },
     "cdtsm": {
-        "title": "Cisco Deep Time Series Model feature preview",
-        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-models/feature-preview-cisco-deep-time-series-model",
+        "title": "Cisco Deep Time Series Model",
+        "url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-models/cisco-deep-time-series-model",
         "source_type": "product_documentation",
-        "source_version": "5.7.4",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
+    },
+    "cdtsm_on_prem": {
+        "title": "Cisco Deep Time Series Model on-premises installation",
+        "url": "https://help.splunk.com/en/splunk-enterprise/apply-machine-learning/use-ai-toolkit/6.0.2/ai-toolkit-models/cisco-deep-time-series-model-on--premises-installation",
+        "source_type": "product_documentation",
+        "source_version": "6.0.2",
+        "retrieved_at": AI_TOOLKIT_VERIFIED,
     },
     "ctsm": {
         "title": "Cisco Time Series Model 1.0 model card",
@@ -263,6 +293,13 @@ SOURCE_RECORDS = {
         "url": "https://blogs.cisco.com/ai/announcing-cisco-cloud-control-agent-builder",
         "source_type": "announcement",
         "source_version": "2026-06",
+    },
+    "cloud_control_release_notes": {
+        "title": "Cisco Cloud Control Release Notes",
+        "url": "https://www.cisco.com/c/en/us/td/docs/ai/cisco-cloud-control/release-notes/cisco-cloud-control-release-notes.html",
+        "source_type": "product_documentation",
+        "source_version": "2026-08-13",
+        "retrieved_at": CISCO_RECHECKED,
     },
     "cloud_control_splunk": {
         "title": "Integrating Splunk Cloud Platform with Cisco Cloud Control",
@@ -352,22 +389,22 @@ CAPABILITIES = [
     capability("ddss_ddaa_smartstore", "storage", "DDSS, DDAA, and SmartStore lifecycle adjacencies", "version_dependent", "render", "Federated Search, DDAA, ACS, SmartStore skills", "Product/topology dependent", "data_management_guide", "These are distinct from Machine Data Lake and from arbitrary external buckets.", "storage-catalog", "storage_catalog_enabled"),
     capability("knowledge_graph", "context", "Knowledge graph", "roadmap", "ui_handoff", "splunk-itsi-config,splunk-knowledge-objects-setup", "Architecture concept", "agentic_layers", "No independent public Cisco Data Fabric configuration surface is claimed.", "context-governance", "context_governance_enabled"),
     capability("business_context", "context", "Business and service context", "architecture", "delegated_render", "splunk-itsi-config,splunk-cim-data-model-setup,splunk-knowledge-objects-setup", "Splunk feature dependent", "agentic_layers", "Model entities, relationships, schema, ownership, and business impact explicitly.", "context-governance", "context_governance_enabled"),
-    capability("ai_toolkit", "ai_action", "Splunk AI Toolkit 5.7.4 and PSC 4.3.2", "ga", "delegated_render", "splunk-ai-ml-toolkit-setup", "Search tier", "ai_toolkit", "Owning skill validates package compatibility, placement, and model permissions.", "ai-activation", "ai_toolkit_enabled"),
+    capability("ai_toolkit", "ai_action", "Splunk AI Toolkit 6.0.2 and PSC 4.3.4", "ga", "delegated_render", "splunk-ai-ml-toolkit-setup", "Search tier", "ai_toolkit", "AI Toolkit 6.0.2 requires PSC 4.3.4 on Python 3.13; 6.0.0 also accepted 4.3.2 or 4.3.3, and 4.3.2 alone is only valid back at 5.7.4. Never pair 6.0.2 with a PSC release below 4.3.4, and remove the previous PSC before a clean install. Owning skill validates package compatibility, placement, and model permissions.", "ai-activation", "ai_toolkit_enabled"),
     capability("dsdl", "ai_action", "DSDL and external model runtimes", "available", "delegated_render", "splunk-ai-ml-toolkit-setup", "External runtime plus search tier", "ai_toolkit", "Keep runtime, image, TLS, network, GPU, and governance ownership explicit.", "ai-activation", "ai_toolkit_enabled"),
     capability("hosted_models", "ai_action", "Hosted Foundation-Sec and GPT-OSS models", "version_dependent", "delegated_render", "splunk-ai-ml-toolkit-setup", "Eligible Splunk Cloud", "ai_toolkit", "Confirm tenant/model availability and data-governance boundary.", "ai-activation", "ai_toolkit_enabled"),
-    capability("cdtsm", "ai_action", "Cisco Deep Time Series Model", "feature_preview", "delegated_render", "splunk-ai-ml-toolkit-setup", "AI Toolkit feature preview/hosted beta", "cdtsm", "Do not conflate hosted CDTSM with the open Cisco Time Series Model.", "ai-activation", "ai_toolkit_enabled"),
+    capability("cdtsm", "ai_action", "Cisco Deep Time Series Model", "ga", "delegated_render", "splunk-ai-ml-toolkit-setup", "Splunk-hosted for Splunk Cloud in a supported region; Splunk Enterprise requires a self-hosted model service", "cdtsm", "Generally available since AI Toolkit 6.0.0 and no longer a feature preview; the 5.7.4 feature-preview page is superseded. Invoked as apply CDTSM. Do not conflate the hosted AI Toolkit integration with the open Cisco Time Series Model, which remains a separately governed layer.", "ai-activation", "ai_toolkit_enabled"),
     capability("ctsm_open_model", "ai_action", "Cisco Time Series Model 1.0 open model", "available", "render", SKILL_NAME, "Open-weight/self-hosted model", "ctsm", "Apache-2.0 model and cisco-tsm package are available; platform integration is separate.", "ai-activation", "ai_activation_enabled"),
-    capability("splunk_agent_builder", "ai_action", "Splunk AI Toolkit Agent Builder", "alpha", "ui_handoff", "splunk-ai-ml-toolkit-setup", "Alpha; public GA target Fall 2026", "cisco_live_2026", "Distinct from Cloud Control Studio Agent Builder; target date is not GA evidence.", "ai-activation", "agent_builder_enabled"),
-    capability("agent_builder_connections", "ai_action", "Agent Builder knowledge-base and MCP connections", "alpha", "delegated_render", "splunk-ai-ml-toolkit-setup", "Private-preview Splunk Cloud", "agent_builder_preview", "Requires preview enrollment, approved knowledge/MCP sources, edit_agent_connections permission, and secret-safe UI handling.", "ai-activation", "agent_builder_enabled"),
-    capability("agent_builder_aiagent", "ai_action", "Agent Builder aiagent invocation", "alpha", "validation", "splunk-ai-ml-toolkit-setup", "Private-preview Splunk Cloud", "agent_builder_preview", "Validate run_agents permission, per-row invocation limits, timeout, agent selection, and representative non-sensitive input; do not infer availability from the public app package.", "ai-activation", "agent_builder_enabled"),
-    capability("agent_builder_run_history", "governance", "Agent Builder run history", "alpha", "validation", "splunk-ai-ml-toolkit-setup", "Private-preview Splunk Cloud", "agent_builder_preview", "Review ai_agent_run_history_index retention, ACL, capacity, and sensitive content; this parent does not create the index.", "context-governance", "agent_builder_enabled"),
+    capability("splunk_agent_builder", "ai_action", "Splunk AI Toolkit Agent Launchpad", "ga", "ui_handoff", "splunk-ai-ml-toolkit-setup", "Splunk Cloud Platform in a supported AWS region; Splunk Enterprise through Splunk Cloud Connect", "agent_launchpad", "Generally available since AI Toolkit 6.0.0, when Agent Launchpad replaced the Agent Builder feature preview. Reachability gates are a supported AWS region with the region egress IP in the stack apiAllowlistIP, at least one supported LLM connection, and an enabled agent. Distinct from Cloud Control Studio Agent Builder.", "ai-activation", "agent_builder_enabled"),
+    capability("agent_builder_connections", "ai_action", "Agent Launchpad LLM, knowledge-base, and MCP connections", "ga", "delegated_render", "splunk-ai-ml-toolkit-setup", "Splunk Cloud Platform; Splunk Enterprise through Splunk Cloud Connect", "agent_launchpad", "Agent creation requires at least one supported LLM connection: OpenAI, Anthropic, Azure OpenAI, Amazon Bedrock, or Splunk-hosted models. Custom LLM and Ollama connections are not supported by Agent Launchpad. Knowledge-base and MCP connections need edit_agent_connections and secret-safe UI handling.", "ai-activation", "agent_builder_enabled"),
+    capability("agent_builder_aiagent", "ai_action", "Agent Launchpad aiagent invocation", "ga", "validation", "splunk-ai-ml-toolkit-setup", "Splunk Cloud Platform; Splunk Enterprise through Splunk Cloud Connect", "agent_launchpad", "The aiagent command ships in the public AI Toolkit package and is no longer preview-gated. Validate the run_agents capability, an agent in the Available and enabled state, the is_risky SPL safeguard prompt, agent_name and optional prompt arguments, and representative non-sensitive input.", "ai-activation", "agent_builder_enabled"),
+    capability("agent_builder_run_history", "governance", "Agent Launchpad run history", "ga", "validation", "splunk-ai-ml-toolkit-setup", "Splunk Cloud Platform; Splunk Enterprise through Splunk Cloud Connect", "agent_launchpad", "Run history is an in-product page visible to the agent owner or a shared role, stored through mlspl.conf [ai:AgentIntegrations] agent_run_index, which the package ships as _audit. No customer-created run-history index is required; if the index is redirected, review capacity, retention, ACL, and sensitive prompt or tool content with its owner.", "context-governance", "agent_builder_enabled"),
     capability("splunk_mcp_server", "ai_action", "Splunk MCP Server", "ga", "delegated_render", "splunk-mcp-server-setup", "Splunk Enterprise and Splunk Cloud", "mcp", "Product GA does not override the child skill's current package production-safety gate.", "ai-activation", "mcp_enabled"),
     capability("mcp_auth_tool_controls", "governance", "MCP encrypted tokens, OAuth, RBAC, tools, limits, and audit", "version_dependent", "validation", "splunk-mcp-server-setup", "Version and tenant dependent", "mcp_oauth", "Track each tool and OAuth lifecycle independently; never render credentials.", "context-governance", "mcp_enabled"),
     capability("ai_assistant_mcp_tools", "ai_action", "Splunk AI Assistant tools through MCP", "version_dependent", "delegated_render", "splunk-ai-assistant-setup,splunk-mcp-server-setup", "AI Assistant and MCP version dependent", "mcp", "AI Assistant must be installed and tool/RBAC controls validated.", "ai-activation", "ai_assistant_enabled"),
     capability("agent_observability", "governance", "AI Agent Monitoring / Agent Observability", "available", "delegated_render", "splunk-observability-ai-agent-monitoring-setup", "Tenant and instrumentation dependent", "agentic_ops", "Monitor behavior, quality, latency, cost, guardrails, and evaluation evidence.", "context-governance", "agent_observability_enabled"),
     capability("ai_canvas_splunk", "experience", "Cisco AI Canvas with Splunk", "controlled_availability", "ui_handoff", "cisco-cloud-control-setup", "Eligible US commercial AWS Splunk Cloud during CA", "ai_canvas", "Requires Cloud Control enablement, Splunk Cloud 10.5.2605.3, current AI Assistant and MCP Server, and `mcp_tool_execute` for every user.", "experience", "ai_canvas_enabled", access_requirement="cloud_control_ca_tenant_approval_identity_terms_and_admin_onboarding"),
     capability("ai_canvas_splunk_limits", "experience", "AI Canvas Splunk execution limits", "controlled_availability", "validation", "cisco-cloud-control-setup", "Eligible AI Canvas with Splunk integrations", "ai_canvas", "Results are limited to 100 rows per card; some SPL commands are forbidden and fail on refresh/run. Validate every generated search and visualization against the current allowlist.", "experience", "ai_canvas_enabled", access_requirement="same_as_ai_canvas_splunk"),
-    capability("cloud_control_studio_agent_builder", "experience", "Cloud Control Studio Agent Builder", "roadmap", "ui_handoff", "cisco-cloud-control-setup", "Announced; availability not established", "cloud_control_agent_builder", "Separate announced Cisco builder from Splunk AI Toolkit Agent Builder; do not infer CA from Cloud Control's own lifecycle.", "experience", "cloud_control_enabled", access_requirement="when_and_if_available"),
+    capability("cloud_control_studio_agent_builder", "experience", "Cloud Control Studio Agent Builder", "roadmap", "ui_handoff", "cisco-cloud-control-setup", "Announced 2026-06-02; availability not established", "cloud_control_agent_builder", "Announced at Cisco Live on 2026-06-02 on a when-and-if-available basis. Re-checked 2026-08-20 against the Cisco Cloud Control release notes updated 2026-08-13, which list no Cloud Control Studio or Agent Builder feature through August 2026 and ship no Studio documentation, so the stage stays roadmap. Cloud Control itself remains Controlled Availability for US-based infrastructure. Separate announced Cisco builder from Splunk AI Toolkit Agent Launchpad, formerly Agent Builder; do not infer CA from Cloud Control's own lifecycle, and do not infer it from Agent Launchpad GA.", "experience", "cloud_control_enabled", access_requirement="when_and_if_available"),
     capability("rbac_audit_lineage_policy", "governance", "RBAC, audit, lineage, policy, and human approval", "architecture", "validation", "Admin, readiness, and product-owner skills", "Cross-cutting", "agentic_layers", "Production agents require access, meaning, trust, evidence, and approval paths.", "context-governance", "context_governance_enabled"),
     capability("cim_ocsf_readiness", "context", "CIM, OCSF, schema, and downstream data readiness", "available", "delegated_render", "splunk-data-source-readiness-doctor,splunk-cim-data-model-setup", "Data-source dependent", "data_management_guide", "Validate usable data, not only successful transport or package installation.", "context-governance", "context_governance_enabled"),
     capability("cisco_sal_boundary", "integration", "Cisco Security Analytics and Logging boundary", "available", "render", "cisco-product-setup", "Cisco security product", "sal", "SAL is not Machine Data Lake; no undocumented Data Fabric federation contract is inferred.", "experience", "experience_enabled"),
@@ -387,9 +424,9 @@ PRODUCTS = [
     ("splunk_index", "Splunk index", "ga", "Splunk platform/index skills", "Low-latency real-time execution layer."),
     ("machine_data_lake", "Splunk Machine Data Lake", "alpha", SKILL_NAME, "Account-team/UI readiness only."),
     ("catalog", "Global Catalog", "version_dependent", SKILL_NAME, "Gradual 10.5 rollout; distinct from dataset catalogs."),
-    ("ai_toolkit", "Splunk AI Toolkit", "ga", "splunk-ai-ml-toolkit-setup", "Model workflows, hosted/external connections, and preview features."),
-    ("ctsm", "Cisco Time Series Model 1.0", "available", SKILL_NAME, "Open model; separate from hosted CDTSM preview."),
-    ("agent_builder", "Splunk AI Toolkit Agent Builder", "alpha", "splunk-ai-ml-toolkit-setup", "Alpha with public Fall 2026 GA target."),
+    ("ai_toolkit", "Splunk AI Toolkit", "ga", "splunk-ai-ml-toolkit-setup", "Current audited pair is 6.0.2 with PSC 4.3.4; model workflows, hosted/external connections, and preview features."),
+    ("ctsm", "Cisco Time Series Model 1.0", "available", SKILL_NAME, "Open model; separate from the hosted CDTSM integration."),
+    ("agent_builder", "Splunk AI Toolkit Agent Launchpad", "ga", "splunk-ai-ml-toolkit-setup", "GA since AI Toolkit 6.0.0; Splunk Enterprise reaches it through Splunk Cloud Connect."),
     ("mcp_server", "Splunk MCP Server", "ga", "splunk-mcp-server-setup", "Core product GA; child package safety findings still govern use."),
     ("ai_assistant", "Splunk AI Assistant", "version_dependent", "splunk-ai-assistant-setup", "Optional MCP tools and agentic search support."),
     ("cloud_control", "Cisco Cloud Control", "controlled_availability", "cisco-cloud-control-setup", "Operational experience/control plane, not the Data Fabric."),
@@ -787,7 +824,7 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
             "source_url": source["url"],
             "source_type": source["source_type"],
             "source_version": source["source_version"],
-            "retrieved_at": RESEARCH_VERIFIED,
+            "retrieved_at": source.get("retrieved_at", RESEARCH_VERIFIED),
             "boundary": item["boundary"],
         })
     keys = [row["key"] for row in rows]
@@ -811,7 +848,11 @@ def product_rows() -> list[dict[str, str]]:
 
 def source_ledger() -> list[dict[str, str]]:
     return [
-        {"claim_id": key, **value, "retrieved_at": RESEARCH_VERIFIED}
+        {
+            "claim_id": key,
+            **value,
+            "retrieved_at": value.get("retrieved_at", RESEARCH_VERIFIED),
+        }
         for key, value in sorted(SOURCE_RECORDS.items())
     ]
 
@@ -850,7 +891,7 @@ def config_gaps(config: dict[str, Any]) -> list[dict[str, str]]:
     if config["agent_observability_enabled"] and not config["agent_observability_spec"]:
         gaps.append({"severity": "warning", "key": "agent_observability_spec", "message": "Set ai_activation.agent_observability.child_spec to render instrumentation, evaluation, quality, latency, cost, dashboard, and detector readiness."})
     if config["agent_builder_enabled"]:
-        gaps.append({"severity": "warning", "key": "agent_builder_alpha", "message": "Splunk AI Toolkit Agent Builder remains alpha with a Fall 2026 GA target; keep it distinct from Cloud Control Studio Agent Builder."})
+        gaps.append({"severity": "warning", "key": "agent_launchpad_readiness", "message": "Splunk AI Toolkit Agent Launchpad is GA since AI Toolkit 6.0.0, so confirm reachability rather than preview enrollment: a supported AWS region with the region egress IP in the stack apiAllowlistIP, at least one supported LLM connection, and an enabled agent. Splunk Enterprise reaches it through Splunk Cloud Connect. Keep it distinct from Cloud Control Studio Agent Builder."})
     if config["experience_enabled"] and config["cloud_control_enabled"]:
         gaps.append({"severity": "warning", "key": "cloud_control_ca", "message": "Validate Cloud Control Controlled Availability eligibility, US commercial access, tenant approval, identity/domain, and terms. Cloud Control Studio Agent Builder is separately announced/roadmap; do not infer its availability from Cloud Control CA."})
     if config["experience_enabled"] and config["ai_canvas_enabled"]:
@@ -984,7 +1025,7 @@ installer, SKU, API, or data lake.
 2. Real-time execution and storage: Splunk indexes plus governed tiering.
 3. Federation and catalog: search data where it resides with explicit catalog and RBAC models.
 4. Context: schema, metadata, knowledge objects, service/business relationships.
-5. AI and action: models, Agent Builder, MCP, assistants, and governed workflows.
+5. AI and action: models, Agent Launchpad, MCP, assistants, and governed workflows.
 6. Experience: Splunk products, Cisco Cloud Control, and AI Canvas.
 
 - Deployment: `{config['deployment']}` `{config['version']}`
@@ -1017,7 +1058,7 @@ installer, SKU, API, or data lake.
     ]) + "\n\nKeep the global Catalog, per-dataset catalogs, and Machine Data Lake cataloging separate. Machine Data Lake remains alpha and has no direct apply path here.\n")
     write_text(output_dir / "ai/activation-readiness.md", "# AI Activation Readiness\n\n" + markdown_table(rows_for(rows, "ai_action"), [
         ("title", "Capability"), ("product_stage", "Stage"), ("repo_status", "Repo status"), ("access_requirement", "Access"), ("owner", "Owner"), ("boundary", "Boundary"),
-    ]) + "\n\nCisco Time Series Model 1.0 is an available open model; hosted Cisco Deep Time Series Model remains a separate AI Toolkit preview. Splunk Agent Builder and Cloud Control Studio Agent Builder are distinct.\n")
+    ]) + "\n\nCisco Time Series Model 1.0 is an available open model; the hosted Cisco Deep Time Series Model integration is generally available since AI Toolkit 6.0.0 and remains a separately governed layer. Splunk AI Toolkit Agent Launchpad and Cloud Control Studio Agent Builder are distinct products.\n")
     write_text(output_dir / "governance/trust-readiness.md", "# Context And Trust Readiness\n\n" + markdown_table(rows_for(rows, "context", "governance"), [
         ("title", "Capability"), ("product_stage", "Stage"), ("repo_status", "Repo status"), ("owner", "Owner"), ("boundary", "Boundary"),
     ]) + "\n\nRequire access, meaning, and trust: least privilege, catalog/schema context, lineage evidence, auditability, human approval, cost controls, and downstream data-readiness validation.\n")
@@ -1091,8 +1132,8 @@ def render_handoff_and_doctor(output_dir: Path, config: dict[str, Any], rows: li
 - Keep Machine Data Lake alpha and Catalog rollout evidence tenant-specific.
 - Use current Data Management connections/datasets; migrate legacy S3 provider/index objects.
 - Validate federation target, catalog, RBAC, network, encryption, data-residency, and scan-cost constraints.
-- Keep Splunk Agent Builder separate from Cloud Control Studio Agent Builder.
-- Keep open CTSM separate from hosted CDTSM preview.
+- Keep Splunk AI Toolkit Agent Launchpad separate from Cloud Control Studio Agent Builder.
+- Keep the open CTSM 1.0 model deployment separate from the hosted CDTSM AI Toolkit integration.
 - Enforce the MCP child skill's production-package findings despite product GA status.
 - Require data readiness, auditability, agent observability, and human approval before production actions.
 """)

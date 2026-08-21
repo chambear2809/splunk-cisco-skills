@@ -154,7 +154,7 @@ Base URL: `https://api.thousandeyes.com/v7`
 | `/connectors/generic` | Webhook connectors CRUD |
 | `/tags` | Get tags |
 
-The pinned SCAN `2026_07_09_1837` catalog and the repo-inspected `0.6.0`
+The pinned SCAN `2026_08_01_2130` catalog and the repo-inspected `0.6.0`
 package both identify `cisco:thousandeyes:account-group`. Package code writes
 it from the metrics and event collectors, and the scheduled
 `thousandeyes_account_group_lookup` search materializes it into the

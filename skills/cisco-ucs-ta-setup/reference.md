@@ -1,6 +1,6 @@
 # Cisco UCS Package Reference
 
-Source: Splunk Add-on for Cisco UCS `4.3.1` package inspection and published
+Source: Splunk Add-on for Cisco UCS `4.3.2` package inspection and published
 Splunk documentation.
 
 ## Package

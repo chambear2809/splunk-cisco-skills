@@ -5,6 +5,9 @@
 - Use the pinned `splunk_otel_flutter` package; add the pinned
   `splunk_otel_flutter_session_replay` package only when Session Replay is
   enabled.
+- Keep both packages on the same minor line. `1.2.0` pins their platform
+  interfaces to `>=1.2.0 <1.3.0`, and mismatched minors previously produced a
+  native iOS dependency conflict over the exact `splunk-otel-ios` version.
 - Initialize before app startup instrumentation where practical.
 - Add route observers and manual spans for workflows that need explicit naming.
 - Native release artifacts still use iOS dSYM and Android mapping upload.

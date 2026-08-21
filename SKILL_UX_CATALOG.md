@@ -1,6 +1,6 @@
 # Skill UX Catalog
 
-_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `66ee640d5972d1487a4a7bdab676087ddbd39ab600b8173bfec9f2d8b45a2b26`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `3d604951119d043cb8c2a9fd0c061d3738b79969a4a4f716682bec98ed30215a`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
 
 This product-first catalog is the user-facing entry point for choosing and
 consuming a skill. Canonical skill directories remain flat at

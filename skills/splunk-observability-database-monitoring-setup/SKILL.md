@@ -10,9 +10,9 @@ description: "Use when handling DBMon receiver setup, database query analysis, e
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  collector_release: "0.155.0"
-  helm_chart_release: "0.155.0"
-  compatibility_verified: "2026-07-02"
+  collector_release: "0.158.0"
+  helm_chart_release: "0.158.0"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Database Monitoring Setup
@@ -82,8 +82,8 @@ because the collector starts.
 
 ## Audited baseline and production matrix
 
-Pin new deployments to Splunk OTel Collector `v0.155.0` and Helm chart
-`0.155.0`. Enforce these receiver-specific floors and platform/version pairs:
+Pin new deployments to Splunk OTel Collector `v0.158.0` and Helm chart
+`0.158.0`. Enforce these receiver-specific floors and platform/version pairs:
 
 | Engine | Production support | Collector floor |
 |---|---|---|
@@ -237,7 +237,7 @@ current flags and acceptance requirements.
 ### Kubernetes
 
 - Place external database receivers only under `clusterReceiver`; never put
-  them in the node `agent` DaemonSet. Chart `0.155.0` does not accept a
+  them in the node `agent` DaemonSet. Chart `0.158.0` does not accept a
   `clusterReceiver.replicas` value, so use its singleton mode and verify exactly
   one ready cluster-receiver pod after apply.
 - Render generic Kubernetes with a blank chart `distribution` value. Reject EKS
@@ -258,7 +258,7 @@ current flags and acceptance requirements.
   `Recreate`; Helm 4 server-side apply otherwise retains an invalid field.
   Scope the Helm 4 plugin path to template/upgrade commands only, and retain
   `--hide-secret` for server-side upgrade dry-runs.
-- If the installed chart is not `0.155.0`, stop for an upgrade review; only
+- If the installed chart is not `0.158.0`, stop for an upgrade review; only
   continue with the separate `--accept-collector-upgrade` gate. The same gate
   applies if the global image pin changes any existing collector workload.
 - For an accepted chart or image upgrade, derive the target distribution's
@@ -267,7 +267,7 @@ current flags and acceptance requirements.
   before Secret reads or Helm mutation if the final rendered agent, gateway,
   or cluster-receiver config retains an unavailable component type. Existing
   defaults that the target chart removes are not false-blocked.
-- Chart `0.155.0` also rejects deprecated custom component aliases through its
+- Chart `0.158.0` also rejects deprecated custom component aliases through its
   `failOnDeprecatedNames` gate. Before template rendering, fail on exporter
   `otlp`/`otlphttp`, processor `k8sattributes`, or receiver
   `filelog`/`hostmetrics`/`k8sobjects` definitions and pipeline references,
@@ -350,7 +350,7 @@ Record these states separately: `configured`, `collector validated`,
 - Confirm stored-procedure views when used; Splunk exposes them for SQL Server
   and Oracle.
 - Treat Oracle `db.server.session.wait_sample` as an explicit opt-in. The
-  upstream `v0.155.0` receiver documents it, but Splunk's DBMon Oracle product
+  upstream `v0.158.0` receiver documents it, but Splunk's DBMon Oracle product
   page does not yet document its UI/support behavior; record and validate that
   gap.
 - When APM correlation is requested, use only Splunk's published matrix: .NET

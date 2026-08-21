@@ -10,7 +10,7 @@ description: "Use when configuring Galileo MCP, registering Galileo with IDE/age
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Galileo MCP Server Setup
@@ -121,15 +121,17 @@ only for `localhost`, `*.localhost`, or loopback IP validation fixtures.
      other Galileo capability outside the live MCP tool catalog: explicit
      handoff, not silent omission
 
-### July 7, 2026 product boundaries
+### July 7-August 7, 2026 product boundaries
 
-The July 7 release adds platform capabilities, not new tools in the observed
-9-tool MCP catalog. Keep these explicit when planning MCP client setup:
+The reviewed July 7, July 21, August 4, and August 7 releases add platform and
+documentation boundaries, not new tools in the observed 9-tool MCP catalog.
+Keep these explicit when planning MCP client setup:
 
 - AI Assistant is an enterprise beta console feature that requires a configured
   LLM integration and support enablement. It is currently read-only and has no
-  documented public Assistant API or MCP tool. Hand off readiness, enablement,
-  and console evidence to `galileo-platform-setup`.
+  documented public Assistant API or MCP tool. It now works throughout Galileo
+  debugging and prioritizes signals by criticality. Hand off readiness,
+  enablement, and console evidence to `galileo-platform-setup`.
 - Global dashboards span projects and log streams in the console. The documented
   public Trends API remains project/log-stream scoped, so do not claim global
   dashboard CRUD automation; hand off UI readiness and evidence.
@@ -142,6 +144,18 @@ The July 7 release adds platform capabilities, not new tools in the observed
 - Large-dataset Playground and experiment metric processing now uses batching.
   Galileo does not document an exact maximum or client-side batch-size control;
   MCP dataset creation/status does not automate batched experiment execution.
+- Annotation Queues are generally available, but the observed MCP catalog has no
+  queue lifecycle tool. Hand off queue access, assignment, annotation, export,
+  and validation to `galileo-platform-setup`.
+- AI-assisted custom-code metrics, organization billing usage, Model Pricing,
+  Integration Costs, Trace Count alerts, and multimodal evaluation metrics are
+  platform or console workflows outside this MCP setup skill.
+- GPT 5.6 Sol, Terra, and Luna availability and console theme selection are
+  platform state or operator preference, not MCP configuration capabilities.
+- As of August 7, Galileo is named Splunk Agent Observability. The legacy docs
+  apply to customers onboarded before that date; customers onboarded later use
+  `agent-observability-docs.splunk.com`. For an August 7 onboarding, verify the
+  tenant's linked documentation rather than inferring the documentation epoch.
 
 ## Safe First Command
 

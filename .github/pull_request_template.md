@@ -5,18 +5,12 @@
 ## Testing
 
 - [ ] Agent Skills specification/best-practice impact reviewed: https://agentskills.io/specification
+- [ ] `pre-commit run --all-files`
 - [ ] `pytest -q`
 - [ ] `bats tests/*.bats`
 - [ ] `bash -n` for changed shell scripts, or all scripts
-- [ ] `shellcheck --severity=warning $(find skills -name '*.sh' -print)`
-- [ ] `ruff check skills/ tests/ agent/`
-- [ ] `yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents`
-- [ ] `python3 skills/shared/scripts/generate_deployment_docs.py --check`
-- [ ] `python3 skills/shared/scripts/generate_skill_ux_catalog.py --check`
-- [ ] `python3 skills/shared/scripts/generate_skill_validation_matrix.py --check`
+- [ ] `shellcheck --severity=warning $(find agent skills scripts -name '*.sh' -print)`
 - [ ] Pinned SCAN source fixture and generated catalog freshness check passes
-- [ ] `python3 tests/check_skill_frontmatter.py`
-- [ ] `python3 tests/check_repo_readiness.py`
 
 ## Safety
 

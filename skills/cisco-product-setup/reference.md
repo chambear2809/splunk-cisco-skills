@@ -82,3 +82,9 @@ also fails validation.
 with a different catalog version therefore cannot silently regenerate
 `catalog.json`; the reconciliation record and downstream assets must be
 reviewed first.
+
+For the retired Cisco Secure IPS entry, SCAN `2026_08_01_2130` retains only
+`cisco:ips:syslog` and removes the legacy `cisco:ips:input` and
+`sdee_connection` labels. This does not reactivate the retired add-on or create
+a collection route. Existing SDEE deployments require a migration handoff to
+Cisco Secure Firewall; new router requests remain `unsupported_legacy`.

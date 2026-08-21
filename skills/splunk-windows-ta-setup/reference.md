@@ -1,7 +1,7 @@
 # Splunk Add-on for Microsoft Windows Reference
 
 Grounded in the `Splunk_TA_windows` package (Splunkbase app `742`, verified
-version `10.0.1`). The add-on is input-only on Windows forwarders; it ships
+version `11.0.2`). The add-on is input-only on Windows forwarders; it ships
 `[ui] is_visible = false` and has no account or custom REST configuration.
 
 ## Package Model

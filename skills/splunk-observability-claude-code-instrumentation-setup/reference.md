@@ -14,8 +14,11 @@
   `https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/splunk-ai-agent-monitoring/set-up-ai-agent-monitoring/code-based-instrumentation`
 - Galileo Observe OpenTelemetry ingest:
   `https://docs.galileo.ai/integrations/otel`
-- Galileo Observe API reference (project, log stream, direct REST fallback):
-  `https://docs.galileo.ai/reference`
+- Galileo Observe API reference:
+  `https://docs.galileo.ai/api/getting-started`
+- Galileo project and log stream REST fallback:
+  `https://docs.galileo.ai/api-reference/projects/get-project`
+  `https://docs.galileo.ai/api-reference/log_stream/get-log-stream`
 
 ## Claude Code OTel Environment Variables
 
@@ -360,9 +363,11 @@ Resource attributes:
 
 The overlay requires a collector distribution that contains the alpha
 `signal_to_metrics` connector. It is validated on
-`otel/opentelemetry-collector-contrib:0.154.0`. The stock Splunk Distribution
-v0.154.2 does not include that connector and therefore cannot produce the token
-histogram, although it supports the other components in this overlay. Use the
+`otel/opentelemetry-collector-contrib:0.158.0`. The stock Splunk Distribution
+0.158.0 still does not include that connector and therefore cannot produce the
+token histogram, although it supports the other components in this overlay
+(`otelcol validate` on the Splunk build fails with
+`unknown type: "signal_to_metrics"`). Use the
 matching contrib image or a custom build with `signal_to_metrics`; a sum
 connector is not an equivalent fallback.
 

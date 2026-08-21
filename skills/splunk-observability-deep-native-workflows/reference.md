@@ -46,7 +46,7 @@ classic chart/dashboard/group payloads.
 
 Source anchors:
 
-- https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-modern-dashboards/use-new-dashboard-experience-beta
+- https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards/use-new-dashboard-experience
 - https://help.splunk.com/en/splunk-observability-cloud/create-dashboards-and-charts/create-dashboards
 - https://dev.splunk.com/observability/reference/api/dashboards/latest
 - https://dev.splunk.com/observability/reference/api/charts/latest
@@ -157,11 +157,11 @@ RUM skills.
 
 Source anchors:
 
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/set-up-digital-experience-analytics
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-and-manage-event-definitions
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-conversion-funnel-analysis
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-user-segments
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/introduction-to-digital-experience-analytics
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/set-up-digital-experience-analytics
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/create-and-manage-event-definitions
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/analyses-in-digital-experience-analytics/create-conversion-funnel-analysis
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/digital-experience-analytics/create-user-segments
 
 ### Database Monitoring And Explain Plans
 
@@ -174,10 +174,9 @@ instrumentation and only sampled queries have propagated trace information.
 
 Source anchors:
 
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/introduction-to-splunk-database-monitoring
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/queries
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/query-samples
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/query-metrics
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring/navigator/workload
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/use-database-monitoring/navigator/query-metrics
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/correlate-database-queries-with-splunk-apm-traces
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-application-performance/monitor-database-query-performance
 
@@ -287,8 +286,7 @@ are needed.
 
 Source anchors:
 
-- https://help.splunk.com/en/splunk-observability-cloud/use-splunk-mobile
-- https://help.splunk.com/en/splunk-observability-cloud/use-splunk-observability-cloud-mobile/view-dashboards-and-alerts
+- https://help.splunk.com/en/splunk-observability-cloud/use-splunk-observability-cloud-mobile/introduction-to-splunk-observability-cloud-for-mobile
 - https://help.splunk.com/en/splunk-observability-cloud/create-alerts-detectors-and-service-level-objectives/create-alerts-and-detectors/view-alerts
 - https://help.splunk.com/en/splunk-observability-cloud/splunk-on-call/mobile-app
 

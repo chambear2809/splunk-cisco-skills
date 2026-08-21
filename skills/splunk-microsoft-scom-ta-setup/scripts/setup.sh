@@ -80,7 +80,7 @@ validate_request() {
 }
 
 install_app() {
-    local cmd=(bash "${INSTALL_SCRIPT}" --source splunkbase --app-id 2729 --app-version 4.5.0 --no-update)
+    local cmd=(bash "${INSTALL_SCRIPT}" --source splunkbase --app-id 2729 --app-version 4.5.1 --no-update)
     [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart)
     if [[ "${DRY_RUN}" == "true" ]]; then
         printf 'DRY RUN: '

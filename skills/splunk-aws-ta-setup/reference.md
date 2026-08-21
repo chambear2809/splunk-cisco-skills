@@ -1,7 +1,7 @@
 # Splunk Add-on for AWS Reference
 
 Grounded in the `Splunk_TA_aws` package (Splunkbase app `1876`, verified
-version `8.1.2`).
+version `8.2.2`).
 
 ## Package Model
 

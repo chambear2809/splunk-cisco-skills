@@ -1,9 +1,9 @@
 controller_url: https://example.saas.appdynamics.com
 account_name: customer1
-doc_version: 26.4.0
+doc_version: 26.8.0
 operator_mode: render
 smart_agent:
-  controller_version: 26.4.0
+  controller_version: 26.8.0
   package_source: download_portal
   package_source_url: reviewed-package-url
   install_dir: /opt/appdynamics/appdsmartagent

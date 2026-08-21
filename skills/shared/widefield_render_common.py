@@ -92,7 +92,7 @@ SOURCE_LEDGER = [
     (
         "Okta shared signal receiver docs",
         "https://help.okta.com/oie/en-us/content/topics/itp/configure-shared-signal-provider.htm",
-        "Shared Signals Framework receiver setup, System Log events, and risk engine behavior.",
+        "Shared Signals Framework receiver setup, System Log events, and risk engine behavior. This page's `Security providers` table lists `WideField Security` (verified 2026-08-20) and is the only source that evidences WideField's provider status; the OIN listing does not mention Shared Signals, SSF, or CAEP.",
     ),
     (
         "Okta Event Hooks API",

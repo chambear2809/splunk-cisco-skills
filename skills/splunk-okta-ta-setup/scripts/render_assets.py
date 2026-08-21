@@ -19,7 +19,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-okta-ta-rendered"
 
 APP_NAME = "Splunk_TA_okta_identity_cloud"
 SPLUNKBASE_ID = "6553"
-LATEST_VERIFIED_VERSION = "5.0.2"
+LATEST_VERIFIED_VERSION = "5.1.0"
 
 # The single okta_identity_cloud modular input collects one data type per stanza,
 # selected by the `metric` field. Each maps to an OktaIM2:<type> source type.

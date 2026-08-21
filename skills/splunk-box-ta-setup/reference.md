@@ -1,6 +1,6 @@
 # Splunk_TA_box Reference
 
-Package source of truth: `splunk-ta/_unpacked/Splunk_TA_box-4.0.0/Splunk_TA_box`.
+Package source of truth: `splunk-ta/_unpacked/Splunk_TA_box-5.0.0/Splunk_TA_box`.
 
 ## Package Identity
 
@@ -8,7 +8,7 @@ Package source of truth: `splunk-ta/_unpacked/Splunk_TA_box-4.0.0/Splunk_TA_box`
 | --- | --- |
 | Splunkbase | `2679` |
 | App directory | `Splunk_TA_box` |
-| Verified version | `4.0.0` |
+| Verified version | `5.0.0` |
 
 ## Inputs And Source Types
 

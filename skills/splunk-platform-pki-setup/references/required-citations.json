@@ -1,0 +1,66 @@
+{
+  "_comment": "Contract for authoritative-sources.md, read by BOTH tests/test_platform_pki.py and scripts/smoke_offline.sh via skills/shared/lib/doc_citations.py. Previously each of those two files carried its own hardcoded list of Splunk URL slugs, so a vendor rename meant editing three places and presented as a local test failure -- which happened twice while Splunk migrated docs.splunk.com to help.splunk.com. Matching is on the link TITLE (authored here, stable) plus a normalised topic token from the slug (confirms the URL is plausibly the right page without re-encoding the vendor's current spelling). Normalisation strips case and separators, so CustomCertsKVstore and preparing-custom-certificates-for-use-with-kv-store both satisfy the kvstore token. A vendor migration is now a one-line URL edit in authoritative-sources.md with no test change.",
+  "_liveness_note": "This contract deliberately does NOT check that URLs resolve. Liveness belongs to the scheduled repository-wide documentation citation audit, while lifecycle-changing redirects receive a separate scheduled audit; duplicating either here would make an offline unit test depend on the network.",
+  "document": "authoritative-sources.md",
+  "allowed_hosts": [
+    "help.splunk.com",
+    "docs.splunk.com"
+  ],
+  "required_citations": [
+    {
+      "id": "inter-splunk-tls",
+      "claim": "Per-component certificate matrix for splunkd / S2S inter-Splunk traffic.",
+      "title_contains": "Configure TLS certificates for inter-Splunk communication",
+      "url_topic_tokens": ["intersplunkcommunication", "intersplunk"]
+    },
+    {
+      "id": "create-and-sign-own-certs",
+      "claim": "Private PKI workflow where the operator becomes the CA.",
+      "title_contains": "How to create and sign your own TLS certificates",
+      "url_topic_tokens": ["createandsign", "signyourown"]
+    },
+    {
+      "id": "kv-store-custom-certs",
+      "claim": "KV Store dual-EKU and hostname-validation requirements.",
+      "title_contains": "Preparing custom certificates for use with KV store",
+      "url_topic_tokens": ["kvstore"],
+      "_note": "This is the citation whose slug moved from CustomCertsKVstore to preparing-custom-certificates-for-use-with-kv-store. Both normalise to contain kvstore, which is why this token was chosen."
+    },
+    {
+      "id": "fips-mode",
+      "claim": "FIPS 140-2 / 140-3 wiring through splunk-launch.conf.",
+      "title_contains": "Secure Splunk Enterprise with FIPS",
+      "url_topic_tokens": ["fips"]
+    },
+    {
+      "id": "tls-protocol-versions",
+      "claim": "sslVersions / TLS protocol floor for the algorithm presets.",
+      "title_contains": "Configure TLS protocol version support",
+      "url_topic_tokens": ["protocolversion"]
+    },
+    {
+      "id": "uf-credentials-package",
+      "claim": "Splunk Cloud universal forwarder credentials package supersedes self-issued certs for the UF fleet.",
+      "title_contains": "Universal Forwarder Credentials Package",
+      "url_topic_tokens": ["scufcredentials", "forwardercredentials", "credentials"]
+    },
+    {
+      "id": "cipher-suites",
+      "claim": "cipherSuite / ecdhCurves semantics behind the three algorithm presets.",
+      "title_contains": "About TLS encryption and cipher suites",
+      "url_topic_tokens": ["ciphersuites"]
+    },
+    {
+      "id": "mtls",
+      "claim": "Opt-in mutually authenticated TLS between Splunk components.",
+      "title_contains": "Configure mutually authenticated TLS",
+      "url_topic_tokens": ["mtls", "mutuallyauthenticated"]
+    },
+    {
+      "id": "hostname-validation",
+      "claim": "sslVerifyServerName / certificate host name validation.",
+      "title_contains": "Configure TLS certificate host name validation",
+      "url_topic_tokens": ["hostnamevalidation", "certhostname"]
+    }
+  ]
+}

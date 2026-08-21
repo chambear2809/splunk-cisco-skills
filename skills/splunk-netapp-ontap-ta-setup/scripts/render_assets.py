@@ -18,7 +18,7 @@ PRODUCTS: dict[str, dict[str, Any]] = {
         "label": "NetApp ONTAP core",
         "app": "Splunk_TA_ontap",
         "id": "3418",
-        "version": "3.2.0",
+        "version": "3.2.1",
         "role": "scheduler and collection workers",
     },
     "extractions": {

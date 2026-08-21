@@ -32,16 +32,20 @@ indexer-cluster hardening, leave `mgmtHostPort = 0.0.0.0:8089` and rely on
 
 ## 3. TLS / cipher policy
 
-Splunk Enterprise's documented baseline (still current in 10.2):
+Splunk Enterprise's documented baseline (still current in 10.2),
+restricted to AEAD suites:
 
 ```
 sslVersions = tls1.2
 cipherSuite = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:\
-              ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:\
-              ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:\
-              ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256
+              ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256
 ecdhCurves  = prime256v1, secp384r1, secp521r1
 ```
+
+The four non-AEAD suites in Splunk's published list
+(`ECDHE-*-AES256-SHA384`, `ECDHE-*-AES128-SHA256`) are CBC mode and are
+deliberately not rendered here. See
+[`references/tls-hardening.md`](references/tls-hardening.md).
 
 The renderer emits `tls1.2` by default. Pass `--enable-tls13 true` to
 emit `tls1.2,tls1.3`; only safe when target Splunk version is 10.x and

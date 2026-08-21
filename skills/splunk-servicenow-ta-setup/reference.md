@@ -1,7 +1,7 @@
 # Splunk Add-on for ServiceNow Reference
 
 Grounded in the `Splunk_TA_snow` package (Splunkbase app `1928`, verified
-version `10.0.1`).
+version `11.0.2`).
 
 ## Package Model
 

@@ -37,6 +37,30 @@ jobs:
           python3 skills/cisco-product-setup/scripts/build_catalog.py
           --check-live-source
 
+  lifecycle-qualifier-urls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect vendor lifecycle drift behind preview/beta/alpha doc URLs
+        run: >-
+          python3 skills/shared/scripts/audit_lifecycle_qualifier_urls.py
+          --max-workers 12 --timeout 20
+
+  documentation-urls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect dead public documentation citations across the repository
+        run: >-
+          python3 skills/shared/scripts/audit_documentation_urls.py
+          --max-workers 16 --timeout 15
+
   galileo-product-and-mcp:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

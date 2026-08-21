@@ -14,40 +14,43 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-cyberark-ta-rendered"
 PRODUCTS = ["epm", "epv_pta"]
 EPM_APP = "Splunk_TA_cyberark_epm"
 EPM_ID = "5160"
-EPM_VERSION = "4.0.0"
+EPM_VERSION = "5.0.0"
 LEGACY_APP = "Splunk_TA_cyberark"
 LEGACY_ID = "2891"
 LEGACY_VERSION = "1.2.0"
+# 5.0.0 removed the application_events, policy_audit, and threat_detection
+# modular inputs. Rendering them produces REST failures on 5.0.0 and later.
 EPM_INPUTS = [
-    "application_events",
     "inbox_events",
     "admin_audit_logs",
     "account_admin_audit_logs",
-    "policy_audit",
     "policy_audit_events",
-    "threat_detection",
     "policies_and_computers",
 ]
+# 5.0.0 renamed cyberark:epm:raw:policy:events to cyberark:epm:raw:policy:audit,
+# dropped the application:events / policy:audit / threat:detection source types,
+# and added the aggregated, policies, computers, and computer:groups source types.
 EPM_SOURCETYPES = [
     "cyberark:epm:raw:events",
-    "cyberark:epm:raw:policy:events",
+    "cyberark:epm:aggregated:events",
+    "cyberark:epm:raw:policy:audit",
+    "cyberark:epm:aggregated:policy:audit",
+    "cyberark:epm:policies",
+    "cyberark:epm:computers",
+    "cyberark:epm:computer:groups",
     "cyberark:epm:admin:audit",
     "cyberark:epm:account:admin:audit",
-    "cyberark:epm:application:events",
-    "cyberark:epm:policy:audit",
-    "cyberark:epm:threat:detection",
 ]
 LEGACY_SOURCETYPES = ["cyberark:epv:cef", "cyberark:pta:cef"]
 REST_HANDLERS = [
     "splunk_ta_cyberark_epm_account",
-    "splunk_ta_cyberark_epm_application_events",
+    "splunk_ta_cyberark_epm_settings",
     "splunk_ta_cyberark_epm_inbox_events",
     "splunk_ta_cyberark_epm_admin_audit_logs",
     "splunk_ta_cyberark_epm_account_admin_audit_logs",
-    "splunk_ta_cyberark_epm_policy_audit",
     "splunk_ta_cyberark_epm_policy_audit_events",
-    "splunk_ta_cyberark_epm_threat_detection",
     "splunk_ta_cyberark_epm_policies_and_computers",
+    "splunk_ta_cyberark_epm_fetch_set_ids",
 ]
 
 
@@ -188,7 +191,7 @@ index={args.index} sourcetype IN ({sts})
 | stats count min(_time) as first_seen max(_time) as last_seen by sourcetype
 | convert ctime(first_seen) ctime(last_seen)
 
-index={args.index} sourcetype IN ("cyberark:epm:threat:detection","cyberark:pta:cef")
+index={args.index} sourcetype IN ("cyberark:epm:raw:policy:audit","cyberark:pta:cef")
 | stats count dc(user) as users values(action) as actions by sourcetype severity
 
 index=_internal source=*splunkd.log* (Splunk_TA_cyberark_epm OR cyberark_epm)

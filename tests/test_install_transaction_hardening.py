@@ -43,8 +43,8 @@ def build_batch_env(tmp_path: Path, mode: str) -> tuple[dict[str, str], Path, Pa
             handle.write(cmd + "\\n")
         state = json.loads(state_path.read_text(encoding="utf-8"))
         apps = {
-            "7538": ("TA_cisco_catalyst", "3.1.0"),
-            "7539": ("cisco-catalyst-app", "3.1.0"),
+            "7538": ("TA_cisco_catalyst", "3.2.44"),
+            "7539": ("cisco-catalyst-app", "3.2.20"),
         }
 
         if "config current-stack" in cmd:
@@ -152,7 +152,7 @@ def test_409_is_accepted_only_after_exact_terminal_version_is_proven(tmp_path: P
 
     assert result.returncode == 0, output
     assert "409 accepted" in output
-    assert "--splunkbase-id 7538 --version 3.1.0" in acs_log.read_text(encoding="utf-8")
+    assert "--splunkbase-id 7538 --version 3.2.44" in acs_log.read_text(encoding="utf-8")
     assert not list(tmp_path.glob("splunk-cloud-batch-recovery.*"))
 
 
@@ -162,7 +162,7 @@ def test_409_wrong_version_fails_closed_with_recovery_evidence(tmp_path: Path) -
     output = result.stdout + result.stderr
 
     assert result.returncode != 0
-    assert "version 9.9.9, expected 3.1.0" in output
+    assert "version 9.9.9, expected 3.2.44" in output
     assert "apps uninstall" not in acs_log.read_text(encoding="utf-8")
     evidence = list(tmp_path.glob("splunk-cloud-batch-recovery.*"))
     assert len(evidence) == 1

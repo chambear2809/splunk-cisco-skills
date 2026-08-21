@@ -157,11 +157,33 @@ def test_feature_coverage_is_complete_and_lifecycle_aware(tmp_path: Path) -> Non
     assert by_key["machine_data_lake"]["product_stage"] == "alpha"
     assert by_key["machine_data_lake"]["repo_status"] == "ui_handoff"
     assert by_key["legacy_fss3_migration"]["product_stage"] == "deprecated"
-    assert by_key["splunk_agent_builder"]["product_stage"] == "alpha"
+    assert by_key["splunk_agent_builder"]["product_stage"] == "ga"
+    assert by_key["splunk_agent_builder"]["title"] == "Splunk AI Toolkit Agent Launchpad"
+    assert "6.0.0" in by_key["splunk_agent_builder"]["boundary"]
+    assert "apiAllowlistIP" in by_key["splunk_agent_builder"]["boundary"]
+    assert "Splunk Cloud Connect" in by_key["splunk_agent_builder"]["platforms"]
+    assert by_key["splunk_agent_builder"]["source_url"].endswith("ai-toolkit-agent-launchpad")
+    for key in ("agent_builder_connections", "agent_builder_aiagent", "agent_builder_run_history"):
+        assert by_key[key]["product_stage"] == "ga"
+        assert "preview" not in by_key[key]["platforms"].lower()
+    assert "ai_agent_run_history_index" not in by_key["agent_builder_run_history"]["boundary"]
+    assert "agent_run_index" in by_key["agent_builder_run_history"]["boundary"]
     assert by_key["cloud_control_studio_agent_builder"]["key"] != "splunk_agent_builder"
     assert by_key["cloud_control_studio_agent_builder"]["product_stage"] == "roadmap"
+    cisco_builder_boundary = by_key["cloud_control_studio_agent_builder"]["boundary"]
+    assert "2026-06-02" in cisco_builder_boundary
+    assert "2026-08-20" in cisco_builder_boundary
     assert by_key["ctsm_open_model"]["product_stage"] == "available"
-    assert by_key["cdtsm"]["product_stage"] == "feature_preview"
+    assert by_key["cdtsm"]["product_stage"] == "ga"
+    assert "6.0.0" in by_key["cdtsm"]["boundary"]
+    assert by_key["cdtsm"]["source_url"].endswith("ai-toolkit-models/cisco-deep-time-series-model")
+    assert "feature-preview" not in by_key["cdtsm"]["source_url"]
+    assert "Cisco Time Series Model" in by_key["cdtsm"]["boundary"]
+    assert by_key["ai_toolkit"]["title"] == "Splunk AI Toolkit 6.0.2 and PSC 4.3.4"
+    assert "4.3.4" in by_key["ai_toolkit"]["boundary"]
+    assert by_key["ai_toolkit"]["source_url"].startswith(
+        "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/6.0.2/"
+    )
     assert by_key["splunk_mcp_server"]["product_stage"] == "ga"
     assert by_key["splunk_mcp_server"]["repo_status"] == "delegated_render"
     assert by_key["federated_s3"]["product_stage"] == "ga"
@@ -169,7 +191,8 @@ def test_feature_coverage_is_complete_and_lifecycle_aware(tmp_path: Path) -> Non
     assert by_key["federated_amazon_security_lake"]["product_stage"] == "ga"
     assert by_key["federated_amazon_security_lake"]["access_requirement"] == "premium_add_on_activation_and_scan_entitlement"
     assert all("access_requirement" in row for row in rows)
-    assert all(row["retrieved_at"] == "2026-07-03" for row in rows)
+    assert all(row["retrieved_at"] in {"2026-07-03", "2026-08-20"} for row in rows)
+    assert by_key["splunk_agent_builder"]["retrieved_at"] == "2026-08-20"
 
 
 def test_federation_matrix_has_every_current_target_and_no_generic_asl_route(tmp_path: Path) -> None:
@@ -196,7 +219,8 @@ def test_product_matrix_distinguishes_architecture_products_and_experience(tmp_p
     assert by_key["cisco_data_fabric"]["product_stage"] == "architecture"
     assert by_key["machine_data_lake"]["product_stage"] == "alpha"
     assert by_key["ctsm"]["product_stage"] == "available"
-    assert by_key["agent_builder"]["product_stage"] == "alpha"
+    assert by_key["agent_builder"]["product_stage"] == "ga"
+    assert by_key["agent_builder"]["title"] == "Splunk AI Toolkit Agent Launchpad"
     assert by_key["cloud_control"]["product_stage"] == "controlled_availability"
     assert "not the Data Fabric" in by_key["cloud_control"]["relationship"]
     assert "Separate Cisco logging product" in by_key["cisco_sal"]["relationship"]
@@ -211,16 +235,28 @@ def test_source_ledger_has_claim_metadata_and_reconciled_primary_sources(tmp_pat
         "cdf_launch", "data_management_guide", "federated_overview",
         "federated_asl", "federated_asl_ga", "federated_ga",
         "federated_legacy", "catalog", "promote",
-        "data_inputs", "ai_toolkit", "cdtsm", "ctsm", "mcp",
-        "agent_builder_preview",
+        "data_inputs", "ai_toolkit", "ai_toolkit_dependencies",
+        "cdtsm", "cdtsm_on_prem", "ctsm", "mcp",
+        "agent_launchpad", "agent_launchpad_on_prem",
         "cloud_control_splunk", "ai_canvas", "sal",
+        "cloud_control_agent_builder", "cloud_control_release_notes",
     }:
         assert claim_id in by_id
+    assert "agent_builder_preview" not in by_id
+    assert by_id["agent_launchpad"]["source_version"] == "6.0.2"
+    assert by_id["agent_launchpad"]["retrieved_at"] == "2026-08-20"
+    assert "5.6.4" not in by_id["agent_launchpad_on_prem"]["url"]
+    for claim_id in ("ai_toolkit", "ai_toolkit_dependencies", "cdtsm", "cdtsm_on_prem"):
+        assert by_id[claim_id]["source_version"] == "6.0.2"
+        assert by_id[claim_id]["retrieved_at"] == "2026-08-20"
+        assert "/5.7.4/" not in by_id[claim_id]["url"]
+    assert by_id["cloud_control_release_notes"]["retrieved_at"] == "2026-08-20"
+    assert by_id["cloud_control_agent_builder"]["source_type"] == "announcement"
     for row in rows:
         assert row["url"].startswith("https://")
         assert row["source_type"]
         assert row["source_version"]
-        assert row["retrieved_at"] == "2026-07-03"
+        assert row["retrieved_at"] in {"2026-07-03", "2026-08-20"}
 
 
 def test_default_dry_run_does_not_invoke_canned_ingest_or_unconfigured_federation(tmp_path: Path) -> None:
@@ -334,7 +370,7 @@ def test_cloud_platform_and_version_reach_ai_child_and_unknowns_are_reported(tmp
     child = valid_output / "delegated/ai-ml-toolkit"
     child_plan = json.loads((child / "apply-plan.json").read_text())
     assert child_plan["platform"] == "cloud"
-    agent_handoff = (child / "agent-builder-handoff.md").read_text()
+    agent_handoff = (child / "agent-launchpad-handoff.md").read_text()
     assert "Target platform: `cloud`" in agent_handoff
     assert "Repo status: `manual_handoff`" in agent_handoff
 
@@ -509,10 +545,17 @@ def test_skill_docs_keep_critical_product_boundaries() -> None:
         "not as a single", "Machine Data Lake", "alpha", "Global Splunk Catalog",
         "Amazon Security Lake", "Cisco Security Analytics and Logging",
         "Cisco Time Series Model 1.0", "Cisco Deep Time Series Model",
-        "Splunk AI Toolkit Agent Builder", "Cloud Control Studio Agent Builder",
+        "Splunk AI Toolkit Agent Launchpad", "Cloud Control Studio Agent Builder",
         "10.5.2605.3",
     ):
         assert term in text
+    assert "GA target Fall 2026" not in text
+    assert "GA target of Fall\n  2026" not in text
+    assert "5.6.4/ai-toolkit-commands-macros-and-visualizations" not in text
+    unwrapped = " ".join(text.split())
+    assert "Splunk AI Toolkit Agent Launchpad at alpha" not in unwrapped
+    assert "Splunk Cloud Connect" in unwrapped
+    assert "apiAllowlistIP" in unwrapped
 
 
 def test_python_renderer_compiles() -> None:

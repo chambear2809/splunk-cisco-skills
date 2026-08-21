@@ -1,4 +1,4 @@
-doc_version: "26.4.0"
+doc_version: "26.8.0"
 controller_url: https://controller.example.com:8090
 deployment_model: on_premises
 
@@ -12,7 +12,7 @@ deployment:
 
 platform:
   name: prod-platform
-  target_version: "26.4.0"
+  target_version: "26.8.0"
   installation_dir: /opt/appdynamics/platform
   install_mode: custom
   operator_interface: cli

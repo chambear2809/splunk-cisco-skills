@@ -40,10 +40,10 @@ if [[ -n "${SK:-}" ]]; then
   [[ "${installed_apps}" -gt 0 ]] || fail "No CyberArk add-on is installed"
   if platform_check_index "${SK}" "${SPLUNK_URI}" "${INDEX}"; then pass "Index ${INDEX} exists"; else warn "Index ${INDEX} not found"; fi
   if selected epm; then
-    total=0; for prefix in application_events:// inbox_events:// admin_audit_logs:// account_admin_audit_logs:// policy_audit:// policy_audit_events:// threat_detection:// policies_and_computers://; do total=$((total + $(rest_count_conf_stanzas "${SK}" "${SPLUNK_URI}" "Splunk_TA_cyberark_epm" "inputs" "${prefix}"))); done
+    total=0; for prefix in inbox_events:// admin_audit_logs:// account_admin_audit_logs:// policy_audit_events:// policies_and_computers://; do total=$((total + $(rest_count_conf_stanzas "${SK}" "${SPLUNK_URI}" "Splunk_TA_cyberark_epm" "inputs" "${prefix}"))); done
     [[ "${total}" -gt 0 ]] && pass "CyberArk EPM input stanzas: ${total}" || warn "No CyberArk EPM inputs configured yet"
     if [[ "${COMPLETION}" == "true" ]]; then enabled_inputs=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "Splunk_TA_cyberark_epm" "0" 2>/dev/null || echo 0); [[ "${enabled_inputs}" =~ ^[0-9]+$ && "${enabled_inputs}" -gt 0 ]] && pass "Enabled CyberArk EPM inputs: ${enabled_inputs}" || fail "No enabled CyberArk EPM inputs detected"; fi
-    epm_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=${INDEX} sourcetype IN (\"cyberark:epm:raw:events\",\"cyberark:epm:raw:policy:events\",\"cyberark:epm:admin:audit\",\"cyberark:epm:account:admin:audit\",\"cyberark:epm:application:events\",\"cyberark:epm:policy:audit\",\"cyberark:epm:threat:detection\")" "count")
+    epm_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=${INDEX} sourcetype IN (\"cyberark:epm:raw:events\",\"cyberark:epm:aggregated:events\",\"cyberark:epm:raw:policy:audit\",\"cyberark:epm:aggregated:policy:audit\",\"cyberark:epm:policies\",\"cyberark:epm:computers\",\"cyberark:epm:computer:groups\",\"cyberark:epm:admin:audit\",\"cyberark:epm:account:admin:audit\")" "count")
     [[ "${epm_count}" -gt 0 ]] && pass "CyberArk EPM events in ${INDEX}: ${epm_count}" || warn "No CyberArk EPM events found in ${INDEX}"
   fi
   if selected epv_pta; then

@@ -105,8 +105,8 @@ def base_spec(*, outputs: dict[str, bool] | None = None) -> dict:
         "distribution": "kubernetes",
         "scrape_owner": "kubernetes",
         "collector": {
-            "version": "v0.155.0",
-            "chart_version": "0.155.0",
+            "version": "v0.158.0",
+            "chart_version": "0.158.0",
             "namespace": "splunk-otel",
             "release_name": "splunk-otel-collector",
             "kube_context": "production-cluster-admin",
@@ -242,8 +242,8 @@ def test_template_and_render_cover_release_engines_runtimes_and_actions(
     assert expected <= files
 
     metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata["collector_version"] == "v0.155.0"
-    assert metadata["chart_version"] == "0.155.0"
+    assert metadata["collector_version"] == "v0.158.0"
+    assert metadata["chart_version"] == "0.158.0"
     assert {item["type"] for item in metadata["targets"]} == {
         "postgresql",
         "sqlserver",
@@ -280,7 +280,7 @@ def test_k8s_overlay_is_additive_and_uses_engine_specific_pipelines(
         "quay.io/signalfx/splunk-otel-collector"
     )
     assert overlay["image"]["otelcol"]["tag"] == (
-        "0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"
+        "0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
     )
     cluster = overlay["clusterReceiver"]
     assert cluster["enabled"] is True
@@ -305,7 +305,7 @@ def test_k8s_overlay_is_additive_and_uses_engine_specific_pipelines(
     assert pipelines["metrics/dbmon_mysql"]["processors"] == [
         "memory_limiter/dbmon",
         "batch/dbmon",
-        "resourcedetection/dbmon",
+        "resource_detection/dbmon",
         "resource/mysql_service_instance_id",
     ]
     assert pipelines["logs/dbmon_mysql"]["processors"] == [
@@ -561,7 +561,7 @@ def test_k8s_upgrade_component_gate_and_helm_version_paths(
     assert 'strategy.get("rollingUpdate") is not None' in helper_text
     assert 'sys.exit("expected exactly one DBMon Deployment")' in helper_text
     assert 'raise SystemExit("expected exactly one DBMon Deployment") if' not in helper_text
-    assert "@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa" in helper_text
+    assert "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357" in helper_text
     for role in ("otel-agent", "otel-gateway", "otel-k8s-cluster-receiver"):
         assert role in helper_text
 
@@ -587,9 +587,9 @@ case "$*" in
       if [[ "$1" == "--destination" ]]; then destination="$2"; break; fi
       shift
     done
-    : > "${{destination}}/splunk-otel-collector-0.155.0.tgz"
+    : > "${{destination}}/splunk-otel-collector-0.158.0.tgz"
     ;;
-  "show chart "*) printf '%s\\n' 'appVersion: 0.155.0' ;;
+  "show chart "*) printf '%s\\n' 'appVersion: 0.158.0' ;;
   *" list "*) printf '%s\\n' '[{{"chart":"splunk-otel-collector-0.148.0"}}]' ;;
   *" get values "*)
     if [[ "${{FAKE_INCOMPATIBLE}}" == "true" ]]; then receiver_type=signalfx; else receiver_type=otlp; fi
@@ -648,7 +648,7 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa
+          image: quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
           env:
             - name: SPLUNK_OBSERVABILITY_ACCESS_TOKEN
               valueFrom:
@@ -747,7 +747,7 @@ printf '%s\n' "$*" >> "${FAKE_DOCKER_ARGS}"
 if [[ "$*" != *"dbmon-component-inventory.yaml"* ]]; then exit 0; fi
 cat >&2 <<'EOF'
 'receivers' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [hostmetrics mysql oracledb otlp postgresql sqlserver])
-'processors' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [batch memory_limiter resource resourcedetection])
+'processors' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [batch memory_limiter resource resourcedetection resource_detection])
 'exporters' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [otlp_http signalfx])
 'connectors' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [forward])
 'extensions' unknown type: "dbmoninventoryunavailable" for id: "dbmoninventoryunavailable" (valid values: [health_check])
@@ -763,7 +763,7 @@ exit 1
         """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "-c" && "${2:-}" == *"hashlib.sha256"* && "${*: -1}" == *.tgz ]]; then
-  printf '%s\n' 33989dd964afbceaff1db2035467b00cae4ae4868bdd89abbf9a7c68166bbc5a
+  printf '%s\n' 088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274
   exit 0
 fi
 exec "${REAL_PYTHON}" "$@"
@@ -805,7 +805,7 @@ exec "${REAL_PYTHON}" "$@"
     kubectl_calls = kubectl_args.read_text(encoding="utf-8")
     if deprecated_alias:
         assert result.returncode == 1, output_text
-        assert "chart 0.155.0 rejects deprecated collector component aliases" in output_text
+        assert "chart 0.158.0 rejects deprecated collector component aliases" in output_text
         assert "receivers filelog->file_log definitions=1 pipeline_refs=1" in output_text
         assert "splunk-observability-otel-collector-setup" in output_text
         assert not any("args=template " in line for line in helm_calls)
@@ -896,13 +896,13 @@ case " $* " in
       fi
       shift
     done
-    : > "${destination}/splunk-otel-collector-0.155.0.tgz"
+    : > "${destination}/splunk-otel-collector-0.158.0.tgz"
     ;;
   *" show chart "*)
-    printf '%s\n' 'appVersion: 0.155.0'
+    printf '%s\n' 'appVersion: 0.158.0'
     ;;
   *" list "*)
-    printf '%s\n' '[{"chart":"splunk-otel-collector-0.155.0"}]'
+    printf '%s\n' '[{"chart":"splunk-otel-collector-0.158.0"}]'
     ;;
   *" get values "*)
     cat <<'YAML'
@@ -951,7 +951,7 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa
+          image: quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357
           env:
             - name: SPLUNK_OBSERVABILITY_ACCESS_TOKEN
               valueFrom:
@@ -1046,7 +1046,7 @@ printf '%s\n' "$*" >> "${FAKE_KUBECTL_ARGS}"
 if [[ "$*" == "config current-context" ]]; then
   printf '%s\n' production-cluster-admin
 elif [[ "$*" == *"get deployment,daemonset,statefulset"* ]]; then
-  printf '%s\n' '{"items":[{"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"}]}}}}]}'
+  printf '%s\n' '{"items":[{"spec":{"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}}}]}'
 elif [[ "$*" == *"get secret"* ]]; then
   printf '%s\n' '{"data":{"username":"bW9uaXRvcg==","password":"c2VjcmV0","access-token":"dG9rZW4="}}'
 elif [[ "$*" == *"get configmap kube-root-ca.crt"* ]]; then
@@ -1064,11 +1064,11 @@ elif [[ "$*" == *"rollout status"* ]]; then
   [[ "${FAKE_ROLLOUT_FAIL}" != "true" ]]
 elif [[ "$*" == *"get deployment/"* ]]; then
   cat <<'JSON'
-{"spec":{"replicas":1,"strategy":{"type":"Recreate","rollingUpdate":null},"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa","resources":{"limits":{"cpu":"2","memory":"4096Mi"},"requests":{"cpu":"2","memory":"4096Mi"}}}]}}},"status":{"readyReplicas":1}}
+{"spec":{"replicas":1,"strategy":{"type":"Recreate","rollingUpdate":null},"template":{"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357","resources":{"limits":{"cpu":"2","memory":"4096Mi"},"requests":{"cpu":"2","memory":"4096Mi"}}}]}}},"status":{"readyReplicas":1}}
 JSON
 elif [[ "$*" == *"get pod -l"* ]]; then
   cat <<'JSON'
-{"items":[{"status":{"containerStatuses":[{"name":"otel-collector","ready":true,"imageID":"docker-pullable://quay.io/signalfx/splunk-otel-collector@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"}]}}]}
+{"items":[{"status":{"containerStatuses":[{"name":"otel-collector","ready":true,"imageID":"docker-pullable://quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}]}
 JSON
 elif [[ "$*" == *"logs deployment/"* ]]; then
   printf '%s\n' 'info receiver postgresql/orders_postgres started'
@@ -1097,7 +1097,7 @@ exit 0
         """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "-c" && "${2:-}" == *"hashlib.sha256"* && "${*: -1}" == *.tgz ]]; then
-  printf '%s\n' 33989dd964afbceaff1db2035467b00cae4ae4868bdd89abbf9a7c68166bbc5a
+  printf '%s\n' 088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274
   exit 0
 fi
 exec "${REAL_PYTHON}" "$@"
@@ -1191,10 +1191,10 @@ exec "${REAL_PYTHON}" "$@"
     assert state["transaction_id"].startswith("dbmon-")
     assert state["applied_description"] == state["transaction_id"]
     assert state["running_image"].endswith(
-        "@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"
+        "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
     )
     assert state["running_image_id"].endswith(
-        "@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"
+        "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
     )
     calls_before = helm_args.read_text(encoding="utf-8").count(" upgrade ")
     (fake_state / "description").write_text(
@@ -1763,7 +1763,7 @@ def test_mysql_mariadb_floor_namespace_and_fargate_guards(tmp_path: Path) -> Non
     )
     assert result.returncode == 1
     assert "production-audited" in combined(result)
-    assert "v0.155.0" in combined(result)
+    assert "v0.158.0" in combined(result)
 
     spec_data = base_spec()
     spec_data["targets"][3]["credentials"]["kubernetes_secret"]["namespace"] = "wrong"
@@ -2102,7 +2102,7 @@ def test_static_validator_rejects_old_exporter_and_replicas(tmp_path: Path) -> N
     write_yaml(overlay_path, overlay)
     result = run_validate(output)
     assert result.returncode == 1
-    assert "not valid in chart 0.155.0" in combined(result)
+    assert "not valid in chart 0.158.0" in combined(result)
 
 
 def test_apply_always_renders_and_validates_before_acceptance_gate(
@@ -2119,7 +2119,7 @@ def test_apply_always_renders_and_validates_before_acceptance_gate(
     assert result.returncode == 1
     assert "--accept-k8s-apply is required" in combined(result)
     metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata["collector_version"] == "v0.155.0"
+    assert metadata["collector_version"] == "v0.158.0"
     assert not (output / "stale.txt").exists()
     assert "passed static validation" in combined(result)
 
@@ -2158,7 +2158,7 @@ if [[ "$*" == *"get pods"* ]]; then
   [[ "$*" == *"-n splunk-otel"* ]] || exit 42
   [[ "$*" == *"release=splunk-otel-collector"* ]] || exit 42
   cat <<JSON
-{"items":[{"metadata":{"name":"dbmon-cluster-receiver"},"status":{"conditions":[{"type":"Ready","status":"True"}],"containerStatuses":[{"name":"otel-collector","ready":true,"restartCount":${FAKE_KUBECTL_RESTART_COUNT:-0},"imageID":"quay.io/signalfx/splunk-otel-collector@sha256:4e2c6177302abd3c1146388d4aaf7c1ef9a2f91e0a2aad98e8662b4c559cb15c"}]},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.155.0@sha256:df3c302ca23928d7fb5031e52a174b253b44b14c325bbad9fe4dcab36b7e8efa"}]}}]}
+{"items":[{"metadata":{"name":"dbmon-cluster-receiver"},"status":{"conditions":[{"type":"Ready","status":"True"}],"containerStatuses":[{"name":"otel-collector","ready":true,"restartCount":${FAKE_KUBECTL_RESTART_COUNT:-0},"imageID":"quay.io/signalfx/splunk-otel-collector@sha256:16f784e3966cf9ced03ea3765a39f44c3e6395d04d4885e55fde6fc83328b2f0"}]},"spec":{"containers":[{"name":"otel-collector","image":"quay.io/signalfx/splunk-otel-collector:0.158.0@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}]}
 JSON
   exit 0
 fi
@@ -2310,9 +2310,9 @@ def test_live_validation_allows_upstream_best_effort_postgresql_explain_errors(
     output = render(tmp_path)
     logs = "\n".join(
         (
-            "2026-07-08T01:00:00Z error postgresqlreceiver@v0.155.0/client.go:169 "
+            "2026-07-08T01:00:00Z error postgresqlreceiver@v0.158.0/client.go:169 "
             "failed to explain statement postgresql/orders_postgres permission denied",
-            "2026-07-08T01:00:00Z error postgresqlreceiver@v0.155.0/scraper.go:365 "
+            "2026-07-08T01:00:00Z error postgresqlreceiver@v0.158.0/scraper.go:365 "
             "failed to explain query postgresql/orders_postgres permission denied",
         )
     )
@@ -2337,7 +2337,7 @@ def test_live_validation_keeps_transport_failure_fatal_inside_explain_error(
 ) -> None:
     output = render(tmp_path)
     logs = (
-        "2026-07-08T01:00:00Z error postgresqlreceiver@v0.155.0/scraper.go:365 "
+        "2026-07-08T01:00:00Z error postgresqlreceiver@v0.158.0/scraper.go:365 "
         f"failed to explain query postgresql/orders_postgres {transport_failure}"
     )
     env, _ = fake_kubectl_env(tmp_path, logs)
@@ -2986,7 +2986,7 @@ def test_collector_validate_pins_exact_image(tmp_path: Path) -> None:
     result = run_validate(output, "--collector-validate", env=env)
     assert result.returncode == 0, combined(result)
     args = args_file.read_text(encoding="utf-8")
-    assert "quay.io/signalfx/splunk-otel-collector:0.155.0" in args
+    assert "quay.io/signalfx/splunk-otel-collector:0.158.0" in args
     assert "validate --config=/etc/otel/collector/dbmon.yaml" in args
     assert "--network=none" in args
 

@@ -181,7 +181,7 @@ rules-engine variable expansion (e.g. `${{fieldName}}`) in transformations.
   (bidirectional), Statuspage, Twilio Live Call Routing, Conference Bridges
   (Enterprise tier).
 - `sso` — Splunk Support ticket template, IdP metadata XML drop-off steps,
-  and the SP-initiated URL `https://portal.victorops.com/auth/sso/<companyId>`.
+  and the SP-initiated URL `https://portal.victorops.com/auth/sso/<org-slug>`.
 - `reports` — Post-Incident Review (PIR), On-Call Review, MTTA/MTTR,
   Team Dashboard, Similar Incidents.
 - `calendars` — iCal feed export for team and personal calendars.

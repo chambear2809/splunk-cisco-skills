@@ -3,8 +3,11 @@
 - Use the pinned `splunk-otel-ios` release from `Package.swift`.
 - Minimum runtime: iOS/iPadOS 15.0.
 - Keep the RUM token in build-time configuration, not tracked source.
-- Add release attributes: `deployment.environment`, `app.version`,
-  `release.name`, `release.build`, and `release.distribution`.
+- Add release attributes: `deployment.environment.name`, `app.version`,
+  `release.name`, `release.build`, and `release.distribution`. Agent `2.4.1`
+  renamed this attribute from `deployment.environment` and emits only the new
+  key, so queries written against the old key return nothing once an app
+  upgrades. The `deploymentEnvironment` configuration property is unchanged.
 - Enable URLSession, navigation, crash reporting, slow rendering, and
   interaction modules only after reviewing app behavior.
 - Use the generated dSYM helper from CI after archive/export.

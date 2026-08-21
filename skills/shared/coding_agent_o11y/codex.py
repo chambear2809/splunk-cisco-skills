@@ -44,8 +44,8 @@ VALID_DESTINATIONS = {"local-collector", "external-collector", "direct", "all"}
 VALID_PROTOCOLS = {"otlp-http", "otlp-grpc"}
 APPLY_SECTIONS = ("profiles", "runtime", "hooks", "env-helper")
 MANAGED_HOOK_STATUS = "Capturing Codex O11y session metadata"
-SPLUNK_OTEL_COLLECTOR_VERSION = "0.154.2"
-SPLUNK_OTEL_COLLECTOR_DIGEST = "sha256:7ca38b306f8736673f24dda39a2c8040d33e575d22054a7f708b5829ea2a21f2"
+SPLUNK_OTEL_COLLECTOR_VERSION = "0.158.0"
+SPLUNK_OTEL_COLLECTOR_DIGEST = "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
 SPLUNK_OTEL_COLLECTOR_IMAGE = f"quay.io/signalfx/splunk-otel-collector@{SPLUNK_OTEL_COLLECTOR_DIGEST}"
 
 

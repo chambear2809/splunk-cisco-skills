@@ -86,7 +86,7 @@ IP.1  = 10.0.10.11
 
 The dual `serverAuth` + `clientAuth` EKU is **required** for KV
 Store 7.0+ (per
-[Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore)).
+[Preparing custom certificates for use with KV store](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store)).
 Even pure server certs include both EKUs to keep KV Store happy.
 
 ### Client leaf (`openssl-leaf-client.cnf` `[v3_clt]`)

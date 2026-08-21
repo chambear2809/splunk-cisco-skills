@@ -1,6 +1,6 @@
 # Splunk_TA_MS_Security Reference
 
-Package source of truth: `splunk-ta/_unpacked/Splunk_TA_MS_Security-3.0.0/Splunk_TA_MS_Security`.
+Package source of truth: `splunk-ta/_unpacked/Splunk_TA_MS_Security-4.0.0/Splunk_TA_MS_Security`.
 
 ## Inputs
 

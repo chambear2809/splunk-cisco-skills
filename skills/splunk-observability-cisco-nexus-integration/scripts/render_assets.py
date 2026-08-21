@@ -21,6 +21,12 @@ import shlex
 from pathlib import Path
 from typing import Any
 
+# Chart `distribution` accepts only eks, eks/auto-mode, eks/fargate, gke,
+# gke/autopilot, aks, openshift, " ", and "" (identical in chart 0.154.0 and
+# 0.158.0). This skill's own spec vocabulary uses "kubernetes" for vanilla
+# clusters, which the chart rejects, so translate it to the empty string.
+CHART_DISTRIBUTION = {"kubernetes": "", "vanilla": "", "": ""}
+
 
 SKILL_NAME = "splunk-observability-cisco-nexus-integration"
 
@@ -218,7 +224,9 @@ def overlay_values(spec: dict[str, Any], receiver: dict[str, Any], ssh_secret: d
         )
     overlay: dict[str, Any] = {
         "clusterName": cluster_name or "lab-cluster",
-        "distribution": distribution or "kubernetes",
+        # The chart's distribution enum has no "kubernetes" member; vanilla
+        # Kubernetes is the empty string. Anything else fails values.schema.json.
+        "distribution": CHART_DISTRIBUTION.get(distribution, distribution),
         "clusterReceiver": {
             "enabled": True,
             "extraEnvs": extra_envs,
@@ -227,14 +235,16 @@ def overlay_values(spec: dict[str, Any], receiver: dict[str, Any], ssh_secret: d
                 "processors": {
                     "memory_limiter": {"check_interval": "2s", "limit_mib": 200},
                     "batch": {},
-                    "resourcedetection": {"detectors": ["system"], "system": {"hostname_sources": ["os"]}},
+                    # Chart >= 0.158.0 rejects the legacy "resourcedetection"
+                    # alias in clusterReceiver.config; use the canonical name.
+                    "resource_detection": {"detectors": ["system"], "system": {"hostname_sources": ["os"]}},
                     "resource": {"attributes": [{"action": "upsert", "key": "k8s.cluster.name", "value": cluster_name}]},
                 },
                 "service": {
                     "pipelines": {
                         "metrics/cisco-os-metrics": {
                             "exporters": ["signalfx"],
-                            "processors": ["memory_limiter", "batch", "resourcedetection", "resource"],
+                            "processors": ["memory_limiter", "batch", "resource_detection", "resource"],
                             "receivers": ["cisco_os"],
                         }
                     }

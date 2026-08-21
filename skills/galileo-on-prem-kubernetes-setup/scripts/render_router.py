@@ -1742,7 +1742,7 @@ def emit(value: dict[str, Any], json_output: bool) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--operation", choices=("render", "doctor", "coverage"))
     parser.add_argument("--spec")
     parser.add_argument("--output-dir")

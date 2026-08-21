@@ -125,4 +125,5 @@ Read-back fields the renderer always strips before PUT: `metricStreamsSyncState`
 - [`signalfx/aws-terraform-templates`](https://github.com/signalfx/aws-terraform-templates)
 - [Splunk Add-on for AWS (Splunkbase 1876)](https://splunkbase.splunk.com/app/1876)
 - [Bedrock collect-metrics doc](https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/supported-ai-components-metrics-and-metadata/configure-your-splunk-observability-cloud-account-to-collect-aws-bedrock-metrics)
-- [FedRAMP support doc](https://help.splunk.com/en/splunk-observability-cloud/fedramp-support/fedramp-support-for-splunk-observability-cloud)
+- [FedRAMP Marketplace products](https://www.fedramp.gov/marketplace/products/)
+- [Splunk GovSummit 2026 recap](https://www.splunk.com/en_us/blog/industries/govsummit-2026-recap.html)

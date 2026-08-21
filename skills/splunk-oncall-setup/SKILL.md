@@ -10,7 +10,7 @@ description: "Use when the user asks about Splunk On-Call, VictorOps, on-call sc
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk On-Call Setup
@@ -222,7 +222,7 @@ Specs use `api_version: splunk-oncall-setup/v1` and can include:
   ServiceNow (bidirectional), Statuspage, Twilio Live Call Routing, and
   Conference Bridges (Enterprise tier).
 - `sso` — UI/Support handoff that renders the SP-initiated URL pattern
-  `https://portal.victorops.com/auth/sso/<companyId>` and the Splunk Support
+  `https://portal.victorops.com/auth/sso/<org-slug>` and the Splunk Support
   ticket template.
 - `reports` — deeplinks for Post-Incident Review (PIR), On-Call Review,
   MTTA/MTTR, Team Dashboard, and Similar Incidents (NLP grouping).

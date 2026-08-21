@@ -93,19 +93,19 @@ logsCollection:
 
 **Prevention**: The `splunk-observability-isovalent-integration` skill renders this exact pattern. The legacy fluentd path is gated behind `--legacy-fluentd-hec` for users who insist on it (with a banner warning of deprecation).
 
-## Issue 4: kubeletstats receiver fails on OpenShift
+## Issue 4: kubelet_stats receiver fails on OpenShift
 
-**Symptom**: After deploy, the agent DaemonSet logs show `kubeletstats: x509: certificate signed by unknown authority` for every scrape cycle.
+**Symptom**: After deploy, the agent DaemonSet logs show `kubelet_stats: x509: certificate signed by unknown authority` for every scrape cycle.
 
-**Root cause**: OpenShift's kubelet uses an internal CA that's not in the agent pod's default CA bundle. The chart's default `kubeletStats.insecure_skip_verify: false` rejects the cert.
+**Root cause**: OpenShift's kubelet uses an internal CA that's not in the agent pod's default CA bundle. The receiver's default `insecure_skip_verify: false` rejects the cert.
 
-**Fix**: Set `kubeletStats.insecure_skip_verify: true` in the chart values overlay.
+**Fix**: Set `insecure_skip_verify: true` on the receiver in the chart values overlay. Chart 0.157.0 renamed this receiver from `kubeletstats` to `kubelet_stats`; chart 0.158.0 hard-fails on the old name, so the overlay must use `kubelet_stats`.
 
 ```yaml
 agent:
   config:
     receivers:
-      kubeletstats:
+      kubelet_stats:
         insecure_skip_verify: true
 ```
 

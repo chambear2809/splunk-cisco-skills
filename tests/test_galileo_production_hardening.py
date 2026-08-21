@@ -376,7 +376,12 @@ def test_pinned_collector_command_opens_only_the_reviewed_binary(
         "galileo_wrapper_pinned_command_test",
         SKILL / "scripts/collector_runtime_wrapper.py",
     )
+    # "darwin" keeps the Linux-only ancestor sweep and uid check out of the way
+    # so the pin/digest logic can be exercised against a tmp_path binary. The
+    # platform gate is opened through its own seam so this stays a test of the
+    # pin, not of the refusal.
     monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.setattr(module, "exec_platform_supported", lambda: True)
     monkeypatch.setattr(module, "descriptor_exec_supported", lambda: True)
     binary = tmp_path / "collector"
     binary.write_bytes(b"reviewed collector")
@@ -794,6 +799,67 @@ def test_reference_client_help_does_not_require_optional_dependencies() -> None:
     assert result.returncode == 0
     assert "--check" in result.stdout
     assert "Traceback" not in result.stderr
+
+
+def test_wrapper_refuses_collector_exec_off_linux(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exec mode must fail closed where the root-owned checks cannot run.
+
+    ``trusted_executable_path`` and ``open_trusted_executable`` only enforce the
+    root-owned, non-group-writable path chain on Linux. Off Linux the collector
+    would otherwise be executed with those checks skipped.
+    """
+    module = load_module(
+        "galileo_wrapper_platform_refusal_test",
+        SKILL / "scripts/collector_runtime_wrapper.py",
+    )
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    environment = {
+        "GALILEO_COLLECTOR_BINARY": "/usr/bin/otelcol",
+        "GALILEO_COLLECTOR_BINARY_SHA256": "0" * 64,
+    }
+    with pytest.raises(ValueError, match="collector exec requires Linux"):
+        module.open_pinned_collector_command(["/usr/bin/otelcol"], environment)
+
+    # The refusal must be the first gate, so an otherwise-invalid call still
+    # reports the platform rather than leaking a later validation result.
+    with pytest.raises(ValueError, match="collector exec requires Linux"):
+        module.open_pinned_collector_command([], {})
+
+
+def test_wrapper_platform_refusal_does_not_block_linux_or_check_modes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The refusal is exec-only and platform-specific, not a blanket gate."""
+    module = load_module(
+        "galileo_wrapper_platform_allowed_test",
+        SKILL / "scripts/collector_runtime_wrapper.py",
+    )
+    monkeypatch.setattr(module.sys, "platform", "linux")
+    # On Linux the platform gate passes and validation proceeds to the pin.
+    with pytest.raises(ValueError, match="GALILEO_COLLECTOR_BINARY is required"):
+        module.open_pinned_collector_command(["/usr/bin/otelcol"], {})
+
+    # --print-destination-fingerprint never reaches the exec path, so it stays
+    # available on this platform whatever it is.
+    environment = wrapper_environment(tmp_path)
+    expected = environment["GALILEO_DESTINATION_FINGERPRINT"]
+    environment.pop("GALILEO_API_KEY_FILE", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SKILL / "scripts/collector_runtime_wrapper.py"),
+            "--print-destination-fingerprint",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=environment,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+    assert "requires Linux" not in result.stderr
 
 
 def test_api_helpers_disable_ambient_proxies_and_redirects() -> None:

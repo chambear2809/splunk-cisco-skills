@@ -56,7 +56,7 @@ Input type prefix: `cisco_nexus_dashboard://`
 | `mso_audit_user` | Orchestrator | `orchestrator_arguments=audit user` | 300s | `cisco_nd` |
 
 The repo-inspected app `1.2.0` still ships the `fabrics` and `switches` inputs
-and parser stanzas. However, pinned SCAN catalog `2026_07_09_1837` no longer
+and parser stanzas. However, pinned SCAN catalog `2026_08_01_2130` no longer
 advertises `cisco:dc:nd:fabrics` or `cisco:dc:nd:switches`. Keep those inputs
 version-bound: they may be enabled for a reviewed `1.2.0` deployment, but do
 not count them as current SCAN product coverage without observed event and

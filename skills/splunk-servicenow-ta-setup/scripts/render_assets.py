@@ -19,7 +19,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-servicenow-ta-rendered"
 
 APP_NAME = "Splunk_TA_snow"
 SPLUNKBASE_ID = "1928"
-LATEST_VERIFIED_VERSION = "10.0.1"
+LATEST_VERIFIED_VERSION = "11.0.2"
 
 # Common ServiceNow tables. Each snow://<table> input emits sourcetype snow:<table>.
 TABLES: dict[str, dict[str, str]] = {

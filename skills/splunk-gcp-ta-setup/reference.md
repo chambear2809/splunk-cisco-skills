@@ -1,7 +1,7 @@
 # Splunk Add-on for Google Cloud Platform Reference
 
 Grounded in the `Splunk_TA_google-cloudplatform` package (Splunkbase app `3088`,
-verified version `5.0.2`).
+verified version `5.1.1`).
 
 ## Package Model
 

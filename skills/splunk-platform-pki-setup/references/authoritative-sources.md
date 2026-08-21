@@ -11,7 +11,7 @@ When refreshing: bump the date and reconfirm the doc still says
 what the skill assumes. If the doc changed materially, update the
 relevant reference and renderer logic.
 
-> Last reviewed: 2026-07-01
+> Last reviewed: 2026-08-20
 
 ## TLS lifecycle
 
@@ -31,8 +31,8 @@ relevant reference and renderer logic.
 - [Configure mutually authenticated TLS (mTLS) on the Splunk platform](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-mutually-authenticated-transport-layer-security-mtls-on-the-splunk-platform)
 - [Configure TLS certificate host name validation](https://docs.splunk.com/Documentation/Splunk/latest/Security/EnableTLSCertHostnameValidation)
 - [Configure TLS protocol version support](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-- [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites)
-- [server.conf reference](https://docs.splunk.com/Documentation/Splunk/latest/admin/serverconf)
+- [About TLS encryption and cipher suites](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/install-splunk-enterprise-securely/about-tls-encryption-and-cipher-suites)
+- [server.conf reference](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/server.conf)
 - [web.conf reference](https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.0/configuration-file-reference/10.0.1-configuration-file-reference/web.conf)
 - [inputs.conf reference](https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.0/configuration-file-reference/10.0.1-configuration-file-reference/inputs.conf)
 - [outputs.conf reference](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.0/configuration-file-reference/10.0.1-configuration-file-reference/outputs.conf)
@@ -40,7 +40,7 @@ relevant reference and renderer logic.
 
 ## KV Store
 
-- [Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore)
+- [Preparing custom certificates for use with KV store](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store)
 
 ## Indexer cluster + SHC
 
@@ -54,7 +54,7 @@ relevant reference and renderer logic.
 
 ## Auth scheme certificates (separate trust domains)
 
-- [Secure SSO with TLS certificates on Splunk Enterprise](http://docs.splunk.com/Documentation/Splunk/latest/Security/ConfigureSSLforSSO)
+- [Secure SSO with TLS certificates on Splunk Enterprise](https://docs.splunk.com/Documentation/Splunk/latest/Security/ConfigureSSLforSSO)
 - [Configure SAML SSO using configuration files](https://docs.splunk.com/Documentation/Splunk/9.4.2/Security/ConfigureSAMLSSO)
 - [Secure LDAP authentication with TLS certificates](https://docs.splunk.com/Documentation/Splunk/9.4.1/Security/LDAPwithcertificates)
 - [Configure LDAP using configuration files](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/9.4/perform-advanced-configuration-of-ldap-authentication-in-splunk-enterprise/configure-ldap-using-configuration-files)
@@ -76,7 +76,7 @@ relevant reference and renderer logic.
 
 ## Edge Processor
 
-- [Edge Processor: Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors)
+- [Edge Processor: Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors)
 - [Edge Processor: TLS and mTLS support (HEC)](https://help.splunk.com/en/data-management/collect-http-event-data/send-hec-data-to-and-from-edge-processor/send-data-from-edge-processor-with-hec/tls-and-mtls-support)
 - [Edge Processor: Set up an Edge Processor](https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-enterprise/10.2/administer-edge-processors/set-up-an-edge-processor)
 

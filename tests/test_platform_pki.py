@@ -42,7 +42,12 @@ GENERATED_FILES manifest:
     Splunk write API.
 22. metadata.json valid JSON; no PEM private key blocks anywhere.
 23. All rendered .sh pass bash -n.
-24. authoritative-sources.md cites the key upstream Splunk URLs.
+24. authoritative-sources.md satisfies the citation contract in
+    required-citations.json: every claim still has a source, on an approved
+    vendor host, pointing at a topically correct page. Matching is on the
+    link title, so a Splunk URL migration does not fail the build -- with
+    companion tests proving both that a slug rename passes and that a
+    missing, wrong, or off-vendor citation is still caught.
 25. Splunk 10.5 blocks legacy SSL Certificate Checker app 3172 and renders
     native expiry-monitoring guidance instead.
 """
@@ -62,6 +67,9 @@ RENDER_SCRIPT = SKILL_ROOT / "scripts/render_assets.py"
 SETUP_SCRIPT = SKILL_ROOT / "scripts/setup.sh"
 SMOKE_SCRIPT = SKILL_ROOT / "scripts/smoke_offline.sh"
 ALGO_JSON = SKILL_ROOT / "references/algorithm-policy.json"
+
+sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+import doc_citations  # noqa: E402
 
 
 def _load_render_module():
@@ -685,19 +693,96 @@ def test_all_rendered_shell_scripts_pass_bash_n(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_authoritative_sources_md_cites_key_urls() -> None:
-    src = (SKILL_ROOT / "references/authoritative-sources.md").read_text()
-    for keyword in (
-        "configure-tls-certificates-for-inter-splunk-communication",
-        "how-to-create-and-sign-your-own-tls-certificates",
-        "CustomCertsKVstore",
-        "secure-splunk-enterprise-with-fips",
-        "configure-tls-protocol-version-support",
-        "Forwarder_Forwarder_ConfigSCUFCredentials",
-        "AboutTLSencryptionandciphersuites",
-        "configure-mutually-authenticated-transport-layer-security-mtls",
-        "EnableTLSCertHostnameValidation",
+    """Every claim in the manifest still has a citation.
+
+    This used to assert on Splunk URL slugs. It broke twice while Splunk
+    migrated docs.splunk.com to help.splunk.com, both times because the vendor
+    renamed a page rather than because anything here was wrong. The contract
+    now lives in required-citations.json and matches on the link title, so a
+    vendor rename is a one-line URL edit in the markdown and no test change.
+    See skills/shared/lib/doc_citations.py for why that keeps the signal.
+    """
+
+    violations = doc_citations.load_and_check(
+        SKILL_ROOT / "references/authoritative-sources.md",
+        SKILL_ROOT / "references/required-citations.json",
+    )
+    assert not violations, "authoritative-sources.md citation contract failed:\n" + "\n".join(
+        violations
+    )
+
+
+def test_citation_contract_survives_a_vendor_slug_migration() -> None:
+    """A slug rename that keeps the topic noun must not fail the build.
+
+    This is the exact regression that motivated the redesign: the KV Store page
+    moved from CustomCertsKVstore to
+    preparing-custom-certificates-for-use-with-kv-store. Both spellings must
+    satisfy the same contract entry.
+    """
+
+    manifest = json.loads(
+        (SKILL_ROOT / "references/required-citations.json").read_text()
+    )
+    kv_entry = next(
+        e for e in manifest["required_citations"] if e["id"] == "kv-store-custom-certs"
+    )
+    contract = {"allowed_hosts": manifest["allowed_hosts"], "required_citations": [kv_entry]}
+
+    for slug in (
+        "Documentation/Splunk/9.4/Admin/CustomCertsKVstore",
+        "en/splunk-enterprise/administer/admin-manual/9.4/"
+        "administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store",
     ):
-        assert keyword in src, f"authoritative-sources.md missing reference: {keyword}"
+        md = (
+            "- [Preparing custom certificates for use with KV store]"
+            f"(https://docs.splunk.com/{slug})\n"
+        )
+        assert not doc_citations.check_citations(md, contract), (
+            f"citation contract rejected a legitimate slug spelling: {slug}"
+        )
+
+
+def test_citation_contract_still_catches_a_wrong_or_missing_page() -> None:
+    """Robustness must not become blindness.
+
+    Dropping the slug assertions entirely would have made this test pass on a
+    document that cited nothing, or cited the wrong page. Each failure mode the
+    old slug list caught is still caught here.
+    """
+
+    manifest = json.loads(
+        (SKILL_ROOT / "references/required-citations.json").read_text()
+    )
+    kv_entry = next(
+        e for e in manifest["required_citations"] if e["id"] == "kv-store-custom-certs"
+    )
+    contract = {"allowed_hosts": manifest["allowed_hosts"], "required_citations": [kv_entry]}
+
+    kv_url = (
+        "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.4/"
+        "administer-the-app-key-value-store/preparing-custom-certificates-for-use-with-kv-store"
+    )
+    cases = {
+        "citation deleted": "- [Some unrelated page](https://docs.splunk.com/Documentation/Splunk/latest/Security/Whatever)\n",
+        "points at the wrong Splunk page": (
+            "- [Preparing custom certificates for use with KV store]"
+            "(https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites)\n"
+        ),
+        "repointed off-vendor": (
+            "- [Preparing custom certificates for use with KV store]"
+            "(https://example.com/blog/kvstore-certs)\n"
+        ),
+    }
+    for description, md in cases.items():
+        assert doc_citations.check_citations(md, contract), (
+            f"citation contract failed to catch: {description}"
+        )
+
+    # Control: the correct citation passes, so the cases above fail for the
+    # reason under test rather than because the checker rejects everything.
+    good = f"- [Preparing custom certificates for use with KV store]({kv_url})\n"
+    assert not doc_citations.check_citations(good, contract)
 
 
 # ---------------------------------------------------------------------------
@@ -745,3 +830,187 @@ def test_smoke_offline_passes() -> None:
         ["bash", str(SMOKE_SCRIPT)], capture_output=True, text=True, cwd=REPO_ROOT
     )
     assert result.returncode == 0, f"smoke_offline.sh failed:\n{result.stdout}\n{result.stderr}"
+
+
+# ---------------------------------------------------------------------------
+# 27. cipher guardrails: self-consistency, enforcement, and OpenSSL naming
+# ---------------------------------------------------------------------------
+
+sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+from cipher_policy import (  # noqa: E402
+    check_cipher_list,
+    check_policy_document,
+    parse_cipher_suite,
+)
+
+
+def test_every_preset_validates_against_its_own_cipher_guardrails() -> None:
+    """A preset must never reject its own rendered output.
+
+    This is the acceptance test for the guardrail rewrite. The previous STIG
+    preset forbade the substring 'SHA256' while shipping
+    ECDHE-ECDSA-AES128-GCM-SHA256, so it would have failed the instant
+    enforcement went live. Asserting over every preset means a future preset
+    edit cannot reintroduce that shape.
+    """
+    data = json.loads(ALGO_JSON.read_text())
+    violations = check_policy_document(data)
+    assert violations == [], "presets violate their own cipher_policy:\n" + "\n".join(
+        violations
+    )
+
+
+def test_every_preset_declares_a_cipher_policy() -> None:
+    """An absent cipher_policy silently disables enforcement for that preset."""
+    data = json.loads(ALGO_JSON.read_text())
+    for name, preset in data["presets"].items():
+        assert preset.get("cipher_policy"), f"{name} has no cipher_policy block"
+
+
+def test_non_compliant_custom_cipher_list_is_rejected(tmp_path: Path) -> None:
+    """An operator-supplied policy file with a bad cipher list must fail closed.
+
+    Guards against enforcement silently becoming a no-op again: if the
+    renderer stopped calling check_policy_document, this render would succeed.
+    """
+    data = json.loads(ALGO_JSON.read_text())
+    data["presets"]["splunk-modern"]["cipher_suite"] = (
+        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:RC4-MD5"
+    )
+    bad_policy = tmp_path / "bad-algorithm-policy.json"
+    bad_policy.write_text(json.dumps(data))
+
+    result = run_render(
+        *_core5_args(tmp_path / "out"),
+        "--algorithm-policy-file",
+        str(bad_policy),
+    )
+    assert result.returncode != 0, "non-compliant custom cipher list was accepted"
+    combined = result.stdout + result.stderr
+    assert "violates its own cipher guardrails" in combined
+    assert "ECDHE-RSA-AES256-SHA384" in combined  # the CBC suite
+    assert "RC4-MD5" in combined                  # the broken-primitive suite
+
+
+def test_custom_cipher_policy_cannot_omit_guardrail_block(tmp_path: Path) -> None:
+    """A custom cipher-bearing preset must not disable checks by omission."""
+    data = json.loads(ALGO_JSON.read_text())
+    preset = data["presets"]["splunk-modern"]
+    preset["cipher_suite"] = "RC4-MD5:ECDHE-RSA-AES128-SHA"
+    preset.pop("cipher_policy")
+    bad_policy = tmp_path / "missing-cipher-policy.json"
+    bad_policy.write_text(json.dumps(data))
+
+    result = run_render(
+        *_core5_args(tmp_path / "out"),
+        "--algorithm-policy-file",
+        str(bad_policy),
+        "--dry-run",
+    )
+    assert result.returncode != 0, "missing cipher_policy was accepted"
+    combined = result.stdout + result.stderr
+    assert "splunk-modern.cipher_policy" in combined
+    assert "must be a non-empty object" in combined
+    assert "Traceback" not in combined
+
+
+def test_custom_cipher_policy_rejects_wrong_block_and_field_types(
+    tmp_path: Path,
+) -> None:
+    """Malformed JSON types must fail cleanly instead of bypassing or crashing."""
+    cases = (
+        ([], "must be a non-empty object"),
+        (
+            {
+                "require_aead": "false",
+                "forbid_cbc_mode": True,
+                "forbid_sha1_mac": True,
+                "forbidden_tokens": "RC4",
+            },
+            "must be a boolean",
+        ),
+    )
+    for index, (cipher_policy, expected) in enumerate(cases):
+        data = json.loads(ALGO_JSON.read_text())
+        data["presets"]["splunk-modern"]["cipher_policy"] = cipher_policy
+        bad_policy = tmp_path / f"wrong-cipher-policy-{index}.json"
+        bad_policy.write_text(json.dumps(data))
+
+        result = run_render(
+            *_core5_args(tmp_path / f"out-{index}"),
+            "--algorithm-policy-file",
+            str(bad_policy),
+            "--dry-run",
+        )
+        assert result.returncode != 0, f"accepted cipher_policy={cipher_policy!r}"
+        combined = result.stdout + result.stderr
+        assert expected in combined
+        assert "Traceback" not in combined
+
+    assert "must be an array" in combined
+
+
+def test_splunk_modern_ships_only_aead_suites() -> None:
+    """splunk-modern is the default policy; it must match its own name."""
+    data = json.loads(ALGO_JSON.read_text())
+    preset = data["presets"]["splunk-modern"]
+    for field in ("cipher_suite", "tls13_cipher_suite", "ldap_tls_cipher_suite"):
+        for name in preset[field].replace(",", ":").split(":"):
+            info = parse_cipher_suite(name.strip())
+            assert info["aead"], f"{field} still offers non-AEAD suite {name}"
+    for removed in (
+        "ECDHE-ECDSA-AES256-SHA384",
+        "ECDHE-RSA-AES256-SHA384",
+        "ECDHE-ECDSA-AES128-SHA256",
+        "ECDHE-RSA-AES128-SHA256",
+    ):
+        assert removed not in preset["cipher_suite"]
+
+
+def test_cipher_classification_survives_openssl_naming_traps() -> None:
+    """The three naming traps that made substring matching unusable.
+
+    Substring matching failed because OpenSSL names do not spell out mode or
+    MAC: CBC suites contain no 'CBC', SHA-1 suites are '-SHA' not '-SHA1', and
+    a trailing 'SHA256' on an AEAD suite is the PRF hash, not an HMAC.
+    """
+    # Trap 1: CBC mode with no "CBC" anywhere in the name.
+    cbc = parse_cipher_suite("ECDHE-RSA-AES256-SHA384")
+    assert "CBC" not in cbc["name"].upper()
+    assert cbc["mode"] == "cbc" and not cbc["aead"]
+
+    # Trap 2: SHA-1 spelled as a bare "SHA".
+    sha1 = parse_cipher_suite("ECDHE-RSA-AES128-SHA")
+    assert "SHA1" not in sha1["name"].upper()
+    assert sha1["mac"] == "SHA1"
+
+    # Trap 3: trailing SHA256 on AEAD is a PRF hash, not an HMAC.
+    for aead_name in ("ECDHE-ECDSA-AES128-GCM-SHA256", "TLS_AES_128_GCM_SHA256"):
+        aead = parse_cipher_suite(aead_name)
+        assert aead["aead"] and aead["mode"] == "aead"
+        assert aead["mac"] is None, "AEAD suite must not report an HMAC"
+        assert aead["prf"] == "SHA256"
+
+    # TLS 1.3 suites are AEAD by construction.
+    assert parse_cipher_suite("TLS_CHACHA20_POLY1305_SHA256")["aead"]
+
+
+def test_cipher_policy_rejects_cbc_and_broken_primitives() -> None:
+    strict = {
+        "require_aead": True,
+        "forbid_cbc_mode": True,
+        "forbid_sha1_mac": True,
+        "forbidden_tokens": ["NULL", "EXPORT", "RC4", "DES", "3DES", "MD5", "ANON"],
+    }
+    assert check_cipher_list("ECDHE-RSA-AES256-GCM-SHA384", strict) == []
+    for bad in ("ECDHE-RSA-AES256-SHA384", "ECDHE-RSA-AES128-SHA", "RC4-MD5"):
+        assert check_cipher_list(bad, strict), f"{bad} should have been rejected"
+
+
+def test_forbidden_tokens_match_whole_tokens_not_substrings() -> None:
+    """Token equality is what stops the SHA256-matches-SHA384-era bug."""
+    policy = {"forbidden_tokens": ["DES"]}
+    # "AES256" must not trip the "DES" rule, and neither should GCM AEAD names.
+    assert check_cipher_list("ECDHE-RSA-AES256-GCM-SHA384", policy) == []
+    # A real DES suite must still be caught.
+    assert check_cipher_list("ECDHE-RSA-DES-CBC3-SHA", policy)

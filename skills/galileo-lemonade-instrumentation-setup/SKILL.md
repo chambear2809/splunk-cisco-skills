@@ -8,7 +8,7 @@ description: "Use when adding Galileo OTLP fan-out to a Lemonade collector, capt
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Galileo Lemonade Instrumentation Setup
@@ -164,6 +164,12 @@ Galileo key to the Lemonade service.
 - Use `GALILEO_API_KEY_FILE` with the packaged collector runtime wrapper. Do
   not source a plaintext key into an interactive shell or store it in the
   non-secret collector environment file.
+- Pin the collector the wrapper may exec with `GALILEO_COLLECTOR_BINARY` and
+  `GALILEO_COLLECTOR_BINARY_SHA256`. Exec mode requires both and fails closed
+  without them, before the API key is read. Exec mode also requires Linux and
+  refuses to run elsewhere, because the binary and every ancestor directory
+  must be proven root-owned, link-free, and not group/other-writable.
+  Recompute the digest after every collector package change.
 - Render one complete config from the live base, review its diff, validate with
   the exact installed collector binary, back up, then apply transactionally.
 - Keep both Lemonade and client OTLP receivers loopback-bound.
@@ -226,7 +232,18 @@ Galileo key to the Lemonade service.
 
    Record it as `GALILEO_DESTINATION_FINGERPRINT`, and set
    `GALILEO_QUEUE_STORAGE_DIRECTORY` to a new private directory ending with
-   that exact digest. Render from the existing full collector config:
+   that exact digest.
+
+   Pin the collector the wrapper may exec. Record the reviewed binary as
+   `GALILEO_COLLECTOR_BINARY` and its digest as
+   `GALILEO_COLLECTOR_BINARY_SHA256`, read from the installed file itself, not
+   from a vendor download page:
+
+   ```bash
+   sha256sum /usr/bin/otelcol
+   ```
+
+   Render from the existing full collector config:
 
    ```bash
    bash skills/galileo-lemonade-instrumentation-setup/scripts/setup.sh \

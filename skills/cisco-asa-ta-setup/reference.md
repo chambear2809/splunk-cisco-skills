@@ -1,7 +1,7 @@
 # Cisco ASA TA Reference
 
 Primary package: `Splunk_TA_cisco-asa` (Splunkbase `1620`, verified docs
-version `6.0.1`).
+version `6.1.2`).
 
 ## Data Contract
 

@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Meraki TA Setup Automation

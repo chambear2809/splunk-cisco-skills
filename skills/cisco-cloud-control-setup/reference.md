@@ -66,7 +66,7 @@ separately classified handoffs rather than being promoted to matrix rows.
 | Machine Data Lake alpha | Dedicated parent readiness handoff; no provisioning API calls |
 | Catalogs | Dedicated parent distinguishes global Splunk Catalog, dataset-native catalog, AWS Glue, Iceberg REST, Databricks Unity Catalog, and Machine Data Lake cataloging; no undocumented CRUD |
 | Federation | Dedicated parent covers Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake independently, plus legacy FSS3 migration and Cisco SAL boundaries |
-| AI activation | Dedicated parent distinguishes AI Toolkit, open CTSM, hosted CDTSM preview, Splunk Agent Builder alpha, announced/roadmap Cloud Control Studio Agent Builder, MCP, and AI Canvas CA |
+| AI activation | Dedicated parent distinguishes AI Toolkit `6.0.2` with PSC `4.3.4`, open CTSM, GA hosted CDTSM, GA Splunk AI Toolkit Agent Launchpad, the separate announced/roadmap Cloud Control Studio Agent Builder, MCP, and AI Canvas CA |
 | MCP | `splunk-mcp-server-setup` when `mcp.splunk_mcp_url` is set; `cisco-thousandeyes-mcp-setup` can render without Splunk credentials |
 | AI agent monitoring | `splunk-observability-ai-agent-monitoring-setup` |
 | Observability dashboards | `splunk-observability-dashboard-builder` |

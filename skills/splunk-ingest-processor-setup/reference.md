@@ -57,12 +57,29 @@ and feature visibility before use.
   entry does not explicitly promote AFE to General Availability, so its
   presence there is not used to override the later Controlled Availability
   label without a current lifecycle statement from Splunk.
+  Announced `2026-03-11`, re-checked `2026-08-20` against the release notes
+  updated `2026-06-16`. AFE appears only in the February 18, 2026 entry and
+  carries no release-stage label there. The same table does label stages when
+  they apply: the May 18, 2026 Microsoft Azure routing entry reads
+  "(Controlled Availability release)" and states the CA gating inline, and the
+  June 29, 2026 entry re-lists that feature as "(General Availability
+  release)". The page preamble groups entries by generally available release
+  date, but the May 18 Controlled Availability entry shows that framing is not
+  a per-entry GA assertion. Splunk still makes no affirmative GA statement for
+  AFE, so the Controlled Availability label is current rather than merely
+  un-rechecked.
 - **Guided Onboarding with Auto-Schematization: Alpha.** The same March 11,
   2026 announcement labels this workflow Alpha and directs interested users
   to Splunk experts. It analyzes sample data, clusters similar events, and can
   recommend CIM mappings plus candidate search-time TA packages or ingest-time
   SPL2 pipelines. No stable public API or Ingest Processor release-note entry
   was found, so this skill provides only an access and review handoff.
+  Announced `2026-03-11`, re-checked `2026-08-20` against the release notes
+  updated `2026-06-16`, which contain zero occurrences of
+  "Auto-Schematization" or "Guided Onboarding" in any release section. That
+  absence is equally consistent with "still Alpha" and with "quietly
+  withdrawn", so it is recorded as dated negative evidence and the Alpha
+  stance, enrollment gate, and human-review gate all stay as they are.
 - **Lifecycle gate for both capabilities:** verify access, keep representative
   sample data non-sensitive, review proposed fields and CIM mappings, lint and
   preview candidate SPL2, validate destination and event counts, and require
@@ -117,7 +134,9 @@ same parsing/finding classification but writes no files.
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/send-data-out-from-ingest-processor/how-the-destination-for-ingest-processor-works>
 - Queueing:
   <https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors/monitor-system-health-and-activity/resiliency-and-queueing-in-ingest-processor>
-- Release notes:
+- Release notes (updated `2026-06-16`, re-checked `2026-08-20`; negative
+  evidence for both AI-powered Data Management release stages):
   <https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/introduction/release-notes-for-ingest-processor>
-- AI-powered Data Management announcement and release-stage source:
+- AI-powered Data Management announcement and release-stage source
+  (`2026-03-11`, re-checked `2026-08-20`):
   <https://www.splunk.com/en_us/blog/artificial-intelligence/accelerating-data-intelligence-with-ai-powered-data-management.html>

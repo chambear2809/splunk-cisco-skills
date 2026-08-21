@@ -15,8 +15,8 @@ from urllib.parse import urlparse, urlunparse
 SKILL_NAME = "galileo-mcp-server-setup"
 DEFAULT_MCP_URL = "https://api.galileo.ai/mcp/http/mcp"
 EXPECTED_SERVER_NAME = "EvalsInIDEServer"
-EXPECTED_SERVER_VERSION = "1.28.1"
-CATALOG_REVIEW_DATE = "2026-07-08"
+EXPECTED_SERVER_VERSION = "1.29.0"
+CATALOG_REVIEW_DATE = "2026-08-20"
 BRIDGE_SOURCE = (
     Path(__file__).resolve().parent.parent / "assets/stdio_streamable_http_bridge.js"
 )
@@ -200,9 +200,34 @@ PRODUCT_GAP_MATRIX: list[dict[str, str]] = [
         "handoff": "galileo-platform-setup for create/run assets",
     },
     {
-        "area": "AI Assistant beta, evidence-linked investigation, and enterprise enablement",
+        "area": "AI Assistant beta, evidence-linked investigation, criticality, and organization-wide debugging",
         "mcp_coverage": "docs_search_only_no_public_assistant_api",
         "handoff": "galileo-platform-setup for AI Assistant readiness, enablement, and console evidence",
+    },
+    {
+        "area": "Splunk Agent Observability naming and pre-/post-August 7 documentation epoch",
+        "mcp_coverage": "docs_search_only_onboarding_date_selects_documentation_set",
+        "handoff": "docs.galileo.ai before 2026-08-07; agent-observability-docs.splunk.com after that date",
+    },
+    {
+        "area": "Annotation Queues GA, templates, users, records, and human-feedback operations",
+        "mcp_coverage": "docs_search_only_no_observed_queue_lifecycle_tool",
+        "handoff": "galileo-platform-setup for queue access, assignment, annotation, export, and validation",
+    },
+    {
+        "area": "AI-assisted custom-code metrics, organization billing usage, model pricing, and integration costs",
+        "mcp_coverage": "docs_search_only_no_observed_metric_authoring_or_billing_tool",
+        "handoff": "galileo-platform-setup for scorer review, cost governance, and console evidence",
+    },
+    {
+        "area": "Trace Count alerts and multimodal out-of-the-box evaluation metrics",
+        "mcp_coverage": "docs_search_only_no_observed_alert_or_metric_configuration_tool",
+        "handoff": "galileo-platform-setup for alert and metric configuration and validation",
+    },
+    {
+        "area": "Hosted-model availability and light, dark, or system console themes",
+        "mcp_coverage": "docs_search_only_no_observed_configuration_tool",
+        "handoff": "galileo-platform-setup for model availability; console theme is an operator preference",
     },
     {
         "area": "Global dashboards across projects and log streams",
@@ -808,13 +833,14 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
         )
     lines.extend(
         [
-            "## July 7, 2026 product boundaries",
+            "## July 7-August 7, 2026 product boundaries",
             "",
             "These release features are not new tools in the observed 9-tool MCP catalog:",
             "",
             "- AI Assistant beta is read-only, requires enterprise support enablement and",
             "  a configured LLM integration, and has no documented public Assistant API",
-            "  or MCP tool.",
+            "  or MCP tool. It now works throughout Galileo debugging and prioritizes",
+            "  signals by criticality.",
             "- Global dashboards span projects and log streams in the console; the public",
             "  Trends API remains project/log-stream scoped, with no documented global",
             "  dashboard CRUD endpoint.",
@@ -825,6 +851,17 @@ def render_readme(clients: list[str], mcp_url: str, accept_write_tools: bool) ->
             "- Large-dataset Playground and experiment metric processing uses batching,",
             "  but MCP dataset creation/status does not run batched experiments and Galileo",
             "  documents no exact maximum or client batch-size control.",
+            "- Annotation Queues are generally available, but the observed MCP catalog has",
+            "  no queue lifecycle tool.",
+            "- AI-assisted custom-code metrics, organization billing usage, Model Pricing,",
+            "  Integration Costs, Trace Count alerts, and multimodal evaluation metrics",
+            "  remain platform/API/console handoffs.",
+            "- GPT 5.6 Sol, Terra, and Luna availability and console theme selection are",
+            "  platform state or operator preference, not MCP configuration.",
+            "- As of August 7, Galileo is Splunk Agent Observability. Customers onboarded",
+            "  before that date use docs.galileo.ai; customers onboarded later use",
+            "  agent-observability-docs.splunk.com. Verify the tenant-linked docs for an",
+            "  onboarding exactly on August 7.",
             "",
             "Use `galileo-platform-setup` for readiness, configuration handoffs, receiver",
             "or relay design, execution, and validation evidence for these capabilities.",

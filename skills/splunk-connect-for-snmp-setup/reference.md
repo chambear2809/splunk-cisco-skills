@@ -63,6 +63,6 @@ This repo's validation focuses on:
 ## Official References
 
 - [SC4SNMP architecture](https://splunk.github.io/splunk-connect-for-snmp/main/architecture/design/)
-- [Splunk requirements](https://splunk.github.io/splunk-connect-for-snmp/main/gettingstarted/splunk-requirements/)
-- [SC4SNMP installation](https://splunk.github.io/splunk-connect-for-snmp/main/gettingstarted/sc4snmp-installation/)
+- [Splunk requirements](https://splunk.github.io/splunk-connect-for-snmp/main/microk8s/splunk-requirements/)
+- [SC4SNMP installation](https://splunk.github.io/splunk-connect-for-snmp/main/microk8s/sc4snmp-installation/)
 - [Docker Compose env file configuration](https://splunk.github.io/splunk-connect-for-snmp/main/dockercompose/6-env-file-configuration/)

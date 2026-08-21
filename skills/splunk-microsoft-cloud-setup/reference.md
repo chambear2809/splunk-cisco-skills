@@ -2,8 +2,8 @@
 
 Grounded in two real packages:
 
-- `splunk_ta_o365` (Splunkbase `4055`, verified `6.0.2`)
-- `Splunk_TA_microsoft-cloudservices` (Splunkbase `3110`, verified `6.1.3`)
+- `splunk_ta_o365` (Splunkbase `4055`, verified `6.1.0`)
+- `Splunk_TA_microsoft-cloudservices` (Splunkbase `3110`, verified `6.3.1`)
 
 Note the exact app folder names: the Office 365 add-on installs as the
 lowercase `splunk_ta_o365`, and the Microsoft Cloud Services add-on installs as

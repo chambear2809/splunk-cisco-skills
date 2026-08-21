@@ -2,6 +2,16 @@
 
 Package source of truth: `splunk-ta/_unpacked/Splunk_TA_Google_Workspace-4.0.0/Splunk_TA_Google_Workspace`.
 
+## Package Version Boundary
+
+- Repo-verified package: `4.0.0`. Current public release: `5.0.0`.
+- The `4.0.0` release record lists Splunk `10.5`; `5.0.0` lists versions only
+  through `10.4`. The pin therefore stays on `4.0.0` so the default install path
+  keeps working on a `10.5` stack.
+- Install `5.0.0` only on a stack at `10.4` or below, and only with documented
+  vendor approval for that exact version. This skill has no platform preflight
+  wrapper, so nothing refuses a mismatched package for you.
+
 ## Inputs
 
 | Input | Key fields | Source type |

@@ -5,7 +5,10 @@
 - Bare React Native apps use the native iOS and Android setup paths.
 - Expo apps need a development build; Expo Go cannot load custom native
   modules.
-- iOS projects that use the pod path may require `USE_FRAMEWORKS=dynamic`.
+- iOS projects need no Podfile linkage change. From agent 1.0.1 the native iOS
+  SDK ships as vendored xcframeworks instead of resolving through SPM at
+  `pod install`, so `USE_FRAMEWORKS=dynamic` is no longer required and
+  `use_frameworks! :linkage => :static` works.
 - Use provider or imperative initialization depending on the app architecture.
 - Use manual instrumentation for navigation and custom workflows where
   automatic route detection is insufficient.

@@ -10,7 +10,7 @@ description: "Use when users need Cisco Data Fabric architecture, feature or pro
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Data Fabric Setup
@@ -113,8 +113,9 @@ public contracts and required non-secret inputs are available.
    approval, and downstream data-readiness evidence.
 5. **AI activation and action**: delegate AI Toolkit/PSC/DSDL, hosted-model
    readiness, and MCP Server. Distinguish the available open Cisco Time Series
-   Model 1.0 from the hosted Cisco Deep Time Series Model preview, and keep
-   Agent Builder and AI Canvas at their documented alpha or CA boundaries.
+   Model 1.0 from the GA hosted Cisco Deep Time Series Model integration, keep Agent
+   Launchpad at its documented GA boundary with its region, egress, connection,
+   and enabled-agent gates, and keep AI Canvas at its CA boundary.
 6. **Cross-domain experience**: represent SecOps, ITOps, Engineering/DevOps,
    NetOps, Splunk Enterprise Security, ITSI, Observability Cloud, Cisco Cloud
    Control, AI Canvas, and Cisco product telemetry as consumers or handoffs,
@@ -206,9 +207,19 @@ when a later lane is missing required intake.
   10.5; the old provider/index path is deprecated and migrated to the Data
   Management connection/dataset model.
 - Do not promote announcement dates to current availability. Cisco Time Series
-  Model 1.0 is now published as an open Apache-2.0 model, but that does not make
-  hosted CDTSM or its platform integrations GA. Keep the Agent Builder GA
-  target as roadmap until current product documentation says otherwise.
+  Model 1.0 is published as an open Apache-2.0 model and the hosted Cisco Deep
+  Time Series Model integration is generally available since AI Toolkit `6.0.0`,
+  but they remain separately governed layers and neither one settles the other.
+- Do not pair AI Toolkit `6.0.2` with a PSC release below `4.3.4`. The audited
+  baseline is `6.0.2` with PSC `4.3.4` on Python `3.13`; PSC `4.3.2` only
+  applies back at AI Toolkit `5.7.4`.
+- Do not describe Splunk AI Toolkit Agent Launchpad as alpha, private preview,
+  or a Fall 2026 GA target. Current AI Toolkit documentation makes it generally
+  available since `6.0.0`. Report it as unreachable only when a readiness gate
+  actually fails: an unsupported AWS region or a missing region egress IP in
+  the stack `apiAllowlistIP`, no supported LLM connection, or no enabled agent.
+  Splunk Enterprise reaches it through the Splunk Cloud Connect app rather than
+  being unsupported.
 - Do not treat Cisco Security Analytics and Logging (SAL) as Splunk Machine
   Data Lake or as an automatically configured federation target.
 - For AI Canvas with Splunk, require Cloud Control enablement, Splunk Cloud

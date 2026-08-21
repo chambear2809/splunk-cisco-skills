@@ -11,7 +11,7 @@ description: "Use when instrumenting mobile apps with Splunk RUM, preparing Mobi
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Mobile RUM
@@ -93,17 +93,33 @@ user tracking, readable stack traces, or Mobile Session Replay.
 
 ## Version Pins
 
-Defaults are pinned to package versions verified on 2026-05-19:
+Every default below was verified against its upstream registry on 2026-08-20 and
+is the current release on that date. No pin is knowingly behind upstream.
 
 | Component | Default |
 | --- | --- |
-| iOS agent | `2.2.3` |
-| Android agent | `2.3.0` |
-| Android Gradle plugins | `2.3.0` |
-| React Native agent | `1.0.0` |
-| React Native Session Replay | `1.0.0` |
-| Flutter agent | `1.0.1` |
-| Flutter Session Replay | `1.0.1` |
+| iOS agent | `2.4.1` |
+| Android agent | `2.3.3` |
+| Android Gradle plugins | `2.3.3` |
+| React Native agent | `1.2.0` |
+| React Native Session Replay | `1.2.0` |
+| Flutter agent | `1.2.0` |
+| Flutter Session Replay | `1.2.0` |
+
+Flutter agent and Flutter Session Replay must stay on the same minor line:
+`1.2.0` pins both platform interfaces to `>=1.2.0 <1.3.0`.
+
+### Deployment environment attribute rename
+
+iOS `2.4.1` and Android `2.3.2` renamed the deployment environment resource
+attribute from `deployment.environment` to `deployment.environment.name`. Both
+agents emit only the new key; there is no transitional dual-emit. Dashboards,
+detectors, and saved searches that filter or group mobile RUM data on the old
+key go blank as soon as an app ships these pins. While a fleet straddles the
+rename, accept both keys rather than switching outright.
+
+The Swift and Kotlin configuration property is still named
+`deploymentEnvironment`, so rendered initialization snippets are unaffected.
 
 The renderer rejects `latest`, `+`, ranges, wildcard, and otherwise unpinned
 versions unless `--allow-latest-version` is set.

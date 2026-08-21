@@ -25,10 +25,10 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-microsoft-cloud-rendered"
 # Real package facts.
 MSCS_APP = "Splunk_TA_microsoft-cloudservices"
 MSCS_ID = "3110"
-MSCS_VERSION = "6.1.3"
+MSCS_VERSION = "6.3.1"
 O365_APP = "splunk_ta_o365"
 O365_ID = "4055"
-O365_VERSION = "6.0.2"
+O365_VERSION = "6.1.0"
 
 # Office 365 Management Activity content types (real values from the spec).
 O365_MGMT_CONTENT_TYPES = [

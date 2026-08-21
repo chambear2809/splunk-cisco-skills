@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+require_arg() {
+    local flag="$1"
+    local remaining="$2"
+    local value="${3:-}"
+    if [[ "${remaining}" -lt 2 || -z "${value}" || "${value}" == --* ]]; then
+        echo "ERROR: Option '${flag}' requires a value." >&2
+        exit 2
+    fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUNTIME_SOURCE="${SKILL_DIR}/runtime"
@@ -39,13 +49,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --codex-home) CODEX_HOME_TARGET="$2"; shift 2 ;;
-    --service-name) SERVICE_NAME="$2"; shift 2 ;;
-    --environment) ENVIRONMENT_NAME="$2"; shift 2 ;;
-    --realm) REALM="$2"; shift 2 ;;
-    --trace-endpoint) TRACE_ENDPOINT="$2"; shift 2 ;;
-    --metrics-endpoint) METRICS_ENDPOINT="$2"; shift 2 ;;
-    --python-version) PYTHON_VERSION="$2"; shift 2 ;;
+    --codex-home) require_arg "$1" "$#" "${2:-}"; CODEX_HOME_TARGET="$2"; shift 2 ;;
+    --service-name) require_arg "$1" "$#" "${2:-}"; SERVICE_NAME="$2"; shift 2 ;;
+    --environment) require_arg "$1" "$#" "${2:-}"; ENVIRONMENT_NAME="$2"; shift 2 ;;
+    --realm) require_arg "$1" "$#" "${2:-}"; REALM="$2"; shift 2 ;;
+    --trace-endpoint) require_arg "$1" "$#" "${2:-}"; TRACE_ENDPOINT="$2"; shift 2 ;;
+    --metrics-endpoint) require_arg "$1" "$#" "${2:-}"; METRICS_ENDPOINT="$2"; shift 2 ;;
+    --python-version) require_arg "$1" "$#" "${2:-}"; PYTHON_VERSION="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;

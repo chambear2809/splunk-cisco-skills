@@ -22,29 +22,29 @@ from yaml_compat import YamlCompatError, load_yaml_or_json  # noqa: E402
 
 
 TA_APP_ID = "7125"
-COLLECTOR_AUDITED_VERSION = "0.154.2"
-CHART_AUDITED_VERSION = "0.154.0"
+COLLECTOR_AUDITED_VERSION = "0.158.0"
+CHART_AUDITED_VERSION = "0.158.0"
 CHART_NAME = "splunk-otel-collector"
 CHART_ARCHIVE_NAME = f"{CHART_NAME}-{CHART_AUDITED_VERSION}.tgz"
 CHART_ARCHIVE_URL = (
     "https://github.com/signalfx/splunk-otel-collector-chart/releases/download/"
     f"splunk-otel-collector-{CHART_AUDITED_VERSION}/{CHART_ARCHIVE_NAME}"
 )
-CHART_ARCHIVE_SHA256 = "613f788d786bf741be770512c7c297c4b70d3ab5426ac337b0416209e66bc7b0"
-COLLECTOR_STANDARD_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector:0.154.0"
+CHART_ARCHIVE_SHA256 = "088a93ebbcfbecf8e6f7ef3651747b65bbad443f0823489768bd4901cce0a274"
+COLLECTOR_STANDARD_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector:0.158.0"
 COLLECTOR_STANDARD_IMAGE = (
     "quay.io/signalfx/splunk-otel-collector@"
-    "sha256:b37160d858a5ad3344301424fba8cdb4d7cc12430383616e0ebc5fb39ad33410"
+    "sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
 )
-COLLECTOR_FIPS_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector-fips:0.154.0"
+COLLECTOR_FIPS_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector-fips:0.158.0"
 COLLECTOR_FIPS_IMAGE = (
     "quay.io/signalfx/splunk-otel-collector-fips@"
-    "sha256:b11a6e592248a2281cf95a765d30660a9951f04b0935f91d9ae93db5839b3b52"
+    "sha256:e60b7721a2be509cd71d6594387d437ce4996dba1804c6ff774fbb4e7ef3ba8d"
 )
-COLLECTOR_WINDOWS_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector-windows:0.154.0"
+COLLECTOR_WINDOWS_SOURCE_IMAGE = "quay.io/signalfx/splunk-otel-collector-windows:0.158.0"
 COLLECTOR_WINDOWS_IMAGE = (
     "quay.io/signalfx/splunk-otel-collector-windows@"
-    "sha256:aedfa35fcbff3dcf92bbcc195e9631ed2648d83e836ee2f9f0a2536d3a1a1e9a"
+    "sha256:5d1cb3cf0c7608b8ac6f25444c3e23d49096f39e35e466a345025a7f3054952c"
 )
 FARGATE_NODE_DISCOVERER_SOURCE_IMAGE = "public.ecr.aws/amazonlinux/amazonlinux:latest"
 FARGATE_NODE_DISCOVERER_RELEASE_TAG = "2023.12.20260629.0"
@@ -68,9 +68,9 @@ K8S_AUXILIARY_IMAGE_PINS = {
     "busybox:latest": (
         "busybox@sha256:fd8d9aa63ba2f0982b5304e1ee8d3b90a210bc1ffb5314d980eb6962f1a9715d"
     ),
-    "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.153.0": (
+    "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.156.0": (
         "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator@"
-        "sha256:71c80734e698e0a38039aeb5a6fad7129ca68eaa31eb262752c1e5015b319a24"
+        "sha256:e6f4503cade002bc2797b937e51801e1013abafb734933f35b67168448659dfe"
     ),
     "registry.k8s.io/kubectl:v1.35.1": (
         "registry.k8s.io/kubectl@"
@@ -80,45 +80,66 @@ K8S_AUXILIARY_IMAGE_PINS = {
         "ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go@"
         "sha256:664715c04cb854ffdbb920ea1289a86b0717f39e46b18e6584caa9e1f2e4d83f"
     ),
+    # Upstream re-pushed the mutable tag 1.0.4 between chart 0.154.0 and 0.158.0.
+    # Chart 0.158.0 still declares 1.0.4; this digest is what that tag resolves to
+    # as of the 0.158.0 audit. The former digest (sha256:c519018e...) is still
+    # pullable, so already-applied deployments are unaffected.
     "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd:1.0.4": (
         "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd@"
-        "sha256:c519018eb569926a44d5e078f1dcc301aa6cf8c6f35afe809b67f4eb37d0458d"
+        "sha256:a86df0699bf53228588d8e08dbd95e763b7bb377a02fe1d9e68806ef954d04f8"
     ),
-    "ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet:v1.14.0": (
+    "ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet:v1.15.0": (
         "ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet@"
-        "sha256:dea496508f6d94d417bc3f26d0bd0a4dd3a16049b6a2a5753c2a21a8035be910"
+        "sha256:1b8d96528c8138ef40a20fa0a58db423d653a9bcb7e1fa0fa5ecb83293b8e5bc"
     ),
-    "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java:v2.28.0": (
+    "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java:v2.30.0": (
         "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java@"
-        "sha256:8c3092572c4a433cb4fc258655880215d4c3dd0bf090d31fa0343a865180bfa9"
+        "sha256:812ad3b45675ef90043020c10e9ed21a3f11ba0903a848e78e3fe71654ae622c"
     ),
-    "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java-csa:v2.28.0": (
+    "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java-csa:v2.30.0": (
         "ghcr.io/signalfx/splunk-otel-java/splunk-otel-java-csa@"
-        "sha256:6c2c1d95c3753a4bcd9ea51c27498a242ea3de9a72345bb64d7c836fcf1c2abb"
+        "sha256:8b7e4f33254915fd657d1cc8a18288b6fbdd6392fac2912cb27d60df4fc383ea"
     ),
-    "ghcr.io/signalfx/splunk-otel-js/splunk-otel-js:v4.8.0": (
+    "ghcr.io/signalfx/splunk-otel-js/splunk-otel-js:v4.10.0": (
         "ghcr.io/signalfx/splunk-otel-js/splunk-otel-js@"
-        "sha256:97f0536ba942e110e3e8a493d265e11c26064c502614ad0b67069f429431484a"
+        "sha256:55f93be18e545d98a981bba124fe94a02fdbbb88f1fc471aa08793f7ccba4d78"
     ),
     "quay.io/signalfx/splunk-otel-instrumentation-python:v2.7.0": (
         "quay.io/signalfx/splunk-otel-instrumentation-python@"
         "sha256:d488c507e0cacc64b81423b96f6e53b30f2602a0e4bcc614658182f6aa13d5b4"
     ),
-    "quay.io/signalfx/splunk-otel-instrumentation-python:v2.11.0-secureapp": (
+    "quay.io/signalfx/splunk-otel-instrumentation-python:v2.12.1-secureapp": (
         "quay.io/signalfx/splunk-otel-instrumentation-python@"
-        "sha256:f47a8f0f7362da98f0e0ac0f5ac83492555b495c6c37c411680bb055bd1f2dbe"
+        "sha256:db4c6d848af4b46c89f48584b18030f00677495a0f0f26f13de67f84fc758191"
     ),
-    "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation/ebpf-instrument:v0.9.0": (
+    "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation/ebpf-instrument:v0.10.0": (
         "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation/ebpf-instrument@"
-        "sha256:26f82b148dfe8cb0530561ab72a3cb5490b3ae5df556a33c27984af2e28542cf"
+        "sha256:9c66cdb920202b9502e6f1b8e9b238757848eded40a0aad262976d6ebea23b02"
     ),
-    "ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.152.0": (
+    "ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.156.0": (
         "ghcr.io/open-telemetry/opentelemetry-operator/target-allocator@"
-        "sha256:85a08d334a480c33aff1f0e9d9e432202c1e0bf23f58f8bd11aececa5506a4c6"
+        "sha256:feeedb038f075d2e29e420ccbd9329c72396f44d28aefae859a19f07ee4a31a4"
     ),
 }
 INSTRUMENTATION_KUBECTL_IMAGE_TAG = "v1.35.1"
-INSTRUMENTATION_AUDITED_VERSION = "0.154.2"
+INSTRUMENTATION_AUDITED_VERSION = "0.158.0"
+# Two vendor statements apply at different layers, so state both rather than
+# collapsing them: the chart is production tested (chart README "Current
+# Status"), while Operator-related features carry an alpha/experimental notice
+# (chart values.yaml). Keep this text identical to the copy in
+# splunk-observability-k8s-auto-instrumentation-setup; the two skills are
+# required to agree. Sources are recorded in references/sources.md.
+OPERATOR_MATURITY_ADVISORY = (
+    "Auto-instrumentation is a supported capability on a production-tested chart, but the chart's "
+    "bundled OpenTelemetry Operator packaging carries the vendor's alpha/experimental notice: "
+    "breaking changes or outright replacement are reserved, and Operator subchart upgrades can "
+    "change injected instrumentation even when your values are unchanged. The chart is the "
+    "supported route for injection-based auto-instrumentation, so treat this as a stability "
+    "caveat, not a reason to avoid it: keep the chart version pinned exactly, review the Operator "
+    "subchart release notes before every upgrade, and diff rendered manifests. To avoid the "
+    "Operator dependency entirely, instrument each language runtime directly instead of by "
+    "injection."
+)
 OBI_AUDITED_VERSION = "v0.6.0"
 OBI_ARCHIVE_SHA256 = {
     "amd64": "da5f3501a4ae1de67930fa8dca2c822138417796c40266193af0d36effa20b95",
@@ -132,11 +153,11 @@ LINUX_INSTALLER_URL = (
     "https://raw.githubusercontent.com/signalfx/splunk-otel-collector/"
     f"v{COLLECTOR_AUDITED_VERSION}/packaging/installer/install.sh"
 )
-LINUX_INSTALLER_SHA256 = "16f2c34ad1a91bf0817f5675eca3d705af5385377e87fda23537808efd5f7e29"
-TA_LATEST_VERSION = "0.154.2"
-TA_PUBLISHED_DATE = "2026-06-17"
+LINUX_INSTALLER_SHA256 = "cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b"
+TA_LATEST_VERSION = "0.158.0"
+TA_PUBLISHED_DATE = "2026-08-07"
 TA_SPLUNK_MIN_VERSION = "9.0"
-TA_SPLUNK_MAX_VERSION = "10.4"
+TA_SPLUNK_MAX_VERSION = "10.5"
 TA_SUPPORTED_ROOTS = (
     "Splunk_TA_otel",
     "Splunk_TA_otel_linux_x86_64",
@@ -174,6 +195,7 @@ TA_SPLUNKBASE_METADATA = {
         "min": TA_SPLUNK_MIN_VERSION,
         "max": TA_SPLUNK_MAX_VERSION,
         "listed": [
+            "10.5",
             "10.4",
             "10.3",
             "10.2",
@@ -193,31 +215,31 @@ TA_SPLUNKBASE_METADATA = {
     "sources": {
         "splunkbase": "https://splunkbase.splunk.com/app/7125",
         "docs_install": "https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/splunk-add-on-for-opentelemetry-collector/install-the-technical-add-on",
-        "upstream": "https://github.com/signalfx/splunk-otel-collector/tree/v0.154.2/packaging/ta-v2",
+        "upstream": "https://github.com/signalfx/splunk-otel-collector/tree/v0.158.0/packaging/ta-v2",
     },
-    "filename": "splunk-add-on-for-opentelemetry-collector_01542.tgz",
-    "sha256": "928e66efb5591c3e9c07e2eae2008b605aa7cf10ae9cc48acff88f417811a7da",
+    "filename": "splunk-add-on-for-opentelemetry-collector_01580.tgz",
+    "sha256": "b50a495b44577f7a4b80f9a300fce8ea2b9e0711e074d5b1be01c5c8395a44b5",
     "signed_available": False,
 }
 TA_ARTIFACTS = {
     "Splunk_TA_otel": {
         "splunkbase_app_id": "7125",
-        "filename": "splunk-add-on-for-opentelemetry-collector_01542.tgz",
-        "sha256": "928e66efb5591c3e9c07e2eae2008b605aa7cf10ae9cc48acff88f417811a7da",
+        "filename": "splunk-add-on-for-opentelemetry-collector_01580.tgz",
+        "sha256": "b50a495b44577f7a4b80f9a300fce8ea2b9e0711e074d5b1be01c5c8395a44b5",
         "cloud_compatible": True,
         "source": "https://splunkbase.splunk.com/app/7125",
     },
     "Splunk_TA_otel_linux_x86_64": {
         "splunkbase_app_id": "8698",
-        "filename": "splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01542.tgz",
-        "sha256": "efd048ae1c30fa81adbe05f9e3de0dced90cfe8a89dc750b116ca812bb3471de",
+        "filename": "splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01580.tgz",
+        "sha256": "6fb7e34553f59b803bf1e01d3b191e6314a431f2a6a640a50080012b100575ba",
         "cloud_compatible": False,
         "source": "https://splunkbase.splunk.com/app/8698",
     },
     "Splunk_TA_otel_windows_x86_64": {
         "splunkbase_app_id": "8699",
-        "filename": "splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01542.tgz",
-        "sha256": "c66825ef1020c53237767d643953a8e6033c51cda92aad875a54fefcf51aea63",
+        "filename": "splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01580.tgz",
+        "sha256": "b9100e0171558bd12d8cc244569fcd5709013aac438113f92ee7397da60a822c",
         "cloud_compatible": False,
         "source": "https://splunkbase.splunk.com/app/8699",
     },
@@ -683,7 +705,6 @@ def validate_extra_values(path: Path) -> None:
         ("operator", "namespaceOverride"),
         ("operator", "admissionWebhooks"),
         ("operatorcrds", "install"),
-        ("certmanager", "enabled"),
         ("instrumentation", "enabled"),
         ("instrumentation", "installationJob", "enabled"),
         ("instrumentation", "installationJob", "image", "tag"),
@@ -2598,7 +2619,7 @@ def parse_args() -> argparse.Namespace:
         platform_metrics_enabled(args) or platform_logs_enabled(args)
     ):
         parser.error(
-            "chart 0.154.0 does not accept a traces-only splunkPlatform destination; "
+            "chart 0.158.0 does not accept a traces-only splunkPlatform destination; "
             "enable a reviewed Platform metrics or logs pipeline as well"
         )
     if args.platform_otlp_endpoint:
@@ -2883,7 +2904,7 @@ def parse_args() -> argparse.Namespace:
         parser.error("Platform persistent queue/fsync requires an effective Splunk Platform destination")
     if args.render_k8s and persistence_requested and not platform_logs_enabled(args):
         parser.error(
-            "chart 0.154.0 mounts Platform persistent queue storage only when Platform logs are enabled"
+            "chart 0.158.0 mounts Platform persistent queue storage only when Platform logs are enabled"
         )
     if args.render_k8s and str_bool(args.platform_fsync_enabled) and not str_bool(
         args.platform_persistent_queue_enabled
@@ -2897,7 +2918,7 @@ def parse_args() -> argparse.Namespace:
     ):
         parser.error(
             "Platform persistent queue/fsync requires a non-Autopilot Linux agent DaemonSet "
-            "with the gateway disabled; chart 0.154.0 does not persist gateway exports"
+            "with the gateway disabled; chart 0.158.0 does not persist gateway exports"
         )
     if args.render_k8s and not any(
         (effective_agent, effective_gateway, effective_cluster_receiver_enabled(args))
@@ -3260,16 +3281,17 @@ def warnings(args: argparse.Namespace) -> list[str]:
         )
     if str_bool(args.enable_certmanager):
         result.append(
-            "The Operator is configured to use an existing cert-manager installation; the deprecated bundled cert-manager subchart stays disabled and preflight checks its CRDs."
+            "The Operator is configured to use an existing cert-manager installation; chart 0.158.0 removed the bundled cert-manager subchart entirely, so cert-manager must already be installed and preflight checks its CRDs."
         )
     if str_bool(args.enable_autoinstrumentation) and args.render_k8s:
+        result.append(OPERATOR_MATURITY_ADVISORY)
         if str_bool(args.instrumentation_installation_job):
             result.append(
-                "Kubernetes Operator auto-instrumentation is alpha; the installation Job path avoids the Helm first-install webhook race. Its audited kubectl v1.35.1 image supports Kubernetes server minors 1.34 through 1.36 in this packet."
+                "The auto-instrumentation installation Job path avoids the Helm first-install webhook race. Its audited kubectl v1.35.1 image supports Kubernetes server minors 1.34 through 1.36 in this packet."
             )
         else:
             result.append(
-                "Kubernetes Operator auto-instrumentation is alpha and the installation Job is disabled. Helm 4 first install is rejected because upstream resource mode races the operator webhook; use the default Job or an externally reviewed two-step install."
+                "The auto-instrumentation installation Job is disabled. Helm 4 first install is rejected because upstream resource mode races the operator webhook; use the default Job or an externally reviewed two-step install."
             )
     if (
         args.render_linux
@@ -3397,9 +3419,6 @@ def k8s_values(args: argparse.Namespace) -> str:
         "operatorcrds:",
         f"  install: {yaml_scalar(str_bool(args.enable_operator_crds) and str_bool(args.enable_autoinstrumentation))}",
         "",
-        "certmanager:",
-        "  enabled: false",
-        "",
         "instrumentation:",
         f"  enabled: {yaml_scalar(str_bool(args.enable_autoinstrumentation))}",
         "  installationJob:",
@@ -3436,7 +3455,7 @@ def k8s_values(args: argparse.Namespace) -> str:
             "",
         ]
     # These feature gates are explicit because Kubernetes entity emission and
-    # entity-event property updates are experimental in chart 0.154.0.
+    # entity-event property updates are experimental in chart 0.158.0.
     feature_index = lines.index("featureGates:") + 2
     lines[feature_index:feature_index] = [
         f"  enableK8sEntities: {yaml_scalar(str_bool(args.k8s_entities_enabled))}",
@@ -8130,8 +8149,8 @@ def ta_package_audit_md(args: argparse.Namespace, packages: list[dict[str, objec
                 f"- Audited filename: `{package['audited_artifact']['filename']}`",
                 f"- Splunk Cloud-compatible package metadata: `{str(package['audited_artifact']['cloud_compatible']).lower()}`",
                 f"- SHA-256: `{package['sha256'] or '(not audited)'}`",
-                f"- Matches audited 0.154.2 package digest: `{str(package['matches_audited_release_sha256']).lower()}`",
-                f"- Matches audited 0.154.2 package version: `{str(package['matches_audited_release_version']).lower()}`",
+                f"- Matches audited {TA_LATEST_VERSION} package digest: `{str(package['matches_audited_release_sha256']).lower()}`",
+                f"- Matches audited {TA_LATEST_VERSION} package version: `{str(package['matches_audited_release_version']).lower()}`",
                 f"- Archive members / expanded bytes: `{package['member_count']}` / `{package['expanded_size_bytes']}`",
                 f"- App root: `{package['app_root']}`",
                 f"- App version: `{package['version'] or '(not found)'}`",

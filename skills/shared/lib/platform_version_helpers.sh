@@ -58,37 +58,35 @@ spv_cloud_doc_train_previous() {
     spv_default cloud_doc_train_previous
 }
 
+spv_lib_path() {
+    local root
+    root="$(spv_skills_root)" || return 1
+    printf '%s/shared/lib' "${root}"
+}
+
+# Delegates to skills/shared/lib/platform_versions.py rather than
+# re-implementing the classification rules. This used to be a duplicated inline
+# copy, which is precisely how a shell caller and a Python caller can reach
+# different conclusions about the same host: the Python side learned about
+# enterprise_support_end_dates and the shell side did not. One implementation,
+# two front ends.
 spv_classify_enterprise_version() {
     local version="${1:-}"
-    local json_path
+    local json_path lib_path
     json_path="$(spv_json_path)" || return 1
-    python3 - "${json_path}" "${version}" <<'PY'
-import json
-import re
+    lib_path="$(spv_lib_path)" || return 1
+    python3 - "${json_path}" "${version}" "${lib_path}" <<'PY'
 import sys
+from pathlib import Path
 
-path, version = sys.argv[1], sys.argv[2]
-match = re.fullmatch(r"\s*(\d+)\.(\d+)(?:\.\d+)?\s*", version or "")
-if not match:
+path, version, lib_path = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, lib_path)
+from platform_versions import classify_enterprise_version
+
+try:
+    print(classify_enterprise_version(version, path=Path(path)))
+except ValueError:
     print("invalid")
-    raise SystemExit(0)
-train = f"{int(match.group(1))}.{int(match.group(2))}"
-with open(path, encoding="utf-8") as handle:
-    payload = json.load(handle)
-supported = {str(item) for item in payload.get("enterprise_platform_versions", [])}
-cloud_only = {str(item) for item in payload.get("enterprise_cloud_only_trains", [])}
-not_public = {
-    str(item)
-    for item in payload.get("enterprise_not_publicly_released_trains", [])
-}
-if train in supported:
-    print("supported")
-elif train in cloud_only:
-    print("cloud-only")
-elif train in not_public:
-    print("not-publicly-released")
-else:
-    print("unsupported")
 PY
 }
 
@@ -96,6 +94,10 @@ spv_require_supported_enterprise_version() {
     local version="${1:-}"
     local classification
     classification="$(spv_classify_enterprise_version "${version}")" || return 1
+    if [[ "${classification}" == "end-of-support" ]]; then
+        echo "ERROR: Splunk Enterprise ${version:-<empty>} is on an end-of-support release train; it receives no further security fixes. Upgrade to a supported train." >&2
+        return 1
+    fi
     if [[ "${classification}" != "supported" ]]; then
         echo "ERROR: Splunk Enterprise ${version:-<empty>} is ${classification}; it is not a supported public self-managed runtime train." >&2
         return 1

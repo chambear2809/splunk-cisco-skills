@@ -173,6 +173,50 @@ def test_coverage_rows_use_allowed_statuses_and_required_fields(tmp_path: Path) 
     assert "forbidden" in canvas
 
 
+def test_ai_activation_lifecycle_claims_stay_current(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    run_cmd("bash", str(SETUP), "--render", "--spec", str(TEMPLATE), "--output-dir", str(output_dir))
+
+    handoff = (output_dir / "data-fabric/handoff.md").read_text(encoding="utf-8")
+    readiness = (output_dir / "data-fabric/cisco-data-fabric-2026-readiness.md").read_text(encoding="utf-8")
+
+    # Both are generally available as of AI Toolkit 6.0.0; neither may be described
+    # as preview or alpha. Agent Builder is the retired Splunk name for Agent Launchpad.
+    for text in (handoff, readiness):
+        assert "CDTSM preview" not in text
+        assert "Deep Time Series Model preview" not in text
+        assert "Splunk Agent Builder alpha" not in text
+        assert "Agent Launchpad" in text
+
+    assert "GA hosted Cisco Deep Time Series Model" in handoff
+    assert "generally available as of AI Toolkit `6.0.0`" in handoff
+
+    # The Cisco product stays distinct from the Splunk one; Splunk GA must not leak across.
+    assert "Cloud Control Studio Agent Builder is a different Cisco product" in handoff
+
+    # 6.0.2 pairs only with PSC 4.3.4; 6.0.2 with 4.3.2 is unsupported.
+    assert "`6.0.2` with Python for Scientific Computing `4.3.4`" in handoff
+    assert "`6.0.2` with `4.3.2` is an unsupported pairing" in handoff
+
+    coverage = json.loads((output_dir / "coverage-report.json").read_text(encoding="utf-8"))
+    rows = {row["key"]: row for row in coverage["coverage"]}
+
+    ai_activation = rows["data_fabric_machine_data_ai_activation"]
+    assert "/use-ai-toolkit/6.0.2/" in ai_activation["source_url"]
+    assert "/use-ai-toolkit/5.7.4/" not in ai_activation["source_url"]
+
+    # The Cisco Cloud Control Studio capability keeps its own owner and Cisco source.
+    studio = rows["cloud_control_studio_agent_builder"]
+    assert studio["owner"] == "Cisco Cloud Control Studio"
+    assert "cloud-control-studio" in studio["source_url"]
+    assert "help.splunk.com" not in studio["source_url"]
+
+    # No rendered artifact may cite a superseded AI Toolkit or PSC version.
+    everything = rendered_text(output_dir)
+    assert "/use-ai-toolkit/5.7.4/" not in everything
+    assert "feature-preview-cisco-deep-time-series-model" not in everything
+
+
 def test_execute_dry_run_json_emits_secret_free_command_arrays(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
     secret = "DIRECT_SECRET_SHOULD_NOT_RENDER"

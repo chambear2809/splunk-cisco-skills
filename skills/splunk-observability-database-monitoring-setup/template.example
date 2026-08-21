@@ -1,6 +1,6 @@
 # Splunk Observability Database Monitoring production spec
 #
-# Collector/chart release: 0.155.0
+# Collector/chart release: 0.158.0
 # Copy this file to template.local and keep only non-secret values here.
 # Database passwords, datasource strings, and access tokens belong in the
 # referenced Kubernetes Secrets or a chmod-600 host env file.
@@ -16,8 +16,8 @@ distribution: kubernetes
 scrape_owner: kubernetes  # kubernetes | linux | windows
 
 collector:
-  version: v0.155.0
-  chart_version: 0.155.0
+  version: v0.158.0
+  chart_version: 0.158.0
   namespace: splunk-otel
   release_name: splunk-otel-collector
   # Required for live Kubernetes mutation. The action checks this context and

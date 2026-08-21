@@ -19,7 +19,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-gcp-ta-rendered"
 
 APP_NAME = "Splunk_TA_google-cloudplatform"
 SPLUNKBASE_ID = "3088"
-LATEST_VERIFIED_VERSION = "5.0.2"
+LATEST_VERIFIED_VERSION = "5.1.1"
 
 # Audit log source types the add-on auto-assigns to Pub/Sub messages via props.
 AUDIT_SOURCETYPES = [

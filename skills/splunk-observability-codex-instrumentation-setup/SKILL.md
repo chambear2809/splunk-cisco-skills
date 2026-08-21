@@ -6,7 +6,7 @@ description: "Use when instrumenting Codex itself for Splunk Observability or AI
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Codex Instrumentation Setup
@@ -217,7 +217,7 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   normalized `service.name`/`deployment.environment` and
   `sf_service`/`sf_environment`, and `send_otlp_histograms: true`.
 - `collector/run-codex-o11y-local-collector.sh`: runner pinned by multi-platform
-  digest to Splunk Distribution `0.154.2`; upstream contrib is rejected for
+  digest to Splunk Distribution `0.158.0`; upstream contrib is rejected for
   this native-histogram path.
 - `bin/codex-o11y-exec`: wrapper around
   `codex exec --profile <rendered-profile> --json`.

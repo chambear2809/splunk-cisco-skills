@@ -8,7 +8,7 @@ description: "Use when the user asks about splunk-ai-assistant, Splunk AI Assist
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk AI Assistant Setup
@@ -100,22 +100,26 @@ this app.
 
 - Primary path: Splunkbase app ID `7245`
 - Internal app name: `Splunk_AI_Assistant_Cloud`
-- Latest verified Splunkbase release: `2.0.0` (April 9, 2026)
-- Current public Splunkbase release: `2.1.1` (June 25, 2026); the listing
-  advertises Splunk 10.5 support, but this package is not verified here
+- Verified Splunkbase release: `2.2.0` (July 22, 2026), which is also the
+  current public release and advertises Splunk 10.5 support
+- The earlier `2.0.0` pin (April 9, 2026) is no longer published in the public
+  release API, so it can no longer be fetched from Splunkbase at all
 - Install on search heads only
-- The shared installer defaults to verified `2.0.0`; its explicit
-  `--accept-unverified-release` override follows public `2.1.1`
+- The shared installer defaults to verified `2.2.0`, so the default path needs
+  no review override
 - Do not model this as a private-app upload on Splunk Cloud
-- For the verified `2.0.0` baseline, Splunkbase lists compatibility with Splunk
-  Enterprise `9.3+` and Splunk Cloud. Agent Mode requires Splunk platform
-  `10.1+`.
+- Splunkbase lists compatibility with Splunk Enterprise `9.3+` and Splunk Cloud.
+  Agent Mode requires Splunk platform `10.1+`.
 
-Do not apply the `2.0.0` Agent Mode, FedRAMP, Context, or Model Runtime behavior
-claims to `2.1.1` without reviewing that release's package and documentation.
-Keep the default `2.0.0` pin for repository-reviewed behavior. If the shared
-installer is invoked with `--accept-unverified-release`, treat `2.1.1` as
-package delivery followed by fresh feature and onboarding validation.
+Package inspection of `2.2.0` confirms the collection and REST surface this
+skill drives is unchanged from `2.0.0`: the same five `saia_*` modular inputs
+(`saia_field_summary`, `saia_knowledge_object_summary`, `saia_macros_dms_modinput`,
+`saia_async_jobs`, `saia_mdc_federated_datasets`) with the same disabled-by-default
+posture, and the same onboarding and validation handlers (`/submitonboardingform`,
+`/completeonboarding`, `/version`, `/cloudconnectedproxysettings`). Feature-level
+statements about Agent Mode, FedRAMP, Context, and Model Runtime were reviewed
+against `2.0.0` documentation; re-read the `2.2.0` release notes before relying on
+version-specific feature behavior.
 
 For Splunk Cloud, the shared installer uses ACS Splunkbase install behavior.
 For Splunk Enterprise, the shared installer downloads from Splunkbase and
@@ -206,10 +210,10 @@ python3 skills/splunk-ai-assistant-setup/scripts/cloud_onboarding_plan.py \
 **Splunk Enterprise (cloud connected)**
 
 - The search head must be able to reach `*.scs.splunk.com` on `443`
-- The shared installer defaults to verified `2.0.0`. Public `2.1.1` requires
-  its explicit unverified-release override and is not package-verified here.
-  Confirm current release documentation rather than inheriting the `2.0.0`
-  Enterprise `9.3+` statement automatically.
+- The shared installer defaults to verified `2.2.0`, which is also public latest,
+  so no release override is needed. The Enterprise `9.3+` compatibility
+  statement comes from the Splunkbase listing; confirm it against the release
+  documentation for the exact version you install.
 - Optional: configure the outbound proxy first if the search head needs one:
 
 ```bash

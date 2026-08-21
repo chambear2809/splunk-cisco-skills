@@ -17,12 +17,22 @@ def test_release_specific_registry_entries_explain_their_product_boundary() -> N
     )
     apps = {str(app.get("splunkbase_id")): app for app in registry["apps"]}
 
-    for app_id in ("7404", "7539", "7828"):
+    # Platform-gate holds: the reviewed pin advertises 10.5 and public latest does not.
+    for app_id in ("5556", "7828"):
         assert apps[app_id]["compatibility_status"] == "unsupported"
         assert "10.5" in apps[app_id]["verified_platform_versions"]
         assert apps[app_id]["latest_verified_version"] in apps[app_id]["notes"]
         assert apps[app_id]["latest_release_version"] in apps[app_id]["notes"]
         assert "10.5" in apps[app_id]["notes"]
+
+    # Formerly package-verification holds. Both packages have now been downloaded,
+    # unpacked, and inspected, so the reviewed pin is the current public release and
+    # the 10.5 install path no longer needs a review override.
+    for app_id in ("7404", "7539"):
+        assert apps[app_id]["compatibility_status"] == "supported"
+        assert apps[app_id]["latest_verified_version"] == apps[app_id]["latest_release_version"]
+        assert "10.5" in apps[app_id]["verified_platform_versions"]
+        assert "10.5" in apps[app_id]["platform_versions"]
 
     assert apps["4147"]["compatibility_status"] == "unsupported"
     assert "10.5" not in apps["4147"].get("verified_platform_versions", [])
@@ -35,8 +45,6 @@ def test_release_specific_registry_entries_explain_their_product_boundary() -> N
 
 def test_release_specific_skill_docs_match_the_fail_closed_contract() -> None:
     version_pairs = {
-        "cisco-enterprise-networking-setup": ("3.1.0", "3.2.0"),
-        "cisco-security-cloud-setup": ("3.6.6", "3.6.7"),
         "cisco-intersight-setup": ("3.1.1", "3.2.0"),
     }
     for skill, (verified, public) in version_pairs.items():
@@ -48,6 +56,17 @@ def test_release_specific_skill_docs_match_the_fail_closed_contract() -> None:
         assert public in normalized, skill
         assert "--accept-unsupported-platform" in normalized, skill
         assert "vendor approval" in normalized, skill
+
+    # Google Workspace holds 4.0.0 for the same reason but has no platform-gated
+    # setup wrapper, so its reference must document the hold without claiming an
+    # override flag the skill does not implement.
+    gws = (REPO_ROOT / "skills/splunk-google-workspace-ta-setup/reference.md").read_text(
+        encoding="utf-8"
+    )
+    normalized_gws = " ".join(gws.split())
+    assert "4.0.0" in normalized_gws
+    assert "5.0.0" in normalized_gws
+    assert "10.5" in normalized_gws
 
     uba = (REPO_ROOT / "skills/splunk-uba-setup/SKILL.md").read_text(
         encoding="utf-8"
@@ -63,14 +82,14 @@ WRAPPER_CASES = (
     (
         "skills/cisco-enterprise-networking-setup/scripts/setup.sh",
         "cisco-catalyst-app",
-        "3.1.0",
+        "3.2.20",
         "3.2.0",
         (),
     ),
     (
         "skills/cisco-security-cloud-setup/scripts/setup.sh",
         "CiscoSecurityCloud",
-        "3.6.6",
+        "3.6.10",
         "3.6.7",
         ("--set-log-level", "INFO"),
     ),
@@ -285,7 +304,14 @@ def test_legacy_ai_and_synthetic_packages_are_not_new_10_5_installs() -> None:
     assert "native Splunk" in synthetic_text
 
 
-def test_tomcat_package_gap_uses_the_shared_fail_closed_installer() -> None:
+def test_tomcat_profile_keeps_the_shared_fail_closed_installer_contract() -> None:
+    """Tomcat's 10.5 gap closed at 4.0.3, but the fail-closed wiring must stay.
+
+    The profile previously had to be render-only on 10.5. Now that the verified
+    pin advertises 10.5, the skill must still document that the shared installer
+    refuses a platform-mismatched release for app 2911 before mutation, and that
+    --accept-unsupported-platform is the only override.
+    """
     text = (
         REPO_ROOT / "skills/splunk-syslog-web-proxy-ta-setup/SKILL.md"
     ).read_text(encoding="utf-8")
@@ -293,31 +319,62 @@ def test_tomcat_package_gap_uses_the_shared_fail_closed_installer() -> None:
     assert "refuses" in text
     assert "--accept-unsupported-platform" in text
 
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+    tomcat = next(
+        app for app in registry["apps"] if str(app.get("splunkbase_id")) == "2911"
+    )
+    # If Tomcat ever loses 10.5 again, the render-only guidance has to come back.
+    assert "10.5" in tomcat["verified_platform_versions"]
+    assert tomcat["latest_verified_version"] in text
+
 
 def test_verified_and_public_release_drift_is_explicit_in_owning_skills() -> None:
-    expected = {
-        "cisco-secure-email-web-gateway-setup": ("1.7.0", "1.7.1"),
-        "splunk-itsi-setup": ("4.21.2", "5.0.0"),
-        "splunk-servicenow-ta-setup": ("10.0.1", "11.0.0"),
-        "splunk-observability-gcp-integration": ("5.0.2", "5.0.3"),
-        "splunk-security-content-update-setup": ("6.0.0", "6.1.0"),
-        "splunk-salesforce-ta-setup": ("6.0.2", "6.0.3"),
-        "splunk-infosec-app-setup": ("1.7.1", "1.7.2"),
-        "splunk-github-ta-setup": ("3.3.0", "3.3.1"),
-        "splunk-okta-ta-setup": ("5.0.2", "5.0.3"),
-        "splunk-ai-assistant-setup": ("2.0.0", "2.1.1"),
-        "cisco-catalyst-ta-setup": ("3.1.0", "3.2.35"),
-        "cisco-talos-intelligence-setup": ("1.0.1", "1.0.3"),
-        "cisco-scan-setup": ("1.0.27", "1.0.29"),
-    }
+    """Any registry entry whose reviewed pin trails public latest must say so.
 
-    for skill, (verified, public) in expected.items():
-        text = (REPO_ROOT / "skills" / skill / "SKILL.md").read_text(
-            encoding="utf-8"
+    Derived from the registry rather than a frozen list so that advancing a pin
+    retires its obligation automatically, while a newly introduced hold is
+    caught the moment it lands without documentation.
+    """
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+
+    drifting = [
+        app
+        for app in registry["apps"]
+        if app.get("latest_verified_version")
+        and app.get("latest_release_version")
+        and app["latest_verified_version"] != app["latest_release_version"]
+    ]
+    # The hold set is small and deliberate; a silent explosion here means pins
+    # are drifting from public latest without review.
+    assert 0 < len(drifting) <= 8
+
+    for app in drifting:
+        skill = app["skill"]
+        skill_dir = REPO_ROOT / "skills" / skill
+        assert skill_dir.is_dir(), skill
+        text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(skill_dir.glob("*.md"))
         )
-        assert verified in text, skill
-        assert public in text, skill
-        assert "--accept-unverified-release" in text, skill
+        assert app["latest_verified_version"] in text, skill
+        assert app["latest_release_version"] in text, skill
+        # The owning skill must name the reason class, not just the versions:
+        # either the override that follows public latest, the entitlement block
+        # that prevents package inspection, or the manual approval a skill
+        # without a preflight wrapper depends on instead.
+        assert any(
+            marker in text
+            for marker in (
+                "--accept-unverified-release",
+                "--accept-unsupported-platform",
+                "entitlement-gated",
+                "vendor approval",
+            )
+        ), skill
 
 
 def test_pki_uses_native_expiry_monitoring_and_correct_legacy_app_identity() -> None:

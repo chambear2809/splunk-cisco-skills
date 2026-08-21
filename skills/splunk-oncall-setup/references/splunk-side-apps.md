@@ -240,3 +240,21 @@ in the operator's notable event correlation searches.
 The skill renders a deeplink + handoff that adds On-Call as a Splunk
 Observability detector recipient. The actual mutation lives in
 `splunk-observability-native-ops` via deeplink only.
+
+Setting `splunk_side.observability_handoff` requires a top-level `realm`:
+
+```yaml
+realm: us1
+splunk_side:
+  observability_handoff: true
+```
+
+The deeplink resolves to `https://app.<realm>.observability.splunkcloud.com`,
+matching the base used by `splunk-observability-native-ops` and
+`splunk-observability-deep-native-workflows`. `us2-gcp` is served from the
+`us2` hostname; `app.us2-gcp.*` does not resolve on either the
+`observability.splunkcloud.com` or the legacy `signalfx.com` domain.
+
+The realm is required rather than defaulted. A deeplink into the wrong realm
+still loads a real UI, one in which the operator's org does not exist, so
+rendering fails with a message naming the field instead of guessing.

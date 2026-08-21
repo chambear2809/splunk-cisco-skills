@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-sysmon-ta-rendered"
 
 APP_NAME = "Splunk_TA_microsoft_sysmon"
 SPLUNKBASE_ID = "5709"
-LATEST_VERIFIED_VERSION = "5.0.0"
+LATEST_VERIFIED_VERSION = "5.0.1"
 
 SYSMON_SOURCE = "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
 EVENTTYPES = [

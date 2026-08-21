@@ -29,15 +29,15 @@ The umbrella renders the OTel agent with two metrics pipelines:
 service:
   pipelines:
     metrics:
-      receivers: [k8s_cluster, kubeletstats, hostmetrics]
-      processors: [resourcedetection, k8s_attributes, filter/exclude_metrics, batch]
+      receivers: [k8s_cluster, kubelet_stats, host_metrics]
+      processors: [resource_detection, k8s_attributes, filter/exclude_metrics, batch]
       exporters: [signalfx]
     metrics/cisco-ai-pods:
       receivers:
         - receiver_creator/dcgm-cisco
         - receiver_creator/milvus
         - receiver_creator/storage
-      processors: [resourcedetection, k8s_attributes, batch]   # NO filter
+      processors: [resource_detection, k8s_attributes, batch]   # NO filter
       exporters: [signalfx]
     metrics/nvidianim-metrics:
       receivers:

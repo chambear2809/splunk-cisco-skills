@@ -5,7 +5,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
 RENDER_SCRIPT="${SCRIPT_DIR}/render_assets.py"
 INSTALL=false; NO_RESTART=false; CREATE_INDEX=false; RENDER=false; JSON=false; DRY_RUN=false
-INDEX="cyberark"; ACCOUNT_NAME="cyberark_epm_prod"; PRODUCTS="epm,epv_pta"; EPM_INPUTS="application_events,inbox_events,admin_audit_logs,account_admin_audit_logs,policy_audit,policy_audit_events,threat_detection,policies_and_computers"; SYSLOG_PORT="514"; OUTPUT_DIR=""; SK=""
+INDEX="cyberark"; ACCOUNT_NAME="cyberark_epm_prod"; PRODUCTS="epm,epv_pta"; EPM_INPUTS="inbox_events,admin_audit_logs,account_admin_audit_logs,policy_audit_events,policies_and_computers"; SYSLOG_PORT="514"; OUTPUT_DIR=""; SK=""
 usage(){ cat >&2 <<EOF
 CyberArk Splunk Add-on Setup
 

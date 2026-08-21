@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Catalyst TA Setup Automation
@@ -99,20 +99,17 @@ review-only.
 
 ### Package Verification Boundary
 
-The inspected TA source-contract baseline is `3.2.44`. It covers 29 modular
-input types, per-input polling defaults, generic endpoint catalogs, scheduled
-reports, SD-WAN audit and energy collection, and the TA's Data Collection
-Health dashboard. The Splunkbase package-evidence baseline remains `3.1.0`;
-the tracked public metadata snapshot reports `3.2.35` as the latest release.
+The source-contract baseline and the Splunkbase package-evidence baseline are
+now the same release, `3.2.44`, which is also the current public release. The
+package was downloaded, unpacked, and inspected here: 29 modular input types,
+per-input polling defaults, generic endpoint catalogs, scheduled reports, SD-WAN
+audit and energy collection, and the TA's Data Collection Health dashboard. The
+shared installer's default pin therefore needs no review override.
 
-These are deliberately separate claims. The shared installer defaults to the
-package-verified `3.1.0`; only `--accept-unverified-release` follows the public
-release selected by the registry. After that explicit override, compare the
-installed UCC REST handlers, account/input schemas, source types, and dashboard
-views with the `3.2.44` source contract before applying automation.
-The setup scripts capability-probe 3.2.44-only input and IOS-XE CLI handlers
-before mutation. Missing optional Catalyst Center handlers are skipped; missing
-IOS-XE CLI handlers fail closed with an upgrade/verification message.
+One gap survives package inspection: no public release through `3.2.44` ships
+IOS-XE CLI account or input handlers. The setup scripts capability-probe for
+them before mutation, so the Beta CLI path still fails closed with a
+verification message; optional missing Catalyst Center handlers are skipped.
 
 ### Source Contract Highlights
 

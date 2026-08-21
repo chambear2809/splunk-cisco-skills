@@ -1,6 +1,6 @@
 # Splunk_TA_salesforce Reference
 
-Package source of truth: `splunk-ta/_unpacked/Splunk_TA_salesforce-6.0.2/Splunk_TA_salesforce`.
+Package source of truth: `splunk-ta/_unpacked/Splunk_TA_salesforce-7.0.0/Splunk_TA_salesforce`.
 
 ## Package Identity
 
@@ -8,7 +8,7 @@ Package source of truth: `splunk-ta/_unpacked/Splunk_TA_salesforce-6.0.2/Splunk_
 | --- | --- |
 | Splunkbase | `3549` |
 | App directory | `Splunk_TA_salesforce` |
-| Verified version | `6.0.2` |
+| Verified version | `7.0.0` |
 
 ## Inputs And Source Types
 

@@ -7,7 +7,7 @@ description: "Use when the outcome is ITSI product/package installation, upgrade
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk ITSI Setup Automation
@@ -112,11 +112,14 @@ automatically; a missing-product finding is an explicit user-visible handoff.
 installer pins the repository-verified release by default. If Splunkbase is
 unavailable, fall back to the local package in `splunk-ta/`.
 
-The repository-verified package and configuration baseline is ITSI `4.21.2`.
-The current public listing is `5.0.0` and advertises Splunk 10.5 support, but
-the `5.0.0` package and native-object contracts have not been verified by this
-repository. The shared installer defaults to `4.21.2`; only an explicit
-`--accept-unverified-release` follows public `5.0.0`. After that override,
+The repository-verified package and configuration baseline is ITSI `4.21.2`,
+which also advertises Splunk 10.5, so the default install path needs no
+override. The current public listing is `5.0.1` and advertises Splunk 10.5 too,
+but its package and native-object contracts have not been verified here: the
+Splunkbase download for `1841` is entitlement-gated and returns HTTP 403 without
+an ITSI entitlement, so `5.0.1` could not be downloaded, unpacked, or inspected.
+The shared installer therefore defaults to `4.21.2`; only an explicit
+`--accept-unverified-release` follows public `5.0.1`. After that override,
 limit this skill to package installation and core-health validation, then
 review ITSI 5.0 before handing native object changes to `splunk-itsi-config`.
 
@@ -165,7 +168,7 @@ bash skills/splunk-app-install/scripts/install_app.sh \
 ```
 
 That command defaults to the repository-reviewed `4.21.2` package. To request
-public `5.0.0`, add `--accept-unverified-release` and follow the compatibility
+public `5.0.1`, add `--accept-unverified-release` and follow the compatibility
 review boundary above.
 
 If Splunkbase is unavailable, fall back to a local package:

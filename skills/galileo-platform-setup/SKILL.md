@@ -7,11 +7,13 @@ description: "Use when configuring an already-running Galileo instance for Splun
   datasets, prompts, experiments, metrics, annotations, feedback, RBAC, provider handoffs, trace
   maintenance/metrics APIs, Luna Studio training, metadata-only media export, AI Assistant beta readiness,
   global dashboards, generic alert webhook relay, SDK experiment groups, large-dataset batching,
+  Annotation Queues GA, AI-assisted custom metrics, cost/billing review, Trace Count alerts,
+  multimodal out-of-the-box metric variants, and the Splunk Agent Observability documentation epoch,
   HEC/OTLP/OTel handoffs, dashboards, and detectors; delegate On-Prem Kubernetes deployment and packaged services."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Galileo Platform Setup
@@ -43,7 +45,10 @@ metadata:
 
 Follow the documented read-only or render-first path whenever it is available.
 This skill does not imply permission to mutate live systems. Require explicit
-apply flags, protected credentials, and operator review for state changes.
+apply flags, protected credentials, an exact tenant onboarding date, and
+operator review for state changes. This implementation applies only the legacy
+Galileo contract for tenants onboarded before August 7, 2026. Unknown, exact-
+boundary, and later onboarding dates are render-only.
 
 ## Examples
 
@@ -91,6 +96,14 @@ Pass the URL as `--galileo-console-url "$GALILEO_CONSOLE_URL"` or set
 `galileo.console_url` in the spec. Derive API and OTLP endpoints from that
 console URL unless the user provides explicit endpoint overrides.
 
+Before any apply, also ask for the tenant's exact onboarding date. Pass it as
+`--tenant-onboarding-date YYYY-MM-DD` or set `galileo.onboarding_date` in the
+spec. A missing date does not block rendering, validation, or doctor output,
+but it records an `unconfirmed` epoch and blocks every operational apply. Only
+a date before `2026-08-07` enables the reviewed legacy Galileo apply contract.
+The exact boundary and later dates use materially different Splunk Agent
+Observability names, SDKs, and API surfaces that this skill does not implement.
+
 ## Supported Paths
 
 Read the tracked [product feature matrix](references/product-feature-matrix.json)
@@ -100,9 +113,14 @@ by both the renderer and repository coverage audit.
 1. **Platform readiness**: render endpoint derivation, `/v2/healthcheck`,
    auth mode inventory, RBAC/group/project-sharing checklist, Luna Enterprise
    readiness, metric sampling/filtering coverage, Protect invoke readiness, and
-   Signals/Trends/annotation coverage. The July 7, 2026 release gate also
-   tracks AI Assistant beta, organization-wide global dashboards, generic
-   alert webhooks, experiment groups, and large-dataset batched processing.
+   Signals/Trends/annotation coverage. The current release gate reviews the
+   July 21 through August 7, 2026 changes: Splunk Agent Observability naming
+   and documentation epoch, Annotation Queues GA, expanded AI Assistant beta,
+   AI-assisted custom code metrics, pricing/billing surfaces, Trace Count
+   alerts, multimodal out-of-the-box metric variants, hosted models, and theme
+   selection. The July 7 readiness contract remains as historical evidence for
+   global dashboards, generic webhooks, experiment groups, and large-dataset
+   batched processing.
 2. **Galileo object lifecycle**: create or validate projects, log streams,
    datasets, prompts, experiments and experiment-group assignment, log stream metrics, Protect stages, and
    Agent Control targets using `scripts/galileo_object_lifecycle.py`. The
@@ -141,17 +159,21 @@ by both the renderer and repository coverage audit.
 6. **Protect runtime**: render a file-secret-backed legacy Python helper for
    `/v2/protect/invoke` where an existing deployment still uses Protect.
 7. **Evaluate assets**: render handoffs for experiments, datasets, metrics
-   testing, annotations, feedback, Signals, Trends, AI Assistant investigations,
-   experiment-group ranking, and large-dataset progress-validation handoff.
+   testing, Annotation Queues GA, feedback, Signals, Trends, AI Assistant
+   investigations, reviewed AI-generated custom code metrics, experiment-group
+   ranking, and large-dataset progress-validation handoff.
 8. **Multimodal observability**: render GalileoLogger, file/upload,
    LangChain/LangGraph, multimodal quality metric, Splunk metadata-only export,
-   and validation-search handoffs for image, audio, and PDF/document traces.
+   and validation-search handoffs for image, audio, and PDF/document traces,
+   including the eight out-of-the-box metrics available in text, image/PDF,
+   and audio variants.
 9. **Agent Observability Controls**: render console inventory, Log stream
    attachment, control-span export, and Splunk search evidence handoffs without
    claiming undocumented control CRUD API support.
-10. **Latest Galileo console and push workflows**: render guarded handoffs for
-    cross-project global dashboards and AI Assistant beta. Render a v1.0
-    generic-alert payload, Splunk searches, and
+10. **Latest console and push workflows**: select the tenant-appropriate
+    pre/post-August 7 documentation set, render guarded handoffs for
+    cross-project global dashboards, AI Assistant beta, billing/cost review,
+    and Trace Count alerts. Render a v1.0 generic-alert payload, Splunk searches, and
     `galileo_alert_webhook_relay.py` because Galileo's Bearer webhook auth is
     not directly compatible with Splunk HEC's `Authorization: Splunk` scheme.
 11. **Splunk handoffs**:
@@ -193,6 +215,7 @@ Apply only explicit sections:
 ```bash
 bash skills/galileo-platform-setup/scripts/setup.sh \
   --apply object-lifecycle \
+  --tenant-onboarding-date "$GALILEO_TENANT_ONBOARDING_DATE" \
   --project-name "$GALILEO_PROJECT" \
   --log-stream "$GALILEO_LOG_STREAM" \
   --galileo-console-url "$GALILEO_CONSOLE_URL" \
@@ -205,6 +228,7 @@ Export records after object provisioning:
 ```bash
 bash skills/galileo-platform-setup/scripts/setup.sh \
   --apply splunk-hec,observe-export \
+  --tenant-onboarding-date "$GALILEO_TENANT_ONBOARDING_DATE" \
   --project-id "$GALILEO_PROJECT_ID" \
   --log-stream-id "$GALILEO_LOG_STREAM_ID" \
   --splunk-hec-url "$SPLUNK_HEC_URL" \
@@ -217,6 +241,7 @@ Render and apply only Splunk Observability Cloud sections:
 ```bash
 bash skills/galileo-platform-setup/scripts/setup.sh \
   --apply \
+  --tenant-onboarding-date "$GALILEO_TENANT_ONBOARDING_DATE" \
   --o11y-only \
   --realm "$SPLUNK_O11Y_REALM" \
   --o11y-token-file /tmp/splunk_o11y_token
@@ -225,7 +250,11 @@ bash skills/galileo-platform-setup/scripts/setup.sh \
 ## CLI Contract
 
 `setup.sh` supports `--render`, `--validate`, `--doctor`, `--apply SECTIONS`,
-`--dry-run`, `--json`, and `--o11y-only`.
+`--dry-run`, `--json`, `--o11y-only`, and `--tenant-onboarding-date YYYY-MM-DD`.
+Dry-run apply reports the derived gate without writing. A blocked real apply
+renders the complete evidence packet and exits before executing any section.
+Every generated `apply-*.sh` wrapper repeats that fail-closed gate; only the
+exact-ID cleanup wrapper remains available for recovery.
 
 Apply sections:
 

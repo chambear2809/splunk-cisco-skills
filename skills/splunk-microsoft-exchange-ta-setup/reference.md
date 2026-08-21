@@ -4,10 +4,10 @@ Package source of truth:
 
 | Package | App directory | Splunkbase | Verified |
 | --- | --- | --- | --- |
-| Exchange bundle | `TA-Exchange-ClientAccess` | `3225` | `4.1.0` |
-| Exchange bundle | `TA-Exchange-Mailbox` | `3225` | `4.1.0` |
-| Exchange bundle | `TA-SMTP-Reputation` | `3225` | `4.1.0` |
-| Exchange bundle | `TA-Windows-Exchange-IIS` | `3225` | `4.1.0` |
+| Exchange bundle | `TA-Exchange-ClientAccess` | `3225` | `4.1.1` |
+| Exchange bundle | `TA-Exchange-Mailbox` | `3225` | `4.1.1` |
+| Exchange bundle | `TA-SMTP-Reputation` | `3225` | `4.1.1` |
+| Exchange bundle | `TA-Windows-Exchange-IIS` | `3225` | `4.1.1` |
 | Exchange Indexes | `SA-ExchangeIndex` | `5663` | `4.0.4` |
 
 `SA-ExchangeIndex` defines `msexchange`, `perfmon`, `windows`,

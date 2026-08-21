@@ -66,13 +66,9 @@ def test_evidence_marks_only_non_reproducible_reviewed_pins_as_historical() -> N
         == module.HISTORICAL_ONLY_STATUS
     }
 
-    assert historical_ids == evidence_historical_ids == {
-        "1761",
-        "1928",
-        "2911",
-        "3549",
-        "7557",
-    }
+    # Every reviewed pin now resolves to a currently downloadable release, so no
+    # entry may claim the historical-only status. Registry and evidence must agree.
+    assert historical_ids == evidence_historical_ids == set()
     assert all(
         item["verified_release"]["source_status"]
         in {module.SOURCE_VERIFIED_STATUS, module.HISTORICAL_ONLY_STATUS}

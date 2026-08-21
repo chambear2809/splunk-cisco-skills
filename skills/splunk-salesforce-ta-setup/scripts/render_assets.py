@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-salesforce-ta-rendered"
 
 APP_NAME = "Splunk_TA_salesforce"
 SPLUNKBASE_ID = "3549"
-LATEST_VERIFIED_VERSION = "6.0.2"
+LATEST_VERIFIED_VERSION = "7.0.0"
 OBJECTS = ["user", "loginhistory", "account", "opportunity", "dashboard", "report", "contentversion"]
 SOURCETYPES = [
     "sfdc:object",

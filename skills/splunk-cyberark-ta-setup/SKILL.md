@@ -8,7 +8,7 @@ description: "Use when the user asks to onboard, configure, render, or validate 
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # CyberArk Splunk Add-on Setup
@@ -83,8 +83,7 @@ doctor.
 
 Render-first umbrella workflow for CyberArk EPM and legacy EPV/PTA parsing.
 The skill keeps the support boundary explicit: `Splunk_TA_cyberark_epm`
-(Splunkbase `5160`, repo-reviewed pin `4.0.0`; public `5.0.0` requires review)
-is the supported API path, while
+(Splunkbase `5160`, repo-reviewed pin `5.0.0`) is the supported API path, while
 `Splunk_TA_cyberark` (Splunkbase `2891`, verified `1.2.0`) is archived and
 parser-only.
 

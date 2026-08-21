@@ -7,7 +7,7 @@ compatibility: >-
   paths remain on the public 10.4 baseline.
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Secure Email/Web Gateway Setup
@@ -45,8 +45,8 @@ paths. Select one transport owner and preserve parser placement.
 Render both product paths for SC4S ownership:
 
 ```bash
-bash skills/cisco-secure-email-web-gateway-setup/scripts/setup.sh \
-  --product both --transport sc4s
+bash skills/cisco-secure-email-web-gateway-setup/scripts/render_ingestion_assets.sh \
+  --product both
 ```
 
 Expected output: reviewable package, index, macro, parser, transport, and
@@ -95,13 +95,13 @@ ESA/WSA syslog export, SC4S, or file-monitor deployment.
 
 ## Package Verification Boundary
 
-The repository's ESA package-derived behavior was verified against `1.7.0`.
-The current public ESA listing is `1.7.1` and advertises Splunk 10.5 support,
-but this repository has not inspected that newer package. The shared installer
-defaults to verified `1.7.0`; only `--accept-unverified-release` follows public
-`1.7.1`. After that explicit override, re-check its manifest, source types,
-eventtypes, and parser/dashboard evidence. The WSA package has no corresponding
-verified/public-version drift in the registry.
+The ESA package-derived behavior was verified against `1.7.1`, the current
+public listing, which advertises Splunk 10.5. That package was downloaded,
+unpacked, and inspected here, so the shared installer's default pin needs no
+review override and no historical-pin acknowledgement. The WSA package carries
+no verified/public-version drift in the registry either. When Splunkbase
+publishes a newer release for either add-on, re-check its manifest, source
+types, eventtypes, and parser/dashboard evidence before advancing the pin.
 
 ## Workflow
 

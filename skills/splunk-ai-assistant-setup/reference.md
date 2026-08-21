@@ -9,8 +9,8 @@ flow exposed by [`SKILL.md`](SKILL.md).
 |---|---|
 | Product name | Splunk AI Assistant (formerly: Splunk AI Assistant for SPL / AI Assistant in Splunk) |
 | Splunkbase listing | [App ID 7245](https://splunkbase.splunk.com/app/7245) |
-| Latest verified release | `2.0.0` (April 9, 2026) |
-| Current public release | `2.1.1` (June 25, 2026; lists Splunk 10.5, package not verified here) |
+| Verified release | `2.2.0` (July 22, 2026; also current public, lists Splunk 10.5) |
+| Prior reviewed pin | `2.0.0` (April 9, 2026; withdrawn from the public release API) |
 | Internal app name | `Splunk_AI_Assistant_Cloud` |
 | Package family | `splunk-ai-assistant-for-splunk_*.tgz` |
 | Deployment placement | Search head only |
@@ -18,31 +18,52 @@ flow exposed by [`SKILL.md`](SKILL.md).
 
 Refer to Splunk Docs for canonical references:
 
-- [Splunk AI Assistant release notes](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.0.0/release-notes/whats-new-in-splunk-ai-assistant)
-- [Splunk AI Assistant Cloud install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.0.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-cloud-customers)
-- [Splunk AI Assistant Enterprise Cloud Connected install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.0.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-enterprise-customers-with-cloud-connected)
+- [Splunk AI Assistant release notes](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.2.0/release-notes/whats-new-in-splunk-ai-assistant)
+- [Splunk AI Assistant Cloud install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.2.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-cloud-customers)
+- [Splunk AI Assistant Enterprise Cloud Connected install](https://help.splunk.com/en/splunk-cloud-platform/search/splunk-ai-assistant/2.2.0/install-and-configure-splunk-ai-assistant/install-splunk-ai-assistant-for-splunk-enterprise-customers-with-cloud-connected)
 
-## Verified 2.0.0 Release Notes
+## Verified 2.2.0 Release Notes
 
-- The repository-reviewed app ID `7245` baseline is `2.0.0`, published April
-  9, 2026, with compatibility for Splunk Cloud and Splunk Enterprise `9.3+`.
+- The repository-reviewed app ID `7245` baseline is `2.2.0`, which is also the
+  current public release, with compatibility for Splunk Cloud and Splunk
+  Enterprise `9.3+`. The prior reviewed pin `2.0.0` (April 9, 2026) is no longer
+  published in the release API.
 - The product name is now **Splunk AI Assistant**. Older docs and customer
   language may still say **Splunk AI Assistant for SPL**.
-- Agent Mode is new in `2.0.0` and is limited to Splunk Cloud Platform
-  customers in supported AWS regions.
+- Agent Mode arrived in `2.0.0` for Splunk Cloud Platform in supported AWS
+  regions, extended to Splunk Enterprise through Cloud Connected in `2.1.0`,
+  and gained additional AWS regions in `2.2.0`. Confirm the specific region
+  rather than assuming Cloud-only availability.
+- `2.2.0` adds an ITSI subagent that requires both Splunk ITSI `5.0.0+` and
+  Splunk MCP Server `1.2.1+`.
+- `2.2.0` adds a Cloud feature preview for natural-language search over
+  federated data (SPL2 and Federated Data Context) in supported regions.
 - Personalization is now **Context**, with more granular administrative
   controls for which context data the assistant uses.
-- Model Runtime is on by default for both new installs and upgrades to
-  `2.0.0`.
+- Model Runtime is on by default for both new installs and upgrades from
+  `2.0.0` onward.
 - Splunk AI Assistant has limited IL2 FedRAMP support. The FedRAMP edition does
   not include Agent Mode, data for training/fine-tuning defaults off, and Model
   Runtime is fixed to Splunk-hosted models.
 
-The public listing has since advanced to `2.1.1`, which advertises Splunk 10.5
-support but has not been package-verified by this repository. Do not promote
-the version-specific statements above to `2.1.1` without reviewing its release
-notes and package. The shared installer defaults to verified `2.0.0`; only its
-explicit `--accept-unverified-release` override follows `2.1.1`.
+## Verified 2.2.0 Package
+
+`2.2.0` is the current public release, advertises Splunk 10.5, and is the
+verified pin. Its package was downloaded, unpacked, and inspected here. The
+collection and REST surface this skill drives is identical to `2.0.0`:
+
+- Modular inputs: `saia_field_summary`, `saia_knowledge_object_summary`,
+  `saia_macros_dms_modinput`, `saia_async_jobs`, `saia_mdc_federated_datasets`.
+  All are disabled by default except `saia_async_jobs`, which the app drives
+  itself; this skill does not create or enable `saia_*` inputs.
+- Handlers used by `setup.sh` and `validate.sh`: `/submitonboardingform`,
+  `/completeonboarding`, `/version`, `/cloudconnectedproxysettings`. All four are
+  still declared in `restmap.conf`.
+
+The release-note bullets above were reviewed against the `2.2.0` documentation,
+so the linked release notes and install pages match the verified pin. Splunkbase
+no longer publishes `2.0.0` in its release API, so that pin cannot be fetched at
+all; there is no reason to prefer it.
 
 ## Topology Placement
 
@@ -55,7 +76,7 @@ explicit `--accept-unverified-release` override follows `2.1.1`.
 | Heavy forwarder | No |
 | Splunk Cloud Victoria | Self-service install for eligible AWS/Azure commercial regions |
 | Splunk Cloud Classic | Self-service install is supported; use Splunk Support if tenant gates block install |
-| Splunk Cloud FedRAMP IL2 | Limited support in `2.0.0`; no Agent Mode |
+| Splunk Cloud FedRAMP IL2 | Limited support since `2.0.0`; no Agent Mode |
 
 ## Splunk Cloud vs Enterprise Differences
 
@@ -66,7 +87,7 @@ explicit `--accept-unverified-release` override follows `2.1.1`.
 | Outbound reach | Search head must reach `*.scs.splunk.com:443` directly or via configured proxy | Stack-managed |
 | Proxy configuration | `setup.sh --set-proxy` writes `proxy_url` into the app config | Stack-managed |
 | Restart | Required after install on Enterprise | ACS reports `restartRequired`; only restart when set |
-| Agent Mode | Not enabled by this skill; Cloud Connected app setup only | Available only for supported AWS commercial Cloud regions in `2.0.0` |
+| Agent Mode | Not enabled by this skill; available through Cloud Connected in a supported AWS region since `2.1.0` | Available for supported AWS commercial Cloud regions, expanded in `2.2.0` |
 | Context / Model Runtime | Configure in app UI after install/onboarding | Configure in app UI after install/onboarding |
 
 ## CLI Surface (provided by `setup.sh`)
@@ -114,11 +135,14 @@ not_started ──submit-onboarding-form──▶ submitted ──complete-onboa
 2. **Public Splunkbase only on Cloud.** Do not perform a private upload of a
    downloaded archive. Splunk Cloud installs must come from the public
    Splunkbase listing, served through ACS.
-3. **Public-versus-verified baseline.** Default installs pin verified `2.0.0`.
-   Public `2.1.1` requires the shared installer's explicit unverified-release
-   override and a fresh package/documentation review.
-4. **Agent Mode constraints.** Agent Mode is a `2.0.0` Cloud feature for
-   supported AWS commercial regions and requires Splunk platform `10.1+`.
+3. **Verified baseline is the public release.** Default installs pin verified
+   `2.2.0`, which is the current public release, so no unverified-release
+   override is required. The withdrawn `2.0.0` pin cannot be reinstalled from
+   Splunkbase.
+4. **Agent Mode constraints.** Agent Mode requires a supported AWS commercial
+   region and Splunk platform `10.1+`. It reached Splunk Enterprise through
+   Cloud Connected in `2.1.0`, so confirm the region rather than ruling
+   Enterprise out.
 5. **FedRAMP IL2 constraints.** The FedRAMP edition omits Agent Mode, defaults
    training/fine-tuning data off, and uses only Splunk-hosted models.
 6. **Activation code timing.** The Splunk-issued activation code may not

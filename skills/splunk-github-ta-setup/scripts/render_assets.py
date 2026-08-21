@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "splunk-github-ta-rendered"
 
 APP_NAME = "Splunk_TA_github"
 SPLUNKBASE_ID = "6254"
-LATEST_VERIFIED_VERSION = "3.3.0"
+LATEST_VERIFIED_VERSION = "4.0.0"
 
 INPUTS = {"audit", "user", "code_scanning", "dependabot", "secret_scanning"}
 ALERT_TYPES = {

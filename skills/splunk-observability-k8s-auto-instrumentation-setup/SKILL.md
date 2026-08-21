@@ -10,7 +10,7 @@ description: "Use when wiring zero-code Java, Node.js, Python, .NET, Go, Apache,
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
   splunk_cloud_10_5: "not-applicable"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Observability Kubernetes Auto-Instrumentation
@@ -233,7 +233,7 @@ bare `"true"` lookup. `--namespace` overrides every rendered CR namespace;
 ## Instrumentation image policy
 
 Java, Node.js, Python, .NET, Go, and Apache HTTPD defaults are immutable
-`@sha256` pins copied from the base Collector skill's chart-0.154.0 audited
+`@sha256` pins copied from the base Collector skill's chart-0.158.0 audited
 image ledger. Custom image overrides must also be digest-pinned. This
 repository has no audited Nginx default image, so Nginx fails closed until the
 operator supplies a reviewed `--nginx-image ...@sha256:<digest>` override.

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -328,3 +329,143 @@ def test_no_secret_values_appear_in_rendered_output(tmp_path: Path) -> None:
     rendered = rendered_text(output_dir)
     assert "ONCALL_SECRET_SHOULD_NOT_RENDER" not in rendered
     assert "ONCALL_SECRET_SHOULD_NOT_RENDER" not in combined_output(result)
+
+
+def render_deeplinks(tmp_path: Path, spec_path: Path) -> list[dict[str, str]]:
+    output_dir = tmp_path / "rendered"
+    result = run_setup("--render", "--validate", "--spec", str(spec_path), "--output-dir", str(output_dir))
+    assert result.returncode == 0, combined_output(result)
+    return json.loads((output_dir / "deeplinks.json").read_text(encoding="utf-8"))["deeplinks"]
+
+
+def test_sso_deeplink_uses_the_org_slug(tmp_path: Path) -> None:
+    """The SP-initiated SSO URL takes the org slug.
+
+    Splunk's per-IdP guides (Okta, Google Apps, OneLogin, Azure AD, AWS IAM
+    Identity Center) all put the org slug in this path. There is no
+    Support-provisioned "companyId" identifier, so rendering a placeholder for
+    one told operators to open a ticket and wait for a value that never comes.
+    """
+    deeplinks = render_deeplinks(tmp_path, EXAMPLE_YAML_SPEC)
+    sso = [item for item in deeplinks if item["object_type"] == "sso"]
+    assert sso, "example spec no longer renders an sso deeplink"
+    for item in sso:
+        assert item["url"] == "https://portal.victorops.com/auth/sso/acme-corp"
+        assert "companyId" not in item["url"]
+
+
+def test_no_rendered_deeplink_carries_an_unsubstituted_placeholder(tmp_path: Path) -> None:
+    """No deeplink may ship angle-bracket placeholder text to an operator.
+
+    Rendered artifacts are handed straight to an operator, so an unsubstituted
+    `<...>` token is a defect regardless of which branch produced it.
+    """
+    for spec_path in (EXAMPLE_JSON_SPEC, EXAMPLE_YAML_SPEC):
+        for item in render_deeplinks(tmp_path / spec_path.stem, spec_path):
+            url = item["url"]
+            assert "<" not in url and ">" not in url, f"{item['object_type']} renders a placeholder: {url}"
+
+
+def test_org_scoped_deeplinks_percent_encode_the_slug_consistently(tmp_path: Path) -> None:
+    """Every org-scoped portal deeplink quotes the slug the same way.
+
+    This is what keeps the sso branch from drifting away from its siblings
+    again: it has to agree with them on the encoded slug, not merely contain
+    the raw value.
+    """
+    spec = yaml.safe_load(EXAMPLE_YAML_SPEC.read_text(encoding="utf-8"))
+    spec["org_slug"] = "acme corp"
+    spec_path = tmp_path / "escaping-spec.yaml"
+    spec_path.write_text(yaml.safe_dump(spec), encoding="utf-8")
+
+    org_scoped = [
+        item for item in render_deeplinks(tmp_path, spec_path)
+        if item["url"].startswith("https://portal.victorops.com/") and "acme" in item["url"]
+    ]
+    assert {item["object_type"] for item in org_scoped} >= {"sso", "webhook", "email_alert"}
+    for item in org_scoped:
+        assert "acme%20corp" in item["url"], f"{item['object_type']} does not quote the slug: {item['url']}"
+        assert "acme corp" not in item["url"]
+
+
+# Every realm Splunk Observability currently publishes. The example spec pins
+# us1, so any *other* token appearing in rendered output is a hardcoded literal.
+O11Y_REALMS = ("us0", "us1", "us2", "eu0", "eu1", "eu2", "au0", "jp0", "sg0")
+
+
+def render_with_realm(tmp_path: Path, realm: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+    spec = yaml.safe_load(EXAMPLE_YAML_SPEC.read_text(encoding="utf-8"))
+    if realm is None:
+        spec.pop("realm", None)
+    else:
+        spec["realm"] = realm
+    spec_path = tmp_path / "realm-spec.yaml"
+    spec_path.write_text(yaml.safe_dump(spec), encoding="utf-8")
+    output_dir = tmp_path / "rendered"
+    result = run_setup("--render", "--spec", str(spec_path), "--output-dir", str(output_dir))
+    return result, output_dir
+
+
+def test_observability_deeplink_follows_the_spec_realm(tmp_path: Path) -> None:
+    result, output_dir = render_with_realm(tmp_path, "eu0")
+    assert result.returncode == 0, combined_output(result)
+    deeplinks = json.loads((output_dir / "deeplinks.json").read_text(encoding="utf-8"))["deeplinks"]
+    handoff = [item for item in deeplinks if item["object_type"] == "splunk_side_observability_handoff"]
+    assert handoff, "example spec no longer renders the observability handoff"
+    for item in handoff:
+        assert item["url"] == "https://app.eu0.observability.splunkcloud.com/#/me"
+
+
+def test_observability_handoff_refuses_to_render_without_a_realm(tmp_path: Path) -> None:
+    """An absent realm must fail, not fall back to a default.
+
+    A deeplink into the wrong realm loads a real UI in which the operator's org
+    does not exist, so a silent default hides the error instead of surfacing it.
+    """
+    result, _ = render_with_realm(tmp_path, None)
+    assert result.returncode != 0
+    output = combined_output(result)
+    assert "realm" in output
+    assert "observability_handoff" in output
+
+
+@pytest.mark.parametrize(
+    "bad_realm",
+    ["US0", "https://app.us0.signalfx.com", "us0/../eu0", "uso", "not-a-realm", "us2"],
+)
+def test_malformed_realms_are_rejected(tmp_path: Path, bad_realm: str) -> None:
+    result, _ = render_with_realm(tmp_path, bad_realm)
+    assert result.returncode != 0, f"accepted malformed realm {bad_realm!r}"
+
+
+def test_us2_gcp_realm_uses_the_published_us2_hostname(tmp_path: Path) -> None:
+    result, output_dir = render_with_realm(tmp_path, "us2-gcp")
+    assert result.returncode == 0, combined_output(result)
+    deeplinks = json.loads((output_dir / "deeplinks.json").read_text(encoding="utf-8"))[
+        "deeplinks"
+    ]
+    handoff = [
+        item
+        for item in deeplinks
+        if item["object_type"] == "splunk_side_observability_handoff"
+    ]
+    assert handoff
+    assert {item["url"] for item in handoff} == {
+        "https://app.us2.observability.splunkcloud.com/#/me"
+    }
+
+
+def test_no_rendered_url_pins_a_realm_other_than_the_spec_realm(tmp_path: Path) -> None:
+    """No rendered artifact may name a realm the spec did not ask for.
+
+    This catches the class rather than the instance: a newly hardcoded realm
+    literal anywhere in the renderer shows up as a foreign realm token.
+    """
+    result, output_dir = render_with_realm(tmp_path, "jp0")
+    assert result.returncode == 0, combined_output(result)
+    rendered = rendered_text(output_dir)
+    for realm in O11Y_REALMS:
+        if realm == "jp0":
+            continue
+        assert f"app.{realm}." not in rendered, f"rendered output hardcodes realm {realm}"
+        assert f"{realm}.signalfx.com" not in rendered, f"rendered output hardcodes realm {realm}"

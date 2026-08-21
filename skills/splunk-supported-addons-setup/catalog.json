@@ -1375,8 +1375,8 @@
         "name": "Splunk Add-on for Unix and Linux",
         "app_name": "Splunk_TA_nix",
         "splunkbase_id": "833",
-        "latest_verified_version": "10.2.0",
-        "latest_verified_date": "October 8, 2025",
+        "latest_verified_version": "10.3.3",
+        "latest_verified_date": "August 11, 2026",
         "min_splunk_version": "9.2",
         "cim_version": "6.x",
         "support": "Splunk Supported addon"

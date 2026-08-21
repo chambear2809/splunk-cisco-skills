@@ -41,6 +41,12 @@ if str(SHARED_LIB) not in sys.path:
 
 from yaml_compat import YamlCompatError, dump_yaml, load_yaml_or_json  # noqa: E402
 
+# Chart `distribution` accepts only eks, eks/auto-mode, eks/fargate, gke,
+# gke/autopilot, aks, openshift, " ", and "" (identical in chart 0.154.0 and
+# 0.158.0). This skill's own spec vocabulary uses "kubernetes" for vanilla
+# clusters, which the chart rejects, so translate it to the empty string.
+CHART_DISTRIBUTION = {"kubernetes": "", "vanilla": "", "": ""}
+
 
 SKILL_NAME = "splunk-observability-isovalent-integration"
 DEFAULT_TETRAGON_HOST_PATH = "/var/run/cilium/tetragon"
@@ -449,7 +455,12 @@ def overlay_values(
             metric_allowlist.append(name)
 
     receivers: dict[str, Any] = {}
-    pipeline_receivers: list[str] = ["hostmetrics", "kubeletstats", "otlp"]
+    # The chart fails the install when agent.config uses a legacy component
+    # alias, so the overlay must reference canonical names: host_metrics
+    # (renamed in chart 0.152.0), kubelet_stats (0.157.0), and
+    # resource_detection (0.158.0). The otlp *receiver* keeps its name; only
+    # the otlp *exporter* was renamed to otlp_grpc.
+    pipeline_receivers: list[str] = ["host_metrics", "kubelet_stats", "otlp"]
     if scrape.get("cilium_agent_9962", True):
         receivers["prometheus/isovalent_cilium"] = _scrape_job(
             "cilium_metrics_9962", "cilium", 9962, "k8s_app"
@@ -488,8 +499,10 @@ def overlay_values(
 
     overlay: dict[str, Any] = {
         "clusterName": cluster_name or "lab-cluster",
-        "distribution": distribution or "kubernetes",
-        # OpenShift requires kubeletstats to skip TLS verify (self-signed kubelet
+        # The chart's distribution enum has no "kubernetes" member; vanilla
+        # Kubernetes is the empty string. Anything else fails values.schema.json.
+        "distribution": CHART_DISTRIBUTION.get(distribution, distribution),
+        # OpenShift requires kubelet_stats to skip TLS verify (self-signed kubelet
         # certs). Other distributions accept this default safely.
         "agent": {
             "config": {
@@ -502,7 +515,7 @@ def overlay_values(
                 "receivers": dict(
                     receivers,
                     **{
-                        "kubeletstats": {
+                        "kubelet_stats": {
                             "collection_interval": "30s",
                             "insecure_skip_verify": True,
                         },
@@ -517,7 +530,7 @@ def overlay_values(
                             }
                         }
                     },
-                    "resourcedetection": {
+                    "resource_detection": {
                         "detectors": ["system"],
                         "system": {"hostname_sources": ["os"]},
                     },
@@ -531,7 +544,7 @@ def overlay_values(
                                 "memory_limiter",
                                 "batch",
                                 "filter/includemetrics",
-                                "resourcedetection",
+                                "resource_detection",
                                 "resource",
                             ],
                         }
@@ -1446,8 +1459,10 @@ def warnings(args: argparse.Namespace, spec: dict[str, Any]) -> list[str]:
     distribution = args.distribution or spec.get("distribution", "")
     if distribution == "openshift":
         items.append(
-            "OpenShift detected: the overlay enables kubeletstats.insecure_skip_verify=true "
-            "(required for kubelet self-signed certs) and disables certmanager."
+            "OpenShift detected: the overlay enables kubelet_stats.insecure_skip_verify=true "
+            "(required for kubelet self-signed certs). Chart 0.158.0 removed the bundled "
+            "certmanager subchart, so no certmanager value is rendered; install cert-manager "
+            "separately if the operator path needs it."
         )
     return items
 

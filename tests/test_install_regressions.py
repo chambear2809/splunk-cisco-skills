@@ -262,11 +262,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.2.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps describe Splunk AI Assistant for SPL":
-                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.0.0", "status": "installed"}))
+                    print(json.dumps({"name": "Splunk AI Assistant for SPL", "version": "2.2.0", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "status current-stack":
@@ -334,15 +334,19 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
             env["SPLUNK_SKIP_ALLOWLIST"] = "true"
 
+            # The reviewed 2.0.0 pin is no longer published in the public release API, so
+            # pin current public 2.2.0 to exercise the ACS install path.
             result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/setup.sh",
                 "--install",
+                "--app-version",
+                "2.2.0",
                 env=env,
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn(
-                "apps install splunkbase --splunkbase-id 7245 --version 2.0.0",
+                "apps install splunkbase --splunkbase-id 7245 --version 2.2.0",
                 acs_log.read_text(encoding="utf-8"),
             )
             self.assertIn(
@@ -1298,22 +1302,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             tmp_path = Path(tmpdir)
             env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            public_result = self.run_script(
-                "skills/shared/scripts/cloud_batch_install.sh",
-                "--no-restart",
-                "--accept-unverified-release",
-                "7539",
-                env=env,
-            )
-            public_output = public_result.stdout + public_result.stderr
-            self.assertEqual(public_result.returncode, 1, msg=public_output)
-            self.assertIn(
-                "cisco-catalyst-app version 3.2.0 (public-latest) does not advertise Splunk 10.5",
-                public_output,
-            )
-            self.assertIn("--accept-unsupported-platform", public_output)
-            self.assertFalse(acs_log.exists())
-
+            # Both Catalyst pins are package-verified and advertise Splunk 10.5, so the
+            # default verified-pin path installs without any override flag and still
+            # expands the 7538 dependency ahead of 7539.
             result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
@@ -1324,9 +1315,10 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn(
-                "cisco-catalyst-app version 3.1.0 (repo-verified) advertises Splunk 10.5",
+                "cisco-catalyst-app version 3.2.20 (repo-verified) advertises Splunk 10.5",
                 output,
             )
+            self.assertNotIn("--accept-unverified-release", output)
 
             install_lines = [
                 line
@@ -1339,7 +1331,8 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 if re.search(r"--splunkbase-id (\d+)", line)
             ]
             self.assertEqual(install_ids, ["7538", "7539"])
-            self.assertTrue(all("--version 3.1.0" in line for line in install_lines))
+            self.assertIn("--version 3.2.44", install_lines[0])
+            self.assertIn("--version 3.2.20", install_lines[1])
 
     def test_cloud_batch_applies_explicit_version_only_to_one_root(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1363,7 +1356,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
                 if "apps install splunkbase" in line
             ]
-            self.assertIn("--splunkbase-id 7538 --version 3.1.0", install_lines[0])
+            self.assertIn("--splunkbase-id 7538 --version 3.2.44", install_lines[0])
             self.assertIn("--splunkbase-id 7539 --version 3.2.0", install_lines[1])
 
     def test_cloud_batch_rejects_one_version_for_multiple_roots(self):
@@ -1614,9 +1607,12 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["ACS_LOG"] = str(acs_log)
             env["SPLUNK_BATCH_RECOVERY_DIR"] = str(tmp_path)
 
+            # The reviewed 3.1.0 pins no longer advertise 10.5, so use public latest to
+            # reach the injected ACS install failure this test exercises.
             result = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-unverified-release",
                 "7538",
                 "7539",
                 env=env,
@@ -1632,31 +1628,13 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(recovery_files[0].stat().st_mode & 0o777, 0o600)
 
 
-    def test_install_app_uses_verified_7539_pin_and_blocks_unverified_public_latest(self):
+    def test_install_app_uses_verified_catalyst_pins_without_release_overrides(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            public_result = self.run_script(
-                "skills/splunk-app-install/scripts/install_app.sh",
-                "--source",
-                "splunkbase",
-                "--app-id",
-                "7539",
-                "--accept-unverified-release",
-                "--no-update",
-                "--no-restart",
-                env=env,
-            )
-            public_output = public_result.stdout + public_result.stderr
-            self.assertEqual(public_result.returncode, 1, msg=public_output)
-            self.assertIn(
-                "cisco-catalyst-app version 3.2.0 (public-latest) does not advertise Splunk 10.5",
-                public_output,
-            )
-            self.assertIn("--accept-unsupported-platform", public_output)
-            self.assertFalse(acs_log.exists())
-
+            # 7539 3.2.20 and its 7538 3.2.44 dependency are both package-verified and
+            # advertise Splunk 10.5, so the default pin path needs no override flag.
             result = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
                 "--source",
@@ -1670,23 +1648,27 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn(
-                "cisco-catalyst-app version 3.1.0 (repo-verified) advertises Splunk 10.5",
+                "cisco-catalyst-app version 3.2.20 (repo-verified) advertises Splunk 10.5",
                 output,
             )
+            self.assertNotIn("--accept-unverified-release", output)
             install_lines = [
                 line
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
                 if "apps install splunkbase" in line
             ]
             self.assertEqual(len(install_lines), 2)
-            self.assertTrue(all("--version 3.1.0" in line for line in install_lines))
+            self.assertIn("--version 3.2.44", install_lines[0])
+            self.assertIn("--version 3.2.20", install_lines[1])
 
-    def test_install_app_requires_public_latest_review_when_verified_pin_has_no_10_5_evidence(self):
+    def test_install_app_installs_reproducible_verified_pin_without_overrides(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            blocked = self.run_script(
+            # 1761 1.7.1 is package-verified and reproducible from the public release
+            # API, so the default pin path installs with no acknowledgement flags.
+            accepted = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
                 "--source",
                 "splunkbase",
@@ -1696,35 +1678,13 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "--no-restart",
                 env=env,
             )
-            blocked_output = blocked.stdout + blocked.stderr
-            self.assertEqual(blocked.returncode, 1, msg=blocked_output)
-            self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.0 is historical-review-only",
-                blocked_output,
-            )
-            self.assertIn(
-                "--accept-historical-review-only-pin",
-                blocked_output,
-            )
-            self.assertFalse(acs_log.exists())
-
-            accepted = self.run_script(
-                "skills/splunk-app-install/scripts/install_app.sh",
-                "--source",
-                "splunkbase",
-                "--app-id",
-                "1761",
-                "--accept-unverified-release",
-                "--no-update",
-                "--no-restart",
-                env=env,
-            )
             accepted_output = accepted.stdout + accepted.stderr
             self.assertEqual(accepted.returncode, 0, msg=accepted_output)
             self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.1 (public-latest) advertises Splunk 10.5",
+                "Splunk_TA_cisco-esa version 1.7.1 (repo-verified) advertises Splunk 10.5",
                 accepted_output,
             )
+            self.assertNotIn("historical-review-only", accepted_output)
             install_line = next(
                 line
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
@@ -1732,42 +1692,24 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
             self.assertIn("--version 1.7.1", install_line)
 
-    def test_cloud_batch_requires_public_latest_review_when_verified_pin_has_no_10_5_evidence(self):
+    def test_cloud_batch_installs_reproducible_verified_pin_without_overrides(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            blocked = self.run_script(
-                "skills/shared/scripts/cloud_batch_install.sh",
-                "--no-restart",
-                "1761",
-                env=env,
-            )
-            blocked_output = blocked.stdout + blocked.stderr
-            self.assertEqual(blocked.returncode, 1, msg=blocked_output)
-            self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.0 is historical-review-only",
-                blocked_output,
-            )
-            self.assertIn(
-                "--accept-historical-review-only-pin",
-                blocked_output,
-            )
-            self.assertFalse(acs_log.exists())
-
             accepted = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
-                "--accept-unverified-release",
                 "1761",
                 env=env,
             )
             accepted_output = accepted.stdout + accepted.stderr
             self.assertEqual(accepted.returncode, 0, msg=accepted_output)
             self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.1 (public-latest) advertises Splunk 10.5",
+                "Splunk_TA_cisco-esa version 1.7.1 (repo-verified) advertises Splunk 10.5",
                 accepted_output,
             )
+            self.assertNotIn("historical-review-only", accepted_output)
             install_line = next(
                 line
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
@@ -1775,30 +1717,47 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
             self.assertIn("--version 1.7.1", install_line)
 
-    def test_historical_review_only_pin_requires_independent_explicit_acknowledgements(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
-            env, acs_log = self.build_selected_release_cloud_env(tmp_path)
+    def test_no_registry_pin_claims_historical_review_only_provenance(self):
+        """Every verified pin must be reproducible from the public release API."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
 
-            accepted = self.run_script(
-                "skills/shared/scripts/cloud_batch_install.sh",
-                "--no-restart",
-                "--accept-historical-review-only-pin",
-                "--accept-unsupported-platform",
-                "1761",
-                env=env,
-            )
-            output = accepted.stdout + accepted.stderr
+        historical = sorted(
+            f"{app.get('splunkbase_id')}/{app.get('app_name')}"
+            for app in registry.get("apps", [])
+            if app.get("verified_release_evidence_status")
+            == "historical-review-only-not-currently-reproducible"
+        )
 
-            self.assertEqual(accepted.returncode, 0, msg=output)
-            self.assertIn("Explicit historical-review-only pin override accepted", output)
-            self.assertIn("not current source provenance", output)
-            install_line = next(
-                line
-                for line in acs_log.read_text(encoding="utf-8").splitlines()
-                if "apps install splunkbase --splunkbase-id 1761" in line
-            )
-            self.assertIn("--version 1.7.0", install_line)
+        self.assertEqual(
+            historical,
+            [],
+            msg=(
+                "Historical-review-only pins are not reproducible from Splunkbase. "
+                "Verify a currently downloadable package and advance the pin, or keep "
+                "the status and re-add installer coverage for the acknowledgement gate."
+            ),
+        )
+
+    def test_historical_review_only_pin_gate_stays_wired_in_both_installers(self):
+        """The acknowledgement gate must survive even with no historical pins today."""
+        for script in (
+            "skills/splunk-app-install/scripts/install_app.sh",
+            "skills/shared/scripts/cloud_batch_install.sh",
+        ):
+            text = (REPO_ROOT / script).read_text(encoding="utf-8")
+            with self.subTest(script=script):
+                self.assertIn("--accept-historical-review-only-pin", text)
+                self.assertIn(
+                    "historical-review-only-not-currently-reproducible", text
+                )
+                self.assertIn(
+                    "Explicit historical-review-only pin override accepted", text
+                )
+                self.assertIn(
+                    "is historical-review-only and cannot be reproduced", text
+                )
 
     def test_cloud_installers_block_explicit_cloud_incompatibility_before_mutation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1927,13 +1886,13 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     handle.write(cmd + "\\n")
 
                 if "apps install splunkbase --splunkbase-id 7538" in cmd:
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.2.44", "status": "installed"}))
                     raise SystemExit(0)
                 if "apps install splunkbase --splunkbase-id 7539" in cmd:
                     print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
                     raise SystemExit(0)
                 if "apps describe TA_cisco_catalyst" in cmd:
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.2.44", "status": "installed"}))
                     raise SystemExit(0)
                 if "apps describe cisco-catalyst-app" in cmd:
                     print(json.dumps({"name": "cisco-catalyst-app", "version": "3.0.0", "status": "installed"}))
@@ -2030,7 +1989,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd == "apps describe Splunk_AI_Assistant_Cloud":
-                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.0.0", "status": "updated"}))
+                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.2.0", "status": "updated"}))
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
@@ -2063,12 +2022,15 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["ACS_LOG"] = str(acs_log)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
+            # The reviewed 2.0.0 pin is no longer reproducible from the public release
+            # API and has no current platform evidence, so review public latest instead.
             result = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
                 "--source",
                 "splunkbase",
                 "--app-id",
                 "7245",
+                "--accept-unverified-release",
                 "--update",
                 "--no-restart",
                 env=env,
@@ -2117,19 +2079,19 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     handle.write(cmd + "\\n")
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7538"):
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.2.44", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7539"):
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.2.20", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps describe TA_cisco_catalyst":
-                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "TA_cisco_catalyst", "version": "3.2.44", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps describe cisco-catalyst-app":
-                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.1.0", "status": "installed"}))
+                    print(json.dumps({"name": "cisco-catalyst-app", "version": "3.2.20", "status": "installed"}))
                     raise SystemExit(0)
 
                 if cmd == "apps list --splunkbase --count 100 --offset 0":

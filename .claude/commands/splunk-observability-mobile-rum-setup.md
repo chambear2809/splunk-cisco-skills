@@ -1,4 +1,4 @@
-<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: 6b298fcb7796731835421d6eb6d192fe007d662a6e62acd4e1203c3321a0d25d. -->
+<!-- Generated from skills/catalog.yaml; schema: 1; entry-sha256: d7ba7f0c66892e1389cd60134aafacfe7dbb8b35dce5a9625262d611d1d75aa0. -->
 
 Render, validate, and optionally apply guarded source patches for Splunk Observability Cloud Mobile RUM across native iOS, native Android, React Native, and Flutter apps.
 

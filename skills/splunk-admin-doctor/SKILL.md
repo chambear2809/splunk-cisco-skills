@@ -7,7 +7,7 @@ description: "Use when the user asks for a Splunk admin doctor, health audit, fu
 compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
 metadata:
   splunk_cloud_10_5: "supported"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Admin Doctor

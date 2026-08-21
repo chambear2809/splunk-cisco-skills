@@ -82,7 +82,7 @@ required = [
     "apply-plan.json",
     "doctor-report.md",
     "dsdl-runtime-handoff.md",
-    "agent-builder-handoff.md",
+    "agent-launchpad-handoff.md",
     "time-series-model-handoff.md",
     "legacy-anomaly-migration.md",
 ]
@@ -110,13 +110,14 @@ if bad:
     raise SystemExit(1)
 by_key = {entry.get("key"): entry for entry in coverage}
 expected_stages = {
-    "ai_toolkit.agent_builder": "alpha",
-    "ai_toolkit.agent_builder_knowledge_base_connections": "alpha",
-    "ai_toolkit.agent_builder_mcp_connections": "alpha",
-    "ai_toolkit.aiagent_command": "alpha",
-    "ai_toolkit.agent_run_history": "alpha",
+    "ai_toolkit.agent_launchpad": "ga",
+    "ai_toolkit.agent_launchpad_knowledge_base_connections": "ga",
+    "ai_toolkit.agent_launchpad_mcp_connections": "ga",
+    "ai_toolkit.agent_skills": "ga",
+    "ai_toolkit.aiagent_command": "ga",
+    "ai_toolkit.agent_run_history": "ga",
     "ai_toolkit.open_cisco_time_series_model_1_0": "available",
-    "ai_toolkit.anomaly_cisco_deep_time_series": "feature_preview",
+    "ai_toolkit.anomaly_cisco_deep_time_series": "ga",
 }
 for key, expected_stage in expected_stages.items():
     entry = by_key.get(key)

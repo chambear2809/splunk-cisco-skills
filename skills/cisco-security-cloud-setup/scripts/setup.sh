@@ -8,8 +8,7 @@ source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 APP_NAME="CiscoSecurityCloud"
 APP_LABEL="Cisco Security Cloud"
 APP_ID="7404"
-VERIFIED_APP_VERSION="3.6.6"
-PUBLIC_APP_VERSION="3.6.7"
+VERIFIED_APP_VERSION="3.6.10"
 PACKAGE_PATTERN="cisco-security-cloud_*"
 SETTINGS_CONF="ciscosecuritycloud_settings"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
@@ -57,9 +56,6 @@ require_configuration_version_compatible() {
     fi
 
     log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
-    if [[ "${selected_version}" == "${PUBLIC_APP_VERSION}" ]]; then
-        log "The public ${PUBLIC_APP_VERSION} release does not advertise Splunk 10.5 compatibility."
-    fi
     log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
     return 1
 }

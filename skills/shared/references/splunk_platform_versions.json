@@ -1,5 +1,6 @@
 {
-  "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-07-02. Enterprise entries list currently supported minor trains; Cloud entries identify current documentation trains.",
+  "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-08-20. Enterprise entries are recognized release trains and remain listed when an end date is needed for lifecycle classification; Cloud entries identify current documentation trains.",
+  "compatibility_verified_date": "2026-08-20",
   "defaults": {
     "enterprise_version": "10.4.1",
     "enterprise_image": "splunk/splunk:10.4.1",
@@ -46,9 +47,9 @@
   "splunkbase_pins": {
     "7125": {
       "app_name": "Splunk_TA_otel",
-      "latest_version": "0.154.2",
-      "published_date": "2026-06-17",
-      "max_platform_version": "10.4"
+      "latest_version": "0.158.0",
+      "published_date": "2026-08-07",
+      "max_platform_version": "10.5"
     },
     "8704": {
       "app_name": "splunk-connect-for-otlp",
@@ -70,15 +71,15 @@
     },
     "8698": {
       "app_name": "Splunk_TA_otel_linux_x86_64",
-      "latest_version": "0.154.2",
-      "published_date": "2026-06-17",
-      "max_platform_version": "10.4"
+      "latest_version": "0.158.0",
+      "published_date": "2026-08-07",
+      "max_platform_version": "10.5"
     },
     "8699": {
       "app_name": "Splunk_TA_otel_windows_x86_64",
-      "latest_version": "0.154.2",
-      "published_date": "2026-06-17",
-      "max_platform_version": "10.4"
+      "latest_version": "0.158.0",
+      "published_date": "2026-08-07",
+      "max_platform_version": "10.5"
     }
   },
   "upgrade_notes_10_4": {

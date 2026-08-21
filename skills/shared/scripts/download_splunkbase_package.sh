@@ -26,7 +26,7 @@ Usage:
     --app-id 5556 --version 4.0.0 --app-name Splunk_TA_Google_Workspace
 
   bash skills/shared/scripts/download_splunkbase_package.sh \
-    --app-id 3225 --version 4.1.0 \
+    --app-id 3225 --version 4.1.1 \
     --app-names TA-Exchange-ClientAccess,TA-Exchange-Mailbox,TA-SMTP-Reputation,TA-Windows-Exchange-IIS
 
 Options:

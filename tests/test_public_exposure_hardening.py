@@ -351,6 +351,69 @@ def test_enterprise_10_5_is_not_treated_as_a_public_runtime(tmp_path: Path) -> N
     assert "not-publicly-released" in (result.stderr + result.stdout)
 
 
+def test_end_of_support_branch_refused_even_at_its_svd_floor(tmp_path: Path) -> None:
+    """9.3.11 is exactly the published 9.3 SVD floor, and 9.3 support ended
+    2026-07-24. Floor comparison alone reports it as current, which is the
+    defect: an end-of-support branch receives no further fixes, so its last
+    floor is frozen and permanently satisfiable. Must fail closed.
+    """
+    out = tmp_path / "out"
+    result = run_render(*base_render_args(out, **{"--splunk-version": "9.3.11"}))
+    assert result.returncode != 0, "end-of-support branch was accepted"
+    combined = result.stderr + result.stdout
+    assert "2026-07-24" in combined
+    assert "end-of-support" in combined.lower()
+
+
+def test_end_of_support_refusal_has_no_override_flag() -> None:
+    """The refusal must not be bypassable.
+
+    The original defect was a gate that passed something it should have
+    stopped; an --accept-end-of-support style escape hatch would reintroduce
+    exactly that. --accept-public-exposure gates a risk the operator can own;
+    an unpatchable runtime is not one hardening can compensate for.
+    """
+    help_text = run_render("--help").stdout
+    for forbidden in ("--accept-end-of-support", "--accept-eos", "--allow-eol"):
+        assert forbidden not in help_text
+
+
+def test_classifier_and_svd_gate_agree_about_the_same_host() -> None:
+    """A classifier and a gate disagreeing about one host is its own bug."""
+    sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+    from platform_versions import (
+        classify_enterprise_version,
+        enterprise_support_status,
+    )
+
+    assert classify_enterprise_version("9.3.11") == "end-of-support"
+    assert enterprise_support_status("9.3.11")["eos"] is True
+    # And the renderer, which is the gate, refuses the same version.
+    assert render_module.EMBEDDED_SVD_FLOOR["9.3"] == "9.3.11"
+
+
+def test_support_status_is_date_driven_not_hardcoded() -> None:
+    """Before the published date the same version classifies as supported.
+
+    Pins the behaviour to the registry date rather than to a version literal,
+    so the check keeps working when another train reaches end of support.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+    from datetime import date
+
+    from platform_versions import (
+        classify_enterprise_version,
+        enterprise_support_status,
+    )
+
+    before = date(2026, 1, 1)
+    assert classify_enterprise_version("9.3.11", today=before) == "supported"
+    assert enterprise_support_status("9.3.11", today=before)["eos"] is False
+    # Inside the 90-day window the operator is warned but not blocked.
+    near = enterprise_support_status("9.3.11", today=date(2026, 6, 1))
+    assert near["near_eos"] is True and near["eos"] is False
+
+
 def test_svd_floor_external_override(tmp_path: Path) -> None:
     out = tmp_path / "out"
     floor_path = tmp_path / "floor.json"

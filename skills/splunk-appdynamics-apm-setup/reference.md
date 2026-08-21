@@ -1,11 +1,11 @@
 # APM Reference
 
 Primary source:
-https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0
+https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/application-monitoring
 
 Additional focused source:
-https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/install-app-server-agents/serverless-apm-for-aws-lambda/serverless-apm-in-the-controller
-https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry
+https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/install-app-server-agents/serverless-apm-for-aws-lambda/serverless-apm-in-the-controller
+https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.8.0/splunk-appdynamics-for-opentelemetry
 
 Coverage includes applications, tiers, nodes, business transactions, service
 endpoints, remote services, information points, snapshots, metrics, Serverless

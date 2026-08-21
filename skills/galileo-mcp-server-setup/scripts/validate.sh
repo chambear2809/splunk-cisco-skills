@@ -87,9 +87,9 @@ if parsed_url.scheme == "http" and not is_loopback:
     raise SystemExit("metadata.json mcp_url must use HTTPS outside loopback testing")
 if data.get("expected_prompts_count") != 0 or data.get("expected_resources_count") != 0:
     raise SystemExit("metadata.json expected prompt/resource counts should be zero")
-if data["expected_server"] != {"name": "EvalsInIDEServer", "version_observed": "1.28.1"}:
+if data["expected_server"] != {"name": "EvalsInIDEServer", "version_observed": "1.29.0"}:
     raise SystemExit("metadata.json observed server identity/version is stale")
-if data["tool_catalog_reviewed"] != "2026-07-08":
+if data["tool_catalog_reviewed"] != "2026-08-20":
     raise SystemExit("metadata.json tool catalog review date is stale")
 if data.get("stdio_bridge") != {
     "transport": "streamable_http",
@@ -119,11 +119,16 @@ import json, sys
 with open(sys.argv[1], encoding="utf-8") as fh:
     data = json.load(fh)
 matrix = data.get("product_gap_matrix")
-if not isinstance(matrix, list) or len(matrix) < 32:
+if not isinstance(matrix, list) or len(matrix) < 37:
     raise SystemExit("product-gap-matrix.json does not contain expected coverage rows")
 areas = {row.get("area") for row in matrix}
 required_areas = {
-    "AI Assistant beta, evidence-linked investigation, and enterprise enablement",
+    "AI Assistant beta, evidence-linked investigation, criticality, and organization-wide debugging",
+    "Splunk Agent Observability naming and pre-/post-August 7 documentation epoch",
+    "Annotation Queues GA, templates, users, records, and human-feedback operations",
+    "AI-assisted custom-code metrics, organization billing usage, model pricing, and integration costs",
+    "Trace Count alerts and multimodal out-of-the-box evaluation metrics",
+    "Hosted-model availability and light, dark, or system console themes",
     "Global dashboards across projects and log streams",
     "Generic alert webhooks, payload v1.0, authentication, testing, and deduplication",
     "Experiment groups (Python SDK >=2.2.0), comparison, ranking, playground runs, and unit-test gates",
@@ -131,7 +136,7 @@ required_areas = {
 }
 missing = required_areas - areas
 if missing:
-    raise SystemExit(f"product-gap-matrix.json missing July 7 boundaries: {sorted(missing)}")
+    raise SystemExit(f"product-gap-matrix.json missing reviewed release boundaries: {sorted(missing)}")
 PY
 
 python3 - "${OUTPUT_DIR}/coverage/tool-catalog.json" <<'PY'
@@ -143,9 +148,9 @@ if not isinstance(tools, list) or data.get("tool_count") != len(tools):
     raise SystemExit("tool-catalog.json tool_count mismatch")
 if data.get("tool_count") != 9:
     raise SystemExit("tool-catalog.json observed tool count changed")
-if data.get("observed_server") != {"name": "EvalsInIDEServer", "version": "1.28.1"}:
+if data.get("observed_server") != {"name": "EvalsInIDEServer", "version": "1.29.0"}:
     raise SystemExit("tool-catalog.json observed server identity/version is stale")
-if data.get("reviewed_on") != "2026-07-08":
+if data.get("reviewed_on") != "2026-08-20":
     raise SystemExit("tool-catalog.json review date is stale")
 for tool in tools:
     for key in ("name", "risk_group", "required", "properties", "schema_sha256", "coverage", "auto_allow"):

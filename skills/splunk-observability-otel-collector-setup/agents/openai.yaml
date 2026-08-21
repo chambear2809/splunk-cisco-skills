@@ -3,8 +3,8 @@ interface:
   short_description: "Deploy pinned Splunk OTel Collector and audit its TA packages"
   default_prompt: >-
     Use $splunk-observability-otel-collector-setup to render and optionally
-    apply and validate Linux Collector and auto-instrumentation 0.154.2 or the
-    Kubernetes chart and Collector image 0.154.0; audit Splunkbase apps 7125,
+    apply and validate Linux Collector and auto-instrumentation 0.158.0 or the
+    Kubernetes chart and Collector image 0.158.0; audit Splunkbase apps 7125,
     8698, and 8699 for deployment-server, Linux heavy-forwarder, or Linux
     Universal-Forwarder staging; and route specialized Observability products
     with file-backed secret, immutable-overlay, and supply-chain guardrails.

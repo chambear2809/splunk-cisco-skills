@@ -7,7 +7,7 @@ description: "Use when the user asks to install, upgrade, review, or validate ES
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Security Content Update Setup
@@ -84,12 +84,12 @@ enablement and content mutation remain outside this skill.
 
 ## Package Verification Boundary
 
-The repository's reviewed ESCU baseline is `6.0.0`. The current public release
-is `6.1.0` and advertises Splunk 10.5 support, but its analytic-story and
-correlation-search contents have not been package-verified here. The shared
-installer defaults to verified `6.0.0`; only `--accept-unverified-release`
-follows public `6.1.0`. After that explicit override, inventory its shipped
-content and repeat the activation review before enabling anything.
+The reviewed ESCU baseline is `6.4.0`, the current public release, which
+advertises Splunk 10.5. The package was downloaded, unpacked, and inspected
+here, so the shared installer's default pin needs no review override. ESCU
+ships new detections on every release, so always inventory the shipped
+analytic stories and repeat the correlation-search activation review after an
+upgrade — nothing here enables content for you.
 
 ## Workflow
 

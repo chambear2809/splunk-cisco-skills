@@ -46,6 +46,21 @@ repos:
           )$
       - id: check-symlinks
       - id: detect-private-key
+        # These files intentionally contain PEM boundary syntax in validators,
+        # renderers, documentation, or synthetic security tests. Gitleaks still
+        # scans every one of them.
+        exclude: |
+          (?x)^(
+            agent/splunk_cisco_skills_mcp/core\.py|
+            skills/galileo-on-prem-stack-setup/scripts/self_test\.py|
+            skills/splunk-admin-doctor/scripts/(doctor|live_validate_all)\.py|
+            skills/splunk-ingest-processor-setup/scripts/(render_assets\.py|smoke_offline\.sh)|
+            skills/splunk-observability-cisco-intersight-integration/(references/intersight-secrets\.md|scripts/render_assets\.py)|
+            skills/splunk-observability-cisco-nexus-integration/scripts/render_assets\.py|
+            skills/splunk-observability-otel-collector-setup/scripts/render_assets\.py|
+            skills/splunk-platform-pki-setup/(reference\.md|references/(edge-processor-pki|key-format-and-permissions)\.md|scripts/render_assets\.py)|
+            tests/(test_agent_mcp_core|test_cisco_collaboration_setup|test_live_validation_runner|test_splunk_admin_doctor|test_splunk_enterprise_kubernetes_setup|test_splunk_enterprise_security_config|test_splunk_ingest_processor_setup|test_splunk_observability_azure_integration|test_splunk_observability_gcp_integration|test_splunk_observability_otel_collector_setup)\.py
+          )$
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1

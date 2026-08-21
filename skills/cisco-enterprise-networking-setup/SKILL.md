@@ -7,7 +7,7 @@ description: "Use when the user asks about Cisco Enterprise Networking app, cisc
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Cisco Enterprise Networking App Setup Automation
@@ -82,13 +82,14 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 `splunk-app-install` with `--source splunkbase --app-id 7539`; the shared
 installer defaults to the repository-verified package. If Splunkbase is
 unavailable, fall back to the local package in `splunk-ta/`.
-The repo-verified `3.1.0` release explicitly advertises `10.5` and is
-Cloud-compatible. The newer public `3.2.0` listing advertises versions only
-through `10.4`. On Splunk Cloud `10.5`, keep the shared installer's verified
-`3.1.0` pin. The setup wrapper reads the actual installed version before any
-REST mutation and refuses an unverified selection unless
-`--accept-unsupported-platform` is backed by documented vendor approval for
-the exact package and stack; the override is not compatibility certification.
+The repo-verified `3.2.20` release is also the current public listing, advertises
+`10.5`, and is Cloud-compatible, so the default install path works on a `10.5`
+stack with no review override. Do not downgrade below `3.2.20` on a `10.5`
+stack: `3.1.0`, `3.2.0`, and `3.2.10` do not advertise that train. The setup
+wrapper reads the actual installed version before any REST mutation and refuses
+an unverified selection unless `--accept-unsupported-platform` is backed by
+documented vendor approval for the exact package and stack; the override is not
+compatibility certification.
 The shared installer enforces the required Cisco Catalyst Add-on dependency and
 installs `TA_cisco_catalyst` (Splunkbase ID `7538`) first when it is missing,
 so the visualization app is not deployed by itself. The Cisco Catalyst
@@ -170,7 +171,7 @@ than installed by default.
 
 ## Setup Workflow
 
-### Step 1: Update Index Macro
+### Step 1: Update Index Scopes
 
 The app uses the `cisco_catalyst_app_index` macro to know which indexes to
 search. This must match the indexes configured in the TA.
@@ -180,7 +181,11 @@ bash skills/cisco-enterprise-networking-setup/scripts/setup.sh
 ```
 
 This updates `cisco_catalyst_app_index` to include all four product indexes:
-`catalyst`, `ise`, `sdwan`, `cybervision`.
+`catalyst`, `ise`, `sdwan`, `cybervision`. It also scopes the app's
+`cisco_catalyst_sdwan_index` macro and writes the identical scope to the
+companion TA's `cisco_sdwan_index` eventtype. That eventtype must not retain its
+package-default `()` placeholder because the SD-WAN firewall, ACL, and SGACL
+transition eventtypes depend on it.
 
 Partial runs: `--macros-only`, `--custom-indexes "idx1,idx2,idx3"`.
 
@@ -230,18 +235,22 @@ Checks: app installation, macros, saved searches, data model, data presence.
 
 | Macro | Default | Purpose |
 |---|---|---|
-| `cisco_catalyst_app_index` | `index IN ("main")` | Tells dashboards which indexes to search |
-| `cisco_catalyst_app_sourcetypes` | Setup writes the current SCAN-aligned Cisco source families, including `cisco:catalyst:center:*` and `cisco:thousandeyes:*` | Filters to known Cisco sourcetypes |
+| `cisco_catalyst_app_index` | `index IN (*)` | Tells shared dashboards and the data model which indexes to search; setup replaces the wildcard with an explicit list |
+| `cisco_catalyst_sdwan_index` | `index IN (*)` | Tells SD-WAN raw dashboards which indexes to search; setup replaces the wildcard with an explicit list |
+| `cisco_catalyst_app_sourcetypes` | Exact `3.2.20` package families, including `cisco:thousandeyes:metric`, `cisco:sgacl:logs`, `cisco:catalyst:center:*`, `cisco:ise:analytics*`, and `tenable:sc*` | Filters to the source types shipped with the app contract |
 | `summariesonly` | `summariesonly=false` | Controls data model acceleration usage |
 
-The setup script updates both dashboard filter macros. The index definition is:
+The setup script updates all three dashboard filter macros. The shared index
+definition is:
 ```
 index IN ("catalyst", "ise", "sdwan", "cybervision")
 ```
 
-The managed sourcetype definition preserves broad canonical product families
-while removing the stale exact aliases `cisco:thousandeyes:test` and
-`cisco:sgacl:logs`.
+The default SD-WAN-only scope is `index IN ("sdwan")`. When custom indexes are
+provided, setup uses the explicit custom list for both app index macros and the
+TA `cisco_sdwan_index` eventtype so the three scopes cannot silently diverge.
+The managed sourcetype definition mirrors the exact `3.2.20` package contract;
+`cisco:thousandeyes:test` is not part of that contract.
 
 ## Dashboards
 
@@ -287,7 +296,9 @@ bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
 ## Key Learnings / Known Issues
 
 1. **Macro alignment**: The `cisco_catalyst_app_index` macro MUST include all
-   indexes configured in the TA, or dashboards will show no data.
+   indexes configured in the TA, or dashboards will show no data. The app
+   `cisco_catalyst_sdwan_index` macro and TA `cisco_sdwan_index` eventtype must
+   use the same explicit SD-WAN index scope.
 2. **Data model acceleration**: Enable for production; keep disabled during
    initial setup/testing.
 3. **Saved searches**: The lookup-building saved searches should run at least
@@ -308,5 +319,6 @@ bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
 ## Validation Modes
 
 Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
-to require dashboard macro alignment, shipped views, required saved searches,
-and at least one populated Cisco networking index.
+to require safe explicit custom-or-default index scopes, exact package
+sourcetype coverage, TA SD-WAN eventtype alignment, shipped views, required
+saved searches, and data in at least one configured Cisco networking index.

@@ -31,7 +31,25 @@ readonly SAVED_SEARCHES=(
     "cisco_catalyst_meraki_organization_mapping"
     "cisco_catalyst_meraki_devices_serial_mapping"
 )
+readonly REQUIRED_SOURCETYPE_FAMILIES=(
+    "cisco:ise*"
+    "cisco:sdwan*"
+    "cisco:dnac*"
+    "stream:netflow"
+    "cisco:cybervision:*"
+    "meraki:*"
+    "cisco:ios"
+    "cisco:thousandeyes:metric"
+    "cisco:sgacl:logs"
+    "cisco:catalyst:center:*"
+    "cisco:ise:analytics*"
+    "tenable:sc*"
+)
 SK=""
+dashboard_index_csv=""
+sdwan_index_csv=""
+ta_sdwan_index_csv=""
+dashboard_indexes=()
 
 PASS=0
 FAIL=0
@@ -41,6 +59,42 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 completion_issue() { if ${STRICT}; then fail "$@"; else warn "$@"; fi; }
+
+# Accept only the explicit index-list form written by setup.sh and documented
+# by the package. Canonical output is a sorted, de-duplicated comma list that is
+# safe to split and interpolate into the bounded tstats checks below.
+parse_index_macro_definition() {
+    local definition="${1:-}"
+    python3 - "${definition}" <<'PY'
+import re
+import sys
+
+definition = sys.argv[1].strip()
+match = re.fullmatch(r"index\s+IN\s*\(\s*(.*?)\s*\)", definition, re.IGNORECASE)
+if not match:
+    raise SystemExit(1)
+
+indexes = []
+for raw_token in match.group(1).split(","):
+    token = raw_token.strip()
+    if len(token) >= 2 and token[0] in {'"', "'"} and token[-1] == token[0]:
+        token = token[1:-1]
+    elif '"' in token or "'" in token:
+        raise SystemExit(1)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", token):
+        raise SystemExit(1)
+    indexes.append(token)
+
+if not indexes:
+    raise SystemExit(1)
+print(",".join(sorted(set(indexes))), end="")
+PY
+}
+
+index_csv_contains() {
+    local csv="${1:-}" candidate="${2:-}"
+    [[ ",${csv}," == *",${candidate},"* ]]
+}
 
 log "=== Cisco Enterprise Networking App Validation ==="
 log ""
@@ -79,34 +133,68 @@ fi
 log ""
 log "--- Macros ---"
 def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_app_index" "definition" 2>/dev/null || true)
-if [[ -n "${def}" ]]; then
-    pass "cisco_catalyst_app_index macro defined: ${def}"
-    for idx in "catalyst" "ise" "sdwan" "cybervision"; do
-        if [[ "${def}" == *"${idx}"* ]]; then
-            pass "  Index '${idx}' included in macro"
-        else
-            completion_issue "Index '${idx}' is not in cisco_catalyst_app_index — dashboards will not search it"
-        fi
+if [[ -z "${def}" ]]; then
+    completion_issue "cisco_catalyst_app_index macro not found; dashboard searches are not aligned"
+elif dashboard_index_csv=$(parse_index_macro_definition "${def}" 2>/dev/null); then
+    pass "cisco_catalyst_app_index has an explicit, safe index scope: ${def}"
+    IFS=',' read -r -a dashboard_indexes <<<"${dashboard_index_csv}"
+    for idx in "${dashboard_indexes[@]}"; do
+        pass "  Configured dashboard index '${idx}' accepted"
     done
 else
-    completion_issue "cisco_catalyst_app_index macro not found; dashboard searches are not aligned"
+    completion_issue "cisco_catalyst_app_index must use an explicit safe list such as index IN (\"catalyst\", \"ise\"); wildcard, empty, and arbitrary SPL definitions are refused"
 fi
 
 sourcetype_def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_app_sourcetypes" "definition" 2>/dev/null || true)
 if [[ -n "${sourcetype_def}" ]]; then
     pass "cisco_catalyst_app_sourcetypes macro is defined"
-    for source_family in "cisco:dnac*" "cisco:catalyst:center:*" "cisco:ise*" "cisco:sdwan*" "cisco:thousandeyes:*"; do
-        if [[ "${sourcetype_def}" == *"${source_family}"* ]]; then
+    for source_family in "${REQUIRED_SOURCETYPE_FAMILIES[@]}"; do
+        if [[ "${sourcetype_def}" == *"\"${source_family}\""* ]]; then
             pass "  Sourcetype family '${source_family}' included in macro"
         else
             completion_issue "Sourcetype family '${source_family}' is missing from cisco_catalyst_app_sourcetypes"
         fi
     done
-    if [[ "${sourcetype_def}" == *"cisco:thousandeyes:test"* || "${sourcetype_def}" == *"cisco:sgacl:logs"* ]]; then
-        warn "Sourcetype macro still contains a retired SCAN alias; run setup.sh --macros-only"
+    if [[ "${sourcetype_def}" == *"cisco:thousandeyes:test"* ]]; then
+        warn "Sourcetype macro still contains retired alias 'cisco:thousandeyes:test'; run setup.sh --macros-only"
     fi
 else
     completion_issue "cisco_catalyst_app_sourcetypes macro not found; dashboard source coverage is not aligned"
+fi
+
+sdwan_def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_catalyst_sdwan_index" "definition" 2>/dev/null || true)
+if [[ -z "${sdwan_def}" ]]; then
+    completion_issue "cisco_catalyst_sdwan_index macro not found; SD-WAN raw dashboards are not scoped"
+elif sdwan_index_csv=$(parse_index_macro_definition "${sdwan_def}" 2>/dev/null); then
+    pass "cisco_catalyst_sdwan_index has an explicit, safe index scope: ${sdwan_def}"
+    if [[ -n "${dashboard_index_csv}" ]]; then
+        IFS=',' read -r -a sdwan_indexes <<<"${sdwan_index_csv}"
+        for idx in "${sdwan_indexes[@]}"; do
+            if index_csv_contains "${dashboard_index_csv}" "${idx}"; then
+                pass "  SD-WAN index '${idx}' is included in cisco_catalyst_app_index"
+            else
+                completion_issue "SD-WAN index '${idx}' is missing from cisco_catalyst_app_index"
+            fi
+        done
+    fi
+else
+    completion_issue "cisco_catalyst_sdwan_index must use an explicit safe index IN (...) list; the wildcard and empty definitions are not completion-ready"
+fi
+
+ta_sdwan_def=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$CATALYST_TA_APP" "eventtypes" "cisco_sdwan_index" "search" 2>/dev/null || true)
+if [[ -z "${ta_sdwan_def}" ]]; then
+    completion_issue "TA eventtype cisco_sdwan_index was not found"
+elif ta_sdwan_index_csv=$(parse_index_macro_definition "${ta_sdwan_def}" 2>/dev/null); then
+    pass "TA eventtype cisco_sdwan_index has an explicit, safe index scope: ${ta_sdwan_def}"
+    if [[ -n "${sdwan_index_csv}" ]]; then
+        if [[ "${ta_sdwan_index_csv}" == "${sdwan_index_csv}" ]]; then
+            pass "TA cisco_sdwan_index eventtype matches the app cisco_catalyst_sdwan_index macro"
+        else
+            completion_issue "TA cisco_sdwan_index eventtype does not match the app cisco_catalyst_sdwan_index macro"
+        fi
+    fi
+else
+    completion_issue "TA eventtype cisco_sdwan_index must replace the package's empty () placeholder with the same explicit index IN (...) list used by cisco_catalyst_sdwan_index"
 fi
 
 view_count=$(splunk_curl "$SK" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
@@ -149,16 +237,20 @@ done
 log ""
 log "--- Data Flow Check ---"
 event_total=0
-for idx in "catalyst" "ise" "sdwan" "cybervision"; do
-    event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
-    if [[ "${event_count}" -gt 0 ]]; then
-        event_total=$((event_total + event_count))
-        pass "Index '${idx}' has ${event_count} events"
-    else
-        warn "Index '${idx}' has no events (configure TA first)"
-    fi
-done
-[[ "${event_total}" -gt 0 ]] || completion_issue "No Enterprise Networking dashboard data was found"
+if [[ ${#dashboard_indexes[@]} -eq 0 ]]; then
+    warn "Data flow check skipped because cisco_catalyst_app_index has no valid explicit index list"
+else
+    for idx in "${dashboard_indexes[@]}"; do
+        event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=\"${idx}\"" "count" 2>/dev/null || echo "0")
+        if [[ "${event_count}" =~ ^[0-9]+$ && "${event_count}" -gt 0 ]]; then
+            event_total=$((event_total + event_count))
+            pass "Index '${idx}' has ${event_count} events"
+        else
+            warn "Index '${idx}' has no events (configure TA first)"
+        fi
+    done
+    [[ "${event_total}" -gt 0 ]] || completion_issue "No Enterprise Networking dashboard data was found"
+fi
 fi
 
 log ""

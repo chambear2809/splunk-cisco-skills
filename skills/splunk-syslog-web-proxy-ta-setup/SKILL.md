@@ -8,7 +8,7 @@ description: "Use when the user asks to onboard, configure, render, or validate 
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Syslog, Web, And Proxy Supported Add-on Setup
@@ -87,13 +87,16 @@ profiles default to local file/Universal Forwarder monitors, IIS defaults to a
 Windows UF handoff, and network/proxy/security appliances default to SC4S or
 syslog handoff.
 
-Tomcat is a compatibility exception for the repository's current Splunk Cloud
-`10.5` target: as of July 2, 2026, Splunkbase app `2911` advertises versions
-only through `10.4`. When `tomcat` is selected for a `10.5` Cloud stack, record
-the warning and keep the workflow render-only. The shared installer refuses
-app `2911` on a `10.5` target before mutation. Use
-`--accept-unsupported-platform` only when vendor approval and the operator's
-exception record explicitly cover that package and target.
+Tomcat is no longer a compatibility exception. As of August 20, 2026 Splunkbase
+app `2911` designates `4.0.3` as current and advertises Splunk `10.5`; that
+package was downloaded, unpacked, and inspected here, so `tomcat` installs on a
+`10.5` Cloud stack through the default path. Older `4.0.x` releases through
+`4.0.1` advertised versions only through `10.4`, so do not pin below `4.0.3` on
+`10.5`. The shared installer still refuses an app whose selected release does not
+advertise the target platform before any mutation, and
+`--accept-unsupported-platform` remains the only override — usable only when
+vendor approval and the operator's exception record explicitly cover that package
+and target.
 
 ## Workflow
 

@@ -20,7 +20,7 @@ agent:
     extensions:
       k8s_observer: { auth_type: serviceAccount, observe_pods: true }
     receivers:
-      kubeletstats: { collection_interval: 30s, insecure_skip_verify: true }
+      kubelet_stats: { collection_interval: 30s, insecure_skip_verify: true }
       prometheus/isovalent_cilium: { ... }   # 9962
       prometheus/isovalent_hubble: { ... }   # 9965
       prometheus/isovalent_envoy: { ... }    # 9964
@@ -30,13 +30,13 @@ agent:
       prometheus/isovalent_dnsproxy: { ... } # 9967, optional
     processors:
       filter/includemetrics: { metrics: { include: { match_type: strict, metric_names: [...] } } }
-      resourcedetection: { detectors: [system], system: { hostname_sources: [os] } }
+      resource_detection: { detectors: [system], system: { hostname_sources: [os] } }
     service:
       pipelines:
         metrics:
           exporters: [signalfx]
-          receivers: [...all enabled prometheus/isovalent_*..., kubeletstats, hostmetrics, otlp]
-          processors: [memory_limiter, batch, filter/includemetrics, resourcedetection, resource]
+          receivers: [...all enabled prometheus/isovalent_*..., kubelet_stats, host_metrics, otlp]
+          processors: [memory_limiter, batch, filter/includemetrics, resource_detection, resource]
 splunkPlatform:
   logsEnabled: true                    # only in file/stdout export modes
 logsCollection:

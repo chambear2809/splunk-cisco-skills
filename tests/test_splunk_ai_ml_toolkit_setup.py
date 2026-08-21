@@ -48,7 +48,7 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "apply-plan.json",
         "doctor-report.md",
         "dsdl-runtime-handoff.md",
-        "agent-builder-handoff.md",
+        "agent-launchpad-handoff.md",
         "time-series-model-handoff.md",
         "legacy-anomaly-migration.md",
     ]
@@ -69,9 +69,10 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "ai_toolkit.anomaly_cisco_deep_time_series",
         "ai_toolkit.open_cisco_time_series_model_1_0",
         "ai_toolkit.hosted_foundation_models",
-        "ai_toolkit.agent_builder",
-        "ai_toolkit.agent_builder_knowledge_base_connections",
-        "ai_toolkit.agent_builder_mcp_connections",
+        "ai_toolkit.agent_launchpad",
+        "ai_toolkit.agent_launchpad_knowledge_base_connections",
+        "ai_toolkit.agent_launchpad_mcp_connections",
+        "ai_toolkit.agent_skills",
         "ai_toolkit.aiagent_command",
         "ai_toolkit.agent_run_history",
         "ai_toolkit.llm_ai_command",
@@ -112,46 +113,61 @@ def test_ai_ml_toolkit_tracks_agent_and_time_series_product_lifecycle(tmp_path: 
     )
 
     payload = json.loads((output_dir / "coverage-report.json").read_text())
-    assert payload["research_verified"] == "2026-07-03"
+    assert payload["research_verified"] == "2026-08-20"
     by_key = {entry["key"]: entry for entry in payload["coverage"]}
 
-    alpha_keys = {
-        "ai_toolkit.agent_builder",
-        "ai_toolkit.agent_builder_knowledge_base_connections",
-        "ai_toolkit.agent_builder_mcp_connections",
+    # aiagent/agentstatus and CDTSM left preview in AI Toolkit 6.0.0, so every
+    # agent surface must render as GA. A regression back to `alpha` would tell
+    # operators a shipped command does not exist.
+    agent_keys = {
+        "ai_toolkit.agent_launchpad",
+        "ai_toolkit.agent_launchpad_knowledge_base_connections",
+        "ai_toolkit.agent_launchpad_mcp_connections",
+        "ai_toolkit.agent_skills",
         "ai_toolkit.aiagent_command",
         "ai_toolkit.agent_run_history",
     }
-    assert {by_key[key]["product_stage"] for key in alpha_keys} == {"alpha"}
-    assert {by_key[key]["status"] for key in alpha_keys} == {"manual_handoff"}
+    assert {by_key[key]["product_stage"] for key in agent_keys} == {"ga"}
+    assert {by_key[key]["status"] for key in agent_keys} == {"manual_handoff"}
+    assert all("alpha" not in by_key[key]["summary"].lower() for key in agent_keys)
+    assert all("private preview" not in by_key[key]["summary"].lower() for key in agent_keys)
     assert by_key["ai_toolkit.open_cisco_time_series_model_1_0"]["product_stage"] == "available"
-    assert by_key["ai_toolkit.anomaly_cisco_deep_time_series"]["product_stage"] == "feature_preview"
+    assert by_key["ai_toolkit.anomaly_cisco_deep_time_series"]["product_stage"] == "ga"
     assert "CDTSM is a separate" in by_key["ai_toolkit.hosted_foundation_models"]["summary"]
+    assert "6.0.2" in by_key["ai_toolkit.package"]["summary"]
+    assert "4.3.4" in by_key["ai_toolkit.compatibility"]["summary"]
 
-    agent_handoff = (output_dir / "agent-builder-handoff.md").read_text()
-    assert "Alpha/private preview" in agent_handoff
+    commands = by_key["ai_toolkit.ml_spl_commands"]["summary"]
+    for command in ("aiagent", "agentstatus", "externalendpointinventory", "mltkmanage"):
+        assert command in commands
+
+    agent_handoff = (output_dir / "agent-launchpad-handoff.md").read_text()
+    assert "Agent Launchpad" in agent_handoff
+    assert "generally available" in agent_handoff
+    for stale in ("Alpha/private preview", "ai_agent_run_history_index", "Fall 2026", "25 invocations"):
+        assert stale not in agent_handoff, f"handoff still claims {stale!r}"
     assert "not Cisco Cloud Control Studio Agent Builder" in agent_handoff
     assert "`edit_agent_connections`" in agent_handoff
     assert "`run_agents`" in agent_handoff
     assert "`aiagent`" in agent_handoff
-    assert "`ai_agent_run_history_index`" in agent_handoff
-    assert "100 MB" in agent_handoff
-    assert "30 days" in agent_handoff
+    assert "apiAllowlistIP" in agent_handoff
+    assert "agent_run_index" in agent_handoff
 
     time_series_handoff = (output_dir / "time-series-model-handoff.md").read_text()
     assert "`available` open-weight release" in time_series_handoff
     assert "`Apache-2.0`" in time_series_handoff
-    assert "`feature_preview`" in time_series_handoff
-    assert "Open model availability does not make" in time_series_handoff
+    assert "`ga` since AI Toolkit `6.0.0`" in time_series_handoff
+    assert "apply CDTSM" in time_series_handoff
+    assert "separately governed layers" in time_series_handoff
 
     plan = json.loads((output_dir / "apply-plan.json").read_text())
     sections = {step["section"] for step in plan["steps"]}
-    assert "agent-builder" not in sections
+    assert "agent-launchpad" not in sections
     assert "ctsm" not in sections
     assert "cdtsm" not in sections
 
 
-def test_ai_ml_toolkit_agent_builder_is_not_applicable_to_enterprise_plan(tmp_path: Path) -> None:
+def test_ai_ml_toolkit_agent_launchpad_routes_enterprise_through_cloud_connect(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
     run_setup(
         "--render",
@@ -165,8 +181,15 @@ def test_ai_ml_toolkit_agent_builder_is_not_applicable_to_enterprise_plan(tmp_pa
     agent_entries = [entry for entry in coverage if entry["key"].startswith("ai_toolkit.agent_")]
     agent_entries.append(next(entry for entry in coverage if entry["key"] == "ai_toolkit.aiagent_command"))
     assert agent_entries
-    assert {entry["product_stage"] for entry in agent_entries} == {"alpha"}
-    assert {entry["status"] for entry in agent_entries} == {"not_applicable"}
+    assert {entry["product_stage"] for entry in agent_entries} == {"ga"}
+    assert {entry["status"] for entry in agent_entries} == {"manual_handoff"}
+
+    launchpad = next(entry for entry in coverage if entry["key"] == "ai_toolkit.agent_launchpad")
+    assert launchpad["source_url"].endswith("agent-launchpad-for-on-premises-users")
+
+    agent_handoff = (output_dir / "agent-launchpad-handoff.md").read_text()
+    assert "Splunk Cloud Connect" in agent_handoff
+    assert "## Splunk Enterprise Gate" in agent_handoff
 
 
 def test_ai_ml_toolkit_apply_plan_orders_psc_ai_toolkit_then_dsdl(tmp_path: Path) -> None:
@@ -224,13 +247,46 @@ def test_ai_ml_toolkit_registry_metadata_tracks_current_apps() -> None:
     }
 
     assert apps["2890"]["app_name"] == "Splunk_ML_Toolkit"
-    assert apps["2890"]["latest_verified_version"] == "5.7.4"
+    assert apps["2890"]["latest_verified_version"] == "6.0.2"
     assert apps["2882"]["app_name"] == "Splunk_SA_Scientific_Python_linux_x86_64"
     assert apps["2883"]["app_name"] == "Splunk_SA_Scientific_Python_windows_x86_64"
     assert apps["2881"]["app_name"] == "Splunk_SA_Scientific_Python_darwin_x86_64"
     assert apps["6785"]["app_name"] == "Splunk_SA_Scientific_Python_darwin_arm64"
     assert apps["4607"]["app_name"] == "mltk-container"
     assert apps["4607"]["install_requires"] == ["2890"]
+
+
+def test_ai_ml_toolkit_docs_are_derived_from_the_verified_package() -> None:
+    """The 6.0.2 derivation must not leave 5.7.4-era paths or the gap notice behind.
+
+    The renderer, SKILL.md, and reference.md previously described 5.7.4 while
+    the registry pin had already advanced. A stale version-pathed help.splunk.com
+    URL sends operators to documentation for a release they are not running, and
+    the 5.6.4 Agent Builder preview path now 404s outright.
+    """
+    skill_dir = REPO_ROOT / "skills/splunk-ai-ml-toolkit-setup"
+    tracked = [
+        skill_dir / "SKILL.md",
+        skill_dir / "reference.md",
+        skill_dir / "scripts/render_assets.py",
+        skill_dir / "template.example",
+    ]
+    for path in tracked:
+        text = path.read_text(encoding="utf-8")
+        for stale in ("use-ai-toolkit/5.7.4", "use-ai-toolkit/5.6.4", "feature-preview-cisco-deep-time-series-model"):
+            assert stale not in text, f"{path.name} still references {stale}"
+        assert "Derivation Gap" not in text, f"{path.name} still carries the derivation-gap notice"
+        assert "ai_agent_run_history_index" not in text, f"{path.name} still requires the preview run-history index"
+
+    reference = (skill_dir / "reference.md").read_text(encoding="utf-8")
+    # reference.md is hard-wrapped, so compare against a single-space form.
+    unwrapped = " ".join(reference.split())
+    assert "`6.0.2`, August 10, 2026" in unwrapped
+    assert "`6.0.2` requires PSC `4.3.4` on Python `3.13`" in unwrapped
+    assert "agent-launchpad-for-on-premises-users" in reference
+    assert "6.0.2/ai-toolkit-connections-containers-and-agents/connections-in-the-ai-toolkit" in reference
+    for command in ("agentstatus", "externalendpointinventory", "kvstorelookup", "logexperiment", "mltkmanage"):
+        assert f"`{command}`" in reference
 
 
 def test_security_portfolio_routes_mltk_dsdl_and_anomaly_to_ai_ml_skill() -> None:

@@ -9,7 +9,7 @@ description: "Use when the user asks to onboard, configure, render, or validate 
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
   splunk_cloud_10_5: "conditional"
-  compatibility_verified: "2026-07-02"
+  compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Add-on for GitHub Setup
@@ -89,12 +89,12 @@ token values.
 
 ## Package Verification Boundary
 
-The current public release is `3.3.1` and advertises Splunk 10.5 support;
-this repository's package-derived baseline remains `3.3.0`. The shared
-installer defaults to verified `3.3.0`; only `--accept-unverified-release`
-follows public `3.3.1`. After that explicit override, re-check its
-modular-input/account schema, source types, and shipped views before applying
-the rendered `3.3.0`-based templates.
+The package-derived baseline is `4.0.0`, the current public release, which
+advertises Splunk 10.5. Both `3.3.0` and `4.0.0` were unpacked and diffed here,
+and the rendered templates follow `4.0.0`, so the shared installer's default pin
+needs no review override. When Splunkbase publishes a newer release, re-check
+its modular-input/account schema, source types, and shipped views before
+advancing the pin.
 
 ## Workflow
 
