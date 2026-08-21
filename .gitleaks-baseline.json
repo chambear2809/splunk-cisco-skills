@@ -8,10 +8,10 @@
     "linux_x64_archive": "gitleaks_8.30.1_linux_x64.tar.gz",
     "linux_x64_sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
   },
-  "reviewed_at": "2026-08-21",
+  "reviewed_at": "2026-07-25",
   "review_policy": "The baseline contains only fingerprints, line hashes, and redacted classification metadata. It never contains matched values. Commit-bound history fingerprints cannot suppress a finding introduced by a new commit. Current-tree false positives are removed only from a temporary scan snapshot after the exact reviewed source line passes SHA-256 verification; any line change fails closed and requires re-review.",
-  "history_fingerprint_count": 86,
-  "history_fingerprints_sha256": "8db2241f6e060ea7eaa5af5f2c0b561406e112228d21b6b96597c6ffede9f380",
+  "history_fingerprint_count": 88,
+  "history_fingerprints_sha256": "8a1cf69c34acc6d7553f2a473b1f1e1c01b2514a902db01d0c6f95954c662531",
   "history_categories": {
     "documentation-and-placeholders": {
       "count": 9,
