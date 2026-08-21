@@ -61,6 +61,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = REPO_ROOT / "skills/splunk-platform-pki-setup"
 RENDER_SCRIPT = SKILL_ROOT / "scripts/render_assets.py"
@@ -1005,6 +1007,18 @@ def test_cipher_policy_rejects_cbc_and_broken_primitives() -> None:
     assert check_cipher_list("ECDHE-RSA-AES256-GCM-SHA384", strict) == []
     for bad in ("ECDHE-RSA-AES256-SHA384", "ECDHE-RSA-AES128-SHA", "RC4-MD5"):
         assert check_cipher_list(bad, strict), f"{bad} should have been rejected"
+
+
+def test_unknown_tls_prefixed_names_fail_closed() -> None:
+    strict = {
+        "require_aead": True,
+        "forbid_cbc_mode": True,
+        "forbid_sha1_mac": True,
+        "forbidden_tokens": [],
+    }
+    with pytest.raises(ValueError, match="unrecognized TLS 1.3 cipher suite"):
+        parse_cipher_suite("TLS_RSA_WITH_AES_128_CBC_SHA")
+    assert check_cipher_list("TLS_RSA_WITH_AES_128_CBC_SHA", strict)
 
 
 def test_forbidden_tokens_match_whole_tokens_not_substrings() -> None:

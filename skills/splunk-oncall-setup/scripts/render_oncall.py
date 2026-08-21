@@ -1731,7 +1731,19 @@ def build_handoff_md(spec: dict[str, Any], coverage: list[dict[str, Any]]) -> st
 
 
 O11Y_REALMS = frozenset(
-    {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0", "us2-gcp"}
+    {
+        "us0",
+        "us1",
+        "us2",
+        "us3",
+        "eu0",
+        "eu1",
+        "eu2",
+        "au0",
+        "jp0",
+        "sg0",
+        "us2-gcp",
+    }
 )
 
 

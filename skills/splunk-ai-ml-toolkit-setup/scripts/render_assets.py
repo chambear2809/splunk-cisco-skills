@@ -441,7 +441,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "Cisco Time Series Model 1.0 open-weight release",
             "manual_handoff",
             TIME_SERIES_MODELS["ctsm_open_1_0"]["source_url"],
-            "Cisco Time Series Model 1.0 is an available Apache-2.0 open-weight model on Hugging Face, with source and self-hosting assets on GitHub. Model/runtime deployment is separate from enabling the AI Toolkit CDTSM feature preview.",
+            "Cisco Time Series Model 1.0 is an available Apache-2.0 open-weight model on Hugging Face, with source and self-hosting assets on GitHub. Model/runtime deployment is separate from enabling the AI Toolkit CDTSM integration.",
             product_stage="available",
         )
     )
@@ -451,7 +451,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "Hosted foundation model readiness",
             "manual_handoff",
             AI_TOOLKIT["connections_url"],
-            "Review Splunk-hosted LLM availability for Foundation-Sec and GPT-OSS in the Connections tab. CDTSM is a separate time-series feature-preview integration and is not an LLM connection option. No external API keys are rendered by this skill.",
+            "Review Splunk-hosted LLM availability for Foundation-Sec and GPT-OSS in the Connections tab. CDTSM is a separate time-series integration and is not an LLM connection option. No external API keys are rendered by this skill.",
             product_stage="ga",
         )
     )

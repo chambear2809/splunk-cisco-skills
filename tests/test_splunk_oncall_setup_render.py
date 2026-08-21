@@ -390,7 +390,7 @@ def test_org_scoped_deeplinks_percent_encode_the_slug_consistently(tmp_path: Pat
 
 # Every realm Splunk Observability currently publishes. The example spec pins
 # us1, so any *other* token appearing in rendered output is a hardcoded literal.
-O11Y_REALMS = ("us0", "us1", "us2", "eu0", "eu1", "eu2", "au0", "jp0", "sg0")
+O11Y_REALMS = ("us0", "us1", "us2", "us3", "eu0", "eu1", "eu2", "au0", "jp0", "sg0")
 
 
 def render_with_realm(tmp_path: Path, realm: str) -> tuple[subprocess.CompletedProcess[str], Path]:
@@ -431,7 +431,7 @@ def test_observability_handoff_refuses_to_render_without_a_realm(tmp_path: Path)
 
 @pytest.mark.parametrize(
     "bad_realm",
-    ["US0", "https://app.us0.signalfx.com", "us0/../eu0", "uso", "not-a-realm", "us2"],
+    ["US0", "https://app.us0.signalfx.com", "us0/../eu0", "uso", "not-a-realm"],
 )
 def test_malformed_realms_are_rejected(tmp_path: Path, bad_realm: str) -> None:
     result, _ = render_with_realm(tmp_path, bad_realm)
@@ -452,6 +452,21 @@ def test_us2_gcp_realm_uses_the_published_us2_hostname(tmp_path: Path) -> None:
     assert handoff
     assert {item["url"] for item in handoff} == {
         "https://app.us2.observability.splunkcloud.com/#/me"
+    }
+
+
+@pytest.mark.parametrize("realm", ["us2", "us3"])
+def test_us2_and_us3_realms_are_accepted(tmp_path: Path, realm: str) -> None:
+    result, output_dir = render_with_realm(tmp_path, realm)
+    assert result.returncode == 0, combined_output(result)
+    deeplinks = json.loads((output_dir / "deeplinks.json").read_text(encoding="utf-8"))["deeplinks"]
+    handoff = [
+        item
+        for item in deeplinks
+        if item["object_type"] == "splunk_side_observability_handoff"
+    ]
+    assert {item["url"] for item in handoff} == {
+        f"https://app.{realm}.observability.splunkcloud.com/#/me"
     }
 
 

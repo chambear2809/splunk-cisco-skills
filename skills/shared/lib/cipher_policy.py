@@ -44,6 +44,19 @@ _AEAD_TOKENS = frozenset({"GCM", "CCM", "CCM8", "POLY1305"})
 # suite it is the HMAC algorithm. Conflating the two is the original defect.
 _HASH_TOKENS = frozenset({"SHA", "SHA256", "SHA384", "SHA512", "MD5"})
 
+# Only these names are TLS 1.3 cipher suites.  Treating every ``TLS_*``
+# spelling as AEAD would let an operator typo or legacy/non-standard name
+# bypass ``require_aead`` and CBC checks.
+_TLS13_SUITES = frozenset(
+    {
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256",
+        "TLS_AES_128_CCM_SHA256",
+        "TLS_AES_128_CCM_8_SHA256",
+    }
+)
+
 # OpenSSL spells SHA-1 as a bare "SHA".
 _SHA1_TOKEN = "SHA"
 
@@ -82,7 +95,10 @@ def parse_cipher_suite(name: str) -> dict[str, Any]:
 
     if raw.upper().startswith("TLS_"):
         # TLS 1.3 names are underscore-delimited and are AEAD by construction;
-        # the ciphersuite registry defines no CBC or standalone-HMAC option.
+        # reject unknown TLS_* names instead of treating arbitrary input as a
+        # compliant TLS 1.3 suite.
+        if raw.upper() not in _TLS13_SUITES:
+            raise ValueError(f"unrecognized TLS 1.3 cipher suite {raw!r}")
         tokens = [tok for tok in raw.split("_")[1:] if tok]
         family = "tls1.3"
     else:
