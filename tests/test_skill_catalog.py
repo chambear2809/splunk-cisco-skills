@@ -231,18 +231,25 @@ def _append_fixture_alias(text: str) -> str:
         ]
     )
     result = "\n".join(lines) + "\n"
-    result = result.replace("skill_count: 168", "skill_count: 169", 1)
-    result = result.replace("alias_count: 0", "alias_count: 1", 1)
+    result = _increment_catalog_count(result, "skill_count")
+    return _increment_catalog_count(result, "alias_count")
+
+
+def _increment_catalog_count(text: str, field: str) -> str:
+    pattern = rf"(?m)^({re.escape(field)}: )(\d+)$"
+    result, replacements = re.subn(
+        pattern,
+        lambda match: f"{match.group(1)}{int(match.group(2)) + 1}",
+        text,
+        count=1,
+    )
+    if replacements != 1:
+        raise AssertionError(f"catalog is missing exactly one {field} field")
     return result
 
 
 def _increment_alias_count(text: str) -> str:
-    return re.sub(
-        r"alias_count: (\d+)",
-        lambda match: f"alias_count: {int(match.group(1)) + 1}",
-        text,
-        count=1,
-    )
+    return _increment_catalog_count(text, "alias_count")
 
 
 def test_repository_manifest_is_the_complete_versioned_identity_source() -> None:

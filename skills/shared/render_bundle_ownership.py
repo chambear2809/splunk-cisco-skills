@@ -97,6 +97,18 @@ _BUNDLE_COMPATIBILITY: dict[str, dict[str, set[str]]] = {
     },
 }
 
+# Marker payloads written before alias retirement retain the concrete alias
+# name even though those aliases are no longer active catalog entries.
+_HISTORICAL_RETIRED_ALIASES: dict[str, frozenset[str]] = {
+    "splunk-cim-data-model-setup": frozenset({"splunk-cim-data-model"}),
+    "splunk-dashboard-studio-setup": frozenset({"splunk-dashboard-studio"}),
+    "splunk-ddaa-archive-setup": frozenset({"splunk-ddaa-archive"}),
+    "splunk-ingest-actions-setup": frozenset({"splunk-ingest-actions"}),
+    "splunk-knowledge-objects-setup": frozenset({"splunk-knowledge-objects"}),
+    "splunk-kvstore-admin-setup": frozenset({"splunk-kvstore-admin"}),
+    "splunk-secure-gateway-setup": frozenset({"splunk-secure-gateway"}),
+}
+
 
 @dataclass(frozen=True)
 class LegacyBundleCompatibility:
@@ -259,18 +271,29 @@ def _validate_marker(
     contract: LegacyBundleCompatibility,
 ) -> None:
     payload = _read_marker(marker)
+    retired_aliases = frozenset(
+        {contract.retired_alias}
+        | _HISTORICAL_RETIRED_ALIASES.get(contract.canonical, frozenset())
+    )
     # Accept markers emitted by the previous canonical renderer, but never a
     # marker claiming the retired alias as owner.
     if payload.get("schema") == 1:
         owner = payload.get("owner")
         peer = payload.get("incompatible_peer")
-        if owner == contract.retired_alias:
+        if owner in retired_aliases:
+            owner_name = owner if isinstance(owner, str) else contract.retired_alias
             raise SystemExit(
-                f"ERROR: bundle is owned by retired alias '{contract.retired_alias}', "
+                f"ERROR: bundle is owned by retired alias '{owner_name}', "
                 f"not canonical '{contract.canonical}'; use a new --output-dir."
             )
-        if owner == contract.canonical and peer == contract.retired_alias:
+        if owner == contract.canonical and peer in retired_aliases:
             return
+    if (
+        payload.get("schema") == MARKER_SCHEMA
+        and payload.get("canonical_owner") == contract.canonical
+        and payload.get("retired_alias") in retired_aliases
+    ):
+        return
     if (
         payload.get("schema") != MARKER_SCHEMA
         or payload.get("canonical_owner") != contract.canonical
