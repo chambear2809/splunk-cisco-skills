@@ -21,7 +21,8 @@ MARKER_NAME = ".splunk-skill-bundle.json"
 MARKER_SCHEMA = 2
 
 # Optional compatibility data, keyed only by the active canonical renderer.
-# The retired alias identity is derived from manifest replaced_by edges.
+# These file-shape checks protect against stale bundles without keeping retired
+# skill identities in the active catalog.
 _BUNDLE_COMPATIBILITY: dict[str, dict[str, set[str]]] = {
     "splunk-cim-data-model-setup": {
         "canonical_files": {
@@ -96,6 +97,18 @@ _BUNDLE_COMPATIBILITY: dict[str, dict[str, set[str]]] = {
     },
 }
 
+# Marker payloads written before alias retirement retain the concrete alias
+# name even though those aliases are no longer active catalog entries.
+_HISTORICAL_RETIRED_ALIASES: dict[str, frozenset[str]] = {
+    "splunk-cim-data-model-setup": frozenset({"splunk-cim-data-model"}),
+    "splunk-dashboard-studio-setup": frozenset({"splunk-dashboard-studio"}),
+    "splunk-ddaa-archive-setup": frozenset({"splunk-ddaa-archive"}),
+    "splunk-ingest-actions-setup": frozenset({"splunk-ingest-actions"}),
+    "splunk-knowledge-objects-setup": frozenset({"splunk-knowledge-objects"}),
+    "splunk-kvstore-admin-setup": frozenset({"splunk-kvstore-admin"}),
+    "splunk-secure-gateway-setup": frozenset({"splunk-secure-gateway"}),
+}
+
 
 @dataclass(frozen=True)
 class LegacyBundleCompatibility:
@@ -124,11 +137,6 @@ def _build_compatibility_contracts(
     contracts: dict[str, LegacyBundleCompatibility] = {}
     for canonical, raw in configured.items():
         candidates = aliases_by_canonical.get(canonical, [])
-        if len(candidates) != 1:
-            raise CatalogError(
-                f"legacy-bundle compatibility owner {canonical!r} must have exactly one "
-                "manifest alias replaced_by edge"
-            )
         if set(raw) != {"canonical_files", "retired_alias_files"}:
             raise CatalogError(
                 f"legacy-bundle compatibility for {canonical} must contain exactly "
@@ -144,9 +152,14 @@ def _build_compatibility_contracts(
             raise CatalogError(
                 f"legacy-bundle compatibility for {canonical} has no retired-only files"
             )
+        if extension is not None and len(candidates) != 1:
+            raise CatalogError(
+                f"legacy-bundle compatibility owner {canonical!r} must have exactly one "
+                "manifest alias replaced_by edge"
+            )
         contracts[canonical] = LegacyBundleCompatibility(
             canonical=canonical,
-            retired_alias=candidates[0],
+            retired_alias=candidates[0] if candidates else "retired-renderer",
             canonical_files=canonical_files,
             retired_alias_files=retired_files,
         )
@@ -258,18 +271,29 @@ def _validate_marker(
     contract: LegacyBundleCompatibility,
 ) -> None:
     payload = _read_marker(marker)
+    retired_aliases = frozenset(
+        {contract.retired_alias}
+        | _HISTORICAL_RETIRED_ALIASES.get(contract.canonical, frozenset())
+    )
     # Accept markers emitted by the previous canonical renderer, but never a
     # marker claiming the retired alias as owner.
     if payload.get("schema") == 1:
         owner = payload.get("owner")
         peer = payload.get("incompatible_peer")
-        if owner == contract.retired_alias:
+        if owner in retired_aliases:
+            owner_name = owner if isinstance(owner, str) else contract.retired_alias
             raise SystemExit(
-                f"ERROR: bundle is owned by retired alias '{contract.retired_alias}', "
+                f"ERROR: bundle is owned by retired alias '{owner_name}', "
                 f"not canonical '{contract.canonical}'; use a new --output-dir."
             )
-        if owner == contract.canonical and peer == contract.retired_alias:
+        if owner == contract.canonical and peer in retired_aliases:
             return
+    if (
+        payload.get("schema") == MARKER_SCHEMA
+        and payload.get("canonical_owner") == contract.canonical
+        and payload.get("retired_alias") in retired_aliases
+    ):
+        return
     if (
         payload.get("schema") != MARKER_SCHEMA
         or payload.get("canonical_owner") != contract.canonical

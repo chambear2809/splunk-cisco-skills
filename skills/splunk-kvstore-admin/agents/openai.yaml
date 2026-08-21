@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk KV Store Administration"
-  short_description: "Deprecated alias for KV Store administration"
-  default_prompt: "Use $splunk-kvstore-admin only for compatibility; route new work to $splunk-kvstore-admin-setup."
-policy:
-  allow_implicit_invocation: false

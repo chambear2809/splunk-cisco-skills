@@ -12,8 +12,10 @@ import pytest
 
 from skills.shared.render_bundle_ownership import (
     MARKER_NAME,
+    _HISTORICAL_RETIRED_ALIASES,
     _BUNDLE_COMPATIBILITY,
     _build_compatibility_contracts,
+    _validate_marker,
     _write_marker,
     compatibility_contract,
 )
@@ -94,13 +96,12 @@ def _run_renderer(canonical: str, output_dir: Path) -> subprocess.CompletedProce
 
 
 def test_compatibility_extension_is_canonical_only_and_manifest_validated() -> None:
-    catalog = load_catalog()
     contracts = _build_compatibility_contracts()
 
     assert set(contracts) == set(RENDERERS)
     assert set(contracts) == set(_BUNDLE_COMPATIBILITY)
     for canonical, contract in contracts.items():
-        assert catalog.aliases[contract.retired_alias] == canonical
+        assert contract.retired_alias == "retired-renderer"
         assert contract.canonical == canonical
 
 
@@ -197,6 +198,35 @@ def test_marker_writer_failure_leaves_no_marker_or_temporary_file(
 
     assert not marker.exists()
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("schema", [1, 2])
+@pytest.mark.parametrize("canonical, aliases", sorted(_HISTORICAL_RETIRED_ALIASES.items()))
+def test_canonical_renderer_accepts_historical_alias_marker(
+    tmp_path: Path,
+    schema: int,
+    canonical: str,
+    aliases: frozenset[str],
+) -> None:
+    contract = compatibility_contract(canonical)
+    historical_alias = next(iter(aliases))
+    marker = tmp_path / MARKER_NAME
+    payload = (
+        {
+            "schema": schema,
+            "owner": canonical,
+            "incompatible_peer": historical_alias,
+        }
+        if schema == 1
+        else {
+            "schema": schema,
+            "canonical_owner": canonical,
+            "retired_alias": historical_alias,
+        }
+    )
+    marker.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    _validate_marker(marker, contract)
 
 
 @pytest.mark.parametrize("canonical", sorted(RENDERERS))

@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk Ingest Actions"
-  short_description: "Deprecated alias for Ingest Actions"
-  default_prompt: "Use $splunk-ingest-actions only for compatibility; route new work to $splunk-ingest-actions-setup."
-policy:
-  allow_implicit_invocation: false

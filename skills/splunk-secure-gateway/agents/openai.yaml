@@ -1,6 +1,0 @@
-interface:
-  display_name: "Splunk Secure Gateway / Mobile"
-  short_description: "Deprecated alias for Secure Gateway"
-  default_prompt: "Use $splunk-secure-gateway only for compatibility; route new work to $splunk-secure-gateway-setup."
-policy:
-  allow_implicit_invocation: false

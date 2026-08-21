@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "3d604951119d043cb8c2a9fd0c061d3738b79969a4a4f716682bec98ed30215a"
+    "sha256": "4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff"
   },
   "skill_records": [
     {
@@ -537,41 +537,6 @@
       "replaced_by": null
     },
     {
-      "name": "splunk-kvstore-admin",
-      "status": "deprecated",
-      "replaced_by": "splunk-kvstore-admin-setup"
-    },
-    {
-      "name": "splunk-cim-data-model",
-      "status": "deprecated",
-      "replaced_by": "splunk-cim-data-model-setup"
-    },
-    {
-      "name": "splunk-knowledge-objects",
-      "status": "deprecated",
-      "replaced_by": "splunk-knowledge-objects-setup"
-    },
-    {
-      "name": "splunk-ingest-actions",
-      "status": "deprecated",
-      "replaced_by": "splunk-ingest-actions-setup"
-    },
-    {
-      "name": "splunk-ddaa-archive",
-      "status": "deprecated",
-      "replaced_by": "splunk-ddaa-archive-setup"
-    },
-    {
-      "name": "splunk-secure-gateway",
-      "status": "deprecated",
-      "replaced_by": "splunk-secure-gateway-setup"
-    },
-    {
-      "name": "splunk-dashboard-studio",
-      "status": "deprecated",
-      "replaced_by": "splunk-dashboard-studio-setup"
-    },
-    {
       "name": "splunk-kvstore-admin-setup",
       "status": "canonical",
       "replaced_by": null
@@ -899,7 +864,6 @@
             "splunk-mcp-server-setup",
             "splunk-platform-restart-orchestrator",
             "splunk-platform-sizing",
-            "splunk-secure-gateway",
             "splunk-secure-gateway-setup"
           ]
         },
@@ -921,16 +885,12 @@
           "id": "data-management-search-and-governance",
           "name": "Data Management, Search, and Governance",
           "skills": [
-            "splunk-cim-data-model",
             "splunk-cim-data-model-setup",
-            "splunk-dashboard-studio",
             "splunk-dashboard-studio-setup",
             "splunk-db-connect-setup",
             "splunk-edge-processor-setup",
             "splunk-federated-search-setup",
-            "splunk-ingest-actions",
             "splunk-ingest-actions-setup",
-            "splunk-knowledge-objects",
             "splunk-knowledge-objects-setup",
             "splunk-lookup-file-editing-setup",
             "splunk-spl2-pipeline-kit"
@@ -998,7 +958,6 @@
           "skills": [
             "splunk-cloud-acs-admin-setup",
             "splunk-cloud-acs-allowlist-setup",
-            "splunk-ddaa-archive",
             "splunk-ddaa-archive-setup"
           ]
         },
@@ -1035,7 +994,6 @@
           "skills": [
             "splunk-enterprise-public-exposure-hardening",
             "splunk-index-lifecycle-smartstore-setup",
-            "splunk-kvstore-admin",
             "splunk-kvstore-admin-setup",
             "splunk-license-manager-setup",
             "splunk-monitoring-console-setup",
