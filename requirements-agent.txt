@@ -1,6 +1,6 @@
-# MCP SDK 2.x is still pre-release; pin the current stable 1.x contract.
+# MCP SDK 2.x is a breaking rewrite; keep the FastMCP v1 contract until migrated.
 pip==26.2.1
-mcp==2.0.0
+mcp>=1.28.1,<2
 PyYAML==6.0.3
 # Security-reviewed MCP runtime transitive floor, pinned after pip-audit.
 cryptography==50.0.0
