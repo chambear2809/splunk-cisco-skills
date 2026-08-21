@@ -5,7 +5,7 @@ PyYAML>=6,<7
 # Pin until the repository's legacy lint baseline is intentionally migrated;
 # Ruff 0.16 changes default rule behavior and exposes unrelated existing findings.
 ruff>=0.15.20,<0.16
-yamllint>=1.35,<2
+yamllint>=1.38.0,<2
 defusedxml>=0.7.1,<1
 # Optional: enables `pre-commit install` per CONTRIBUTING.md.
 pre-commit>=4.6.2,<5
