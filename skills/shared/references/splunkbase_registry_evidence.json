@@ -1,5 +1,5 @@
 {
-  "app_count": 119,
+  "app_count": 120,
   "apps": [
     {
       "app_name": "SplunkEnterpriseSecuritySuite",
@@ -65,7 +65,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5e7f72152bbc2ef2a143caba4c62e8a705f63674f5a9bd61e525ebc319408a3a",
+          "sha256": "1f6b590fc2d8ef771f4c5b348fad31df2ff530b1ab0f6f86960d6c83ce9c18c5",
           "url": "https://splunkbase.splunk.com/app/742"
         },
         "release_api": {
@@ -110,7 +110,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5f1980bed2cbb30ccb06964c8598dfc523d29b489137f42e8e8ccf8ea2641360",
+          "sha256": "5cf00568e1dd31a3b3730fcd28e6b047ce78ee542bd285351fd9742797dfbc84",
           "url": "https://splunkbase.splunk.com/app/833"
         },
         "release_api": {
@@ -197,7 +197,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c8f1675393e57b4c82774f3e28c02a2e07f290a69285c67bf8b4191919a12d9b",
+          "sha256": "44f859f8a2b9389cb331e0a28d7a2e519f4a64030981a3c03d6254a998e89378",
           "url": "https://splunkbase.splunk.com/app/1620"
         },
         "release_api": {
@@ -243,7 +243,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "926443c8e0180a9f71942cfd1dc37f311253985eb38a224195eb9175729f713f",
+          "sha256": "1b4a9288a80a0da482dc2d616f3cb3579128129b4430ceb2ea5b27e5239fb2b0",
           "url": "https://splunkbase.splunk.com/app/1621"
         },
         "release_api": {
@@ -290,7 +290,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fe7233dde014685f2a913627a166ae6070d0f060b1b0257b3f2b683aa0c14814",
+          "sha256": "336471730453345f397356e07a838f4e6a7cc184c16ad6156ba3025dc0ea8b93",
           "url": "https://splunkbase.splunk.com/app/1724"
         },
         "release_api": {
@@ -339,7 +339,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b8592638706b941ff4ddf03424d3f6b6dca6a980034073d12217385e97887670",
+          "sha256": "4918d444393903849e662a89cf3a49894e4cc89b6ae35b28ff89b27221485f12",
           "url": "https://splunkbase.splunk.com/app/1747"
         },
         "release_api": {
@@ -389,7 +389,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "36ff28ccc3d55356464a84d51e3a61fdcfeb613e6f8987b2a6eaef18b40548e9",
+          "sha256": "f8cbb1f14d2e50adb9726d20dbe3bdfd54d00de003a02a0d9997157561d99db9",
           "url": "https://splunkbase.splunk.com/app/1761"
         },
         "release_api": {
@@ -437,7 +437,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1dcdbd5436d90f8146bfe199299c2d69300c0ccc28c2a93f35ccef0e2955ee3b",
+          "sha256": "469ec03e341d768d8b58c587866f49a4dca6f7a78563eab66ad2e3282b9c9a79",
           "url": "https://splunkbase.splunk.com/app/1809"
         },
         "release_api": {
@@ -526,7 +526,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1bf5cc30a63ccc8ac2dc1de8a54707a17a30696348a5f59b6b9ed49ecd5a4eb5",
+          "sha256": "d2a99f6de795e2e480b6f447f55bde26af084e22adea4236896fab1069b48800",
           "url": "https://splunkbase.splunk.com/app/1876"
         },
         "release_api": {
@@ -574,7 +574,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3e6e5eb82c369fbd28c2d473d2e72a598379a7e982781986fb22ec7df4873947",
+          "sha256": "c3bf32e220c411553d14a98dae34a063bc1548e92f348aa9b20254794ad5530f",
           "url": "https://splunkbase.splunk.com/app/1910"
         },
         "release_api": {
@@ -622,7 +622,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c4d8ff6db148f29c677425a4e56fab72e67e11d9be609bdc0fc814d69b2ec85e",
+          "sha256": "e91d99086f4c9fd0c9e77595c74a73afa87d8801289cc461fba443a661ebcd42",
           "url": "https://splunkbase.splunk.com/app/1928"
         },
         "release_api": {
@@ -670,7 +670,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "dfc4146b432b2d53c51d79ce56b777caa9e1961177bd4b22335c82d585b5d48e",
+          "sha256": "b51051192299979cceac782c564df43252c8ef0c66333f9f7c12ed7d9b12fa06",
           "url": "https://splunkbase.splunk.com/app/2648"
         },
         "release_api": {
@@ -718,7 +718,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ec64967779ec8a2e072394c986907c43d5a0b4b603dd11935e4eb89f2df676e0",
+          "sha256": "a3e958c2690eacb2eaa0647c9e1a7ea8b4b4a29ab4d43ba6b874b30ae0d3e95e",
           "url": "https://splunkbase.splunk.com/app/2679"
         },
         "release_api": {
@@ -764,7 +764,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "de5d9b750960e582011345662d663f6d06b32a216b3e48ad02d74b33110b8847",
+          "sha256": "9595bf9b226f2a3c7e5ddb6eaa9ae39cc830339da4187105017b7a1c8484b980",
           "url": "https://splunkbase.splunk.com/app/2680"
         },
         "release_api": {
@@ -813,7 +813,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "0667d4a51c94aedc59771d383a0b134f43551fff788c59610e6bad5ed6baad64",
+          "sha256": "b7af6a215ef35e714676411a39a0ed222cf5cd596fcf20b06e338c3d9f2cacfd",
           "url": "https://splunkbase.splunk.com/app/2686"
         },
         "release_api": {
@@ -862,7 +862,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d2163ce8b5967fef7aa298cef6ff4e8314283c1564b0621d8c318d904225e8e1",
+          "sha256": "6e84a8c03aea1c4b40c1270def32e8a51e35f8f29f8b826f2228e8353816c796",
           "url": "https://splunkbase.splunk.com/app/2729"
         },
         "release_api": {
@@ -910,7 +910,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8ad967d853407b95accd7627ec1f4dc9d875c8e25668e937221748276cc20562",
+          "sha256": "2155b940047f4843ba7a9683215e71077548d212ba92a87a5e1c00b7355e9ccc",
           "url": "https://splunkbase.splunk.com/app/2731"
         },
         "release_api": {
@@ -959,7 +959,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "68a1f9b819f394503a31ead9ecc80eb897f94b8acbc3f0c1908a7579af5138f3",
+          "sha256": "d04ea451d20c7c18bda1e1ab494a3fc2ebede6d30c1a7cf56739cb611134f010",
           "url": "https://splunkbase.splunk.com/app/2758"
         },
         "release_api": {
@@ -1006,7 +1006,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "909d82665d042f0d170c52664423aae868027049ccae36891e07f8ecb68f63ca",
+          "sha256": "7c56535393725738b034a6d93ff6318ede5bbd2591a24b430d14055089c49558",
           "url": "https://splunkbase.splunk.com/app/2770"
         },
         "release_api": {
@@ -1053,7 +1053,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "49058655be8bf09275cec02344fdaa6874eeeb82390a98907541be55c4e5265c",
+          "sha256": "e5b79314af41dc7446d55a96c23b3b6e3c3978488606aec34e62b54dda3bc1f6",
           "url": "https://splunkbase.splunk.com/app/2772"
         },
         "release_api": {
@@ -1101,7 +1101,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "704caa50476156cd81f41ca22191e165b388894e3cbdfa01600a4a53e8f005f7",
+          "sha256": "ee9061690c889ce81ab78e288c68be7448317e292d479342a03eb87975fb6e64",
           "url": "https://splunkbase.splunk.com/app/2790"
         },
         "release_api": {
@@ -1150,7 +1150,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "49343a17087621c42d473e52f1909f6ecd7b6b257545dba0bb04dac5050f2ad1",
+          "sha256": "335fbcf361f956afa4748bad15a0a292823f4b2abcdee58100d6965192aa7de5",
           "url": "https://splunkbase.splunk.com/app/2848"
         },
         "release_api": {
@@ -1198,7 +1198,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "18d12b64fa0a752763bcb7d8c121531b1355e5bdef5425f08752cacf283741f1",
+          "sha256": "f090cd986a3c46764b8b238fe91da714b20eb02c73a4a0a6816d7628b84d0edf",
           "url": "https://splunkbase.splunk.com/app/2881"
         },
         "release_api": {
@@ -1244,7 +1244,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "06c8b8dbc58fd6c10327f2416536adc20034ab4890facde17c78104f5655c53b",
+          "sha256": "d1b07b4b78751bda7f2b28cc860aa316cfb294f8dff65cbe96d96758e039cd43",
           "url": "https://splunkbase.splunk.com/app/2882"
         },
         "release_api": {
@@ -1290,7 +1290,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "0c261fb8552f2757964a462a76ee1a111f88085a717bfc3b17726cf2801e8b21",
+          "sha256": "1b2ab15b4a29752f8daa9cb2b52212d2cea33fcadb2da0244b06cd7c572f3ed3",
           "url": "https://splunkbase.splunk.com/app/2883"
         },
         "release_api": {
@@ -1364,7 +1364,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "21b757b8819063819cbf08f7ebc0315c6ebe299cd6fa373fa4dc75bfad3932ac",
+          "sha256": "8988a1da1a897eeacd08fc28d9834fa5d502e01c8917d8c29b51203117bef3d2",
           "url": "https://splunkbase.splunk.com/app/2890"
         },
         "release_api": {
@@ -1416,7 +1416,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5f9124a5f27ac2167ca98ba8395edfc5be89d224809301bbaced2fc0ec1cb70b",
+          "sha256": "58b884ea264ae546b46de5155aeee56ae8a516ecb2d3bb705ff4f4ecfec32af7",
           "url": "https://splunkbase.splunk.com/app/2891"
         },
         "release_api": {
@@ -1510,7 +1510,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3048bc0c1146598c969a7450af2534d22fac82f509842ce89d68a95bb5c5a730",
+          "sha256": "5e74f6ce986967db4b0db79e6cc508587511dd80de0fe0c76451ec03db67c2d1",
           "url": "https://splunkbase.splunk.com/app/2911"
         },
         "release_api": {
@@ -1562,7 +1562,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f80065e18ea84efb7c1a4b66db6282baf9ad0047173e8c2935bb218ca170c3cc",
+          "sha256": "3cc6cf1fb491842de86930e80067ebbc55375c9d746ea7bd66e363e24ed04767",
           "url": "https://splunkbase.splunk.com/app/2934"
         },
         "release_api": {
@@ -1615,7 +1615,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ae09b07c604f735edd9059cd88d954ed3e3a447b8dece2d71a71cca2092ac98d",
+          "sha256": "3ffed56fb794596b61fc23ac1054278aa0aa6b3f7ea911f8b19225eb3ca5dcf7",
           "url": "https://splunkbase.splunk.com/app/2958"
         },
         "release_api": {
@@ -1726,7 +1726,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "dd46de304444852031b5192ee170f8538856dc529f6988830128b27a747afba5",
+          "sha256": "8a79549225fa584715eaf43a464dbd7e2a896d8be70240f1b4ebccab52a2b7d1",
           "url": "https://splunkbase.splunk.com/app/2966"
         },
         "release_api": {
@@ -1778,7 +1778,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fe8029603a36a446ee6a39418e37804b892ef3b40d9034925da87520be08151f",
+          "sha256": "38fb32f615e0b8f5f545e24b1370b34a0837e9a67da4d4b7b3dfcdf01ee02aca",
           "url": "https://splunkbase.splunk.com/app/3088"
         },
         "release_api": {
@@ -1824,7 +1824,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a96a39aa21dbfca81d957f3deeb132b1cb0d64e7bc0962d0658f1e05fad20dfe",
+          "sha256": "bf2dcc04a81c9165ec5c1ba1b5d5496adaba0ac04ad6db0351d0ba1e47a28fc5",
           "url": "https://splunkbase.splunk.com/app/3110"
         },
         "release_api": {
@@ -1876,7 +1876,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "307e6fae1baa77a30aaaf52a9f969425ae27b690c89a9084bb618a55f9b67155",
+          "sha256": "f7845926e22a06866cd4127e342f7c8460c859e7ff1233bb11674dab7294bd4b",
           "url": "https://splunkbase.splunk.com/app/3135"
         },
         "release_api": {
@@ -1925,7 +1925,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d85e48e5ac2d0b66572e9f4909e3f194ef68337271bb85d8fcce814b5746266e",
+          "sha256": "45a222d2c647c0976fa6e9d90616d5568150bb8b787220e014238868e3f70ee9",
           "url": "https://splunkbase.splunk.com/app/3172"
         },
         "release_api": {
@@ -1970,7 +1970,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9cddcf68f8e5f4d63b4c5876224b5fcce7acdcd4c3fa7b61500b19085ad846dd",
+          "sha256": "916e94a061427153ffcb498d47d97ab728c7d17405f4679209a83c1cdaefc4e2",
           "url": "https://splunkbase.splunk.com/app/3185"
         },
         "release_api": {
@@ -2018,7 +2018,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "bdff96c9f31e85068accedb1682308518934e78add1847a08aca6130af5ba05f",
+          "sha256": "f981d36b0393d39ee6ccbffd968a05e4a8f9f8bd94c9d434dd1b296ea7f92ffb",
           "url": "https://splunkbase.splunk.com/app/3186"
         },
         "release_api": {
@@ -2060,7 +2060,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b189fb2de1ee8c7697f5f7e05bbc8105385f41f8274fe561dd873f6bb50770c5",
+          "sha256": "82b2f4a79a9954498ac414cd49e558d57cd9b95f433f884a5a020dd6f174ef4e",
           "url": "https://splunkbase.splunk.com/app/3215"
         },
         "release_api": {
@@ -2100,7 +2100,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "827a72ba6b54b77953b7dadb9ad42ba396d70d19032b05f5a1dcf4bbf23b6ea8",
+          "sha256": "7c054198da47cbc845a02cd7bc63f5cd8d982701cedbb628a1b0b6c000cf60aa",
           "url": "https://splunkbase.splunk.com/app/3225"
         },
         "release_api": {
@@ -2143,7 +2143,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a416db855f6e9588faf9f2891de1cd77f3d723c885105d6b937b831331c9785c",
+          "sha256": "889b86d9632906af6a1bb67cc9df821af43def8d057d68d3b1f2f76c5b8c81e3",
           "url": "https://splunkbase.splunk.com/app/3258"
         },
         "release_api": {
@@ -2184,7 +2184,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a32b838a46d207bd57f1218b1b3aab87f3da979c2ca72f7b96e2eb93353fa90c",
+          "sha256": "cc14b0d8c322c40f555b7b63f893b7f6460830ea38c761ede5f7374469b91f3f",
           "url": "https://splunkbase.splunk.com/app/3411"
         },
         "release_api": {
@@ -2226,7 +2226,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "646dd9b04dbc8c4382ed2b5199119681b35875e3dcf84b5900d691d4f42f0e7c",
+          "sha256": "afc66208778f87fbb92472f1cca4806686a78afd48e105f836e159f4c93a3695",
           "url": "https://splunkbase.splunk.com/app/3412"
         },
         "release_api": {
@@ -2268,7 +2268,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1205cf9dc40f812f165265b780e8caae9c3ff93fe2ce840dbd3ae3a7093502cf",
+          "sha256": "941d256bc2fd6d20f6d9a3b4f16f45c077b2623bb094d119cab48450edb4bb8f",
           "url": "https://splunkbase.splunk.com/app/3418"
         },
         "release_api": {
@@ -2313,7 +2313,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "22a36c39366599aad9b1bdb0c99204007778e0b1485a77c37a36220b23accb1b",
+          "sha256": "3fb88499dedc8d719f22311c7b6f1178fa4d49e0c7105f68125c2863a4f7fe4d",
           "url": "https://splunkbase.splunk.com/app/3435"
         },
         "release_api": {
@@ -2365,7 +2365,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9159f3a94f2082bcc2e2bc94983af8db619543f75b6ad524a99d76d4c5f5c3b2",
+          "sha256": "585e7dbcdf36540619e2114c11b7ce7ddf4667fdd9124bfa039339336fe961d7",
           "url": "https://splunkbase.splunk.com/app/3449"
         },
         "release_api": {
@@ -2417,7 +2417,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fe6bb0317871b8eb43b5b9382ac221eb830eb27925820b0c9cf4cb2100ad21ff",
+          "sha256": "346f4e3148009bd760497e0a2ffeee0ce1616dc009c933974d158199ef5b5fc5",
           "url": "https://splunkbase.splunk.com/app/3471"
         },
         "release_api": {
@@ -2469,7 +2469,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ae733fd88760eca3d56a1ea30d6563a3978e959dfa7022d7c95dd58d1d534df8",
+          "sha256": "890bae834e8380753d36b162323462c546195a70f4b38667edb77080f147d1e0",
           "url": "https://splunkbase.splunk.com/app/3546"
         },
         "release_api": {
@@ -2518,7 +2518,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8f3aff748704336cf09e1e4164d6c6528b251536a41b9b31f130900b77b09c8b",
+          "sha256": "ad9aa693445cdd6feede88f8e4793e69aa909a0b34ff1cd6f17eabf7fa3e0611",
           "url": "https://splunkbase.splunk.com/app/3549"
         },
         "release_api": {
@@ -2564,7 +2564,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "456a66d858199f5bf706ff56021c48a3340485d9058d2c9fc5e43325f11b8cf9",
+          "sha256": "8d2d24113ea6ee3b6e0b0cb42de50cde93bc8747f9600bb289e6d27b69a2c011",
           "url": "https://splunkbase.splunk.com/app/4055"
         },
         "release_api": {
@@ -2652,7 +2652,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "4e11e59b42f0609cb70c96f9b9d3ea6e337fb6133ebe4b53f1c63034e8eda374",
+          "sha256": "33ec7452ad35e2902e2563c836a69a37615891b34ee2a1d66267cf69e2b6e597",
           "url": "https://splunkbase.splunk.com/app/4240"
         },
         "release_api": {
@@ -2700,7 +2700,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3a8d16838faf4c1ae764a65bf18240ca672d0e9f10101b8e3f2186f7a98fdbae",
+          "sha256": "8c6eabcf155d8fd059cb73be5bfe1ab02bc79915c7b7f1236a2205cc2b744bac",
           "url": "https://splunkbase.splunk.com/app/4603"
         },
         "release_api": {
@@ -2751,7 +2751,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "51acd714d543367f7e5f333e74c2e0cbcb9bcb439d49756f3adac1b8b65ab97b",
+          "sha256": "4c9307c76beab929ba1897f9b69af984744149aa4b26b48293b319a3c4944c9f",
           "url": "https://splunkbase.splunk.com/app/4607"
         },
         "release_api": {
@@ -2802,7 +2802,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ff40157056254f0d05197eca0f8c3d6732d4f5360e627c9bb335a631c1e3c953",
+          "sha256": "9121ca119b851b616a308a5ba553c54e18cb96d63ac56547aaf2cb4943842671",
           "url": "https://splunkbase.splunk.com/app/4882"
         },
         "release_api": {
@@ -2950,7 +2950,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d6b8aa76b2c4d072e438299cd59af047d01a793eccfbfe60207e15c3d3e6f0e4",
+          "sha256": "10a891b322e61f6023c7f62869ba5e2bdde6c5711005fd25a5d42763ca4b0d0e",
           "url": "https://splunkbase.splunk.com/app/5089"
         },
         "release_api": {
@@ -2995,7 +2995,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b0f2d849152c346ccdda6ebb025430a3f71ce76bdc28463a85979b8512222230",
+          "sha256": "578cad9a6388c6dde4b5eb09a6e20e84de39880dd8d103de92a68ed348c4e023",
           "url": "https://splunkbase.splunk.com/app/5160"
         },
         "release_api": {
@@ -3044,7 +3044,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a77f2fa438db55db4ce4ecc5eee4cb2ce62e787021d3fa8e4c2d29c68a8e0070",
+          "sha256": "853e210a9a401bfef1c0672443fd8bb4c1acfb9532752821e5f49a2c6f8a342e",
           "url": "https://splunkbase.splunk.com/app/5210"
         },
         "release_api": {
@@ -3093,7 +3093,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d224718c202dca36c674a27300bba26e7a2df90036f82737e20e2d482e36462f",
+          "sha256": "52f5d4f71fef0260693b1bdcc3033ed18b1fa8d7bc1bd54c21c2e57d4d2cabbb",
           "url": "https://splunkbase.splunk.com/app/5234"
         },
         "release_api": {
@@ -3145,7 +3145,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "2bc51f9368124403e641360893c00bd300424910037f74971351ce149c9de301",
+          "sha256": "7f55a913af38c2440b302803e8d2b063f16a1ab58b619fff98e94d966455daaa",
           "url": "https://splunkbase.splunk.com/app/5238"
         },
         "release_api": {
@@ -3190,7 +3190,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f96f68e3b10c295edea3347aef171f68f292fdfafcac6539b2fd2c8ec1088a74",
+          "sha256": "19fca4a11c98b6c29c9060dfb682579f2341c7607fa9a0a5b52d462bc6f25f6c",
           "url": "https://splunkbase.splunk.com/app/5247"
         },
         "release_api": {
@@ -3231,7 +3231,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "36fd0841edfd3c1dd3f2b7fbadb0cd634a49c123a079d6e4d6dbc3d2457e9496",
+          "sha256": "22775fd1a871a8496bd7bc741691af014ad9568408c477fd2488d82e287d1680",
           "url": "https://splunkbase.splunk.com/app/5391"
         },
         "release_api": {
@@ -3281,7 +3281,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "30cd1ed39fdbce3d748fd1ad8c0ac4d3fe35802dd4e3b9edabfa22d29da6d2d1",
+          "sha256": "52986cff17dfe86e60d3292131ea7d12b1c3482acd93bcee5b8e9a7273849382",
           "url": "https://splunkbase.splunk.com/app/5478"
         },
         "release_api": {
@@ -3331,7 +3331,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "06c37b53683eb0d956e6fe95b72fe7fe955ca52abf90a7ac22c529d3bc69e3b7",
+          "sha256": "d1332d0586a4396f79984a54bed5a9cf5f81fa06d1e2cc1d068114f963773946",
           "url": "https://splunkbase.splunk.com/app/5556"
         },
         "release_api": {
@@ -3377,7 +3377,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "802760cf520ae4b4141c963b578d4fd4134b06fc39bc411f8c652fd87042497c",
+          "sha256": "0de1c956acdfe52f0d320d272554afba89e0f80bcad883ee4ca59ebe31634185",
           "url": "https://splunkbase.splunk.com/app/5558"
         },
         "release_api": {
@@ -3418,7 +3418,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6f9b540cc4b436e923b015a4af232df4270ccf26c5b236cd108131b40e1102ef",
+          "sha256": "6a0a798350c1b695b7c6bf6353ab45dec14aa04274255c5249ccc7b2622f6aef",
           "url": "https://splunkbase.splunk.com/app/5580"
         },
         "release_api": {
@@ -3607,7 +3607,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c21e1126d143bab304ed2854bf1f4a2d2c21ff4f87ee6d1d9def5bbe43a9866b",
+          "sha256": "2e5fb6fb61ef259f7e46aae2dde9b2eeed4b07370fa4184aa7e1bc2a4be3c6c0",
           "url": "https://splunkbase.splunk.com/app/5663"
         },
         "release_api": {
@@ -3657,7 +3657,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e9489d777e86470d604823ae09dcb3f5cdde5701c606703423eb0d4f4c8e139b",
+          "sha256": "46b2c275a739799f399ff8bb435fb3f1b0fbc53d39ff387f7cac2a27644cd64c",
           "url": "https://splunkbase.splunk.com/app/5709"
         },
         "release_api": {
@@ -3714,7 +3714,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "bc312295c0a378a456e529e673963e56b68d1becb47dd45bd46b48c27bbf43c1",
+          "sha256": "9787a408034e73f303a866af9adde3f4cad12dacc7af0ac9a903f5bc5b782f60",
           "url": "https://splunkbase.splunk.com/app/5863"
         },
         "release_api": {
@@ -3770,7 +3770,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "39a880e60b016b524029ec69cad071be705fb622320e302f0a4d2cd1e08feb1b",
+          "sha256": "5868240403d6f4f8248d02dfc639c4bcff7c7e8618c57dd958a47572a1355812",
           "url": "https://splunkbase.splunk.com/app/6149"
         },
         "release_api": {
@@ -3819,7 +3819,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5bf0fa315b989c95d5685b47fbc5c233c75cfc244a8a2f6e3a22c241ad78b05d",
+          "sha256": "c17acd3e4ab26e56a3c40175b5e9293c22e44e1e96da5680afb23971db948f1d",
           "url": "https://splunkbase.splunk.com/app/6150"
         },
         "release_api": {
@@ -3871,7 +3871,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5964a2b91893ea51624db8bce6f5f158d91b8b94983c9338693e4ee9c457bf49",
+          "sha256": "4132ad4d8b6d98d08a7ff58b3be6d56403a691e5afb74c8b322466a6b1dd87dd",
           "url": "https://splunkbase.splunk.com/app/6151"
         },
         "release_api": {
@@ -3920,7 +3920,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e8c958521ae41a5c8ca7aa3142eb020f762e2ccf23ba748690ebd3ae112f90d1",
+          "sha256": "4bf86bb77c2ab25543b9cfc460dec96d55faa7f55261ab7acc431b79a4767897",
           "url": "https://splunkbase.splunk.com/app/6152"
         },
         "release_api": {
@@ -3969,7 +3969,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5d446c80dd62c315aac8459938ce522c0c915f8cf68d80e896c14d125fafc9e6",
+          "sha256": "b2f1701093e7ef6c7db0ca31fe85c8d5f0f2aaa0ab9cd9724fe69e93f4190fed",
           "url": "https://splunkbase.splunk.com/app/6153"
         },
         "release_api": {
@@ -4020,7 +4020,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "63d62a8629d5e1c2d1394a1408468ad96e446002b723f9ee868b4725abc6d938",
+          "sha256": "b30a8b15d4f26f202df191df00d89ccc490b12b34dbd91eacdf99a3455d51cbe",
           "url": "https://splunkbase.splunk.com/app/6154"
         },
         "release_api": {
@@ -4069,7 +4069,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "4537094e8743dfe14128b9abfe6abb7edde24ada2ed87e5277be978763794feb",
+          "sha256": "dc463084feb34dd264d5de606b5d3cc7a33606b456b69cabea5f3cb7a33c9132",
           "url": "https://splunkbase.splunk.com/app/6207"
         },
         "release_api": {
@@ -4116,7 +4116,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f2ff44ffef075cff2ffe731889f2fda2ce93b691a136b5ab1ecbb5fa33470942",
+          "sha256": "31260c40e4ff6786901e95b0599e75c723f102132301622d917cd11f159a3d40",
           "url": "https://splunkbase.splunk.com/app/6254"
         },
         "release_api": {
@@ -4162,7 +4162,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3675a6513690e585814ea4e03ed5f6557cbe57f26f6a3e7d361df8ad5be8ef53",
+          "sha256": "c7b83e066f3bdb0784cd679a8cd2badf19f9097595848917732b7771aa88624f",
           "url": "https://splunkbase.splunk.com/app/6332"
         },
         "release_api": {
@@ -4204,7 +4204,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6e041c7a6366d71b2370b35a25429b6a9346d9c62657da5fdceaf58eda2b9c1a",
+          "sha256": "9d4873f25d7b794538ada8089fe662e8d6657c539aeff1be6acd47029e78f2de",
           "url": "https://splunkbase.splunk.com/app/6361"
         },
         "release_api": {
@@ -4286,7 +4286,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fbca2313aa566fae4e014f93a51126b39230c5e1b234f8ee05fc6318756a9e3e",
+          "sha256": "2aba6037735aac8bed1d6344184a1e45f4728fa33390ca29a7287987553d84c8",
           "url": "https://splunkbase.splunk.com/app/6553"
         },
         "release_api": {
@@ -4332,7 +4332,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b7ded2096eead48d3a3043ba9eb930d29f5e0e66c658b09fb291e6eb790a16e8",
+          "sha256": "6b5c957a15cf6530570519a21ce6a1f7db6fccff64b5b4d9461d4a41d4340ac3",
           "url": "https://splunkbase.splunk.com/app/6785"
         },
         "release_api": {
@@ -4380,7 +4380,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "13c0e4d24a92cc30026750f5fa99364ba0d919c024fee8e543e1195086751caa",
+          "sha256": "ab7ba6457062120d24ff654b69e793e6400b1d373dcd5362258044b5dd83fc6e",
           "url": "https://splunkbase.splunk.com/app/6841"
         },
         "release_api": {
@@ -4425,7 +4425,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e194b4dd0351cb9059e2bb1be62497964bb5f063707ea9bddbead208bae83c17",
+          "sha256": "5fa98202f8ae1be33ee050b7238162db7db1e0ba38f71fd26f2e368a659d9b25",
           "url": "https://splunkbase.splunk.com/app/6843"
         },
         "release_api": {
@@ -4469,7 +4469,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ad7e2bd89fc82511d74823f059b2970c60380f66b3a4e6c65a67e6366c7eb086",
+          "sha256": "264d414b581fd1e6b3e61d73348df7c4efd5537a48acb8680fa0b604cf2f41c4",
           "url": "https://splunkbase.splunk.com/app/6872"
         },
         "release_api": {
@@ -4515,7 +4515,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a229f2c9054cc44142060b88a7ab83a480d2a7b86c0a2d846ac3c8a612ac7d2e",
+          "sha256": "659b41aec92b79b4b46d34540f6b8a5d69f78c3ee62da85b6d9be3d23d5e8044",
           "url": "https://splunkbase.splunk.com/app/6999"
         },
         "release_api": {
@@ -4559,7 +4559,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6841bf2d2f0bcd26c8fbbd9ba5620edfc5d35da0ff6d501764e9905085ce4a8d",
+          "sha256": "c90d39571baf74daa6277f347fbb07ad4e92f059207bd46d49fc991983bea476",
           "url": "https://splunkbase.splunk.com/app/7000"
         },
         "release_api": {
@@ -4607,7 +4607,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9c25de5f7b8a0cb4b9fb95345763313523e0cbc1a53a75e5d0559e7f05043d45",
+          "sha256": "2daa513f58e50390a966f84307d48e9a51278aaf653e76bb317f1b64cb239d99",
           "url": "https://splunkbase.splunk.com/app/7095"
         },
         "release_api": {
@@ -4659,7 +4659,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "27cfba2fac41d265543f0ad8dbe1221e7489b8972d3dc5cc20728cbbe2ae5bb8",
+          "sha256": "8ad26d53a1c97ec2a3a60eb8904a1c78eb2a7ffbcfd5913211b0f1b9d3706fb1",
           "url": "https://splunkbase.splunk.com/app/7125"
         },
         "release_api": {
@@ -4757,7 +4757,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "2b3fd6695b74d4a96e9131d3dc52c01061efddee0376f8f3a1c4389ccfebb3fe",
+          "sha256": "05d2d719adcaf5d997edaa501538db1b24ede4e890b5c881dca627fda1290b60",
           "url": "https://splunkbase.splunk.com/app/7214"
         },
         "release_api": {
@@ -4806,7 +4806,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "795e45c2557c56ed257d6296b8f183a2ff48926f6e8f444d86670e0895fc3179",
+          "sha256": "36287ed2918073a0d401fbeb2e148feb6d8d9510704acea59b415591d93bdb94",
           "url": "https://splunkbase.splunk.com/app/7245"
         },
         "release_api": {
@@ -4854,7 +4854,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "06ae8f2b327b95ce1e3a8661880dff50a25161cb6d44608276e1c84ff25513d2",
+          "sha256": "d339e8d7e9de6901e8a9b7befbe6f369105b13a778b6eb1203d08b0787e799b6",
           "url": "https://splunkbase.splunk.com/app/7404"
         },
         "release_api": {
@@ -5002,7 +5002,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "14eeaeb23f8c8917fc72e990d2f79684bebff078fe6b0c9bb3fc2e4e407ec90a",
+          "sha256": "70167e85993c64e00761544fd8b0257faeb1905d635fc0636c74e431cce8ffcc",
           "url": "https://splunkbase.splunk.com/app/7538"
         },
         "release_api": {
@@ -5040,7 +5040,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ece70710ce6e4010cb29146f8468d6ac57477bcdf89e735b131425fa9982778c",
+          "sha256": "80e9761831b72f5fd8203258a57340beb16588fd41f1e3180bdfaa63c96f46b2",
           "url": "https://splunkbase.splunk.com/app/7539"
         },
         "release_api": {
@@ -5080,7 +5080,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9e3832cf33387aaacd315d95f61ad9f9b579b16691afc733d8a8113401540fac",
+          "sha256": "f16cb64f82272857a71dbd3c0a6de23117c92437f610b8b89e39008a4eec292b",
           "url": "https://splunkbase.splunk.com/app/7557"
         },
         "release_api": {
@@ -5123,7 +5123,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "79a1452237d193d7eee7d994e692d462e7b9f741cbf2ca6f1f561bc0b0fe7c0b",
+          "sha256": "359c78d915a918363879879611a8c1b73e08fb64f1bf990b0bcd778f28d712ad",
           "url": "https://splunkbase.splunk.com/app/7569"
         },
         "release_api": {
@@ -5170,7 +5170,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f17cade74b356feaa4f59c9d5f6ccde9884b566cba66784c3dd9eb35da06b84d",
+          "sha256": "c9d9d16eaccac7b659c628a881adfbfe3db233df153f2160bdd2bd078a687cfe",
           "url": "https://splunkbase.splunk.com/app/7719"
         },
         "release_api": {
@@ -5221,7 +5221,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "85a916fa14ecff01c8d2f38e5dc41b8b63899791ec826c14ed1775e9a0cd16bf",
+          "sha256": "0412d061a11f9c6691f443ed601391e2f0654389b8dadc03eb0c36020bcca717",
           "url": "https://splunkbase.splunk.com/app/7777"
         },
         "release_api": {
@@ -5269,7 +5269,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1159bdc407edaf5dbd600f1693363bbf30bbf151a0eb60a78599881083370c29",
+          "sha256": "209bdd0d83b338b187534a52bbb5f7ff88e3f04e448083541e09954b15a8f33b",
           "url": "https://splunkbase.splunk.com/app/7828"
         },
         "release_api": {
@@ -5296,6 +5296,58 @@
       }
     },
     {
+      "app_name": "Splunk_MCP_Server",
+      "latest_release": {
+        "cloud_compatible": true,
+        "install_method_distributed": "appmgmt_phase",
+        "install_method_single": "simple",
+        "platform_versions": [
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "release_date": "August 3, 2026",
+        "version": "1.3.1"
+      },
+      "registry_package_facts_sha256": "c69799469f25e1b763135fb7f265fc9a8b0a2457db88e66ab0882e2d1d8b53b1",
+      "sources": {
+        "listing": {
+          "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
+          "sha256": "b9c801b6c18d93189d8200159e3cd753353e4ce19d89db3362475fc64eb27146",
+          "url": "https://splunkbase.splunk.com/app/7931"
+        },
+        "release_api": {
+          "hash_input": "raw-fetched-payload",
+          "sha256": "7d991947517ff469426c1dd3b61dc85a4ca6f27071c56eb7904b610ae673654e",
+          "url": "https://splunkbase.splunk.com/api/v1/app/7931/release/"
+        }
+      },
+      "splunkbase_id": "7931",
+      "verified_release": {
+        "cloud_compatible": true,
+        "install_method_distributed": "appmgmt_phase",
+        "install_method_single": "simple",
+        "platform_versions": [
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "release_date": "August 3, 2026",
+        "source_status": "source-verified-current-release-api",
+        "version": "1.3.1"
+      }
+    },
+    {
       "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
@@ -5318,7 +5370,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6d7b3115d7cbe1a6e6b4d786917eacbcb5353885bd9b23df67f971501c72821b",
+          "sha256": "51ae26b31f18117862425e568c77f3667cc678ecb0d0484d87be4dcdef642781",
           "url": "https://splunkbase.splunk.com/app/8133"
         },
         "release_api": {
@@ -5367,7 +5419,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f2068a8258cc166991cdfa40dbe869e5f671fbfb7bcacddb6f3f3d50a8390738",
+          "sha256": "cea06702f888cc96b135cffd7b5a15890c5fd8246142103cfaf975b476f2deec",
           "url": "https://splunkbase.splunk.com/app/8365"
         },
         "release_api": {
@@ -5412,7 +5464,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7a7da9b675394d21ce4a3bfd79523812f70ee1b333cc8d3ca8769544ee8ae76d",
+          "sha256": "b7ee125f47a2bae105ad16741702a33dc1c1ec8dd044d6b9ecd865a9de947587",
           "url": "https://splunkbase.splunk.com/app/8485"
         },
         "release_api": {
@@ -5456,7 +5508,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "935a760a25ae270f7d718b38130de08ab944028a4cc06b56e0d205ccc74be69c",
+          "sha256": "c03fb71a243586a5f3c1995aba684173d31de16d83f2fd5747b549d3ac3422fb",
           "url": "https://splunkbase.splunk.com/app/8566"
         },
         "release_api": {
@@ -5504,7 +5556,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7c5cb126b8798c8f867da9ac34422d90fa39ab101f5456fbdf4b5dda2fb668b2",
+          "sha256": "7315f7426130914c949657e7e5ac5db04cb900957ea6bade49eedf9d03b1715d",
           "url": "https://splunkbase.splunk.com/app/8698"
         },
         "release_api": {
@@ -5556,7 +5608,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7f662a878548c78701a3a98abfa7211626734e5575ebf3487baf3273890d9938",
+          "sha256": "03939b0a225bb935dc6d6325aab12ab5134b03b4c94584eeb07c60b68cf8893d",
           "url": "https://splunkbase.splunk.com/app/8699"
         },
         "release_api": {
@@ -5607,7 +5659,7 @@
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "2a9cf2480640f628d1627ef6dec0b1223680d150f7ad215d6b4cefee8fa4f886",
+          "sha256": "5ba71c1ea8dfbee89da0ecbb31bc446719cfe463a29cea0152b3410be43567d6",
           "url": "https://splunkbase.splunk.com/app/8704"
         },
         "release_api": {
@@ -5638,7 +5690,7 @@
   ],
   "compatibility_target": "10.5",
   "evidence_type": "splunkbase-public-metadata-release-provenance",
-  "generated_date": "2026-08-20",
+  "generated_date": "2026-08-22",
   "max_evidence_age_days": 90,
   "registry_package_fact_fields": [
     "skill",
@@ -5667,7 +5719,7 @@
     "install_method_single",
     "install_method_distributed"
   ],
-  "registry_package_facts_sha256": "f0d93bf3604aefc625f319e2e6dba4af73c07c1c97958cd2bbec9ec44532672e",
+  "registry_package_facts_sha256": "a3c142cb40e1a63d74c49814f624def4e50bb11c2bdcafc9668f76ceeea24996",
   "schema_version": 1,
   "scope": "Public Splunkbase listing and release API metadata/release provenance only; does not verify downloadable package binaries or package checksums."
 }

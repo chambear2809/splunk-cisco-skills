@@ -39,6 +39,7 @@ DO_INSTALL=false
 ACCEPT_NONPRODUCTION_PACKAGE=false
 DO_UNINSTALL=false
 HAS_UNINSTALL_CONFLICT=false
+RESTART_SPLUNK=true
 PACKAGE_FILE="${DEFAULT_PACKAGE_FILE}"
 ROTATE_KEYS=false
 ROTATE_KEY_SIZE="2048"
@@ -96,6 +97,7 @@ Usage: $(basename "$0") [OPTIONS]
 
 Primary actions:
   --install                              Install or update ${APP_NAME} from the repo-local package
+  --no-restart                           Defer the Splunk restart after --install (lab use; updated app may remain inactive)
   --accept-nonproduction-package         Permit review-blocked package workflows for isolated evaluation only
   --uninstall                            Uninstall ${APP_NAME} using the shared app uninstaller (standalone)
   --rotate-keys                          Rotate the MCP RSA keys through /mcp_token
@@ -128,7 +130,7 @@ Server settings:
   --timeout SECONDS                      mcp.conf [server] timeout
   --max-row-limit N                      mcp.conf [server] max_row_limit
   --default-row-limit N                  mcp.conf [server] default_row_limit
-  --ssl-verify VALUE                     Store mcp.conf [server] ssl_verify (not enforced by vendor 1.2.1)
+  --ssl-verify VALUE                     Store mcp.conf [server] ssl_verify (not enforced by vendor 1.3.1)
   --require-encrypted-token true|false   mcp.conf [server] require_encrypted_token
   --legacy-token-grace-days N            mcp.conf [server] legacy_token_grace_days
   --token-max-lifetime-seconds N         mcp.conf [server] mcp_token_max_lifetime_seconds
@@ -538,6 +540,11 @@ PY
 
 install_or_update_app() {
     local update_flag="--no-update" actual_sha package_version
+    local -a restart_args=()
+
+    if [[ "${RESTART_SPLUNK}" == "false" ]]; then
+        restart_args=(--no-restart)
+    fi
 
     if [[ -L "${PACKAGE_FILE}" || ! -f "${PACKAGE_FILE}" ]]; then
         log "ERROR: Package file not found: ${PACKAGE_FILE}"
@@ -609,7 +616,8 @@ PY
     bash "${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh" \
         --source local \
         --file "${PACKAGE_FILE}" \
-        "${update_flag}"
+        "${update_flag}" \
+        "${restart_args[@]}"
 }
 
 uninstall_app() {
@@ -758,30 +766,31 @@ except Exception:
 
 mint_token_to_file() {
     local target_file="$1"
-    local url body_form resp http_code body token
+    local url query resp http_code body token
 
     if [[ -z "${TOKEN_USER}" ]]; then
         log "ERROR: --token-user is required with --write-token-file."
         exit 1
     fi
 
-    # Send the username/expiry/not_before fields in the POST body (form-urlencoded)
-    # rather than as URL query parameters so they do not appear in proxy/web/access
-    # logs that record full request URLs.
-    url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?output_mode=json"
+    # Splunk_MCP_Server 1.3.1 mints on GET and reserves POST exclusively for
+    # action=rotate. Let curl encode the non-secret username and lifetime fields
+    # into the query string; the encrypted token remains response-only and is
+    # written directly to a mode-0600 file below.
     if [[ -n "${TOKEN_NOT_BEFORE}" ]]; then
-        body_form="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}" not_before "${TOKEN_NOT_BEFORE}")" || {
-            log "ERROR: Failed to encode token mint payload."
+        query="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}" not_before "${TOKEN_NOT_BEFORE}" output_mode json)" || {
+            log "ERROR: Failed to encode token mint query."
             exit 1
         }
     else
-        body_form="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}")" || {
-            log "ERROR: Failed to encode token mint payload."
+        query="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}" output_mode json)" || {
+            log "ERROR: Failed to encode token mint query."
             exit 1
         }
     fi
+    url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?${query}"
 
-    resp="$(splunk_curl_post "${SK}" "${body_form}" "${url}" -X POST -w '\n%{http_code}' 2>/dev/null || true)"
+    resp="$(splunk_curl "${SK}" "${url}" -w '\n%{http_code}' 2>/dev/null || true)"
     http_code="$(printf '%s\n' "${resp}" | tail -1)"
     body="$(printf '%s\n' "${resp}" | sed '$d')"
 
@@ -1846,6 +1855,7 @@ apply_client_setup() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install) DO_INSTALL=true; shift ;;
+        --no-restart) HAS_UNINSTALL_CONFLICT=true; RESTART_SPLUNK=false; shift ;;
         --accept-nonproduction-package) HAS_UNINSTALL_CONFLICT=true; ACCEPT_NONPRODUCTION_PACKAGE=true; shift ;;
         --uninstall) DO_UNINSTALL=true; shift ;;
         --package-file) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; PACKAGE_FILE="$2"; shift 2 ;;
@@ -1905,6 +1915,11 @@ GATEWAY_MODE="$(normalize_gateway_mode "${GATEWAY_MODE}")"
 
 if [[ "${DO_INSTALL}" == "true" && "${DO_UNINSTALL}" == "true" ]]; then
     log "ERROR: --install and --uninstall cannot be used together."
+    exit 1
+fi
+
+if [[ "${RESTART_SPLUNK}" == "false" && "${DO_INSTALL}" != "true" ]]; then
+    log "ERROR: --no-restart requires --install."
     exit 1
 fi
 

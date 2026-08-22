@@ -2,27 +2,27 @@
 
 ## Supported Package And Provenance
 
-This skill supports the official [Splunk MCP Server 1.2.1 package from
+This skill supports the official [Splunk MCP Server 1.3.1 package from
 Splunkbase app 7931](https://splunkbase.splunk.com/app/7931). The matching
-[Splunk 1.2 release notes](https://help.splunk.com/en/splunk-enterprise/mcp-server-for-splunk-platform/1.2/mcp-server-release-notes)
-describe the supported 1.2.x behavior.
+[Splunk 1.3 release notes](https://help.splunk.com/en/splunk-cloud-platform/mcp-server-for-splunk-platform/1.3/mcp-server-release-notes)
+describe the supported 1.3.x behavior.
 
 | Property | Required value |
 |----------|----------------|
 | Splunkbase app ID | `7931` |
 | Package directory | `Splunk_MCP_Server` |
-| App version | `1.2.1` |
-| Default local cache | `splunk-ta/splunk-mcp-server_121.tgz` |
-| SHA-256 | `f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db` |
+| App version | `1.3.1` |
+| Default local cache | `splunk-ta/splunk-mcp-server_131.tgz` |
+| SHA-256 | `fa380909ba24dcea155d59f9dccc67fd83d99b1d9595681183c6467bacdf70d3` |
 | Provenance | Official Splunkbase app 7931 download; do not use a repacked or unverified archive |
 | Production approval | **Blocked pending vendor security fixes** |
 
 The package cache is intentionally ignored by Git. The tracked
 `package-manifest.json` is the authoritative version, filename, and checksum
-record. `setup.sh` verifies version `1.2.1` and the checksum above for every
+record. `setup.sh` verifies version `1.3.1` and the checksum above for every
 supplied archive, including `--package-file` overrides.
 
-Version 1.2.1 remains useful for isolated compatibility testing, but it is not
+Version 1.3.1 remains useful for isolated compatibility testing, but it is not
 a production-approved release. Setup blocks installation, local configuration,
 key rotation, token minting, and local Platform client activation by default;
 `--completion` cannot certify this release. The explicit
@@ -37,10 +37,13 @@ These are the main endpoints surfaced by the packaged app:
 |----------|---------|
 | `/services/mcp` | Main MCP HTTP endpoint used by external clients |
 | `https://region-<REGION>.api.scs.splunk.com/system/mcp-gateway/v1/` | Hosted SCS MCP Gateway endpoint for Splunk Observability Cloud tools |
-| `/servicesNS/nobody/Splunk_MCP_Server/mcp_token` | Mint encrypted bearer tokens and rotate RSA keys |
+| `/servicesNS/nobody/Splunk_MCP_Server/mcp_token` | `GET` mints encrypted bearer tokens; `POST action=rotate` rotates RSA keys in 1.3.1 |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_rate_limits` | Read or update effective rate limits |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_tools` | Custom tool CRUD endpoint |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_tools/collisions` | Tool-collision analysis endpoint |
+| `/servicesNS/nobody/Splunk_MCP_Server/mcp_tool_roles` | Version 1.3 role-to-tool mapping administration |
+| `/servicesNS/nobody/Splunk_MCP_Server/mcp_guardrails` | Version 1.3 guardrail administration |
+| `/servicesNS/nobody/Splunk_MCP_Server/allowed_spl_cmds` | Version 1.3 allowed SPL command administration |
 | `/.well-known/oauth-protected-resource` | Protected-resource metadata |
 
 ## Supported Remote Configuration Surface
@@ -55,7 +58,7 @@ The setup skill manages these fields:
 - `max_row_limit`
 - `default_row_limit`
 - `ssl_verify` (stored for forward compatibility, but **not enforced by vendor
-  release 1.2.1**; it is not a verified TLS control)
+  release 1.3.1**; it is not a verified TLS control)
 - `require_encrypted_token`
 - `legacy_token_grace_days`
 - `mcp_token_default_lifetime_seconds`
@@ -71,7 +74,7 @@ The setup skill manages these fields:
 - `circuit_breaker_failure_threshold`
 - `circuit_breaker_cooldown_seconds`
 
-## Local-Only Policy Files
+## Policy Files And 1.3 Administration Surfaces
 
 The app loads these directly from the app directory with local-over-default
 precedence:
@@ -86,7 +89,12 @@ That means:
 - Splunk Cloud targets should treat those files as package content, not as
   something this repo edits remotely
 
-Do not use `exclude_tools` to disable tools in release 1.2.1. The vendor code
+Version 1.3.1 adds authenticated administration surfaces for allowed SPL
+commands, tool-role mappings, and guardrails. The skill validates those
+endpoints but does not mutate their policies. Role assignments and additions to
+the allowed-command set require separate operator review.
+
+Do not use `exclude_tools` to disable tools in release 1.3.1. The vendor code
 incorrectly interprets that list as a Safe-SPL validation bypass. Disable tools
 through `mcp_tools_enabled` only, and do not expose query-capable tools to
 untrusted callers until the vendor fixes and regression-tests this behavior.
@@ -98,9 +106,10 @@ new vetted package revision.
 The packaged app includes:
 
 - custom REST handlers
-- KV Store collections `mcp_tools` and `mcp_tools_enabled`
+- KV Store collections `mcp_tools`, `mcp_tools_enabled`, and `mcp_tool_roles`
 - built-in tool definitions from `default/builtin_tools.json`
 - safe-SPL enforcement from `safe_spl.json`
+- authenticated tool-role, guardrail, and allowed-command REST handlers
 - the `dashboard`, `monitoring`, `tools`, and `tool_settings` Splunk Web views
 
 ## Cursor, Codex, And Claude Code Compatibility Model
@@ -116,6 +125,11 @@ Supported gateway modes:
 | `platform` | `--mcp-url` or derived `<SPLUNK_URI>/services/mcp` | `Authorization: Bearer ${SPLUNK_MCP_TOKEN}` |
 | `o11y` | `--gateway-url` or `--scs-region` derived hosted gateway URL | `X-SF-TOKEN`, `X-SF-REALM` |
 | `combined` | `--gateway-url` or `--scs-region` derived hosted gateway URL | `Authorization`, `splunk_tenant`, `X-SF-TOKEN`, `X-SF-REALM` |
+
+Splunk has deprecated the legacy hosted SCS MCP Gateway for new deployments.
+Use `o11y` or `combined` only for an existing endpoint explicitly provided by
+Splunk; use `platform` and the Splunkbase app for new Splunk Platform MCP
+deployments.
 
 The rendered wrappers pass literal `${VAR}` placeholders to `mcp-remote` in
 each `--header` value. `mcp-remote` expands those placeholders from the
@@ -205,7 +219,7 @@ For a general-purpose admin/search workflow:
 - `timeout=90`
 - `max_row_limit=2000`
 - `default_row_limit=250`
-- `ssl_verify=true` (configuration intent only; 1.2.1 does not enforce it)
+- `ssl_verify=true` (configuration intent only; 1.3.1 does not enforce it)
 - `require_encrypted_token=true`
 - `legacy_token_grace_days=0`
 - `mcp_token_default_lifetime_seconds=43200` (12 hours)
@@ -254,7 +268,7 @@ through `--allowed-tools-file` when additional tools have been explicitly
 reviewed. Validation requires HTTP 200 for the
 shipped `dashboard`, `monitoring`, `tools`, and `tool_settings` views.
 
-Release 1.2.1 logs complete tool arguments and SPL to `_internal`; evaluation
+Release 1.3.1 logs complete tool arguments and SPL to `_internal`; evaluation
 must therefore use synthetic, non-sensitive data. Never place literal secrets
 in custom tool headers or bodies because the `mcp_tools` collection can expose
 those definitions broadly. Enabled-tool policy, malformed JSON-RPC handling,

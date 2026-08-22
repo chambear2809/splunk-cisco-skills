@@ -73,6 +73,7 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ "Splunk MCP Server Setup" ]]
     [[ "$output" =~ "--uninstall" ]]
+    [[ "$output" =~ "--no-restart" ]]
     [[ "$output" =~ "--cursor-workspace" ]]
     [[ "$output" =~ "--no-register-codex" ]]
     [[ "$output" =~ "--no-configure-cursor" ]]

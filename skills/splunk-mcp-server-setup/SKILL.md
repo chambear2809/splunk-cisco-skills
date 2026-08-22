@@ -76,11 +76,18 @@ skill supports them; help exits without mutation.
 
 ## Production release status
 
-The current official package, 1.2.1, is **not production-approved** by this
+The current official package, 1.3.1, is **not production-approved** by this
 repository's security and protocol review. Installation fails closed by
 default while vendor fixes are pending. Do not deploy it to production or
 expose it to untrusted clients. `--accept-nonproduction-package` exists only
 for isolated evaluation and does not make the package production-safe.
+
+Version 1.3.1 is the supported evaluation baseline. It includes the 1.3
+SPL2 `@spl2` query path, custom-tool UI, `find_data_source` preview, `rest`
+command support, role-to-tool mappings, allowed-command administration, and
+workload-pool selection. Treat those as vendor features: this skill validates
+their shipped administration surfaces but does not silently enable tools,
+expand allowed SPL commands, or assign roles.
 
 ## Shared add-on completion gate
 
@@ -124,7 +131,7 @@ bridge is not itself a production trust boundary.
 The packaged app currently lives in:
 
 ```bash
-splunk-ta/splunk-mcp-server_121.tgz
+splunk-ta/splunk-mcp-server_131.tgz
 ```
 
 The setup workflow is the required install path because it enforces package
@@ -185,7 +192,7 @@ keep any filled copy local as `template.local`.
 | Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Splunk Cloud |
 | App name | `Splunk_MCP_Server` |
-| Local package | `splunk-ta/splunk-mcp-server_121.tgz` (version 1.2.1; SHA-256 verified before install) |
+| Local package | `splunk-ta/splunk-mcp-server_131.tgz` (version 1.3.1; SHA-256 verified before install) |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-mcp-server-setup/scripts/` |
 
@@ -196,6 +203,20 @@ keep any filled copy local as `template.local`.
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh --install
 ```
+
+For an isolated Enterprise lab where service interruption should be deferred:
+
+```bash
+bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --install \
+  --no-restart \
+  --accept-nonproduction-package
+```
+
+`--no-restart` only defers the shared installer restart; it does not guarantee
+that updated Python handlers are active. Run validation afterward. If the live
+endpoint still exposes the prior app behavior, restart Splunk before relying
+on the upgrade.
 
 This command intentionally refuses the current review-blocked release. After a
 fixed vendor release is reviewed and marked production-approved in
@@ -240,7 +261,7 @@ This updates supported fields in `mcp.conf`:
 - `[server] timeout`
 - `[server] max_row_limit`
 - `[server] default_row_limit`
-- `[server] ssl_verify` (configuration intent only; vendor 1.2.1 does not
+- `[server] ssl_verify` (configuration intent only; vendor 1.3.1 does not
   enforce it for internal HTTP calls)
 - `[server] require_encrypted_token`
 - `[server] legacy_token_grace_days`
@@ -273,6 +294,12 @@ bash skills/splunk-mcp-server-setup/scripts/setup.sh \
 
 The script writes the encrypted token to the target file with `0600`
 permissions. It does not print the token to stdout.
+
+Release 1.3.1 mints tokens with an authenticated `GET /mcp_token` request;
+`POST /mcp_token` is reserved for `action=rotate`. The helper URL-encodes the
+username and lifetime fields required by that vendor contract. Those non-secret
+fields can appear in Splunk or intermediary access logs, but the returned token
+is kept out of URLs and written only to the requested mode-`0600` file.
 
 If you disable `require_encrypted_token`, the app intentionally fails closed on
 `/mcp_token` minting and key rotation. Do not combine
@@ -392,53 +419,60 @@ bash skills/splunk-mcp-server-setup/scripts/validate.sh \
 
 Checks:
 - app installed and visible
-- installed app version exactly matches the reviewed manifest (and is at least 1.2.1)
+- installed app version exactly matches the reviewed manifest (and is at least 1.3.1)
 - `/services/mcp` completes authenticated `initialize`, `notifications/initialized`, `tools/list`, and a safe `splunk_get_info` tool call
 - `/services/mcp` rejects an untrusted `Origin`
 - enabled tools exactly match the reviewed allowlist (minimal default:
   `["splunk_get_info"]`; use `--allowed-tools-file` for a reviewed expansion)
-- key MCP REST endpoints respond
+- key MCP REST endpoints respond, including the 1.3 tool-role, guardrail, and
+  allowed-SPL-command administration surfaces
 - protected-resource metadata endpoint is reachable when configured
 - current server settings and rate-limit values are readable
 - encrypted-token, zero-grace, short-lifetime, and nonzero admission settings meet the production policy
-- `ssl_verify` is reported as configuration-only and release 1.2.1 fails because the vendor does not enforce it
+- `ssl_verify` is reported as configuration-only and release 1.3.1 fails because the vendor does not enforce it
 - derived `/services/mcp` URL is sane
 - the shipped `dashboard`, `monitoring`, `tools`, and `tool_settings` views are visible
 
-## Local-Only Policy Overlays
+## Policy Surfaces In 1.3.1
 
-Two important policy files are **not** exposed through a safe remote admin API
-in this app:
+The package still ships these baseline policy files with local-over-default
+precedence:
 
 - `local/safe_spl.json`
 - `local/generating_commands.json`
 
-Those files must be managed as app-local overlays on targets where you control
-the filesystem. On Splunk Cloud, treat those as package-content concerns rather
-than something this repo silently edits in place.
+Version 1.3.1 also ships authenticated administration endpoints for allowed SPL
+commands, tool-role mappings, and guardrails. This skill validates that those
+surfaces exist but does not mutate them. Review proposed commands and role
+assignments separately, use the Splunk UI or documented app endpoint, and then
+pass the exact enabled-tool policy to validation with `--allowed-tools-file`.
+On self-managed targets, app-local overlays remain available when filesystem
+ownership is explicit. On Splunk Cloud, treat direct file changes as package
+content and use supported administration surfaces.
 
 See [reference.md](reference.md) for the exact implications.
 
 ## Key Learnings / Known Issues
 
-1. **`safe_spl.json` is local-only**: the app loads it from the app directory,
-   not from a custom REST config endpoint.
+1. **`safe_spl.json` remains the local baseline**: the app loads it from the
+   app directory; the 1.3 allowed-command endpoint manages a separate
+   REST-backed command layer rather than rewriting that JSON file.
 2. **Token output is secret material**: write encrypted bearer tokens to local
    files, never to chat or tracked repo files.
 3. **The shared wrapper is the most portable client path**: Cursor, Codex, and
    Claude Code can all use the rendered `run-splunk-mcp.js` bridge via `mcp-remote`.
 4. **`mcp.conf` is the supported remote configuration surface**: use it for
-   row limits and token policy. Release 1.2.1 does not enforce its documented
+   row limits and token policy. Release 1.3.1 does not enforce its documented
    `ssl_verify` value, so that field cannot satisfy a TLS control.
 5. **The app needs search-tier placement**: it exposes `/services/mcp` and
    depends on custom REST handlers plus KV Store-backed tool metadata.
 6. **Hosted SCS MCP Gateway is client-side configuration**: it uses
    `--gateway-mode o11y` or `combined` and does not install hosted
    Observability tools into the local Splunk Platform app.
-7. **Safe-SPL exclusion is defective in 1.2.1**: never use `exclude_tools` to
+7. **Safe-SPL exclusion is defective in 1.3.1**: never use `exclude_tools` to
    disable a tool; use `mcp_tools_enabled`, and keep query tools away from
    untrusted callers pending a vendor fix.
-8. **Evaluation data must be synthetic**: 1.2.1 logs tool arguments and SPL to
+8. **Evaluation data must be synthetic**: 1.3.1 logs tool arguments and SPL to
    `_internal`. Never embed literal credentials in custom tool headers or bodies.
 
 ## Cursor IDE Integration

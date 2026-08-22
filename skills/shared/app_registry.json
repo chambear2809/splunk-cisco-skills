@@ -3,10 +3,10 @@
   "splunkbase_metadata_evidence": {
     "schema_version": 1,
     "path": "skills/shared/references/splunkbase_registry_evidence.json",
-    "sha256": "6bfaeb09b50b1b7ac385837e81ef36fedd534af28f248ced3f733a671202ee16",
-    "generated_date": "2026-08-20",
+    "sha256": "9b181844eee9fc87e897eddf46281a6e2f6b2668f96e2b5c2fa4135bfe47dc54",
+    "generated_date": "2026-08-22",
     "max_evidence_age_days": 90,
-    "registry_package_facts_sha256": "f0d93bf3604aefc625f319e2e6dba4af73c07c1c97958cd2bbec9ec44532672e",
+    "registry_package_facts_sha256": "a3c142cb40e1a63d74c49814f624def4e50bb11c2bdcafc9668f76ceeea24996",
     "scope": "Public Splunkbase listing and release API metadata/release provenance only; does not verify downloadable package binaries or package checksums."
   },
   "compatibility_target": "10.5",
@@ -5741,11 +5741,11 @@
     {
       "skill": "splunk-mcp-server-setup",
       "app_name": "Splunk_MCP_Server",
-      "splunkbase_id": "",
-      "relationship": "private-primary",
+      "splunkbase_id": "7931",
+      "relationship": "primary",
       "label": "Splunk MCP Server",
-      "package_source": "repo-local private package",
-      "reviewed_version": "1.2.1",
+      "package_source": "official Splunkbase app 7931 with a checksum-pinned repo-local cache",
+      "reviewed_version": "1.3.1",
       "target_product": "Splunk Platform",
       "production_status": "blocked",
       "compatibility_classification": "nonproduction",
@@ -5768,7 +5768,36 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "notes": "Private/local package rather than a Splunkbase listing. Version 1.2.1 is review-blocked for production; setup fails closed unless --accept-nonproduction-package is supplied for isolated evaluation. No Splunk Cloud 10.5 production compatibility is claimed."
+      "latest_verified_version": "1.3.1",
+      "latest_release_version": "1.3.1",
+      "latest_verified_date": "August 3, 2026",
+      "latest_release_date": "August 3, 2026",
+      "last_verified_date": "August 22, 2026",
+      "platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "verified_platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "cloud_compatible": true,
+      "install_method_single": "simple",
+      "install_method_distributed": "appmgmt_phase",
+      "compatibility_status": "supported",
+      "notes": "Official Splunkbase app 7931. Version 1.3.1 is checksum-pinned and review-blocked for production because internal Splunk API calls still disable TLS certificate verification and other vendor-review items remain. Setup fails closed unless --accept-nonproduction-package is supplied for isolated evaluation. Splunkbase platform compatibility does not override this repository security gate."
     },
     {
       "skill": "cisco-spaces-setup",

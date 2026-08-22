@@ -2,10 +2,10 @@
   "app_id": 7931,
   "app_name": "Splunk_MCP_Server",
   "download_url": "https://splunkbase.splunk.com/app/7931",
-  "filename": "splunk-mcp-server_121.tgz",
+  "filename": "splunk-mcp-server_131.tgz",
   "production_approved": false,
   "review_status": "blocked_pending_vendor_security_fixes",
-  "reviewed_on": "2026-07-01",
-  "sha256": "f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db",
-  "version": "1.2.1"
+  "reviewed_on": "2026-08-22",
+  "sha256": "fa380909ba24dcea155d59f9dccc67fd83d99b1d9595681183c6467bacdf70d3",
+  "version": "1.3.1"
 }
