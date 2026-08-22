@@ -142,6 +142,23 @@ Remote endpoints must use HTTPS with a trusted certificate. Explicit HTTP and
 `localhost`, `127.0.0.1`, or `::1`; do not use them to bypass certificate
 validation for a remote Splunk deployment.
 
+## Client Activation
+
+The repo's `.cursor/mcp.json` and `.mcp.json` point to
+`splunk-mcp-rendered/run-splunk-mcp.js`. The bridge wrapper is tracked, while
+the live `.env.splunk-mcp` token file is local-only and appears only after
+rendering with a token file.
+
+After completing installation, configuration, token minting, and rendering:
+
+1. Verify `splunk-mcp-rendered/.env.splunk-mcp` exists locally.
+2. Restart or reload Cursor so it reads `.cursor/mcp.json`.
+3. Restart the Claude Code session so it reads `.mcp.json`.
+
+When `--cursor-workspace` is supplied, the workspace's `.cursor/mcp.json` is
+updated too. The `--render-clients` step writes Claude Code's `.mcp.json`
+unless `--no-configure-claude` is passed.
+
 Current hosted gateway region mapping:
 
 | O11y realm | SCS region |

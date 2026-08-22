@@ -475,43 +475,10 @@ See [reference.md](reference.md) for the exact implications.
 8. **Evaluation data must be synthetic**: 1.3.1 logs tool arguments and SPL to
    `_internal`. Never embed literal credentials in custom tool headers or bodies.
 
-## Cursor IDE Integration
+## Client Activation
 
-The repo's `.cursor/mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.js`.
-The bridge wrapper is tracked, but the live `.env.splunk-mcp` token file is
-local-only and does not exist until the render/token step runs.
-
-To activate Splunk MCP in Cursor:
-
-1. Complete steps 1–5 above (install, configure, mint token, render bundle).
-2. Verify the local token env file exists:
-   ```bash
-   ls splunk-mcp-rendered/.env.splunk-mcp
-   ```
-3. Restart or reload Cursor so it picks up the new `.cursor/mcp.json` entry.
-
-If `--cursor-workspace` was used during render, the workspace's own
-`.cursor/mcp.json` was also updated. If it was omitted, the repo-root
-`.cursor/mcp.json` is the active registration.
-
-## Claude Code Integration
-
-The repo's `.mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.js`.
-The bridge wrapper is tracked, but the live `.env.splunk-mcp` token file is
-local-only and does not exist until the render/token step runs.
-
-To activate Splunk MCP in Claude Code:
-
-1. Complete steps 1–5 above (install, configure, mint token, render bundle).
-2. Verify the local token env file exists:
-   ```bash
-   ls splunk-mcp-rendered/.env.splunk-mcp
-   ```
-3. Restart the Claude Code session so it picks up the `.mcp.json` entry.
-
-The `--render-clients` step writes `.mcp.json` to the target workspace automatically
-unless `--no-configure-claude` is passed. If the workspace is the repo root, the
-committed `.mcp.json` is updated in place.
+For Cursor and Claude Code activation details, including the local-only token
+file and reload requirements, read the [client activation notes](reference.md#client-activation).
 
 ## Additional Resources
 
