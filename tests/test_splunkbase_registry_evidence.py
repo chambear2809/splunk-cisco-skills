@@ -37,7 +37,7 @@ def test_tracked_evidence_covers_and_binds_all_numeric_registry_apps() -> None:
 
     assert findings == []
     assert evidence is not None
-    assert evidence["app_count"] == len(apps) == 119
+    assert evidence["app_count"] == len(apps) == 120
     assert [int(item["splunkbase_id"]) for item in evidence["apps"]] == sorted(
         int(app["splunkbase_id"]) for app in apps
     )

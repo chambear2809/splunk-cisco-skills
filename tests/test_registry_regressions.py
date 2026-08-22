@@ -131,6 +131,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "8698",
     "8699",
     "8704",
+    "7931",
 }
 
 
