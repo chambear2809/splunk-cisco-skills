@@ -1578,6 +1578,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             result = self.run_script(
                 "skills/splunk-mcp-server-setup/scripts/setup.sh",
                 "--install",
+                "--accept-nonproduction-package",
                 "--render-clients",
                 "--mcp-url",
                 "https://different.example.invalid:8089/services/mcp",

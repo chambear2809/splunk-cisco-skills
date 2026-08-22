@@ -540,7 +540,7 @@ PY
 
 install_or_update_app() {
     local update_flag="--no-update" actual_sha package_version
-    local -a restart_args=()
+    local -a restart_args=() installer_args=(--expected-sha256 "${DEFAULT_PACKAGE_SHA256}")
 
     if [[ "${RESTART_SPLUNK}" == "false" ]]; then
         restart_args=(--no-restart)
@@ -558,6 +558,9 @@ install_or_update_app() {
             log "       Wait for a reviewed vendor fix. For isolated evaluation only, pass --accept-nonproduction-package."
             exit 1
         fi
+    fi
+    if [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" == "true" ]]; then
+        installer_args+=(--accept-nonproduction-package)
     fi
 
     actual_sha="$(python3 - "${PACKAGE_FILE}" <<'PY'
@@ -617,6 +620,7 @@ PY
         --source local \
         --file "${PACKAGE_FILE}" \
         "${update_flag}" \
+        "${installer_args[@]}" \
         "${restart_args[@]}"
 }
 
@@ -2047,12 +2051,9 @@ fi
 
 if [[ "${DO_INSTALL}" == "true" ]]; then
     install_or_update_app
-    if [[ "${PACKAGE_PRODUCTION_APPROVED}" == "true" \
-       && "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
-        # Verify what the installer actually exposed, and bind any platform
-        # client activation to that same reviewed Splunk endpoint.
-        ensure_expected_installed_app_version
-    fi
+    # Verify what the installer actually exposed, and bind any platform
+    # client activation to that same reviewed Splunk endpoint.
+    ensure_expected_installed_app_version
 fi
 
 if [[ "${DO_UNINSTALL}" == "true" ]]; then
