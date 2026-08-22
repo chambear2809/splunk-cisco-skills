@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_MCP_Server"
-MIN_APP_VERSION="1.2.1"
+MIN_APP_VERSION="1.3.1"
 PACKAGE_MANIFEST="${SCRIPT_DIR}/../package-manifest.json"
 PACKAGE_REVIEW_METADATA="$(python3 - "${PACKAGE_MANIFEST}" <<'PY'
 import json
@@ -332,7 +332,7 @@ fi
 APP_VERSION="$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
 APP_VISIBLE="$(app_visible)"
 SSL_VERIFY_ENFORCEMENT="unverified"
-if [[ "${APP_VERSION}" == "1.2.1" ]]; then
+if [[ "${APP_VERSION}" == "1.3.1" ]]; then
     SSL_VERIFY_ENFORCEMENT="not_implemented_by_vendor"
 fi
 MCP_URL="$(derive_mcp_url "${SPLUNK_URI}" || echo "unknown")"
@@ -439,8 +439,12 @@ fi
 MCP_TOOLS_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_tools?output_mode=json")"
 MCP_RATE_LIMITS_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_rate_limits?output_mode=json")"
 MCP_TOKEN_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?output_mode=json")"
+MCP_TOOL_ROLES_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_tool_roles?output_mode=json")"
+MCP_GUARDRAILS_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_guardrails?output_mode=json")"
+ALLOWED_SPL_COMMANDS_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/allowed_spl_cmds?output_mode=json")"
 MCP_TOOLS_COLLECTION_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/storage/collections/config/mcp_tools?output_mode=json")"
 MCP_TOOLS_ENABLED_COLLECTION_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/storage/collections/config/mcp_tools_enabled?output_mode=json")"
+MCP_TOOL_ROLES_COLLECTION_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/storage/collections/config/mcp_tool_roles?output_mode=json")"
 PROTECTED_RESOURCE_CODE="$(http_code_for "${PROTECTED_RESOURCE_URL}")"
 VIEW_DASHBOARD_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views/dashboard?output_mode=json")"
 VIEW_MONITORING_CODE="$(http_code_for "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views/monitoring?output_mode=json")"
@@ -487,9 +491,13 @@ printf '%s\n' "  app=${APP_NAME}" \
                "  endpoint_mcp_tools_http=${MCP_TOOLS_CODE}" \
                "  endpoint_mcp_rate_limits_http=${MCP_RATE_LIMITS_CODE}" \
                "  endpoint_mcp_token_http=${MCP_TOKEN_CODE}" \
+               "  endpoint_mcp_tool_roles_http=${MCP_TOOL_ROLES_CODE}" \
+               "  endpoint_mcp_guardrails_http=${MCP_GUARDRAILS_CODE}" \
+               "  endpoint_allowed_spl_cmds_http=${ALLOWED_SPL_COMMANDS_CODE}" \
                "  endpoint_protected_resource_http=${PROTECTED_RESOURCE_CODE}" \
                "  kv_mcp_tools_http=${MCP_TOOLS_COLLECTION_CODE}" \
                "  kv_mcp_tools_enabled_http=${MCP_TOOLS_ENABLED_COLLECTION_CODE}" \
+               "  kv_mcp_tool_roles_http=${MCP_TOOL_ROLES_COLLECTION_CODE}" \
                "  view_dashboard_http=${VIEW_DASHBOARD_CODE}" \
                "  view_monitoring_http=${VIEW_MONITORING_CODE}" \
                "  view_tools_http=${VIEW_TOOLS_CODE}" \
@@ -560,8 +568,8 @@ if [[ "${COMPLETION}" == "true" ]]; then
         log "ERROR: Production completion requires require_encrypted_token=true."
         FAILURES=$((FAILURES + 1))
     }
-    if [[ "${APP_VERSION}" == "1.2.1" ]]; then
-        log "ERROR: Splunk MCP Server 1.2.1 records ssl_verify but does not enforce it for internal HTTP calls."
+    if [[ "${APP_VERSION}" == "1.3.1" ]]; then
+        log "ERROR: Splunk MCP Server 1.3.1 records ssl_verify but does not enforce it for internal HTTP calls."
         FAILURES=$((FAILURES + 1))
     fi
     assert_integer_range "legacy_token_grace_days" "${SERVER_LEGACY_TOKEN_GRACE_DAYS}" 0 0
@@ -584,6 +592,18 @@ fi
 }
 [[ "${MCP_RATE_LIMITS_CODE}" == "200" ]] || {
     log "ERROR: /mcp_rate_limits did not return HTTP 200."
+    FAILURES=$((FAILURES + 1))
+}
+[[ "${MCP_TOOL_ROLES_CODE}" == "200" ]] || {
+    log "ERROR: /mcp_tool_roles did not return HTTP 200."
+    FAILURES=$((FAILURES + 1))
+}
+[[ "${MCP_GUARDRAILS_CODE}" == "200" ]] || {
+    log "ERROR: /mcp_guardrails did not return HTTP 200."
+    FAILURES=$((FAILURES + 1))
+}
+[[ "${ALLOWED_SPL_COMMANDS_CODE}" == "200" ]] || {
+    log "ERROR: /allowed_spl_cmds did not return HTTP 200."
     FAILURES=$((FAILURES + 1))
 }
 case "${SERVER_REQUIRE_ENCRYPTED_TOKEN_NORMALIZED}" in
@@ -614,6 +634,10 @@ esac
 }
 [[ "${MCP_TOOLS_ENABLED_COLLECTION_CODE}" == "200" ]] || {
     log "ERROR: KV Store collection config for mcp_tools_enabled is missing."
+    FAILURES=$((FAILURES + 1))
+}
+[[ "${MCP_TOOL_ROLES_COLLECTION_CODE}" == "200" ]] || {
+    log "ERROR: KV Store collection config for mcp_tool_roles is missing."
     FAILURES=$((FAILURES + 1))
 }
 for view_check in \

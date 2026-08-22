@@ -25,6 +25,7 @@ TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
 ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
 ACCEPT_UNVERIFIED_RELEASE="${SPLUNK_ACCEPT_UNVERIFIED_RELEASE:-false}"
 ACCEPT_HISTORICAL_REVIEW_ONLY_PIN="${SPLUNK_ACCEPT_HISTORICAL_REVIEW_ONLY_PIN:-false}"
+ACCEPT_NONPRODUCTION_PACKAGE="${SPLUNK_ACCEPT_NONPRODUCTION_PACKAGE:-false}"
 CLOUD_APP_NAME=""
 CLOUD_APP_VERSION=""
 CLOUD_APP_STATUS=""
@@ -346,7 +347,7 @@ preflight_current_install_target_compatibility() {
     local target_app_id metadata status app_name platforms verified release
     local selected_version evidence
     local cloud_compatible install_method_single install_method_distributed
-    local verified_evidence_status
+    local verified_evidence_status production_status
 
     resolve_target_splunk_version || exit 1
     target_app_id="$(registry_target_app_id)"
@@ -385,6 +386,15 @@ preflight_current_install_target_compatibility() {
     fi
     IFS='|' read -r status app_name platforms verified release selected_version evidence cloud_compatible \
         install_method_single install_method_distributed verified_evidence_status <<< "${metadata}"
+    production_status="$(registry_app_field_by_app_id "${target_app_id}" "production_status")"
+    if [[ "${production_status}" == "blocked" ]]; then
+        if [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" != "true" ]]; then
+            log "ERROR: ${app_name:-App ID ${target_app_id}} is review-blocked for production use."
+            log "Refusing installation before mutation. For isolated evaluation only, pass --accept-nonproduction-package."
+            exit 1
+        fi
+        log "WARNING: Explicit nonproduction package approval accepted for ${app_name:-App ID ${target_app_id}}."
+    fi
     if [[ "${selected_version}" == "${verified}" && "${verified_evidence_status}" == "historical-review-only-not-currently-reproducible" ]]; then
         if [[ "${ACCEPT_HISTORICAL_REVIEW_ONLY_PIN}" == "true" ]]; then
             log "WARNING: Explicit historical-review-only pin override accepted for ${app_name:-app ID ${target_app_id}} version ${selected_version}."
@@ -600,6 +610,18 @@ prepare_exact_package_contract() {
         expected_name="$(registry_app_name_by_app_id "${target_app_id}")"
     fi
     inspect_package_contract "${APP_FILE}" "${expected_name}" "${APP_VERSION}" || return 1
+    if [[ -n "${EXPECTED_SHA256}" ]]; then
+        local actual_sha expected_sha
+        actual_sha="$(hbs_sha256_file "${APP_FILE}")"
+        expected_sha="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
+        if [[ "${actual_sha}" != "${expected_sha}" ]]; then
+            log "ERROR: SHA-256 mismatch for local package ${APP_FILE}."
+            log "       expected: ${expected_sha}"
+            log "       actual:   ${actual_sha:-<could not compute>}"
+            return 1
+        fi
+        log "Verified operator-provided SHA-256 ${actual_sha} for local package."
+    fi
     APP_VERSION="${PACKAGE_INSPECTED_VERSION}"
     if [[ -z "${APP_ID}" && -n "${target_app_id}" ]]; then
         APP_ID="${target_app_id}"
@@ -795,6 +817,11 @@ cloud_prefer_splunkbase_for_known_package() {
     metadata="$(cloud_known_splunkbase_metadata_from_package "${package_path}")"
     [[ -n "${metadata}" ]] || return 0
 
+    if [[ -n "${EXPECTED_SHA256}" ]]; then
+        log "Checksum-pinned local package detected for Splunk Cloud; preserving the exact verified archive."
+        return 0
+    fi
+
     IFS='|' read -r known_app_id default_license <<< "${metadata}"
     APP_ID="${known_app_id}"
     [[ -z "${LICENSE_ACK_URL}" ]] && LICENSE_ACK_URL="${default_license}"
@@ -827,6 +854,7 @@ while [[ $# -gt 0 ]]; do
         --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
         --accept-unverified-release) ACCEPT_UNVERIFIED_RELEASE=true; shift ;;
         --accept-historical-review-only-pin) ACCEPT_HISTORICAL_REVIEW_ONLY_PIN=true; shift ;;
+        --accept-nonproduction-package) ACCEPT_NONPRODUCTION_PACKAGE=true; shift ;;
         --help)
             cat <<EOF
 Splunk App Installer (interactive)
@@ -864,6 +892,8 @@ Optional flags (skip the corresponding prompt):
                         Permit a reviewed older pin that the current public release API no
                         longer returns. Requires independent package/version approval and
                         does not verify package-binary contents or checksums.
+  --accept-nonproduction-package
+                        Permit a registry review-blocked package for isolated evaluation only.
 
 Credentials and remote host settings are read from the project-root credentials file automatically.
 For Splunk Cloud installs, configure ACS access. If one credentials file contains

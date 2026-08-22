@@ -2923,6 +2923,8 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 str(package_file),
                 "--no-update",
                 "--no-restart",
+                "--accept-unsupported-platform",
+                "--accept-nonproduction-package",
                 env=env,
             )
 

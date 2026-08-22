@@ -119,7 +119,7 @@ def write_mcp_validation_curl(path: Path) -> None:
         if url.endswith("/services/auth/login"):
             body = "<response><sessionKey>test-session-key</sessionKey></response>"
         elif "/services/apps/local/Splunk_MCP_Server?" in url:
-            version = os.environ.get("MCP_VALIDATION_APP_VERSION", "1.2.1")
+            version = os.environ.get("MCP_VALIDATION_APP_VERSION", "1.3.1")
             body = json.dumps({
                 "entry": [{"content": {"version": version, "visible": True}}]
             })
@@ -211,10 +211,10 @@ def mcp_validation_env(tmp_path: Path) -> tuple[dict[str, str], Path]:
 
 
 class MCPRegressionTests(ShellScriptRegressionBase):
-    def test_splunk_mcp_121_package_manifest_and_archive_contract(self):
-        expected_filename = "splunk-mcp-server_121.tgz"
-        expected_version = "1.2.1"
-        expected_sha256 = "f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db"
+    def test_splunk_mcp_131_package_manifest_and_archive_contract(self):
+        expected_filename = "splunk-mcp-server_131.tgz"
+        expected_version = "1.3.1"
+        expected_sha256 = "fa380909ba24dcea155d59f9dccc67fd83d99b1d9595681183c6467bacdf70d3"
         manifest_path = REPO_ROOT / "skills/splunk-mcp-server-setup/package-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -263,9 +263,46 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                     names,
                 )
 
+    def test_splunk_mcp_131_token_mint_uses_vendor_get_contract(self):
+        archive_path = REPO_ROOT / "splunk-ta/splunk-mcp-server_131.tgz"
+        if not archive_path.exists():
+            self.skipTest("Splunk MCP Server 1.3.1 archive is not present in this checkout")
+
+        with tarfile.open(archive_path, mode="r:gz") as archive:
+            handler_member = archive.extractfile(
+                "Splunk_MCP_Server/bin/mcp_token_handler.py"
+            )
+            self.assertIsNotNone(handler_member)
+            handler_text = handler_member.read().decode("utf-8")
+
+        self.assertIn('if method == "POST":', handler_text)
+        self.assertIn('if action != "rotate":', handler_text)
+        self.assertIn('username = query_params.get(USERNAME, "").strip()', handler_text)
+
+        setup_text = (
+            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/setup.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'query="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}"',
+            setup_text,
+        )
+        self.assertIn(
+            'not_before "${TOKEN_NOT_BEFORE}" output_mode json)',
+            setup_text,
+        )
+        self.assertIn(
+            'url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?${query}"',
+            setup_text,
+        )
+        self.assertIn('splunk_curl "${SK}" "${url}"', setup_text)
+        self.assertNotIn(
+            'splunk_curl_post "${SK}" "${body_form}" "${url}" -X POST',
+            setup_text,
+        )
+
     def test_splunk_mcp_install_blocks_nonproduction_package_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            package_file = Path(tmpdir) / "splunk-mcp-server_121.tgz"
+            package_file = Path(tmpdir) / "splunk-mcp-server_131.tgz"
             package_file.write_bytes(b"evaluation fixture")
             env = os.environ.copy()
             env.update(
@@ -1326,6 +1363,10 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertIn("endpoint_services_mcp_tools_list_has_get_info=true", output)
             self.assertIn("endpoint_services_mcp_tools_policy_ok=true", output)
             self.assertIn("endpoint_services_mcp_get_info_ok=true", output)
+            self.assertIn("endpoint_mcp_tool_roles_http=200", output)
+            self.assertIn("endpoint_mcp_guardrails_http=200", output)
+            self.assertIn("endpoint_allowed_spl_cmds_http=200", output)
+            self.assertIn("kv_mcp_tool_roles_http=200", output)
             self.assertIn("does not enforce it for internal HTTP calls", output)
 
             records = [
@@ -1364,6 +1405,17 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             )
 
             urls = {record["url"] for record in records}
+            for endpoint in ("mcp_tool_roles", "mcp_guardrails", "allowed_spl_cmds"):
+                self.assertIn(
+                    "https://splunk.example.invalid:8089/servicesNS/nobody/"
+                    f"Splunk_MCP_Server/{endpoint}?output_mode=json",
+                    urls,
+                )
+            self.assertIn(
+                "https://splunk.example.invalid:8089/servicesNS/nobody/"
+                "Splunk_MCP_Server/storage/collections/config/mcp_tool_roles?output_mode=json",
+                urls,
+            )
             for view_name in ("dashboard", "monitoring", "tools", "tool_settings"):
                 self.assertIn(
                     "https://splunk.example.invalid:8089/servicesNS/nobody/"
@@ -1372,11 +1424,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 )
 
 
-    def test_splunk_mcp_validate_rejects_pre_121_app_and_missing_view(self):
+    def test_splunk_mcp_validate_rejects_pre_131_app_and_missing_view(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, _ = mcp_validation_env(tmp_path)
-            env["MCP_VALIDATION_APP_VERSION"] = "1.2.0"
+            env["MCP_VALIDATION_APP_VERSION"] = "1.3.0"
             env["MCP_VALIDATION_MISSING_VIEW"] = "monitoring"
 
             result = self.run_script(
@@ -1387,7 +1439,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
 
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 1, msg=output)
-            self.assertIn("Splunk MCP Server 1.2.1 or newer is required; found 1.2.0", output)
+            self.assertIn("Splunk MCP Server 1.3.1 or newer is required; found 1.3.0", output)
             self.assertIn("Shipped view monitoring is not visible (HTTP 404)", output)
 
     def test_splunk_mcp_completion_blocks_unapproved_vendor_release(self):
@@ -1473,7 +1525,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 if any(arg.endswith("package-manifest.json") for arg in sys.argv[1:]):
                     sys.stdin.read()
                     print(
-                        "1.2.2\\tsplunk-mcp-server_122.tgz\\t"
+                        "1.3.2\\tsplunk-mcp-server_132.tgz\\t"
                         + "0" * 64
                         + "\\ttrue\\tapproved"
                     )
@@ -1491,15 +1543,15 @@ class MCPRegressionTests(ShellScriptRegressionBase):
 
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 1, msg=output)
-            self.assertIn("Installed Splunk_MCP_Server version 1.2.1", output)
-            self.assertIn("reviewed version 1.2.2", output)
+            self.assertIn("Installed Splunk_MCP_Server version 1.3.1", output)
+            self.assertIn("reviewed version 1.3.2", output)
 
     def test_splunk_mcp_approved_install_binds_platform_client_target(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            archive_path = REPO_ROOT / "splunk-ta/splunk-mcp-server_121.tgz"
+            archive_path = REPO_ROOT / "splunk-ta/splunk-mcp-server_131.tgz"
             if not archive_path.is_file():
-                self.skipTest("Splunk MCP Server 1.2.1 archive is not present in this checkout")
+                self.skipTest("Splunk MCP Server 1.3.1 archive is not present in this checkout")
             env, _ = mcp_validation_env(tmp_path)
             env["SPLUNK_URI"] = "https://127.0.0.1:8089"
             fake_python = Path(env["PATH"].split(os.pathsep, 1)[0]) / "python3"
@@ -1514,8 +1566,8 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 if any(arg.endswith("package-manifest.json") for arg in sys.argv[1:]):
                     sys.stdin.read()
                     print(
-                        "1.2.1\\tsplunk-mcp-server_121.tgz\\t"
-                        "f325418ddd8617eaef26e60b11b67183b62a5641e61654335b13d67a9a0d89db"
+                        "1.3.1\\tsplunk-mcp-server_131.tgz\\t"
+                        "fa380909ba24dcea155d59f9dccc67fd83d99b1d9595681183c6467bacdf70d3"
                         "\\ttrue\\tapproved"
                     )
                     raise SystemExit(0)
@@ -1526,6 +1578,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             result = self.run_script(
                 "skills/splunk-mcp-server-setup/scripts/setup.sh",
                 "--install",
+                "--accept-nonproduction-package",
                 "--render-clients",
                 "--mcp-url",
                 "https://different.example.invalid:8089/services/mcp",

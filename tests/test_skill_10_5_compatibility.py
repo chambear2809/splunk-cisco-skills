@@ -89,21 +89,27 @@ def test_all_unsupported_registry_apps_have_non_unconditional_skill_status() -> 
     assert offenders == []
 
 
-def test_private_packages_are_explicitly_classified() -> None:
+def test_review_blocked_mcp_package_is_explicitly_classified() -> None:
     payload = load_audit_module().audit()
     mcp = next(row for row in payload["skills"] if row["skill"] == "splunk-mcp-server-setup")
     assert mcp["splunkbase_apps"] == [
         {
-            "id": "",
+            "id": "7931",
             "name": "Splunk_MCP_Server",
-            "relationship": "private-primary",
-            "status": "nonproduction",
-            "release_version": "",
-            "verified_version": "1.2.1",
-            "verified_status": "nonproduction",
-            "cloud_compatible": None,
+            "relationship": "primary",
+            "status": "supported",
+            "release_version": "1.3.1",
+            "verified_version": "1.3.1",
+            "verified_status": "supported",
+            "cloud_compatible": True,
         }
     ]
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+    app = next(row for row in registry["apps"] if row.get("splunkbase_id") == "7931")
+    assert app["production_status"] == "blocked"
+    assert app["compatibility_classification"] == "nonproduction"
 
 
 def test_generic_installer_contains_fail_closed_version_and_release_gates() -> None:
