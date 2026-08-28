@@ -4,7 +4,7 @@ pip-audit==2.10.1
 PyYAML>=6,<7
 # Pin until the repository's legacy lint baseline is intentionally migrated;
 # Ruff 0.16 changes default rule behavior and exposes unrelated existing findings.
-ruff>=0.15.20,<0.16
+ruff>=0.16.4,<0.17
 yamllint>=1.38.0,<2
 defusedxml>=0.7.1,<1
 # Optional: enables `pre-commit install` per CONTRIBUTING.md.
