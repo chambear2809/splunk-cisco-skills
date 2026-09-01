@@ -1,4 +1,4 @@
-"""FastMCP stdio server exposing this repository as agent tools."""
+"""MCP v2 stdio server exposing this repository as agent tools."""
 
 from __future__ import annotations
 
@@ -11,13 +11,15 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal, TypeVar
 
 import anyio
-import mcp.server.session as mcp_server_session
-from mcp import types as mcp_types
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.utilities.func_metadata import func_metadata
-from mcp.shared.exceptions import McpError
+from mcp import MCPError, types as mcp_types
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import (
+    ResourceNotFoundError,
+    ToolError,
+    UnexpectedToolError,
+)
+from mcp.server.mcpserver.utilities.func_metadata import func_metadata
 from mcp.shared.message import SessionMessage
-from mcp.shared.session import RequestResponder
 from mcp.types import CallToolResult, TextContent
 from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError
 
@@ -60,8 +62,8 @@ class _DuplicateJSONKey(ValueError):
     """Raised when an inbound JSON object has ambiguous duplicate keys."""
 
 
-def _model_method_names(model: Any) -> frozenset[str]:
-    schema = model.model_json_schema()
+def _model_method_names(adapter: Any) -> frozenset[str]:
+    schema = adapter.json_schema()
     methods = {
         definition["properties"]["method"]["const"]
         for definition in schema.get("$defs", {}).values()
@@ -73,8 +75,8 @@ def _model_method_names(model: Any) -> frozenset[str]:
     return frozenset(methods)
 
 
-_CLIENT_REQUEST_METHODS = _model_method_names(mcp_types.ClientRequest)
-_CLIENT_NOTIFICATION_METHODS = _model_method_names(mcp_types.ClientNotification)
+_CLIENT_REQUEST_METHODS = _model_method_names(mcp_types.client_request_adapter)
+_CLIENT_NOTIFICATION_METHODS = _model_method_names(mcp_types.client_notification_adapter)
 
 
 async def _shutdown_core_processes() -> None:
@@ -88,7 +90,7 @@ async def _shutdown_core_processes() -> None:
 
 
 @asynccontextmanager
-async def _server_lifespan(_: FastMCP[Any]) -> AsyncIterator[dict[str, Any]]:
+async def _server_lifespan(_: MCPServer[Any]) -> AsyncIterator[dict[str, Any]]:
     """Ensure tracked subprocesses cannot outlive the stdio server."""
     try:
         yield {}
@@ -143,17 +145,16 @@ def _validate_json_shape(payload: Any) -> None:
             stack.extend((item, depth + 1) for item in value)
 
 
-def _exception_chain_contains(
-    error: BaseException, kinds: type[BaseException] | tuple[type[BaseException], ...]
-) -> bool:
+def _expected_tool_error(error: BaseException) -> BaseException | None:
+    """Return a reviewed, user-presentable error from a chained tool failure."""
     seen: set[int] = set()
     current: BaseException | None = error
     while current is not None and id(current) not in seen:
         seen.add(id(current))
-        if isinstance(current, kinds):
-            return True
+        if isinstance(current, (core.SkillMCPError, discovery.DiscoveryError)):
+            return current
         current = current.__cause__ or current.__context__
-    return False
+    return None
 
 
 @asynccontextmanager
@@ -248,9 +249,13 @@ async def _bounded_stdio_server() -> AsyncIterator[tuple[Any, Any]]:
                                 continue
                             try:
                                 if is_request:
-                                    mcp_types.ClientRequest.model_validate(payload)
+                                    mcp_types.client_request_adapter.validate_python(
+                                        payload, by_name=False
+                                    )
                                 else:
-                                    mcp_types.ClientNotification.model_validate(payload)
+                                    mcp_types.client_notification_adapter.validate_python(
+                                        payload, by_name=False
+                                    )
                             except ValidationError:
                                 if is_request:
                                     await write_stream.send(
@@ -262,7 +267,9 @@ async def _bounded_stdio_server() -> AsyncIterator[tuple[Any, Any]]:
                                     )
                                 continue
                     try:
-                        message = mcp_types.JSONRPCMessage.model_validate(payload)
+                        message = mcp_types.jsonrpc_message_adapter.validate_python(
+                            payload, by_name=False
+                        )
                     except ValidationError:
                         await write_stream.send(
                             _protocol_error_line(-32600, "Invalid Request.")
@@ -297,81 +304,91 @@ async def _bounded_stdio_server() -> AsyncIterator[tuple[Any, Any]]:
         yield read_stream, write_stream
 
 
-mcp = FastMCP(
+class _SkillsMCPServer(MCPServer[dict[str, Any]]):
+    """Preserve the repository's strict, value-free protocol error boundary."""
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Context[dict[str, Any], Any] | None = None,
+    ) -> CallToolResult:
+        tool = self._tool_manager._tools.get(name)
+        if tool is None:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Unknown tool name.",
+            )
+        try:
+            prepared = tool.fn_metadata.pre_parse_json(arguments)
+            tool.fn_metadata.arg_model.model_validate(prepared)
+        except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Invalid tool arguments; review the published input schema.",
+            ) from exc
+        try:
+            return await super().call_tool(name, arguments, context)
+        except UnexpectedToolError as exc:
+            expected = _expected_tool_error(exc)
+            if expected is not None:
+                raise ToolError(str(expected)) from exc
+            raise
+
+    async def read_resource(
+        self,
+        uri: str,
+        context: Context[dict[str, Any], Any] | None = None,
+    ) -> Any:
+        resources = self._resource_manager._resources
+        templates = self._resource_manager._templates
+        known = uri in resources or any(
+            template.matches(uri) is not None for template in templates.values()
+        )
+        if not known:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Resource not found.",
+            )
+        try:
+            return await super().read_resource(uri, context)
+        except ResourceNotFoundError as exc:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Resource not found.",
+            ) from exc
+
+    async def get_prompt(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        context: Context[dict[str, Any], Any] | None = None,
+    ) -> Any:
+        prompt = self._prompt_manager.get_prompt(name)
+        if prompt is None:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Unknown prompt name.",
+            )
+        try:
+            metadata = func_metadata(getattr(prompt.fn, "raw_function", prompt.fn))
+            prepared = metadata.pre_parse_json(arguments or {})
+            metadata.arg_model.model_validate(prepared)
+        except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="Invalid prompt arguments; review the published arguments.",
+            ) from exc
+        return await super().get_prompt(name, arguments, context)
+
+
+mcp = _SkillsMCPServer(
     "splunk-cisco-skills",
     instructions=SERVER_INSTRUCTIONS,
+    version=SERVER_VERSION,
     lifespan=_server_lifespan,
     log_level="WARNING",
 )
-
-
-def _set_server_contract_version(server: FastMCP[Any]) -> None:
-    """Isolate the one private FastMCP v1 hook used for server versioning."""
-    low_level_server = getattr(server, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "Unsupported MCP SDK: FastMCP no longer exposes the v1 server-version hook."
-        )
-    low_level_server.version = SERVER_VERSION
-
-
-def _exclude_batch_required_protocol_version() -> None:
-    """Do not negotiate MCP 2025-03-26 with the SDK v1 stdio JSON-line reader.
-
-    MCP 2025-03-26 requires receivers to accept JSON-RPC batches, while the pinned
-    SDK's stdio reader accepts one JSON-RPC object per line. Newer MCP revisions
-    removed batching. FastMCP v1 has no public protocol-version configuration, so
-    this asserted compatibility hook is intentionally isolated here.
-    """
-    supported = getattr(mcp_server_session, "SUPPORTED_PROTOCOL_VERSIONS", None)
-    if not isinstance(supported, list):
-        raise RuntimeError(
-            "Unsupported MCP SDK: cannot constrain negotiated protocol versions."
-        )
-    supported[:] = [version for version in supported if version != "2025-03-26"]
-    if "2025-03-26" in supported:  # pragma: no cover - defensive assertion
-        raise RuntimeError("Failed to disable MCP 2025-03-26 negotiation.")
-
-
-_ORIGINAL_REQUEST_RESPONDER_ENTER = getattr(
-    RequestResponder,
-    "_splunk_skills_original_enter",
-    RequestResponder.__enter__,
-)
-
-
-def _enter_request_with_pending_cancel(responder: Any) -> Any:
-    entered = _ORIGINAL_REQUEST_RESPONDER_ENTER(responder)
-    if getattr(responder, "_cancel_pending", False):
-        responder._cancel_scope.cancel()
-    return entered
-
-
-async def _cancel_request_without_response(responder: Any) -> None:
-    """Apply MCP fire-and-forget cancellation semantics for SDK v1."""
-    responder._completed = True
-    if responder._entered:
-        responder._cancel_scope.cancel()
-    else:
-        responder._cancel_pending = True
-
-
-def _install_cancellation_semantics() -> None:
-    """Prevent SDK v1 from emitting its non-standard code-0 cancel response."""
-    if not inspect.iscoroutinefunction(getattr(RequestResponder, "cancel", None)):
-        raise RuntimeError("Unsupported MCP SDK cancellation contract.")
-    if not callable(getattr(RequestResponder, "__enter__", None)):
-        raise RuntimeError("Unsupported MCP SDK request context contract.")
-    RequestResponder._splunk_skills_original_enter = (  # type: ignore[attr-defined]
-        _ORIGINAL_REQUEST_RESPONDER_ENTER
-    )
-    RequestResponder.__enter__ = _enter_request_with_pending_cancel
-    RequestResponder.cancel = _cancel_request_without_response
-
-
-_exclude_batch_required_protocol_version()
-_install_cancellation_semantics()
-_set_server_contract_version(mcp)
 
 _read_worker_limiter = anyio.CapacityLimiter(READ_WORKER_LIMIT)
 _subprocess_worker_limiter = anyio.CapacityLimiter(SUBPROCESS_WORKER_LIMIT)
@@ -470,8 +487,8 @@ async def _run_cancellable(operation: Callable[[core.CommandCancellation], T]) -
 def _execution_result(payload: dict[str, Any]) -> CallToolResult:
     return CallToolResult(
         content=[TextContent(type="text", text=_json_resource(payload))],
-        structuredContent=payload,
-        isError=not bool(payload.get("ok")),
+        structured_content=payload,
+        is_error=not bool(payload.get("ok")),
     )
 
 
@@ -510,6 +527,27 @@ DiscoveryReadBytes = Annotated[
 ]
 
 
+async def _read_legacy_skill_resource(
+    skill: str,
+    kind: discovery.SkillFileKind,
+) -> str:
+    """Read a legacy resource while preserving its sanitized protocol errors."""
+    try:
+        return await _run_blocking(
+            lambda: _bounded_legacy_skill_resource(skill, kind)
+        )
+    except discovery.DiscoveryNotFound as exc:
+        raise ResourceNotFoundError("Resource not found.") from exc
+    except (
+        discovery.InvalidDiscoveryRequest,
+        discovery.UnsafeDiscoveryPath,
+    ) as exc:
+        raise MCPError(
+            code=mcp_types.INVALID_PARAMS,
+            message="Invalid resource identifier.",
+        ) from exc
+
+
 @mcp.resource(
     "skills://catalog",
     title="Splunk and Cisco skill catalog",
@@ -536,9 +574,7 @@ async def skills_catalog() -> str:
 )
 async def skill_instructions(skill: str) -> str:
     """Return a skill's SKILL.md instructions."""
-    return await _run_blocking(
-        lambda: _bounded_legacy_skill_resource(skill, "instructions")
-    )
+    return await _read_legacy_skill_resource(skill, "instructions")
 
 
 @mcp.resource(
@@ -552,9 +588,7 @@ async def skill_instructions(skill: str) -> str:
 )
 async def skill_reference(skill: str) -> str:
     """Return a skill's reference.md file or aggregated references/*.md files."""
-    return await _run_blocking(
-        lambda: _bounded_legacy_skill_resource(skill, "reference")
-    )
+    return await _read_legacy_skill_resource(skill, "reference")
 
 
 @mcp.resource(
@@ -568,9 +602,7 @@ async def skill_reference(skill: str) -> str:
 )
 async def skill_template(skill: str) -> str:
     """Return a skill's template.example file or aggregated templates/* files."""
-    return await _run_blocking(
-        lambda: _bounded_legacy_skill_resource(skill, "template")
-    )
+    return await _read_legacy_skill_resource(skill, "template")
 
 
 @mcp.tool(
@@ -925,12 +957,12 @@ def review_skill_script_plan(skill: SkillName, script: ScriptName) -> str:
 
 
 def _enforce_strict_tool_arguments() -> None:
-    """Reject unknown properties through an asserted FastMCP v1 compatibility hook."""
+    """Reject unknown tool properties through the retained MCPServer metadata hook."""
     tool_manager = getattr(mcp, "_tool_manager", None)
     tools = getattr(tool_manager, "_tools", None)
     if not isinstance(tools, dict):
         raise RuntimeError(
-            "Unsupported MCP SDK: FastMCP no longer exposes the v1 tool-schema hook."
+            "Unsupported MCP SDK: MCPServer does not expose tool metadata."
         )
     for tool in tools.values():
         if not hasattr(tool, "fn_metadata") or not hasattr(tool, "parameters"):
@@ -943,182 +975,8 @@ def _enforce_strict_tool_arguments() -> None:
 _enforce_strict_tool_arguments()
 
 
-def _install_protocol_error_guards() -> None:
-    """Sanitize validation failures and restore MCP-defined error codes.
-
-    FastMCP v1 includes Pydantic's rejected ``input_value`` in tool errors,
-    which can echo a credential that a client mistakenly placed in malformed
-    input. It also represents an unknown tool as a successful JSON-RPC call
-    whose tool result has ``isError=true``, and maps resource failures to the
-    non-standard error code 0. Validate before those handlers and emit small,
-    value-free protocol errors instead.
-    """
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    tool_manager = getattr(mcp, "_tool_manager", None)
-    resource_manager = getattr(mcp, "_resource_manager", None)
-    prompt_manager = getattr(mcp, "_prompt_manager", None)
-    handlers = getattr(low_level_server, "request_handlers", None)
-    tools = getattr(tool_manager, "_tools", None)
-    resources = getattr(resource_manager, "_resources", None)
-    templates = getattr(resource_manager, "_templates", None)
-    prompts = getattr(prompt_manager, "_prompts", None)
-    if not (
-        isinstance(handlers, dict)
-        and isinstance(tools, dict)
-        and isinstance(resources, dict)
-        and isinstance(templates, dict)
-        and isinstance(prompts, dict)
-    ):
-        raise RuntimeError(
-            "Unsupported MCP SDK: FastMCP no longer exposes the v1 protocol hooks."
-        )
-
-    original_call_tool = handlers.get(mcp_types.CallToolRequest)
-    original_read_resource = handlers.get(mcp_types.ReadResourceRequest)
-    original_get_prompt = handlers.get(mcp_types.GetPromptRequest)
-    if not (
-        callable(original_call_tool)
-        and callable(original_read_resource)
-        and callable(original_get_prompt)
-    ):
-        raise RuntimeError("Unsupported MCP SDK request-handler contract.")
-    prompt_metadata = {
-        name: func_metadata(getattr(prompt.fn, "raw_function", prompt.fn))
-        for name, prompt in prompts.items()
-    }
-
-    async def guarded_call_tool(
-        request: mcp_types.CallToolRequest,
-    ) -> mcp_types.ServerResult:
-        tool = tools.get(request.params.name)
-        if tool is None:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INVALID_PARAMS,
-                    message="Unknown tool name.",
-                )
-            )
-        arguments = request.params.arguments or {}
-        try:
-            prepared = tool.fn_metadata.pre_parse_json(arguments)
-            tool.fn_metadata.arg_model.model_validate(prepared)
-        except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INVALID_PARAMS,
-                    message="Invalid tool arguments; review the published input schema.",
-                )
-            ) from exc
-        return await original_call_tool(request)
-
-    async def guarded_read_resource(
-        request: mcp_types.ReadResourceRequest,
-    ) -> mcp_types.ServerResult:
-        uri = str(request.params.uri)
-        known = uri in resources or any(
-            template.matches(uri) is not None for template in templates.values()
-        )
-        if not known:
-            raise McpError(
-                mcp_types.ErrorData(code=-32002, message="Resource not found.")
-            )
-        try:
-            resource = await resource_manager.get_resource(
-                request.params.uri,
-                context=mcp.get_context(),
-            )
-            content = await resource.read()
-        except discovery.DiscoveryNotFound as exc:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=-32002,
-                    message="Resource not found.",
-                )
-            ) from exc
-        except (
-            discovery.InvalidDiscoveryRequest,
-            discovery.UnsafeDiscoveryPath,
-        ) as exc:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INVALID_PARAMS,
-                    message="Invalid resource identifier.",
-                )
-            ) from exc
-        except Exception as exc:
-            if _exception_chain_contains(exc, discovery.DiscoveryNotFound):
-                raise McpError(
-                    mcp_types.ErrorData(code=-32002, message="Resource not found.")
-                ) from exc
-            if _exception_chain_contains(
-                exc,
-                (
-                    discovery.InvalidDiscoveryRequest,
-                    discovery.UnsafeDiscoveryPath,
-                ),
-            ):
-                raise McpError(
-                    mcp_types.ErrorData(
-                        code=mcp_types.INVALID_PARAMS,
-                        message="Invalid resource identifier.",
-                    )
-                ) from exc
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INTERNAL_ERROR,
-                    message="Resource read failed.",
-                )
-            ) from exc
-        if not isinstance(content, str):
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INTERNAL_ERROR,
-                    message="Resource returned an unsupported content type.",
-                )
-            )
-        meta = getattr(resource, "meta", None)
-        contents = mcp_types.TextResourceContents(
-            uri=request.params.uri,
-            text=content,
-            mimeType=getattr(resource, "mime_type", None) or "text/plain",
-            **({"_meta": meta} if meta is not None else {}),
-        )
-        return mcp_types.ServerResult(mcp_types.ReadResourceResult(contents=[contents]))
-
-    async def guarded_get_prompt(
-        request: mcp_types.GetPromptRequest,
-    ) -> mcp_types.ServerResult:
-        metadata = prompt_metadata.get(request.params.name)
-        if metadata is None:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INVALID_PARAMS,
-                    message="Unknown prompt name.",
-                )
-            )
-        arguments = request.params.arguments or {}
-        try:
-            prepared = metadata.pre_parse_json(arguments)
-            metadata.arg_model.model_validate(prepared)
-        except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
-            raise McpError(
-                mcp_types.ErrorData(
-                    code=mcp_types.INVALID_PARAMS,
-                    message="Invalid prompt arguments; review the published arguments.",
-                )
-            ) from exc
-        return await original_get_prompt(request)
-
-    handlers[mcp_types.CallToolRequest] = guarded_call_tool
-    handlers[mcp_types.ReadResourceRequest] = guarded_read_resource
-    handlers[mcp_types.GetPromptRequest] = guarded_get_prompt
-
-
-_install_protocol_error_guards()
-
-
 async def _run_stdio_server() -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
+    low_level_server = getattr(mcp, "_lowlevel_server", None)
     if low_level_server is None:
         raise RuntimeError("Unsupported MCP SDK: low-level server hook is unavailable.")
     async with _bounded_stdio_server() as (read_stream, write_stream):

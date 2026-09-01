@@ -1,0 +1,5 @@
+[lint]
+# Ruff 0.16 enables every stable rule family when no selection is configured.
+# Keep the repository's established Pyflakes/pycodestyle baseline explicit; new
+# rule families can be adopted in focused, reviewable migrations.
+select = ["E4", "E7", "E9", "F"]

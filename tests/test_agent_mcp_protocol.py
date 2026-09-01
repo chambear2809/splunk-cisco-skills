@@ -15,16 +15,15 @@ from typing import AsyncIterator
 from skills.shared.skill_catalog import load_catalog
 
 try:
-    from mcp import ClientSession, StdioServerParameters, types as mcp_types
+    from mcp import MCPError, ClientSession, StdioServerParameters, types as mcp_types
     from mcp.client.stdio import stdio_client
-    from mcp.shared.exceptions import McpError
 except (
     ModuleNotFoundError
 ):  # pragma: no cover - requirements-agent.txt supplies MCP in CI
     ClientSession = None  # type: ignore[assignment,misc]
     StdioServerParameters = None  # type: ignore[assignment,misc]
     mcp_types = None  # type: ignore[assignment]
-    McpError = Exception  # type: ignore[assignment,misc]
+    MCPError = Exception  # type: ignore[assignment,misc]
     stdio_client = None  # type: ignore[assignment]
 
 
@@ -42,8 +41,8 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         *,
         expected_message: str = "Invalid tool arguments",
         absent_values: tuple[str, ...] = (),
-    ) -> McpError:
-        with self.assertRaises(McpError) as raised:
+    ) -> MCPError:
+        with self.assertRaises(MCPError) as raised:
             await client.call_tool(name, arguments)
 
         error = raised.exception.error
@@ -94,9 +93,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
     async def test_initialize_advertises_stable_server_contract(self) -> None:
         async with self.session() as _client:
             initialized = self.initialized
-            self.assertEqual(initialized.serverInfo.name, "splunk-cisco-skills")
-            self.assertEqual(initialized.serverInfo.version, "1.1.0")
-            self.assertNotEqual(initialized.protocolVersion, "2025-03-26")
+            self.assertEqual(initialized.server_info.name, "splunk-cisco-skills")
+            self.assertEqual(initialized.server_info.version, "1.1.0")
+            self.assertNotEqual(initialized.protocol_version, "2025-03-26")
             self.assertIn(
                 "SPLUNK_SKILLS_MCP_ENABLE_EXECUTION=1", initialized.instructions
             )
@@ -104,9 +103,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 "SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION=1",
                 initialized.instructions,
             )
-            self.assertFalse(initialized.capabilities.tools.listChanged)
+            self.assertFalse(initialized.capabilities.tools.list_changed)
             self.assertFalse(initialized.capabilities.resources.subscribe)
-            self.assertFalse(initialized.capabilities.prompts.listChanged)
+            self.assertFalse(initialized.capabilities.prompts.list_changed)
 
     async def test_tool_schemas_are_strict_and_publish_constraints(self) -> None:
         async with self.session() as client:
@@ -133,9 +132,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         )
         for tool in tools.values():
             with self.subTest(tool=tool.name):
-                self.assertIs(tool.inputSchema.get("additionalProperties"), False)
+                self.assertIs(tool.input_schema.get("additionalProperties"), False)
 
-        product_plan = tools["plan_cisco_product_setup"].inputSchema["properties"]
+        product_plan = tools["plan_cisco_product_setup"].input_schema["properties"]
         self.assertEqual(
             product_plan["phase"]["enum"],
             ["full", "install", "configure", "validate"],
@@ -154,20 +153,20 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
             product_plan["set_values"]["anyOf"][0]["propertyNames"]["maxLength"],
             255,
         )
-        plan_hash = tools["execute_skill_script"].inputSchema["properties"]["plan_hash"]
+        plan_hash = tools["execute_skill_script"].input_schema["properties"]["plan_hash"]
         self.assertEqual(plan_hash["pattern"], "^[0-9a-f]{64}$")
 
         self.assertEqual(
-            tools["execute_skill_script"].inputSchema["properties"]["confirm"]["type"],
+            tools["execute_skill_script"].input_schema["properties"]["confirm"]["type"],
             "boolean",
         )
-        search = tools["search_skills"].inputSchema["properties"]
+        search = tools["search_skills"].input_schema["properties"]
         self.assertEqual(search["limit"]["minimum"], 1)
         self.assertEqual(search["limit"]["maximum"], 100)
         self.assertIn("canonical", tools["search_skills"].description)
         self.assertIn("exact legacy name", tools["search_skills"].description)
         self.assertIn("canonical", tools["list_skills"].description)
-        read = tools["read_skill_file"].inputSchema["properties"]
+        read = tools["read_skill_file"].input_schema["properties"]
         self.assertEqual(read["offset"]["minimum"], 0)
         self.assertEqual(read["max_bytes"]["minimum"], 1)
         self.assertEqual(read["max_bytes"]["maximum"], 262144)
@@ -271,31 +270,31 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 else:
                     os.environ[name] = value
 
-        self.assertFalse(status.isError)
-        self.assertEqual(status.structuredContent["server"]["version"], "1.1.0")
+        self.assertFalse(status.is_error)
+        self.assertEqual(status.structured_content["server"]["version"], "1.1.0")
         self.assertEqual(
-            status.structuredContent["gates"],
+            status.structured_content["gates"],
             {
                 "execution_enabled": False,
                 "generic_execution_enabled": False,
                 "mutation_enabled": False,
             },
         )
-        self.assertFalse(resolved.isError)
-        self.assertEqual(resolved.structuredContent["status"], "resolved")
-        self.assertEqual(resolved.structuredContent["matches"][0]["id"], "cisco_aci")
-        self.assertFalse(ambiguous.isError)
-        self.assertEqual(ambiguous.structuredContent["status"], "ambiguous")
+        self.assertFalse(resolved.is_error)
+        self.assertEqual(resolved.structured_content["status"], "resolved")
+        self.assertEqual(resolved.structured_content["matches"][0]["id"], "cisco_aci")
+        self.assertFalse(ambiguous.is_error)
+        self.assertEqual(ambiguous.structured_content["status"], "ambiguous")
         self.assertEqual(
-            [item["id"] for item in ambiguous.structuredContent["matches"]],
+            [item["id"] for item in ambiguous.structured_content["matches"]],
             ["cisco_asa_ftd_syslog", "cisco_secure_firewall"],
         )
 
     async def test_discovery_paginates_and_rejects_file_traversal(self) -> None:
         async with self.session() as client:
             first = await client.call_tool("search_skills", {"limit": 1})
-            self.assertFalse(first.isError)
-            first_payload = first.structuredContent
+            self.assertFalse(first.is_error)
+            first_payload = first.structured_content
             self.assertGreater(first_payload["total"], 1)
             self.assertIsNotNone(first_payload["next_cursor"])
 
@@ -334,21 +333,21 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 },
             )
 
-        self.assertFalse(second.isError)
+        self.assertFalse(second.is_error)
         self.assertNotEqual(
             first_payload["skills"][0]["skill"],
-            second.structuredContent["skills"][0]["skill"],
+            second.structured_content["skills"][0]["skill"],
         )
-        self.assertFalse(listing.isError)
-        self.assertEqual(listing.structuredContent["files"][0]["path"], "SKILL.md")
-        self.assertFalse(bounded_read.isError)
+        self.assertFalse(listing.is_error)
+        self.assertEqual(listing.structured_content["files"][0]["path"], "SKILL.md")
+        self.assertFalse(bounded_read.is_error)
         self.assertLessEqual(
-            len(bounded_read.structuredContent["text"].encode("utf-8")),
+            len(bounded_read.structured_content["text"].encode("utf-8")),
             64,
         )
-        self.assertTrue(traversal.isError)
+        self.assertTrue(traversal.is_error)
         self.assertIn("path", traversal.content[0].text.lower())
-        self.assertTrue(script_read.isError)
+        self.assertTrue(script_read.is_error)
         self.assertIn("curated", script_read.content[0].text.lower())
 
     async def test_legacy_catalog_view_describes_canonical_only_traversal(self) -> None:
@@ -357,8 +356,8 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         async with self.session() as client:
             result = await client.call_tool("list_skills", {})
 
-        self.assertFalse(result.isError)
-        payload = result.structuredContent
+        self.assertFalse(result.is_error)
+        payload = result.structured_content
         note = payload["compatibility_note"]
         self.assertEqual(payload["total"], canonical_count)
         self.assertEqual(
@@ -400,7 +399,7 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_validation_is_sanitized_and_uses_invalid_params(self) -> None:
         sentinel = "protocol-test-secret-value-do-not-echo"
         async with self.session() as client:
-            with self.assertRaises(McpError) as raised:
+            with self.assertRaises(MCPError) as raised:
                 await client.get_prompt(
                     "plan_cisco_product_workflow",
                     {"product": "Cisco ACI", "phase": sentinel},
@@ -425,11 +424,11 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 f"skills://{sentinel}/not-a-resource",
                 "skills://definitely-not-a-skill/instructions",
             ):
-                with self.subTest(uri=uri), self.assertRaises(McpError) as raised:
+                with self.subTest(uri=uri), self.assertRaises(MCPError) as raised:
                     await client.read_resource(uri)  # type: ignore[arg-type]
 
                 error = raised.exception.error
-                self.assertEqual(error.code, -32002)
+                self.assertEqual(error.code, mcp_types.INVALID_PARAMS)
                 self.assertIn("Resource not found", error.message)
                 self.assertNotIn(sentinel, str(error.model_dump(mode="json")))
 
@@ -443,9 +442,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                     "args": ["--help"],
                 },
             )
-            self.assertFalse(planned.isError)
-            self.assertFalse(planned.structuredContent["read_only"])
-            plan_hash = planned.structuredContent["plan_hash"]
+            self.assertFalse(planned.is_error)
+            self.assertFalse(planned.structured_content["read_only"])
+            plan_hash = planned.structured_content["plan_hash"]
 
             first = await client.call_tool(
                 "execute_skill_script",
@@ -456,9 +455,9 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 {"plan_hash": plan_hash, "confirm": True},
             )
 
-        self.assertTrue(first.isError)
+        self.assertTrue(first.is_error)
         self.assertIn("Subprocess execution is disabled", first.content[0].text)
-        self.assertTrue(second.isError)
+        self.assertTrue(second.is_error)
         self.assertIn("Subprocess execution is disabled", second.content[0].text)
 
     async def test_generic_execution_requires_its_explicit_gate(self) -> None:
@@ -473,10 +472,10 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
             )
             blocked = await client.call_tool(
                 "execute_skill_script",
-                {"plan_hash": planned.structuredContent["plan_hash"], "confirm": True},
+                {"plan_hash": planned.structured_content["plan_hash"], "confirm": True},
             )
 
-        self.assertTrue(blocked.isError)
+        self.assertTrue(blocked.is_error)
         self.assertIn(
             "Generic skill-script execution is disabled", blocked.content[0].text
         )
@@ -496,10 +495,10 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
             )
             blocked = await client.call_tool(
                 "execute_skill_script",
-                {"plan_hash": planned.structuredContent["plan_hash"], "confirm": True},
+                {"plan_hash": planned.structured_content["plan_hash"], "confirm": True},
             )
 
-        self.assertTrue(blocked.isError)
+        self.assertTrue(blocked.is_error)
         self.assertIn("Mutating execution is disabled", blocked.content[0].text)
 
     async def test_nonzero_execution_sets_is_error_and_plan_is_single_use(self) -> None:
@@ -516,7 +515,7 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                     "args": ["--definitely-invalid"],
                 },
             )
-            plan_hash = planned.structuredContent["plan_hash"]
+            plan_hash = planned.structured_content["plan_hash"]
             failed = await client.call_tool(
                 "execute_skill_script",
                 {"plan_hash": plan_hash, "confirm": True},
@@ -526,10 +525,10 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 {"plan_hash": plan_hash, "confirm": True},
             )
 
-        self.assertTrue(failed.isError)
-        self.assertFalse(failed.structuredContent["ok"])
-        self.assertNotEqual(failed.structuredContent["returncode"], 0)
-        self.assertTrue(replay.isError)
+        self.assertTrue(failed.is_error)
+        self.assertFalse(failed.structured_content["ok"])
+        self.assertNotEqual(failed.structured_content["returncode"], 0)
+        self.assertTrue(replay.is_error)
         self.assertIn("Unknown plan_hash", replay.content[0].text)
 
 
