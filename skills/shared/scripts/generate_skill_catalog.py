@@ -239,15 +239,20 @@ def render_catalog_block(catalog: SkillCatalog) -> str:
             "<!-- source: skills/catalog.yaml; schema: "
             f"{catalog.schema_version}; sha256: {catalog.checksum} -->"
         ),
-        "## Skill Catalog",
+        "## Skill Index",
         "",
-        "| Skill | Target | Main purpose | Lifecycle |",
-        "| --- | --- | --- | --- |",
+        (
+            f"The complete {catalog.declared_skill_count}-entry catalog is maintained "
+            "in `skills/catalog.yaml`. Read the selected skill's `SKILL.md` on demand."
+        ),
+        "",
+        "| Skill | Instructions | Lifecycle |",
+        "| --- | --- | --- |",
     ]
     for record in catalog.skills:
         lines.append(
-            f"| `{record.name}` | {_escape_cell(record.target)} | "
-            f"{_escape_cell(record.purpose)} | {_lifecycle(record)} |"
+            f"| `{record.name}` | `{_escape_cell(record.path)}` | "
+            f"{_lifecycle(record)} |"
         )
     lines.append(CATALOG_END)
     return "\n".join(lines)
