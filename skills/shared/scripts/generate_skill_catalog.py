@@ -243,7 +243,9 @@ def render_catalog_block(catalog: SkillCatalog) -> str:
         "",
         (
             f"The complete {catalog.declared_skill_count}-entry catalog is maintained "
-            "in `skills/catalog.yaml`. Read the selected skill's `SKILL.md` on demand."
+            "in `skills/catalog.yaml`. If a product term or alias does not clearly match "
+            "a skill name below, search that catalog for the term before selecting a "
+            "skill. Read only the selected skill's `SKILL.md` on demand."
         ),
         "",
         "| Skill | Instructions | Lifecycle |",

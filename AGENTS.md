@@ -36,7 +36,7 @@ record explicit evidence that the package ships no pre-built dashboards.
 <!-- source: skills/catalog.yaml; schema: 1; sha256: 4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff -->
 ## Skill Index
 
-The complete 168-entry catalog is maintained in `skills/catalog.yaml`. Read the selected skill's `SKILL.md` on demand.
+The complete 168-entry catalog is maintained in `skills/catalog.yaml`. If a product term or alias does not clearly match a skill name below, search that catalog for the term before selecting a skill. Read only the selected skill's `SKILL.md` on demand.
 
 | Skill | Instructions | Lifecycle |
 | --- | --- | --- |

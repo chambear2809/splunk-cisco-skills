@@ -6,6 +6,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAX_CONTEXT_BYTES = 32 * 1024
 INDEX_MARKER = "## Skill Index"
+ALIAS_LOOKUP_GUIDANCE = (
+    "If a product term or alias does not clearly match a skill name below, search that "
+    "catalog for the term before selecting a skill."
+)
 
 
 def test_generated_context_files_fit_the_default_instruction_budget() -> None:
@@ -16,3 +20,4 @@ def test_generated_context_files_fit_the_default_instruction_budget() -> None:
             f"{name} exceeds the 32 KiB project-instruction limit"
         )
         assert INDEX_MARKER in content
+        assert ALIAS_LOOKUP_GUIDANCE in content
