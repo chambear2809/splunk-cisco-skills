@@ -347,6 +347,7 @@ def test_one_entry_drives_all_identity_outputs_and_migration_is_idempotent(
     agents = (root / "AGENTS.md").read_text(encoding="utf-8")
     claude = (root / "CLAUDE.md").read_text(encoding="utf-8")
     for text in (agents, claude):
+        assert "The complete 1-entry catalog" in text
         assert "<!-- END GENERATED SKILL CATALOG -->\n\n## Splunk MCP Server" in text
         assert (
             "<!-- END GENERATED LOCAL SKILL MCP SAFETY -->\n\n## Credentials"
@@ -358,8 +359,8 @@ def test_one_entry_drives_all_identity_outputs_and_migration_is_idempotent(
             "AFTER-SECTIONS-SENTINEL",
         ):
             assert text.count(sentinel) == 1
-        assert r"Target \| C:\\collector" in text
-        assert r"Purpose \| safe and deterministic." in text
+        assert "`skills/sample-skill/SKILL.md`" in text
+        assert "| Canonical |" in text
         assert text.endswith("\n") and not text.endswith("\n\n")
 
     product_registry = json.loads(
@@ -687,7 +688,7 @@ def test_alias_chains_cycles_and_invalid_targets_fail_closed(tmp_path: Path) -> 
         load_catalog(_write_catalog(tmp_path, canonical_migration))
 
 
-def test_description_and_safety_drift_are_detected(tmp_path: Path) -> None:
+def test_generated_index_and_mcp_safety_drift_are_detected(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     _write_fixture(root)
@@ -695,8 +696,8 @@ def test_description_and_safety_drift_are_detected(tmp_path: Path) -> None:
     agents = root / "AGENTS.md"
     agents.write_text(
         agents.read_text(encoding="utf-8").replace(
-            "Purpose \\| safe and deterministic.",
-            "Purpose \\| drifted.",
+            "`skills/sample-skill/SKILL.md`",
+            "`skills/drifted-skill/SKILL.md`",
             1,
         ),
         encoding="utf-8",
