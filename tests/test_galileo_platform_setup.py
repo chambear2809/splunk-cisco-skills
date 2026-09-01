@@ -1094,7 +1094,13 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
         assert platform_section not in payload["selected_sections"]
 
 
-def test_o11y_only_apply_all_uses_cloud_sections_before_apply(tmp_path: Path) -> None:
+def test_o11y_only_apply_all_uses_cloud_sections_before_apply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    healthcheck = tmp_path / "galileo-healthcheck"
+    healthcheck.write_text("ok\n", encoding="utf-8")
+    monkeypatch.setenv("GALILEO_HEALTH_URL", healthcheck.as_uri())
+
     result = run_cmd(
         "bash",
         str(SETUP),
