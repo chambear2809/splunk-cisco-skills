@@ -21,6 +21,7 @@ from mcp.server.mcpserver.exceptions import (
 from mcp.server.mcpserver.utilities.func_metadata import func_metadata
 from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, TextContent
+from mcp_types.version import LATEST_HANDSHAKE_VERSION
 from pydantic import Field, StrictBool, StrictInt, StrictStr, ValidationError
 
 from . import core, discovery
@@ -51,6 +52,7 @@ LEGACY_RESOURCE_BYTES = discovery.MAX_READ_BYTES
 MAX_STDIO_FRAME_BYTES = 1024 * 1024
 MAX_STDIO_JSON_DEPTH = 64
 MAX_STDIO_JSON_ITEMS = 100_000
+BATCH_REQUIRED_PROTOCOL_VERSION = "2025-03-26"
 T = TypeVar("T")
 
 
@@ -145,6 +147,22 @@ def _validate_json_shape(payload: Any) -> None:
             stack.extend((item, depth + 1) for item in value)
 
 
+def _replace_batch_required_protocol_offer(payload: Any) -> Any:
+    """Counter-offer a protocol compatible with the bounded JSON-line transport."""
+    if not isinstance(payload, dict) or payload.get("method") != "initialize":
+        return payload
+    params = payload.get("params")
+    if not isinstance(params, dict) or params.get("protocolVersion") != (
+        BATCH_REQUIRED_PROTOCOL_VERSION
+    ):
+        return payload
+    normalized = dict(payload)
+    normalized_params = dict(params)
+    normalized_params["protocolVersion"] = LATEST_HANDSHAKE_VERSION
+    normalized["params"] = normalized_params
+    return normalized
+
+
 def _expected_tool_error(error: BaseException) -> BaseException | None:
     """Return a reviewed, user-presentable error from a chained tool failure."""
     seen: set[int] = set()
@@ -217,6 +235,7 @@ async def _bounded_stdio_server() -> AsyncIterator[tuple[Any, Any]]:
                             _protocol_error_line(-32600, "Invalid Request.")
                         )
                         continue
+                    payload = _replace_batch_required_protocol_offer(payload)
                     if isinstance(payload, dict) and isinstance(
                         payload.get("method"), str
                     ):
@@ -340,16 +359,6 @@ class _SkillsMCPServer(MCPServer[dict[str, Any]]):
         uri: str,
         context: Context[dict[str, Any], Any] | None = None,
     ) -> Any:
-        resources = self._resource_manager._resources
-        templates = self._resource_manager._templates
-        known = uri in resources or any(
-            template.matches(uri) is not None for template in templates.values()
-        )
-        if not known:
-            raise MCPError(
-                code=mcp_types.INVALID_PARAMS,
-                message="Resource not found.",
-            )
         try:
             return await super().read_resource(uri, context)
         except ResourceNotFoundError as exc:

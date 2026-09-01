@@ -423,6 +423,7 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
             for uri in (
                 f"skills://{sentinel}/not-a-resource",
                 "skills://definitely-not-a-skill/instructions",
+                "skills://%2E%2E/instructions",
             ):
                 with self.subTest(uri=uri), self.assertRaises(MCPError) as raised:
                     await client.read_resource(uri)  # type: ignore[arg-type]
@@ -534,6 +535,37 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
 
 @unittest.skipIf(ClientSession is None, "requires requirements-agent.txt")
 class AgentMCPRawStdioTests(unittest.TestCase):
+    def test_batch_required_protocol_version_is_not_negotiated(self) -> None:
+        initialize = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "protocol-test", "version": "1.0"},
+            },
+        }
+        env = os.environ.copy()
+        env["SPLUNK_CISCO_SKILLS_MCP_NO_VENV"] = "1"
+        process = subprocess.Popen(
+            [sys.executable, "-I", str(RUNNER)],
+            cwd=REPO_ROOT,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        frame = json.dumps(initialize, separators=(",", ":")).encode() + b"\n"
+        stdout, stderr = process.communicate(input=frame, timeout=20)
+
+        self.assertEqual(process.returncode, 0, msg=stderr.decode(errors="replace"))
+        response = json.loads(stdout.splitlines()[0])
+        self.assertNotEqual(
+            response["result"]["protocolVersion"],
+            "2025-03-26",
+        )
+
     def test_raw_transport_bounds_and_sanitizes_invalid_frames(self) -> None:
         sentinel = b"raw-transport-secret-do-not-echo"
         frames = [
