@@ -3,7 +3,7 @@ jsonschema>=4.26.0,<5
 pip-audit==2.10.1
 PyYAML>=6,<7
 # Ruff 0.16's rule selection is configured explicitly in ruff.toml.
-ruff>=0.16.4,<0.17
+ruff>=0.16.5,<0.17
 yamllint>=1.38.0,<2
 defusedxml>=0.7.1,<1
 # Optional: enables `pre-commit install` per CONTRIBUTING.md.
