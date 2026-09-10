@@ -7,9 +7,15 @@ import argparse
 import json
 import re
 import shlex
+import shutil
 import stat
 from pathlib import Path
 
+_SKILLS_ROOT = Path(__file__).resolve().parents[2]
+_PLATFORM_VERSION_HELPERS = _SKILLS_ROOT / "shared" / "lib" / "platform_version_helpers.sh"
+_SPV_VERSIONS_JSON = _SKILLS_ROOT / "shared" / "references" / "splunk_platform_versions.json"
+_SPV_VERSIONS_PY = _SKILLS_ROOT / "shared" / "lib" / "platform_versions.py"
+_SPV_BUNDLE_DIR = ".spv-bundle"
 
 GENERATED_FILES = {
     "README.md",
@@ -17,6 +23,7 @@ GENERATED_FILES = {
     "inputs.conf.template",
     "acs-hec-token.json",
     "acs-hec-token-bulk.json",
+    "platform_version_helpers.sh",
     "preflight.sh",
     "apply-enterprise-files.sh",
     "apply-cloud-acs.sh",
@@ -290,12 +297,10 @@ def helper_path() -> Path:
 
 
 def enterprise_version_gate(args: argparse.Namespace) -> str:
-    helper = shell_quote(
-        Path(__file__).resolve().parents[2]
-        / "shared/lib/platform_version_helpers.sh"
-    )
     splunk_home = shell_quote(args.splunk_home)
-    return f'''platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-{helper}}}"
+    return f'''_script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+export SPV_SKILLS_ROOT="${{_script_dir}}/{_SPV_BUNDLE_DIR}"
+platform_version_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_script_dir}}/platform_version_helpers.sh}}"
 [[ -r "${{platform_version_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_version_helpers}}" >&2; exit 1; }}
 # shellcheck disable=SC1090
 source "${{platform_version_helpers}}"
@@ -905,6 +910,16 @@ def render(args: argparse.Namespace) -> dict:
         for rel, content in files.items():
             write_file(render_dir / rel, content, executable=rel.endswith(".sh"))
             assets.append(rel)
+        spv_refs = render_dir / _SPV_BUNDLE_DIR / "shared" / "references"
+        spv_lib = render_dir / _SPV_BUNDLE_DIR / "shared" / "lib"
+        spv_refs.mkdir(parents=True, exist_ok=True)
+        spv_lib.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_SPV_VERSIONS_JSON, spv_refs / "splunk_platform_versions.json")
+        shutil.copy2(_SPV_VERSIONS_PY, spv_lib / "platform_versions.py")
+        shutil.copy2(_PLATFORM_VERSION_HELPERS, render_dir / "platform_version_helpers.sh")
+        assets.append("platform_version_helpers.sh")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/references/splunk_platform_versions.json")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/lib/platform_versions.py")
     return {
         "target": "hec-service",
         "platform": args.platform,

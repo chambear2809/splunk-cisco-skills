@@ -5943,6 +5943,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_redshift",
       "splunkbase_id": "6149",
       "label": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -5986,6 +5987,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_mssql",
       "splunkbase_id": "6150",
       "label": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6032,6 +6034,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_oracle",
       "splunkbase_id": "6151",
       "label": "Oracle JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6078,6 +6081,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_postgress",
       "splunkbase_id": "6152",
       "label": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6121,6 +6125,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_snowflake",
       "splunkbase_id": "6153",
       "label": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6167,6 +6172,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_mysql",
       "splunkbase_id": "6154",
       "label": "MySQL JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6212,6 +6218,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_db2",
       "splunkbase_id": "6332",
       "label": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6255,6 +6262,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_mongodb",
       "splunkbase_id": "7095",
       "label": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [
@@ -6301,6 +6309,7 @@
     {
       "skill": "splunk-db-connect-setup",
       "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "install_app_name": "Splunk_JDBC_athena",
       "splunkbase_id": "8133",
       "label": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
       "package_patterns": [

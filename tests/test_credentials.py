@@ -24,6 +24,7 @@ ALLOWED_KEYS = [
     "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
+    "SPLUNK_RESOLVE",
     "SPLUNK_URI",
     "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST",
@@ -50,6 +51,12 @@ ALLOWED_KEYS = [
     "SPLUNK_ONCALL_API_KEY_FILE",
     "SPLUNK_ONCALL_REST_INTEGRATION_KEY_FILE",
     "SPLUNK_ONCALL_DEFAULT_ROUTING_KEY",
+    "APPD_CONTROLLER_URL",
+    "APPD_ACCOUNT_NAME",
+    "APPD_CLIENT_NAME",
+    "APPD_CLIENT_SECRET_FILE",
+    "APPD_VERIFY_SSL",
+    "APPD_CA_CERT",
     "SPLUNK_MCP_GATEWAY_URL",
     "SPLUNK_MCP_SCS_REGION",
     "SPLUNK_MCP_SPLUNK_TENANT",
@@ -310,6 +317,46 @@ class TestCredentialParsing(unittest.TestCase):
         self.assertEqual(result["SPLUNK_SSH_ALLOW_TOFU"], "false")
         self.assertEqual(result["SPLUNK_REMOTE_TMPDIR"], "/var/tmp")
         self.assertEqual(result["SPLUNK_REMOTE_SUDO"], "true")
+
+    def test_profile_appd_keys_use_explicit_literals(self):
+        text = textwrap.dedent("""\
+            APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
+            APPD_ACCOUNT_NAME="customer1"
+            APPD_CLIENT_NAME="splunk-integration"
+            APPD_CLIENT_SECRET_FILE="/tmp/appd_client_secret"
+            PROFILE_lab__APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
+            PROFILE_lab__APPD_ACCOUNT_NAME="customer1"
+            PROFILE_lab__APPD_CLIENT_NAME="splunk-integration"
+            PROFILE_lab__APPD_CLIENT_SECRET_FILE="/tmp/appd_client_secret"
+        """)
+        result = parse_credential_file(text, "lab")
+        self.assertEqual(
+            result["APPD_CONTROLLER_URL"], "https://customer1.saas.appdynamics.com"
+        )
+        self.assertEqual(result["APPD_ACCOUNT_NAME"], "customer1")
+        self.assertEqual(result["APPD_CLIENT_NAME"], "splunk-integration")
+        self.assertEqual(result["APPD_CLIENT_SECRET_FILE"], "/tmp/appd_client_secret")
+
+    def test_profile_self_referential_appd_keys_stay_unresolved(self):
+        text = textwrap.dedent("""\
+            APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
+            PROFILE_lab__APPD_CONTROLLER_URL="${APPD_CONTROLLER_URL}"
+        """)
+        result = parse_credential_file(text, "lab")
+        self.assertEqual(result["APPD_CONTROLLER_URL"], "${APPD_CONTROLLER_URL}")
+
+    def test_splunk_resolve_profile_selection(self):
+        text = textwrap.dedent("""\
+            SPLUNK_RESOLVE="default.local:8089:10.0.0.1"
+            PROFILE_lab__SPLUNK_RESOLVE="amd-halo.local:8089:192.168.68.90"
+        """)
+        self.assertEqual(
+            parse_credential_file(text)["SPLUNK_RESOLVE"], "default.local:8089:10.0.0.1"
+        )
+        self.assertEqual(
+            parse_credential_file(text, "lab")["SPLUNK_RESOLVE"],
+            "amd-halo.local:8089:192.168.68.90",
+        )
 
     def test_observability_cloud_keys_allowed(self):
         text = textwrap.dedent("""\

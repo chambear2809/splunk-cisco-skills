@@ -1418,6 +1418,20 @@ os.execv(
             0,
         )
 
+    def test_resolve_splunk_home_honors_profile_metadata(self) -> None:
+        self.assertEqual(
+            runner.resolve_splunk_home({"splunk_home": "/home/cisco/splunk"}),
+            "/home/cisco/splunk",
+        )
+        self.assertEqual(runner.resolve_splunk_home({}), "/opt/splunk")
+
+    def test_resolve_ssh_service_user_honors_profile_metadata(self) -> None:
+        self.assertEqual(
+            runner.resolve_ssh_service_user({"ssh_user": "cisco", "service_user": "splunk"}),
+            "splunk",
+        )
+        self.assertEqual(runner.resolve_ssh_service_user({}), "splunk")
+
     def test_stop_request_cannot_return_success_after_a_completed_payload(self) -> None:
         args = runner.parse_args(["--once"])
 

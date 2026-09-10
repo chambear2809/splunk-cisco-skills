@@ -385,11 +385,11 @@ def chart_payload(chart: dict[str, Any]) -> dict[str, Any]:
 
     options: dict[str, Any] = {
         "type": chart_type,
-        "includeZero": bool(chart.get("include_zero", chart.get("includeZero", False))),
-        "showEventLines": bool(chart.get("show_event_lines", chart.get("showEventLines", False))),
         "unitPrefix": chart.get("unit_prefix", chart.get("unitPrefix", "Metric")),
     }
     if chart_type == "TimeSeriesChart":
+        options["includeZero"] = bool(chart.get("include_zero", chart.get("includeZero", False)))
+        options["showEventLines"] = bool(chart.get("show_event_lines", chart.get("showEventLines", False)))
         options["defaultPlotType"] = normalize_plot_type(chart.get("plot_type"))
         options["lineChartOptions"] = {"showDataMarkers": bool(chart.get("show_data_markers", False))}
         options["areaChartOptions"] = {"showDataMarkers": bool(chart.get("show_data_markers", False))}

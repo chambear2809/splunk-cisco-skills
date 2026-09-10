@@ -175,5 +175,12 @@ projects/tmp-*
 /widefield-identity-threat-doctor-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js
+
+# lab_6890 rendered handoffs (regenerate via setup.sh --phase render)
+/*-rendered-lab6890/
+
+# --- Local scratch / generated reports ---
+/output/
+
 error.log
 /tmp/

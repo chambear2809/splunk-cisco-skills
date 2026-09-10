@@ -1,0 +1,43 @@
+# lab_6890 / amd-halo — AppDynamics controller OAuth lab spec.
+# Client secret lives only in /tmp/appd_client_secret (chmod 600).
+
+version: cisco-appdynamics-setup/v1
+
+platform:
+  type: enterprise
+  splunk_version: "10.4"
+  stack: "amd-halo"
+
+topology:
+  mode: single_sh
+  install_targets:
+    - search-tier
+
+controller:
+  url: "https://fso-tme.saas.appdynamics.com"
+  account_name: "fso-tme"
+  client_name: "aleccham"
+  client_secret_file: "/tmp/appd_client_secret"
+  verify_ssl: true
+
+install:
+  install_apps: false
+  accept_install: false
+  app_id: "3471"
+  local_packages: []
+
+account:
+  connection_name: "lab6890_fso_tme"
+  create_inputs: "recommended"
+  index: "appdynamics"
+
+analytics:
+  enabled: false
+
+validation:
+  oauth_probe: true
+  run_splunk_ta_validate: true
+  run_spl_searches: false
+
+security:
+  secret_policy: file_or_external_ref_only

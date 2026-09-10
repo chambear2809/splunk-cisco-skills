@@ -55,6 +55,7 @@ PROFILE_BOUND_ENV_KEYS = {
     "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_STACK",
+    "SPLUNK_HOME",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
     "SPLUNK_PASS",
@@ -313,9 +314,10 @@ if [[ -n "${SPLUNK_PROFILE:-}" ]]; then
   fi
 fi
 load_splunk_connection_settings >/dev/null
+load_splunk_ssh_credentials >/dev/null || true
 load_splunk_platform_settings >/dev/null || true
 export SPLUNK_PROFILE SPLUNK_PLATFORM SPLUNK_TARGET_ROLE SPLUNK_SEARCH_TARGET_ROLE
-export SPLUNK_URI SPLUNK_VERIFY_SSL SPLUNK_O11Y_REALM SPLUNK_O11Y_TOKEN_FILE
+export SPLUNK_URI SPLUNK_VERIFY_SSL SPLUNK_O11Y_REALM SPLUNK_O11Y_TOKEN_FILE SPLUNK_HOME SPLUNK_SSH_USER
 python3 - <<'PY'
 import json
 import os
@@ -326,6 +328,8 @@ print(json.dumps({
     "target_role": os.environ.get("SPLUNK_TARGET_ROLE", ""),
     "search_target_role": os.environ.get("SPLUNK_SEARCH_TARGET_ROLE", ""),
     "splunk_uri": os.environ.get("SPLUNK_URI", ""),
+    "splunk_home": os.environ.get("SPLUNK_HOME", "/opt/splunk"),
+    "ssh_user": os.environ.get("SPLUNK_SSH_USER", ""),
     "verify_ssl": os.environ.get("SPLUNK_VERIFY_SSL", "true"),
     "o11y_realm_present": bool(os.environ.get("SPLUNK_O11Y_REALM")),
     "o11y_token_file_present": bool(os.environ.get("SPLUNK_O11Y_TOKEN_FILE")),
@@ -1330,6 +1334,26 @@ def rest_probe(endpoint: str, *, profile: str, timeout_seconds: int = SPLUNK_RES
     )
 
 
+def resolve_splunk_home(metadata: dict[str, Any] | None = None) -> str:
+    """Return the Splunk home directory for SSH probes."""
+
+    if metadata:
+        configured = str(metadata.get("splunk_home", "")).strip()
+        if configured:
+            return configured.rstrip("/")
+    return os.environ.get("SPLUNK_HOME", "/opt/splunk").rstrip("/")
+
+
+def resolve_ssh_service_user(metadata: dict[str, Any] | None = None) -> str:
+    """Return the remote OS user that owns Splunk CLI probes."""
+
+    if metadata:
+        configured = str(metadata.get("service_user", "")).strip()
+        if configured:
+            return configured
+    return os.environ.get("SPLUNK_SERVICE_USER", "splunk").strip() or "splunk"
+
+
 def ssh_cli_probe(
     remote_command: str,
     *,
@@ -1525,6 +1549,9 @@ def collect_live_evidence(
     *,
     allow_flat_credentials: bool = False,
 ) -> dict[str, Any]:
+    profile_meta = profile_metadata(
+        profile, allow_flat_credentials=allow_flat_credentials
+    )
     evidence = profile_gate_evidence(
         profile,
         requested_platform,
@@ -1532,6 +1559,9 @@ def collect_live_evidence(
     )
     evidence["collection"]["scope"] = "full_live_evidence"
     platform = str(evidence["platform"])
+    splunk_home = resolve_splunk_home(profile_meta)
+    ssh_service_user = resolve_ssh_service_user(profile_meta)
+    evidence["inputs"]["splunk_home"] = splunk_home
     fatal_errors = evidence["collection"]["fatal_errors"]
     if fatal_errors:
         evidence["rest"]["probe_errors"] = list(fatal_errors)
@@ -1790,8 +1820,12 @@ def collect_live_evidence(
     if _stop_requested():
         raise RunnerInterrupted(stderr="interrupt requested before Enterprise SSH evidence collection")
     version_out, version_err, version_rc = ssh_cli_probe(
-        "hostname; test -x /opt/splunk/bin/splunk; /opt/splunk/bin/splunk version",
+        (
+            f"hostname; test -x {splunk_home}/bin/splunk; "
+            f"{splunk_home}/bin/splunk version"
+        ),
         profile=profile,
+        service_user=ssh_service_user,
         timeout_seconds=90,
     )
     remote_summary["checks"]["version"] = {
@@ -1818,8 +1852,9 @@ def collect_live_evidence(
     if _stop_requested():
         raise RunnerInterrupted(stderr="interrupt requested during Enterprise SSH evidence collection")
     btool_out, btool_err, btool_rc = ssh_cli_probe(
-        "/opt/splunk/bin/splunk btool check --debug",
+        f"{splunk_home}/bin/splunk btool check --debug",
         profile=profile,
+        service_user=ssh_service_user,
         timeout_seconds=180,
     )
     remote_summary["checks"]["btool_check"] = {
@@ -1841,8 +1876,12 @@ def collect_live_evidence(
     if _stop_requested():
         raise RunnerInterrupted(stderr="interrupt requested during Enterprise SSH evidence collection")
     health_log_out, health_log_err, health_log_rc = ssh_cli_probe(
-        "test -f /opt/splunk/var/log/splunk/health.log && tail -n 200 /opt/splunk/var/log/splunk/health.log || true",
+        (
+            f"test -f {splunk_home}/var/log/splunk/health.log && "
+            f"tail -n 200 {splunk_home}/var/log/splunk/health.log || true"
+        ),
         profile=profile,
+        service_user=ssh_service_user,
         timeout_seconds=90,
     )
     remote_summary["checks"]["health_log_tail"] = {
@@ -1856,8 +1895,12 @@ def collect_live_evidence(
     if _stop_requested():
         raise RunnerInterrupted(stderr="interrupt requested during Enterprise SSH evidence collection")
     diag_out, diag_err, diag_rc = ssh_cli_probe(
-        "test -x /opt/splunk/bin/splunk && /opt/splunk/bin/splunk diag --help >/dev/null",
+        (
+            f"test -x {splunk_home}/bin/splunk && "
+            f"{splunk_home}/bin/splunk diag --help >/dev/null"
+        ),
         profile=profile,
+        service_user=ssh_service_user,
         timeout_seconds=90,
     )
     remote_summary["checks"]["diag_help"] = {

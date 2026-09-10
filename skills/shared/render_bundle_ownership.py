@@ -76,8 +76,9 @@ _BUNDLE_COMPATIBILITY: dict[str, dict[str, set[str]]] = {
     "splunk-kvstore-admin-setup": {
         "canonical_files": {
             "README.md", "metadata.json", "server.conf", "collections.conf",
-            "transforms.conf", "preflight.sh", "backup.sh", "restore.sh", "clean.sh",
-            "migrate.sh", "upgrade.sh", "status.sh",
+            "transforms.conf", "platform_version_helpers.sh", "preflight.sh",
+            "backup.sh", "restore.sh", "clean.sh", "migrate.sh", "upgrade.sh",
+            "status.sh",
         },
         "retired_alias_files": {
             "README.md", "metadata.json", "server.conf", "status.sh", "backup.sh",

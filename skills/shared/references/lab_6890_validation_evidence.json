@@ -1,182 +1,12 @@
 {
   "schema_version": 1,
-  "generated_from": {
-    "path": "skills/catalog.yaml",
-    "schema_version": 1,
-    "sha256": "4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff"
-  },
-  "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
-  "skills": [
-    "cisco-appdynamics-setup",
-    "cisco-asa-ta-setup",
-    "cisco-catalyst-enhanced-netflow-setup",
-    "cisco-catalyst-ta-setup",
-    "cisco-cloud-control-setup",
-    "cisco-collaboration-setup",
-    "cisco-data-fabric-setup",
-    "cisco-dc-networking-setup",
-    "cisco-defenseclaw-deskside-setup",
-    "cisco-enterprise-networking-setup",
-    "cisco-intersight-setup",
-    "cisco-isovalent-platform-setup",
-    "cisco-meraki-aam-thousandeyes-setup",
-    "cisco-meraki-ta-setup",
-    "cisco-product-setup",
-    "cisco-scan-setup",
-    "cisco-secure-access-setup",
-    "cisco-secure-email-web-gateway-setup",
-    "cisco-security-cloud-setup",
-    "cisco-spaces-setup",
-    "cisco-talos-intelligence-setup",
-    "cisco-thousandeyes-mcp-setup",
-    "cisco-thousandeyes-setup",
-    "cisco-ucs-ta-setup",
-    "cisco-webex-setup",
-    "galileo-agent-control-setup",
-    "galileo-lemonade-instrumentation-setup",
-    "galileo-mcp-server-setup",
-    "galileo-on-prem-agent-control-setup",
-    "galileo-on-prem-air-gap-setup",
-    "galileo-on-prem-kubernetes-setup",
-    "galileo-on-prem-luna-studio-setup",
-    "galileo-on-prem-stack-setup",
-    "galileo-platform-setup",
-    "lemonade-splunk-otel",
-    "splunk-admin-doctor",
-    "splunk-agent-management-setup",
-    "splunk-ai-assistant-setup",
-    "splunk-ai-ml-toolkit-setup",
-    "splunk-amazon-kinesis-firehose-setup",
-    "splunk-app-install",
-    "splunk-appdynamics-agent-management-setup",
-    "splunk-appdynamics-alerting-content-setup",
-    "splunk-appdynamics-analytics-setup",
-    "splunk-appdynamics-apm-setup",
-    "splunk-appdynamics-controller-admin-setup",
-    "splunk-appdynamics-dashboards-reports-setup",
-    "splunk-appdynamics-database-visibility-setup",
-    "splunk-appdynamics-dual-agent-setup",
-    "splunk-appdynamics-eum-setup",
-    "splunk-appdynamics-infrastructure-visibility-setup",
-    "splunk-appdynamics-k8s-cluster-agent-setup",
-    "splunk-appdynamics-log-observer-connect-setup",
-    "splunk-appdynamics-machine-agent-otel-collector-setup",
-    "splunk-appdynamics-platform-setup",
-    "splunk-appdynamics-sap-agent-setup",
-    "splunk-appdynamics-security-ai-setup",
-    "splunk-appdynamics-setup",
-    "splunk-appdynamics-synthetic-monitoring-setup",
-    "splunk-appdynamics-tags-extensions-setup",
-    "splunk-appdynamics-thousandeyes-integration-setup",
-    "splunk-asset-risk-intelligence-setup",
-    "splunk-attack-analyzer-setup",
-    "splunk-aws-ta-setup",
-    "splunk-box-ta-setup",
-    "splunk-cim-data-model-setup",
-    "splunk-cloud-acs-admin-setup",
-    "splunk-cloud-acs-allowlist-setup",
-    "splunk-cloud-data-manager-setup",
-    "splunk-connect-for-otlp-setup",
-    "splunk-connect-for-snmp-setup",
-    "splunk-connect-for-syslog-setup",
-    "splunk-cyberark-ta-setup",
-    "splunk-dashboard-studio-setup",
-    "splunk-data-source-readiness-doctor",
-    "splunk-database-ta-setup",
-    "splunk-db-connect-setup",
-    "splunk-ddaa-archive-setup",
-    "splunk-deployment-server-setup",
-    "splunk-edge-processor-setup",
-    "splunk-enterprise-host-setup",
-    "splunk-enterprise-kubernetes-setup",
-    "splunk-enterprise-public-exposure-hardening",
-    "splunk-enterprise-security-config",
-    "splunk-enterprise-security-install",
-    "splunk-federated-search-setup",
-    "splunk-fraud-analytics-setup",
-    "splunk-gcp-ta-setup",
-    "splunk-github-ta-setup",
-    "splunk-google-workspace-ta-setup",
-    "splunk-hec-service-setup",
-    "splunk-index-lifecycle-smartstore-setup",
-    "splunk-indexer-cluster-setup",
-    "splunk-infosec-app-setup",
-    "splunk-ingest-actions-setup",
-    "splunk-ingest-processor-setup",
-    "splunk-itsi-config",
-    "splunk-itsi-setup",
-    "splunk-knowledge-objects-setup",
-    "splunk-kvstore-admin-setup",
-    "splunk-license-manager-setup",
-    "splunk-lookup-file-editing-setup",
-    "splunk-mcp-server-setup",
-    "splunk-microsoft-cloud-setup",
-    "splunk-microsoft-exchange-ta-setup",
-    "splunk-microsoft-scom-ta-setup",
-    "splunk-microsoft-security-ta-setup",
-    "splunk-monitoring-console-setup",
-    "splunk-netapp-ontap-ta-setup",
-    "splunk-observability-ai-agent-monitoring-setup",
-    "splunk-observability-aws-integration",
-    "splunk-observability-aws-lambda-apm-setup",
-    "splunk-observability-azure-integration",
-    "splunk-observability-browser-rum-setup",
-    "splunk-observability-cisco-ai-pod-integration",
-    "splunk-observability-cisco-intersight-integration",
-    "splunk-observability-cisco-nexus-integration",
-    "splunk-observability-claude-code-instrumentation-setup",
-    "splunk-observability-cloud-integration-setup",
-    "splunk-observability-codex-instrumentation-setup",
-    "splunk-observability-coding-agent-instrumentation-setup",
-    "splunk-observability-dashboard-builder",
-    "splunk-observability-database-monitoring-setup",
-    "splunk-observability-deep-native-workflows",
-    "splunk-observability-gcp-integration",
-    "splunk-observability-isovalent-integration",
-    "splunk-observability-k8s-auto-instrumentation-setup",
-    "splunk-observability-k8s-frontend-rum-setup",
-    "splunk-observability-metrics-pipeline-setup",
-    "splunk-observability-mobile-rum-setup",
-    "splunk-observability-native-ops",
-    "splunk-observability-nvidia-gpu-integration",
-    "splunk-observability-otel-collector-setup",
-    "splunk-observability-slo-setup",
-    "splunk-observability-synthetics-setup",
-    "splunk-observability-thousandeyes-integration",
-    "splunk-okta-ta-setup",
-    "splunk-oncall-setup",
-    "splunk-pci-compliance-setup",
-    "splunk-platform-pki-setup",
-    "splunk-platform-restart-orchestrator",
-    "splunk-platform-sizing",
-    "splunk-rsa-securid-ta-setup",
-    "splunk-salesforce-ta-setup",
-    "splunk-search-head-cluster-setup",
-    "splunk-secure-gateway-setup",
-    "splunk-security-appliance-ta-setup",
-    "splunk-security-content-update-setup",
-    "splunk-security-essentials-setup",
-    "splunk-security-portfolio-setup",
-    "splunk-servicenow-ta-setup",
-    "splunk-soar-setup",
-    "splunk-spl2-pipeline-kit",
-    "splunk-stream-setup",
-    "splunk-supported-addons-setup",
-    "splunk-syslog-web-proxy-ta-setup",
-    "splunk-sysmon-ta-setup",
-    "splunk-uba-setup",
-    "splunk-universal-forwarder-setup",
-    "splunk-vmware-ta-setup",
-    "splunk-windows-ta-setup",
-    "splunk-workload-management-setup",
-    "widefield-google-secops-setup",
-    "widefield-identity-threat-doctor",
-    "widefield-okta-integration-setup",
-    "widefield-saviynt-integration-setup",
-    "widefield-security-setup",
-    "widefield-splunk-siem-setup"
+  "profile": "lab_6890",
+  "generated_at": "2026-09-09",
+  "targets": [
+    "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
   ],
-  "evidence": {
+  "pin_10_6": "pivoted_10_4_3",
+  "skills": {
     "cisco-appdynamics-setup": {
       "live_apply_e2e": {
         "status": "pass",
@@ -542,17 +372,6 @@
       }
     },
     "galileo-lemonade-instrumentation-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Hardened client-side and server-side Galileo collector fan-out renderings validated with Splunk OpenTelemetry Collector 0.156.0"
-        ],
-        "last_verified": "2026-07-12",
-        "evidence": [
-          "skills/shared/references/galileo_lemonade_instrumentation_validation_evidence.json"
-        ],
-        "notes": "Client/server rendering, destination-bound persistent queues, terminal privacy/route guards, exact-origin proxy controls, four crash-durable transactions, schema-aware readback, distinct-revoker finalization, dual-401 revocation, and exact legacy no-DELETE reconciliation passed. Collector 0.156 validated production client fan-out under the service identity."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -564,17 +383,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "External-target skill; recorded as partial without full live apply in this campaign."
-      },
-      "live_apply_e2e": {
-        "status": "pass",
-        "targets": [
-          "AMD Ryzen AI Debian development system with Lemonade Server 10.10.0, Splunk OpenTelemetry Collector 0.156.0, and a hosted custom Galileo tenant"
-        ],
-        "last_verified": "2026-07-12",
-        "evidence": [
-          "skills/shared/references/galileo_lemonade_instrumentation_validation_evidence.json"
-        ],
-        "notes": "Queue, exact-origin proxy, five-file runtime, and Collector YAML transactions passed apply, reverse-order rollback, Splunk-only baseline readback, and reapply. A real privacy-safe caller trace produced Agent/LLM/Tool hierarchy with Galileo and same-trace Splunk backend readback, zero plaintext content fields, empty queues, and no exporter failures. A post-wake three-span canary again reached both backends with empty queues. The exposed bootstrap key reached 401 on both current-user and token issuance; the scoped runtime key was revalidated and the credential journal finalized."
       }
     },
     "galileo-mcp-server-setup": {
@@ -592,17 +400,6 @@
       }
     },
     "galileo-on-prem-agent-control-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Pinned standalone and umbrella-owned Agent Control lifecycle fixtures"
-        ],
-        "last_verified": "2026-08-13",
-        "evidence": [
-          "tests/test_galileo_on_prem_optional.py"
-        ],
-        "notes": "Immutable render and validation, parent ownership binding, stable-version lifecycle gates, target-bound preflight, private input snapshots, exact rendered-image evidence, final rechecks, uninstall safety, and adversarial secret, path, and bundle-integrity cases passed without a live cluster mutation."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -617,17 +414,6 @@
       }
     },
     "galileo-on-prem-air-gap-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Synthetic OCI-layout, chart, binary, model, and no-egress air-gap fixtures"
-        ],
-        "last_verified": "2026-08-13",
-        "evidence": [
-          "tests/test_galileo_on_prem_optional.py"
-        ],
-        "notes": "Immutable offline assembly and verification, safe extraction, exact chart and digest inventory, Stack seed/final and optional-child evidence binding, endpoint allowlisting, architecture checks, and adversarial tamper, symlink, extra-file, missing-image, and tag-only cases passed without registry writes or a live cluster mutation."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -642,17 +428,6 @@
       }
     },
     "galileo-on-prem-kubernetes-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Full-coverage Galileo On-Prem orchestration and immutable router fixtures"
-        ],
-        "last_verified": "2026-08-13",
-        "evidence": [
-          "tests/test_galileo_on_prem_router.py"
-        ],
-        "notes": "The source ledger, stable-ID deployment matrix, exact nine-category runtime inventory contract, immutable render and semantic recomputation, URL and domain consistency, secret-shaped input rejection, mutation rejection, and adversarial bundle-tamper cases passed."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -667,17 +442,6 @@
       }
     },
     "galileo-on-prem-luna-studio-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Pinned standalone and umbrella-owned Luna Studio lifecycle fixtures"
-        ],
-        "last_verified": "2026-08-13",
-        "evidence": [
-          "tests/test_galileo_on_prem_optional.py"
-        ],
-        "notes": "Immutable render and validation, parent ownership binding, stable-version lifecycle gates, target-bound preflight, private input snapshots, exact rendered-image evidence, final rechecks, uninstall safety, and adversarial secret, path, and bundle-integrity cases passed without a live cluster mutation."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -692,17 +456,6 @@
       }
     },
     "galileo-on-prem-stack-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Offline synthetic pinned Stack and galileoctl render, parser, validation, and handoff-contract fixtures"
-        ],
-        "last_verified": "2026-08-13",
-        "evidence": [
-          "tests/test_galileo_on_prem_stack.py"
-        ],
-        "notes": "Offline fixtures exercised immutable bundle identity, pinned chart and values checks, exact runtime classification, static Helm rendering, CRD/storage/route/TLS/topology/Wizard/monitoring/air-gap evidence parsing, read-only command policy, and Galileo/CSE handoff generation. This is static/mock coverage only: no real Galileo chart was supplied, no connected server dry-run or workload validation was completed, and install, upgrade, rollback, uninstall, bootstrap, registry, cloud, storage, Helm, and Kubernetes mutation are not implemented by the skill."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -717,17 +470,6 @@
       }
     },
     "galileo-platform-setup": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Rendered Galileo generic-webhook relay and redacted Observe-export bridge with a mock Splunk HEC"
-        ],
-        "last_verified": "2026-07-08",
-        "evidence": [
-          "skills/shared/references/galileo_platform_validation_evidence.json"
-        ],
-        "notes": "A synthetic generic-alert webhook traversed the rendered relay into a mock HEC, and a redacted existing trace traversed the rendered export bridge into a mock HEC without retaining raw tenant content."
-      },
       "live_read_only": {
         "status": "partial",
         "targets": [
@@ -739,31 +481,9 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "External-target skill; recorded as partial without full live apply in this campaign."
-      },
-      "live_apply_e2e": {
-        "status": "partial",
-        "targets": [
-          "Galileo Platform synthetic-object and OTLP trace lifecycle for DefenseClaw on AWS EKS"
-        ],
-        "last_verified": "2026-07-08",
-        "evidence": [
-          "skills/shared/references/galileo_platform_validation_evidence.json"
-        ],
-        "notes": "Disposable project, log-stream, dataset, prompt, experiment, experiment-group assignment and filtered readback, and exact ownership-ledger cleanup passed with zero residue, alongside synthetic trace lifecycle and protobuf ingest through both supported OTLP paths. AI Assistant and global-dashboard UI observation, large-dataset batched execution, Protect/Control mutation, and retained live Splunk event delivery remain unverified."
       }
     },
     "lemonade-splunk-otel": {
-      "integration_mock": {
-        "status": "pass",
-        "targets": [
-          "Hardened Lemonade-to-Splunk collector rendering and validation workflow using Splunk OpenTelemetry Collector 0.156.0"
-        ],
-        "last_verified": "2026-07-12",
-        "evidence": [
-          "skills/shared/references/lemonade_splunk_otel_validation_evidence.json"
-        ],
-        "notes": "Renderer ownership/idempotency, exact legacy migration, literal exporter-credential rejection, private Splunk token cutover, fail-closed validation, privacy, loopback, official Collector 0.156 validation, organization-bound all-segment backend readback, and schema-v2 apply/restore recovery regressions passed."
-      },
       "live_apply_e2e": {
         "status": "not-applicable",
         "targets": [
@@ -1170,18 +890,6 @@
       }
     },
     "splunk-aws-ta-setup": {
-      "live_read_only": {
-        "status": "partial",
-        "targets": [
-          "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
-        ],
-        "last_verified": "2026-09-09",
-        "evidence": [
-          "splunk-live-validation-runs/orchestration/20260909T000000/workers/splunk-aws-ta-setup.json",
-          "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
-        ],
-        "notes": "Splunk_TA_aws 8.2.2 installed visible; TA completion gate blocked on ingest: no aws index, no enabled inputs, no CloudTrail/Config events. AWS account secrets required."
-      },
       "live_apply_e2e": {
         "status": "partial",
         "targets": [
@@ -1403,18 +1111,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "Executed smoke-offline; rc=0."
-      },
-      "live_apply_e2e": {
-        "status": "pass",
-        "targets": [
-          "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
-        ],
-        "last_verified": "2026-09-09",
-        "evidence": [
-          "splunk-live-validation-runs/orchestration/20260909T000000/workers/splunk-deployment-server-setup.json",
-          "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
-        ],
-        "notes": "batch2 apply/help rc=0"
       }
     },
     "splunk-edge-processor-setup": {
@@ -1457,17 +1153,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "External-target skill; recorded as partial without full live apply in this campaign."
-      },
-      "live_apply_e2e": {
-        "status": "partial",
-        "targets": [
-          "AWS EKS isolated-worker lab; Kubernetes 1.34.8; Splunk Operator for Kubernetes 3.1.0; Splunk Enterprise 10.4.1; S1 standalone"
-        ],
-        "last_verified": "2026-07-08",
-        "evidence": [
-          "skills/shared/references/splunk_enterprise_kubernetes_validation_evidence.json"
-        ],
-        "notes": "An isolated EKS run verified the pinned SOK 3.1.0 and Splunk Enterprise 10.4.1 S1 lifecycle from a clean baseline through strict render, preflight, guarded apply, status and live validation, real SPL search, authenticated receiver ingest, pod recreation, canary search using preserved storage, and zero-residue cleanup. The run used the development profile with production-shaped isolated compute and encrypted gp3 storage; external licensing and SmartStore, C3/M4, Splunk POD, upgrades, backup and restore, disaster recovery, UI behavior, and failure-domain continuity remain unverified."
       }
     },
     "splunk-enterprise-public-exposure-hardening": {
@@ -1664,18 +1349,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "Executed smoke-offline; rc=0."
-      },
-      "live_apply_e2e": {
-        "status": "pass",
-        "targets": [
-          "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
-        ],
-        "last_verified": "2026-09-09",
-        "evidence": [
-          "splunk-live-validation-runs/orchestration/20260909T000000/workers/splunk-ingest-processor-setup.json",
-          "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
-        ],
-        "notes": "batch2 apply/help rc=0"
       }
     },
     "splunk-itsi-config": {
@@ -2054,18 +1727,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "External-target skill; recorded as partial without full live apply in this campaign."
-      },
-      "live_apply_e2e": {
-        "status": "partial",
-        "targets": [
-          "AWS EKS isolated-node lab; Amazon RDS PostgreSQL 17.5, self-hosted SQL Server 2022 CU25 and Oracle Database Free 26ai; Splunk OTel Collector/chart 0.155.0; us1",
-          "AWS EKS lab; MySQL 8.4.10 and MariaDB 10.11.18 standalone; Splunk OTel Collector/chart 0.155.0; us1"
-        ],
-        "last_verified": "2026-07-07",
-        "evidence": [
-          "skills/shared/references/splunk_observability_dbmon_validation_evidence.json"
-        ],
-        "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai. Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified."
       }
     },
     "splunk-observability-deep-native-workflows": {
@@ -2444,18 +2105,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "Catalog validation PASS (30 entries). ES installed; SSE/ESCU/UBA apps not on host."
-      },
-      "live_apply_e2e": {
-        "status": "partial",
-        "targets": [
-          "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
-        ],
-        "last_verified": "2026-09-09",
-        "evidence": [
-          "splunk-live-validation-runs/orchestration/20260909T000000/workers/splunk-security-portfolio-setup.json",
-          "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
-        ],
-        "notes": "validate-live returned 1; accepted partial when upstream vendor data or entitlements are missing."
       }
     },
     "splunk-servicenow-ta-setup": {
@@ -2498,18 +2147,6 @@
           "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
         ],
         "notes": "Executed smoke-offline; rc=0."
-      },
-      "live_apply_e2e": {
-        "status": "pass",
-        "targets": [
-          "Splunk Enterprise 10.4.3 amd-halo 192.168.68.90 /opt/splunk (10.6 unavailable; validated against latest public 10.4.3)"
-        ],
-        "last_verified": "2026-09-09",
-        "evidence": [
-          "splunk-live-validation-runs/orchestration/20260909T000000/workers/splunk-spl2-pipeline-kit.json",
-          "splunk-live-validation-runs/orchestration/pin_10_6_resolution.json"
-        ],
-        "notes": "batch2 apply/help rc=0"
       }
     },
     "splunk-stream-setup": {
