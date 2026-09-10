@@ -295,8 +295,8 @@ sudo systemctl daemon-reload
 sudo systemctl restart Splunkd.service
 ```
 
-Lab note: amd-halo shipped with `MemoryMax=134315737088` (~125 GiB, ~100% RAM).
-For production cutover, prefer ~90% (`calculate-memory-max.sh` output).
+If a lab host was initially configured at ~100% of `MemTotal`, reduce to the
+`calculate-memory-max.sh` output (default 90%) before production cutover.
 
 ## Pool weight review (`{args.profile}` profile)
 
