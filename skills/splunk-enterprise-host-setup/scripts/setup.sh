@@ -424,7 +424,7 @@ resolve_requested_package_version() {
 
 capture_installed_splunk_version() {
     local version_output version
-    version_output="$(hbs_capture_target_cmd "${EXECUTION_MODE}" "$(splunk_cli_cmd version)" 2>/dev/null || true)"
+    version_output="$(capture_splunk_as_service_user "$(splunk_cli_cmd version)" 2>/dev/null || true)"
     version="$(hbs_extract_splunk_version "${version_output}")"
     printf '%s' "${version}"
 }

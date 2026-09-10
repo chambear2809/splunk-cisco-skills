@@ -37,6 +37,7 @@ allowed_keys = [
     "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
+    "SPLUNK_RESOLVE",
     "SPLUNK_URI",
     "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST",
@@ -50,6 +51,7 @@ allowed_keys = [
     "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER",
     "SPLUNK_PASS",
+    "SPLUNK_HOME",
     "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK",
     "SPLUNK_CLOUD_SEARCH_HEAD",
@@ -63,6 +65,12 @@ allowed_keys = [
     "SPLUNK_ONCALL_API_KEY_FILE",
     "SPLUNK_ONCALL_REST_INTEGRATION_KEY_FILE",
     "SPLUNK_ONCALL_DEFAULT_ROUTING_KEY",
+    "APPD_CONTROLLER_URL",
+    "APPD_ACCOUNT_NAME",
+    "APPD_CLIENT_NAME",
+    "APPD_CLIENT_SECRET_FILE",
+    "APPD_VERIFY_SSL",
+    "APPD_CA_CERT",
     "SPLUNK_MCP_GATEWAY_URL",
     "SPLUNK_MCP_SCS_REGION",
     "SPLUNK_MCP_SPLUNK_TENANT",
@@ -206,6 +214,8 @@ flat_target_keys = {
     "SPLUNK_O11Y_ORG_TOKEN_FILE", "SPLUNK_O11Y_RUM_TOKEN_FILE",
     "SPLUNK_ONCALL_API_ID", "SPLUNK_ONCALL_API_KEY_FILE",
     "SPLUNK_ONCALL_REST_INTEGRATION_KEY_FILE", "SPLUNK_ONCALL_DEFAULT_ROUTING_KEY",
+    "APPD_CONTROLLER_URL", "APPD_ACCOUNT_NAME", "APPD_CLIENT_NAME",
+    "APPD_CLIENT_SECRET_FILE", "APPD_VERIFY_SSL", "APPD_CA_CERT",
     "SPLUNK_MCP_GATEWAY_URL",
     "SPLUNK_MCP_SCS_REGION", "SPLUNK_MCP_SPLUNK_TENANT",
     "SPLUNK_MCP_SPLUNK_JWT_FILE", "ACS_SERVER",
@@ -1022,6 +1032,51 @@ load_splunkbase_credentials() {
     if [[ -z "${SB_USER:-}" || -z "${SB_PASS:-}" ]]; then
         echo "ERROR: Splunkbase credentials are required." >&2
         return 1
+    fi
+}
+
+_appd_infer_account_name_from_controller_url() {
+    local controller_url="${1:-}"
+    python3 - "${controller_url}" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+raw = (sys.argv[1] or "").strip()
+if not raw:
+    raise SystemExit(1)
+if "://" not in raw:
+    raw = f"https://{raw}"
+host = urlparse(raw).hostname or ""
+if host.endswith(".saas.appdynamics.com"):
+    account = host[: -len(".saas.appdynamics.com")]
+    if account:
+        print(account, end="")
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+load_appd_credentials() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+
+    if [[ -n "${APPD_CONTROLLER_URL:-}" && "${APPD_CONTROLLER_URL}" != http://* && "${APPD_CONTROLLER_URL}" != https://* ]]; then
+        APPD_CONTROLLER_URL="https://${APPD_CONTROLLER_URL}"
+    fi
+
+    if [[ -z "${APPD_ACCOUNT_NAME:-}" && -n "${APPD_CONTROLLER_URL:-}" ]]; then
+        APPD_ACCOUNT_NAME="$(_appd_infer_account_name_from_controller_url "${APPD_CONTROLLER_URL}" 2>/dev/null || true)"
+    fi
+
+    if [[ -n "${APPD_CLIENT_NAME:-}" && -z "${APPD_API_CLIENT_NAME:-}" ]]; then
+        APPD_API_CLIENT_NAME="${APPD_CLIENT_NAME}"
+    elif [[ -n "${APPD_API_CLIENT_NAME:-}" && -z "${APPD_CLIENT_NAME:-}" ]]; then
+        APPD_CLIENT_NAME="${APPD_API_CLIENT_NAME}"
+    fi
+
+    if [[ -n "${APPD_CLIENT_SECRET_FILE:-}" && -z "${APPD_OAUTH_CLIENT_SECRET_FILE:-}" ]]; then
+        APPD_OAUTH_CLIENT_SECRET_FILE="${APPD_CLIENT_SECRET_FILE}"
+    elif [[ -n "${APPD_OAUTH_CLIENT_SECRET_FILE:-}" && -z "${APPD_CLIENT_SECRET_FILE:-}" ]]; then
+        APPD_CLIENT_SECRET_FILE="${APPD_OAUTH_CLIENT_SECRET_FILE}"
     fi
 }
 

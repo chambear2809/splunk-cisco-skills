@@ -50,6 +50,29 @@ _warn_once() {
 
 _splunk_transport_curl_args=()
 
+_splunk_resolve_curl_arg() {
+    local resolve_value="${SPLUNK_RESOLVE:-}"
+    [[ -n "${resolve_value}" ]] || return 0
+    if ! python3 - "${resolve_value}" <<'PY'
+import re
+import sys
+
+value = sys.argv[1].strip()
+if not re.fullmatch(r"[A-Za-z0-9._-]+:[0-9]{1,5}:[0-9A-Fa-f:.]+", value):
+    raise SystemExit(1)
+host, port, _address = value.split(":", 2)
+if not 1 <= int(port) <= 65535:
+    raise SystemExit(1)
+if not host:
+    raise SystemExit(1)
+PY
+    then
+        echo "ERROR: SPLUNK_RESOLVE must be a curl --resolve mapping like host:port:address; got '${resolve_value}'." >&2
+        return 1
+    fi
+    _splunk_transport_curl_args+=(--resolve "${resolve_value}")
+}
+
 _reset_splunk_transport_curl_args() {
     # Authenticated helpers never follow redirects. curl has no option that
     # constrains redirects to the original origin, so zero redirects is the
@@ -58,6 +81,7 @@ _reset_splunk_transport_curl_args() {
     _splunk_transport_curl_args=(
         --proto '=https' --proto-redir '=https' --max-redirs 0 --globoff
     )
+    _splunk_resolve_curl_arg
 }
 
 _check_splunk_transport_uri() {

@@ -206,6 +206,17 @@ registry_app_name_by_app_id() {
     registry_app_field_by_app_id "${1:-}" "app_name"
 }
 
+registry_install_app_name_by_app_id() {
+    local app_id="${1:-}"
+    local install_name
+    install_name="$(registry_app_field_by_app_id "${app_id}" "install_app_name")"
+    if [[ -n "${install_name}" ]]; then
+        printf '%s' "${install_name}"
+        return 0
+    fi
+    registry_app_name_by_app_id "${app_id}"
+}
+
 registry_app_name_by_package() {
     local package_name
     package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
@@ -218,7 +229,7 @@ with open(sys.argv[2]) as f:
 for app in registry.get('apps', []):
     patterns = [str(p).lower() for p in app.get('package_patterns', [])]
     if any(fnmatch.fnmatch(pkg, pattern) for pattern in patterns):
-        print(str(app.get('app_name', '')), end='')
+        print(str(app.get('install_app_name') or app.get('app_name', '')), end='')
         break
 " "${package_name}" "${REGISTRY_FILE}" 2>/dev/null || true
 }
@@ -452,7 +463,7 @@ guess_app_name_from_package() {
 
     app_id="$(registry_app_id_by_package "${package_path}")"
     if [[ -n "${app_id}" ]]; then
-        app_name="$(registry_app_name_by_app_id "${app_id}")"
+        app_name="$(registry_install_app_name_by_app_id "${app_id}")"
         if [[ -n "${app_name}" ]]; then
             printf '%s' "${app_name}"
             return 0
@@ -607,7 +618,7 @@ prepare_exact_package_contract() {
     target_app_id="$(registry_target_app_id)"
     expected_name=""
     if [[ -n "${target_app_id}" ]]; then
-        expected_name="$(registry_app_name_by_app_id "${target_app_id}")"
+        expected_name="$(registry_install_app_name_by_app_id "${target_app_id}")"
     fi
     inspect_package_contract "${APP_FILE}" "${expected_name}" "${APP_VERSION}" || return 1
     if [[ -n "${EXPECTED_SHA256}" ]]; then
@@ -1673,6 +1684,44 @@ stage_file_via_ssh() {
     return "${rc}"
 }
 
+prepare_remote_app_package_for_splunkd() {
+    local remote_path="$1"
+    local quoted_path prepare_cmd verify_cmd
+
+    [[ -n "${remote_path}" ]] || return 1
+
+    if ! command -v sshpass >/dev/null 2>&1; then
+        log "ERROR: sshpass is required to harden remote app package permissions."
+        return 1
+    fi
+
+    if ! load_splunk_ssh_credentials; then
+        return 1
+    fi
+
+    # scp preserves the local package mode; operator caches are often 0600 while
+    # splunkd runs as the splunk user and must read the staged path for
+    # filename=true REST installs.
+    quoted_path="$(printf '%q' "${remote_path}")"
+    prepare_cmd="chown splunk:splunk ${quoted_path}"
+    if ! hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "${prepare_cmd}")"; then
+        log "ERROR: Could not chown the staged package to splunk:splunk at ${remote_path}."
+        log "Ensure SPLUNK_REMOTE_SUDO=true and the SSH user can chown staged files to splunk."
+        return 1
+    fi
+
+    # Mode 0600 is sufficient once splunk owns the file; widen permissions when allowed.
+    hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "chmod 0644 ${quoted_path}")" >/dev/null 2>&1 || true
+
+    verify_cmd="runuser -u splunk -- test -r ${quoted_path}"
+    if ! hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "${verify_cmd}")"; then
+        log "ERROR: Staged package is still not readable by the splunk user at ${remote_path}."
+        return 1
+    fi
+
+    return 0
+}
+
 cleanup_remote_stage_file() {
     local remote_path="$1"
 
@@ -1682,7 +1731,7 @@ cleanup_remote_stage_file() {
         return 0
     fi
 
-    hbs_run_target_cmd ssh "$(hbs_shell_join rm -f "${remote_path}")" >/dev/null 2>&1 || true
+    hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join rm -f "${remote_path}")")" >/dev/null 2>&1 || true
 }
 
 install_app() {
@@ -1785,6 +1834,11 @@ install_app() {
         log "Copying package to ${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}:${remote_tmp} ..."
         if ! stage_file_via_ssh "${abs_file_path}" "${remote_tmp}"; then
             log "ERROR: SSH copy failed."
+            exit 1
+        fi
+
+        if ! prepare_remote_app_package_for_splunkd "${remote_tmp}"; then
+            cleanup_remote_stage_file "${remote_tmp}"
             exit 1
         fi
 

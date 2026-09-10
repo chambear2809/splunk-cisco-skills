@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import shlex
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -16,13 +17,18 @@ from render_bundle_ownership import ensure_canonical_bundle_compatible  # noqa: 
 
 BUNDLE_OWNER = "splunk-kvstore-admin-setup"
 
-_PLATFORM_VERSION_HELPERS = Path(__file__).resolve().parents[2] / "shared" / "lib" / "platform_version_helpers.sh"
+_SKILLS_ROOT = Path(__file__).resolve().parents[2]
+_PLATFORM_VERSION_HELPERS = _SKILLS_ROOT / "shared" / "lib" / "platform_version_helpers.sh"
+_SPV_VERSIONS_JSON = _SKILLS_ROOT / "shared" / "references" / "splunk_platform_versions.json"
+_SPV_VERSIONS_PY = _SKILLS_ROOT / "shared" / "lib" / "platform_versions.py"
+_SPV_BUNDLE_DIR = ".spv-bundle"
 GENERATED_FILES = {
     "README.md",
     "metadata.json",
     "server.conf",
     "collections.conf",
     "transforms.conf",
+    "platform_version_helpers.sh",
     "preflight.sh",
     "backup.sh",
     "restore.sh",
@@ -85,7 +91,6 @@ def make_script(body: str, *, platform: str) -> str:
     first, separator, remainder = body.lstrip().partition("\n")
     if not separator:
         die("internal renderer error: local script body has no runtime assignment")
-    helper_default = shell_quote(_PLATFORM_VERSION_HELPERS)
     rendered_platform = shell_quote(platform)
     gate = f"""rendered_platform={rendered_platform}
 runtime_platform="${{SPLUNK_PLATFORM:-${{rendered_platform}}}}"
@@ -95,7 +100,9 @@ if [[ "${{runtime_platform}}" == "cloud" ]]; then
   exit 2
 fi
 [[ "${{runtime_platform}}" == "auto" || "${{runtime_platform}}" == "enterprise" ]] || {{ echo "ERROR: invalid SPLUNK_PLATFORM=${{runtime_platform}}" >&2; exit 1; }}
-_platform_helpers_default={helper_default}
+_script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+export SPV_SKILLS_ROOT="${{_script_dir}}/{_SPV_BUNDLE_DIR}"
+_platform_helpers_default="${{_script_dir}}/platform_version_helpers.sh"
 platform_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_platform_helpers_default}}}}"
 [[ -r "${{platform_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_helpers}}" >&2; exit 1; }}
 # shellcheck disable=SC1090
@@ -432,6 +439,16 @@ def render(args: argparse.Namespace, fields: list[tuple[str, str]]) -> dict:
         for rel, content in files.items():
             write_file(render_dir / rel, content, executable=rel.endswith(".sh"))
             assets.append(rel)
+        spv_refs = render_dir / _SPV_BUNDLE_DIR / "shared" / "references"
+        spv_lib = render_dir / _SPV_BUNDLE_DIR / "shared" / "lib"
+        spv_refs.mkdir(parents=True, exist_ok=True)
+        spv_lib.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_SPV_VERSIONS_JSON, spv_refs / "splunk_platform_versions.json")
+        shutil.copy2(_SPV_VERSIONS_PY, spv_lib / "platform_versions.py")
+        shutil.copy2(_PLATFORM_VERSION_HELPERS, render_dir / "platform_version_helpers.sh")
+        assets.append("platform_version_helpers.sh")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/references/splunk_platform_versions.json")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/lib/platform_versions.py")
     return {
         "target": "kvstore",
         "platform": args.platform,

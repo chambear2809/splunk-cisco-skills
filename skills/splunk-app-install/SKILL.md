@@ -68,6 +68,7 @@ skill supports them; help exits without mutation.
 | Rendered assets are incomplete | Required non-secret inputs are absent | Complete intake and render again |
 | Apply is blocked | Review, credentials, or explicit acceptance is missing | Use the documented handoff |
 | Validation is incomplete | Live evidence is unavailable | Record the gap and keep completion open |
+| REST install fails with `failed to extract app ... bundle_tmp ... Permission denied` after SSH staging | `scp` preserved a mode-0600 package owned by the SSH user, so `splunkd` cannot read the staged path | The installer now `chown`s the staged file to `splunk:splunk` and sets mode `0644` when `SPLUNK_REMOTE_SUDO=true`; ensure the SSH user can sudo without a password |
 
 ## Shared add-on completion gate
 

@@ -7,10 +7,15 @@ import argparse
 import json
 import re
 import shlex
+import shutil
 import stat
 from pathlib import Path
 
-_PLATFORM_VERSION_HELPERS = Path(__file__).resolve().parents[2] / "shared" / "lib" / "platform_version_helpers.sh"
+_SKILLS_ROOT = Path(__file__).resolve().parents[2]
+_PLATFORM_VERSION_HELPERS = _SKILLS_ROOT / "shared" / "lib" / "platform_version_helpers.sh"
+_SPV_VERSIONS_JSON = _SKILLS_ROOT / "shared" / "references" / "splunk_platform_versions.json"
+_SPV_VERSIONS_PY = _SKILLS_ROOT / "shared" / "lib" / "platform_versions.py"
+_SPV_BUNDLE_DIR = ".spv-bundle"
 
 GENERATED_FILES = {
     "README.md",
@@ -18,6 +23,10 @@ GENERATED_FILES = {
     "workload_pools.conf",
     "workload_rules.conf",
     "workload_policy.conf",
+    "production-cutover.md",
+    "systemd/Splunkd.service.d/99-wlm-production.conf.example",
+    "systemd/calculate-memory-max.sh",
+    "platform_version_helpers.sh",
     "preflight.sh",
     "apply.sh",
     "status.sh",
@@ -89,8 +98,9 @@ def make_script(body: str) -> str:
     first, separator, remainder = body.lstrip().partition("\n")
     if not separator:
         die("internal renderer error: local script body has no runtime assignment")
-    helper_default = shell_quote(_PLATFORM_VERSION_HELPERS)
-    gate = f"""_platform_helpers_default={helper_default}
+    gate = f"""_script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+export SPV_SKILLS_ROOT="${{_script_dir}}/{_SPV_BUNDLE_DIR}"
+_platform_helpers_default="${{_script_dir}}/platform_version_helpers.sh"
 platform_helpers="${{SPLUNK_PLATFORM_VERSION_HELPERS:-${{_platform_helpers_default}}}}"
 [[ -r "${{platform_helpers}}" ]] || {{ echo "ERROR: platform version helper is missing: ${{platform_helpers}}" >&2; exit 1; }}
 # shellcheck disable=SC1090
@@ -244,6 +254,114 @@ admission_rules_enabled = {enabled}
 """
 
 
+def render_production_cutover(args: argparse.Namespace) -> str:
+    search_cpu, ingest_cpu, misc_cpu = weights(args)
+    return f"""# Workload Management Production Cutover Checklist
+
+Profile rendered: `{args.profile}`
+
+## Systemd prerequisites (cgroups v2)
+
+Splunk Enterprise must run as a **systemd-managed** service with cgroup delegation:
+
+```bash
+sudo /opt/splunk/bin/splunk disable boot-start
+sudo /opt/splunk/bin/splunk enable boot-start -systemd-managed 1 -user splunk -group splunk
+sudo systemctl daemon-reload
+sudo systemctl enable --now Splunkd.service
+```
+
+Required unit properties (already present on a correct `Splunkd.service`):
+
+- `Delegate=true`
+- `CPUAccounting=yes` (implicit with Delegate on modern systemd)
+- `MemoryAccounting=yes` (implicit with Delegate on modern systemd)
+
+## MemoryMax review
+
+**Do not set `MemoryMax` to 100% of host RAM.** Reserve headroom for the kernel,
+page cache, other agents, and OOM recovery.
+
+1. Run `./systemd/calculate-memory-max.sh` on the target host to compute a
+   recommended value (default: 90% of `MemTotal`).
+2. Install the drop-in:
+
+```bash
+sudo mkdir -p /etc/systemd/system/Splunkd.service.d
+sudo cp systemd/Splunkd.service.d/99-wlm-production.conf.example \\
+  /etc/systemd/system/Splunkd.service.d/99-wlm-production.conf
+# Edit MemoryMax= to the calculated byte value before enabling.
+sudo systemctl daemon-reload
+sudo systemctl restart Splunkd.service
+```
+
+If a lab host was initially configured at ~100% of `MemTotal`, reduce to the
+`calculate-memory-max.sh` output (default 90%) before production cutover.
+
+## Pool weight review (`{args.profile}` profile)
+
+| Category | CPU/mem weight | Production guidance |
+|----------|----------------|---------------------|
+| search   | {search_cpu}%  | Increase for search-heavy SH/SHC; decrease if ingest latency matters |
+| ingest   | {ingest_cpu}%  | Increase on indexer-heavy or HEC-heavy stacks (`ingest-protect` profile) |
+| misc     | {misc_cpu}%    | Keep ≥5–10% for housekeeping, deployer pushes, KV Store |
+
+Rendered pools:
+
+| Pool | Category | CPU weight | Notes |
+|------|----------|------------|-------|
+| `{args.default_search_pool}` | search | 70 | Default adhoc searches |
+| `{args.critical_search_pool}` | search | 30 | Admin/critical role placement |
+| `{args.ingest_pool}` | ingest | 100 | Indexing pipelines |
+| `{args.misc_pool}` | misc | 100 | Background tasks |
+
+### Profile alternatives
+
+- **search-priority** (80/15/5): production SHC with heavy interactive search.
+- **ingest-protect** (55/35/10): indexer tier or mixed SH with sustained ingest.
+- **balanced** (70/20/10): general-purpose starting point; tune after baseline.
+
+## Cutover validation
+
+```bash
+./preflight.sh
+./apply.sh
+./status.sh
+splunk show workload-management-status --verbose
+splunk list workload-pool
+```
+
+Confirm `Enabled: 1`, pools show cgroup v2 paths, and admission rules match policy.
+"""
+
+
+def render_systemd_dropin_example() -> str:
+    return """# Example systemd drop-in for Splunk WLM production cutover.
+# Copy to /etc/systemd/system/Splunkd.service.d/99-wlm-production.conf
+# Set MemoryMax from ./systemd/calculate-memory-max.sh output.
+
+[Service]
+# Reserve ~10% host RAM for kernel and non-Splunk processes.
+# Example for 125 GiB host at 90%: MemoryMax=120795955200
+MemoryMax=120795955200
+CPUWeight=100
+"""
+
+
+def render_memory_max_calculator() -> str:
+    return """#!/usr/bin/env bash
+# Compute recommended Splunkd MemoryMax (bytes) for WLM production cutover.
+set -euo pipefail
+percent="${1:-90}"
+mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+mem_bytes=$((mem_kb * 1024))
+max_bytes=$((mem_bytes * percent / 100))
+echo "MemTotal: ${mem_kb} kB"
+echo "Recommended MemoryMax (${percent}%): ${max_bytes}"
+echo "Drop-in line: MemoryMax=${max_bytes}"
+"""
+
+
 def render_readme(args: argparse.Namespace) -> str:
     return f"""# Splunk Workload Management Rendered Assets
 
@@ -257,6 +375,8 @@ Files:
 - `preflight.sh`
 - `apply.sh`
 - `status.sh`
+- `production-cutover.md` — systemd MemoryMax and pool-weight review
+- `systemd/` — MemoryMax calculator and drop-in example
 
 Workload management remains disabled unless rendered with
 `--enable-workload-management`. Admission rules remain globally disabled unless
@@ -332,13 +452,28 @@ def render(args: argparse.Namespace) -> dict:
             "workload_pools.conf": render_workload_pools(args),
             "workload_rules.conf": render_workload_rules(args),
             "workload_policy.conf": render_workload_policy(args),
+            "production-cutover.md": render_production_cutover(args),
+            "systemd/Splunkd.service.d/99-wlm-production.conf.example": render_systemd_dropin_example(),
+            "systemd/calculate-memory-max.sh": render_memory_max_calculator(),
         }
         for rel, content in files.items():
             write_file(render_dir / rel, content)
             assets.append(rel)
+        spv_refs = render_dir / _SPV_BUNDLE_DIR / "shared" / "references"
+        spv_lib = render_dir / _SPV_BUNDLE_DIR / "shared" / "lib"
+        spv_refs.mkdir(parents=True, exist_ok=True)
+        spv_lib.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_SPV_VERSIONS_JSON, spv_refs / "splunk_platform_versions.json")
+        shutil.copy2(_SPV_VERSIONS_PY, spv_lib / "platform_versions.py")
+        shutil.copy2(_PLATFORM_VERSION_HELPERS, render_dir / "platform_version_helpers.sh")
+        assets.append("platform_version_helpers.sh")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/references/splunk_platform_versions.json")
+        assets.append(f"{_SPV_BUNDLE_DIR}/shared/lib/platform_versions.py")
         for rel, content in render_scripts(args).items():
             write_file(render_dir / rel, content, executable=True)
             assets.append(rel)
+        calc = render_dir / "systemd" / "calculate-memory-max.sh"
+        calc.chmod(calc.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return {
         "target": "workload-management",
         "profile": args.profile,

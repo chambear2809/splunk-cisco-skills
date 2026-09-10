@@ -245,7 +245,7 @@ mcp_post_json_with_code() {
             -H 'MCP-Protocol-Version: 2025-06-18' \
             -H 'Content-Type: application/json' \
             -d "${payload}" \
-            -w '\n%{http_code}' "${extra_headers[@]}" \
+            -w '\n%{http_code}' ${extra_headers[@]+"${extra_headers[@]}"} \
             --proto "${transport_protocol}" \
             --proto-redir "${transport_protocol}" \
             --max-redirs 0 \
@@ -258,7 +258,7 @@ mcp_post_json_with_code() {
         -H 'MCP-Protocol-Version: 2025-06-18' \
         -H 'Content-Type: application/json' \
         -d "${payload}" \
-        -w '\n%{http_code}' "${extra_headers[@]}" 2>/dev/null || echo "000"
+        -w '\n%{http_code}' ${extra_headers[@]+"${extra_headers[@]}"} 2>/dev/null || echo "000"
 }
 
 app_visible() {
@@ -540,12 +540,22 @@ fi
     FAILURES=$((FAILURES + 1))
 }
 if [[ "${COMPLETION}" == "true" ]]; then
-    [[ "${MCP_INITIALIZE_CODE}" == "200" && "${MCP_INITIALIZE_PROTOCOL}" == "2025-06-18" ]] || {
-        log "ERROR: Authenticated MCP initialize failed or did not negotiate protocol 2025-06-18."
+    MCP_PROTOCOL_OK="false"
+    case "${MCP_INITIALIZE_PROTOCOL}" in
+        2025-06-18|2025-11-25) MCP_PROTOCOL_OK="true" ;;
+    esac
+    [[ "${MCP_INITIALIZE_CODE}" == "200" && "${MCP_PROTOCOL_OK}" == "true" ]] || {
+        log "ERROR: Authenticated MCP initialize failed or did not negotiate a supported protocol (got '${MCP_INITIALIZE_PROTOCOL:-unset}')."
         FAILURES=$((FAILURES + 1))
     }
-    [[ "${MCP_INITIALIZED_CODE}" == "202" && "${MCP_INITIALIZED_EMPTY_BODY}" == "true" ]] || {
-        log "ERROR: MCP notifications/initialized must return HTTP 202 with an empty body."
+    MCP_INITIALIZED_HTTP_OK="false"
+    if [[ "${MCP_INITIALIZED_EMPTY_BODY}" == "true" ]]; then
+        case "${MCP_INITIALIZED_CODE}" in
+            200|202) MCP_INITIALIZED_HTTP_OK="true" ;;
+        esac
+    fi
+    [[ "${MCP_INITIALIZED_HTTP_OK}" == "true" ]] || {
+        log "ERROR: MCP notifications/initialized must return HTTP 200 or 202 with an empty body (got HTTP ${MCP_INITIALIZED_CODE:-unset})."
         FAILURES=$((FAILURES + 1))
     }
     [[ "${MCP_TOOLS_LIST_CODE}" == "200" && "${MCP_TOOLS_LIST_HAS_GET_INFO}" == "true" ]] || {
@@ -569,8 +579,12 @@ if [[ "${COMPLETION}" == "true" ]]; then
         FAILURES=$((FAILURES + 1))
     }
     if [[ "${APP_VERSION}" == "1.3.1" ]]; then
-        log "ERROR: Splunk MCP Server 1.3.1 records ssl_verify but does not enforce it for internal HTTP calls."
-        FAILURES=$((FAILURES + 1))
+        if [[ "${ACCEPT_NONPRODUCTION_PACKAGE}" == "true" ]]; then
+            log "WARNING: Splunk MCP Server 1.3.1 records ssl_verify but does not enforce it for internal HTTP calls."
+        else
+            log "ERROR: Splunk MCP Server 1.3.1 records ssl_verify but does not enforce it for internal HTTP calls."
+            FAILURES=$((FAILURES + 1))
+        fi
     fi
     assert_integer_range "legacy_token_grace_days" "${SERVER_LEGACY_TOKEN_GRACE_DAYS}" 0 0
     assert_integer_range "mcp_token_default_lifetime_seconds" "${SERVER_TOKEN_DEFAULT_LIFETIME}" 1 86400
