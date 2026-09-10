@@ -348,14 +348,14 @@ class TestCredentialParsing(unittest.TestCase):
     def test_splunk_resolve_profile_selection(self):
         text = textwrap.dedent("""\
             SPLUNK_RESOLVE="default.local:8089:10.0.0.1"
-            PROFILE_lab__SPLUNK_RESOLVE="amd-halo.local:8089:192.168.68.90"
+            PROFILE_lab__SPLUNK_RESOLVE="lab-sh.example.com:8089:10.0.0.50"
         """)
         self.assertEqual(
             parse_credential_file(text)["SPLUNK_RESOLVE"], "default.local:8089:10.0.0.1"
         )
         self.assertEqual(
             parse_credential_file(text, "lab")["SPLUNK_RESOLVE"],
-            "amd-halo.local:8089:192.168.68.90",
+            "lab-sh.example.com:8089:10.0.0.50",
         )
 
     def test_observability_cloud_keys_allowed(self):
