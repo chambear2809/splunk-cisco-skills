@@ -5,6 +5,7 @@ import getpass
 import json
 import os
 import subprocess
+import sys
 import tarfile
 import tempfile
 import textwrap
@@ -244,6 +245,30 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             self.assertIn("Quote-ProcessArgument $PackagePath", rendered)
             self.assertIn("'INSTALLDIR=' + (Quote-ProcessArgument $SplunkHome)", rendered)
             self.assertIn("user-seed.conf", rendered)
+
+    def test_windows_renderer_can_require_local_system_without_rendering_a_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_script(
+                sys.executable,
+                str(RENDERER),
+                "--output-dir",
+                str(Path(tmpdir) / "rendered"),
+                "--target-os",
+                "windows",
+                "--package-type",
+                "msi",
+                "--package-path",
+                r"C:\Temp\splunkforwarder.msi",
+                "--service-user",
+                "LocalSystem",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            script = (Path(tmpdir) / "rendered/universal-forwarder/install-universal-forwarder.ps1").read_text(encoding="utf-8")
+            self.assertIn("USE_LOCAL_SYSTEM=1", script)
+            self.assertIn("GENRANDOMPASSWORD=1", script)
+            self.assertIn("Get-AuthenticodeSignature", script)
+            self.assertIn("(Resolve-Path -LiteralPath $PackagePath).ProviderPath", script)
+            self.assertIn("Remove-Item -LiteralPath $msiLog", script)
 
     def test_windows_setup_render_defaults_to_render_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

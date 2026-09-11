@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff"
+    "sha256": "daeea0647b08625937bca088b3da970a195d10f91b69cefee770ef2567606b41"
   },
   "skill_records": [
     {
@@ -787,6 +787,11 @@
       "replaced_by": null
     },
     {
+      "name": "splunk-stream-windows-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
       "name": "splunk-connect-for-syslog-setup",
       "status": "canonical",
       "replaced_by": null
@@ -877,6 +882,7 @@
             "splunk-connect-for-syslog-setup",
             "splunk-hec-service-setup",
             "splunk-stream-setup",
+            "splunk-stream-windows-setup",
             "splunk-supported-addons-setup",
             "splunk-universal-forwarder-setup"
           ]

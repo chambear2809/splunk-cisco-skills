@@ -1,5 +1,5 @@
 schema_version: 1
-skill_count: 168
+skill_count: 169
 alias_count: 0
 shared_sections:
   local_skill_mcp_server: |-
@@ -1406,6 +1406,14 @@ skills:
     target: "Splunk Stream stack"
     purpose: "Install and configure Splunk Stream components"
     command_summary: "Install and configure the Splunk Stream stack components, including hybrid Splunk Cloud support, NetFlow receiver configuration, and protocol stream enablement."
+    product: "splunk-platform"
+    capability: "collection-and-forwarding"
+    status: "canonical"
+  - name: "splunk-stream-windows-setup"
+    path: "skills/splunk-stream-windows-setup/SKILL.md"
+    target: "Splunk Stream capture tier on Windows Server"
+    purpose: "Investigate, plan, deploy, validate, and roll back Splunk Stream Forwarder and Npcap on Windows"
+    command_summary: "Investigate Windows Stream readiness, then perform drift-bound installation and validation through local PowerShell, OpenSSH, WinRM, or AWS Systems Manager."
     product: "splunk-platform"
     capability: "collection-and-forwarding"
     status: "canonical"

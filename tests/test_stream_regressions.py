@@ -11,6 +11,56 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write
 
 
 class StreamRegressionTests(ShellScriptRegressionBase):
+    def test_stream_completion_validates_data_internal_macros_and_all_shipped_views(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            shipped_views = [
+                "app_analytics", "capture_ip_addresses", "database_metrics", "dns_activity",
+                "dns_overview", "flow_visualization", "forwarder_groups_management",
+                "http_activity", "http_overview", "info_overview", "interface_metrics",
+                "mount_points", "processor_metrics", "product_tour", "ssl_activity",
+                "stream_data_volume", "stream_estimate", "streamfwd_status", "streams",
+            ]
+            env = self._build_mock_stream_validate_env(
+                tmp_path,
+                target_role="search-tier",
+                state={
+                    "apps": {
+                        "splunk_app_stream": {"version": "8.1.6"},
+                        "Splunk_TA_stream_wire_data": {"version": "8.1.6"},
+                    },
+                    "indexes": ["stream", "netflow"],
+                    "configs": {
+                        "splunk_app_stream:macros:stream_logs": {
+                            "definition": "index=_internal sourcetype=stream:log"
+                        },
+                        "splunk_app_stream:macros:stream_stats": {
+                            "definition": "index=_internal sourcetype=stream:stats"
+                        },
+                    },
+                    "counts": {
+                        "source=stream": 42,
+                        "index=netflow": 0,
+                        "sourcetype=stream:log": 7,
+                        "sourcetype=stream:stats": 9,
+                    },
+                    "views": shipped_views,
+                    "kvstore_status": "ready",
+                },
+            )
+
+            result = self.run_script(
+                "skills/splunk-stream-setup/scripts/validate.sh",
+                "--completion",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Macro stream_logs is aligned", result.stdout)
+            self.assertIn("Shipped Stream view is visible through REST: streamfwd_status", result.stdout)
+            self.assertIn("dashboard data foundations are returning data", result.stdout)
+            self.assertIn("Status: ALL CHECKS PASSED", result.stdout)
+
     def test_stream_indexes_only_cloud_mode_uses_acs_without_session_key(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

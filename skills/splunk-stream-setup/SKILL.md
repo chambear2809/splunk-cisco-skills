@@ -41,6 +41,14 @@ Follow the documented read-only or render-first path whenever it is available.
 This skill does not imply permission to mutate live systems. Require explicit
 apply flags, protected credentials, and operator review for state changes.
 
+For a Windows capture host, delegate host investigation, transport, Npcap,
+`Splunk_TA_stream`, and transactional host validation to the child
+[`splunk-stream-windows-setup`](../splunk-stream-windows-setup/SKILL.md). The
+child supports local elevated PowerShell, Windows OpenSSH, WinRM, and AWS
+Systems Manager. Its read-only investigation and drift-bound plan are mandatory
+before Windows mutation. Return here for search/index-tier setup, protocol
+streams, indexed-data checks, `_internal` evidence, and dashboard completion.
+
 ## Examples
 
 Inspect the supported setup modes before selecting one:
@@ -152,6 +160,11 @@ This skill supports two different deployment patterns:
   `splunk_app_stream`, while `Splunk_TA_stream` runs on forwarders or hosts
   under your control. In Cloud mode, index creation uses ACS and the combined
   `--install` / `--configure-streamfwd` path is intentionally blocked.
+- **Windows capture tier**: use `splunk-stream-windows-setup`. Prefer an x64
+  Universal Forwarder running as LocalSystem. The child blocks Stream capture
+  in Splunk Enterprise 10.4+ on Windows because the platform's required
+  least-privilege service identity conflicts with Stream's documented Windows
+  service-account requirement.
 
 | Item | Value |
 |------|-------|

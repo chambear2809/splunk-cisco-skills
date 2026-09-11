@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "skill": "splunk-stream-windows-setup",
+  "last_verified": "2026-09-10",
+  "target": {
+    "environment": "Dedicated AWS EC2 validation host",
+    "os": "Microsoft Windows Server 2025 Datacenter 64-bit (build 26100)",
+    "instance_type": "t3.small",
+    "transport": "AWS Systems Manager Run Command",
+    "execution_identity": "LocalSystem"
+  },
+  "validated": {
+    "management": {
+      "ssm_agent_online": true,
+      "openssh_service_running": true,
+      "winrm_service_running": true,
+      "temporary_s3_staging_encrypted": true,
+      "temporary_objects_removed": true
+    },
+    "universal_forwarder_prerequisite": {
+      "source_skill": "splunk-universal-forwarder-setup",
+      "version": "10.4.3",
+      "build": "4174a2deda5d",
+      "download_sha512_verified": true,
+      "authenticode_verified_on_target": true,
+      "service_name": "SplunkForwarder",
+      "service_state": "Running",
+      "service_account": "LocalSystem",
+      "reboot_required": false
+    },
+    "stream_investigation": {
+      "stream_ta_installed": false,
+      "npcap_installed": false,
+      "active_capture_adapters": 1,
+      "stream_app_endpoint_tested": "https://10.110.253.20:8000/en-US/custom/splunk_app_stream",
+      "stream_app_tcp_reachable": false,
+      "plan_status": "blocked",
+      "blocker_code": "stream_app_unreachable"
+    }
+  },
+  "not_validated": [
+    "Splunk_TA_stream and bundled Npcap apply",
+    "streamfwd process and packet capture",
+    "Universal Forwarder outputs to a reachable index tier",
+    "indexed source=stream data",
+    "stream:log and stream:stats internal data",
+    "Stream macros and shipped dashboard data"
+  ],
+  "notes": [
+    "The saved Splunk Cloud stack was absent from ACS and its saved hostname did not resolve.",
+    "The saved on-premises Stream endpoint was not routable from the validation VPC.",
+    "The workflow correctly refused Stream mutation and emitted a blocked plan.",
+    "Two initial SSM/PowerShell defects were found live (ordered parameter typing and native MSI path canonicalization), fixed, regression-tested, and revalidated before the successful prerequisite apply."
+  ]
+}

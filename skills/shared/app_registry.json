@@ -2303,6 +2303,20 @@
       "notes": "Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects."
     },
     {
+      "skill": "splunk-stream-windows-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "required",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Windows x64 Stream capture-host child: investigation-first local PowerShell, OpenSSH, WinRM, and AWS Systems Manager execution with Npcap and transactional Splunk_TA_stream management."
+    },
+    {
       "skill": "cisco-spaces-setup",
       "role_support": {
         "search-tier": "supported",

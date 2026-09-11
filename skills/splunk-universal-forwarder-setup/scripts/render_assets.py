@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shlex
@@ -243,6 +244,10 @@ def validate(args: argparse.Namespace) -> None:
         package_type = detected_package_type
         args.package_type = detected_package_type
     validate_package_type_for_target(package_type, args.target_os)
+    if args.target_os == "windows" and args.service_user and args.service_user.lower() != "localsystem":
+        die("Windows rendered apply supports only --service-user LocalSystem; named service accounts require a separately protected service-password workflow.")
+    if args.target_os == "windows" and args.enroll == "splunk-cloud" and not args.admin_password_file:
+        die("Windows Splunk Cloud enrollment requires --admin-password-file so the credentials app can be installed without exposing a password.")
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -250,6 +255,17 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.write_text(content, encoding="utf-8")
     if executable:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def local_sha256(path_value: str) -> str:
+    path = Path(path_value).expanduser()
+    if not path.is_file():
+        return ""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def clean_render_dir(render_dir: Path) -> None:
@@ -313,6 +329,7 @@ def render_windows_script(args: argparse.Namespace) -> str:
 param(
     [string]$PackagePath = {ps_quote(package_path)},
     [string]$SplunkHome = {ps_quote(splunk_home)},
+    [string]$ServiceUser = {ps_quote(args.service_user)},
     [string]$AdminUser = {ps_quote(args.admin_user)},
     [string]$AdminPasswordFile = {ps_quote(args.admin_password_file)},
     [ValidateSet('none','deployment-server','enterprise-indexers','splunk-cloud')]
@@ -359,10 +376,20 @@ function Quote-ProcessArgument([string]$Value) {{
 
 Assert-Administrator
 Require-File $PackagePath 'Universal Forwarder MSI package'
-Require-File $AdminPasswordFile 'Admin password file'
-
-$password = [IO.File]::ReadAllText($AdminPasswordFile).TrimEnd("`r", "`n")
-if ([string]::IsNullOrEmpty($password)) {{ throw 'Admin password file is empty.' }}
+$PackagePath = (Resolve-Path -LiteralPath $PackagePath).ProviderPath
+$signature = Get-AuthenticodeSignature -LiteralPath $PackagePath
+if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Splunk') {{
+    throw "Universal Forwarder MSI Authenticode validation failed: $($signature.Status), signer $($signature.SignerCertificate.Subject)"
+}}
+$password = ''
+if (-not [string]::IsNullOrWhiteSpace($AdminPasswordFile)) {{
+    Require-File $AdminPasswordFile 'Admin password file'
+    $password = [IO.File]::ReadAllText($AdminPasswordFile).TrimEnd("`r", "`n")
+    if ([string]::IsNullOrEmpty($password)) {{ throw 'Admin password file is empty.' }}
+}}
+if ($ServiceUser -and $ServiceUser -ine 'LocalSystem') {{
+    throw 'This rendered workflow supports only LocalSystem or the MSI default account. Named service accounts require a separate protected service-password workflow.'
+}}
 
 $msiLog = Join-Path $env:TEMP 'splunkforwarder-msi.log'
 $msiArgs = @(
@@ -374,12 +401,17 @@ $msiArgs = @(
     '/quiet',
     '/L*v', (Quote-ProcessArgument $msiLog)
 )
+if ($ServiceUser -ieq 'LocalSystem') {{ $msiArgs += 'USE_LOCAL_SYSTEM=1' }}
+if ([string]::IsNullOrEmpty($password)) {{ $msiArgs += 'GENRANDOMPASSWORD=1' }}
 $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList ($msiArgs -join ' ') -Wait -PassThru
-if ($process.ExitCode -ne 0) {{ throw "msiexec failed with exit code $($process.ExitCode). See $msiLog." }}
+if ($process.ExitCode -notin @(0, 3010)) {{ throw "msiexec failed with exit code $($process.ExitCode). See $msiLog." }}
+$rebootRequired = $process.ExitCode -eq 3010
 
 $localDir = Join-Path $SplunkHome 'etc\\system\\local'
 $userSeed = Join-Path $localDir 'user-seed.conf'
-Write-TextFile $userSeed "[user_info]`nUSERNAME = $AdminUser`nPASSWORD = $password`n"
+if (-not [string]::IsNullOrEmpty($password)) {{
+    Write-TextFile $userSeed "[user_info]`nUSERNAME = $AdminUser`nPASSWORD = $password`n"
+}}
 
 if ($Enroll -eq 'deployment-server') {{
     if ([string]::IsNullOrWhiteSpace($DeploymentServer)) {{ throw 'DeploymentServer is required.' }}
@@ -398,6 +430,10 @@ $splunkExe = Join-Path $SplunkHome 'bin\\splunk.exe'
 & $splunkExe start --accept-license --answer-yes --no-prompt
 Remove-Item -LiteralPath $userSeed -Force -ErrorAction SilentlyContinue
 Get-ChildItem -LiteralPath $localDir -Filter 'user-seed.conf.bak.*' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+if ([string]::IsNullOrEmpty($password)) {{
+    Remove-Item -LiteralPath (Join-Path $env:TEMP 'splunk.log') -Force -ErrorAction SilentlyContinue
+}}
+Remove-Item -LiteralPath $msiLog -Force -ErrorAction SilentlyContinue
 
 if ($Enroll -eq 'splunk-cloud') {{
     "$AdminUser`n$password`n" | & $splunkExe install app $CloudCredentialsPackage
@@ -407,7 +443,18 @@ elseif ($Enroll -in @('deployment-server', 'enterprise-indexers')) {{
     & $splunkExe restart
 }}
 
-Write-Host 'Splunk Universal Forwarder bootstrap completed.'
+$service = Get-CimInstance Win32_Service -Filter "Name='SplunkForwarder'" -ErrorAction Stop
+if ($service.State -ne 'Running') {{ throw "SplunkForwarder service is not running after installation: $($service.State)" }}
+[ordered]@{{
+    schema_version = 1
+    operation = 'BootstrapUniversalForwarder'
+    success = $true
+    version = [string](Get-Item -LiteralPath $splunkExe).VersionInfo.ProductVersion
+    service_name = [string]$service.Name
+    service_state = [string]$service.State
+    service_account = [string]$service.StartName
+    reboot_required = [bool]$rebootRequired
+}} | ConvertTo-Json -Compress
 """
 
 
@@ -515,6 +562,7 @@ def metadata(args: argparse.Namespace, files: list[str]) -> dict[str, object]:
         "target_arch": args.target_arch,
         "package_type": args.package_type,
         "package_path": args.package_path,
+        "package_sha256": local_sha256(args.package_path),
         "splunk_home": args.splunk_home or default_home(args.target_os),
         "service_user": args.service_user or default_service_user(args.target_os),
         "enroll": args.enroll,

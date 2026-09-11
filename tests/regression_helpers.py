@@ -1228,15 +1228,21 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     out(json.dumps({"entry": [{"name": idx}]}))
                 out(json.dumps({"entry": []}))
 
-            if "/servicesNS/nobody/Splunk_TA_stream/configs/conf-" in path:
+            if "/servicesNS/nobody/" in path and "/configs/conf-" in path:
+                app = path.split("/servicesNS/nobody/", 1)[1].split("/", 1)[0]
                 conf = path.split("/configs/conf-", 1)[1].split("/", 1)[0]
                 stanza = unquote(path.rsplit("/", 1)[-1].split("?", 1)[0])
-                content = state.get("configs", {}).get(f"{conf}:{stanza}")
+                content = state.get("configs", {}).get(f"{app}:{conf}:{stanza}")
+                if content is None:
+                    content = state.get("configs", {}).get(f"{conf}:{stanza}")
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if content else 404)
                 if content:
                     out(json.dumps({"entry": [{"content": content}]}))
                 out(json.dumps({"entry": []}))
+
+            if path.endswith("/servicesNS/nobody/splunk_app_stream/data/ui/views"):
+                out(json.dumps({"entry": [{"name": name} for name in state.get("views", [])]}))
 
             if path.endswith("/services/search/jobs") and method == "POST":
                 body = decode_form(data)
@@ -1246,6 +1252,10 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     count = counts.get("source=stream", 0)
                 elif "index=netflow" in search:
                     count = counts.get("index=netflow", 0)
+                elif "sourcetype=stream:log" in search:
+                    count = counts.get("sourcetype=stream:log", 0)
+                elif "sourcetype=stream:stats" in search:
+                    count = counts.get("sourcetype=stream:stats", 0)
                 else:
                     count = 0
                 out(json.dumps({"results": [{"count": str(count)}]}))

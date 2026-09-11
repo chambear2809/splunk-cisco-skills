@@ -131,6 +131,7 @@ plan by itself is not successful completion of a requested live change.
 | `splunk-connect-for-snmp-setup` | `docker` or `podman` for Compose paths; `kubectl` and `helm` for Kubernetes paths. | HEC token/index readiness; SNMP polling/trap source details; Kubernetes or container host access. |
 | `splunk-connect-for-syslog-setup` | `docker` or `podman` for host paths; `kubectl` and `helm` for Kubernetes paths; `sudo` for system host setup. | HEC token/index readiness; syslog source/network port planning; Kubernetes or collector host access. |
 | `splunk-stream-setup` | Shared baseline. | Splunk app workflow access; Stream Forwarder host/network placement; packet capture or NetFlow/IPFIX source access. |
+| `splunk-stream-windows-setup` | Python 3 plus one controller path: local Windows PowerShell, `ssh`/`scp`, PowerShell Remoting, or AWS CLI with temporary private S3 staging. | Supported x64 Windows Server; elevated LocalSystem/Administrator execution; LocalSystem or verified Administrator Splunk service; reachable Stream app endpoint; reviewed Stream 8.1.6 package; Npcap change approval. |
 | `splunk-universal-forwarder-setup` | `ssh`, `sudo`; `sshpass` for password-based remote bootstrap. | Target Linux/macOS/Windows hosts; Splunk package or Splunk Cloud credentials package; deployment server or indexer output details. |
 
 ## Security And Response

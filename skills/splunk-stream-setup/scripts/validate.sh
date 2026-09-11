@@ -4,18 +4,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
     cat <<'EOF'
-Usage: bash skills/splunk-stream-setup/scripts/validate.sh [--completion] [--help]
+Usage: bash skills/splunk-stream-setup/scripts/validate.sh [--completion] [--expect-netflow-data] [--help]
 
 Validates the deployed Splunk Stream stack using configured Splunk credentials.
 Use --completion (or --strict) to treat every warning as a failed completion gate.
+Use --expect-netflow-data when a NetFlow/sFlow receiver is part of the reviewed deployment.
 EOF
 }
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 COMPLETION=false
+EXPECT_NETFLOW_DATA=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --completion|--strict) COMPLETION=true; shift ;;
+        --expect-netflow-data) EXPECT_NETFLOW_DATA=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -103,7 +106,7 @@ if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream"; then
     pass "Splunk TA Stream (Forwarder) installed (v${version})"
 else
     if stream_role_is_search_tier; then
-        warn "Splunk TA Stream (Forwarder) is not installed on this search-tier target. Validate a heavy or universal forwarder separately."
+        info "Splunk TA Stream (Forwarder) is not installed on this search-tier target (expected); validate the Windows or other capture-host child separately."
     elif stream_role_is_indexer; then
         info "Splunk TA Stream (Forwarder) is not installed on this indexer target (expected on dedicated indexers)."
     elif ${CLOUD_MODE}; then
@@ -155,7 +158,7 @@ log ""
 log "--- Stream Forwarder Config ---"
 
 if stream_role_is_search_tier; then
-    warn "Forwarder-side streamfwd validation is skipped on the search tier. Validate Splunk_TA_stream against the forwarder management endpoint."
+    info "Forwarder-side streamfwd validation is skipped on the search tier and delegated to the capture-host child."
 elif stream_role_is_indexer; then
     info "Forwarder-side streamfwd validation is skipped on the indexer tier."
 elif ${CLOUD_MODE}; then
@@ -195,7 +198,7 @@ log ""
 log "--- Stream Input (inputs.conf) ---"
 
 if stream_role_is_search_tier; then
-    warn "Forwarder-side streamfwd input validation is skipped on the search tier."
+    info "Forwarder-side streamfwd input validation is skipped on the search tier and delegated to the capture-host child."
 elif stream_role_is_indexer; then
     info "Forwarder-side streamfwd input validation is skipped on the indexer tier."
 elif ${CLOUD_MODE}; then
@@ -246,15 +249,94 @@ fi
 log ""
 log "--- Data Flow Check ---"
 
-for search_target in "source=stream" "index=netflow"; do
-    event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where ${search_target}" "count")
+stream_event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where source=stream" "count")
+netflow_event_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=netflow" "count")
+stream_log_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=_internal sourcetype=stream:log" "count")
+stream_stats_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| tstats count where index=_internal sourcetype=stream:stats" "count")
 
-    if [[ "${event_count}" -gt 0 ]] 2>/dev/null; then
-        pass "${search_target} has ${event_count} events"
-    else
-        warn "${search_target} has no events (may be normal if just configured)"
+if [[ "${stream_event_count}" -gt 0 ]] 2>/dev/null; then
+    pass "source=stream has ${stream_event_count} events"
+else
+    warn "source=stream has no events; packet-capture completion remains open"
+fi
+
+if [[ "${netflow_event_count}" -gt 0 ]] 2>/dev/null; then
+    pass "index=netflow has ${netflow_event_count} events"
+elif ${EXPECT_NETFLOW_DATA}; then
+    warn "index=netflow has no events even though NetFlow/sFlow data is expected"
+else
+    info "index=netflow has no events and no NetFlow/sFlow completion requirement was declared"
+fi
+
+if [[ "${stream_log_count}" -gt 0 ]] 2>/dev/null; then
+    pass "_internal sourcetype=stream:log has ${stream_log_count} events"
+else
+    warn "_internal sourcetype=stream:log has no events; forward Stream internal logs to support administration"
+fi
+
+if [[ "${stream_stats_count}" -gt 0 ]] 2>/dev/null; then
+    pass "_internal sourcetype=stream:stats has ${stream_stats_count} events"
+else
+    warn "_internal sourcetype=stream:stats has no events; Stream Forwarder Status and volume dashboards cannot be completed"
+fi
+
+# --- Shipped macros and dashboards ---
+if stream_role_is_search_tier || { ! stream_role_is_forwarder && ! stream_role_is_indexer; }; then
+    log ""
+    log "--- Shipped Macros and Dashboards ---"
+
+    for macro_name in stream_logs stream_stats; do
+        if rest_check_conf "${SK}" "${SPLUNK_URI}" "splunk_app_stream" "macros" "${macro_name}"; then
+            macro_definition=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "splunk_app_stream" "macros" "${macro_name}" "definition")
+            expected_sourcetype="stream:log"
+            [[ "${macro_name}" == "stream_stats" ]] && expected_sourcetype="stream:stats"
+            if [[ "${macro_definition}" == *"index=_internal"* && "${macro_definition}" == *"sourcetype=${expected_sourcetype}"* ]]; then
+                pass "Macro ${macro_name} is aligned to index=_internal sourcetype=${expected_sourcetype}"
+            else
+                warn "Macro ${macro_name} is present but not aligned to index=_internal sourcetype=${expected_sourcetype}"
+            fi
+        else
+            warn "Shipped macro ${macro_name} is unavailable"
+        fi
+    done
+
+    shipped_views=(
+        app_analytics capture_ip_addresses database_metrics dns_activity dns_overview
+        flow_visualization forwarder_groups_management http_activity http_overview
+        info_overview interface_metrics mount_points processor_metrics product_tour
+        ssl_activity stream_data_volume stream_estimate streamfwd_status streams
+    )
+    view_names=$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/servicesNS/nobody/splunk_app_stream/data/ui/views?count=0&output_mode=json" 2>/dev/null \
+        | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    payload = {}
+for entry in payload.get("entry", []):
+    name = entry.get("name")
+    if name:
+        print(name)
+' 2>/dev/null || true)
+    missing_views=()
+    for view_name in "${shipped_views[@]}"; do
+        if [[ $'\n'"${view_names}"$'\n' == *$'\n'"${view_name}"$'\n'* ]]; then
+            pass "Shipped Stream view is visible through REST: ${view_name}"
+        else
+            missing_views+=("${view_name}")
+        fi
+    done
+    if (( ${#missing_views[@]} > 0 )); then
+        warn "Missing or inaccessible shipped Stream views: ${missing_views[*]}"
     fi
-done
+
+    if [[ "${stream_event_count}" -gt 0 && "${stream_stats_count}" -gt 0 && "${stream_log_count}" -gt 0 ]] 2>/dev/null; then
+        pass "Informational and admin dashboard data foundations are returning data"
+    else
+        warn "Dashboard data foundations are incomplete; require source=stream plus stream:stats and stream:log data"
+    fi
+fi
 
 if stream_role_is_forwarder || stream_role_is_indexer; then
     info "KV Store check skipped on ${STREAM_VALIDATE_ROLE:-this target}; Stream UI KV Store health belongs on the search tier."

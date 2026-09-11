@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff"
+    "sha256": "daeea0647b08625937bca088b3da970a195d10f91b69cefee770ef2567606b41"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -161,6 +161,7 @@
     "splunk-soar-setup",
     "splunk-spl2-pipeline-kit",
     "splunk-stream-setup",
+    "splunk-stream-windows-setup",
     "splunk-supported-addons-setup",
     "splunk-syslog-web-proxy-ta-setup",
     "splunk-sysmon-ta-setup",
@@ -409,6 +410,19 @@
           "skills/shared/references/splunk_observability_dbmon_validation_evidence.json"
         ],
         "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai. Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified."
+      }
+    },
+    "splunk-stream-windows-setup": {
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "Dedicated AWS EC2 Windows Server 2025 x64 validation host using Systems Manager Run Command"
+        ],
+        "last_verified": "2026-09-10",
+        "evidence": [
+          "skills/shared/references/splunk_stream_windows_validation_evidence.json"
+        ],
+        "notes": "Live investigation, encrypted temporary S3 staging, official UF 10.4.3 download verification, target Authenticode validation, LocalSystem MSI bootstrap, service readback, and post-apply reinventory passed. Stream apply remained correctly blocked because the saved Splunk Cloud stack no longer exists and the saved on-premises Stream endpoint is unroutable from the validation VPC; Npcap, Splunk_TA_stream, streamfwd, indexed data, internal telemetry, and dashboard completion were not claimed."
       }
     }
   }
