@@ -269,14 +269,14 @@ fleet design, dashboards, known issues, and citations, use the parent
 | NIC reconfiguration/Windows update | Reinvestigate interfaces, restart the Splunk service if approved, and prove capture resumed |
 | No indexed data | Check endpoint reachability, stream enablement, outputs, receiver/listener, `_internal`, then parent data/dashboard validation |
 
-## TA completion gate
+## TA Completion Gate
 
 Apply [the shared TA completion gate](../shared/ta_completion_gate.md). Evidence
-must include configured and enabled ingestion, fresh data in the intended
-indexes/source types, and the shipped Stream dashboards visible, macro-aligned,
-and returning data. `Splunk_TA_stream_wire_data` ships no user-facing views;
-record that package evidence explicitly while validating dashboards from
-`splunk_app_stream`.
+must include the configured and enabled data ingest path, fresh data in the
+intended indexes/source types, and the pre-built/package-shipped dashboards
+visible, macro-aligned, and returning data. `Splunk_TA_stream_wire_data` ships
+no user-facing views; record explicitly that the package ships no dashboards
+while validating dashboards from `splunk_app_stream`.
 
 ## Examples
 

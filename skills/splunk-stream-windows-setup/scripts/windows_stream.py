@@ -783,7 +783,11 @@ def add_transport_arguments(parser: argparse.ArgumentParser, *, optional: bool =
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
-        description="Investigation-first Splunk Stream 8.1.6 deployment for Windows Server."
+        description="Investigation-first Splunk Stream 8.1.6 deployment for Windows Server.",
+        epilog=(
+            "Actions: investigate, plan (render-only), bootstrap-uf, apply, validate, "
+            "and rollback. Review the plan before any mutation."
+        ),
     )
     sub = root.add_subparsers(dest="command", required=True)
 
