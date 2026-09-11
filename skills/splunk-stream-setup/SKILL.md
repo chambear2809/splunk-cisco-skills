@@ -245,11 +245,15 @@ In Splunk Cloud, `--indexes-only` creates these indexes through ACS.
 ```bash
 bash skills/splunk-stream-setup/scripts/setup.sh \
   --configure-streamfwd \
-  --ip-addr "10.110.253.20" \
+  --ip-addr "<capture-host-ip>" \
   --port 8889 \
-  --splunk-web-url "https://10.110.253.20:8000" \
+  --splunk-web-url "https://<stream-search-tier-host>:8000" \
   --ssl-verify false
 ```
+
+Use the capture host's address for `--ip-addr` and the reachable Stream
+search-tier/app endpoint for `--splunk-web-url`; these values are deployment
+specific and must not be copied from an example.
 
 Writes `local/streamfwd.conf` and `local/inputs.conf` in the Stream TA.
 For Splunk Cloud, run this step against the forwarder-side Splunk instance you
@@ -261,9 +265,9 @@ Optional NetFlow receiver:
 ```bash
 bash skills/splunk-stream-setup/scripts/setup.sh \
   --configure-streamfwd \
-  --ip-addr "10.110.253.20" \
+  --ip-addr "<capture-host-ip>" \
   --port 8889 \
-  --splunk-web-url "https://10.110.253.20:8000" \
+  --splunk-web-url "https://<stream-search-tier-host>:8000" \
   --ssl-verify false \
   --netflow-ip "0.0.0.0" \
   --netflow-port 9995 \
