@@ -6,7 +6,7 @@ This is the umbrella's general troubleshooting reference. For specific deep-dive
 - `dual-pipeline-filtering.md` — pipeline / filter issues
 - `nim-scrape-modes.md` — NIM scrape issues
 - `composition-and-overlay-merge.md` — child composition issues
-- `production-troubleshooting-atl-ocp2.md` — full production case study
+- `production-troubleshooting-reference.md` — full OpenShift production case study
 - `openshift-scc.md` — OpenShift SCC issues
 - `workshop-multi-tenant.md` — workshop mode issues
 
@@ -183,6 +183,6 @@ If after these steps you still can't get metrics flowing, gather:
 2. Output of `helm get values splunk-otel-collector -n splunk-otel`.
 3. Output of `kubectl -n splunk-otel logs --tail=500 daemonset/<release>-splunk-otel-collector-agent`.
 4. Output of `kubectl get clusterrole splunk-otel-collector -o yaml`.
-5. Verification of the eight production atl-ocp2 issues (`production-troubleshooting-atl-ocp2.md`).
+5. Verification of the eight OpenShift production issues (`production-troubleshooting-reference.md`).
 
 This is enough for a Splunk support escalation or a focused debug session.

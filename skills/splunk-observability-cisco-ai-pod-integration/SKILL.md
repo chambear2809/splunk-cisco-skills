@@ -78,7 +78,7 @@ This is the **AI Pod umbrella** that ties together every component skill needed 
 2. [splunk-observability-cisco-intersight-integration](../splunk-observability-cisco-intersight-integration/SKILL.md) for Cisco UCS metrics via Intersight OTel deployment.
 3. [splunk-observability-nvidia-gpu-integration](../splunk-observability-nvidia-gpu-integration/SKILL.md) for NVIDIA GPU telemetry via DCGM Exporter.
 
-And adds **AI-Pod-specific bits** documented in the configuration guide and production-validated by the atl-ocp2 OpenShift cluster:
+And adds **AI-Pod-specific bits** documented in the configuration guide and production-validated by an OpenShift deployment:
 
 - NIM scrapes (multi-job: llm/embedqa/rerankqa, port 8000 `/v1/metrics`).
 - vLLM scrape (port 8000 `/metrics`).
@@ -203,4 +203,4 @@ Runs each child skill's `validate.sh` recursively, then checks the composed over
 
 With `--live`, validation prefers `oc`, falls back to `kubectl`, passes `--live` through to child validators, and fails on Intersight OTLP export errors such as `unknown service opentelemetry.proto.collector.metrics.v1.MetricsService`.
 
-See `reference.md` and `references/composition-and-overlay-merge.md`, `nim-vllm-scrape-catalog.md`, `milvus-storage-redfish.md`, `openshift-scc.md`, `workshop-multi-tenant.md`, `ai-pod-dashboards-catalog.md`, `endpoints-rbac-patch.md`, `dual-pipeline-filtering.md`, `nim-scrape-modes.md`, `production-troubleshooting-atl-ocp2.md`, `troubleshooting.md` for the full annexes.
+See `reference.md` and `references/composition-and-overlay-merge.md`, `nim-vllm-scrape-catalog.md`, `milvus-storage-redfish.md`, `openshift-scc.md`, `workshop-multi-tenant.md`, `ai-pod-dashboards-catalog.md`, `endpoints-rbac-patch.md`, `dual-pipeline-filtering.md`, `nim-scrape-modes.md`, `production-troubleshooting-reference.md`, `troubleshooting.md` for the full annexes.

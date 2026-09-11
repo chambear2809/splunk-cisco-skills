@@ -1,0 +1,19 @@
+# Non-secret intake for splunk-stream-windows-setup
+TRANSPORT=ssm
+WINDOWS_HOST_OR_INSTANCE=i-0123456789abcdef0
+AWS_REGION=us-east-1
+SSM_STAGING_S3_URI=s3://private-bucket/splunk-stream-staging
+STREAM_APP_URL=https://splunk.example.com:8000/en-US/custom/splunk_app_stream
+SPLUNK_HOME=
+BIND_IP=auto
+STREAMFWD_PORT=8889
+SSL_VERIFY=true
+NPCAP_POLICY=install-if-missing
+NETFLOW_IP=
+NETFLOW_PORT=
+NETFLOW_DECODER=netflow
+
+# Paths only; never put secret values in this file.
+SSH_KEY_FILE=
+SSH_KNOWN_HOSTS_FILE=
+WINRM_PASSWORD_FILE=

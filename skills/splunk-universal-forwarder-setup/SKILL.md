@@ -151,10 +151,17 @@ bash skills/splunk-universal-forwarder-setup/scripts/setup.sh \
   --execution render \
   --source local \
   --file /tmp/splunkforwarder.msi \
+  --service-user LocalSystem \
   --enroll enterprise-indexers \
   --server-list idx01.example.com:9997,idx02.example.com:9997 \
   --admin-password-file C:\\Temp\\uf_admin_password.txt
 ```
+
+Use `--service-user LocalSystem` only for a reviewed add-on requirement such as
+Splunk Stream packet capture. If `--admin-password-file` is omitted, the
+Windows handoff asks the MSI to generate a random admin password and removes
+the temporary installer logs that contain it; manage the forwarder through its
+deployment configuration rather than trying to recover that discarded secret.
 
 Latest-resolution smoke without downloading a package:
 

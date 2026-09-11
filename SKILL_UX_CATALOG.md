@@ -1,6 +1,6 @@
 # Skill UX Catalog
 
-_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
 
 This product-first catalog is the user-facing entry point for choosing and
 consuming a skill. Canonical skill directories remain flat at
@@ -20,7 +20,7 @@ skill summary to identify cross-product handoffs.
 
 | Product | Scope | Skills |
 | --- | --- | --- |
-| [Splunk Platform](#splunk-platform) | Capabilities shared by Splunk Cloud Platform and Splunk Enterprise, including applications, data management, collection, and data-source integrations. | 62 |
+| [Splunk Platform](#splunk-platform) | Capabilities shared by Splunk Cloud Platform and Splunk Enterprise, including applications, data management, collection, and data-source integrations. | 63 |
 | [Splunk Cloud Platform](#splunk-cloud-platform) | Cloud-only administration, archive, onboarding, and ingest-processing capabilities for Splunk Cloud Platform. | 5 |
 | [Splunk Enterprise](#splunk-enterprise) | Self-managed Splunk Enterprise runtime, topology, storage, security, and operational administration. | 13 |
 | [Splunk Enterprise Security and Security Portfolio](#splunk-enterprise-security-and-security-portfolio) | Splunk Enterprise Security lifecycle, security content, adjacent security products, and security-specific integrations. | 13 |
@@ -58,7 +58,8 @@ Capabilities shared by Splunk Cloud Platform and Splunk Enterprise, including ap
 | `splunk-connect-for-snmp-setup` | Canonical | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` plus 6 more | `bash skills/splunk-connect-for-snmp-setup/scripts/setup.sh --help` | `bash skills/splunk-connect-for-snmp-setup/scripts/validate.sh --help` | `reference.md` |
 | `splunk-connect-for-syslog-setup` | Canonical | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` plus 7 more | `bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh --help` | `bash skills/splunk-connect-for-syslog-setup/scripts/validate.sh --help` | `reference.md` |
 | `splunk-hec-service-setup` | Canonical | Prepare reusable HEC token configuration, allowed indexes, Enterprise inputs.conf assets, and Splunk Cloud ACS payloads | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-hec-service-setup/scripts/setup.sh --help` | `bash skills/splunk-hec-service-setup/scripts/validate.sh --help` | `reference.md` |
-| `splunk-stream-setup` | Canonical | Install and configure Splunk Stream components | Splunk Cloud Platform 10.5.2605: conditional. | Start with `templates/splunk-cloud-hf-netflow-any/README.md` plus 3 more | `bash skills/splunk-stream-setup/scripts/setup.sh --help` | `bash skills/splunk-stream-setup/scripts/validate.sh --help` | `reference.md` |
+| `splunk-stream-setup` | Canonical | Install and configure Splunk Stream components | Splunk Cloud Platform 10.5.2605: conditional. | Start with `templates/splunk-cloud-hf-netflow-any/README.md` plus 3 more | `bash skills/splunk-stream-setup/scripts/setup.sh --help` | `bash skills/splunk-stream-setup/scripts/validate.sh --help` | `reference.md`, `references/windows.md` |
+| `splunk-stream-windows-setup` | Canonical | Investigate, plan, deploy, validate, and roll back Splunk Stream Forwarder and Npcap on Windows | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-stream-windows-setup/scripts/setup.sh --help` | `bash skills/splunk-stream-windows-setup/scripts/validate.sh --help` | `reference.md` |
 | `splunk-supported-addons-setup` | Canonical | Track official supported-addons coverage and resolve entries to first-class Unix/Linux plans, skill handoffs, or generic install-only paths... | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-supported-addons-setup/scripts/setup.sh --help` | `bash skills/splunk-supported-addons-setup/scripts/validate.sh --help` | `reference.md` |
 | `splunk-universal-forwarder-setup` | Canonical | Bootstrap Linux, macOS, and rendered Windows Universal Forwarders; enroll clients with deployment server, static indexers, or Splunk Cloud... | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-universal-forwarder-setup/scripts/setup.sh --help` | `bash skills/splunk-universal-forwarder-setup/scripts/validate.sh --help` | `reference.md` |
 

@@ -65,7 +65,7 @@ Use `pods` only if:
 - You're in a single-namespace cluster where namespace-scoping is unnecessary.
 - You're prototyping and want to skip the RBAC step.
 
-For the AI Pod production deployment (atl-ocp2), `endpoints` mode was chosen and the RBAC was applied via the umbrella's customRules patch.
+For the AI Pod production deployment, `endpoints` mode was chosen and the RBAC was applied via the umbrella's customRules patch.
 
 ## Mixed mode: per-model overrides
 

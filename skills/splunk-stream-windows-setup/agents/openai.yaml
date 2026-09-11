@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk Stream Windows Setup"
+  short_description: "Deploy Splunk Stream capture on Windows"
+  default_prompt: "Use $splunk-stream-windows-setup to investigate, plan, deploy, and validate Splunk Stream capture on Windows."

@@ -96,14 +96,14 @@ Run a non-mutating preflight first:
 
 ```bash
 bash skills/cisco-defenseclaw-deskside-setup/scripts/setup.sh \
-  --host 192.168.68.90 --user cisco
+  --host "<deskside-host>" --user cisco
 ```
 
 Apply the current Cisco release and switch Lemonade to the desired model:
 
 ```bash
 bash skills/cisco-defenseclaw-deskside-setup/scripts/setup.sh \
-  --host 192.168.68.90 --user cisco \
+  --host "<deskside-host>" --user cisco \
   --release latest \
   --model Qwen3.6-27B-GGUF \
   --replace-active-model --apply
@@ -130,7 +130,7 @@ Validate the model endpoint, configured judge, and gateway afterward:
 
 ```bash
 bash skills/cisco-defenseclaw-deskside-setup/scripts/validate.sh \
-  --host 192.168.68.90 --user cisco --live --check-inference \
+  --host "<deskside-host>" --user cisco --live --check-inference \
   --expect-mode observe
 ```
 
@@ -138,12 +138,12 @@ After a clean observe-mode Codex canary, explicitly enable enforcement:
 
 ```bash
 bash skills/cisco-defenseclaw-deskside-setup/scripts/setup.sh \
-  --host 192.168.68.90 --user cisco \
+  --host "<deskside-host>" --user cisco \
   --release 0.8.3 --model Qwen3.6-27B-GGUF \
   --replace-active-model --guardrail-mode action --apply
 
 bash skills/cisco-defenseclaw-deskside-setup/scripts/validate.sh \
-  --host 192.168.68.90 --user cisco --live --check-inference \
+  --host "<deskside-host>" --user cisco --live --check-inference \
   --expect-mode action
 ```
 

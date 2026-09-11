@@ -1,6 +1,6 @@
 # Deployment Role Matrix
 
-_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `4bb6aab4661bc8efe961cc511cfa370430bd8bc0f0b51fdad0f3a85a9f4a89ff`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
+_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
 
 This document defines the repo's role-based placement model across all
 supported Splunk deployment topologies.
@@ -119,6 +119,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-ai-ml-toolkit-setup` | Canonical | Required | None | None | None | Supported | External collector | Search-tier AI Toolkit/MLTK, PSC, and optional DSDL app workflow with external runtime handoffs for Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped images, LLM providers, Connections, Container Management, DSDL API/health/telemetry, and legacy anomaly migration. |
 | `splunk-mcp-server-setup` | Canonical | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Canonical | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
+| `splunk-stream-windows-setup` | Canonical | None | None | Supported | Required | None | Search tier | Windows x64 Stream capture-host child: investigation-first local PowerShell, OpenSSH, WinRM, and AWS Systems Manager execution with Npcap and transactional Splunk_TA_stream management. |
 | `cisco-spaces-setup` | Canonical | Supported | None | Supported | None | None | None | Cisco Spaces firehose collector app with UCC REST handlers for stream configuration and activation token encryption. |
 | `cisco-scan-setup` | Canonical | Required | None | None | None | None | None | Search-head-only catalog and management app. No data ingestion — provides product catalog UI, ecosystem intelligence, and Splunkbase analytics. |
 | `cisco-thousandeyes-mcp-setup` | Canonical | None | None | None | None | None | None | Cisco ThousandEyes MCP Server bridge for Cursor / Claude / Codex / VS Code / AWS Kiro AI assistants. No Splunk Platform runtime placement; operator-side MCP wiring only. |

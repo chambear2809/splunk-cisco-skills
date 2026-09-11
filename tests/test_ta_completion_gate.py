@@ -26,6 +26,7 @@ TA_COMPANION_SKILLS = {
     "splunk-observability-cloud-integration-setup",
     "splunk-observability-otel-collector-setup",
     "splunk-stream-setup",
+    "splunk-stream-windows-setup",
     "splunk-supported-addons-setup",
 }
 

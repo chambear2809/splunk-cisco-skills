@@ -531,6 +531,7 @@ PRODUCT_ROUTE_CATALOG = [
         "covered_skill_names": [
             "splunk-amazon-kinesis-firehose-setup", "splunk-app-install", "splunk-db-connect-setup",
             "splunk-microsoft-cloud-setup", "splunk-supported-addons-setup",
+            "splunk-stream-windows-setup",
         ],
         "covered_skill_prefixes": [],
         "covered_skill_suffixes": ["-ta-setup"],

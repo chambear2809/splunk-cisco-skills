@@ -24,7 +24,7 @@ We rename our scraper to `receiver_creator/dcgm-cisco`. This is a unique name no
 - Our `receiver_creator/dcgm-cisco` runs alongside the chart's `receiver_creator/nvidia` (if not disabled).
 - We can give our scraper its own dedicated pipeline (`metrics/cisco-ai-pods` or `metrics/nvidia-metrics`) without filter/exclude processing.
 
-## What the production atl-ocp2 deployment does
+## What the production reference deployment does
 
 The production `6-splunk-otel-collector-values.yaml` from `otel-gruve` uses exactly this pattern:
 

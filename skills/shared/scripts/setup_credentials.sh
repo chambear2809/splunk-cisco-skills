@@ -193,7 +193,7 @@ echo ""
 read -rp "Add Splunk Cloud ACS settings? [y/N]: " add_cloud
 if [[ "${add_cloud}" =~ ^[yY] ]]; then
     read -rp "ACS stack identifier (required for ACS; for staging use the prefix before .stg.splunkcloud.com): " splunk_cloud_stack
-    read -rp "Target specific ACS search head prefix (optional; example: sh-i-0910d0dfdb9ed913a or shc1): " splunk_cloud_search_head
+    read -rp "Target specific ACS search head prefix (optional; example: <search-head-prefix> or shc1): " splunk_cloud_search_head
     read -rp "ACS server URL (default: ${acs_server}): " acs_server_input
     acs_server="${acs_server_input:-${acs_server}}"
     read -rp "Default searchable days for ACS-created indexes (default: 90): " searchable_days_input

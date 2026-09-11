@@ -174,6 +174,27 @@ def test_iam_policies_have_version_and_statements(tmp_path: Path) -> None:
         assert isinstance(body["Statement"], list) and body["Statement"]
 
 
+def test_iam_trust_policy_uses_response_placeholder_without_live_arn() -> None:
+    renderer = _load_renderer()
+    spec = renderer.validate_spec(_spec(realm="us1"))
+
+    policy = renderer.render_iam_trust_policy(spec)
+    principal = policy["Statement"][0]["Principal"]["AWS"]
+
+    assert principal == renderer.SPLUNK_AWS_ACCOUNT_ARN_PLACEHOLDER
+    assert "${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}" in principal
+
+
+def test_iam_trust_policy_accepts_returned_live_arn() -> None:
+    renderer = _load_renderer()
+    spec = renderer.validate_spec(_spec(realm="us1"))
+    returned_arn = "arn:aws:iam::999999999999:root"
+
+    policy = renderer.render_iam_trust_policy(spec, returned_arn)
+
+    assert policy["Statement"][0]["Principal"]["AWS"] == returned_arn
+
+
 def test_cassandra_uses_explicit_resource_arns(tmp_path: Path) -> None:
     renderer = _load_renderer()
     spec = renderer.validate_spec(_spec())

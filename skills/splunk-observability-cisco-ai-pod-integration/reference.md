@@ -4,7 +4,7 @@
 
 - *Configuration Guide: Splunk Observability for Cisco AI Pods* (updated 2026-05-01) — operator-supplied; the PDF is not bundled with this repository.
 - `signalfx/splunk-opentelemetry-examples/collector/cisco-ai-ready-pods/otel-collector/values.yaml` — the canonical signalfx example.
-- [Production atl-ocp2 troubleshooting evidence](references/production-troubleshooting-atl-ocp2.md) — lessons from the OpenShift deployment that informed the rendered overlay.
+- [OpenShift production troubleshooting evidence](references/production-troubleshooting-reference.md) — lessons from a production OpenShift deployment that informed the rendered overlay.
 - Splunk Observability Workshop AI Pod scenario: `splunk.github.io/observability-workshop/en/ninja-workshops/14-cisco-ai-pods/`.
 
 ## Composition model
@@ -68,4 +68,4 @@ By default, assets are written under `splunk-observability-cisco-ai-pod-rendered
 - Detectors: [splunk-observability-native-ops](../splunk-observability-native-ops/SKILL.md).
 - All component skills (composed): Nexus / Intersight / GPU children.
 
-See `references/composition-and-overlay-merge.md`, `nim-vllm-scrape-catalog.md`, `milvus-storage-redfish.md`, `openshift-scc.md`, `workshop-multi-tenant.md`, `ai-pod-dashboards-catalog.md`, `endpoints-rbac-patch.md`, `dual-pipeline-filtering.md`, `nim-scrape-modes.md`, `production-troubleshooting-atl-ocp2.md`, `troubleshooting.md` for the full annexes.
+See `references/composition-and-overlay-merge.md`, `nim-vllm-scrape-catalog.md`, `milvus-storage-redfish.md`, `openshift-scc.md`, `workshop-multi-tenant.md`, `ai-pod-dashboards-catalog.md`, `endpoints-rbac-patch.md`, `dual-pipeline-filtering.md`, `nim-scrape-modes.md`, `production-troubleshooting-reference.md`, `troubleshooting.md` for the full annexes.
