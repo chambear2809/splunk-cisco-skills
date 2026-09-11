@@ -32,7 +32,7 @@
       "stream_ta_installed": false,
       "npcap_installed": false,
       "active_capture_adapters": 1,
-      "stream_app_endpoint_tested": "https://10.110.253.20:8000/en-US/custom/splunk_app_stream",
+      "stream_app_endpoint_tested": "https://<stream-search-tier-host>:8000/en-US/custom/splunk_app_stream",
       "stream_app_tcp_reachable": false,
       "plan_status": "blocked",
       "blocker_code": "stream_app_unreachable"

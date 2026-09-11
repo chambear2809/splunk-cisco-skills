@@ -4,7 +4,7 @@ Three paths for routing Tetragon (and optionally Hubble Enterprise) events into 
 
 ## File-based via OTel filelog receiver (DEFAULT, recommended)
 
-**Production-validated** (atl-ocp2 OpenShift cluster, Splunk OTel chart v0.147.1).
+**Production-validated** (OpenShift deployment, Splunk OTel chart v0.147.1).
 
 Two coordinated changes:
 

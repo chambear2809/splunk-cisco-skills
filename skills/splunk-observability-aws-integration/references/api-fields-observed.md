@@ -1,28 +1,29 @@
 # API Fields Observed (Live)
 
-This file records field-name spellings, defaults, and Splunk-side AWS account
-IDs observed in live `GET /v2/integration?type=AWSCloudWatch` responses. The
+This file records field-name spellings and defaults observed in live
+`GET /v2/integration?type=AWSCloudWatch` responses. Account and resource
+identifiers are intentionally redacted. The
 renderer's canonical schema in [`api-fields.md`](api-fields.md) is the
 write-side source of truth; this file documents read-side variations the
 renderer must accept.
 
 ## Live observations (2026-04-22, realm us1)
 
-Discovered against the operator's account that has one
-`AWSCloudWatch` integration named `AWS`.
+A live `AWSCloudWatch` integration was used to confirm the response shape.
+The integration name and account identity are not retained here.
 
 ### Splunk-side AWS account ID per realm
 
 The `sfxAwsAccountArn` field returned by `POST /v2/integration` is stable per
-realm. Observed values:
+realm. The live value is intentionally not stored in this repository:
 
 | Realm | Splunk AWS account ID | sfxAwsAccountArn |
 |-------|----------------------|------------------|
-| `us1` | `562691491210` | `arn:aws:iam::562691491210:root` |
+| `us1` | `<returned by API>` | `arn:aws:iam::<SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE>:root` |
 
-Encoded into the renderer's `SPLUNK_AWS_ACCOUNT_ID_PER_REALM` table. Other
-realms render the placeholder `${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}`
-until we observe their values.
+The renderer accepts the returned ARN when available and otherwise emits the
+placeholder `${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}`. This keeps offline
+renders portable across organizations and realms.
 
 ### Field-name spelling variations
 
@@ -59,7 +60,7 @@ All fields below are in the canonical write schema unless flagged otherwise:
 - `regions`: AWS region list
 - `roleArn`: customer IAM role ARN
 - `services`: `[]` (empty = all built-in)
-- `sfxAwsAccountArn`: `arn:aws:iam::<SPLUNK_AWS_ACCOUNT_ID>:root` (per-realm constant; see table above)
+- `sfxAwsAccountArn`: `arn:aws:iam::<SPLUNK_AWS_ACCOUNT_ID>:root` (returned by the API; never embedded as a live account ID)
 - `syncCustomNamespacesOnly`: `false`
 - `syncLoadBalancerTargetGroupTags`: `false`
 - `type`: `AWSCloudWatch`

@@ -176,14 +176,14 @@ projects/tmp-*
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js
 
-# lab_6890 rendered handoffs (regenerate via setup.sh --phase render)
-/*-rendered-lab6890/
+# Local rendered handoffs (regenerate via setup.sh --phase render)
+/*-rendered-*/
 
-# --- Local lab validation campaign artifacts (operator-specific, not shared) ---
-/specs/lab6890-*
-/skills/shared/references/lab_*_validation_evidence.json
-/skills/shared/scripts/lab_validation_orchestrator.py
-/skills/shared/scripts/lab_validation_teardown.sh
+# --- Local validation campaign artifacts (operator-specific, not shared) ---
+/specs/*
+/skills/shared/references/*_local_validation_evidence.json
+/skills/shared/scripts/local_validation_orchestrator.py
+/skills/shared/scripts/local_validation_teardown.sh
 
 # --- Local scratch / generated reports ---
 /output/

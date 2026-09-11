@@ -58,7 +58,7 @@ INDEX_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,127}$")
 SOURCETYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.-]{0,255}$")
 MAX_TOKEN_BYTES = 16 * 1024
 
-# Default metric allow-list. Curated from the production Gruve atl-ocp2
+# Default metric allow-list. Curated from a production reference deployment
 # deployment values + the Isovalent_Splunk_o11y reference repo. The goal:
 # enough series to power the standard cilium/hubble/tetragon dashboards
 # without flooding O11y with high-cardinality kernel-level event noise.

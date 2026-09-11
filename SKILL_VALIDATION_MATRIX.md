@@ -1,6 +1,6 @@
 # Skill Validation Matrix
 
-_Generated from `skills/catalog.yaml` (SHA-256 `daeea0647b08625937bca088b3da970a195d10f91b69cefee770ef2567606b41`), checked-in skill/test surfaces, and the manifest-generated identity plus maintained evidence in `skills/shared/skill_validation_registry.json` by `skills/shared/scripts/generate_skill_validation_matrix.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (SHA-256 `1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5`), checked-in skill/test surfaces, and the manifest-generated identity plus maintained evidence in `skills/shared/skill_validation_registry.json` by `skills/shared/scripts/generate_skill_validation_matrix.py`; do not edit manually._
 
 This matrix separates checked-in validation capability from observed target
 results. A working `--help` interface is an interface contract; it is never

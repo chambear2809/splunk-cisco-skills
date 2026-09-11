@@ -69,15 +69,13 @@ REALM_STS_REGION: dict[str, str] = {
 # and cannot run the AWSCloudWatch integration. We do NOT include it here.
 SUPPORTED_REALMS: tuple[str, ...] = tuple(REALM_STS_REGION)
 
-# Splunk-side AWS account ID per realm. Used to render the IAM trust policy
-# Principal. These values are returned by `POST /v2/integration` as the
-# `sfxAwsAccountArn` field, and are stable per realm. We seed the map with
-# values discovered against live integrations; unknown realms render the
-# placeholder `${SPLUNK_AWS_ACCOUNT_ID}` so the operator pulls the live
-# value from the create response.
-SPLUNK_AWS_ACCOUNT_ID_PER_REALM: dict[str, str] = {
-    "us1": "562691491210",  # confirmed via live discover (April 2026)
-}
+# Splunk-side AWS account identity is returned by `POST /v2/integration` as
+# `sfxAwsAccountArn`. Never bake a live account identifier into this skill:
+# offline renders use a placeholder, while discover/apply flows can pass the
+# returned ARN into the trust-policy renderer.
+SPLUNK_AWS_ACCOUNT_ARN_PLACEHOLDER = (
+    "arn:aws:iam::${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}:root"
+)
 
 # AWS region inventory (16 regular + 10 optional + 2 GovCloud + 2 China).
 REGULAR_REGIONS: tuple[str, ...] = (
@@ -1037,11 +1035,7 @@ def render_iam_trust_policy(spec: dict[str, Any], sfx_aws_account_arn: str | Non
     if auth["mode"] != "external_id":
         return {}
     if sfx_aws_account_arn is None:
-        account_id = SPLUNK_AWS_ACCOUNT_ID_PER_REALM.get(spec["realm"])
-        sfx_aws_account_arn = (
-            f"arn:aws:iam::{account_id}:root" if account_id
-            else "arn:aws:iam::${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}:root"
-        )
+        sfx_aws_account_arn = SPLUNK_AWS_ACCOUNT_ARN_PLACEHOLDER
     return {
         "Version": "2012-10-17",
         "Statement": [

@@ -217,6 +217,11 @@ Plus quality-of-life flags:
    uses the rendered two-phase handoff and direct apply refuses a partial
    disabled integration:
 
+   The rendered `iam/iam-trust.json` intentionally uses
+   `${SPLUNK_AWS_ACCOUNT_ID_FROM_POST_RESPONSE}` until the create response is
+   available. After `POST /v2/integration`, replace that placeholder with the
+   returned `sfxAwsAccountArn` before deploying the IAM trust policy.
+
    ```bash
    bash skills/splunk-observability-aws-integration/scripts/setup.sh \
      --apply integration,validation \

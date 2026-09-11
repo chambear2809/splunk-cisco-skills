@@ -123,7 +123,7 @@
     },
     {
       "path": "skills/splunk-observability-aws-integration/scripts/render_assets.py",
-      "line": 126,
+      "line": 124,
       "rule_id": "generic-api-key",
       "line_sha256": "41bbb93a2bfdf2e1895d17c5fc9bb6f5f47d5611744ecb229507384dba0a6b10",
       "category": "literal-guardrail-or-renderer-syntax"

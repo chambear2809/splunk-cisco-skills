@@ -105,9 +105,9 @@ service:
 - **Disabling filter/exclude entirely**: works but unfilters all the chart-default-noisy metrics too, blowing up MTS budget.
 - **Per-metric pipelines**: don't create one pipeline per metric source; the OTel collector's pipeline overhead grows linearly with pipeline count. 3-5 pipelines is fine; 30+ is excessive.
 
-## Production atl-ocp2 evidence
+## Production deployment evidence
 
-The atl-ocp2 reference values use exactly this pattern:
+The production reference values use exactly this pattern:
 
 ```yaml
 service:

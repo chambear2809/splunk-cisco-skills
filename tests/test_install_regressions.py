@@ -2294,7 +2294,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     SB_PASS="sb-pass"
                     PROFILE_onprem__SPLUNK_PLATFORM="enterprise"
                     PROFILE_onprem__SPLUNK_TARGET_ROLE="search-tier"
-                    PROFILE_onprem__SPLUNK_HOST="10.110.253.5"
+                    PROFILE_onprem__SPLUNK_HOST="192.0.2.5"
                     PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
                     PROFILE_onprem__SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
                     PROFILE_onprem__SPLUNK_USER="splunk"
@@ -2337,7 +2337,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("Downloading app 99999 v1.2.3 from Splunkbase...", output)
             self.assertIn("Source URL: https://splunkbase.splunk.com/app/99999/release/1.2.3/download/", output)
             self.assertIn("Resolved URL: https://cdn.splunkbase.invalid/remote-test-app_123.tgz", output)
-            self.assertIn("Copying package to splunk@10.110.253.5:/tmp/", output)
+            self.assertIn("Copying package to splunk@192.0.2.5:/tmp/", output)
             self.assertIn("Installing staged package from /tmp/", output)
             self.assertIn("Version: 1.2.3", output)
             self.assertTrue((ta_cache / "remote-test-app_123.tgz").exists())
@@ -2345,7 +2345,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             curl_text = curl_log.read_text(encoding="utf-8")
             self.assertIn("https://splunkbase.splunk.com/api/account:login", curl_text)
             self.assertIn("https://splunkbase.splunk.com/api/v1/app/99999/release/", curl_text)
-            self.assertIn("https://10.110.253.5:8089/services/apps/local", curl_text)
+            self.assertIn("https://192.0.2.5:8089/services/apps/local", curl_text)
             self.assertIn("filename=true", curl_text)
             self.assertIn("name=/tmp/", curl_text)
 
@@ -2353,7 +2353,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("-d 3 scp", sshpass_text)
             self.assertNotIn("-f ", sshpass_text)
             self.assertIn("scp", sshpass_text)
-            self.assertIn("splunk@10.110.253.5:/tmp/", sshpass_text)
+            self.assertIn("splunk@192.0.2.5:/tmp/", sshpass_text)
             self.assertIn("ssh", sshpass_text)
 
     def test_install_app_reports_download_failure_without_unbound_cookie_trap(self):
@@ -2592,7 +2592,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     SB_PASS="sb-pass"
                     PROFILE_onprem__SPLUNK_PLATFORM="enterprise"
                     PROFILE_onprem__SPLUNK_TARGET_ROLE="search-tier"
-                    PROFILE_onprem__SPLUNK_HOST="10.110.253.5"
+                    PROFILE_onprem__SPLUNK_HOST="192.0.2.5"
                     PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
                     PROFILE_onprem__SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
                     PROFILE_onprem__SPLUNK_USER="splunk"
@@ -2657,7 +2657,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn(f"Using SHA-256-verified cached package: {cached_package}", output)
             self.assertNotIn("Authenticated to Splunkbase", output)
             self.assertNotIn("Downloading app 99998 v1.2.3 from Splunkbase...", output)
-            self.assertIn("Copying package to splunk@10.110.253.5:/tmp/", output)
+            self.assertIn("Copying package to splunk@192.0.2.5:/tmp/", output)
             self.assertIn("Installing staged package from /tmp/", output)
             self.assertIn("Version: 1.2.3", output)
 
@@ -2665,7 +2665,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("https://splunkbase.splunk.com/api/v1/app/99998/release/", curl_text)
             self.assertNotIn("https://splunkbase.splunk.com/api/account:login", curl_text)
             self.assertNotIn("/app/99998/release/1.2.3/download/", curl_text)
-            self.assertIn("https://10.110.253.5:8089/services/apps/local", curl_text)
+            self.assertIn("https://192.0.2.5:8089/services/apps/local", curl_text)
 
             sshpass_text = sshpass_log.read_text(encoding="utf-8")
             self.assertIn("-d 3 scp", sshpass_text)

@@ -204,7 +204,7 @@ def ai_pod_overlay_additions(spec: dict[str, Any], cluster_name: str, distributi
     }
 
     if distribution == "openshift":
-        # OpenShift defaults validated in atl-ocp2 production.
+        # OpenShift defaults validated in a production reference deployment.
         # Chart 0.157.0 renamed the kubeletstats receiver to kubelet_stats and
         # fails the install on the legacy alias.
         additions.setdefault("agent", {}).setdefault("config", {}).setdefault("receivers", {}).setdefault(

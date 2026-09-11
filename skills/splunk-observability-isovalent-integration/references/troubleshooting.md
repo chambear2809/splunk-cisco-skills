@@ -18,7 +18,7 @@ kubectl -n splunk-otel logs -l app=splunk-otel-collector --tail=200 | grep -E 'c
 
 Common errors:
 
-- `endpoints is forbidden`: missing RBAC. The base chart's ClusterRole grants pods + services but not endpoints. **This is the AI Pod skill's known production issue (atl-ocp2)**, not Isovalent's — Isovalent uses pod-based SD, not endpoint-based. If you see this error, either you've added a custom endpoint-SD scrape, or the chart version doesn't grant the expected pod permissions.
+- `endpoints is forbidden`: missing RBAC. The base chart's ClusterRole grants pods + services but not endpoints. **This is the AI Pod skill's known production issue**, not Isovalent's — Isovalent uses pod-based SD, not endpoint-based. If you see this error, either you've added a custom endpoint-SD scrape, or the chart version doesn't grant the expected pod permissions.
 - `connection refused`: pod IP correct, port wrong. Confirm the metrics ports match (cilium 9962, hubble 9965, envoy 9964, operator 9963, tetragon 2112, tetragon-operator 2113).
 - `no targets matched`: the relabel_configs `keep` rule didn't match any pods. Confirm pod labels: `kubectl -n kube-system get pods --show-labels | grep cilium`.
 

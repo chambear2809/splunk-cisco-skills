@@ -1,6 +1,6 @@
-# Production troubleshooting: atl-ocp2 deployment
+# Production troubleshooting: OpenShift AI Pod deployment
 
-This annex documents the specific issues encountered during the atl-ocp2 OpenShift production deployment of the AI Pod observability stack. Each issue is presented as **symptom**, **root cause**, **fix**, and **prevention**.
+This annex documents the specific issues encountered during a production OpenShift deployment of the AI Pod observability stack. Each issue is presented as **symptom**, **root cause**, **fix**, and **prevention**.
 
 ## Issue 1: NIM/DCGM metrics not appearing
 
@@ -146,7 +146,7 @@ clusterReceiver:
 
 **Symptom**: `helm install` fails with `Error: cert-manager: webhook returned: 500`.
 
-**Root cause**: atl-ocp2 already had cert-manager installed cluster-wide. The chart's bundled cert-manager attempted to install a CRD that conflicted with the existing one.
+**Root cause**: The target OpenShift deployment already had cert-manager installed cluster-wide. The chart's bundled cert-manager attempted to install a CRD that conflicted with the existing one.
 
 **Fix**: Set `certmanager.enabled: false` in the chart values overlay.
 
@@ -155,7 +155,7 @@ certmanager:
   enabled: false
 ```
 
-**Prevention**: The umbrella's renderer applies this when `--distribution openshift` (atl-ocp2 was OpenShift; OpenShift commonly has an existing certificate-management path that must be reviewed).
+**Prevention**: The umbrella's renderer applies this when `--distribution openshift` (OpenShift commonly has an existing certificate-management path that must be reviewed).
 
 ## Issue 8: cloudProvider auto-detection wrong for bare-metal
 
@@ -171,7 +171,7 @@ cloudProvider: ""
 
 **Prevention**: The umbrella's renderer applies this when `--distribution openshift`; there is no `openshift-baremetal` distribution value.
 
-## Summary of atl-ocp2 lessons codified in the umbrella
+## Summary of production lessons codified in the umbrella
 
 
 | Issue                 | Codified as                                                      |

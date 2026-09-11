@@ -212,14 +212,14 @@ class TestCredentialParsing(unittest.TestCase):
 
     def test_profile_can_derive_uri_from_profile_host(self):
         text = textwrap.dedent("""\
-            PROFILE_onprem__SPLUNK_HOST="10.110.253.5"
+            PROFILE_onprem__SPLUNK_HOST="192.0.2.5"
             PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
             PROFILE_onprem__SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
         """)
         result = parse_credential_file(text, "onprem")
-        self.assertEqual(result["SPLUNK_HOST"], "10.110.253.5")
-        self.assertEqual(result["SPLUNK_SEARCH_API_URI"], "https://10.110.253.5:8089")
-        self.assertEqual(result["SPLUNK_URI"], "https://10.110.253.5:8089")
+        self.assertEqual(result["SPLUNK_HOST"], "192.0.2.5")
+        self.assertEqual(result["SPLUNK_SEARCH_API_URI"], "https://192.0.2.5:8089")
+        self.assertEqual(result["SPLUNK_URI"], "https://192.0.2.5:8089")
 
     def test_circular_reference_does_not_loop(self):
         text = textwrap.dedent("""\
@@ -254,16 +254,16 @@ class TestCredentialParsing(unittest.TestCase):
         result = parse_credential_file(text)
         self.assertEqual(result["SPLUNK_VERIFY_SSL"], "true")
 
-    def test_lab_only_insecure_http_key_allowed_for_flat_and_profile_config(self):
+    def test_insecure_http_key_allowed_for_flat_and_profile_config(self):
         text = textwrap.dedent("""\
             SPLUNK_ALLOW_INSECURE_HTTP="false"
-            PROFILE_lab__SPLUNK_ALLOW_INSECURE_HTTP="true"
+            PROFILE_example__SPLUNK_ALLOW_INSECURE_HTTP="true"
         """)
         self.assertEqual(
             parse_credential_file(text)["SPLUNK_ALLOW_INSECURE_HTTP"], "false"
         )
         self.assertEqual(
-            parse_credential_file(text, "lab")["SPLUNK_ALLOW_INSECURE_HTTP"], "true"
+            parse_credential_file(text, "example")["SPLUNK_ALLOW_INSECURE_HTTP"], "true"
         )
 
     def test_target_role_keys_are_allowed(self):
@@ -320,42 +320,42 @@ class TestCredentialParsing(unittest.TestCase):
 
     def test_profile_appd_keys_use_explicit_literals(self):
         text = textwrap.dedent("""\
-            APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
-            APPD_ACCOUNT_NAME="customer1"
+            APPD_CONTROLLER_URL="https://appd.example.com"
+            APPD_ACCOUNT_NAME="example-account"
             APPD_CLIENT_NAME="splunk-integration"
             APPD_CLIENT_SECRET_FILE="/tmp/appd_client_secret"
-            PROFILE_lab__APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
-            PROFILE_lab__APPD_ACCOUNT_NAME="customer1"
-            PROFILE_lab__APPD_CLIENT_NAME="splunk-integration"
-            PROFILE_lab__APPD_CLIENT_SECRET_FILE="/tmp/appd_client_secret"
+            PROFILE_example__APPD_CONTROLLER_URL="https://appd.example.com"
+            PROFILE_example__APPD_ACCOUNT_NAME="example-account"
+            PROFILE_example__APPD_CLIENT_NAME="splunk-integration"
+            PROFILE_example__APPD_CLIENT_SECRET_FILE="/tmp/appd_client_secret"
         """)
-        result = parse_credential_file(text, "lab")
+        result = parse_credential_file(text, "example")
         self.assertEqual(
-            result["APPD_CONTROLLER_URL"], "https://customer1.saas.appdynamics.com"
+            result["APPD_CONTROLLER_URL"], "https://appd.example.com"
         )
-        self.assertEqual(result["APPD_ACCOUNT_NAME"], "customer1")
+        self.assertEqual(result["APPD_ACCOUNT_NAME"], "example-account")
         self.assertEqual(result["APPD_CLIENT_NAME"], "splunk-integration")
         self.assertEqual(result["APPD_CLIENT_SECRET_FILE"], "/tmp/appd_client_secret")
 
     def test_profile_self_referential_appd_keys_stay_unresolved(self):
         text = textwrap.dedent("""\
-            APPD_CONTROLLER_URL="https://customer1.saas.appdynamics.com"
-            PROFILE_lab__APPD_CONTROLLER_URL="${APPD_CONTROLLER_URL}"
+            APPD_CONTROLLER_URL="https://appd.example.com"
+            PROFILE_example__APPD_CONTROLLER_URL="${APPD_CONTROLLER_URL}"
         """)
-        result = parse_credential_file(text, "lab")
+        result = parse_credential_file(text, "example")
         self.assertEqual(result["APPD_CONTROLLER_URL"], "${APPD_CONTROLLER_URL}")
 
     def test_splunk_resolve_profile_selection(self):
         text = textwrap.dedent("""\
-            SPLUNK_RESOLVE="default.local:8089:10.0.0.1"
-            PROFILE_lab__SPLUNK_RESOLVE="lab-sh.example.com:8089:10.0.0.50"
+            SPLUNK_RESOLVE="default.example.com:8089:192.0.2.1"
+            PROFILE_example__SPLUNK_RESOLVE="search-tier.example.com:8089:192.0.2.50"
         """)
         self.assertEqual(
-            parse_credential_file(text)["SPLUNK_RESOLVE"], "default.local:8089:10.0.0.1"
+            parse_credential_file(text)["SPLUNK_RESOLVE"], "default.example.com:8089:192.0.2.1"
         )
         self.assertEqual(
-            parse_credential_file(text, "lab")["SPLUNK_RESOLVE"],
-            "lab-sh.example.com:8089:10.0.0.50",
+            parse_credential_file(text, "example")["SPLUNK_RESOLVE"],
+            "search-tier.example.com:8089:192.0.2.50",
         )
 
     def test_observability_cloud_keys_allowed(self):
@@ -528,10 +528,10 @@ class TestCredentialParserParity(unittest.TestCase):
             "profile with cross-references",
             textwrap.dedent("""\
                 SPLUNK_HOST="global-host"
-                PROFILE_lab__SPLUNK_HOST="lab-host"
-                PROFILE_lab__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
+                PROFILE_example__SPLUNK_HOST="example-host"
+                PROFILE_example__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
             """),
-            "lab",
+            "example",
         ),
     ]
 

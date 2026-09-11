@@ -413,7 +413,7 @@ class ContentPackTests(unittest.TestCase):
             commands: list[list[str]] = []
             command_envs: list[dict[str, str]] = []
             known_hosts = Path(tempdir) / "known_hosts"
-            known_hosts.write_text("10.110.253.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
+            known_hosts.write_text("192.0.2.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
 
             def runner(command, **kwargs):
                 commands.append(command)
@@ -440,7 +440,7 @@ class ContentPackTests(unittest.TestCase):
             client = SimpleNamespace(config=SimpleNamespace(username="splunk", password="changeme"))
             installer = ShellContentLibraryInstaller(script_path=installer_script, runner=runner)
             spec = {
-                "connection": {"base_url": "https://10.110.253.20:8089", "verify_ssl": False},
+                "connection": {"base_url": "https://192.0.2.20:8089", "verify_ssl": False},
                 "content_library": {"require_present": True, "source": "splunkbase", "app_id": "5391"},
             }
 
@@ -453,7 +453,7 @@ class ContentPackTests(unittest.TestCase):
                     "SPLUNK_SSH_KNOWN_HOSTS_FILE",
                 )
             }
-            os.environ["SPLUNK_SSH_HOST"] = "10.110.253.20"
+            os.environ["SPLUNK_SSH_HOST"] = "192.0.2.20"
             os.environ["SPLUNK_SSH_USER"] = "splunk"
             os.environ["SPLUNK_SSH_PASS"] = "changeme"
             os.environ["SPLUNK_SSH_KNOWN_HOSTS_FILE"] = str(known_hosts)
@@ -499,7 +499,7 @@ class ContentPackTests(unittest.TestCase):
             bundle_path.write_text("placeholder", encoding="utf-8")
             commands: list[list[str]] = []
             known_hosts = Path(tempdir) / "known_hosts"
-            known_hosts.write_text("10.110.253.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
+            known_hosts.write_text("192.0.2.20 ssh-ed25519 AAAATESTKEY\n", encoding="utf-8")
 
             def runner(command, **kwargs):
                 commands.append(command)
@@ -524,7 +524,7 @@ class ContentPackTests(unittest.TestCase):
             client = SimpleNamespace(config=SimpleNamespace(username="splunk", password="changeme"))
             installer = ShellContentLibraryInstaller(script_path=installer_script, runner=runner)
             spec = {
-                "connection": {"base_url": "https://10.110.253.20:8089", "verify_ssl": False},
+                "connection": {"base_url": "https://192.0.2.20:8089", "verify_ssl": False},
                 "content_library": {"require_present": True, "source": "splunkbase", "app_id": "5391"},
             }
 
@@ -537,7 +537,7 @@ class ContentPackTests(unittest.TestCase):
                     "SPLUNK_SSH_KNOWN_HOSTS_FILE",
                 )
             }
-            os.environ["SPLUNK_SSH_HOST"] = "10.110.253.20"
+            os.environ["SPLUNK_SSH_HOST"] = "192.0.2.20"
             os.environ["SPLUNK_SSH_USER"] = "splunk"
             os.environ["SPLUNK_SSH_PASS"] = "changeme"
             os.environ["SPLUNK_SSH_KNOWN_HOSTS_FILE"] = str(known_hosts)

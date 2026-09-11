@@ -63,8 +63,8 @@ scrape:
   tetragon_operator_2113: true  # tetragon operator metrics
   cilium_dnsproxy: false        # set true if isovalent/cilium-dnsproxy is installed
 
-# filter/includemetrics allow-list. Skill defaults match the production-validated
-# Gruve allow-list (atl-ocp2 reference). Override when you need additional
+# filter/includemetrics allow-list. Skill defaults match a production reference
+# allow-list. Override when you need additional
 # series; values in this list ARE forwarded to Splunk Observability Cloud.
 metric_allowlist:
   extra: []                  # extra metric names to add (preserves the default set)

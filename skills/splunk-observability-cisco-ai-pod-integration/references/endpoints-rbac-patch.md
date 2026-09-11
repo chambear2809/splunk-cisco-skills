@@ -8,7 +8,7 @@ The Splunk OTel collector chart's default ClusterRole grants pod-list cluster-wi
 
 When the umbrella's NIM scrape uses `kubernetes_sd_configs.role: endpoints` (the precise mode), the OTel agent needs to list endpoints in the NIM-hosting namespaces (`nvidia-inference`, `nvidia-nemo`, etc.). Without this RBAC, scrapes fail silently with `forbidden: endpoints is forbidden` in the agent log, and NIM metrics never appear in O11y.
 
-This was the #1 production failure in the atl-ocp2 deployment.
+This was the #1 production failure in the OpenShift deployment.
 
 ## The fix
 
@@ -84,7 +84,7 @@ The skill assumes chart v0.95+; older versions will silently ignore `rbac.custom
 - **Using a separate "scraper" ServiceAccount with broader RBAC**: doesn't work; the chart's discovery code uses the chart's default SA.
 - **Disabling NIM scrape entirely** to avoid the RBAC need: defeats the purpose. Use `nim_scrape_mode: pods` if you really need to avoid endpoint RBAC; you'll get less precise scrape targeting but fewer permissions needed.
 
-## Production atl-ocp2 timeline
+## Production OpenShift timeline
 
 Original deployment: missing endpoint RBAC. NIM scrape silently failed. No metrics appeared in O11y.
 
