@@ -178,6 +178,7 @@ projects/tmp-*
 
 # Local rendered handoffs (regenerate via setup.sh --phase render)
 /*-rendered-*/
+/rendered/
 
 # --- Local validation campaign artifacts (operator-specific, not shared) ---
 /specs/*

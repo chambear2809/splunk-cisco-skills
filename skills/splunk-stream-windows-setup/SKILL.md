@@ -134,6 +134,10 @@ For WinRM, use HTTPS or Kerberos/Negotiate. Never add a wildcard to
 file via `--winrm-password-file`; its value is never passed to the controller's
 command line.
 
+If both `SplunkForwarder` and `Splunkd` services are installed, add
+`--splunk-home <selected-splunk-home>` to `investigate`; the workflow refuses to
+guess between two runtimes.
+
 ### 2. Resolve prerequisites and investigate again
 
 If the inventory reports `runtime_type: absent`, invoke the Universal Forwarder
@@ -148,10 +152,12 @@ bash skills/splunk-stream-windows-setup/scripts/setup.sh bootstrap-uf \
   --uf-msi splunk-ta/splunkforwarder-<version>-windows-x64.msi \
   --transport ssm --instance-id i-0123456789abcdef0 --region us-east-1 \
   --staging-s3-uri s3://reviewed-private-bucket/splunk-stream-staging \
+  --stream-app-url https://splunk.example.com:8000/en-US/custom/splunk_app_stream \
   --accept-forwarder-mutation
 ```
 
-`bootstrap-uf` permits only metadata from `splunk-universal-forwarder-setup`
+`bootstrap-uf` requires the same `--stream-app-url` used during investigation and
+permits only metadata from `splunk-universal-forwarder-setup`
 for Windows x64, LocalSystem, and an MSI whose SHA-256 still matches the child
 render. It rechecks the missing-runtime inventory before mutation and writes a
 fresh inventory afterward.
@@ -202,6 +208,9 @@ stanzas, stops Splunk, replaces `Splunk_TA_stream`, restarts Splunk, and runs
 host validation. Same-version/same-config healthy reruns are no-ops. Backups
 and a private journal remain under
 `%ProgramData%\SplunkStreamSetup\transactions\<transaction-id>`.
+If Npcap returns exit 3010, the journal is saved as `reboot-required` and the
+TA replacement stops before post-install success; reboot the host and rerun the
+same reviewed apply transaction to resume it.
 
 ### 5. Validate host and product completion
 

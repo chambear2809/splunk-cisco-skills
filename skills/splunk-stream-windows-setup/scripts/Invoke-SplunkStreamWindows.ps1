@@ -22,6 +22,7 @@ param(
     [string]$TransactionId = '',
     [ValidateSet('install-if-missing', 'preserve', 'upgrade')]
     [string]$NpcapPolicy = 'install-if-missing',
+    [switch]$RebootResume,
     [switch]$AcceptMutation,
     [string]$TransactionRoot = "$env:ProgramData\SplunkStreamSetup\transactions"
 )
@@ -68,32 +69,73 @@ function Get-DirectAdministratorMembership([string]$StartName) {
     return $false
 }
 
+function Get-ServiceRuntimeHome([object]$Service) {
+    if ($null -eq $Service) { return '' }
+    $image = [string]$Service.PathName
+    $executable = ''
+    if ($image -match '^\s*"([^"]+)"') { $executable = $Matches[1] }
+    elseif ($image -match '^\s*(.+?\.exe)(?:\s|$)') { $executable = $Matches[1] }
+    if (-not $executable) { return '' }
+    try { return Split-Path -Parent (Split-Path -Parent $executable) }
+    catch { return '' }
+}
+
+function Normalize-RuntimePath([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+    try { return ([IO.Path]::GetFullPath($Path)).TrimEnd('\').ToLowerInvariant() }
+    catch { return $Path.Trim().TrimEnd('\').ToLowerInvariant() }
+}
+
 function Get-SplunkRuntime([string]$RequestedHome) {
-    $service = $null
+    $serviceCandidates = @()
     foreach ($name in @('SplunkForwarder', 'Splunkd')) {
         $candidate = Get-CimInstance Win32_Service -Filter "Name='$name'" -ErrorAction SilentlyContinue
-        if ($null -ne $candidate) { $service = $candidate; break }
+        if ($null -ne $candidate) {
+            $serviceCandidates += [pscustomobject]@{
+                service = $candidate
+                home = Get-ServiceRuntimeHome $candidate
+            }
+        }
     }
 
     $runtimeHome = $RequestedHome
-    if ([string]::IsNullOrWhiteSpace($runtimeHome) -and $null -ne $service) {
-        $image = [string]$service.PathName
-        $executable = ''
-        if ($image -match '^\s*"([^"]+)"') { $executable = $Matches[1] }
-        elseif ($image -match '^\s*([^\s]+\.exe)') { $executable = $Matches[1] }
-        if ($executable) { $runtimeHome = Split-Path -Parent (Split-Path -Parent $executable) }
+    $service = $null
+    if ($serviceCandidates.Count -gt 1) {
+        if ([string]::IsNullOrWhiteSpace($runtimeHome)) {
+            throw 'Both SplunkForwarder and Splunkd services are present. Supply -SplunkHome to select the intended runtime.'
+        }
+        $requestedKey = Normalize-RuntimePath $runtimeHome
+        $matches = @($serviceCandidates | Where-Object { (Normalize-RuntimePath $_.home) -eq $requestedKey })
+        if ($matches.Count -ne 1) {
+            throw "-SplunkHome does not identify exactly one installed Splunk service runtime: $runtimeHome"
+        }
+        $service = $matches[0].service
+        $runtimeHome = $matches[0].home
     }
+    elseif ($serviceCandidates.Count -eq 1) {
+        $selected = $serviceCandidates[0]
+        $service = $selected.service
+        if ([string]::IsNullOrWhiteSpace($runtimeHome)) {
+            $runtimeHome = $selected.home
+        }
+        elseif ($selected.home -and (Normalize-RuntimePath $runtimeHome) -ne (Normalize-RuntimePath $selected.home)) {
+            throw "-SplunkHome does not match the installed Splunk service runtime: $runtimeHome"
+        }
+    }
+
     if ([string]::IsNullOrWhiteSpace($runtimeHome)) {
-        foreach ($candidateHome in @(
+        $candidateHomes = @(
             "$env:ProgramFiles\SplunkUniversalForwarder",
             "$env:ProgramFiles\Splunk",
             "${env:ProgramFiles(x86)}\SplunkUniversalForwarder"
-        )) {
-            if ($candidateHome -and (Test-Path -LiteralPath (Join-Path $candidateHome 'bin\splunk.exe') -PathType Leaf)) {
-                $runtimeHome = $candidateHome
-                break
-            }
+        )
+        $installedHomes = @($candidateHomes | Where-Object {
+            $_ -and (Test-Path -LiteralPath (Join-Path $_ 'bin\splunk.exe') -PathType Leaf)
+        })
+        if ($installedHomes.Count -gt 1) {
+            throw 'Multiple Splunk homes were found without an unambiguous service selection. Supply -SplunkHome.'
         }
+        if ($installedHomes.Count -eq 1) { $runtimeHome = $installedHomes[0] }
     }
 
     $runtimeType = 'absent'
@@ -379,11 +421,14 @@ function Install-Npcap([string]$Installer, [string]$Policy, [Collections.IDictio
     $process = Start-Process -FilePath $Installer -ArgumentList '/S /winpcap_mode=yes' -Wait -PassThru
     $Journal.npcap_exit_code = [int]$process.ExitCode
     if ($process.ExitCode -eq 350) { throw 'Npcap requires a reboot before installation can be retried (exit 350).' }
-    if ($process.ExitCode -eq 3010) { $Journal.reboot_required = $true }
-    elseif ($process.ExitCode -notin @(0)) {
+    if (-not $before.installed) { $Journal.npcap_installed_by_transaction = $true }
+    if ($process.ExitCode -eq 3010) {
+        $Journal.reboot_required = $true
+        return $before
+    }
+    if ($process.ExitCode -notin @(0)) {
         throw "Npcap silent installation failed with exit code $($process.ExitCode)."
     }
-    if (-not $before.installed) { $Journal.npcap_installed_by_transaction = $true }
     Start-Sleep -Seconds 2
     $after = Get-NpcapState
     if (-not $after.installed) { throw 'Npcap installer returned success but the npcap driver service is absent.' }
@@ -401,6 +446,8 @@ function Get-Validation([string]$RuntimeHome, [string]$Endpoint, [string]$Expect
     Add-Check 'splunk_service_running' ([bool]($inventory.splunk.service.state -eq 'Running')) "$($inventory.splunk.service.name): $($inventory.splunk.service.state)"
     Add-Check 'supported_service_account' ([bool]$inventory.splunk.service.stream_account_supported) "$($inventory.splunk.service.start_name)"
     Add-Check 'npcap_driver_present' ([bool]$inventory.npcap.installed) "Npcap $($inventory.npcap.version), $($inventory.npcap.service_state)"
+    Add-Check 'npcap_service_running' ([bool]($inventory.npcap.service_state -eq 'Running')) "Npcap service state=$($inventory.npcap.service_state)"
+    Add-Check 'npcap_winpcap_compatible' ([bool]$inventory.npcap.winpcap_compatible) "WinPcapCompatible=$($inventory.npcap.winpcap_compatible)"
     Add-Check 'stream_ta_installed' ([bool]$inventory.stream.installed) "Splunk_TA_stream $($inventory.stream.version)"
     Add-Check 'streamfwd_process_running' ([bool]$inventory.stream.process_running) "streamfwd process running=$($inventory.stream.process_running)"
     $inputConfig = $inventory.stream.configuration.inputs
@@ -411,6 +458,7 @@ function Get-Validation([string]$RuntimeHome, [string]$Endpoint, [string]$Expect
     Add-Check 'stream_bind_address' ([bool]($forwarderConfig.ipAddr -ieq $ExpectedBindIp)) "ipAddr=$($forwarderConfig.ipAddr)"
     Add-Check 'stream_management_port' ([bool]([string]$forwarderConfig.port -eq [string]$ExpectedPort)) "port=$($forwarderConfig.port)"
     Add-Check 'stream_app_tcp_reachable' ([bool]$inventory.reachability.tcp_succeeded) "$($inventory.reachability.host):$($inventory.reachability.port)"
+    Add-Check 'stream_app_http_tls_reachable' ([bool]$inventory.reachability.http_succeeded) "HTTP/TLS status=$($inventory.reachability.http_status), error=$($inventory.reachability.error)"
     $logPath = Join-Path $inventory.splunk.home 'var\log\splunk\streamfwd.log'
     if (Test-Path -LiteralPath $logPath -PathType Leaf) {
         $recentErrors = @(Get-Content -LiteralPath $logPath -Tail 200 -ErrorAction SilentlyContinue | Where-Object { $_ -match '\b(ERROR|FATAL)\b' })
@@ -456,29 +504,33 @@ function Invoke-Apply {
     $desiredUrl = $StreamAppUrl.TrimEnd('/') + '/'
     $currentInputs = $inventory.stream.configuration.inputs
     $currentForwarder = $inventory.stream.configuration.streamfwd
-    $sameConfig = [bool](
-        $inventory.stream.version -eq '8.1.6' -and
-        $currentInputs.disabled -in @('0', 'false') -and
-        ([string]$currentInputs.splunk_stream_app_location).TrimEnd('/') -ieq $desiredUrl.TrimEnd('/') -and
-        $currentInputs.sslVerifyServerCert -ieq $SslVerify -and
-        $currentForwarder.ipAddr -ieq $resolvedBindIp -and
-        [string]$currentForwarder.port -eq [string]$Port -and
-        ($inventory.npcap.installed -or $NpcapPolicy -eq 'preserve')
-    )
-    if ($sameConfig -and $inventory.splunk.service.state -eq 'Running' -and $inventory.stream.process_running -and $NpcapPolicy -ne 'upgrade') {
-        $validation = Get-Validation $inventory.splunk.home $desiredUrl $resolvedBindIp $Port $SslVerify
-        $validation.operation = 'Apply'
-        $validation.no_op = $true
-        $validation.plan_hash = $PlanHash
-        $validation.transaction_id = $TransactionId
-        return $validation
+    $desiredNetflowEnabled = $NetflowPort -gt 0
+    $currentNetflowIp = [string]$currentForwarder.'netflowReceiver.0.ip'
+    $currentNetflowPort = [string]$currentForwarder.'netflowReceiver.0.port'
+    $currentNetflowDecoder = [string]$currentForwarder.'netflowReceiver.0.decoder'
+    $netflowConfigMatches = if ($desiredNetflowEnabled) {
+        [bool]($currentNetflowIp -ieq $NetflowIp -and
+            $currentNetflowPort -eq [string]$NetflowPort -and
+            $currentNetflowDecoder -ieq $NetflowDecoder)
     }
+    else {
+        [bool]([string]::IsNullOrWhiteSpace($currentNetflowIp) -and
+            [string]::IsNullOrWhiteSpace($currentNetflowPort) -and
+            [string]::IsNullOrWhiteSpace($currentNetflowDecoder))
+    }
+    $npcapReady = [bool]($inventory.npcap.installed -and
+        $inventory.npcap.service_state -eq 'Running' -and
+        $inventory.npcap.winpcap_compatible)
 
     $transaction = Join-Path $TransactionRoot $TransactionId
-    Protect-TransactionDirectory $transaction
     $journalPath = Join-Path $transaction 'journal.json'
+    $existing = $null
+    $journal = $null
     if (Test-Path -LiteralPath $journalPath -PathType Leaf) {
         $existing = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
+        if ($existing.plan_hash -ne $PlanHash) {
+            throw 'Transaction plan hash does not match the reviewed plan.'
+        }
         if ($existing.status -eq 'complete') {
             $validation = Get-Validation $inventory.splunk.home $desiredUrl $resolvedBindIp $Port $SslVerify
             $validation.operation = 'Apply'
@@ -487,30 +539,66 @@ function Invoke-Apply {
             $validation.transaction_id = $TransactionId
             return $validation
         }
-        throw "Transaction already exists but is not complete: $transaction"
+        if ($existing.status -ne 'reboot-required') {
+            throw "Transaction already exists but is not resumable: $transaction"
+        }
+        $journal = [ordered]@{}
+        foreach ($property in $existing.PSObject.Properties) { $journal[$property.Name] = $property.Value }
+        $journal.status = 'started'
+        $journal.failure = ''
+        $journal.reboot_required = $false
     }
+    if ($RebootResume -and $null -eq $existing) {
+        throw "Reboot resume was requested, but no reboot-required transaction journal exists: $transaction"
+    }
+    $sameConfig = [bool](
+        $inventory.stream.version -eq '8.1.6' -and
+        $currentInputs.disabled -in @('0', 'false') -and
+        ([string]$currentInputs.splunk_stream_app_location).TrimEnd('/') -ieq $desiredUrl.TrimEnd('/') -and
+        $currentInputs.sslVerifyServerCert -ieq $SslVerify -and
+        $currentForwarder.ipAddr -ieq $resolvedBindIp -and
+        [string]$currentForwarder.port -eq [string]$Port -and
+        $netflowConfigMatches -and
+        $npcapReady
+    )
+    if ($null -eq $existing -and $sameConfig -and $inventory.splunk.service.state -eq 'Running' -and $inventory.stream.process_running -and $NpcapPolicy -ne 'upgrade') {
+        $validation = Get-Validation $inventory.splunk.home $desiredUrl $resolvedBindIp $Port $SslVerify
+        $validation.operation = 'Apply'
+        $validation.no_op = $true
+        $validation.plan_hash = $PlanHash
+        $validation.transaction_id = $TransactionId
+        return $validation
+    }
+
+    Protect-TransactionDirectory $transaction
     $appParent = Join-Path $inventory.splunk.home 'etc\apps'
     $appPath = Join-Path $appParent 'Splunk_TA_stream'
     $backupPath = Join-Path $transaction 'Splunk_TA_stream.before'
     $extractRoot = Join-Path $transaction 'expanded'
-    $journal = [ordered]@{
-        schema_version = 1
-        transaction_id = $TransactionId
-        plan_hash = $PlanHash
-        status = 'started'
-        splunk_home = $inventory.splunk.home
-        service_name = $inventory.splunk.service.name
-        prior_service_state = $inventory.splunk.service.state
-        app_path = $appPath
-        backup_path = $backupPath
-        prior_app_present = [bool](Test-Path -LiteralPath $appPath -PathType Container)
-        npcap_installed_before = [bool]$inventory.npcap.installed
-        npcap_installed_by_transaction = $false
-        npcap_exit_code = $null
-        reboot_required = $false
-        resolved_bind_ip = $resolvedBindIp
-        created_at = (Get-Date).ToUniversalTime().ToString('o')
-        updated_at = ''
+    if ($null -eq $journal) {
+        $journal = [ordered]@{
+            schema_version = 1
+            transaction_id = $TransactionId
+            plan_hash = $PlanHash
+            status = 'started'
+            splunk_home = $inventory.splunk.home
+            service_name = $inventory.splunk.service.name
+            prior_service_state = $inventory.splunk.service.state
+            app_path = $appPath
+            backup_path = $backupPath
+            prior_app_present = [bool](Test-Path -LiteralPath $appPath -PathType Container)
+            npcap_installed_before = [bool]$inventory.npcap.installed
+            npcap_installed_by_transaction = $false
+            npcap_exit_code = $null
+            reboot_required = $false
+            resolved_bind_ip = $resolvedBindIp
+            created_at = (Get-Date).ToUniversalTime().ToString('o')
+            updated_at = ''
+        }
+    }
+    else {
+        $appPath = [string]$journal.app_path
+        $backupPath = [string]$journal.backup_path
     }
     Save-Journal $journalPath $journal
 
@@ -520,15 +608,37 @@ function Invoke-Apply {
     $newAppMoved = $false
     try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
-        [IO.Compression.ZipFile]::ExtractToDirectory($PackagePath, $extractRoot)
+        if (-not (Test-Path -LiteralPath $extractRoot -PathType Container)) {
+            New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+        }
         $stagedApp = Join-Path $extractRoot 'Splunk_TA_stream'
         $streamExe = Join-Path $stagedApp 'windows_x86_64\bin\streamfwd.exe'
         $npcapInstaller = Join-Path $stagedApp 'windows_x86_64\bin\npcap-1.55-oem.exe'
+        if (-not (Test-Path -LiteralPath $streamExe -PathType Leaf)) {
+            Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+            [IO.Compression.ZipFile]::ExtractToDirectory($PackagePath, $extractRoot)
+        }
         if (-not (Test-Path -LiteralPath $streamExe -PathType Leaf)) { throw 'Staged package is missing windows_x86_64\bin\streamfwd.exe.' }
         if ((Get-AppVersion $stagedApp) -ne '8.1.6') { throw 'Staged package version is not the reviewed Stream 8.1.6 build.' }
         Install-Npcap $npcapInstaller $NpcapPolicy $journal | Out-Null
         Save-Journal $journalPath $journal
+        if ($journal.reboot_required) {
+            $journal.status = 'reboot-required'
+            $journal.failure = 'Npcap requested a reboot (exit 3010). Reboot the host, then rerun this exact reviewed apply transaction.'
+            Save-Journal $journalPath $journal
+            return [ordered]@{
+                schema_version = 1
+                operation = 'Apply'
+                success = $false
+                no_op = $false
+                reboot_required = $true
+                message = $journal.failure
+                plan_hash = $PlanHash
+                transaction_id = $TransactionId
+                journal_path = $journalPath
+            }
+        }
 
         if (Test-Path -LiteralPath (Join-Path $appPath 'local') -PathType Container) {
             Copy-Item -LiteralPath (Join-Path $appPath 'local') -Destination (Join-Path $stagedApp 'local') -Recurse -Force
@@ -539,11 +649,12 @@ function Invoke-Apply {
             splunk_stream_app_location = $desiredUrl
             sslVerifyServerCert = $SslVerify
         }
-        $forwarder = [ordered]@{ ipAddr = $resolvedBindIp; port = [string]$Port }
-        if ($NetflowPort -gt 0) {
-            $forwarder['netflowReceiver.0.ip'] = $NetflowIp
-            $forwarder['netflowReceiver.0.port'] = [string]$NetflowPort
-            $forwarder['netflowReceiver.0.decoder'] = $NetflowDecoder
+        $forwarder = [ordered]@{
+            ipAddr = $resolvedBindIp
+            port = [string]$Port
+            'netflowReceiver.0.ip' = if ($desiredNetflowEnabled) { $NetflowIp } else { '' }
+            'netflowReceiver.0.port' = if ($desiredNetflowEnabled) { [string]$NetflowPort } else { '' }
+            'netflowReceiver.0.decoder' = if ($desiredNetflowEnabled) { $NetflowDecoder } else { '' }
         }
         Set-ConfStanza (Join-Path $stagedApp 'local\inputs.conf') 'streamfwd://streamfwd' $inputs
         Set-ConfStanza (Join-Path $stagedApp 'local\streamfwd.conf') 'streamfwd' $forwarder
@@ -621,18 +732,22 @@ function Invoke-Rollback {
     if ($journal.status -eq 'rolled-back') {
         return [ordered]@{ schema_version = 1; operation = 'Rollback'; success = $true; no_op = $true; transaction_id = $TransactionId; journal_path = $journalPath }
     }
+    $currentRecovery = Join-Path $transaction 'Splunk_TA_stream.rolled_back_from'
+    if ($journal.prior_app_present -and -not (Test-Path -LiteralPath $journal.backup_path -PathType Container)) {
+        throw "Prior app backup is missing: $($journal.backup_path)"
+    }
+    if (Test-Path -LiteralPath $currentRecovery -PathType Container) {
+        throw "Rollback recovery path already exists: $currentRecovery"
+    }
     $service = Get-Service -Name $journal.service_name -ErrorAction Stop
     if ($service.Status -eq 'Running') {
         Stop-Service -Name $journal.service_name -Force
         (Get-Service -Name $journal.service_name).WaitForStatus('Stopped', (New-TimeSpan -Seconds 60))
     }
-    $currentRecovery = Join-Path $transaction 'Splunk_TA_stream.rolled_back_from'
     if (Test-Path -LiteralPath $journal.app_path -PathType Container) {
-        if (Test-Path -LiteralPath $currentRecovery) { throw "Rollback recovery path already exists: $currentRecovery" }
         Move-Item -LiteralPath $journal.app_path -Destination $currentRecovery
     }
     if ($journal.prior_app_present) {
-        if (-not (Test-Path -LiteralPath $journal.backup_path -PathType Container)) { throw "Prior app backup is missing: $($journal.backup_path)" }
         Move-Item -LiteralPath $journal.backup_path -Destination $journal.app_path
     }
     if ($journal.prior_service_state -eq 'Running') {

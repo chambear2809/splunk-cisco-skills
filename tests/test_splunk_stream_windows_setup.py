@@ -188,9 +188,23 @@ def test_plan_blocks_windows_enterprise_104_service_conflict(tmp_path: Path) -> 
 def test_plan_blocks_unverified_service_account_and_unreachable_endpoint(tmp_path: Path) -> None:
     state = inventory(account_ok=False)
     state["reachability"]["tcp_succeeded"] = False
+    state["reachability"]["http_succeeded"] = False
     plan = make_plan(tmp_path, state)
     codes = {item["code"] for item in plan["blockers"]}
     assert {"unsupported_service_account", "stream_app_unreachable"} <= codes
+
+
+def test_plan_blocks_npcap_that_is_not_running_in_compatibility_mode(tmp_path: Path) -> None:
+    state = inventory()
+    state["npcap"] = {
+        "installed": True,
+        "service_state": "Stopped",
+        "version": "1.55",
+        "winpcap_compatible": False,
+        "watchdog_task_present": False,
+    }
+    plan = make_plan(tmp_path, state)
+    assert "npcap_not_ready" in {item["code"] for item in plan["blockers"]}
 
 
 def test_inventory_fingerprint_ignores_timestamp_but_detects_runtime_drift() -> None:
@@ -200,6 +214,63 @@ def test_inventory_fingerprint_ignores_timestamp_but_detects_runtime_drift() -> 
     assert MODULE.inventory_hash(first) == MODULE.inventory_hash(second)
     second["splunk"]["service"]["start_name"] = "NT SERVICE\\splunkforwarder"
     assert MODULE.inventory_hash(first) != MODULE.inventory_hash(second)
+    second = json.loads(json.dumps(first))
+    second["npcap"]["service_state"] = "Running"
+    assert MODULE.inventory_hash(first) != MODULE.inventory_hash(second)
+    assert MODULE.inventory_hash_without_npcap(first) == MODULE.inventory_hash_without_npcap(second)
+
+
+def test_bootstrap_requires_the_investigated_stream_endpoint(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        MODULE.parser().parse_args(
+            [
+                "bootstrap-uf",
+                "--transport",
+                "ssm",
+                "--inventory-file",
+                str(tmp_path / "inventory.json"),
+                "--uf-render-dir",
+                str(tmp_path / "render"),
+                "--uf-msi",
+                str(tmp_path / "forwarder.msi"),
+            ]
+        )
+
+
+def test_blocked_plan_cannot_be_validated() -> None:
+    plan = {
+        "schema_version": 1,
+        "workflow": "splunk-stream-windows-setup",
+        "status": "blocked",
+        "blockers": [{"message": "endpoint check is incomplete"}],
+    }
+    plan["plan_hash"] = MODULE.sha256_bytes(MODULE.canonical_json(plan))
+    with pytest.raises(MODULE.UserError, match="cannot be validated"):
+        MODULE.require_ready_plan(plan, "validated")
+
+
+def test_completion_passes_netflow_expectation_from_reviewed_plan(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    plan = {
+        "schema_version": 1,
+        "workflow": "splunk-stream-windows-setup",
+        "status": "ready",
+        "blockers": [],
+        "transport": "ssm",
+        "configuration": {"netflow_port": 9995},
+        "package": {},
+        "transaction_id": "transaction",
+    }
+    plan["plan_hash"] = MODULE.sha256_bytes(MODULE.canonical_json(plan))
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    args = argparse.Namespace(plan_file=str(plan_path), transport=None, completion=True, timeout=60)
+    completed = subprocess.CompletedProcess(["bash"], 0, stdout="", stderr="")
+    with mock.patch.object(MODULE, "execute_target", return_value={"success": True}), mock.patch.object(
+        MODULE, "run", return_value=completed
+    ) as run_mock:
+        assert MODULE.cmd_validate(args) == 0
+    assert "--expect-netflow-data" in run_mock.call_args.args[0]
+    capsys.readouterr()
 
 
 def test_archive_conversion_rejects_traversal_and_emits_required_windows_payload(tmp_path: Path) -> None:
@@ -238,6 +309,11 @@ def test_powershell_remote_invocation_keeps_named_parameters_and_quotes_values()
     assert "'-Operation'" not in rendered
 
 
+def test_reboot_resume_is_a_switch_parameter() -> None:
+    parameters = MODULE.target_parameters("Apply", {"reboot_resume": True})
+    assert parameters == ["-Operation", "Apply", "-RebootResume"]
+
+
 def test_windows_scripts_contain_transaction_transport_and_driver_guards() -> None:
     target = TARGET_PS.read_text(encoding="utf-8")
     winrm = WINRM_PS.read_text(encoding="utf-8")
@@ -252,6 +328,13 @@ def test_windows_scripts_contain_transaction_transport_and_driver_guards() -> No
         "Set-ConfStanza",
         "compensation-failed",
         "streamfwd_process_running",
+        "npcap_service_running",
+        "npcap_winpcap_compatible",
+        "stream_app_http_tls_reachable",
+        "reboot-required",
+        "RebootResume",
+        "netflowReceiver.0.port",
+        "Get-ServiceRuntimeHome",
     ):
         assert required in target
     assert "Copy-Item -LiteralPath $PackagePath" in winrm

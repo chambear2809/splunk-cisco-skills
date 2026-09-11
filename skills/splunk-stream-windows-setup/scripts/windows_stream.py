@@ -139,6 +139,17 @@ def inventory_hash(inventory: dict[str, Any]) -> str:
     return sha256_bytes(canonical_json(stable_inventory(inventory)))
 
 
+def inventory_hash_without_npcap(inventory: dict[str, Any]) -> str:
+    stable = stable_inventory(inventory)
+    stable.pop("npcap", None)
+    return sha256_bytes(canonical_json(stable))
+
+
+def npcap_is_ready(inventory: dict[str, Any]) -> bool:
+    state = inventory.get("npcap") or {}
+    return bool(state.get("installed") and state.get("service_state") == "Running" and state.get("winpcap_compatible"))
+
+
 def parse_version(value: str) -> tuple[int, ...]:
     found = re.findall(r"\d+", value or "")
     return tuple(int(item) for item in found[:4])
@@ -242,6 +253,8 @@ def target_parameters(operation: str, config: dict[str, Any], package_path: str 
         value = config.get(key)
         if value is not None and value != "":
             parameters.extend([option, str(value).lower() if isinstance(value, bool) else str(value)])
+    if config.get("reboot_resume"):
+        parameters.append("-RebootResume")
     if package_path:
         parameters.extend(["-PackagePath", package_path])
     if config.get("accept_mutation"):
@@ -518,11 +531,21 @@ def make_plan(args: argparse.Namespace, inventory: dict[str, Any], package: Path
             }
         )
     reachability = inventory.get("reachability") or {}
-    if reachability.get("tested") and not reachability.get("tcp_succeeded"):
+    if not reachability.get("tested") or not (reachability.get("tcp_succeeded") and reachability.get("http_succeeded")):
         blockers.append(
             {
                 "code": "stream_app_unreachable",
-                "message": "The Windows host cannot reach the supplied Splunk Stream app endpoint. Fix DNS, routing, firewall, or TLS reachability first.",
+                "message": "The Windows host did not complete TCP and HTTP/TLS checks for the supplied Splunk Stream app endpoint. Fix DNS, routing, firewall, or TLS reachability first.",
+            }
+        )
+    npcap = inventory.get("npcap") or {}
+    if npcap.get("installed") and args.npcap_policy != "upgrade" and not (
+        npcap.get("service_state") == "Running" and npcap.get("winpcap_compatible")
+    ):
+        blockers.append(
+            {
+                "code": "npcap_not_ready",
+                "message": "Npcap is installed but is not running in WinPcap-compatible mode. Choose --npcap-policy upgrade or remediate Npcap, then investigate again.",
             }
         )
     adapters = [item for item in (inventory.get("network_adapters") or []) if item.get("status") == "Up"]
@@ -596,6 +619,12 @@ def verify_plan(plan: dict[str, Any]) -> None:
         raise UserError(f"Plan hash is invalid. Expected calculated hash {calculated}.")
     if plan.get("schema_version") != PLAN_SCHEMA or plan.get("workflow") != "splunk-stream-windows-setup":
         raise UserError("The plan does not belong to the supported Splunk Stream Windows workflow.")
+
+
+def require_ready_plan(plan: dict[str, Any], action: str) -> None:
+    if plan.get("status") != "ready":
+        messages = "; ".join(item.get("message", "") for item in plan.get("blockers", []))
+        raise UserError(f"Plan is blocked and cannot be {action}: {messages}")
 
 
 def config_from_plan(plan: dict[str, Any], *, accept_mutation: bool = False) -> dict[str, Any]:
@@ -687,9 +716,7 @@ def load_apply_plan(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
     plan_path = Path(args.plan_file).expanduser().resolve()
     plan = read_json(plan_path, "plan")
     verify_plan(plan)
-    if plan.get("status") != "ready":
-        messages = "; ".join(item.get("message", "") for item in plan.get("blockers", []))
-        raise UserError(f"Plan is blocked and cannot be applied: {messages}")
+    require_ready_plan(plan, "applied")
     package = Path((plan.get("package") or {}).get("staged_zip", "")).expanduser().resolve()
     if not package.is_file():
         raise UserError(f"Staged Windows package not found: {package}")
@@ -710,11 +737,21 @@ def cmd_apply(args: argparse.Namespace) -> int:
     config = config_from_plan(plan)
     current = execute_target(args, "Investigate", config)
     current_hash = inventory_hash(current)
+    reboot_resume = False
     if current_hash != plan.get("inventory_hash"):
-        raise UserError(
-            "Target inventory drifted after planning. "
-            f"Planned {plan.get('inventory_hash')}, current {current_hash}. Re-run investigate and plan."
-        )
+        planned_inventory = read_json(Path(plan["inventory_file"]), "planned inventory")
+        if (
+            inventory_hash_without_npcap(current) == inventory_hash_without_npcap(planned_inventory)
+            and npcap_is_ready(current)
+        ):
+            reboot_resume = True
+        else:
+            raise UserError(
+                "Target inventory drifted after planning. "
+                f"Planned {plan.get('inventory_hash')}, current {current_hash}. Re-run investigate and plan."
+            )
+    if reboot_resume:
+        config["reboot_resume"] = True
     config["accept_mutation"] = True
     result = execute_target(args, "Apply", config, package)
     if not result.get("success"):
@@ -726,6 +763,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
 def cmd_validate(args: argparse.Namespace) -> int:
     plan = read_json(Path(args.plan_file).expanduser().resolve(), "plan")
     verify_plan(plan)
+    require_ready_plan(plan, "validated")
     args.transport = args.transport or plan.get("transport")
     config = config_from_plan(plan)
     result = execute_target(args, "Validate", config)
@@ -734,7 +772,14 @@ def cmd_validate(args: argparse.Namespace) -> int:
         return 1
     if args.completion:
         parent = REPO_ROOT / "skills/splunk-stream-setup/scripts/validate.sh"
-        completed = run(["bash", str(parent), "--completion"], timeout=args.timeout, check=False)
+        completion_command = ["bash", str(parent), "--completion"]
+        try:
+            expect_netflow = int(config.get("netflow_port") or 0) > 0
+        except (TypeError, ValueError) as exc:
+            raise UserError("Reviewed plan contains an invalid NetFlow port.") from exc
+        if expect_netflow:
+            completion_command.append("--expect-netflow-data")
+        completed = run(completion_command, timeout=args.timeout, check=False)
         if completed.stdout:
             print(completed.stdout, end="")
         if completed.stderr:
@@ -818,7 +863,7 @@ def parser() -> argparse.ArgumentParser:
     prerequisite.add_argument("--inventory-file", required=True)
     prerequisite.add_argument("--uf-render-dir", required=True)
     prerequisite.add_argument("--uf-msi", required=True)
-    prerequisite.add_argument("--stream-app-url", default="")
+    prerequisite.add_argument("--stream-app-url", required=True)
     prerequisite.add_argument("--output-dir", default="rendered/splunk-stream-windows")
     prerequisite.add_argument("--accept-forwarder-mutation", action="store_true")
     prerequisite.set_defaults(func=cmd_bootstrap_uf)
