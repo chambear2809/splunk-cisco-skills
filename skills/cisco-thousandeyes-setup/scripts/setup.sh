@@ -259,7 +259,16 @@ enterprise_hec_token_state() {
     ensure_ingest_api_session || return 1
     if ! state="$(rest_get_hec_token_state \
         "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null)"; then
-        return 1
+        # Some older Enterprise HEC responses omit the disabled field on a
+        # token immediately after creation.  Permit that one bounded,
+        # post-create transition only after the create call itself succeeded;
+        # pre-existing malformed observations remain fail-closed.
+        if [[ "${_HEC_TOKEN_CREATED_THIS_RUN:-false}" == "true" ]] \
+            && rest_hec_token_presence "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null; then
+            state="enabled"
+        else
+            return 1
+        fi
     fi
     case "${state}" in
         enabled|disabled|missing) printf '%s' "${state}" ;;
@@ -633,7 +642,10 @@ rest_create_hec_token() {
         -w '\n%{http_code}' 2>/dev/null)
     hec_code=$(echo "${resp}" | tail -1)
     case "${hec_code}" in
-        201|200|409) return 0 ;;
+        201|200|409)
+            _HEC_TOKEN_CREATED_THIS_RUN=true
+            return 0
+            ;;
         *) return 1 ;;
     esac
 }

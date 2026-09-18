@@ -30,7 +30,7 @@ deployment_profile_has_explicit_endpoint() {
 
 deployment_execution_mode_for_profile() {
     local profile_name="${1:-}"
-    local ssh_host="" target_uri target_host explicit_ssh_host="" explicit_endpoint=false explicit_status=0
+    local ssh_host="" target_uri target_host explicit_ssh_host="" explicit_profile_host="" explicit_endpoint=false explicit_status=0
 
     if [[ -n "${profile_name}" ]]; then
         if ! explicit_ssh_host="$(_credential_profile_value_for_profile_key \
@@ -49,9 +49,25 @@ deployment_execution_mode_for_profile() {
             # A profile that supplies no endpoint may intentionally inherit the
             # current route, including its explicitly configured SSH alias.
             ssh_host="${SPLUNK_SSH_HOST:-}"
+        else
+            # An API URI alone does not authorize an SSH hop.  Bundle
+            # operations stay local unless the profile explicitly supplies an
+            # SSH host (or a host field that intentionally denotes the remote
+            # machine).  This also prevents a REST-only ingest profile from
+            # causing an accidental connection attempt to its API hostname.
+            if ! explicit_profile_host="$(_credential_profile_value_for_profile_key \
+                "${profile_name}" "SPLUNK_HOST")"; then
+                return 1
+            fi
+            ssh_host="${explicit_profile_host}"
         fi
     else
         ssh_host="${SPLUNK_SSH_HOST:-}"
+    fi
+    if [[ -n "${profile_name}" && "${explicit_endpoint}" == "true" \
+        && -z "${ssh_host}" ]]; then
+        printf '%s' "local"
+        return 0
     fi
     if [[ -n "${ssh_host}" ]]; then
         case "${ssh_host}" in
