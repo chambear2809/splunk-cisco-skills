@@ -1437,7 +1437,7 @@ platform_get_index_datatype() {
 
 platform_create_index() {
     local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
-    local bundle_profile="" bundle_status=0 platform=""
+    local bundle_status=0 platform=""
     _acs_validate_splunk_index_name "${idx}" || return 1
     if ! platform="$(resolve_splunk_platform)"; then
         return 1
@@ -1446,7 +1446,7 @@ platform_create_index() {
         cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}" "${index_type}"
     else
         if type deployment_index_bundle_profile >/dev/null 2>&1; then
-            if bundle_profile="$(deployment_index_bundle_profile)"; then
+            if deployment_index_bundle_profile >/dev/null; then
                 deployment_create_cluster_bundle_index "${idx}" "${max_size}" "${index_type}"
                 return $?
             else

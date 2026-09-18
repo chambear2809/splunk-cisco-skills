@@ -1810,7 +1810,7 @@ _warn_invalid_target_role_once() {
     local role_key="${2:-SPLUNK_TARGET_ROLE}"
 
     _warn_once "_WARNED_INVALID_SPLUNK_TARGET_ROLE" \
-        "ERROR: ${role_key} must be search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; refusing target selection."
+        "ERROR: ${role_key} value '${role_value}' must be search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; refusing target selection."
 }
 
 _resolve_target_role_platform_hint() {

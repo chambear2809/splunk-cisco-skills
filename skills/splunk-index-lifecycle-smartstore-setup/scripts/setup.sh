@@ -242,7 +242,8 @@ PY
 }
 
 read_render_metadata_identity() {
-    local metadata_path="$(render_dir)/metadata.json"
+    local metadata_path
+    metadata_path="$(render_dir)/metadata.json"
     python3 - "${metadata_path}" <<'PY'
 import json
 import os

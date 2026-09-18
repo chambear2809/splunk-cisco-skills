@@ -434,12 +434,12 @@ deployment_apply_profile_globals() {
             return 1
         fi
         if [[ -n "${ssh_port}" ]]; then
-            ssh_port_policy=set
+            ssh_port_policy="set"
         else
             ssh_port_policy=clear
         fi
         if [[ -n "${explicit_resolve}" ]]; then
-            resolve_policy=set
+            resolve_policy="set"
         elif [[ "${explicit_endpoint}" == "true" ]]; then
             # A distinct profile-local endpoint must not retain a resolver pin
             # for the previous target unless that profile explicitly supplies
@@ -474,7 +474,7 @@ deployment_apply_profile_globals() {
         [[ -n "${endpoint_host}" ]] || return 1
         if [[ -n "${profile_name}" ]]; then
             if [[ -n "${ssh_host}" ]]; then
-                ssh_policy=set
+                ssh_policy="set"
             else
                 ssh_policy=clear
             fi

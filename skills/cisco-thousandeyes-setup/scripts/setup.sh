@@ -149,7 +149,7 @@ normalize_hec_base_url() {
 }
 
 detect_hec_target() {
-    local host ingest_role bundle_profile="" bundle_status=0
+    local host ingest_role bundle_status=0
 
     if [[ -n "${HEC_URL}" ]]; then
         normalize_hec_base_url "${HEC_URL}"
@@ -186,7 +186,7 @@ detect_hec_target() {
         return 1
     fi
     if [[ "${ingest_role}" == "indexer" ]]; then
-        if bundle_profile="$(deployment_index_bundle_profile)"; then
+        if deployment_index_bundle_profile >/dev/null; then
             log "ERROR: Clustered indexer-tier ingest requires an explicit HEC URL."
             log "ERROR: Set --hec-url or configure SPLUNK_HEC_URL on the ingest profile."
             return 1
