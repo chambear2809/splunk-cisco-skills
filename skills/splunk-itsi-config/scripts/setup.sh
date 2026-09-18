@@ -165,7 +165,10 @@ if [[ "${APPLY}" == true || "${MODE_OVERRIDE}" == "cleanup-apply" ]]; then
 fi
 python3 "${SCRIPT_DIR}/lint_spec.py" "${LINT_ARGS[@]}"
 
-load_splunk_connection_settings
+if ! load_splunk_connection_settings; then
+  echo "ERROR: Could not load the selected Splunk credential target." >&2
+  exit 1
+fi
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
 fi

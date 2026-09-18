@@ -11,7 +11,10 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck source=/dev/null
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-load_oncall_settings
+if ! load_oncall_settings; then
+    log "ERROR: Could not load the selected Splunk On-Call settings."
+    exit 1
+fi
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-oncall-rendered"
 if [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then

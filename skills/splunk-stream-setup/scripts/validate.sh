@@ -70,7 +70,10 @@ if is_splunk_cloud; then
     CLOUD_MODE=true
 fi
 
-STREAM_VALIDATE_ROLE="$(resolve_splunk_target_role)"
+if ! STREAM_VALIDATE_ROLE="$(resolve_splunk_target_role)"; then
+    fail "Could not resolve the selected Splunk target role."
+    finish_validation true
+fi
 WIRE_DATA_PRESENT=false
 
 stream_role_is_search_tier() {

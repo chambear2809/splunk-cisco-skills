@@ -361,6 +361,1035 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertEqual(python_plan["command"][0], sys.executable)
         self.assertEqual(ruby_plan["command"][0], "ruby")
 
+    def test_resolved_command_preserves_virtualenv_launcher_path(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            venv_bin = root / ".venv" / "bin"
+            venv_bin.mkdir(parents=True)
+            base_python = root / "base-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            launcher = venv_bin / "python"
+            launcher.symlink_to(base_python)
+
+            command = core._resolved_command([str(launcher), "synthetic.py"])
+
+        self.assertEqual(command[0], str(launcher))
+        self.assertNotEqual(command[0], str(base_python))
+
+    @unittest.skipUnless(os.name == "posix", "POSIX interpreter ancestry policy")
+    def test_interpreter_binding_allows_trusted_sticky_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+            candidate = Path(tmpdir) / "synthetic-python"
+            candidate.write_bytes(b"synthetic interpreter")
+            candidate.chmod(0o700)
+            binding = core._interpreter_binding(candidate)
+
+        self.assertEqual(binding[0], candidate)
+        self.assertEqual(binding[1], candidate.resolve())
+
+    def test_direct_running_interpreter_compatibility_is_preserved(self) -> None:
+        running = Path(sys.executable).resolve(strict=True)
+        launcher, resolved, link_target = core._interpreter_binding(running)
+
+        self.assertEqual(launcher, running)
+        self.assertEqual(resolved, running)
+        self.assertEqual(link_target, "")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX interpreter ancestry policy")
+    def test_interpreter_binding_rejects_foreign_owner_writable_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            candidate = root / "synthetic-python"
+            candidate.write_bytes(b"synthetic interpreter")
+            candidate.chmod(0o700)
+            real_stat = Path.stat
+
+            def spoofed_stat(
+                path: Path, *args: object, **kwargs: object
+            ) -> os.stat_result:
+                metadata = real_stat(path, *args, **kwargs)
+                if path == root:
+                    values = list(metadata)
+                    values[0] = (values[0] & ~0o7777) | 0o755
+                    values[4] = os.geteuid() + 1
+                    return os.stat_result(tuple(values))
+                return metadata
+
+            with (
+                mock.patch.object(
+                    Path,
+                    "stat",
+                    autospec=True,
+                    side_effect=spoofed_stat,
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "ancestry"),
+            ):
+                core._interpreter_binding(candidate)
+
+    def test_execute_plan_preserves_virtualenv_only_imports(self) -> None:
+        """Deferred integration regression; do not run during remediation."""
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            venv = root / "venv"
+            subprocess.run(
+                [sys.executable, "-m", "venv", "--without-pip", str(venv)],
+                check=True,
+            )
+            launcher = venv / "bin" / "python"
+            site_packages = next((venv / "lib").glob("python*/site-packages"))
+            (site_packages / "venv_only_module.py").write_text(
+                "VALUE = 'venv-only'\n",
+                encoding="utf-8",
+            )
+            script = root / "print_venv_module.py"
+            script.write_text(
+                "import venv_only_module\n"
+                "print(venv_only_module.VALUE)\n",
+                encoding="utf-8",
+            )
+            script.chmod(0o700)
+            command = [str(launcher), str(script)]
+            with mock.patch.object(
+                core, "_skills_snapshot_sha256", return_value="1" * 64
+            ):
+                plan = core._store_plan(
+                    kind="typed_read_only_test",
+                    command=command,
+                    summary="synthetic venv-only import",
+                    read_only=True,
+                )
+                result = core.execute_plan(
+                    plan["plan_hash"],
+                    confirm=True,
+                    expected_kind="typed_read_only_test",
+                )
+
+        self.assertEqual(result["returncode"], 0)
+        self.assertEqual(result["stdout"].strip(), "venv-only")
+
+    def test_interpreter_launcher_replacement_is_rejected(self) -> None:
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            base_python = root / "base-python"
+            replacement = root / "replacement-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            replacement.write_bytes(b"replacement interpreter")
+            base_python.chmod(0o700)
+            replacement.chmod(0o700)
+            launcher = root / "python"
+            launcher.symlink_to(base_python)
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            plan = core.PlannedCommand(
+                plan_hash="0" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic interpreter binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            launcher.unlink()
+            launcher.symlink_to(replacement)
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    def test_interpreter_binding_rejects_symlink_cycle(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            first = root / "python"
+            second = root / "python3"
+            first.symlink_to(second.name)
+            second.symlink_to(first.name)
+
+            with self.assertRaisesRegex(
+                core.SkillMCPError,
+                "symbolic-link cycle|resolve interpreter launcher",
+            ):
+                core._interpreter_binding(first)
+
+    def test_interpreter_binding_rejects_excessive_symlink_depth(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            target = root / "base-python"
+            target.write_bytes(b"synthetic interpreter")
+            target.chmod(0o700)
+            second = root / "python3"
+            second.symlink_to(target)
+            first = root / "python"
+            first.symlink_to(second.name)
+
+            with (
+                mock.patch.object(core, "MAX_INTERPRETER_SYMLINKS", 1),
+                self.assertRaisesRegex(core.SkillMCPError, "too many"),
+            ):
+                core._interpreter_binding(first)
+
+    def test_interpreter_intermediate_link_replacement_is_rejected(self) -> None:
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            base_python = root / "base-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            intermediate = root / "python3"
+            intermediate.symlink_to(base_python)
+            launcher = root / "python"
+            launcher.symlink_to(intermediate.name)
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            chain = core._interpreter_symlink_chain(launcher)
+            plan = core.PlannedCommand(
+                plan_hash="7" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic interpreter chain binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_invocation_chain=chain,
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            intermediate.unlink()
+            intermediate.symlink_to(base_python)
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher or target"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink ownership policy")
+    def test_interpreter_rejects_untrusted_intermediate_target_route_alias(
+        self,
+    ) -> None:
+        """Deferred regression; do not run during remediation."""
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            real_bin = root / "real-bin"
+            real_bin.mkdir()
+            base_python = real_bin / "python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            route = root / "route"
+            route.mkdir()
+            intermediate = route / "current"
+            intermediate.symlink_to(real_bin)
+            launcher = root / "python"
+            launcher.symlink_to(Path("route") / "current" / "python")
+            real_lstat = Path.lstat
+
+            def spoofed_lstat(
+                path: Path, *args: object, **kwargs: object
+            ) -> os.stat_result:
+                metadata = real_lstat(path, *args, **kwargs)
+                if path == intermediate:
+                    values = list(metadata)
+                    values[4] = os.geteuid() + 1
+                    return os.stat_result(tuple(values))
+                return metadata
+
+            with (
+                mock.patch.object(
+                    Path,
+                    "lstat",
+                    autospec=True,
+                    side_effect=spoofed_lstat,
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "untrusted principal"),
+            ):
+                core._interpreter_binding(launcher)
+
+    def test_interpreter_intermediate_target_route_alias_replacement_is_rejected(
+        self,
+    ) -> None:
+        """Deferred regression; do not run during remediation."""
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            real_bin = root / "real-bin"
+            real_bin.mkdir()
+            base_python = real_bin / "python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            route = root / "route"
+            route.mkdir()
+            intermediate = route / "current"
+            intermediate.symlink_to(real_bin)
+            launcher = root / "python"
+            launcher.symlink_to(Path("route") / "current" / "python")
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            chain = core._interpreter_symlink_chain(launcher)
+            self.assertIn(str(intermediate), json.dumps(chain))
+            plan = core.PlannedCommand(
+                plan_hash="c" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic interpreter target-route binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_invocation_chain=chain,
+                interpreter_invocation_parent_route=core._interpreter_parent_route(
+                    launcher
+                ),
+                interpreter_environment_files=core._interpreter_environment_files(
+                    launcher
+                ),
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            stale_intermediate = route / "previous-current"
+            intermediate.rename(stale_intermediate)
+            intermediate.symlink_to(real_bin)
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher or target"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    def test_interpreter_target_content_replacement_is_rejected(self) -> None:
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            base_python = root / "base-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            launcher = root / "python"
+            launcher.symlink_to(base_python)
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            plan = core.PlannedCommand(
+                plan_hash="8" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic interpreter target binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_invocation_chain=core._interpreter_symlink_chain(launcher),
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            base_python.write_bytes(b"modified interpreter")
+            base_python.chmod(0o700)
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher or target"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    def test_interpreter_parent_alias_replacement_is_rejected(self) -> None:
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            base_python = root / "base-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            venv = root / "venv"
+            (venv / "bin").mkdir(parents=True)
+            (venv / "bin" / "python").symlink_to(base_python)
+            (venv / "pyvenv.cfg").write_text(
+                "home = /synthetic\n",
+                encoding="utf-8",
+            )
+            alias = root / "active-venv"
+            alias.symlink_to(venv.name)
+            launcher = alias / "bin" / "python"
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            plan = core.PlannedCommand(
+                plan_hash="a" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic interpreter parent binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_invocation_chain=core._interpreter_symlink_chain(launcher),
+                interpreter_invocation_parent_route=core._interpreter_parent_route(
+                    launcher
+                ),
+                interpreter_environment_files=core._interpreter_environment_files(
+                    launcher
+                ),
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            alias.unlink()
+            alias.symlink_to(venv.name)
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher or target"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    def test_interpreter_pyvenv_configuration_change_is_rejected(self) -> None:
+        script = core.REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            base_python = root / "base-python"
+            base_python.write_bytes(b"synthetic interpreter")
+            base_python.chmod(0o700)
+            venv = root / "venv"
+            (venv / "bin").mkdir(parents=True)
+            launcher = venv / "bin" / "python"
+            launcher.symlink_to(base_python)
+            pyvenv = venv / "pyvenv.cfg"
+            pyvenv.write_text("home = /synthetic\n", encoding="utf-8")
+            _, resolved, link_target = core._interpreter_binding(launcher)
+            plan = core.PlannedCommand(
+                plan_hash="b" * 64,
+                kind="skill_script",
+                command=[str(launcher), str(script.relative_to(core.REPO_ROOT))],
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic Python environment binding",
+                read_only=False,
+                timeout_seconds=1,
+                executable_path=str(script),
+                executable_sha256=core._file_sha256(script),
+                repository_sha256="1" * 64,
+                interpreter_invocation_path=str(launcher),
+                interpreter_invocation_link_target=link_target,
+                interpreter_invocation_identity=core._interpreter_launcher_identity(
+                    launcher
+                ),
+                interpreter_invocation_chain=core._interpreter_symlink_chain(launcher),
+                interpreter_invocation_parent_route=core._interpreter_parent_route(
+                    launcher
+                ),
+                interpreter_environment_files=core._interpreter_environment_files(
+                    launcher
+                ),
+                interpreter_path=str(resolved),
+                interpreter_sha256=core._file_sha256(resolved),
+            )
+            pyvenv.write_text("home = /changed\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(
+                    core, "_skills_snapshot_sha256", return_value="1" * 64
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "launcher or target"),
+            ):
+                core._verify_plan_integrity(plan)
+
+    def test_secret_output_binding_allows_fresh_destination(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "fresh.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            bindings = core._secret_output_bindings(command)
+
+        self.assertEqual(len(bindings), 1)
+        self.assertFalse(bindings[0]["identity"]["exists"])
+        self.assertEqual(core._secret_file_identities(command), ())
+        plan = core.PlannedCommand(
+            plan_hash="4" * 64,
+            kind="skill_script",
+            command=command,
+            cwd=str(core.REPO_ROOT),
+            summary="synthetic fresh output binding",
+            read_only=False,
+            timeout_seconds=1,
+            secret_file_identities=(),
+        )
+        core._verify_secret_file_identities(plan)
+
+    def test_secret_output_binding_accepts_inline_output_flag(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "fresh-inline.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                f"--write-token-file={output}",
+            ]
+
+            bindings = core._secret_output_bindings(command)
+
+        self.assertEqual(len(bindings), 1)
+        self.assertEqual(bindings[0]["argument"], "--write-token-file")
+        self.assertEqual(bindings[0]["identity"]["path"], str(output))
+        self.assertFalse(bindings[0]["identity"]["exists"])
+        self.assertEqual(core._secret_file_identities(command), ())
+
+    def test_hec_secret_output_flag_allows_fresh_destination(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "fresh-hec.token"
+            command = [
+                "bash",
+                "skills/splunk-hec-service-setup/scripts/setup.sh",
+                "--write-hec-token-file",
+                str(output),
+            ]
+            bindings = core._secret_output_bindings(command)
+
+        self.assertEqual(len(bindings), 1)
+        self.assertFalse(bindings[0]["identity"]["exists"])
+
+    def test_secret_output_binding_allows_existing_owner_only_destination(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "existing.token"
+            output.write_text("synthetic-token\n", encoding="utf-8")
+            output.chmod(0o600)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            bindings = core._secret_output_bindings(command)
+            (Path(tmpdir) / "unrelated").write_text(
+                "synthetic sibling\n",
+                encoding="utf-8",
+            )
+            plan = core.PlannedCommand(
+                plan_hash="5" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic stable output binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=bindings,
+            )
+            core._verify_secret_output_bindings(plan)
+
+        self.assertTrue(bindings[0]["identity"]["exists"])
+        self.assertEqual(bindings[0]["identity"]["mode"], 0o600)
+
+    def test_secret_output_binding_rejects_symlink_and_unsafe_parent(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            target = root / "target.token"
+            target.write_text("synthetic-token\n", encoding="utf-8")
+            target.chmod(0o600)
+            linked = root / "linked.token"
+            linked.symlink_to(target)
+            symlink_command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(linked),
+            ]
+            with self.assertRaisesRegex(core.SkillMCPError, "symbolic link"):
+                core._secret_output_bindings(symlink_command)
+
+            unsafe = root / "unsafe"
+            unsafe.mkdir()
+            unsafe.chmod(0o777)
+            try:
+                unsafe_command = [
+                    "bash",
+                    "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                    "--write-token-file",
+                    str(unsafe / "token"),
+                ]
+                with self.assertRaisesRegex(core.SkillMCPError, "unsafe"):
+                    core._secret_output_bindings(unsafe_command)
+            finally:
+                unsafe.chmod(0o700)
+
+    def test_secret_output_binding_requires_existing_secure_parent(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "not-created" / "token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "parent directory does not exist"
+            ):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_requires_writable_parent(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "fresh.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            with (
+                mock.patch.object(os, "access", return_value=False),
+                self.assertRaisesRegex(core.SkillMCPError, "not writable"),
+            ):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_rejects_non_directory_alias_parent(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            target = root / "not-a-directory"
+            target.write_text("synthetic\n", encoding="utf-8")
+            alias = root / "alias"
+            alias.symlink_to(target)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(alias / "token"),
+            ]
+            with self.assertRaisesRegex(core.SkillMCPError, "does not resolve"):
+                core._secret_output_bindings(command)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX sticky-directory policy")
+    def test_secret_output_binding_allows_trusted_sticky_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+            output = Path(tmpdir) / "fresh.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            bindings = core._secret_output_bindings(command)
+
+        self.assertEqual(len(bindings), 1)
+        self.assertFalse(bindings[0]["identity"]["exists"])
+
+    def test_secret_output_binding_rejects_parent_traversal(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            alias = root / "alias"
+            alias.mkdir()
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                f"{alias}/../token",
+            ]
+            with self.assertRaisesRegex(core.SkillMCPError, "must not contain"):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_rejects_leading_expanduser_alias(self) -> None:
+        for output in ("~/fresh.token", "~another-user/fresh.token"):
+            with self.subTest(output=output):
+                command = [
+                    "bash",
+                    "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                    "--write-token-file",
+                    output,
+                ]
+                with self.assertRaisesRegex(
+                    core.SkillMCPError,
+                    "canonical absolute path",
+                ):
+                    core._secret_output_bindings(command)
+
+    def test_secret_output_binding_allows_literal_tilde_in_absolute_path(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            parent = Path(tmpdir) / "~literal"
+            parent.mkdir(mode=0o700)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(parent / "fresh.token"),
+            ]
+
+            bindings = core._secret_output_bindings(command)
+
+        self.assertEqual(len(bindings), 1)
+        self.assertFalse(bindings[0]["identity"]["exists"])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink ownership policy")
+    def test_secret_output_binding_rejects_attacker_owned_alias_parent(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            secure = root / "secure"
+            secure.mkdir()
+            secure.chmod(0o700)
+            alias = root / "alias"
+            alias.symlink_to(secure)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(alias / "token"),
+            ]
+            real_lstat = Path.lstat
+
+            def spoofed_lstat(path: Path) -> os.stat_result:
+                metadata = real_lstat(path)
+                if path == alias:
+                    values = list(metadata)
+                    values[4] = os.geteuid() + 1
+                    return os.stat_result(tuple(values))
+                return metadata
+
+            with (
+                mock.patch.object(
+                    Path,
+                    "lstat",
+                    autospec=True,
+                    side_effect=spoofed_lstat,
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "untrusted principal"),
+            ):
+                core._secret_output_bindings(command)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink ownership policy")
+    def test_secret_output_binding_rejects_untrusted_intermediate_alias(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            secure = root / "secure"
+            secure.mkdir()
+            secure.chmod(0o700)
+            intermediate = root / "intermediate"
+            intermediate.symlink_to(secure)
+            alias = root / "alias"
+            alias.symlink_to(intermediate)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(alias / "token"),
+            ]
+            real_lstat = Path.lstat
+
+            def spoofed_lstat(path: Path) -> os.stat_result:
+                metadata = real_lstat(path)
+                if path == intermediate:
+                    values = list(metadata)
+                    values[4] = os.geteuid() + 1
+                    return os.stat_result(tuple(values))
+                return metadata
+
+            with (
+                mock.patch.object(
+                    Path,
+                    "lstat",
+                    autospec=True,
+                    side_effect=spoofed_lstat,
+                ),
+                self.assertRaisesRegex(core.SkillMCPError, "untrusted principal"),
+            ):
+                core._secret_output_bindings(command)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink policy")
+    def test_secret_output_binding_rejects_symlink_parent_traversal(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            secure = root / "secure"
+            secure.mkdir(mode=0o700)
+            (root / "nested_alias").symlink_to(secure)
+            alias = root / "alias"
+            alias.symlink_to("nested_alias/../secure")
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(alias / "token"),
+            ]
+            with self.assertRaisesRegex(
+                core.SkillMCPError, "symlink target contains"
+            ):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_rejects_parent_symlink_cycle(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            first = root / "first"
+            second = root / "second"
+            first.symlink_to(second.name)
+            second.symlink_to(first.name)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(first / "token"),
+            ]
+            with self.assertRaisesRegex(core.SkillMCPError, "symlink cycle"):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_rejects_excessive_symlink_depth(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            secure = root / "secure"
+            secure.mkdir(mode=0o700)
+            second = root / "second"
+            second.symlink_to(secure.name)
+            first = root / "first"
+            first.symlink_to(second.name)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(first / "token"),
+            ]
+            with (
+                mock.patch.object(core, "MAX_OUTPUT_ROUTE_SYMLINKS", 1),
+                self.assertRaisesRegex(core.SkillMCPError, "too many"),
+            ):
+                core._secret_output_bindings(command)
+
+    def test_secret_output_binding_rejects_same_target_alias_replacement(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            secure = root / "secure"
+            secure.mkdir()
+            secure.chmod(0o700)
+            alias = root / "alias"
+            alias.symlink_to(secure)
+            output = alias / "token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            planned = core._secret_output_bindings(command)
+            self.assertTrue(
+                any(
+                    item["kind"] == "symlink"
+                    for item in planned[0]["identity"]["parent"]["requested_components"]
+                )
+            )
+            alias.unlink()
+            alias.symlink_to(secure)
+            plan = core.PlannedCommand(
+                plan_hash="3" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic alias binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "destination changed"):
+                core._verify_secret_output_bindings(plan)
+
+    def test_secret_output_binding_rejects_destination_created_after_review(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "new.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            planned = core._secret_output_bindings(command)
+            output.write_text("synthetic-token\n", encoding="utf-8")
+            output.chmod(0o600)
+            plan = core.PlannedCommand(
+                plan_hash="1" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic output binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "destination changed"):
+                core._verify_secret_output_bindings(plan)
+
+    def test_secret_output_binding_rejects_existing_destination_replacement(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "existing.token"
+            output.write_text("synthetic-token\n", encoding="utf-8")
+            output.chmod(0o600)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            planned = core._secret_output_bindings(command)
+            output.unlink()
+            output.write_text("replacement-token\n", encoding="utf-8")
+            output.chmod(0o600)
+            plan = core.PlannedCommand(
+                plan_hash="9" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic output replacement binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "destination changed"):
+                core._verify_secret_output_bindings(plan)
+
+    def test_secret_output_binding_rejects_existing_destination_removal(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            output = Path(tmpdir) / "existing.token"
+            output.write_text("synthetic-token\n", encoding="utf-8")
+            output.chmod(0o600)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            planned = core._secret_output_bindings(command)
+            output.unlink()
+            plan = core.PlannedCommand(
+                plan_hash="c" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic output removal binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "destination changed"):
+                core._verify_secret_output_bindings(plan)
+
+    def test_secret_output_binding_rejects_plain_parent_replacement(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            root = Path(tmpdir)
+            parent = root / "secure-parent"
+            parent.mkdir(mode=0o700)
+            output = parent / "new.token"
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--write-token-file",
+                str(output),
+            ]
+            planned = core._secret_output_bindings(command)
+            parent.rename(root / "replaced-parent")
+            parent.mkdir(mode=0o700)
+            plan = core.PlannedCommand(
+                plan_hash="d" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic plain parent replacement binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_output_bindings=planned,
+            )
+
+            with self.assertRaisesRegex(core.SkillMCPError, "destination changed"):
+                core._verify_secret_output_bindings(plan)
+
+    def test_changed_input_secret_remains_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            secret = Path(tmpdir) / "input.token"
+            secret.write_text("synthetic-input\n", encoding="utf-8")
+            secret.chmod(0o600)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--token-file",
+                str(secret),
+            ]
+            planned = core._secret_file_identities(command)
+            secret.write_text("changed-input\n", encoding="utf-8")
+            secret.chmod(0o600)
+            plan = core.PlannedCommand(
+                plan_hash="2" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic input binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_file_identities=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "planned secret file"):
+                core._verify_secret_file_identities(plan)
+
+    def test_dynamic_secret_file_flag_remains_bound(self) -> None:
+        with tempfile.TemporaryDirectory(dir=core.REPO_ROOT) as tmpdir:
+            secret = Path(tmpdir) / "dynamic.token"
+            secret.write_text("synthetic-input\n", encoding="utf-8")
+            secret.chmod(0o600)
+            command = [
+                "bash",
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--custom-token-file",
+                str(secret),
+            ]
+            planned = core._secret_file_identities(command)
+            self.assertEqual(len(planned), 1)
+            secret.write_text("changed-input\n", encoding="utf-8")
+            secret.chmod(0o600)
+            plan = core.PlannedCommand(
+                plan_hash="6" * 64,
+                kind="skill_script",
+                command=command,
+                cwd=str(core.REPO_ROOT),
+                summary="synthetic dynamic input binding",
+                read_only=False,
+                timeout_seconds=1,
+                secret_file_identities=planned,
+            )
+            with self.assertRaisesRegex(core.SkillMCPError, "planned secret file"):
+                core._verify_secret_file_identities(plan)
+
     def test_all_execution_requires_explicit_enable_gate(self) -> None:
         plan = core._store_plan(
             kind="typed_read_only_test",

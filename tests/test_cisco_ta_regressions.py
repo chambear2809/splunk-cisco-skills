@@ -383,6 +383,565 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             self.assertEqual(state["indexes"], [])
 
 
+    def test_thousandeyes_hec_observation_failure_cannot_trigger_mutation(self):
+        """Deferred regression: a failed production read must not become create."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mutation_marker = tmp_path / "hec-mutation-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                method = "GET"
+                url = ""
+                i = 0
+                while i < len(args):
+                    if args[i] == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if args[i] == "-d" and i + 1 < len(args):
+                        if method == "GET":
+                            method = "POST"
+                        i += 2
+                        continue
+                    if args[i].startswith(("http://", "https://")):
+                        url = args[i]
+                    i += 1
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write(
+                        "<response><sessionKey>test-session</sessionKey></response>"
+                    )
+                    raise SystemExit(0)
+                if "/services/data/inputs/http" in path:
+                    if method != "GET":
+                        Path(os.environ["HEC_MUTATION_MARKER"]).touch()
+                        raise SystemExit(0)
+                    raise SystemExit(1)
+                raise SystemExit(0)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "enterprise"
+            env["HEC_MUTATION_MARKER"] = str(mutation_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, msg=output)
+            self.assertIn("Could not inspect HEC token", output)
+            self.assertFalse(
+                mutation_marker.exists(),
+                msg="HEC mutation followed a failed read",
+            )
+
+            validation = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/validate.sh",
+                env=env,
+            )
+            validation_output = validation.stdout + validation.stderr
+            self.assertNotEqual(validation.returncode, 0, msg=validation_output)
+            self.assertIn("Could not inspect HEC token", validation_output)
+
+    def test_thousandeyes_cloud_hec_list_failure_cannot_trigger_create(self):
+        """Deferred regression: an ACS list failure is not a missing token."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mutation_marker = tmp_path / "acs-hec-mutation-reached"
+            legacy_marker = tmp_path / "acs-legacy-fallback-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                args = sys.argv[1:]
+                command = " ".join(args)
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
+                if "hec-token list" in command and "--help" in args:
+                    raise SystemExit(0)
+                if "hec-token list" in command:
+                    raise SystemExit(1)
+                if "http-event-collectors" in command:
+                    Path(os.environ["ACS_LEGACY_MARKER"]).touch()
+                    print('[{"type":"http","status":404}]')
+                    raise SystemExit(1)
+                if "hec-token create" in command or "http-event-collectors create" in command:
+                    Path(os.environ["ACS_HEC_MUTATION_MARKER"]).touch()
+                raise SystemExit(0)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "cloud"
+            env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+            env["ACS_LEGACY_MARKER"] = str(legacy_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, msg=output)
+            self.assertIn("Could not inspect HEC token", output)
+            self.assertIn("refusing mutation", output)
+            self.assertFalse(
+                mutation_marker.exists(),
+                msg="ACS create followed a failed token inventory",
+            )
+            self.assertFalse(
+                legacy_marker.exists(),
+                msg="Modern ACS transport failure incorrectly triggered legacy fallback",
+            )
+
+    def test_thousandeyes_cloud_acs_create_requires_successful_readback(self):
+        """Deferred regression: ACS command success alone is not create success."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mutation_marker = tmp_path / "acs-hec-create-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                command = " ".join(sys.argv[1:])
+                marker = Path(os.environ["ACS_HEC_MUTATION_MARKER"])
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
+                if "hec-token create" in command:
+                    marker.touch()
+                    raise SystemExit(0)
+                if "hec-token list" in command:
+                    if marker.exists() and "--count 100" in command:
+                        raise SystemExit(1)
+                    print(json.dumps({"tokens": []}))
+                    raise SystemExit(0)
+                if "http-event-collectors" in command:
+                    raise SystemExit(1)
+                raise SystemExit(0)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "cloud"
+            env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, msg=output)
+            self.assertTrue(mutation_marker.exists(), msg="Fixture did not reach ACS create")
+            self.assertIn("Could not read back HEC token", output)
+            self.assertNotIn("created via ACS", output)
+
+    def test_thousandeyes_failed_acs_create_cannot_fall_through_to_rest_create(self):
+        """Deferred regression: an uncertain ACS create is never followed by REST create."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            acs_marker = tmp_path / "acs-hec-create-attempted"
+            rest_marker = tmp_path / "rest-hec-create-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                args = sys.argv[1:]
+                command = " ".join(args)
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
+                if "hec-token list" in command:
+                    print(json.dumps({"tokens": []}))
+                    raise SystemExit(0)
+                if "hec-token create" in command:
+                    Path(os.environ["ACS_CREATE_MARKER"]).touch()
+                    raise SystemExit(1)
+                if "http-event-collectors" in command:
+                    raise SystemExit(1)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                method = "GET"
+                url = ""
+                i = 0
+                while i < len(args):
+                    if args[i] == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if args[i] == "-d" and i + 1 < len(args):
+                        method = "POST"
+                        i += 2
+                        continue
+                    if args[i].startswith(("http://", "https://")):
+                        url = args[i]
+                    i += 1
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    print("<response><sessionKey>test-session</sessionKey></response>", end="")
+                    raise SystemExit(0)
+                if "/services/data/inputs/http" in path and method == "GET":
+                    print('{"entry":[]}')
+                    print("200")
+                    raise SystemExit(0)
+                if "/services/data/inputs/http" in path:
+                    Path(os.environ["REST_CREATE_MARKER"]).touch()
+                    print("{}")
+                    print("201")
+                    raise SystemExit(0)
+                raise SystemExit(1)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "cloud"
+            env["ACS_CREATE_MARKER"] = str(acs_marker)
+            env["REST_CREATE_MARKER"] = str(rest_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, msg=output)
+            self.assertTrue(acs_marker.exists(), msg="Fixture did not attempt ACS create")
+            self.assertFalse(rest_marker.exists(), msg="Ambiguous ACS create reached REST create")
+            self.assertIn("refusing a second create operation", output)
+
+    def test_thousandeyes_cloud_verified_absence_allows_verified_create(self):
+        """Deferred regression: a valid empty inventory retains create behavior."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mutation_marker = tmp_path / "acs-hec-create-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                command = " ".join(sys.argv[1:])
+                marker = Path(os.environ["ACS_HEC_MUTATION_MARKER"])
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
+                if "hec-token create" in command:
+                    marker.touch()
+                    raise SystemExit(0)
+                if "hec-token list" in command:
+                    tokens = []
+                    if marker.exists():
+                        tokens.append({"name": "thousandeyes", "disabled": False})
+                    print(json.dumps({"tokens": tokens}))
+                    raise SystemExit(0)
+                if "http-event-collectors" in command:
+                    raise SystemExit(1)
+                raise SystemExit(0)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "cloud"
+            env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertTrue(mutation_marker.exists(), msg="Verified absence did not reach create")
+            self.assertIn("created via ACS", output)
+
+    def test_thousandeyes_cloud_hec_searches_all_pages_before_create(self):
+        """Deferred regression: a page-two token is present, not missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            create_marker = tmp_path / "acs-hec-create-reached"
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                args = sys.argv[1:]
+                command = " ".join(args)
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
+                if "hec-token list" in command:
+                    if "--help" in args:
+                        raise SystemExit(0)
+                    if "--count" in args and args[args.index("--count") + 1] == "1":
+                        print(json.dumps({"tokens": [{"name": "probe", "disabled": False}]}))
+                        raise SystemExit(0)
+                    offset = int(args[args.index("--offset") + 1])
+                    if offset == 0:
+                        tokens = [
+                            {"name": f"decoy-{number}", "disabled": False}
+                            for number in range(100)
+                        ]
+                    elif offset == 100:
+                        tokens = [{"name": "thousandeyes", "disabled": False}]
+                    else:
+                        tokens = []
+                    print(json.dumps({"tokens": tokens}))
+                    raise SystemExit(0)
+                if "hec-token create" in command or "http-event-collectors create" in command:
+                    Path(os.environ["ACS_HEC_CREATE_MARKER"]).touch()
+                if "http-event-collectors" in command:
+                    raise SystemExit(1)
+                raise SystemExit(0)
+                """,
+            )
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_PLATFORM"] = "cloud"
+            env["ACS_HEC_CREATE_MARKER"] = str(create_marker)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("already exists in Splunk Cloud", output)
+            self.assertFalse(create_marker.exists(), msg="Page-two token was duplicated")
+
+    def test_thousandeyes_cloud_disabled_token_requires_enable_readback(self):
+        """Deferred regression: a disabled token is never reported ready."""
+        for enable_sticks in (False, True):
+            with self.subTest(enable_sticks=enable_sticks), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                bin_dir = tmp_path / "bin"
+                bin_dir.mkdir()
+                credentials_file = tmp_path / "credentials"
+                mutation_marker = tmp_path / "acs-hec-enable-reached"
+                credentials_file.write_text(
+                    textwrap.dedent(
+                        """\
+                        SPLUNK_PLATFORM="cloud"
+                        SPLUNK_CLOUD_STACK="example-stack"
+                        SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                        SPLUNK_USER="user"
+                        SPLUNK_PASS="pass"
+                        """
+                    ),
+                    encoding="utf-8",
+                )
+                write_executable(
+                    bin_dir / "acs",
+                    """\
+                    #!/usr/bin/env python3
+                    import json
+                    import os
+                    import sys
+                    from pathlib import Path
+
+                    command = " ".join(sys.argv[1:])
+                    marker = Path(os.environ["ACS_HEC_MUTATION_MARKER"])
+                    if "config current-stack" in command:
+                        print("Stack: example-stack")
+                        raise SystemExit(0)
+                    if "hec-token list" in command:
+                        disabled = not (
+                            marker.exists() and os.environ["ACS_ENABLE_STICKS"] == "true"
+                        )
+                        print(
+                            json.dumps(
+                                {"tokens": [{"name": "thousandeyes", "disabled": disabled}]}
+                            )
+                        )
+                        raise SystemExit(0)
+                    if "hec-token update" in command:
+                        marker.touch()
+                        raise SystemExit(0)
+                    if "hec-token create" in command or "http-event-collectors create" in command:
+                        raise SystemExit(2)
+                    if "http-event-collectors" in command:
+                        raise SystemExit(1)
+                    raise SystemExit(0)
+                    """,
+                )
+                env = os.environ.copy()
+                env["PATH"] = f"{bin_dir}:{env['PATH']}"
+                env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+                env["SPLUNK_PLATFORM"] = "cloud"
+                env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+                env["ACS_ENABLE_STICKS"] = "true" if enable_sticks else "false"
+
+                result = self.run_script(
+                    "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                    "--hec-only",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertTrue(mutation_marker.exists(), msg="Fixture did not reach ACS enable")
+                self.assertNotIn("already exists in Splunk Cloud", output)
+                if enable_sticks:
+                    self.assertEqual(result.returncode, 0, msg=output)
+                    self.assertIn("enabled and read back through ACS", output)
+                else:
+                    self.assertNotEqual(result.returncode, 0, msg=output)
+                    self.assertIn("did not read back as enabled", output)
+
     def test_thousandeyes_hec_management_uses_ingest_profile_on_enterprise(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -484,9 +1043,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     out("<response><sessionKey>test-session</sessionKey></response>")
 
                 if "/services/apps/local/ta_cisco_thousandeyes" in path:
-                    if write_code:
-                        out(code=200)
-                    out(json.dumps({"entry": [{"name": "ta_cisco_thousandeyes", "content": {"version": "1.0.0"}}]}))
+                    out(
+                        json.dumps({"entry": [{"name": "ta_cisco_thousandeyes", "content": {"version": "1.0.0"}}]}),
+                        200 if write_code else None,
+                    )
 
                 if path.endswith("/services/data/inputs/http") and method == "POST":
                     body = parse_qs(data, keep_blank_values=True)
@@ -1229,7 +1789,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             if "/services/apps/local/Splunk_TA_cisco_meraki" in path:
                 if output_target == "/dev/null" and write_code:
                     out(code=200)
-                out(json.dumps({"entry": [{"name": "Splunk_TA_cisco_meraki", "content": {"version": "3.3.0"}}]}))
+                out(
+                    json.dumps({"entry": [{"name": "Splunk_TA_cisco_meraki", "content": {"version": "3.3.0"}}]}),
+                    200 if write_code else None,
+                )
 
             if path.endswith("/services/data/inputs/all"):
                 entries = []

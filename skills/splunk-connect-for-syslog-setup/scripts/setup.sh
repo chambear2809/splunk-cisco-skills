@@ -501,8 +501,13 @@ ensure_splunk_context() {
 }
 
 ensure_ingest_context() {
-    ensure_splunk_context
-    load_ingest_connection_settings
+    if ! ensure_splunk_context; then
+        return 1
+    fi
+    if ! load_ingest_connection_settings; then
+        log "ERROR: Could not load the selected Splunk ingest target settings."
+        return 1
+    fi
 }
 
 ensure_search_session() {
@@ -529,7 +534,9 @@ maybe_start_search_session() {
 ensure_ingest_session() {
     local saved_user saved_pass
 
-    ensure_ingest_context
+    if ! ensure_ingest_context; then
+        return 1
+    fi
     if [[ "${INGEST_SESSION_READY}" == "true" ]]; then
         return 0
     fi
@@ -552,7 +559,9 @@ ensure_ingest_session() {
 maybe_start_ingest_session() {
     local saved_user saved_pass
 
-    ensure_ingest_context
+    if ! ensure_ingest_context; then
+        return 1
+    fi
     if [[ "${INGEST_SESSION_READY}" == "true" ]]; then
         return 0
     fi
@@ -649,14 +658,16 @@ hec_event_url_from_base() {
 }
 
 detect_hec_base_url() {
-    local stack host ingest_role
+    local stack host ingest_role bundle_profile="" bundle_status=0
 
     if [[ -n "${HEC_URL}" ]]; then
         normalize_hec_base_url "${HEC_URL}"
         return 0
     fi
 
-    ensure_ingest_context
+    if ! ensure_ingest_context; then
+        return 1
+    fi
     if is_splunk_cloud; then
         stack="${SPLUNK_CLOUD_STACK:-}"
         if [[ -z "${stack}" ]]; then
@@ -676,11 +687,22 @@ detect_hec_base_url() {
         return 0
     fi
 
-    ingest_role="$(resolve_ingest_target_role 2>/dev/null || true)"
-    if [[ "${ingest_role}" == "indexer" ]] && deployment_index_bundle_profile >/dev/null 2>&1; then
-        log "ERROR: Clustered indexer-tier ingest requires an explicit HEC URL."
-        log "ERROR: Set --hec-url or configure SPLUNK_HEC_URL on the ingest profile."
-        exit 1
+    if ! ingest_role="$(resolve_ingest_target_role)"; then
+        log "ERROR: Could not resolve the selected Splunk ingest target role."
+        return 1
+    fi
+    if [[ "${ingest_role}" == "indexer" ]]; then
+        if bundle_profile="$(deployment_index_bundle_profile)"; then
+            log "ERROR: Clustered indexer-tier ingest requires an explicit HEC URL."
+            log "ERROR: Set --hec-url or configure SPLUNK_HEC_URL on the ingest profile."
+            return 1
+        else
+            bundle_status=$?
+            if (( bundle_status == 2 )); then
+                log "ERROR: Could not resolve the configured index-tier deployment target."
+                return 1
+            fi
+        fi
     fi
 
     host="$(splunk_host_from_uri "${INGEST_SPLUNK_URI}")"
@@ -695,37 +717,78 @@ detect_hec_base_url() {
 }
 
 enterprise_hec_uses_bundle() {
-    if is_splunk_cloud; then
-        return 1
+    local platform="" bundle_status=0
+
+    _DEPLOYMENT_BUNDLE_CHECK_ERROR=false
+    if ! platform="$(resolve_splunk_platform)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
     fi
-    type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
-        && deployment_should_manage_ingest_hec_via_bundle
+    case "${platform}" in
+        cloud) return 1 ;;
+        enterprise) ;;
+        *)
+            _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+            log "ERROR: Unsupported Splunk platform '${platform}'; refusing HEC delivery routing."
+            return 2
+            ;;
+    esac
+    if ! type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if deployment_should_manage_ingest_hec_via_bundle; then
+        return 0
+    else
+        bundle_status=$?
+    fi
+    if (( bundle_status == 2 )) \
+        || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    return 1
 }
 
 enterprise_hec_token_state() {
-    local token_name="$1"
+    local token_name="$1" state=""
 
     if enterprise_hec_uses_bundle; then
-        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
-        return 0
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null
+        return $?
+    fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        log "ERROR: Could not resolve the configured ingest deployment target; refusing REST fallback."
+        return 1
     fi
     if ! maybe_start_ingest_session; then
         return 1
     fi
-    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+    if ! state="$(rest_get_hec_token_state \
+        "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null)"; then
+        return 1
+    fi
+    case "${state}" in
+        enabled|disabled|missing) printf '%s' "${state}" ;;
+        *) return 1 ;;
+    esac
 }
 
 enterprise_hec_token_record() {
     local token_name="$1"
 
     if enterprise_hec_uses_bundle; then
-        deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}"
-        return 0
+        deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null
+        return $?
+    fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        log "ERROR: Could not resolve the configured ingest deployment target; refusing REST fallback."
+        return 1
     fi
     if ! maybe_start_ingest_session; then
         return 1
     fi
-    rest_get_hec_token_record "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}"
+    rest_get_hec_token_record "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null
 }
 
 rest_create_hec_token() {
@@ -751,57 +814,328 @@ acs_hec_command_group() {
         printf '%s' "${_ACS_HEC_CMD_GROUP}"
         return 0
     fi
-    if acs_command hec-token list --count 1 >/dev/null 2>&1; then
+    # Detect only the local CLI surface; a remote/auth failure must not select a fallback.
+    if command acs hec-token list --help >/dev/null 2>&1; then
         _ACS_HEC_CMD_GROUP="hec-token"
-    else
+    elif command acs http-event-collectors describe --help >/dev/null 2>&1; then
         _ACS_HEC_CMD_GROUP="http-event-collectors"
+    else
+        return 1
     fi
     printf '%s' "${_ACS_HEC_CMD_GROUP}"
 }
 
-cloud_get_hec_token_state() {
-    local token_name="$1" cmd_group hec_list
-    cmd_group="$(acs_hec_command_group)"
+cloud_describe_hec_token_state() {
+    local token_name="$1" cmd_group="$2" output command_succeeded=false
 
-    if [[ "${cmd_group}" == "hec-token" ]]; then
-        hec_list=$(acs_command hec-token list --count 100 2>/dev/null | acs_extract_http_response_json || echo "{}")
-    else
-        hec_list=$(acs_command http-event-collectors list 2>/dev/null | acs_extract_http_response_json || echo "{}")
+    if output="$(acs_command "${cmd_group}" describe "${token_name}" 2>&1)"; then
+        command_succeeded=true
     fi
-
-    printf '%s' "${hec_list}" | python3 -c "
+    printf '%s' "${output}" | python3 -c '
 import json
+import re
 import sys
 
-target = sys.argv[1]
+requested = sys.argv[1]
+command_succeeded = sys.argv[2] == "true"
+raw = sys.stdin.read()
+if not raw.strip() or len(raw.encode("utf-8")) > 1024 * 1024:
+    raise SystemExit(1)
 try:
-    data = json.load(sys.stdin)
-    collectors = (
-        data.get('http-event-collectors')
-        or data.get('http_event_collectors')
-        or data.get('tokens')
-        or []
-    )
-    for collector in collectors:
-        spec = collector.get('spec', {}) if isinstance(collector, dict) else {}
-        name = spec.get('name') or collector.get('name', '')
-        if name != target:
-            continue
-        disabled = str(spec.get('disabled', collector.get('disabled', False))).strip().lower()
-        if disabled in ('1', 'true'):
-            print('disabled', end='')
-        else:
-            print('enabled', end='')
-        raise SystemExit(0)
-    print('missing', end='')
+    parsed = json.loads(raw)
 except Exception:
-    print('unknown', end='')
-" "${token_name}" 2>/dev/null
+    parsed = None
+
+def walk(value, depth=0):
+    if depth > 8:
+        return
+    yield value
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "response" and isinstance(child, str):
+                try:
+                    child = json.loads(child)
+                except Exception:
+                    continue
+            yield from walk(child, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            yield from walk(child, depth + 1)
+
+def state_from_disabled(value):
+    if isinstance(value, bool):
+        return "disabled" if value else "enabled"
+    normalized = str(value).strip().lower()
+    if normalized in ("1", "true"):
+        return "disabled"
+    if normalized in ("0", "false"):
+        return "enabled"
+    raise ValueError("invalid disabled value")
+
+if command_succeeded:
+    if parsed is None:
+        raise SystemExit(1)
+    if isinstance(parsed, list):
+        http_items = [
+            item for item in parsed
+            if isinstance(item, dict) and item.get("type") == "http"
+        ]
+        if len(http_items) != 1:
+            raise SystemExit(1)
+        status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+        statuses = [http_items[0][key] for key in status_keys if key in http_items[0]]
+        if statuses:
+            if any(not str(value).isdigit() for value in statuses):
+                raise SystemExit(1)
+            normalized_statuses = {int(value) for value in statuses}
+            if len(normalized_statuses) != 1 or not 200 <= next(iter(normalized_statuses)) <= 299:
+                raise SystemExit(1)
+    observations = []
+    for node in walk(parsed):
+        if not isinstance(node, dict):
+            continue
+        spec = node.get("spec")
+        if isinstance(spec, dict) and isinstance(spec.get("name"), str) and spec["name"]:
+            if "disabled" in spec:
+                disabled = spec["disabled"]
+            elif "disabled" in node:
+                disabled = node["disabled"]
+            else:
+                raise SystemExit(1)
+            observations.append((spec["name"], state_from_disabled(disabled)))
+        direct_name = node.get("name") or node.get("tokenName")
+        if isinstance(direct_name, str) and direct_name and "disabled" in node:
+            observations.append((direct_name, state_from_disabled(node["disabled"])))
+    names = {name for name, _state in observations}
+    states = {state for name, state in observations if name == requested}
+    if names != {requested} or len(states) != 1:
+        raise SystemExit(1)
+    print(states.pop(), end="")
+    raise SystemExit(0)
+
+status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+
+def has_404(value):
+    if not isinstance(value, dict):
+        return False
+    values = [str(value[key]).strip() for key in status_keys if key in value]
+    return bool(values) and all(item == "404" for item in values)
+
+def exact_http_404(value):
+    if isinstance(value, dict):
+        return has_404(value)
+    if not isinstance(value, list):
+        return False
+    http_items = [
+        item for item in value
+        if isinstance(item, dict) and item.get("type") == "http"
+    ]
+    return len(http_items) == 1 and has_404(http_items[0])
+
+if parsed is not None and exact_http_404(parsed):
+    print("missing", end="")
+    raise SystemExit(0)
+
+plain = " ".join(raw.split())
+plain = re.sub(r"^error:\s*", "", plain, flags=re.IGNORECASE).rstrip(".")
+for marker in (chr(34), chr(39), "[", "]"):
+    plain = plain.replace(marker, "")
+escaped = re.escape(requested)
+patterns = (
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{escaped}\s+(?:is\s+|was\s+)?not[ -]?found$",
+    rf"^no such (?:hec[ -]?token|http event collector|token|resource)\s*:?\s*{escaped}$",
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{escaped}\s+does not exist$",
+)
+if any(re.fullmatch(pattern, plain, flags=re.IGNORECASE) for pattern in patterns):
+    print("missing", end="")
+    raise SystemExit(0)
+raise SystemExit(1)
+' "${token_name}" "${command_succeeded}" 2>/dev/null
+}
+
+cloud_get_hec_token_state() {
+    local token_name="$1" cmd_group raw page_result page_count page_state
+    local count=100 offset=0 page_number=0 max_pages=100
+    if ! cmd_group="$(acs_hec_command_group)"; then
+        return 1
+    fi
+
+    if [[ "${cmd_group}" == "http-event-collectors" ]]; then
+        cloud_describe_hec_token_state "${token_name}" "${cmd_group}"
+        return $?
+    fi
+
+    while (( page_number < max_pages )); do
+        if ! raw="$(acs_command hec-token list --count "${count}" --offset "${offset}" 2>/dev/null)"; then
+            return 1
+        fi
+
+        if ! page_result="$(printf '%s' "${raw}" | python3 -c '
+import json, sys
+
+target = sys.argv[1]
+page_limit = int(sys.argv[2])
+try:
+    text = sys.stdin.read()
+    if not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("empty or oversized ACS HEC inventory page")
+    structured = json.loads(text)
+except Exception:
+    raise SystemExit(1)
+
+payload = structured
+if isinstance(structured, list):
+    http_items = [
+        item for item in structured
+        if isinstance(item, dict) and item.get("type") == "http"
+    ]
+    if len(http_items) != 1:
+        raise SystemExit(1)
+    item = http_items[0]
+    status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+    statuses = [item[key] for key in status_keys if key in item]
+    if statuses:
+        if any(not str(value).isdigit() for value in statuses):
+            raise SystemExit(1)
+        normalized_statuses = {int(value) for value in statuses}
+        if len(normalized_statuses) != 1 or not 200 <= next(iter(normalized_statuses)) <= 299:
+            raise SystemExit(1)
+    response = item.get("response")
+    if not isinstance(response, str) or not response.strip():
+        raise SystemExit(1)
+    try:
+        payload = json.loads(response)
+    except Exception:
+        raise SystemExit(1)
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+keys = ("http-event-collectors", "http_event_collectors", "tokens")
+present = [key for key in keys if key in payload]
+if len(present) != 1 or not isinstance(payload[present[0]], list):
+    raise SystemExit(1)
+collectors = payload[present[0]]
+if len(collectors) > page_limit:
+    raise SystemExit(1)
+matches = []
+for collector in collectors:
+    if not isinstance(collector, dict) or not isinstance(collector.get("spec", {}), dict):
+        raise SystemExit(1)
+    spec = collector.get("spec", {})
+    name = spec.get("name") or collector.get("name", "")
+    if not isinstance(name, str) or not name:
+        raise SystemExit(1)
+    if name != target:
+        continue
+    if "disabled" in spec:
+        disabled_value = spec["disabled"]
+    elif "disabled" in collector:
+        disabled_value = collector["disabled"]
+    else:
+        raise SystemExit(1)
+    disabled = str(disabled_value).strip().lower()
+    if disabled in ("1", "true"):
+        matches.append("disabled")
+    elif disabled in ("0", "false"):
+        matches.append("enabled")
+    else:
+        raise SystemExit(1)
+if len(matches) > 1:
+    raise SystemExit(1)
+state = matches[0] if matches else "absent"
+print(f"{len(collectors)}:{state}", end="")
+' "${token_name}" "${count}" 2>/dev/null)"; then
+            return 1
+        fi
+        page_count="${page_result%%:*}"
+        page_state="${page_result#*:}"
+        [[ "${page_count}" =~ ^[0-9]+$ ]] || return 1
+        case "${page_state}" in
+            enabled|disabled)
+                printf '%s' "${page_state}"
+                return 0
+                ;;
+            absent) ;;
+            *) return 1 ;;
+        esac
+        if (( page_count < count )); then
+            printf 'missing'
+            return 0
+        fi
+        offset=$((offset + count))
+        page_number=$((page_number + 1))
+    done
+    return 1
+}
+
+cloud_rest_get_hec_token_record() {
+    local token_name="$1" raw response http_code
+    if ! maybe_start_search_session; then
+        return 1
+    fi
+    if ! response="$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/services/data/inputs/http?output_mode=json&count=0" \
+        -w '\n%{http_code}' 2>/dev/null)"; then
+        return 1
+    fi
+    http_code="${response##*$'\n'}"
+    [[ "${http_code}" == "200" ]] || return 1
+    raw="${response%$'\n'*}"
+
+    printf '%s' "${raw}" | python3 -c '
+import json, sys
+
+target = sys.argv[1]
+aliases = {target, f"http://{target}"}
+try:
+    text = sys.stdin.read()
+    if not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("empty or oversized HEC inventory")
+    data = json.loads(text)
+except Exception:
+    raise SystemExit(1)
+if not isinstance(data, dict) or not isinstance(data.get("entry"), list):
+    raise SystemExit(1)
+matches = []
+for entry in data["entry"]:
+    if not isinstance(entry, dict):
+        raise SystemExit(1)
+    name = entry.get("name", "")
+    content = entry.get("content", {})
+    if not isinstance(name, str) or not isinstance(content, dict):
+        raise SystemExit(1)
+    if name not in aliases:
+        continue
+    matches.append((name, content))
+if not matches:
+    raise SystemExit(2)
+if len(matches) != 1:
+    raise SystemExit(1)
+name, content = matches[0]
+default_index = content.get("index")
+if not isinstance(default_index, str) or not default_index:
+    raise SystemExit(1)
+indexes = content.get("indexes", "")
+if isinstance(indexes, list):
+    indexes = ",".join(str(item) for item in indexes)
+elif not isinstance(indexes, str):
+    raise SystemExit(1)
+record = {
+    "name": name,
+    "disabled": str(content.get("disabled", "")),
+    "useACK": str(content.get("useACK", content.get("useAck", ""))),
+    "indexes": str(indexes),
+    "default_index": default_index,
+    "token": str(content.get("token", "")),
+}
+json.dump(record, sys.stdout, separators=(",", ":"))
+' "${token_name}" 2>/dev/null
 }
 
 cloud_create_hec_token_via_acs() {
     local token_name="$1" cmd_group
-    cmd_group="$(acs_hec_command_group)"
+    if ! cmd_group="$(acs_hec_command_group)"; then
+        return 1
+    fi
     if [[ "${cmd_group}" == "hec-token" ]]; then
         acs_command hec-token create --name "${token_name}" --default-index "${SC4S_INTERNAL_INDEX}" --disabled=false >/dev/null 2>&1
     else
@@ -815,7 +1149,9 @@ cloud_create_hec_token_via_acs() {
 
 cloud_enable_hec_token_via_acs() {
     local token_name="$1" cmd_group
-    cmd_group="$(acs_hec_command_group)"
+    if ! cmd_group="$(acs_hec_command_group)"; then
+        return 1
+    fi
     if [[ "${cmd_group}" == "hec-token" ]]; then
         acs_command hec-token update "${token_name}" --disabled=false >/dev/null 2>&1
     else
@@ -852,7 +1188,9 @@ rest_update_hec_token_default_index() {
 
 cloud_update_hec_token_default_index_via_acs() {
     local token_name="$1" target_index="$2" cmd_group
-    cmd_group="$(acs_hec_command_group)"
+    if ! cmd_group="$(acs_hec_command_group)"; then
+        return 1
+    fi
     if [[ "${cmd_group}" == "hec-token" ]]; then
         acs_command hec-token update "${token_name}" --default-index "${target_index}" >/dev/null 2>&1
         return $?
@@ -864,11 +1202,10 @@ ensure_expected_hec_default_index() {
     local token_name="$1" expected_index="$2" token_record default_index
 
     if is_splunk_cloud; then
-        if ! maybe_start_search_session; then
-            log "WARN: Could not inspect the default index for HEC token '${token_name}' over Splunk REST."
-            return 0
+        if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
+            log "ERROR: Could not inspect the default index for HEC token '${token_name}' over Splunk REST; refusing mutation."
+            return 1
         fi
-        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     else
         if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
             log "ERROR: Could not inspect the default index for HEC token '${token_name}' on the ingest tier."
@@ -889,7 +1226,16 @@ ensure_expected_hec_default_index() {
         log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via ACS..."
         if ! cloud_update_hec_token_default_index_via_acs "${token_name}" "${expected_index}"; then
             log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via ACS."
-            exit 1
+            return 1
+        fi
+        if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
+            log "ERROR: Could not read back HEC token '${token_name}' after the ACS default-index update."
+            return 1
+        fi
+        default_index="$(rest_json_field "${token_record}" "default_index")"
+        if [[ "${default_index}" != "${expected_index}" ]]; then
+            log "ERROR: HEC token '${token_name}' default index remained '${default_index:-unknown}', expected '${expected_index}'."
+            return 1
         fi
         return 0
     fi
@@ -900,14 +1246,27 @@ ensure_expected_hec_default_index() {
             log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via cluster-manager bundle."
             exit 1
         fi
-        token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+        if ! token_record="$(deployment_get_bundle_hec_token_record \
+            "${token_name}" 2>/dev/null)"; then
+            log "ERROR: Could not read back HEC token '${token_name}' after the cluster-manager bundle update."
+            return 1
+        fi
     else
+        if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+            log "ERROR: Could not resolve the configured ingest deployment target; refusing REST fallback."
+            return 1
+        fi
+        ensure_ingest_session || return 1
         log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via Splunk REST..."
         if ! rest_update_hec_token_default_index "${token_name}" "${expected_index}"; then
             log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via Splunk REST."
             exit 1
         fi
-        token_record="$(enterprise_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+        if ! token_record="$(enterprise_hec_token_record \
+            "${token_name}" 2>/dev/null)"; then
+            log "ERROR: Could not read back HEC token '${token_name}' after the REST update."
+            return 1
+        fi
     fi
 
     default_index="$(rest_json_field "${token_record}" "default_index")"
@@ -925,12 +1284,11 @@ write_hec_token_file_if_requested() {
     [[ -n "${WRITE_HEC_TOKEN_FILE}" ]] || return 0
 
     if is_splunk_cloud; then
-        if ! maybe_start_search_session; then
-            log "ERROR: Could not open a Splunk REST session to retrieve the requested HEC token value."
+        if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
+            log "ERROR: Could not inspect the requested Cloud HEC token value over Splunk REST."
             log "HANDOFF: Rotate/create the token through the supported Cloud HEC surface and store the one-time value in ${WRITE_HEC_TOKEN_FILE}."
             return 1
         fi
-        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     else
         if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
             log "ERROR: Could not inspect the requested ingest-tier HEC token value."
@@ -945,7 +1303,7 @@ write_hec_token_file_if_requested() {
         return 1
     fi
 
-    write_secret_file "${WRITE_HEC_TOKEN_FILE}" "${token_value}"$'\n'
+    write_secret_file "${WRITE_HEC_TOKEN_FILE}" "${token_value}"$'\n' || return 1
     HEC_TOKEN_FILE="${WRITE_HEC_TOKEN_FILE}"
     log "Wrote HEC token value to ${WRITE_HEC_TOKEN_FILE}"
 }
@@ -954,11 +1312,10 @@ warn_about_hec_token_details() {
     local token_name="$1" token_record ack_state indexes_value default_index missing_indexes
 
     if is_splunk_cloud; then
-        if ! maybe_start_search_session; then
-            log "WARN: Could not inspect detailed HEC token settings over Splunk REST."
-            return 0
+        if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
+            log "ERROR: Could not inspect detailed Cloud HEC token settings over Splunk REST."
+            return 1
         fi
-        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     else
         if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
             log "WARN: Could not inspect detailed ingest-tier HEC token settings."
@@ -1006,10 +1363,13 @@ ensure_hec_token() {
     local state
     log "Checking HEC token '${HEC_TOKEN_NAME}'..."
 
-    ensure_splunk_context
+    ensure_splunk_context || return 1
     if is_splunk_cloud; then
         acs_prepare_context || { log "ERROR: ACS context is required for Splunk Cloud HEC management."; exit 1; }
-        state="$(cloud_get_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+        if ! state="$(cloud_get_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+            log "ERROR: Could not inspect HEC token '${HEC_TOKEN_NAME}' through ACS; refusing mutation."
+            return 1
+        fi
         case "${state}" in
             enabled)
                 log "HEC token '${HEC_TOKEN_NAME}' already exists in Splunk Cloud."
@@ -1020,24 +1380,42 @@ ensure_hec_token() {
                     log "ERROR: Failed to enable disabled HEC token '${HEC_TOKEN_NAME}' via ACS."
                     exit 1
                 fi
-                state="$(cloud_get_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+                if ! state="$(cloud_get_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+                    log "ERROR: Could not read back HEC token '${HEC_TOKEN_NAME}' after the ACS enable operation."
+                    return 1
+                fi
                 if [[ "${state}" != "enabled" ]]; then
                     log "ERROR: HEC token '${HEC_TOKEN_NAME}' is still not enabled after the ACS update."
-                    exit 1
+                    return 1
                 fi
                 log "Enabled HEC token '${HEC_TOKEN_NAME}' in Splunk Cloud."
                 ;;
-            *)
+            missing)
                 log "Creating HEC token '${HEC_TOKEN_NAME}' via ACS..."
                 if ! cloud_create_hec_token_via_acs "${HEC_TOKEN_NAME}"; then
                     log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via ACS."
-                    exit 1
+                    return 1
+                fi
+                if ! state="$(cloud_get_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+                    log "ERROR: Could not read back HEC token '${HEC_TOKEN_NAME}' after the ACS create."
+                    return 1
+                fi
+                if [[ "${state}" != "enabled" ]]; then
+                    log "ERROR: HEC token '${HEC_TOKEN_NAME}' could not be verified as enabled after the ACS create."
+                    return 1
                 fi
                 log "Created HEC token '${HEC_TOKEN_NAME}' via ACS."
                 ;;
+            *)
+                log "ERROR: ACS returned an invalid HEC token observation for '${HEC_TOKEN_NAME}'; refusing mutation."
+                return 1
+                ;;
         esac
     else
-        state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+        if ! state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+            log "ERROR: Could not inspect HEC token '${HEC_TOKEN_NAME}' on the configured ingest target."
+            return 1
+        fi
         case "${state}" in
             enabled)
                 log "HEC token '${HEC_TOKEN_NAME}' already exists."
@@ -1050,14 +1428,21 @@ ensure_hec_token() {
                         exit 1
                     fi
                 else
-                    ensure_ingest_session
+                    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+                        log "ERROR: Could not resolve the configured ingest deployment target; refusing REST fallback."
+                        return 1
+                    fi
+                    ensure_ingest_session || return 1
                     log "HEC token '${HEC_TOKEN_NAME}' exists but is disabled. Enabling it via Splunk REST..."
                     if ! rest_enable_hec_token "${HEC_TOKEN_NAME}"; then
                         log "ERROR: Failed to enable disabled HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
                         exit 1
                     fi
                 fi
-                state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+                if ! state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+                    log "ERROR: Could not read back HEC token '${HEC_TOKEN_NAME}' after the enable operation."
+                    return 1
+                fi
                 if [[ "${state}" != "enabled" ]]; then
                     log "ERROR: HEC token '${HEC_TOKEN_NAME}' is still not enabled after the update."
                     exit 1
@@ -1071,18 +1456,33 @@ ensure_hec_token() {
                         log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle."
                         exit 1
                     fi
-                    state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+                    if ! state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+                        log "ERROR: Could not read back HEC token '${HEC_TOKEN_NAME}' after the cluster-manager bundle update."
+                        return 1
+                    fi
                     if [[ "${state}" != "enabled" ]]; then
                         log "ERROR: HEC token '${HEC_TOKEN_NAME}' could not be verified after the cluster-manager bundle update."
                         exit 1
                     fi
                     log "Created HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle."
                 else
-                    ensure_ingest_session
+                    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+                        log "ERROR: Could not resolve the configured ingest deployment target; refusing REST fallback."
+                        return 1
+                    fi
+                    ensure_ingest_session || return 1
                     log "Creating HEC token '${HEC_TOKEN_NAME}' via Splunk REST..."
                     if ! rest_create_hec_token "${HEC_TOKEN_NAME}"; then
                         log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
                         exit 1
+                    fi
+                    if ! state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null)"; then
+                        log "ERROR: Could not read back HEC token '${HEC_TOKEN_NAME}' after the Splunk REST create."
+                        return 1
+                    fi
+                    if [[ "${state}" != "enabled" ]]; then
+                        log "ERROR: HEC token '${HEC_TOKEN_NAME}' could not be verified as enabled after the Splunk REST create."
+                        return 1
                     fi
                     log "Created HEC token '${HEC_TOKEN_NAME}'."
                 fi
@@ -1090,16 +1490,16 @@ ensure_hec_token() {
         esac
     fi
 
-    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "${SC4S_INTERNAL_INDEX}"
-    warn_about_hec_token_details "${HEC_TOKEN_NAME}"
-    write_hec_token_file_if_requested "${HEC_TOKEN_NAME}"
+    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "${SC4S_INTERNAL_INDEX}" || return 1
+    warn_about_hec_token_details "${HEC_TOKEN_NAME}" || return 1
+    write_hec_token_file_if_requested "${HEC_TOKEN_NAME}" || return 1
 }
 
 ensure_indexes() {
     local idx index_type
-    ensure_splunk_context
+    ensure_splunk_context || return 1
     if ! is_splunk_cloud; then
-        ensure_search_session
+        ensure_search_session || return 1
     fi
 
     while IFS= read -r idx; do
@@ -1127,16 +1527,19 @@ ensure_indexes() {
 run_splunk_prep() {
     local hec_base event_url
 
-    hec_base="$(detect_hec_base_url)"
+    if ! hec_base="$(detect_hec_base_url)"; then
+        log "ERROR: Could not resolve the selected Splunk HEC target."
+        return 1
+    fi
     event_url="$(hec_event_url_from_base "${hec_base}")"
     log "Detected SC4S HEC base URL: ${hec_base}"
     log "Detected SC4S HEC event URL: ${event_url}"
 
     if [[ "${HEC_ONLY}" != "true" ]]; then
-        ensure_indexes
+        ensure_indexes || return 1
     fi
     if [[ "${INDEXES_ONLY}" != "true" ]]; then
-        ensure_hec_token
+        ensure_hec_token || return 1
     fi
 }
 
@@ -1500,7 +1903,10 @@ render_host_assets() {
 
     host_dir="${OUTPUT_DIR}/host"
     template_dir="${SCRIPT_DIR}/../templates/host"
-    hec_base_url="$(detect_hec_base_url)"
+    if ! hec_base_url="$(detect_hec_base_url)"; then
+        log "ERROR: Could not resolve the selected Splunk HEC target."
+        return 1
+    fi
     if ! validate_hec_base_url "${hec_base_url}"; then
         log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC base, /event, or /raw URL: ${hec_base_url}"
         return 1
@@ -1668,7 +2074,12 @@ render_k8s_assets() {
 
     k8s_dir="${OUTPUT_DIR}/k8s"
     template_dir="${SCRIPT_DIR}/../templates/kubernetes"
-    hec_event_url="$(hec_event_url_from_base "$(detect_hec_base_url)")"
+    local hec_base_url=""
+    if ! hec_base_url="$(detect_hec_base_url)"; then
+        log "ERROR: Could not resolve the selected Splunk HEC target."
+        return 1
+    fi
+    hec_event_url="$(hec_event_url_from_base "${hec_base_url}")"
     if ! validate_hec_base_url "${hec_event_url}"; then
         log "ERROR: Resolved HEC URL is not a credential-free HTTPS HEC event URL: ${hec_event_url}"
         return 1
@@ -1794,7 +2205,7 @@ main() {
     validate_args
 
     if [[ "${DO_SPLUNK_PREP}" == "true" ]]; then
-        run_splunk_prep
+        run_splunk_prep || return 1
     fi
     ensure_apply_token_ready
 

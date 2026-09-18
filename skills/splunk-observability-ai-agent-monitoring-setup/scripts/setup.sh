@@ -7,7 +7,10 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck disable=SC1091
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-load_observability_cloud_settings
+if ! load_observability_cloud_settings; then
+    echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+    exit 1
+fi
 
 PYTHON_BIN="python3"
 if [[ -x "${PROJECT_ROOT}/.venv/bin/python3" ]]; then

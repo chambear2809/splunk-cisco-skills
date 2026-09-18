@@ -786,7 +786,10 @@ PY
 fi
 
 if [[ "${API}" == "true" ]]; then
-    load_observability_cloud_settings
+    if ! load_observability_cloud_settings; then
+        log "ERROR: Could not load the selected Observability Cloud settings."
+        exit 1
+    fi
     if [[ -n "${SPLUNK_O11Y_REALM:-}" ]]; then export SPLUNK_O11Y_REALM; fi
     if [[ -n "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then export SPLUNK_O11Y_TOKEN_FILE; fi
     probe_args=(

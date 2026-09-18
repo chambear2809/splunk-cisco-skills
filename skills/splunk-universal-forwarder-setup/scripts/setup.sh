@@ -1332,7 +1332,10 @@ if [[ "${PHASE}" == "render" ]]; then
 fi
 
 if [[ "${EXECUTION_MODE}" == "ssh" ]]; then
-    load_splunk_ssh_credentials
+    if ! load_splunk_ssh_credentials; then
+        log "ERROR: Could not load the selected Splunk SSH target credentials."
+        exit 1
+    fi
     if [[ "${SPLUNK_SSH_USER}" != "root" && "${SPLUNK_REMOTE_SUDO}" == "true" ]]; then
         log "INFO: SSH UF setup assumes ${SPLUNK_SSH_USER} can run sudo non-interactively on the target host."
     fi

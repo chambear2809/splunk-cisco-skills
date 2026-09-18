@@ -249,7 +249,10 @@ if [[ -z "${PLAN_FILE}" ]]; then
 fi
 
 if [[ "${MODE}" != "rollback" ]]; then
-    load_observability_cloud_settings
+    if ! load_observability_cloud_settings; then
+        echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+        exit 1
+    fi
     if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
         REALM="${SPLUNK_O11Y_REALM}"
     fi

@@ -73,16 +73,28 @@ class StreamRegressionTests(ShellScriptRegressionBase):
                 bin_dir / "acs",
                 """\
                 #!/usr/bin/env python3
+                import json
                 import os
                 import sys
                 from pathlib import Path
 
                 log_path = Path(os.environ["ACS_LOG"])
-                with log_path.open("a", encoding="utf-8") as handle:
-                    handle.write(" ".join(sys.argv[1:]) + "\\n")
-
                 args = sys.argv[1:]
+                command = " ".join(args)
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(command + "\\n")
+
+                if "config current-stack" in command:
+                    print("Stack: example-stack")
+                    raise SystemExit(0)
                 if "indexes" in args and "describe" in args:
+                    index_name = args[args.index("describe") + 1]
+                    create_marker = f"indexes create --name {index_name}"
+                    prior = log_path.read_text(encoding="utf-8")
+                    if create_marker in prior:
+                        print(json.dumps({"name": index_name, "datatype": "event"}))
+                        raise SystemExit(0)
+                    print(f"index {index_name} not found", file=sys.stderr)
                     raise SystemExit(1)
                 raise SystemExit(0)
                 """,
@@ -441,6 +453,11 @@ class StreamRegressionTests(ShellScriptRegressionBase):
                 bin_dir / "acs",
                 """\
                 #!/usr/bin/env python3
+                import sys
+
+                if "config current-stack" in " ".join(sys.argv[1:]):
+                    print("Stack: stack")
+                    print("Current Search Head: shc1")
                 raise SystemExit(0)
                 """,
             )

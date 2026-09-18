@@ -560,12 +560,19 @@ post_acl_body() {
 capture_preflight_state() {
     local sk="$1" conf="$2" stanza="$3"
     local allow_bundle="${4:-false}" code context_json
-    if [[ "${allow_bundle}" != "true" ]] && deployment_should_manage_search_config_via_bundle; then
-        log "ERROR: Transactional content+ACL apply is not supported through an SHC deployer bundle."
-        log "       This skill does not render local.meta or a bulk SHC bundle."
-        log "HANDOFF: prepare a reviewed, deployer-owned app bundle through a supported SHC deployment workflow."
-        record_event "delivery-plane" "failed" "Bundle-managed target refused before mutation because REST ACL governance cannot be atomic with a deployer write."
-        return 1
+    if [[ "${allow_bundle}" != "true" ]]; then
+        if deployment_should_manage_search_config_via_bundle; then
+            log "ERROR: Transactional content+ACL apply is not supported through an SHC deployer bundle."
+            log "       This skill does not render local.meta or a bulk SHC bundle."
+            log "HANDOFF: prepare a reviewed, deployer-owned app bundle through a supported SHC deployment workflow."
+            record_event "delivery-plane" "failed" "Bundle-managed target refused before mutation because REST ACL governance cannot be atomic with a deployer write."
+            return 1
+        fi
+        if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+            log "ERROR: Could not resolve the configured search-tier deployment target; refusing REST preflight."
+            record_event "delivery-plane" "failed" "Target resolution failed before mutation; REST fallback was refused."
+            return 1
+        fi
     fi
 
     code="$(capture_endpoint "${sk}" "${SPLUNK_URI}/services/apps/local/$(_urlencode "${APP_NAME}")" "${TXN_DIR}/app.json")"

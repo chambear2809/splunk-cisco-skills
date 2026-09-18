@@ -78,3 +78,5 @@ which preserves the allowlist safety model and adds broader ACS administration.
 The scripts in this directory still render and apply the original allowlist
 workflow for all seven ACS allowlist features (`acs`, `search-api`, `hec`,
 `s2s`, `search-ui`, `idm-api`, `idm-ui`) with IPv4 and IPv6 coverage.
+Rendering requires an explicit non-secret `--target-stack`; rendered live
+helpers refuse a different configured stack, search head, or ACS control plane.

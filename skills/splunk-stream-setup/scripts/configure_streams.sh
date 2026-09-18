@@ -75,14 +75,19 @@ stream_configure_role() {
         return 0
     fi
 
-    STREAM_CONFIGURE_ROLE="$(resolve_splunk_target_role 2>/dev/null || true)"
+    if ! STREAM_CONFIGURE_ROLE="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     printf '%s' "${STREAM_CONFIGURE_ROLE}"
 }
 
 stream_configure_preflight_role_checks() {
     local role
 
-    role="$(stream_configure_role)"
+    if ! role="$(stream_configure_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     [[ -z "${role}" || "${role}" == "search-tier" ]] && return 0
 
     log "ERROR: Stream protocol configuration is search-tier only and cannot run against role '${role}'."

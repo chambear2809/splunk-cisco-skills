@@ -371,8 +371,11 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if installed else 404)
                 if installed:
-                    out(json.dumps({"entry": [{"name": app, "content": {"version": installed["version"]}}]}))
-                out(json.dumps({"entry": []}))
+                    out(
+                        json.dumps({"entry": [{"name": app, "content": {"version": installed["version"]}}]}),
+                        200 if write_code else None,
+                    )
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/indexes") and method == "POST":
                 body = decode_form(data)
@@ -387,7 +390,10 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 exists = idx in state["indexes"]
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if exists else 404)
-                out(json.dumps({"entry": [{"name": idx}]} if exists else {"entry": []}))
+                out(
+                    json.dumps({"entry": [{"name": idx}]} if exists else {"entry": []}),
+                    (200 if exists else 404) if write_code else None,
+                )
 
             if "configs/conf-ciscosecuritycloud_settings/logging" in path:
                 if method == "POST":
@@ -694,15 +700,20 @@ class ShellScriptRegressionBase(unittest.TestCase):
                                     }
                                 ]
                             }
-                        )
+                        ),
+                        200 if write_code else None,
                     )
-                out(json.dumps({"entry": []}))
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/inputs/http") and method == "POST":
                 body = decode_form(data)
                 name = body.get("name", "sc4s")
                 state["hec_tokens"][name] = {
-                    "disabled": body.get("disabled", "false"),
+                    "disabled": (
+                        "true"
+                        if os.environ.get("SC4X_FORCE_CREATED_HEC_DISABLED") == "true"
+                        else body.get("disabled", "false")
+                    ),
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
                     "index": body.get("index", "sc4s"),
@@ -758,7 +769,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                             },
                         }
                     )
-                out(json.dumps({"entry": entries}))
+                out(json.dumps({"entry": entries}), 200 if write_code else None)
 
             if path.endswith("/services/search/jobs") and method == "POST":
                 out(json.dumps({"results": [{"count": str(state.get("startup_count", 0))}]}))
@@ -922,15 +933,20 @@ class ShellScriptRegressionBase(unittest.TestCase):
                                     }
                                 ]
                             }
-                        )
+                        ),
+                        200 if write_code else None,
                     )
-                out(json.dumps({"entry": []}))
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/inputs/http") and method == "POST":
                 body = decode_form(data)
                 name = body.get("name", "sc4snmp")
                 state["hec_tokens"][name] = {
-                    "disabled": body.get("disabled", "false"),
+                    "disabled": (
+                        "true"
+                        if os.environ.get("SC4X_FORCE_CREATED_HEC_DISABLED") == "true"
+                        else body.get("disabled", "false")
+                    ),
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
                     "index": body.get("index", "netops"),
@@ -986,7 +1002,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                             },
                         }
                     )
-                out(json.dumps({"entry": entries}))
+                out(json.dumps({"entry": entries}), 200 if write_code else None)
 
             if path.endswith("/services/search/jobs") and method == "POST":
                 out(json.dumps({"results": [{"count": str(state.get("data_count", 0))}]}))
@@ -1096,7 +1112,10 @@ class ShellScriptRegressionBase(unittest.TestCase):
             if f"/services/apps/local/{app_name}" in path:
                 if output_target == "/dev/null" and write_code:
                     out(code=200)
-                out(json.dumps({"entry": [{"name": app_name, "content": {"version": app_version}}]}))
+                out(
+                    json.dumps({"entry": [{"name": app_name, "content": {"version": app_version}}]}),
+                    200 if write_code else None,
+                )
 
             out("", 200)
             """,
@@ -1216,8 +1235,11 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if installed else 404)
                 if installed:
-                    out(json.dumps({"entry": [{"name": app, "content": {"version": installed.get("version", "unknown")}}]}))
-                out(json.dumps({"entry": []}))
+                    out(
+                        json.dumps({"entry": [{"name": app, "content": {"version": installed.get("version", "unknown")}}]}),
+                        200 if write_code else None,
+                    )
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if "/services/data/indexes/" in path:
                 idx = path.rsplit("/", 1)[-1]
@@ -1225,8 +1247,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if exists else 404)
                 if exists:
-                    out(json.dumps({"entry": [{"name": idx}]}))
-                out(json.dumps({"entry": []}))
+                    out(json.dumps({"entry": [{"name": idx}]}), 200 if write_code else None)
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if "/servicesNS/nobody/" in path and "/configs/conf-" in path:
                 app = path.split("/servicesNS/nobody/", 1)[1].split("/", 1)[0]
@@ -1294,7 +1316,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 #!/usr/bin/env python3
                 import sys
 
-                if " ".join(sys.argv[1:]) == "config current-stack":
+                if "config current-stack" in " ".join(sys.argv[1:]):
+                    print("Stack: example-stack")
                     print("Current Search Head: {acs_search_head}")
                     raise SystemExit(0)
 

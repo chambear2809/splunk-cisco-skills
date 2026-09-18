@@ -1288,6 +1288,7 @@ def section_loc(spec: dict[str, Any]) -> str:
             "```bash",
             "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render \\",
+            f"  --target-stack {spec['splunk_cloud_stack']} \\",
             "  --features search-api \\",
             f"  --search-api-subnets {','.join(ips)}",
             "```",
@@ -1420,6 +1421,7 @@ def section_sim_addon(spec: dict[str, Any]) -> str:
             "```bash",
             "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render \\",
+            f"  --target-stack {spec['splunk_cloud_stack']} \\",
             "  --features hec",
             "```",
         ])
@@ -1472,7 +1474,7 @@ def section_handoff(spec: dict[str, Any]) -> str:
             "",
             "```bash",
             "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
-            "  --phase render --features search-api \\",
+            f"  --phase render --target-stack {spec['splunk_cloud_stack']} --features search-api \\",
             f"  --search-api-subnets {','.join(ips)}",
             "```",
         ])
@@ -1483,7 +1485,7 @@ def section_handoff(spec: dict[str, Any]) -> str:
             "",
             "```bash",
             "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
-            "  --phase render --features hec",
+            f"  --phase render --target-stack {spec['splunk_cloud_stack']} --features hec",
             "```",
         ])
     if sim.get("itsi_content_pack_handoff"):
@@ -1802,19 +1804,21 @@ def handoff_script_app_install() -> str:
 def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
     realm = spec["realm"]
     ips = LOC_REALM_IPS.get(realm, [])
+    stack = spec["splunk_cloud_stack"]
     return SHEBANG + (
         "# Log Observer Connect realm-IP allowlist handoff to splunk-cloud-acs-admin-setup.\n"
         "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"
-        "  --phase render --features search-api \\\n"
+        f"  --phase render --target-stack {stack} --features search-api \\\n"
         f"  --search-api-subnets {','.join(ips) or '<no-realm-ips>'} \"$@\"\n"
     )
 
 
-def handoff_script_acs_hec() -> str:
+def handoff_script_acs_hec(spec: dict[str, Any]) -> str:
+    stack = spec["splunk_cloud_stack"]
     return SHEBANG + (
         "# Splunk Cloud Victoria-stack HEC allowlist handoff to splunk-cloud-acs-admin-setup.\n"
         "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"
-        "  --phase render --features hec \"$@\"\n"
+        f"  --phase render --target-stack {stack} --features hec \"$@\"\n"
     )
 
 
@@ -2171,7 +2175,7 @@ def render(
     # Cross-skill handoff drivers.
     write_text(output_dir / "scripts/apply-app-install.sh", handoff_script_app_install(), executable=True)
     write_text(output_dir / "scripts/apply-acs-allowlist-loc.sh", handoff_script_acs_loc(spec), executable=True)
-    write_text(output_dir / "scripts/apply-acs-allowlist-hec.sh", handoff_script_acs_hec(), executable=True)
+    write_text(output_dir / "scripts/apply-acs-allowlist-hec.sh", handoff_script_acs_hec(spec), executable=True)
     write_text(output_dir / "scripts/apply-itsi-content-pack.sh", handoff_script_itsi(), executable=True)
 
     # Payloads (sanitized to references only).

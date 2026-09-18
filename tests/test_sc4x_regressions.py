@@ -12,6 +12,416 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write
 
 
 class SC4xRegressionTests(ShellScriptRegressionBase):
+    def test_sc4x_rest_create_requires_enabled_post_readback(self):
+        """Deferred regression: a successful create response is not verification."""
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+            ),
+        )
+        for name, build_env, script in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, state_file = build_env(tmp_path)
+                env["SC4X_FORCE_CREATED_HEC_DISABLED"] = "true"
+
+                result = self.run_script(
+                    script,
+                    "--splunk-prep",
+                    "--hec-only",
+                    "--hec-url",
+                    "https://example.invalid:8088",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, msg=output)
+                self.assertIn("could not be verified as enabled", output)
+                self.assertNotIn(f"Created HEC token '{name}'.", output)
+                state = json.loads(state_file.read_text(encoding="utf-8"))
+                self.assertEqual(state["hec_tokens"][name]["disabled"], "true")
+
+    def test_sc4x_hec_observation_failure_cannot_trigger_mutation(self):
+        """Deferred regression: exercise production entrypoints with a failing HEC read."""
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+            ),
+        )
+        for name, build_env, script, validator in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, _state_file = build_env(tmp_path)
+                marker = tmp_path / "hec-mutation-reached"
+                env["HEC_MUTATION_MARKER"] = str(marker)
+                bin_dir = Path(env["PATH"].split(":", 1)[0])
+                write_executable(
+                    bin_dir / "curl",
+                    """\
+                    #!/usr/bin/env python3
+                    import os
+                    import sys
+                    from pathlib import Path
+                    from urllib.parse import urlparse
+
+                    args = sys.argv[1:]
+                    method = "GET"
+                    url = ""
+                    i = 0
+                    while i < len(args):
+                        if args[i] == "-X" and i + 1 < len(args):
+                            method = args[i + 1]
+                            i += 2
+                            continue
+                        if args[i] == "-d" and i + 1 < len(args):
+                            if method == "GET":
+                                method = "POST"
+                            i += 2
+                            continue
+                        if args[i].startswith(("http://", "https://")):
+                            url = args[i]
+                        i += 1
+
+                    path = urlparse(url).path
+                    if path.endswith("/services/auth/login"):
+                        sys.stdout.write(
+                            "<response><sessionKey>test-session</sessionKey></response>"
+                        )
+                        raise SystemExit(0)
+                    if "/services/data/inputs/http" in path:
+                        if method != "GET":
+                            Path(os.environ["HEC_MUTATION_MARKER"]).touch()
+                            raise SystemExit(0)
+                        raise SystemExit(1)
+                    raise SystemExit(0)
+                    """,
+                )
+
+                result = self.run_script(
+                    script,
+                    "--splunk-prep",
+                    "--hec-only",
+                    "--hec-url",
+                    "https://example.invalid:8088",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, msg=output)
+                self.assertIn("Could not inspect HEC token", output)
+                self.assertFalse(marker.exists(), msg="HEC mutation followed a failed read")
+
+                validation = self.run_script(validator, env=env)
+                validation_output = validation.stdout + validation.stderr
+                self.assertNotEqual(validation.returncode, 0, msg=validation_output)
+                self.assertIn("Could not inspect HEC token", validation_output)
+
+    def test_sc4x_cloud_acs_list_failure_cannot_trigger_hec_mutation(self):
+        """Deferred regression: a failed ACS inventory is not token absence."""
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+            ),
+        )
+        for name, build_env, script in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, _state_file = build_env(tmp_path)
+                bin_dir = Path(env["PATH"].split(":", 1)[0])
+                credentials_file = Path(env["SPLUNK_CREDENTIALS_FILE"])
+                mutation_marker = tmp_path / "acs-hec-mutation-reached"
+                legacy_marker = tmp_path / "acs-legacy-fallback-reached"
+                credentials_file.write_text(
+                    textwrap.dedent(
+                        """\
+                        SPLUNK_PLATFORM="cloud"
+                        SPLUNK_CLOUD_STACK="example-stack"
+                        SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                        SPLUNK_USER="user"
+                        SPLUNK_PASS="pass"
+                        """
+                    ),
+                    encoding="utf-8",
+                )
+                write_executable(
+                    bin_dir / "acs",
+                    """\
+                    #!/usr/bin/env python3
+                    import os
+                    import sys
+                    from pathlib import Path
+
+                    args = sys.argv[1:]
+                    command = " ".join(args)
+                    if "config current-stack" in command:
+                        print("Stack: example-stack")
+                        raise SystemExit(0)
+                    if "hec-token list" in command and "--help" in args:
+                        raise SystemExit(0)
+                    if "hec-token list" in command:
+                        raise SystemExit(1)
+                    if "http-event-collectors" in command:
+                        Path(os.environ["ACS_LEGACY_MARKER"]).touch()
+                        print('[{"type":"http","status":404}]')
+                        raise SystemExit(1)
+                    if "hec-token create" in command or "hec-token update" in command:
+                        Path(os.environ["ACS_HEC_MUTATION_MARKER"]).touch()
+                    if "http-event-collectors create" in command:
+                        Path(os.environ["ACS_HEC_MUTATION_MARKER"]).touch()
+                    raise SystemExit(0)
+                    """,
+                )
+                env["SPLUNK_PLATFORM"] = "cloud"
+                env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+                env["ACS_LEGACY_MARKER"] = str(legacy_marker)
+
+                result = self.run_script(
+                    script,
+                    "--splunk-prep",
+                    "--hec-only",
+                    "--hec-url",
+                    "https://example.invalid:8088",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, msg=output)
+                self.assertIn("Could not inspect HEC token", output)
+                self.assertIn("refusing mutation", output)
+                self.assertFalse(
+                    mutation_marker.exists(),
+                    msg="ACS mutation followed a failed token inventory",
+                )
+                self.assertFalse(
+                    legacy_marker.exists(),
+                    msg="Modern ACS transport failure incorrectly triggered legacy fallback",
+                )
+
+    def test_sc4x_cloud_hec_searches_all_pages_before_create(self):
+        """Deferred regression: an existing page-two token is never recreated."""
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+            ),
+        )
+        for name, build_env, script in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, _state_file = build_env(tmp_path)
+                bin_dir = Path(env["PATH"].split(":", 1)[0])
+                credentials_file = Path(env["SPLUNK_CREDENTIALS_FILE"])
+                page_two_marker = tmp_path / "acs-hec-page-two-reached"
+                create_marker = tmp_path / "acs-hec-create-reached"
+                credentials_file.write_text(
+                    textwrap.dedent(
+                        """\
+                        SPLUNK_PLATFORM="cloud"
+                        SPLUNK_CLOUD_STACK="example-stack"
+                        SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                        SPLUNK_USER="user"
+                        SPLUNK_PASS="pass"
+                        """
+                    ),
+                    encoding="utf-8",
+                )
+                write_executable(
+                    bin_dir / "acs",
+                    """\
+                    #!/usr/bin/env python3
+                    import json
+                    import os
+                    import sys
+                    from pathlib import Path
+
+                    args = sys.argv[1:]
+                    command = " ".join(args)
+                    if "config current-stack" in command:
+                        print("Stack: example-stack")
+                        raise SystemExit(0)
+                    if "hec-token list" in command:
+                        if "--help" in args:
+                            raise SystemExit(0)
+                        if "--count" in args and args[args.index("--count") + 1] == "1":
+                            print(json.dumps({"tokens": [{"name": "probe", "disabled": False}]}))
+                            raise SystemExit(0)
+                        offset = int(args[args.index("--offset") + 1])
+                        if offset == 0:
+                            tokens = [
+                                {"name": f"decoy-{number}", "disabled": False}
+                                for number in range(100)
+                            ]
+                        elif offset == 100:
+                            Path(os.environ["ACS_PAGE_TWO_MARKER"]).touch()
+                            tokens = [
+                                {
+                                    "name": os.environ["CLOUD_HEC_TOKEN_NAME"],
+                                    "disabled": False,
+                                }
+                            ]
+                        else:
+                            tokens = []
+                        print(json.dumps({"tokens": tokens}))
+                        raise SystemExit(0)
+                    if "hec-token create" in command or "http-event-collectors create" in command:
+                        Path(os.environ["ACS_HEC_CREATE_MARKER"]).touch()
+                    if "http-event-collectors" in command:
+                        raise SystemExit(1)
+                    raise SystemExit(0)
+                    """,
+                )
+                env["SPLUNK_PLATFORM"] = "cloud"
+                env["CLOUD_HEC_TOKEN_NAME"] = name
+                env["ACS_PAGE_TWO_MARKER"] = str(page_two_marker)
+                env["ACS_HEC_CREATE_MARKER"] = str(create_marker)
+
+                result = self.run_script(
+                    script,
+                    "--splunk-prep",
+                    "--hec-only",
+                    "--hec-url",
+                    "https://example.invalid:8088",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertTrue(page_two_marker.exists(), msg=output)
+                self.assertFalse(create_marker.exists(), msg="Page-two token was duplicated")
+                self.assertNotIn(f"Creating HEC token '{name}'", output)
+
+    def test_sc4x_cloud_record_failure_stops_before_acs_update(self):
+        """Deferred regression: a failed REST record cannot authorize ACS update."""
+        cases = (
+            (
+                "sc4s",
+                self.build_mock_sc4s_env,
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+            ),
+            (
+                "sc4snmp",
+                self.build_mock_sc4snmp_env,
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+            ),
+        )
+        for name, build_env, script in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                env, _state_file = build_env(tmp_path)
+                bin_dir = Path(env["PATH"].split(":", 1)[0])
+                credentials_file = Path(env["SPLUNK_CREDENTIALS_FILE"])
+                mutation_marker = tmp_path / "acs-hec-update-reached"
+                credentials_file.write_text(
+                    textwrap.dedent(
+                        """\
+                        SPLUNK_PLATFORM="cloud"
+                        SPLUNK_CLOUD_STACK="example-stack"
+                        SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                        SPLUNK_USER="user"
+                        SPLUNK_PASS="pass"
+                        """
+                    ),
+                    encoding="utf-8",
+                )
+                write_executable(
+                    bin_dir / "acs",
+                    """\
+                    #!/usr/bin/env python3
+                    import json
+                    import os
+                    import sys
+                    from pathlib import Path
+
+                    command = " ".join(sys.argv[1:])
+                    if "config current-stack" in command:
+                        print("Stack: example-stack")
+                        raise SystemExit(0)
+                    if "hec-token list" in command:
+                        token_name = os.environ["CLOUD_HEC_TOKEN_NAME"]
+                        print(json.dumps({"tokens": [{"name": token_name, "disabled": False}]}))
+                        raise SystemExit(0)
+                    if "hec-token create" in command or "hec-token update" in command:
+                        Path(os.environ["ACS_HEC_MUTATION_MARKER"]).touch()
+                    if "http-event-collectors" in command:
+                        raise SystemExit(1)
+                    raise SystemExit(0)
+                    """,
+                )
+                write_executable(
+                    bin_dir / "curl",
+                    """\
+                    #!/usr/bin/env python3
+                    import sys
+                    from urllib.parse import urlparse
+
+                    url = next(
+                        (arg for arg in sys.argv[1:] if arg.startswith(("http://", "https://"))),
+                        "",
+                    )
+                    path = urlparse(url).path
+                    if path.endswith("/services/auth/login"):
+                        print("<response><sessionKey>test-session</sessionKey></response>", end="")
+                        raise SystemExit(0)
+                    if path.endswith("/services/data/inputs/http"):
+                        print("{}")
+                        print("200", end="")
+                        raise SystemExit(0)
+                    raise SystemExit(0)
+                    """,
+                )
+                env["SPLUNK_PLATFORM"] = "cloud"
+                env["CLOUD_HEC_TOKEN_NAME"] = name
+                env["ACS_HEC_MUTATION_MARKER"] = str(mutation_marker)
+
+                result = self.run_script(
+                    script,
+                    "--splunk-prep",
+                    "--hec-only",
+                    "--hec-url",
+                    "https://example.invalid:8088",
+                    env=env,
+                )
+
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, msg=output)
+                self.assertIn("Could not inspect the default index", output)
+                self.assertIn("refusing mutation", output)
+                self.assertFalse(
+                    mutation_marker.exists(),
+                    msg="ACS update followed a failed REST record observation",
+                )
+
     def test_sc4s_setup_smoke_flow(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

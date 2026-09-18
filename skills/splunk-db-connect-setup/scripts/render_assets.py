@@ -826,7 +826,10 @@ set -euo pipefail
 PROJECT_ROOT="${{PROJECT_ROOT:-{q(str(REPO_ROOT))}}}"
 # shellcheck disable=SC1091
 source "${{PROJECT_ROOT}}/skills/shared/lib/credential_helpers.sh"
-load_splunk_connection_settings
+if ! load_splunk_connection_settings; then
+  echo "ERROR: Could not load the selected Splunk credential target." >&2
+  exit 1
+fi
 : "${{SPLUNK_SEARCH_API_URI:?configure the Splunk management URI and credentials}}"
 
 SK="$(get_session_key "${{SPLUNK_SEARCH_API_URI}}")"

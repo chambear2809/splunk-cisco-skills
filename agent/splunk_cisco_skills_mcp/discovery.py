@@ -33,6 +33,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_RELATIVE_PATH = "skills"
 PRODUCT_REGISTRY_PARTS = ("shared", "skill_product_registry.json")
 CISCO_CATALOG_PARTS = ("cisco-product-setup", "catalog.json")
+SHARED_GUIDANCE_PARTS = ("shared", "ta_completion_gate.md")
+SHARED_GUIDANCE_PATH = "skills/shared/ta_completion_gate.md"
+SHARED_GUIDANCE_URI = "skills://shared/ta_completion_gate.md"
 
 MIN_PAGE_LIMIT = 1
 MAX_PAGE_LIMIT = 100
@@ -51,6 +54,7 @@ MAX_CURSOR_CHARS = 4096
 MAX_QUERY_CHARS = 4096
 MAX_DESCRIPTION_CHARS = 500
 MAX_FRONTMATTER_BYTES = 64 * 1024
+MAX_INTERNAL_DESCRIPTION_CHARS = MAX_FRONTMATTER_BYTES
 MAX_FRONTMATTER_KEYS = 64
 MAX_FRONTMATTER_NODES = 2048
 MAX_FRONTMATTER_DEPTH = 32
@@ -234,6 +238,7 @@ class SkillManifestResult(TypedDict):
     replaced_by: str | None
     product: ProductRef
     capability: CapabilityRef
+    required_documents: list[str]
     resources: list[ResourceSummary]
     entrypoints: list[RunnableEntrypoint]
     revision: str
@@ -267,6 +272,32 @@ class ReadSkillFileResult(TypedDict):
     revision: str
 
 
+class SharedDocumentRecord(TypedDict):
+    path: str
+    uri: str
+    size: int
+    mime_type: str
+
+
+class ListSharedDocumentsResult(TypedDict):
+    documents: list[SharedDocumentRecord]
+    total: int
+    next_cursor: str | None
+    revision: str
+
+
+class ReadSharedDocumentResult(TypedDict):
+    path: str
+    uri: str
+    mime_type: str
+    offset: int
+    next_offset: int
+    size: int
+    eof: bool
+    text: str
+    revision: str
+
+
 class ResolveCiscoProductResult(TypedDict):
     status: Literal["resolved", "ambiguous", "not_found"]
     query: str
@@ -277,6 +308,7 @@ class ResolveCiscoProductResult(TypedDict):
 class _SkillRecord:
     skill: str
     description: str
+    display_description: str
     status: SkillLifecycle
     replaced_by: str | None
     product_id: str
@@ -285,11 +317,12 @@ class _SkillRecord:
     capability_name: str
     product_order: int
     capability_order: int
+    required_documents: tuple[str, ...]
 
     def public(self) -> SkillSearchRecord:
         return {
             "skill": self.skill,
-            "description": self.description,
+            "description": self.display_description,
             "status": self.status,
             "replaced_by": self.replaced_by,
             "product": {"id": self.product_id, "name": self.product_name},
@@ -414,6 +447,18 @@ def _safe_parts(path: str) -> tuple[str, ...]:
     return parts
 
 
+def _canonical_shared_document_path(path: str) -> str:
+    """Normalize accepted aliases without widening the shared allowlist."""
+    _safe_parts(path)
+    if path in {
+        "ta_completion_gate.md",
+        "shared/ta_completion_gate.md",
+        SHARED_GUIDANCE_PATH,
+    }:
+        return "ta_completion_gate.md"
+    raise UnsafeDiscoveryPath("path is not an allowlisted shared guidance document")
+
+
 def _is_hidden_or_transient(name: str) -> bool:
     return (
         name.startswith(".")
@@ -442,6 +487,35 @@ def _mime_type(path: str) -> str:
     if suffix in {".yaml", ".yml"}:
         return "application/yaml"
     return "text/plain"
+
+
+def _required_shared_documents(
+    metadata: dict[str, Any],
+    instruction_text: str,
+    skill: str,
+) -> tuple[str, ...]:
+    """Return only explicitly allowlisted shared guidance links for a skill."""
+    declared: Any = metadata.get("required_documents")
+    nested_metadata = metadata.get("metadata")
+    if declared is None and isinstance(nested_metadata, dict):
+        declared = nested_metadata.get("required_documents")
+    links: list[str] = []
+    if declared is not None:
+        if not isinstance(declared, list) or not all(
+            isinstance(value, str) for value in declared
+        ):
+            raise DiscoveryCatalogError(
+                f"{skill}/SKILL.md required_documents must be a list of strings"
+            )
+        for value in declared:
+            if value != SHARED_GUIDANCE_PATH:
+                raise DiscoveryCatalogError(
+                    f"{skill}/SKILL.md references a non-allowlisted shared document"
+                )
+            links.append(value)
+    if "../shared/ta_completion_gate.md" in instruction_text:
+        links.append(SHARED_GUIDANCE_PATH)
+    return tuple(dict.fromkeys(links))
 
 
 def _cursor_context(operation: str, values: dict[str, Any]) -> str:
@@ -672,6 +746,7 @@ class SkillDiscovery:
         ).hexdigest()
         return {
             **record.public(),
+            "required_documents": list(record.required_documents),
             "resources": resources,
             "entrypoints": entrypoints,
             "revision": revision,
@@ -806,6 +881,102 @@ class SkillDiscovery:
         return {
             "skill": skill,
             "path": path,
+            "mime_type": resource["mime_type"],
+            "offset": offset,
+            "next_offset": next_offset,
+            "size": file_size,
+            "eof": next_offset >= file_size,
+            "text": text,
+            "revision": revision,
+        }
+
+    def list_shared_documents(
+        self,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        cursor: str | None = None,
+    ) -> ListSharedDocumentsResult:
+        """List only explicitly allowlisted shared guidance documents."""
+        limit = _validate_limit(limit)
+        records, revision, _ = self._shared_documents()
+        inventory = [f"{item['path']}:{item['size']}" for item in records]
+        context = _cursor_context(
+            "list_shared_documents",
+            {"inventory": inventory},
+        )
+        start = _decode_cursor(
+            cursor,
+            revision=revision,
+            context=context,
+            total=len(records),
+        )
+        page = records[start : start + limit]
+        next_offset = start + len(page)
+        next_cursor = (
+            _encode_cursor(
+                revision=revision,
+                context=context,
+                offset=next_offset,
+            )
+            if next_offset < len(records)
+            else None
+        )
+        return {
+            "documents": page,
+            "total": len(records),
+            "next_cursor": next_cursor,
+            "revision": revision,
+        }
+
+    def read_shared_document(
+        self,
+        path: str,
+        offset: int = 0,
+        max_bytes: int = DEFAULT_READ_BYTES,
+    ) -> ReadSharedDocumentResult:
+        """Read one bounded UTF-8 page from an allowlisted shared document."""
+        canonical_path = _canonical_shared_document_path(path)
+        offset, max_bytes = _validate_read_range(offset, max_bytes)
+        records, revision, inventory_identity = self._shared_documents()
+        resource = next(
+            (item for item in records if item["path"] == canonical_path),
+            None,
+        )
+        if resource is None:
+            raise DiscoveryNotFound("shared guidance document is unavailable")
+        opened = self._open_text_file(
+            SHARED_GUIDANCE_PARTS,
+            max_size=MAX_TEXT_FILE_BYTES,
+        )
+        try:
+            file_size = opened.stat_before.st_size
+            if _stat_identity(opened.stat_before) != inventory_identity:
+                raise UnsafeDiscoveryPath(
+                    "shared resource changed before it was read"
+                )
+            if offset > file_size:
+                raise InvalidDiscoveryRequest(
+                    f"offset {offset} exceeds file size {file_size}"
+                )
+            self._validate_utf8_descriptor(opened.descriptor, file_size)
+            raw = os.pread(opened.descriptor, max_bytes, offset)
+            if raw and offset and raw[0] & 0xC0 == 0x80:
+                raise InvalidDiscoveryRequest(
+                    "offset is not on a UTF-8 character boundary"
+                )
+            text, consumed = self._decode_bounded_chunk(raw)
+            if raw and consumed == 0:
+                raise DiscoveryLimitExceeded(
+                    "max_bytes is too small to contain the next UTF-8 character"
+                )
+            stat_after = os.fstat(opened.descriptor)
+            if _stat_identity(stat_after) != _stat_identity(opened.stat_before):
+                raise UnsafeDiscoveryPath("shared resource changed while it was read")
+        finally:
+            os.close(opened.descriptor)
+        next_offset = offset + consumed
+        return {
+            "path": canonical_path,
+            "uri": SHARED_GUIDANCE_URI,
             "mime_type": resource["mime_type"],
             "offset": offset,
             "next_offset": next_offset,
@@ -1126,18 +1297,29 @@ class SkillDiscovery:
                         raise DiscoveryCatalogError(
                             f"{skill}/SKILL.md is missing a frontmatter description"
                         )
+                    if len(description) > MAX_INTERNAL_DESCRIPTION_CHARS:
+                        raise DiscoveryCatalogError(
+                            f"{skill}/SKILL.md description exceeds "
+                            f"{MAX_INTERNAL_DESCRIPTION_CHARS} characters"
+                        )
                     declared_name = metadata.get("name")
                     if declared_name != skill:
                         raise DiscoveryCatalogError(
                             f"{skill}/SKILL.md frontmatter name must equal its directory"
                         )
+                    required_documents = _required_shared_documents(
+                        metadata,
+                        instruction_text,
+                        skill,
+                    )
                     classified.add(skill)
                     digest.update(f"\0{skill}\0".encode("utf-8"))
                     digest.update(instruction_text.encode("utf-8"))
                     records.append(
                         _SkillRecord(
                             skill=skill,
-                            description=_compact(description),
+                            description=description,
+                            display_description=_compact(description),
                             status=lifecycle[0],
                             replaced_by=lifecycle[1],
                             product_id=product_id,
@@ -1146,6 +1328,7 @@ class SkillDiscovery:
                             capability_name=capability_name,
                             product_order=product_order,
                             capability_order=capability_order,
+                            required_documents=required_documents,
                         )
                     )
 
@@ -1271,6 +1454,71 @@ class SkillDiscovery:
             finally:
                 os.close(opened.descriptor)
         return entrypoints
+
+    def _shared_documents(
+        self,
+    ) -> tuple[
+        list[SharedDocumentRecord],
+        str,
+        tuple[int, int, int, int, int, int] | None,
+    ]:
+        """Inventory the fixed shared guidance file without traversing shared/."""
+        target = self.skills_dir.joinpath(*SHARED_GUIDANCE_PARTS)
+        try:
+            metadata = target.lstat()
+        except OSError:
+            metadata = None
+        if (
+            metadata is None
+            or not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+        ):
+            return [], hashlib.sha256(b"shared-guidance-missing").hexdigest(), None
+        if metadata.st_size > MAX_TEXT_FILE_BYTES:
+            raise DiscoveryLimitExceeded(
+                f"{SHARED_GUIDANCE_PATH} exceeds the {MAX_TEXT_FILE_BYTES}-byte file limit"
+            )
+        try:
+            opened = self._open_text_file(
+                SHARED_GUIDANCE_PARTS,
+                max_size=MAX_TEXT_FILE_BYTES,
+            )
+        except (DiscoveryNotFound, UnsafeDiscoveryPath, BinaryResourceRejected):
+            return [], hashlib.sha256(b"shared-guidance-unreadable").hexdigest(), None
+        try:
+            try:
+                self._validate_utf8_descriptor(
+                    opened.descriptor,
+                    opened.stat_before.st_size,
+                )
+            except BinaryResourceRejected:
+                return [], hashlib.sha256(b"shared-guidance-binary").hexdigest(), None
+            stat_after = os.fstat(opened.descriptor)
+            if _stat_identity(stat_after) != _stat_identity(opened.stat_before):
+                raise UnsafeDiscoveryPath(
+                    "shared guidance changed while it was inspected"
+                )
+            identity = _stat_identity(opened.stat_before)
+            if identity != _stat_identity(metadata):
+                raise UnsafeDiscoveryPath(
+                    "shared guidance changed before it was inspected"
+                )
+        finally:
+            os.close(opened.descriptor)
+        revision = hashlib.sha256(
+            json.dumps(
+                [SHARED_GUIDANCE_PATH, identity],
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        return [
+            {
+                "path": "ta_completion_gate.md",
+                "uri": SHARED_GUIDANCE_URI,
+                "size": metadata.st_size,
+                "mime_type": "text/markdown",
+            }
+        ], revision, identity
 
     def _resource_paths(
         self,
@@ -1678,6 +1926,25 @@ def read_skill_file(
     """Read one bounded text page from the default repository."""
 
     return _DEFAULT_DISCOVERY.read_skill_file(skill, path, offset, max_bytes)
+
+
+def list_shared_documents(
+    limit: int = DEFAULT_PAGE_LIMIT,
+    cursor: str | None = None,
+) -> ListSharedDocumentsResult:
+    """List allowlisted shared guidance from the default repository."""
+
+    return _DEFAULT_DISCOVERY.list_shared_documents(limit, cursor)
+
+
+def read_shared_document(
+    path: str,
+    offset: int = 0,
+    max_bytes: int = DEFAULT_READ_BYTES,
+) -> ReadSharedDocumentResult:
+    """Read one bounded allowlisted shared guidance page."""
+
+    return _DEFAULT_DISCOVERY.read_shared_document(path, offset, max_bytes)
 
 
 def resolve_cisco_product(query: str) -> ResolveCiscoProductResult:

@@ -12,13 +12,44 @@ DEPLOYMENT_MANAGED_HEC_APP="${DEPLOYMENT_MANAGED_HEC_APP:-ZZZ_cisco_skills_hec}"
 
 DEPLOYMENT_REST_URI=""
 DEPLOYMENT_REST_SK=""
+_DEPLOYMENT_BUNDLE_CHECK_ERROR=false
+
+deployment_profile_has_explicit_endpoint() {
+    local profile_name="${1:-}"
+    local key value
+
+    [[ -n "${profile_name}" ]] || return 1
+    for key in SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_HOST; do
+        if ! value="$(_credential_profile_value_for_profile_key "${profile_name}" "${key}")"; then
+            return 2
+        fi
+        [[ -n "${value}" ]] && return 0
+    done
+    return 1
+}
 
 deployment_execution_mode_for_profile() {
     local profile_name="${1:-}"
-    local ssh_host target_uri target_host
+    local ssh_host="" target_uri target_host explicit_ssh_host="" explicit_endpoint=false explicit_status=0
 
     if [[ -n "${profile_name}" ]]; then
-        ssh_host="$(_credential_value_for_profile_key "${profile_name}" "SPLUNK_SSH_HOST")"
+        if ! explicit_ssh_host="$(_credential_profile_value_for_profile_key \
+            "${profile_name}" "SPLUNK_SSH_HOST")"; then
+            return 1
+        fi
+        if deployment_profile_has_explicit_endpoint "${profile_name}"; then
+            explicit_endpoint=true
+        else
+            explicit_status=$?
+            (( explicit_status == 1 )) || return 1
+        fi
+        if [[ -n "${explicit_ssh_host}" ]]; then
+            ssh_host="${explicit_ssh_host}"
+        elif [[ "${explicit_endpoint}" != "true" ]]; then
+            # A profile that supplies no endpoint may intentionally inherit the
+            # current route, including its explicitly configured SSH alias.
+            ssh_host="${SPLUNK_SSH_HOST:-}"
+        fi
     else
         ssh_host="${SPLUNK_SSH_HOST:-}"
     fi
@@ -30,7 +61,9 @@ deployment_execution_mode_for_profile() {
         return 0
     fi
 
-    target_uri="$(deployment_profile_uri "${profile_name}")"
+    if ! target_uri="$(deployment_profile_uri "${profile_name}")"; then
+        return 1
+    fi
     target_host="$(splunk_host_from_uri "${target_uri}")"
     case "${target_host}" in
         ""|localhost|127.0.0.1) printf '%s' "local" ;;
@@ -46,20 +79,8 @@ deployment_profile_value() {
 
 deployment_profile_uri() {
     local profile_name="${1:-}"
-    local host mgmt_port uri search_api_uri
-
-    search_api_uri="$(deployment_profile_value "${profile_name}" "SPLUNK_SEARCH_API_URI")"
-    uri="$(deployment_profile_value "${profile_name}" "SPLUNK_URI")"
-    host="$(deployment_profile_value "${profile_name}" "SPLUNK_HOST")"
-    mgmt_port="$(deployment_profile_value "${profile_name}" "SPLUNK_MGMT_PORT")"
-    [[ -z "${mgmt_port}" ]] && mgmt_port="${SPLUNK_MGMT_PORT:-8089}"
-
-    if [[ -n "${search_api_uri}" ]]; then
-        printf '%s' "${search_api_uri}"
-    elif [[ -n "${uri}" ]]; then
-        printf '%s' "${uri}"
-    elif [[ -n "${host}" ]]; then
-        printf 'https://%s:%s' "${host}" "${mgmt_port}"
+    if ! _profile_endpoint_uri "${profile_name}"; then
+        return 1
     fi
 }
 
@@ -67,25 +88,38 @@ deployment_profile_target_role() {
     local profile_name="${1:-}"
     local candidate normalized
 
-    candidate="$(_credential_value_for_profile_key "${profile_name}" "SPLUNK_TARGET_ROLE")"
+    if ! candidate="$(_credential_value_for_profile_key "${profile_name}" "SPLUNK_TARGET_ROLE")"; then
+        return 1
+    fi
     [[ -n "${candidate}" ]] || return 0
     if normalized="$(_normalize_target_role "${candidate}")"; then
         printf '%s' "${normalized}"
+        return 0
     fi
+    echo "ERROR: Profile target role is invalid; refusing deployment routing." >&2
+    return 1
 }
 
 deployment_bundle_kind_for_current_target() {
-    local role
-    role="$(resolve_splunk_target_role)"
+    local role deployer_profile cluster_manager_profile
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     case "${role}" in
         search-tier)
-            if [[ -n "$(resolve_deployer_credential_profile)" ]]; then
+            if ! deployer_profile="$(resolve_deployer_credential_profile)"; then
+                return 1
+            fi
+            if [[ -n "${deployer_profile}" ]]; then
                 printf '%s' "shc"
                 return 0
             fi
             ;;
         indexer)
-            if [[ -n "$(resolve_cluster_manager_credential_profile)" ]]; then
+            if ! cluster_manager_profile="$(resolve_cluster_manager_credential_profile)"; then
+                return 1
+            fi
+            if [[ -n "${cluster_manager_profile}" ]]; then
                 printf '%s' "idxc"
                 return 0
             fi
@@ -95,7 +129,9 @@ deployment_bundle_kind_for_current_target() {
 
 deployment_bundle_profile_for_current_target() {
     local kind
-    kind="$(deployment_bundle_kind_for_current_target)"
+    if ! kind="$(deployment_bundle_kind_for_current_target)"; then
+        return 1
+    fi
     case "${kind}" in
         shc) resolve_deployer_credential_profile ;;
         idxc) resolve_cluster_manager_credential_profile ;;
@@ -104,10 +140,30 @@ deployment_bundle_profile_for_current_target() {
 
 deployment_should_use_bundle_for_current_target() {
     local plane kind
-    plane="$(resolve_delivery_plane)"
-    kind="$(deployment_bundle_kind_for_current_target)"
+    _DEPLOYMENT_BUNDLE_CHECK_ERROR=false
+    # Load file-backed selectors in this shell. Resolver command substitutions
+    # run in subshells, so their assignments cannot establish the delivery
+    # plane used by the parent routing decision.
+    if ! load_splunk_connection_settings; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if ! plane="$(resolve_delivery_plane)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if ! kind="$(deployment_bundle_kind_for_current_target)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
 
-    [[ -n "${kind}" ]] || return 1
+    if [[ -z "${kind}" ]]; then
+        if [[ "${plane}" == "bundle" ]]; then
+            _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+            return 2
+        fi
+        return 1
+    fi
     case "${plane}" in
         bundle) return 0 ;;
         auto) return 0 ;;
@@ -116,21 +172,67 @@ deployment_should_use_bundle_for_current_target() {
 }
 
 deployment_should_manage_search_config_via_bundle() {
-    local plane
-    plane="$(resolve_delivery_plane)"
-    [[ "$(resolve_splunk_target_role)" == "search-tier" ]] || return 1
-    [[ -n "$(resolve_deployer_credential_profile)" ]] || return 1
+    local plane role deployer_profile
+    _DEPLOYMENT_BUNDLE_CHECK_ERROR=false
+    if ! load_splunk_connection_settings; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if ! role="$(resolve_splunk_target_role)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if ! plane="$(resolve_delivery_plane)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if [[ "${role}" != "search-tier" ]]; then
+        if [[ "${plane}" == "bundle" ]]; then
+            _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+            return 2
+        fi
+        return 1
+    fi
+    if ! deployer_profile="$(resolve_deployer_credential_profile)"; then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    if [[ -z "${deployer_profile}" ]]; then
+        if [[ "${plane}" == "bundle" ]]; then
+            _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+            return 2
+        fi
+        return 1
+    fi
     [[ "${plane}" == "bundle" || "${plane}" == "auto" ]]
 }
 
 deployment_index_bundle_profile() {
-    local ingest_role plane
-    ingest_role="$(resolve_ingest_target_role)"
-    plane="$(resolve_delivery_plane)"
-    [[ "${ingest_role}" == "indexer" ]] || return 1
-    [[ -n "$(resolve_cluster_manager_credential_profile)" ]] || return 1
+    local ingest_role plane cluster_manager_profile
+    # Keep the delivery plane and profile selectors in the caller's shell;
+    # command substitutions below intentionally return values only.
+    if ! load_splunk_connection_settings; then
+        return 2
+    fi
+    if ! ingest_role="$(resolve_ingest_target_role)"; then
+        return 2
+    fi
+    if ! plane="$(resolve_delivery_plane)"; then
+        return 2
+    fi
+    if [[ "${ingest_role}" != "indexer" ]]; then
+        [[ "${plane}" == "bundle" ]] && return 2
+        return 1
+    fi
+    if ! cluster_manager_profile="$(resolve_cluster_manager_credential_profile)"; then
+        return 2
+    fi
+    if [[ -z "${cluster_manager_profile}" ]]; then
+        [[ "${plane}" == "bundle" ]] && return 2
+        return 1
+    fi
     [[ "${plane}" == "bundle" || "${plane}" == "auto" ]] || return 1
-    resolve_cluster_manager_credential_profile
+    printf '%s' "${cluster_manager_profile}"
 }
 
 deployment_hec_bundle_profile() {
@@ -138,7 +240,18 @@ deployment_hec_bundle_profile() {
 }
 
 deployment_should_manage_ingest_hec_via_bundle() {
-    deployment_hec_bundle_profile >/dev/null 2>&1
+    local bundle_status=0
+    _DEPLOYMENT_BUNDLE_CHECK_ERROR=false
+    if deployment_hec_bundle_profile >/dev/null; then
+        return 0
+    else
+        bundle_status=$?
+    fi
+    if (( bundle_status == 2 )); then
+        _DEPLOYMENT_BUNDLE_CHECK_ERROR=true
+        return 2
+    fi
+    return 1
 }
 
 deployment_prepare_rest_context() {
@@ -156,7 +269,9 @@ deployment_prepare_rest_context() {
         return 0
     fi
 
-    target_uri="$(deployment_profile_uri "${profile_name}")"
+    if ! target_uri="$(deployment_profile_uri "${profile_name}")"; then
+        return 1
+    fi
     [[ -n "${target_uri}" ]] || return 1
 
     if [[ -n "${current_sk}" && -n "${current_uri}" && "${target_uri}" == "${current_uri}" ]]; then
@@ -165,15 +280,22 @@ deployment_prepare_rest_context() {
         return 0
     fi
 
-    target_user="$(deployment_profile_value "${profile_name}" "SPLUNK_USER")"
-    target_pass="$(deployment_profile_value "${profile_name}" "SPLUNK_PASS")"
+    if ! target_user="$(deployment_profile_value "${profile_name}" "SPLUNK_USER")" \
+        || ! target_pass="$(deployment_profile_value "${profile_name}" "SPLUNK_PASS")"; then
+        return 1
+    fi
     [[ -n "${target_user}" && -n "${target_pass}" ]] || return 1
 
     saved_user="${SPLUNK_USER-}"
     saved_pass="${SPLUNK_PASS-}"
     SPLUNK_USER="${target_user}"
     SPLUNK_PASS="${target_pass}"
-    DEPLOYMENT_REST_SK="$(get_session_key "${target_uri}" 2>/dev/null || true)"
+    if ! DEPLOYMENT_REST_SK="$(get_session_key "${target_uri}" 2>/dev/null)"; then
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        DEPLOYMENT_REST_SK=""
+        return 1
+    fi
     SPLUNK_USER="${saved_user}"
     SPLUNK_PASS="${saved_pass}"
 
@@ -185,14 +307,32 @@ deployment_prepare_rest_context() {
 deployment_prepare_index_rest_context() {
     local current_sk="${1:-}"
     local current_uri="${2:-}"
-    local index_profile=""
+    local index_profile="" cluster_profile="" ingest_role=""
+    local plane=""
 
-    if index_profile="$(deployment_index_bundle_profile 2>/dev/null || true)" && [[ -n "${index_profile}" ]]; then
+    if ! load_splunk_connection_settings; then
+        return 1
+    fi
+    if ! cluster_profile="$(resolve_cluster_manager_credential_profile)"; then
+        return 1
+    fi
+    if ! ingest_role="$(resolve_ingest_target_role)"; then
+        return 1
+    fi
+    if ! plane="$(resolve_delivery_plane)"; then
+        return 1
+    fi
+    if [[ "${ingest_role}" == "indexer" && -n "${cluster_profile}" \
+        && ( "${plane}" == "bundle" || "${plane}" == "auto" ) ]]; then
+        if ! index_profile="$(deployment_index_bundle_profile)"; then
+            return 1
+        fi
         deployment_prepare_rest_context "${index_profile}" "${current_sk}" "${current_uri}"
         return $?
     fi
-
-    index_profile="$(resolve_ingest_credential_profile 2>/dev/null || true)"
+    if ! index_profile="$(resolve_ingest_credential_profile)"; then
+        return 1
+    fi
     deployment_prepare_rest_context "${index_profile}" "${current_sk}" "${current_uri}"
 }
 
@@ -248,16 +388,74 @@ deployment_bundle_conf_path_on_profile() {
 
 deployment_apply_profile_globals() {
     local profile_name="${1:-}"
-    local key value
+    local key value index endpoint_uri endpoint_host ssh_host="" ssh_port=""
+    local explicit_ssh_host="" explicit_resolve=""
+    local explicit_endpoint=false explicit_status=0
+    local ssh_policy=preserve ssh_port_policy=preserve resolve_policy=preserve
     local -a reset_keys=(
-        SPLUNK_HOST SPLUNK_MGMT_PORT SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SSH_HOST
         SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
     )
     local -a keys=(
-        SPLUNK_HOST SPLUNK_MGMT_PORT SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_USER SPLUNK_PASS
-        SPLUNK_SSH_HOST SPLUNK_SSH_PORT SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_REMOTE_TMPDIR SPLUNK_REMOTE_SUDO
+        SPLUNK_USER SPLUNK_PASS SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_REMOTE_TMPDIR SPLUNK_REMOTE_SUDO
         SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
     )
+    local -a values=()
+
+    if ! endpoint_uri="$(_profile_endpoint_uri "${profile_name}")"; then
+        return 1
+    fi
+    if [[ -n "${profile_name}" ]]; then
+        if ! explicit_ssh_host="$(_credential_profile_value_for_profile_key \
+            "${profile_name}" "SPLUNK_SSH_HOST")"; then
+            return 1
+        fi
+        if ! explicit_resolve="$(_credential_profile_value_for_profile_key \
+            "${profile_name}" "SPLUNK_RESOLVE")"; then
+            return 1
+        fi
+        if deployment_profile_has_explicit_endpoint "${profile_name}"; then
+            explicit_endpoint=true
+        else
+            explicit_status=$?
+            (( explicit_status == 1 )) || return 1
+        fi
+        if [[ -n "${explicit_ssh_host}" ]]; then
+            ssh_host="${explicit_ssh_host}"
+        elif [[ "${explicit_endpoint}" == "true" ]]; then
+            # Do not splice the current target's SSH alias into a distinct
+            # profile-local endpoint. Default to that endpoint's host so a
+            # missing profile SSH override fails on-target rather than routing
+            # a mutation to the prior host.
+            ssh_host="$(splunk_host_from_uri "${endpoint_uri}")"
+        elif ! ssh_host="$(deployment_profile_value "${profile_name}" "SPLUNK_SSH_HOST")"; then
+            return 1
+        fi
+        if ! ssh_port="$(deployment_profile_value "${profile_name}" "SPLUNK_SSH_PORT")"; then
+            return 1
+        fi
+        if [[ -n "${ssh_port}" ]]; then
+            ssh_port_policy=set
+        else
+            ssh_port_policy=clear
+        fi
+        if [[ -n "${explicit_resolve}" ]]; then
+            resolve_policy=set
+        elif [[ "${explicit_endpoint}" == "true" ]]; then
+            # A distinct profile-local endpoint must not retain a resolver pin
+            # for the previous target unless that profile explicitly supplies
+            # its own mapping.
+            resolve_policy=clear
+        fi
+    else
+        ssh_host="${SPLUNK_SSH_HOST:-}"
+    fi
+
+    for key in "${keys[@]}"; do
+        if ! value="$(deployment_profile_value "${profile_name}" "${key}")"; then
+            return 1
+        fi
+        values+=("${value}")
+    done
 
     if [[ -n "${profile_name}" ]]; then
         for key in "${reset_keys[@]}"; do
@@ -265,20 +463,26 @@ deployment_apply_profile_globals() {
         done
     fi
 
-    for key in "${keys[@]}"; do
-        value="$(deployment_profile_value "${profile_name}" "${key}")"
-        if [[ -n "${value}" ]]; then
-            printf -v "${key}" '%s' "${value}"
+    for index in "${!keys[@]}"; do
+        if [[ -n "${values[$index]}" ]]; then
+            printf -v "${keys[$index]}" '%s' "${values[$index]}"
         fi
     done
 
-    if [[ -n "${SPLUNK_SEARCH_API_URI:-}" ]]; then
-        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
-    elif [[ -n "${SPLUNK_URI:-}" ]]; then
-        SPLUNK_SEARCH_API_URI="${SPLUNK_URI}"
-    elif [[ -n "${SPLUNK_HOST:-}" ]]; then
-        SPLUNK_URI="https://${SPLUNK_HOST}:${SPLUNK_MGMT_PORT:-8089}"
-        SPLUNK_SEARCH_API_URI="${SPLUNK_URI}"
+    if [[ -n "${endpoint_uri}" ]]; then
+        endpoint_host="$(splunk_host_from_uri "${endpoint_uri}")"
+        [[ -n "${endpoint_host}" ]] || return 1
+        if [[ -n "${profile_name}" ]]; then
+            if [[ -n "${ssh_host}" ]]; then
+                ssh_policy=set
+            else
+                ssh_policy=clear
+            fi
+        fi
+        _credential_transition_runtime_route \
+            "${endpoint_uri}" "${ssh_policy}" "${ssh_host}" \
+            "${ssh_port_policy}" "${ssh_port}" \
+            "${resolve_policy}" "${explicit_resolve}" || return 1
     fi
 }
 
@@ -295,8 +499,12 @@ deployment_bundle_os_user() {
 deployment_run_with_profile() (
     local profile_name="${1:-}"
     shift
-    load_splunk_connection_settings
-    deployment_apply_profile_globals "${profile_name}"
+    if ! load_splunk_connection_settings; then
+        return 1
+    fi
+    if ! deployment_apply_profile_globals "${profile_name}"; then
+        return 1
+    fi
     "$@"
 )
 
@@ -307,7 +515,7 @@ deployment_bundle_apply_current_profile() {
     local auth_pass="${4:-}"
     local execution_mode splunk_home cred_file staged_cred_file apply_script
 
-    execution_mode="$(deployment_execution_mode_for_profile "")"
+    execution_mode="$(deployment_execution_mode_for_profile "")" || return 1
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
     [[ -n "${target_uri}" ]] || target_uri="${SPLUNK_URI:-}"
     [[ -n "${auth_user}" ]] || auth_user="${SPLUNK_USER:-}"
@@ -392,7 +600,7 @@ deployment_capture_target_file_with_profile() {
     local target_path="${2:-}"
     local execution_mode
 
-    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")"
+    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")" || return 1
     deployment_run_with_profile "${profile_name}" \
         hbs_capture_target_cmd "${execution_mode}" "if [[ -f $(hbs_shell_join "${target_path}") ]]; then cat $(hbs_shell_join "${target_path}"); fi"
 }
@@ -442,21 +650,30 @@ PY
 deployment_bundle_scaffold_app_current_profile() {
     local target_root="${1:-}"
     local app_name="${2:-}"
-    local execution_mode app_dir app_conf content
+    local execution_mode app_dir app_conf app_conf_state content
 
-    execution_mode="$(deployment_execution_mode_for_profile "")"
+    execution_mode="$(deployment_execution_mode_for_profile "")" || return 1
     app_dir="${target_root%/}/${app_name}"
     app_conf="${app_dir}/default/app.conf"
     content=$'[install]\nstate = enabled\n\n[ui]\nis_visible = false\n'
 
     hbs_run_target_cmd "${execution_mode}" \
-        "$(hbs_prefix_with_sudo "${execution_mode}" "$(hbs_shell_join mkdir -p "${app_dir}/default" "${app_dir}/local")")" >/dev/null
+        "$(hbs_prefix_with_sudo "${execution_mode}" "$(hbs_shell_join mkdir -p "${app_dir}/default" "${app_dir}/local")")" >/dev/null \
+        || return 1
 
-    if [[ "$(hbs_capture_target_cmd "${execution_mode}" "if [[ -f $(hbs_shell_join "${app_conf}") ]]; then echo yes; fi" 2>/dev/null || true)" == "yes" ]]; then
-        return 0
+    if ! app_conf_state="$(hbs_capture_target_cmd "${execution_mode}" \
+        "if [[ -f $(hbs_shell_join "${app_conf}") ]]; then printf '%s' present; else printf '%s' absent; fi" \
+        2>/dev/null)"; then
+        return 1
     fi
+    case "${app_conf_state}" in
+        present) return 0 ;;
+        absent) ;;
+        *) return 1 ;;
+    esac
 
-    hbs_write_target_file "${execution_mode}" "${app_conf}" "644" "${content}" "false" >/dev/null
+    hbs_write_target_file "${execution_mode}" "${app_conf}" "644" "${content}" "false" >/dev/null \
+        || return 1
 }
 
 deployment_bundle_scaffold_app() {
@@ -470,27 +687,42 @@ deployment_bundle_scaffold_app() {
 deployment_bundle_app_exists_current_profile() {
     local kind="${1:-}"
     local app_name="${2:-}"
-    local execution_mode app_dir
+    local execution_mode app_dir observed_state
 
-    app_dir="$(deployment_bundle_app_dir_current_profile "${kind}" "${app_name}")" || return 1
-    execution_mode="$(deployment_execution_mode_for_profile "")"
-    [[ "$(hbs_capture_target_cmd "${execution_mode}" "if [[ -d $(hbs_shell_join "${app_dir}") ]]; then echo yes; fi" 2>/dev/null || true)" == "yes" ]]
+    app_dir="$(deployment_bundle_app_dir_current_profile "${kind}" "${app_name}")" || return 2
+    execution_mode="$(deployment_execution_mode_for_profile "")" || return 2
+    if ! observed_state="$(hbs_capture_target_cmd "${execution_mode}" \
+        "if [[ -d $(hbs_shell_join "${app_dir}") ]]; then printf '%s' present; else printf '%s' absent; fi" \
+        2>/dev/null)"; then
+        return 2
+    fi
+    case "${observed_state}" in
+        present) return 0 ;;
+        absent) return 1 ;;
+        *) return 2 ;;
+    esac
 }
 
-deployment_bundle_app_exists_on_profile() {
+deployment_bundle_app_exists_on_profile() (
     local profile_name="${1:-}"
     local kind="${2:-}"
     local app_name="${3:-}"
 
-    deployment_run_with_profile "${profile_name}" deployment_bundle_app_exists_current_profile "${kind}" "${app_name}"
-}
+    if ! load_splunk_connection_settings; then
+        return 2
+    fi
+    if ! deployment_apply_profile_globals "${profile_name}"; then
+        return 2
+    fi
+    deployment_bundle_app_exists_current_profile "${kind}" "${app_name}"
+)
 
 deployment_bundle_app_exists_for_current_target() {
     local profile_name kind
 
-    profile_name="$(deployment_bundle_profile_for_current_target)"
-    kind="$(deployment_bundle_kind_for_current_target)"
-    [[ -n "${profile_name}" && -n "${kind}" ]] || return 1
+    profile_name="$(deployment_bundle_profile_for_current_target)" || return 2
+    kind="$(deployment_bundle_kind_for_current_target)" || return 2
+    [[ -n "${profile_name}" && -n "${kind}" ]] || return 2
     deployment_bundle_app_exists_on_profile "${profile_name}" "${kind}" "${1:-}"
 }
 
@@ -506,7 +738,7 @@ deployment_bundle_write_conf_content_on_profile() {
 
     target_root="$(deployment_run_with_profile "${profile_name}" deployment_bundle_root_for_kind "${kind}")" || return 1
     target_path="$(deployment_run_with_profile "${profile_name}" deployment_bundle_conf_path_current_profile "${kind}" "${app_name}" "${conf_name}")" || return 1
-    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")"
+    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")" || return 1
 
     deployment_bundle_scaffold_app "${profile_name}" "${target_root}" "${app_name}" || return 1
     deployment_run_with_profile "${profile_name}" hbs_write_target_file "${execution_mode}" "${target_path}" "644" "${conf_content}" "false" || return 1
@@ -525,7 +757,10 @@ deployment_bundle_set_conf_on_profile() {
     [[ -n "${profile_name}" && -n "${kind}" && -n "${app_name}" && -n "${conf_name}" && -n "${stanza_name}" ]] || return 1
 
     target_path="$(deployment_bundle_conf_path_on_profile "${profile_name}" "${kind}" "${app_name}" "${conf_name}")" || return 1
-    existing_content="$(deployment_capture_target_file_with_profile "${profile_name}" "${target_path}" 2>/dev/null || true)"
+    if ! existing_content="$(deployment_capture_target_file_with_profile \
+        "${profile_name}" "${target_path}" 2>/dev/null)"; then
+        return 1
+    fi
     merged_content="$(deployment_conf_merge "${existing_content}" "${stanza_name}" "${body}")" || return 1
 
     deployment_bundle_write_conf_content_on_profile "${profile_name}" "${kind}" "${app_name}" "${conf_name}" "${merged_content}"
@@ -538,8 +773,8 @@ deployment_bundle_set_conf_for_current_target() {
     local body="${4:-}"
     local profile_name kind
 
-    profile_name="$(deployment_bundle_profile_for_current_target)"
-    kind="$(deployment_bundle_kind_for_current_target)"
+    profile_name="$(deployment_bundle_profile_for_current_target)" || return 1
+    kind="$(deployment_bundle_kind_for_current_target)" || return 1
     [[ -n "${profile_name}" && -n "${kind}" ]] || return 1
     deployment_bundle_set_conf_on_profile "${profile_name}" "${kind}" "${app_name}" "${conf_name}" "${stanza_name}" "${body}"
 }
@@ -579,32 +814,52 @@ existing = os.environ.get("EXISTING_CONF_CONTENT", "")
 sections = OrderedDict()
 current = None
 
+if not target or len(existing.encode("utf-8")) > 1024 * 1024:
+    raise SystemExit(1)
+
 for raw_line in existing.splitlines():
     line = raw_line.strip()
     if not line or line.startswith("#") or line.startswith(";"):
         continue
-    if line.startswith("[") and line.endswith("]"):
+    if line.startswith("[") or line.endswith("]"):
+        if not (line.startswith("[") and line.endswith("]")):
+            raise SystemExit(1)
         current = line[1:-1].strip()
-        sections.setdefault(current, OrderedDict())
+        if not current or "[" in current or "]" in current or current in sections:
+            raise SystemExit(1)
+        sections[current] = OrderedDict()
         continue
     if "=" not in raw_line or current is None:
-        continue
+        raise SystemExit(1)
     key, value = raw_line.split("=", 1)
-    sections.setdefault(current, OrderedDict())[key.strip()] = value.strip()
+    key = key.strip()
+    if not key or key in sections[current]:
+        raise SystemExit(1)
+    sections[current][key] = value.strip()
 
 aliases = [f"http://{target}", target]
-stanza_name = next((alias for alias in aliases if alias in sections), "")
-if not stanza_name:
+matching_stanzas = [alias for alias in aliases if alias in sections]
+if not matching_stanzas:
     print("{}", end="")
     raise SystemExit(0)
+if len(matching_stanzas) != 1:
+    raise SystemExit(1)
+stanza_name = matching_stanzas[0]
 
 global_values = sections.get("http", OrderedDict())
 token_values = sections.get(stanza_name, OrderedDict())
 default_index = token_values.get("index", "")
+disabled = str(token_values.get("disabled", global_values.get("disabled", "")))
+global_disabled = str(global_values.get("disabled", ""))
+valid_boolean_values = {"", "0", "1", "false", "true", "no", "yes", "off", "on"}
+if disabled.strip().lower() not in valid_boolean_values:
+    raise SystemExit(1)
+if global_disabled.strip().lower() not in valid_boolean_values:
+    raise SystemExit(1)
 record = {
     "name": stanza_name,
-    "disabled": str(token_values.get("disabled", global_values.get("disabled", ""))),
-    "global_disabled": str(global_values.get("disabled", "")),
+    "disabled": disabled,
+    "global_disabled": global_disabled,
     "useACK": str(token_values.get("useACK", token_values.get("useAck", ""))),
     "indexes": str(token_values.get("indexes", "")),
     "default_index": str(default_index),
@@ -616,11 +871,15 @@ PY
 }
 
 deployment_bundle_hec_inputs_content() {
-    local profile_name target_path
+    local profile_name target_path content
 
     profile_name="$(deployment_hec_bundle_profile)" || return 1
     target_path="$(deployment_bundle_conf_path_on_profile "${profile_name}" "idxc" "${DEPLOYMENT_MANAGED_HEC_APP}" "inputs")" || return 1
-    deployment_capture_target_file_with_profile "${profile_name}" "${target_path}" 2>/dev/null || true
+    if ! content="$(deployment_capture_target_file_with_profile \
+        "${profile_name}" "${target_path}" 2>/dev/null)"; then
+        return 1
+    fi
+    printf '%s' "${content}"
 }
 
 deployment_get_bundle_hec_token_record() {
@@ -634,9 +893,12 @@ deployment_get_bundle_hec_token_record() {
 
 deployment_get_bundle_hec_token_state() {
     local token_name="${1:-}"
-    local token_record disabled global_disabled
+    local token_record disabled global_disabled disabled_normalized global_disabled_normalized
 
-    token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+    if ! token_record="$(deployment_get_bundle_hec_token_record \
+        "${token_name}" 2>/dev/null)"; then
+        return 1
+    fi
     if [[ -z "${token_record}" || "${token_record}" == "{}" ]]; then
         printf '%s' "missing"
         return 0
@@ -644,8 +906,18 @@ deployment_get_bundle_hec_token_state() {
 
     disabled="$(rest_json_field "${token_record}" "disabled")"
     global_disabled="$(rest_json_field "${token_record}" "global_disabled")"
-    case "${disabled}:${global_disabled}" in
-        1:*|true:*|True:*|*:1|*:true|*:True)
+    disabled_normalized="$(printf '%s' "${disabled}" | tr '[:upper:]' '[:lower:]')"
+    global_disabled_normalized="$(printf '%s' "${global_disabled}" | tr '[:upper:]' '[:lower:]')"
+    case "${disabled_normalized}" in
+        ""|0|false|no|off|1|true|yes|on) ;;
+        *) return 1 ;;
+    esac
+    case "${global_disabled_normalized}" in
+        ""|0|false|no|off|1|true|yes|on) ;;
+        *) return 1 ;;
+    esac
+    case "${disabled_normalized}:${global_disabled_normalized}" in
+        1:*|true:*|yes:*|on:*|*:1|*:true|*:yes|*:on)
             printf '%s' "disabled"
             ;;
         *)
@@ -684,7 +956,10 @@ deployment_create_cluster_bundle_hec_token() {
     local use_ack="${4:-0}"
     local token_record token_value
 
-    token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+    if ! token_record="$(deployment_get_bundle_hec_token_record \
+        "${token_name}" 2>/dev/null)"; then
+        return 1
+    fi
     token_value="$(rest_json_field "${token_record}" "token")"
     deployment_bundle_write_hec_token "${token_name}" "${default_index}" "${indexes_csv}" "${use_ack}" "0" "${token_value}"
 }
@@ -693,7 +968,10 @@ deployment_enable_cluster_bundle_hec_token() {
     local token_name="${1:-}"
     local token_record default_index indexes_csv use_ack token_value
 
-    token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+    if ! token_record="$(deployment_get_bundle_hec_token_record \
+        "${token_name}" 2>/dev/null)"; then
+        return 1
+    fi
     [[ -n "${token_record}" && "${token_record}" != "{}" ]] || return 1
 
     default_index="$(rest_json_field "${token_record}" "default_index")"
@@ -711,7 +989,10 @@ deployment_update_cluster_bundle_hec_token_default_index() {
     local target_index="${2:-}"
     local token_record indexes_csv use_ack token_value disabled_state
 
-    token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+    if ! token_record="$(deployment_get_bundle_hec_token_record \
+        "${token_name}" 2>/dev/null)"; then
+        return 1
+    fi
     [[ -n "${token_record}" && "${token_record}" != "{}" ]] || return 1
 
     indexes_csv="$(rest_json_field "${token_record}" "indexes")"
@@ -720,8 +1001,9 @@ deployment_update_cluster_bundle_hec_token_default_index() {
     token_value="$(rest_json_field "${token_record}" "token")"
     disabled_state="$(rest_json_field "${token_record}" "disabled")"
     case "${disabled_state}" in
-        1|true|True) disabled_state="1" ;;
-        *) disabled_state="0" ;;
+        1|true|True|yes|Yes|on|On) disabled_state="1" ;;
+        ""|0|false|False|no|No|off|Off) disabled_state="0" ;;
+        *) return 1 ;;
     esac
 
     deployment_bundle_write_hec_token "${token_name}" "${target_index}" "${indexes_csv}" "${use_ack}" "${disabled_state}" "${token_value}"
@@ -733,12 +1015,12 @@ deployment_install_app_via_bundle() {
     local profile_name kind execution_mode target_root staged_path
     local script_content
 
-    profile_name="$(deployment_bundle_profile_for_current_target)"
-    kind="$(deployment_bundle_kind_for_current_target)"
+    profile_name="$(deployment_bundle_profile_for_current_target)" || return 1
+    kind="$(deployment_bundle_kind_for_current_target)" || return 1
     [[ -n "${profile_name}" && -n "${kind}" ]] || return 1
 
     target_root="$(deployment_run_with_profile "${profile_name}" deployment_bundle_root_for_kind "${kind}")" || return 1
-    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")"
+    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")" || return 1
     staged_path="$(deployment_run_with_profile "${profile_name}" hbs_stage_file_for_execution "${execution_mode}" "${file_path}" "$(basename "${file_path}").bundle.$$")" || return 1
 
     # The heredoc body and the EOF terminator must remain at column 0; the body is delivered
@@ -823,13 +1105,13 @@ deployment_uninstall_app_via_bundle() {
     local app_name="${1:-}"
     local profile_name kind execution_mode target_root target_dir script_content
 
-    profile_name="$(deployment_bundle_profile_for_current_target)"
-    kind="$(deployment_bundle_kind_for_current_target)"
+    profile_name="$(deployment_bundle_profile_for_current_target)" || return 1
+    kind="$(deployment_bundle_kind_for_current_target)" || return 1
     [[ -n "${profile_name}" && -n "${kind}" && -n "${app_name}" ]] || return 1
 
     target_root="$(deployment_run_with_profile "${profile_name}" deployment_bundle_root_for_kind "${kind}")" || return 1
     target_dir="${target_root%/}/${app_name}"
-    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")"
+    execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")" || return 1
     script_content="$(cat <<EOF
 set -euo pipefail
 target_dir=$(printf '%q' "${target_dir}")
@@ -854,6 +1136,9 @@ deployment_set_app_visible() {
     if deployment_should_manage_search_config_via_bundle; then
         deployment_bundle_set_conf_for_current_target "${app_name}" "app" "ui" "is_visible=${visible_value}"
         return $?
+    fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        return 1
     fi
 
     response="$(splunk_curl "${sk}" -X POST \

@@ -373,10 +373,11 @@ bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
   splunkbase --app-id 5247` (Splunk_TA_sim).
 - ACS Log Observer Connect realm-IP allowlist deltas ->
   `skills/splunk-cloud-acs-admin-setup/scripts/setup.sh --phase render
-  --features search-api --search-api-subnets <pre-baked-realm-IPs>`.
+  --target-stack STACK_NAME --features search-api --search-api-subnets
+  <pre-baked-realm-IPs>`.
 - ACS Splunk Cloud Victoria-stack search-head HEC allowlist (SIM Add-on
   prerequisite) -> `skills/splunk-cloud-acs-admin-setup/scripts/setup.sh
-  --phase render --features hec`.
+  --phase render --target-stack STACK_NAME --features hec`.
 - ITSI Content Pack for Splunk Observability Cloud ->
   `skills/splunk-itsi-config/SKILL.md`.
 - Splunk Observability Cloud dashboards, detectors, Log Observer Connect

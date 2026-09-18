@@ -8,7 +8,9 @@ RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-smartstore-rendered"
 
 DEPLOYMENT="cluster"
+DEPLOYMENT_SET=false
 PLATFORM="enterprise"
+PLATFORM_SET=false
 OPERATION="smartstore"
 OPERATION_SET=false
 SCOPE="per-index"
@@ -69,6 +71,14 @@ OWNER_APPROVAL_FILE=""
 BACKUP_EVIDENCE_FILE=""
 ACCEPT_DESTRUCTIVE_INDEX_DELETE=false
 CONFIRM_TOKENS=()
+STATUS_RENDER_OVERRIDE_OPTIONS=()
+
+for lifecycle_arg in "$@"; do
+    case "${lifecycle_arg}" in
+        --phase|--output-dir|--operation|--platform|--deployment|--help) ;;
+        --*) STATUS_RENDER_OVERRIDE_OPTIONS+=("${lifecycle_arg}") ;;
+    esac
+done
 
 usage() {
     local exit_code="${1:-0}"
@@ -147,8 +157,8 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --deployment) require_arg "$1" $# || exit 1; DEPLOYMENT="$2"; shift 2 ;;
-        --platform) require_arg "$1" $# || exit 1; PLATFORM="$2"; shift 2 ;;
+        --deployment) require_arg "$1" $# || exit 1; DEPLOYMENT="$2"; DEPLOYMENT_SET=true; shift 2 ;;
+        --platform) require_arg "$1" $# || exit 1; PLATFORM="$2"; PLATFORM_SET=true; shift 2 ;;
         --operation) require_arg "$1" $# || exit 1; OPERATION="$2"; OPERATION_SET=true; shift 2 ;;
         --scope) require_arg "$1" $# || exit 1; SCOPE="$2"; shift 2 ;;
         --phase) require_arg "$1" $# || exit 1; PHASE="$2"; shift 2 ;;
@@ -231,6 +241,98 @@ print(Path(sys.argv[1]).expanduser().resolve(), end="")
 PY
 }
 
+read_render_metadata_identity() {
+    local metadata_path="$(render_dir)/metadata.json"
+    python3 - "${metadata_path}" <<'PY'
+import json
+import os
+import stat
+import sys
+
+path = sys.argv[1]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+try:
+    descriptor = os.open(path, flags)
+except OSError as exc:
+    raise SystemExit(f"cannot open rendered metadata safely: {exc}") from exc
+try:
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode):
+        raise SystemExit("rendered metadata must be a regular file")
+    if info.st_size <= 0 or info.st_size > 65536:
+        raise SystemExit("rendered metadata size is outside the accepted bounds")
+    with os.fdopen(descriptor, encoding="utf-8") as handle:
+        descriptor = -1
+        data = json.load(handle)
+finally:
+    if descriptor >= 0:
+        os.close(descriptor)
+
+if not isinstance(data, dict) or data.get("target") != "index-lifecycle":
+    raise SystemExit("rendered metadata does not identify the index lifecycle workflow")
+platform = data.get("platform")
+deployment = data.get("deployment")
+operation = data.get("operation")
+if platform not in {"enterprise", "cloud"}:
+    raise SystemExit("rendered metadata has an invalid platform")
+if deployment not in {"cluster", "standalone"}:
+    raise SystemExit("rendered metadata has an invalid deployment")
+if operation not in {
+    "inventory",
+    "retention",
+    "smartstore",
+    "archive",
+    "disable-index",
+    "delete-index",
+    "clean-data",
+    "restore-handoff",
+}:
+    raise SystemExit("rendered metadata has an invalid operation")
+print(f"{platform}\t{deployment}\t{operation}", end="")
+PY
+}
+
+bind_status_to_render_metadata() {
+    local identity="" rendered_platform="" rendered_deployment="" rendered_operation=""
+    if ! identity="$(read_render_metadata_identity)"; then
+        log "ERROR: Could not bind status execution to valid rendered metadata."
+        exit 1
+    fi
+    IFS=$'\t' read -r rendered_platform rendered_deployment rendered_operation <<<"${identity}"
+
+    if [[ "${PLATFORM_SET}" == "true" && "${PLATFORM}" != "${rendered_platform}" ]]; then
+        log "ERROR: Requested status platform does not match the rendered metadata."
+        exit 1
+    fi
+    if [[ "${DEPLOYMENT_SET}" == "true" && "${DEPLOYMENT}" != "${rendered_deployment}" ]]; then
+        log "ERROR: Requested status deployment does not match the rendered metadata."
+        exit 1
+    fi
+    if [[ "${OPERATION_SET}" == "true" && "${OPERATION}" != "${rendered_operation}" ]]; then
+        log "ERROR: Requested status operation does not match the rendered metadata."
+        exit 1
+    fi
+
+    PLATFORM="${rendered_platform}"
+    DEPLOYMENT="${rendered_deployment}"
+    OPERATION="${rendered_operation}"
+}
+
+assert_render_metadata_matches_request() {
+    local identity="" rendered_platform="" rendered_deployment="" rendered_operation=""
+    if ! identity="$(read_render_metadata_identity)"; then
+        log "ERROR: Could not verify rendered metadata immediately before execution."
+        return 1
+    fi
+    IFS=$'\t' read -r rendered_platform rendered_deployment rendered_operation <<<"${identity}"
+    if [[ "${rendered_platform}" != "${PLATFORM}" \
+        || "${rendered_deployment}" != "${DEPLOYMENT}" \
+        || "${rendered_operation}" != "${OPERATION}" ]]; then
+        log "ERROR: Rendered lifecycle target identity does not match the requested invocation."
+        return 1
+    fi
+}
+
 validate_args() {
     if [[ "${PHASE}" == "inventory" && "${OPERATION_SET}" == "false" ]]; then
         OPERATION="inventory"
@@ -238,11 +340,23 @@ validate_args() {
     if [[ "${PHASE}" == "plan" && "${OPERATION_SET}" == "false" ]]; then
         OPERATION="inventory"
     fi
+    validate_choice "${PHASE}" inventory plan render preflight apply status all
+    if [[ "${PHASE}" == "status" && ${#STATUS_RENDER_OVERRIDE_OPTIONS[@]} -gt 0 ]]; then
+        log "ERROR: --phase status uses the target and expectations bound into rendered metadata; render-affecting overrides are refused."
+        exit 1
+    fi
+    if [[ -n "${OUTPUT_DIR}" ]]; then
+        OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
+    else
+        OUTPUT_DIR="$(resolve_abs_path "${_PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}")"
+    fi
+    if [[ "${PHASE}" == "status" ]]; then
+        bind_status_to_render_metadata
+    fi
     validate_choice "${DEPLOYMENT}" cluster standalone
     validate_choice "${PLATFORM}" enterprise cloud
     validate_choice "${OPERATION}" inventory retention smartstore archive disable-index delete-index clean-data restore-handoff
     validate_choice "${SCOPE}" per-index global
-    validate_choice "${PHASE}" inventory plan render preflight apply status all
     validate_choice "${DATATYPE}" event metric
     validate_choice "${REMOTE_PROVIDER}" s3 gcs azure
     validate_choice "${S3_SUPPORTS_VERSIONING}" true false unset
@@ -252,7 +366,7 @@ validate_args() {
     validate_choice "${CLEAN_REMOTE_STORAGE_BY_DEFAULT}" true false
     validate_choice "${APPLY_CLUSTER_BUNDLE}" true false
     validate_choice "${RESTART_SPLUNK}" true false
-    if [[ "${OPERATION}" == "smartstore" && -z "${REMOTE_PATH}" ]]; then
+    if [[ "${OPERATION}" == "smartstore" && "${PHASE}" != "status" && -z "${REMOTE_PATH}" ]]; then
         log "ERROR: --remote-path is required for --operation smartstore."
         exit 1
     fi
@@ -289,11 +403,6 @@ validate_args() {
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && "${PHASE}" != "render" && "${PHASE}" != "inventory" && "${PHASE}" != "plan" ]]; then
         log "ERROR: --json is supported only for render/inventory/plan or --dry-run workflows."
         exit 1
-    fi
-    if [[ -n "${OUTPUT_DIR}" ]]; then
-        OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
-    else
-        OUTPUT_DIR="$(resolve_abs_path "${_PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}")"
     fi
 }
 
@@ -383,6 +492,9 @@ run_rendered_script() {
     fi
     if [[ ! -x "${dir}/${script_name}" ]]; then
         log "ERROR: Rendered script is missing or not executable: ${dir}/${script_name}"
+        exit 1
+    fi
+    if ! assert_render_metadata_matches_request; then
         exit 1
     fi
     (cd "${dir}" && "./${script_name}")
