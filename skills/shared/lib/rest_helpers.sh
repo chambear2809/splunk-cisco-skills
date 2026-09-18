@@ -1707,6 +1707,7 @@ rest_create_input() {
     local sk="$1" uri="$2" app="$3" input_type="$4" input_name="$5" body="$6"
     local endpoint="${uri}/servicesNS/nobody/${app}/data/inputs/${input_type}"
     local create_body encoded_name http_code resp enable_state body_without_disabled
+    local state_readback_context=""
     local resource_endpoint qualified_name observe_status=0 exists=false
     encoded_name=$(_urlencode "${input_name}")
     resource_endpoint="${endpoint}/${encoded_name}"
@@ -1724,6 +1725,9 @@ rest_create_input() {
             return 1
             ;;
     esac
+    if [[ -n "${enable_state}" ]]; then
+        state_readback_context="; requested enabled/disabled state was not verified"
+    fi
 
     body_without_disabled=$(printf '%s' "${body}" \
         | sed -E 's/(^|&)disabled=[^&]*//g; s/^&//; s/&+$//; s/&&+/\&/g')
@@ -1734,7 +1738,7 @@ rest_create_input() {
     else
         observe_status=$?
         if (( observe_status != 1 )); then
-            echo "ERROR: Could not observe ${qualified_name} exactly; refusing mutation." >&2
+            echo "ERROR: Could not observe ${qualified_name} exactly${state_readback_context}; refusing mutation." >&2
             return 1
         fi
     fi
@@ -1754,7 +1758,7 @@ rest_create_input() {
             if ! _rest_verify_exact_resource_form_body "${sk}" \
                 "${resource_endpoint}?output_mode=json" "${qualified_name}" \
                 "${body_without_disabled}" "${input_name}"; then
-                echo "ERROR: Update ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed." >&2
+                echo "ERROR: Update ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed${state_readback_context}." >&2
                 return 1
             fi
         fi
@@ -1785,7 +1789,7 @@ rest_create_input() {
             if ! _rest_verify_exact_resource_form_body "${sk}" \
                 "${resource_endpoint}?output_mode=json" "${qualified_name}" \
                 "${body_without_disabled}" "${input_name}"; then
-                echo "ERROR: Create ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed." >&2
+                echo "ERROR: Create ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed${state_readback_context}." >&2
                 return 1
             fi
             if ! rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"; then
