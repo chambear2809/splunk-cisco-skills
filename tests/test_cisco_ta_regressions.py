@@ -1062,6 +1062,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                             "content": {
                                 "default_index": token.get("default_index", "thousandeyes_metrics"),
                                 "index": token.get("default_index", "thousandeyes_metrics"),
+                                "disabled": token.get("disabled", "false"),
                             },
                         }
                         for name, token in sorted(state["hec_tokens"].items())
@@ -1612,6 +1613,11 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             from urllib.parse import parse_qs, urlparse, unquote
 
             log_path = Path(os.environ["CURL_LOG"])
+            state_path = log_path.with_suffix(".state.json")
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+            except (FileNotFoundError, json.JSONDecodeError):
+                state = {}
             args = sys.argv[1:]
             method = "GET"
             data = ""
@@ -1622,6 +1628,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             def log(msg: str) -> None:
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(msg + "\\n")
+
+            def save() -> None:
+                state_path.write_text(json.dumps(state), encoding="utf-8")
 
             def out(body: str = "", code: int | None = None) -> None:
                 if output_target == "/dev/null" and write_code and code is not None:
@@ -1674,7 +1683,54 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             if ("_account" in path or "_settings" in path) and method == "POST":
                 log(f"CONF_POST path={path} data={data!r}")
+                parsed_body = parse_qs(data, keep_blank_values=True)
+                stanza = parsed_body.get("name", [""])[-1]
+                resource_path = f"{path.rstrip('/')}/{stanza}" if stanza else path
+                state[resource_path] = {
+                    key: values for key, values in parsed_body.items() if key != "name"
+                }
+                save()
                 out("", 200)
+
+            if method == "GET" and ("_account" in path or "_settings" in path):
+                if path not in state:
+                    out("", 404)
+                content = {key: values[-1] for key, values in state[path].items()}
+                out(
+                    json.dumps(
+                        {"entry": [{"name": path.rsplit("/", 1)[-1], "content": content}]}
+                    ),
+                    200,
+                )
+
+            if method == "GET" and "/data/inputs/" in path:
+                input_name = unquote(path.rsplit("/", 1)[-1])
+                if path not in state:
+                    out("", 404)
+                content = {key: values[-1] for key, values in state[path].items()}
+                content.setdefault("disabled", "0")
+                out(
+                    json.dumps(
+                        {"entry": [{"name": input_name, "content": content}]}
+                    ),
+                    200,
+                )
+
+            if method == "POST" and "/data/inputs/" in path:
+                parsed_body = parse_qs(data, keep_blank_values=True)
+                posted_name = parsed_body.get("name", [""])[-1]
+                resource_path = (
+                    path.rsplit("/", 1)[0]
+                    if path.endswith(("/enable", "/disable"))
+                    else f"{path.rstrip('/')}/{posted_name}" if posted_name else path
+                )
+                state.setdefault(resource_path, {})
+                state[resource_path].update(parsed_body)
+                if path.endswith("/enable"):
+                    state[resource_path]["disabled"] = ["0"]
+                elif path.endswith("/disable"):
+                    state[resource_path]["disabled"] = ["1"]
+                save()
 
             out("", 200)
             """,

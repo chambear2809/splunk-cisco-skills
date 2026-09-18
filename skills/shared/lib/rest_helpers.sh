@@ -857,7 +857,6 @@ _rest_response_has_exact_entry() {
     shift
     python3 -c '
 import json
-import re
 import sys
 
 expected = set(sys.argv[1:])
@@ -1030,11 +1029,36 @@ try:
         if actual_text == wanted:
             return True
         # Splunk normalizes search and macro expressions inconsistently (for
-        # example, it may insert a space after a comma).  Compare those
-        # expression fields with insignificant whitespace removed while still
-        # requiring every requested field to be present.
+        # example, it may insert a space after a comma).  Ignore whitespace
+        # outside quoted strings, while preserving spaces that are part of a
+        # literal value.
         if key in {"definition", "search", "query"}:
-            if re.sub(r"\\s+", "", actual_text) == re.sub(r"\\s+", "", wanted):
+            def normalize_expression(value):
+                normalized = []
+                quote = None
+                escaped = False
+                for character in value:
+                    if escaped:
+                        normalized.append(character)
+                        escaped = False
+                        continue
+                    if character == "\\" and quote is not None:
+                        normalized.append(character)
+                        escaped = True
+                        continue
+                    if quote is not None:
+                        normalized.append(character)
+                        if character == quote:
+                            quote = None
+                        continue
+                    if character in {"'", '"'}:
+                        quote = character
+                        normalized.append(character)
+                    elif not character.isspace():
+                        normalized.append(character)
+                return "".join(normalized)
+
+            if normalize_expression(actual_text) == normalize_expression(wanted):
                 return True
         actual_bool = actual_text.strip().lower()
         wanted_bool = wanted.strip().lower()
@@ -1057,14 +1081,6 @@ _rest_verify_exact_resource_form_body() {
     if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" "${endpoint}")"; then
         return 1
     fi
-    # Some supported Splunk REST surfaces acknowledge a successful write with
-    # an empty body and expose no representation for the follow-up GET.  The
-    # pre-write observation above still had to prove the endpoint was
-    # reachable; preserve that legacy contract while validating any
-    # representation that is returned.
-    if [[ -z "${response_body//[[:space:]]/}" ]]; then
-        return 0
-    fi
     printf '%s' "${response_body}" \
         | _rest_response_matches_form_body "${expected_name}" "${form_body}" "$@"
 }
@@ -1083,13 +1099,23 @@ _rest_observe_exact_resource() {
     case "${http_code}" in
         200)
             if [[ -z "${body//[[:space:]]/}" ]]; then
-                body=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
-                    --max-filesize 1048576 "${endpoint}" 2>/dev/null || true)
+                if ! body=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+                    --max-filesize 1048576 "${endpoint}" 2>/dev/null); then
+                    return 2
+                fi
             fi
-            # Legacy curl-compatible fixtures use an empty 200 response for a
-            # resource that is not present.  Treat that as absence so callers
-            # can create it; malformed non-empty responses remain failures.
             if [[ -z "${body//[[:space:]]/}" ]]; then
+                return 2
+            fi
+            if printf '%s' "${body}" | python3 -c '
+import json
+import sys
+try:
+    payload = json.load(sys.stdin)
+    raise SystemExit(0 if isinstance(payload, dict) and payload.get("entry") == [] else 1)
+except Exception:
+    raise SystemExit(1)
+' 2>/dev/null; then
                 return 1
             fi
             printf '%s' "${body}" \

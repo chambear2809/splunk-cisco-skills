@@ -66,8 +66,20 @@ deployment_execution_mode_for_profile() {
     fi
     if [[ -n "${profile_name}" && "${explicit_endpoint}" == "true" \
         && -z "${ssh_host}" ]]; then
-        printf '%s' "local"
-        return 0
+        if ! target_uri="$(deployment_profile_uri "${profile_name}")"; then
+            return 1
+        fi
+        target_host="$(splunk_host_from_uri "${target_uri}")"
+        case "${target_host}" in
+            ""|localhost|127.0.0.1)
+                printf '%s' "local"
+                return 0
+                ;;
+            *)
+                echo "ERROR: Deployment profile '${profile_name}' has a remote API endpoint but no explicit SSH route; refusing local bundle execution." >&2
+                return 1
+                ;;
+        esac
     fi
     if [[ -n "${ssh_host}" ]]; then
         case "${ssh_host}" in

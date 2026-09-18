@@ -642,10 +642,11 @@ rest_create_hec_token() {
         -w '\n%{http_code}' 2>/dev/null)
     hec_code=$(echo "${resp}" | tail -1)
     case "${hec_code}" in
-        201|200|409)
+        201|200)
             _HEC_TOKEN_CREATED_THIS_RUN=true
             return 0
             ;;
+        409) return 0 ;;
         *) return 1 ;;
     esac
 }

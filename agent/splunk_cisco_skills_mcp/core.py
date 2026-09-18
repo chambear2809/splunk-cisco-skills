@@ -503,8 +503,8 @@ _TRUSTED_INTERPRETER_OS_ROOTS = tuple(
 def _is_trusted_interpreter_os_component(
     path: Path, metadata: os.stat_result
 ) -> bool:
-    """Allow only trusted-owner components below known OS/toolchain roots."""
-    if os.name != "posix" or metadata.st_uid not in {0, os.geteuid()}:
+    """Allow only root-owned components below known OS/toolchain roots."""
+    if os.name != "posix" or metadata.st_uid != 0:
         return False
     try:
         absolute = path.absolute()
