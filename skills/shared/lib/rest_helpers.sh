@@ -1764,7 +1764,7 @@ rest_create_input() {
         fi
         if ! _rest_verify_exact_resource_form_body "${sk}" \
             "${resource_endpoint}?output_mode=json" "${qualified_name}" "${body}" "${input_name}"; then
-            echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state." >&2
+            echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state; requested enabled/disabled state was not verified." >&2
             return 1
         fi
         return 0
@@ -1793,7 +1793,7 @@ rest_create_input() {
             fi
             if ! _rest_verify_exact_resource_form_body "${sk}" \
                 "${resource_endpoint}?output_mode=json" "${qualified_name}" "${body}" "${input_name}"; then
-                echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state." >&2
+                echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state; requested enabled/disabled state was not verified." >&2
                 return 1
             fi
             return 0
