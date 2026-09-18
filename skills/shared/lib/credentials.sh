@@ -25,6 +25,7 @@ _CREDENTIAL_OPERATOR_URI=""
 _CREDENTIAL_OPERATOR_HOST=""
 _CREDENTIAL_OPERATOR_MGMT_PORT=""
 _CREDENTIAL_OPERATOR_SSH_HOST=""
+_CREDENTIAL_OPERATOR_RESOLVE=""
 _CREDENTIAL_FILE_SNAPSHOT_BOUND=false
 _CREDENTIAL_FILE_BOUND_PATH=""
 _CREDENTIAL_FILE_BOUND_SNAPSHOT=""
@@ -1010,6 +1011,7 @@ _load_credential_values_from_file() {
             _CREDENTIAL_OPERATOR_HOST="${SPLUNK_HOST:-}"
             _CREDENTIAL_OPERATOR_MGMT_PORT="${SPLUNK_MGMT_PORT:-}"
             _CREDENTIAL_OPERATOR_SSH_HOST="${SPLUNK_SSH_HOST:-}"
+            _CREDENTIAL_OPERATOR_RESOLVE="${SPLUNK_RESOLVE:-}"
             _CREDENTIAL_OPERATOR_CONNECTION_CAPTURED=true
         fi
         if operator_endpoint="$(_endpoint_uri_from_alias_values \
@@ -1221,7 +1223,10 @@ _load_credential_values_from_file() {
                 if [[ -n "${selected_profile}" ]]; then
                     selected_value="$(_credential_output_value "${primary_output}" "${key}")"
                 fi
-                if [[ -z "${current_value}" || "${current_value}" == "${selected_value}" ]]; then
+                if [[ "${key}" != "SPLUNK_RESOLVE" \
+                    || -z "${_CREDENTIAL_OPERATOR_RESOLVE}" ]] \
+                    && [[ -z "${current_value}" || -z "${selected_profile}" \
+                        || "${current_value}" == "${selected_value}" ]]; then
                     printf -v "${key}" '%s' "${value}"
                 fi
             fi
@@ -1808,9 +1813,10 @@ _search_profile_role_is_active() {
 _warn_invalid_target_role_once() {
     local role_value="${1:-}"
     local role_key="${2:-SPLUNK_TARGET_ROLE}"
+    : "${role_value}"
 
     _warn_once "_WARNED_INVALID_SPLUNK_TARGET_ROLE" \
-        "ERROR: ${role_key} must be search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; received '${role_value}'; refusing target selection."
+        "ERROR: ${role_key} must be search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; refusing target selection."
 }
 
 _resolve_target_role_platform_hint() {
