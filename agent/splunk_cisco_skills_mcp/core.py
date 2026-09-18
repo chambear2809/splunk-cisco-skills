@@ -617,13 +617,20 @@ def _interpreter_binding(candidate: Path) -> tuple[Path, Path, str]:
         running_interpreter = None
     is_running_interpreter = resolved == running_interpreter
     direct_running_interpreter = is_running_interpreter and candidate == resolved
+    # A virtualenv launcher commonly resolves to the interpreter that is
+    # already running this MCP process. That target is an established process
+    # boundary, but the requested launcher parent remains a newly supplied
+    # route and must still satisfy the ancestry policy.
     _interpreter_symlink_chain(
         candidate,
-        validate_permissions=not direct_running_interpreter,
+        validate_permissions=not is_running_interpreter,
     )
     _interpreter_parent_route(
         candidate,
-        validate_permissions=not direct_running_interpreter,
+        validate_permissions=(
+            True if is_running_interpreter and not direct_running_interpreter
+            else not direct_running_interpreter
+        ),
     )
     if os.name == "posix":
         trusted_launcher_owner = launcher_metadata.st_uid in {0, os.geteuid()}

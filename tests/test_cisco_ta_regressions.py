@@ -1067,7 +1067,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                         }
                         for name, token in sorted(state["hec_tokens"].items())
                     ]
-                    out(json.dumps({"entry": entries}))
+                    out(json.dumps({"entry": entries}), 200 if write_code else None)
 
                 out("", 200)
                 """,
@@ -1681,7 +1681,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if path.endswith(unavailable_paths) and method == "GET":
                     out("", 404)
 
-            if ("_account" in path or "_settings" in path) and method == "POST":
+            if "/configs/conf-" in path and method == "POST":
                 log(f"CONF_POST path={path} data={data!r}")
                 parsed_body = parse_qs(data, keep_blank_values=True)
                 stanza = parsed_body.get("name", [""])[-1]
@@ -1692,7 +1692,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 save()
                 out("", 200)
 
-            if method == "GET" and ("_account" in path or "_settings" in path):
+            if method == "GET" and "/configs/conf-" in path:
                 if path not in state:
                     out("", 404)
                 content = {key: values[-1] for key, values in state[path].items()}
@@ -1884,9 +1884,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                                         }
                                     ]
                                 }
-                            )
+                            ),
+                            200 if write_code else None,
                         )
-                    out(json.dumps({"entry": []}))
+                    out(json.dumps({"entry": []}), 200 if write_code else None)
 
                 body = decode_form(data)
                 input_name = existing_name or body.pop("name", "")

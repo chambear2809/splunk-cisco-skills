@@ -402,7 +402,12 @@ class ShellScriptRegressionBase(unittest.TestCase):
                         state["security_cloud_settings"]["loglevel"] = body["loglevel"]
                         save()
                     out("", 200)
-                out(json.dumps({"entry": [{"content": {"loglevel": state["security_cloud_settings"].get("loglevel", "")}}]}))
+                out(
+                    json.dumps(
+                        {"entry": [{"content": {"loglevel": state["security_cloud_settings"].get("loglevel", "")}}]}
+                    ),
+                    200 if write_code else None,
+                )
 
             if "/servicesNS/nobody/CiscoSecurityCloud/CiscoSecurityCloud_" in path:
                 handler = path.split("/servicesNS/nobody/CiscoSecurityCloud/", 1)[1].split("?", 1)[0]
