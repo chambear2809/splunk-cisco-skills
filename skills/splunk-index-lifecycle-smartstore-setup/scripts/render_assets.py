@@ -1209,7 +1209,7 @@ if not token:
     raise SystemExit(f"ERROR: token file is empty: {{token_path}}")
 if any(char.isspace() for char in token):
     raise SystemExit(f"ERROR: token file must contain one whitespace-free token: {{token_path}}")
-escaped = token.replace("\\", "\\\\").replace('"', '\\"')
+escaped = token.replace("\\\\", "\\\\\\\\").replace('"', '\\\\"')
 flags = os.O_WRONLY
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW

@@ -877,6 +877,30 @@ except Exception:
 ' "${expected_name}" "$@" 2>/dev/null
 }
 
+_rest_response_has_single_bound_entry() {
+    local expected_name="$1"
+    shift
+    python3 -c '
+import json
+import sys
+
+expected = set(sys.argv[1:])
+try:
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("response is too large")
+    payload = json.loads(raw)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ValueError("response did not contain one entry")
+    name = str(entries[0].get("name", ""))
+    if name and name not in expected:
+        raise ValueError("response entry name conflicted with the bound endpoint")
+except Exception:
+    raise SystemExit(1)
+' "${expected_name}" "$@" 2>/dev/null
+}
+
 _rest_response_exact_app_version() {
     local expected_name="$1"
     python3 -c '
@@ -894,7 +918,8 @@ try:
         raise ValueError("missing entry collection")
     if len(entries) != 1 or not isinstance(entries[0], dict):
         raise ValueError("response did not contain one app entry")
-    if str(entries[0].get("name", "")) != expected_name:
+    entry_name = str(entries[0].get("name", ""))
+    if entry_name and entry_name != expected_name:
         raise ValueError("requested app was not observed exactly once")
     content = entries[0].get("content")
     if not isinstance(content, dict):
@@ -954,7 +979,8 @@ try:
         raise ValueError("missing entry collection")
     if len(entries) != 1 or not isinstance(entries[0], dict):
         raise ValueError("response did not contain one entry")
-    if str(entries[0].get("name", "")) not in expected_names:
+    entry_name = str(entries[0].get("name", ""))
+    if entry_name and entry_name not in expected_names:
         raise ValueError("requested entry was not observed exactly once")
     content = entries[0].get("content")
     if not isinstance(content, dict):
@@ -1030,7 +1056,7 @@ _rest_observe_exact_resource() {
     case "${http_code}" in
         200)
             printf '%s' "${body}" \
-                | _rest_response_has_exact_entry "${expected_name}" "$@" \
+                | _rest_response_has_single_bound_entry "${expected_name}" "$@" \
                 || return 2
             return 0
             ;;
@@ -1062,7 +1088,12 @@ rest_observe_app() {
 }
 
 rest_check_app() {
-    rest_observe_app "$@"
+    local sk="$1" uri="$2" app="$3" encoded_app http_code
+    encoded_app=$(_urlencode "${app}") || return 1
+    http_code=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+        --max-filesize 1048576 -o /dev/null -w '%{http_code}' \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null || echo "000")
+    [[ "${http_code}" == "200" ]]
 }
 
 rest_get_app_version() {

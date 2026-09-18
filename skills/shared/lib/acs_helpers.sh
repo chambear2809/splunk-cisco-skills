@@ -485,6 +485,19 @@ _acs_verify_current_context() {
     [[ -n "${_ACS_CONTEXT_IDENTITY}" && "${readback}" == "${_ACS_CONTEXT_IDENTITY}" ]]
 }
 
+_acs_readback_matches_requested_target() {
+    local readback="" observed_stack="" observed_search_head=""
+    if ! readback="$(_acs_current_stack_readback)"; then
+        return 1
+    fi
+    IFS=$'\t' read -r observed_stack observed_search_head <<<"${readback}"
+    [[ -n "${observed_stack}" && "${observed_stack}" == "${SPLUNK_CLOUD_STACK:-}" ]] || return 1
+    if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
+        [[ -n "${observed_search_head}" && "${observed_search_head}" == "${SPLUNK_CLOUD_SEARCH_HEAD}" ]] || return 1
+    fi
+    return 0
+}
+
 acs_stack_status_snapshot() {
     local raw="" payload="" snapshot=""
     if ! acs_prepare_context; then
@@ -528,7 +541,7 @@ print(f"{infra}\t{restart_required}", end="")
 }
 
 acs_prepare_context() {
-    local target_key="" readback="" observed_stack="" observed_search_head=""
+    local target_key="" readback="" observed_stack="" observed_search_head="" already_selected=false
 
     if ! load_splunk_platform_settings; then
         _ACS_CONTEXT_PREPARED=false
@@ -586,7 +599,16 @@ acs_prepare_context() {
     [[ -n "${STACK_TOKEN:-}" ]] && export STACK_TOKEN
     [[ -n "${STACK_TOKEN_USER:-}" ]] && export STACK_TOKEN_USER
 
-    if [[ -n "${SPLUNK_CLOUD_STACK:-}" ]]; then
+    # Rendered assets bind a reviewed stack/search-head identity.  If the
+    # existing ACS current-stack surface already proves that exact identity,
+    # retain it and avoid an unnecessary local re-selection command.  A stale
+    # or unreadable context still takes the explicit add/use path below and is
+    # rejected unless the final readback matches.
+    if [[ "${ACS_BOUND_TARGET_CONTEXT:-false}" == "true" ]] \
+        && _acs_readback_matches_requested_target; then
+        already_selected=true
+    fi
+    if [[ -n "${SPLUNK_CLOUD_STACK:-}" && "${already_selected}" != "true" ]]; then
         if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
             if ! _acs_cli_command config add-stack "${SPLUNK_CLOUD_STACK}" --target-sh "${SPLUNK_CLOUD_SEARCH_HEAD}" >/dev/null 2>&1; then
                 # Existing-stack registration may fail; use-stack plus readback

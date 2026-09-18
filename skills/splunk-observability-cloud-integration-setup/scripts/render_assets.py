@@ -1804,7 +1804,9 @@ def handoff_script_app_install() -> str:
 def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
     realm = spec["realm"]
     ips = LOC_REALM_IPS.get(realm, [])
-    stack = spec["splunk_cloud_stack"]
+    stack = spec.get("splunk_cloud_stack", "")
+    if not stack:
+        return SHEBANG + 'echo "Splunk Cloud ACS allowlisting is not applicable to an Enterprise target."\n'
     return SHEBANG + (
         "# Log Observer Connect realm-IP allowlist handoff to splunk-cloud-acs-admin-setup.\n"
         "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"
@@ -1814,7 +1816,9 @@ def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
 
 
 def handoff_script_acs_hec(spec: dict[str, Any]) -> str:
-    stack = spec["splunk_cloud_stack"]
+    stack = spec.get("splunk_cloud_stack", "")
+    if not stack:
+        return SHEBANG + 'echo "Splunk Cloud ACS HEC allowlisting is not applicable to an Enterprise target."\n'
     return SHEBANG + (
         "# Splunk Cloud Victoria-stack HEC allowlist handoff to splunk-cloud-acs-admin-setup.\n"
         "exec bash \"${PROJECT_ROOT}/skills/splunk-cloud-acs-admin-setup/scripts/setup.sh\" \\\n"

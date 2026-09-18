@@ -1787,7 +1787,7 @@ _primary_cloud_search_api_uri() {
 
 _normalize_target_role() {
     case "${1:-}" in
-        search-tier|indexer|heavy-forwarder|universal-forwarder|external-collector)
+        standalone|search-tier|indexer|heavy-forwarder|universal-forwarder|external-collector)
             printf '%s' "${1}"
             return 0
             ;;
@@ -1816,7 +1816,7 @@ _warn_invalid_target_role_once() {
     : "${role_value}"
 
     _warn_once "_WARNED_INVALID_SPLUNK_TARGET_ROLE" \
-        "ERROR: ${role_key} must be search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; refusing target selection."
+        "ERROR: ${role_key} must be standalone, search-tier, indexer, heavy-forwarder, universal-forwarder, or external-collector; refusing target selection."
 }
 
 _resolve_target_role_platform_hint() {

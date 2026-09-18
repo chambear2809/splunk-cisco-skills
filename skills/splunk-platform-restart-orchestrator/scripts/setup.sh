@@ -22,6 +22,10 @@ ACCEPT_RESTART=false
 RELOAD_HINT=""
 AUDIT_OUTPUT_DIR="${REPO_ROOT}/splunk-platform-restart-rendered"
 
+error_log() {
+    log "$@" >&2
+}
+
 usage() {
     cat <<'EOF'
 Usage:
@@ -214,44 +218,44 @@ validate_expected_ports_after_restart() {
 run_reload() {
     local hint="$1" endpoint body sk execution_mode splunk_home stdin_content command platform http_code
     if ! prepare_plan_context; then
-        log "ERROR: Could not prepare the selected Splunk reload target."
+        error_log "ERROR: Could not prepare the selected Splunk reload target."
         return 1
     fi
     if ! platform="$(resolve_splunk_platform)"; then
-        log "ERROR: Could not resolve the selected Splunk platform before reload."
+        error_log "ERROR: Could not resolve the selected Splunk platform before reload."
         return 1
     fi
     if ! _platform_restart_validate_platform_role "${platform}" "${TARGET_ROLE}"; then
-        log "ERROR: Reload target role is incompatible with the selected platform."
+        error_log "ERROR: Reload target role is incompatible with the selected platform."
         return 1
     fi
     case "${hint}" in
         deploy-server|deployment-server|serverclass|serverclass.conf)
             if [[ "${platform}" != "enterprise" ]]; then
-                log "ERROR: Host-command reload hints are supported only for a resolved Splunk Enterprise target."
-                log "HANDOFF: Use a reviewed Cloud REST endpoint or the owning Cloud workflow for this reload."
+                error_log "ERROR: Host-command reload hints are supported only for a resolved Splunk Enterprise target."
+                error_log "HANDOFF: Use a reviewed Cloud REST endpoint or the owning Cloud workflow for this reload."
                 return 1
             fi
             case "${TARGET_ROLE}" in
                 standalone|search-tier|heavy-forwarder) ;;
                 *)
-                    log "ERROR: Deploy-server reload is incompatible with the selected Splunk target role."
-                    log "HANDOFF: Run this reload only on the reviewed deployment-server host."
+                    error_log "ERROR: Deploy-server reload is incompatible with the selected Splunk target role."
+                    error_log "HANDOFF: Run this reload only on the reviewed deployment-server host."
                     return 1
                     ;;
             esac
             ;;
         workload|workload-pools|workload_rules|workload-rules)
             if [[ "${platform}" != "enterprise" ]]; then
-                log "ERROR: Host-command reload hints are supported only for a resolved Splunk Enterprise target."
-                log "HANDOFF: Use a reviewed Cloud REST endpoint or the owning Cloud workflow for this reload."
+                error_log "ERROR: Host-command reload hints are supported only for a resolved Splunk Enterprise target."
+                error_log "HANDOFF: Use a reviewed Cloud REST endpoint or the owning Cloud workflow for this reload."
                 return 1
             fi
             case "${TARGET_ROLE}" in
                 standalone|search-tier) ;;
                 *)
-                    log "ERROR: Workload reload is incompatible with the selected Splunk target role."
-                    log "HANDOFF: Run this reload only on the reviewed search-tier host."
+                    error_log "ERROR: Workload reload is incompatible with the selected Splunk target role."
+                    error_log "HANDOFF: Run this reload only on the reviewed search-tier host."
                     return 1
                     ;;
             esac
@@ -260,8 +264,8 @@ run_reload() {
             case "${TARGET_ROLE}" in
                 standalone|search-tier) ;;
                 *)
-                    log "ERROR: Generic REST reload is incompatible with the selected Splunk target role."
-                    log "HANDOFF: Use the owning role-specific or cluster-aware workflow for this reload."
+                    error_log "ERROR: Generic REST reload is incompatible with the selected Splunk target role."
+                    error_log "HANDOFF: Use the owning role-specific or cluster-aware workflow for this reload."
                     return 1
                     ;;
             esac
@@ -272,7 +276,7 @@ run_reload() {
         return 0
     fi
     if ! execution_mode="$(platform_restart_execution_mode)"; then
-        log "ERROR: Could not resolve the selected restart execution target."
+        error_log "ERROR: Could not resolve the selected restart execution target."
         return 1
     fi
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
@@ -292,7 +296,7 @@ run_reload() {
             ;;
         /services*)
             if ! sk="$(get_session_key "${SPLUNK_URI}")" || [[ -z "${sk}" ]]; then
-                log "ERROR: Could not authenticate to the selected Splunk REST target; refusing reload."
+                error_log "ERROR: Could not authenticate to the selected Splunk REST target; refusing reload."
                 return 1
             fi
             endpoint="${hint%/}"
@@ -305,23 +309,23 @@ run_reload() {
                 "${sk}" "${body}" \
                 --output /dev/null --write-out '%{http_code}' \
                 "${SPLUNK_URI}${endpoint}")"; then
-                log "ERROR: Splunk REST reload request failed before a successful HTTP response was observed."
+                error_log "ERROR: Splunk REST reload request failed before a successful HTTP response was observed."
                 return 1
             fi
             if [[ ! "${http_code}" =~ ^[0-9]{3}$ ]]; then
-                log "ERROR: Splunk REST reload returned an invalid HTTP status; refusing to report success."
+                error_log "ERROR: Splunk REST reload returned an invalid HTTP status; refusing to report success."
                 return 1
             fi
             case "${http_code}" in
                 2??) ;;
                 *)
-                    log "ERROR: Splunk REST reload returned HTTP ${http_code}; refusing to report success."
+                    error_log "ERROR: Splunk REST reload returned HTTP ${http_code}; refusing to report success."
                     return 1
                     ;;
             esac
             ;;
         *)
-            log "ERROR: Unknown reload hint '${hint}'. Use deploy-server, workload, or /services/... endpoint."
+            error_log "ERROR: Unknown reload hint '${hint}'. Use deploy-server, workload, or /services/... endpoint."
             return 1
             ;;
     esac

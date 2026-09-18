@@ -4022,7 +4022,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
-            self.assertIn("could not read back the selected ACS stack", result.stderr.lower())
+            self.assertIn("could not read back the selected acs stack", result.stderr.lower())
             self.assertNotIn("apps uninstall example_app", acs_log.read_text(encoding="utf-8"))
             self.assertFalse(curl_log.exists(), "failed ACS identity readback must not fall back to REST")
 

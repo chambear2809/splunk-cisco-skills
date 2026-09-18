@@ -479,6 +479,41 @@ _CHILD_ENV_BLOCKED_PREFIXES = (
     "GIT_CONFIG_VALUE_",
 )
 
+# Hosted runners commonly place the active Python toolchain under a root-owned
+# operating-system path such as ``/opt/hostedtoolcache``.  Those aliases are
+# trusted route roots even when the image marks the root itself group/world
+# writable.  This is deliberately a small, absolute allowlist: arbitrary
+# writable directories (including /tmp and repository paths) remain rejected.
+_TRUSTED_INTERPRETER_OS_ROOTS = tuple(
+    Path(path)
+    for path in (
+        "/bin",
+        "/lib",
+        "/lib64",
+        "/opt",
+        "/sbin",
+        "/usr",
+        "/System",
+        "/Library",
+    )
+)
+
+
+def _is_trusted_interpreter_os_component(
+    path: Path, metadata: os.stat_result
+) -> bool:
+    """Allow only root-owned components below known OS/toolchain roots."""
+    if os.name != "posix" or metadata.st_uid != 0:
+        return False
+    try:
+        absolute = path.absolute()
+        return any(
+            absolute == root or root in absolute.parents
+            for root in _TRUSTED_INTERPRETER_OS_ROOTS
+        )
+    except (OSError, RuntimeError):
+        return False
+
 
 def _child_environment() -> dict[str, str]:
     """Return a deployment-capable environment without loader injection hooks."""
@@ -617,9 +652,16 @@ def _interpreter_binding(candidate: Path) -> tuple[Path, Path, str]:
                     f"Could not inspect interpreter ancestry {parent}: {exc}"
                 ) from exc
             trusted_owner = parent_metadata.st_uid in {0, os.geteuid()}
+            trusted_os_component = _is_trusted_interpreter_os_component(
+                parent, parent_metadata
+            )
             sticky_shared = bool(parent_mode & stat.S_ISVTX) and trusted_owner
             untrusted_owner_write = bool(parent_mode & stat.S_IWUSR) and not trusted_owner
-            untrusted_world_write = bool(parent_mode & stat.S_IWOTH) and not sticky_shared
+            untrusted_world_write = (
+                bool(parent_mode & stat.S_IWOTH)
+                and not sticky_shared
+                and not trusted_os_component
+            )
             untrusted_group_write = bool(parent_mode & stat.S_IWGRP) and not trusted_owner
             if untrusted_owner_write or untrusted_world_write or untrusted_group_write:
                 raise SkillMCPError(
@@ -842,9 +884,16 @@ def _snapshot_interpreter_route_components(
         if validate_permissions and os.name == "posix":
             mode = stat.S_IMODE(metadata.st_mode)
             trusted_owner = metadata.st_uid in {0, os.geteuid()}
+            trusted_os_component = _is_trusted_interpreter_os_component(
+                current, metadata
+            )
             sticky_shared = bool(mode & stat.S_ISVTX) and trusted_owner
             untrusted_owner_write = bool(mode & stat.S_IWUSR) and not trusted_owner
-            untrusted_world_write = bool(mode & stat.S_IWOTH) and not sticky_shared
+            untrusted_world_write = (
+                bool(mode & stat.S_IWOTH)
+                and not sticky_shared
+                and not trusted_os_component
+            )
             untrusted_group_write = bool(mode & stat.S_IWGRP) and not trusted_owner
             if (
                 untrusted_owner_write

@@ -265,16 +265,33 @@ else
 fi
 
 log "Checking if app '${APP_NAME}' exists..."
-check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+bundle_target=false
+bundle_check_status=0
+if deployment_should_use_bundle_for_current_target; then
+    bundle_target=true
+else
+    bundle_check_status=$?
+    if (( bundle_check_status == 2 )) \
+        || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        log "ERROR: Could not resolve the configured deployment target; refusing REST fallback."
+        exit 1
+    fi
+fi
 
-if [[ "${check_response}" -ne 200 ]]; then
-    log "ERROR: App '${APP_NAME}' not found (HTTP ${check_response})"
-    exit 1
+# Bundle-managed removals are authorized by the deployer/manager bundle
+# evidence.  The current target may intentionally not expose the app over
+# REST, so do not use a failed REST probe as a precondition for the bundle
+# path.  Standalone REST removals retain the strict exact-entry observation.
+if [[ "${bundle_target}" != "true" ]]; then
+    check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+    if [[ "${check_response}" -ne 200 ]]; then
+        log "ERROR: App '${APP_NAME}' not found (HTTP ${check_response})"
+        exit 1
+    fi
 fi
 
 log "Removing app '${APP_NAME}'..."
-bundle_check_status=0
-if deployment_should_use_bundle_for_current_target; then
+if [[ "${bundle_target}" == "true" ]]; then
     bundle_kind=""
     if ! bundle_kind="$(deployment_bundle_kind_for_current_target)"; then
         log "ERROR: Could not resolve the configured deployment target; refusing removal."
@@ -316,12 +333,6 @@ if deployment_should_use_bundle_for_current_target; then
     DELETE_BODY=""
     DELETE_INCOMPLETE_BUT_ABSENT=false
 else
-    bundle_check_status=$?
-    if (( bundle_check_status == 2 )) \
-        || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
-        log "ERROR: Could not resolve the configured deployment target; refusing REST fallback."
-        exit 1
-    fi
     delete_app_via_rest "${SK}" "${SPLUNK_URI}" "${APP_NAME}"
 fi
 http_code="${DELETE_HTTP_CODE:-000}"

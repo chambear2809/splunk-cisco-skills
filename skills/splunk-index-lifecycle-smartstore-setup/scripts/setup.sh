@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
+error_log() {
+    log "$@" >&2
+}
+
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-smartstore-rendered"
 
@@ -296,21 +300,21 @@ PY
 bind_status_to_render_metadata() {
     local identity="" rendered_platform="" rendered_deployment="" rendered_operation=""
     if ! identity="$(read_render_metadata_identity)"; then
-        log "ERROR: Could not bind status execution to valid rendered metadata."
+        error_log "ERROR: Could not bind status execution to valid rendered metadata."
         exit 1
     fi
     IFS=$'\t' read -r rendered_platform rendered_deployment rendered_operation <<<"${identity}"
 
     if [[ "${PLATFORM_SET}" == "true" && "${PLATFORM}" != "${rendered_platform}" ]]; then
-        log "ERROR: Requested status platform does not match the rendered metadata."
+        error_log "ERROR: Requested status platform does not match the rendered metadata."
         exit 1
     fi
     if [[ "${DEPLOYMENT_SET}" == "true" && "${DEPLOYMENT}" != "${rendered_deployment}" ]]; then
-        log "ERROR: Requested status deployment does not match the rendered metadata."
+        error_log "ERROR: Requested status deployment does not match the rendered metadata."
         exit 1
     fi
     if [[ "${OPERATION_SET}" == "true" && "${OPERATION}" != "${rendered_operation}" ]]; then
-        log "ERROR: Requested status operation does not match the rendered metadata."
+        error_log "ERROR: Requested status operation does not match the rendered metadata."
         exit 1
     fi
 
@@ -343,7 +347,7 @@ validate_args() {
     fi
     validate_choice "${PHASE}" inventory plan render preflight apply status all
     if [[ "${PHASE}" == "status" && ${#STATUS_RENDER_OVERRIDE_OPTIONS[@]} -gt 0 ]]; then
-        log "ERROR: --phase status uses the target and expectations bound into rendered metadata; render-affecting overrides are refused."
+        error_log "ERROR: --phase status uses the target and expectations bound into rendered metadata; render-affecting overrides are refused."
         exit 1
     fi
     if [[ -n "${OUTPUT_DIR}" ]]; then
