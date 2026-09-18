@@ -67,28 +67,28 @@
     },
     {
       "path": "skills/splunk-cloud-acs-admin-setup/scripts/setup.sh",
-      "line": 35,
+      "line": 37,
       "rule_id": "generic-api-key",
       "line_sha256": "f5432b13fbfd211b4a52263162609729915e9db6ad5994a17610796628ce683b",
       "category": "literal-guardrail-or-renderer-syntax"
     },
     {
       "path": "skills/splunk-cloud-acs-admin-setup/scripts/setup.sh",
-      "line": 39,
+      "line": 41,
       "rule_id": "generic-api-key",
       "line_sha256": "cbd26928b3a80b702c54e512dfa81fe24a1ead507f0369867f6949ac5ddc75e7",
       "category": "literal-guardrail-or-renderer-syntax"
     },
     {
       "path": "skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh",
-      "line": 33,
+      "line": 35,
       "rule_id": "generic-api-key",
       "line_sha256": "f5432b13fbfd211b4a52263162609729915e9db6ad5994a17610796628ce683b",
       "category": "literal-guardrail-or-renderer-syntax"
     },
     {
       "path": "skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh",
-      "line": 37,
+      "line": 39,
       "rule_id": "generic-api-key",
       "line_sha256": "cbd26928b3a80b702c54e512dfa81fe24a1ead507f0369867f6949ac5ddc75e7",
       "category": "literal-guardrail-or-renderer-syntax"
@@ -179,14 +179,14 @@
     },
     {
       "path": "tests/test_agent_mcp_core.py",
-      "line": 1156,
+      "line": 2185,
       "rule_id": "generic-api-key",
       "line_sha256": "2812cd63dd6b4f606e7d1aff0041cb5b678bc5bace31808d477d7074bfbce3ca",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_agent_mcp_core.py",
-      "line": 1174,
+      "line": 2203,
       "rule_id": "jwt",
       "line_sha256": "f79cfdfabf8d44eb5209b8c810a2097e3a281b51bba4ae7373d6ca5c3e920546",
       "category": "synthetic-security-test"
@@ -207,7 +207,7 @@
     },
     {
       "path": "tests/test_live_validation_runner.py",
-      "line": 606,
+      "line": 654,
       "rule_id": "generic-api-key",
       "line_sha256": "3ceb3e6cc5b81ac85e71a3d5c34797a85392444930304824c0ae1131e32caf23",
       "category": "synthetic-security-test"
