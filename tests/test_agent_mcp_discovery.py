@@ -45,6 +45,10 @@ def _write_fake_repository(
     (skills_root / "shared" / "skill_product_registry.json").write_text(
         json.dumps(registry), encoding="utf-8"
     )
+    (skills_root / "shared" / "ta_completion_gate.md").write_text(
+        "# Synthetic completion gate\n\nUse this only for bounded discovery tests.\n",
+        encoding="utf-8",
+    )
     for name in skills:
         skill_root = skills_root / name
         (skill_root / "scripts").mkdir(parents=True)
@@ -108,6 +112,11 @@ class DiscoveryRepositoryTests(unittest.TestCase):
         cloud = discovery.search_skills(product="Splunk Cloud Platform", limit=100)
         cisco = discovery.search_skills(capability="cisco-integrations", limit=100)
         exact = discovery.search_skills(query="cisco-product-setup", limit=10)
+        appdynamics = discovery.search_skills(
+            query="observability for ai",
+            limit=100,
+        )
+        appdynamics_manifest = discovery.get_skill_manifest("cisco-appdynamics-setup")
 
         self.assertGreater(cloud["total"], 0)
         self.assertTrue(
@@ -124,6 +133,23 @@ class DiscoveryRepositoryTests(unittest.TestCase):
             )
         )
         self.assertEqual(exact["skills"][0]["skill"], "cisco-product-setup")
+        appdynamics_result = next(
+            item
+            for item in appdynamics["skills"]
+            if item["skill"] == "splunk-appdynamics-setup"
+        )
+        self.assertNotIn(
+            "observability for ai",
+            appdynamics_result["description"].lower(),
+        )
+        self.assertLessEqual(
+            len(appdynamics_result["description"]),
+            discovery.MAX_DESCRIPTION_CHARS,
+        )
+        self.assertIn(
+            "skills/shared/ta_completion_gate.md",
+            appdynamics_manifest["required_documents"],
+        )
 
     def test_removed_deprecated_alias_does_not_resolve(self) -> None:
         generic = discovery.search_skills(query="kvstore", limit=10)
@@ -231,6 +257,118 @@ class DiscoverySecurityTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         _write_fake_repository(self.root, ("alpha-skill", "beta-skill"))
         self.service = discovery.SkillDiscovery(self.root)
+
+    def test_shared_guidance_is_allowlisted_and_descriptor_bounded(self) -> None:
+        listing = self.service.list_shared_documents(limit=10)
+        self.assertEqual(listing["total"], 1)
+        self.assertEqual(listing["documents"][0]["path"], "ta_completion_gate.md")
+        page = self.service.read_shared_document(
+            "skills/shared/ta_completion_gate.md",
+            max_bytes=32,
+        )
+        self.assertLessEqual(len(page["text"].encode("utf-8")), 32)
+        self.assertEqual(page["uri"], discovery.SHARED_GUIDANCE_URI)
+        self.assertFalse(page["eof"])
+        continuation = self.service.read_shared_document(
+            "ta_completion_gate.md",
+            offset=page["next_offset"],
+            max_bytes=32,
+        )
+        self.assertEqual(continuation["offset"], page["next_offset"])
+        self.assertEqual(continuation["revision"], page["revision"])
+        for path in (
+            "shared/scripts/setup.sh",
+            "skills/shared/credentials",
+            "../shared/ta_completion_gate.md",
+        ):
+            with self.subTest(path=path), self.assertRaises(
+                (discovery.InvalidDiscoveryRequest, discovery.UnsafeDiscoveryPath)
+            ):
+                self.service.read_shared_document(path)
+
+        with self.assertRaises(discovery.InvalidDiscoveryRequest):
+            self.service.list_shared_documents(limit=0)
+        with self.assertRaises(discovery.InvalidCursor):
+            self.service.list_shared_documents(limit=1, cursor="not-a-cursor")
+
+    def test_shared_guidance_rejects_symlink_binary_and_oversized_files(self) -> None:
+        target = self.root / "skills" / "shared" / "ta_completion_gate.md"
+        original = target.read_bytes()
+        outside = self.root / "outside-shared.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+
+        target.unlink()
+        target.symlink_to(outside)
+        self.assertEqual(self.service.list_shared_documents()["total"], 0)
+        with self.assertRaises(discovery.DiscoveryNotFound):
+            self.service.read_shared_document("ta_completion_gate.md")
+
+        target.unlink()
+        target.write_bytes(b"invalid-utf8-\xff")
+        self.assertEqual(self.service.list_shared_documents()["total"], 0)
+        with self.assertRaises(discovery.DiscoveryNotFound):
+            self.service.read_shared_document("ta_completion_gate.md")
+
+        target.write_bytes(original)
+        with target.open("r+b") as handle:
+            handle.truncate(discovery.MAX_TEXT_FILE_BYTES + 1)
+        with self.assertRaises(discovery.DiscoveryLimitExceeded):
+            self.service.list_shared_documents()
+
+    def test_shared_read_rejects_replacement_between_inventory_and_open(self) -> None:
+        target = self.root / "skills" / "shared" / "ta_completion_gate.md"
+        original_open = self.service._open_text_file
+        calls = 0
+
+        def replace_before_second_open(*args: object, **kwargs: object) -> object:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                target.write_text("# Replacement\n", encoding="utf-8")
+            return original_open(*args, **kwargs)
+
+        with mock.patch.object(
+            self.service,
+            "_open_text_file",
+            side_effect=replace_before_second_open,
+        ):
+            with self.assertRaises(discovery.UnsafeDiscoveryPath):
+                self.service.read_shared_document("ta_completion_gate.md")
+
+    def test_search_matches_terms_beyond_public_description_bound(self) -> None:
+        skill_md = self.root / "skills" / "alpha-skill" / "SKILL.md"
+        long_description = (
+            " ".join(["bounded"] * 120) + " AppDynamics analytics connections"
+        )
+        skill_md.write_text(
+            "---\n"
+            "name: alpha-skill\n"
+            f"description: {long_description}\n"
+            "---\n\n"
+            "# Instructions\n",
+            encoding="utf-8",
+        )
+        result = self.service.search_skills(query="analytics connections", limit=10)
+        self.assertEqual(result["skills"][0]["skill"], "alpha-skill")
+        self.assertLessEqual(len(result["skills"][0]["description"]), 500)
+
+    def test_manifest_rejects_nonallowlisted_required_document(self) -> None:
+        skill_md = self.root / "skills" / "alpha-skill" / "SKILL.md"
+        skill_md.write_text(
+            "---\n"
+            "name: alpha-skill\n"
+            "description: Synthetic skill with unsafe shared metadata.\n"
+            "required_documents:\n"
+            "  - skills/shared/scripts/setup.sh\n"
+            "---\n\n"
+            "# Instructions\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            discovery.DiscoveryCatalogError,
+            "non-allowlisted shared document",
+        ):
+            self.service.get_skill_manifest("alpha-skill")
 
     def test_catalog_json_duplicate_keys_are_rejected(self) -> None:
         with self.assertRaisesRegex(

@@ -6,6 +6,6 @@ PyYAML==6.0.3
 cryptography==50.0.1
 idna==3.19
 pydantic-settings==2.15.0
-PyJWT[crypto]==2.13.0
+PyJWT[crypto]==2.14.0
 python-multipart==0.0.32
 starlette==1.6.0

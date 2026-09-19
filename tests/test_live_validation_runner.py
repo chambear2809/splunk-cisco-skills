@@ -93,6 +93,54 @@ class LiveValidationRunnerTests(unittest.TestCase):
         self.assertNotEqual(missing.returncode, 0)
         self.assertIn("does not exist", missing.stderr)
 
+    def test_profile_metadata_rejects_invalid_platform_settings_without_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credential_file = Path(tmpdir) / "credentials"
+            credential_file.write_text(
+                "\n".join(
+                    (
+                        "PROFILE_invalid__SPLUNK_PLATFORM=cloud",
+                        "PROFILE_invalid__SPLUNK_URI=https://splunk.example.test:8089",
+                        "PROFILE_invalid__SPLUNK_CLOUD_STACK=synthetic-stack",
+                        "PROFILE_invalid__SPLUNK_CLOUD_SEARCH_HEAD=not-a-search-head",
+                        "PROFILE_invalid__SPLUNK_VERIFY_SSL=true",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            credential_file.chmod(0o600)
+            env = os.environ.copy()
+            for variable in (
+                "ACS_SERVER",
+                "SPLUNK_CLOUD_SEARCH_HEAD",
+                "SPLUNK_CLOUD_STACK",
+                "SPLUNK_HOST",
+                "SPLUNK_PLATFORM",
+                "SPLUNK_SEARCH_API_URI",
+                "SPLUNK_URI",
+            ):
+                env.pop(variable, None)
+            env.update(
+                {
+                    "SPLUNK_CREDENTIALS_FILE": str(credential_file),
+                    "SPLUNK_PROFILE": "invalid",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-c", runner.SPLUNK_PROFILE_METADATA_SCRIPT, "profile-probe", "false"],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(completed.stdout, "")
+        self.assertIn("Could not resolve the selected Splunk platform settings", completed.stderr)
+        self.assertNotIn("not-a-search-head", completed.stderr)
+
     def test_flat_credentials_require_the_explicit_compatibility_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             credential_file = Path(tmpdir) / "credentials"

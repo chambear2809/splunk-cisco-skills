@@ -656,7 +656,10 @@ apply_shc_bundle() {
         return 2
     fi
     local deployer_profile
-    deployer_profile="$(resolve_deployer_credential_profile 2>/dev/null || true)"
+    if ! deployer_profile="$(resolve_deployer_credential_profile)"; then
+        log "  FAIL: Could not resolve SPLUNK_DEPLOYER_PROFILE; refusing bundle apply."
+        return 1
+    fi
     if [[ -z "${deployer_profile}" ]]; then
         log "  FAIL: SPLUNK_DEPLOYER_PROFILE is not configured in the credentials file."
         log "        Manual command (not executed):"
@@ -727,12 +730,16 @@ except Exception:
 
 validate_cluster_bundle_on_cm() {
     local cm_profile
-    cm_profile="$(resolve_cluster_manager_credential_profile 2>/dev/null || true)"
+    if ! cm_profile="$(resolve_cluster_manager_credential_profile)"; then
+        log "  FAIL: Could not resolve SPLUNK_CLUSTER_MANAGER_PROFILE; refusing cluster-bundle validation."
+        return 1
+    fi
     [[ -n "${cm_profile}" ]] || return 0
     log "  Running 'splunk validate cluster-bundle' via cluster-manager profile '${cm_profile}'..."
     local execution_mode script splunk_home
-    execution_mode="$(deployment_run_with_profile "${cm_profile}" deployment_execution_mode_for_profile "")"
-    splunk_home="$(deployment_run_with_profile "${cm_profile}" printf '%s' "${SPLUNK_HOME:-/opt/splunk}")"
+    execution_mode="$(deployment_run_with_profile "${cm_profile}" deployment_execution_mode_for_profile "")" || return 1
+    splunk_home="$(deployment_profile_value "${cm_profile}" "SPLUNK_HOME")" || return 1
+    splunk_home="${splunk_home:-/opt/splunk}"
     script="$(cat <<EOF
 set -euo pipefail
 $(printf '%q' "${splunk_home}/bin/splunk") validate cluster-bundle
@@ -769,7 +776,10 @@ deploy_ta_for_indexers() {
     log ""
     log "--- Deploy Splunk_TA_ForIndexers ---"
     local cm_profile
-    cm_profile="$(resolve_cluster_manager_credential_profile 2>/dev/null || true)"
+    if ! cm_profile="$(resolve_cluster_manager_credential_profile)"; then
+        log "  FAIL: Could not resolve SPLUNK_CLUSTER_MANAGER_PROFILE; refusing cluster-bundle deployment."
+        return 1
+    fi
     if [[ -z "${cm_profile}" ]]; then
         log "  FAIL: SPLUNK_CLUSTER_MANAGER_PROFILE is not configured in the credentials file."
         log "        Manual handoff (not executed):"
@@ -782,7 +792,15 @@ deploy_ta_for_indexers() {
     # Otherwise the operator thinks they are targeting CM_URI while the SSH
     # profile actually runs the command on a different cluster manager.
     local profile_host cm_uri_host
-    profile_host="$(deployment_run_with_profile "${cm_profile}" printf '%s' "${SPLUNK_SSH_HOST:-${SPLUNK_HOST:-}}" 2>/dev/null || printf '')"
+    if ! profile_host="$(deployment_profile_value "${cm_profile}" "SPLUNK_SSH_HOST")"; then
+        log "  FAIL: Could not resolve the cluster-manager profile host; refusing deployment."
+        return 1
+    fi
+    if [[ -z "${profile_host}" ]] \
+        && ! profile_host="$(deployment_profile_value "${cm_profile}" "SPLUNK_HOST")"; then
+        log "  FAIL: Could not resolve the cluster-manager profile host; refusing deployment."
+        return 1
+    fi
     cm_uri_host="$(extract_uri_host "${DEPLOY_TA_CM_URI}")"
     if [[ -n "${profile_host}" && -n "${cm_uri_host}" && "${profile_host}" != "${cm_uri_host}" ]]; then
         log "  ERROR: --deploy-ta-for-indexers CM_URI host '${cm_uri_host}' does not match"
@@ -811,7 +829,10 @@ backup_kvstore() {
     log ""
     log "--- KV Store Backup ---"
     local profile
-    profile="$(resolve_deployer_credential_profile 2>/dev/null || true)"
+    if ! profile="$(resolve_deployer_credential_profile)"; then
+        log "  FAIL: Could not resolve SPLUNK_DEPLOYER_PROFILE; refusing KV Store backup."
+        return 1
+    fi
     if [[ -z "${profile}" ]]; then
         log "  FAIL: SPLUNK_DEPLOYER_PROFILE is not configured; --backup-kvstore was not executed."
         log "        Manual command (not executed):"
@@ -822,8 +843,9 @@ backup_kvstore() {
     archive_name="es_kvstore_$(date +%Y%m%d_%H%M%S)"
     log "  Running 'splunk backup kvstore -archiveName ${archive_name}' via profile '${profile}'"
     local execution_mode splunk_home script
-    execution_mode="$(deployment_run_with_profile "${profile}" deployment_execution_mode_for_profile "")"
-    splunk_home="$(deployment_run_with_profile "${profile}" printf '%s' "${SPLUNK_HOME:-/opt/splunk}")"
+    execution_mode="$(deployment_run_with_profile "${profile}" deployment_execution_mode_for_profile "")" || return 1
+    splunk_home="$(deployment_profile_value "${profile}" "SPLUNK_HOME")" || return 1
+    splunk_home="${splunk_home:-/opt/splunk}"
     script="$(cat <<EOF
 set -euo pipefail
 $(printf '%q' "${splunk_home}/bin/splunk") backup kvstore -archiveName $(printf '%q' "${archive_name}")

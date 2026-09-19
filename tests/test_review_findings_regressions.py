@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACS_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-admin-setup/scripts/render_assets.py"
+ACS_ALLOWLIST_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-allowlist-setup/scripts/render_assets.py"
 IDXC_SETUP = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/setup.sh"
 IDXC_RENDERER = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/render_assets.py"
 SOAR_SETUP = REPO_ROOT / "skills/splunk-soar-setup/scripts/setup.sh"
@@ -22,19 +23,196 @@ def load_module(path: Path):
     return module
 
 
-def test_acs_fedramp_preflight_parser_reads_stdin_once() -> None:
+def test_acs_fedramp_preflight_parser_fails_closed_on_invalid_status() -> None:
     renderer = load_module(ACS_RENDERER)
     script = renderer.render_preflight(
         {
             "cloud_provider": "aws",
+            "acs_server": "https://admin.splunk.com",
+            "target_stack": "stack-rendered",
             "target_search_head": "",
             "allow_acs_lockout": False,
         }
     )
 
-    assert "raw = sys.stdin.read()" in script
-    assert "json.loads(raw) if raw.strip()" in script
-    assert "json.load(sys.stdin) if sys.stdin.read()" not in script
+    assert "read_acs_status_payload" in script
+    assert "parse_acs_status_metadata" in script
+    assert "if not text.strip()" in script
+    assert "raise SystemExit(1)" in script
+    assert "invalid or incomplete stack status" in script
+    assert "|| printf '%s' '{}'" not in script
+
+
+def test_acs_rendered_status_and_allowlist_observations_do_not_fall_back_to_empty() -> None:
+    plans = (
+        (
+            load_module(ACS_RENDERER),
+            {
+                "cloud_provider": "aws",
+                "acs_server": "https://admin.splunk.com",
+                "target_stack": "stack-rendered",
+                "target_search_head": "",
+                "allow_acs_lockout": False,
+                "strict_drift": True,
+                "modules": ["allowlists"],
+                "features": {"search-api": {"ipv4": ["198.51.100.0/24"], "ipv6": []}},
+            },
+        ),
+        (
+            load_module(ACS_ALLOWLIST_RENDERER),
+            {
+                "cloud_provider": "aws",
+                "acs_server": "https://admin.splunk.com",
+                "target_stack": "stack-rendered",
+                "target_search_head": "",
+                "allow_acs_lockout": False,
+                "strict_drift": True,
+                "features": {"search-api": {"ipv4": ["198.51.100.0/24"], "ipv6": []}},
+            },
+        ),
+    )
+
+    for renderer, plan in plans:
+        scripts = (
+            renderer.render_preflight(plan),
+            renderer.render_apply(plan, ipv6=False),
+            renderer.render_audit(plan),
+        )
+        for script in scripts:
+            assert "read_acs_allowlist_payload" in script
+            assert "parse_acs_allowlist_subnets" in script
+            assert "except Exception:\n    print('')" not in script
+        wait_script = renderer.render_wait_for_ready(plan)
+        assert "acs_stack_status_snapshot" in wait_script
+        assert "readiness was not verified" in wait_script
+        assert "|| printf '%s' '{}'" not in wait_script
+        assert '[[ "${restart_required}" == "true" ]]' in wait_script
+
+
+def test_acs_admin_apply_requires_verified_absence_and_restart_observation() -> None:
+    renderer = load_module(ACS_RENDERER)
+    empty_lists = {
+        "users": [],
+        "app_permissions": [],
+        "outbound_ports": [],
+        "ddss_self_storage_locations": [],
+        "limits": [],
+        "private_connectivity": [],
+    }
+    plan = {
+        "acs_server": "https://admin.splunk.com",
+        "target_stack": "stack-rendered",
+        "target_search_head": None,
+        "operations": {
+            **empty_lists,
+            "indexes": [
+                {
+                    "name": "synthetic_index",
+                    "datatype": "event",
+                    "searchableDays": 90,
+                    "maxDataSizeMB": 0,
+                }
+            ],
+            "hec_tokens": [
+                {
+                    "name": "synthetic_hec",
+                    "defaultIndex": "synthetic_index",
+                    "allowedIndexes": ["synthetic_index"],
+                    "disabled": False,
+                    "useAck": False,
+                }
+            ],
+            "roles": [{"name": "synthetic_role", "capabilities": ["search"]}],
+            "maintenance_windows": {},
+            "restarts": {"restartIfRequired": True, "forceRestart": False},
+        }
+    }
+
+    script = renderer.render_apply_admin_plan(plan)
+
+    assert "observe_acs_admin_resource indexes index synthetic_index" in script
+    assert "observe_acs_admin_resource hec-token hec-token synthetic_hec" in script
+    assert "observe_acs_admin_resource roles role synthetic_role" in script
+    assert "absence was not verified" in script
+    assert "if acs_command indexes describe" not in script
+    assert "if acs_command hec-token describe" not in script
+    assert "if acs_command roles describe" not in script
+    assert 'if ! restart_required="$(acs_restart_required 2>/dev/null)"' in script
+    assert "|| echo false" not in script
+    assert "apply cannot be reported complete" in script
+
+
+def test_acs_admin_inventory_marks_failed_captures_incomplete() -> None:
+    renderer = load_module(ACS_RENDERER)
+    script = renderer.render_inventory(
+        {
+            "acs_server": "https://admin.splunk.com",
+            "target_stack": "stack-rendered",
+            "target_search_head": None,
+            "modules": ["indexes", "private-connectivity"],
+        }
+    )
+
+    assert "inventory_incomplete=true" in script
+    assert "empty or oversized response" in script
+    assert "INCOMPLETE: ACS inventory contains unavailable or skipped observations" in script
+    assert script.index('if [[ "${inventory_incomplete}" == "true" ]]') < script.index(
+        'log "OK: ACS inventory snapshot saved'
+    )
+
+
+def test_acs_rendered_live_scripts_bind_target_search_head_before_context_prepare() -> None:
+    admin_renderer = load_module(ACS_RENDERER)
+    allowlist_renderer = load_module(ACS_ALLOWLIST_RENDERER)
+    base_plan = {
+        "cloud_provider": "aws",
+        "acs_server": "https://admin.splunk.com",
+        "target_stack": "stack-rendered",
+        "target_search_head": "sh-i-rendered",
+        "allow_acs_lockout": False,
+        "strict_drift": True,
+        "features": {"search-api": {"ipv4": ["198.51.100.0/24"], "ipv6": []}},
+    }
+    admin_plan = {
+        **base_plan,
+        "modules": ["allowlists", "indexes", "restarts", "private-connectivity"],
+        "operations": {
+            "indexes": [],
+            "hec_tokens": [],
+            "users": [],
+            "roles": [],
+            "app_permissions": [],
+            "outbound_ports": [],
+            "ddss_self_storage_locations": [],
+            "limits": [],
+            "maintenance_windows": {},
+            "private_connectivity": [],
+            "restarts": {"restartIfRequired": True, "forceRestart": False},
+        },
+    }
+
+    scripts = (
+        admin_renderer.render_preflight(admin_plan),
+        admin_renderer.render_apply(admin_plan, ipv6=False),
+        admin_renderer.render_wait_for_ready(admin_plan),
+        admin_renderer.render_audit(admin_plan),
+        admin_renderer.render_inventory(admin_plan),
+        admin_renderer.render_apply_admin_plan(admin_plan),
+        admin_renderer.render_private_connectivity_rest(admin_plan),
+        allowlist_renderer.render_preflight(base_plan),
+        allowlist_renderer.render_apply(base_plan, ipv6=False),
+        allowlist_renderer.render_wait_for_ready(base_plan),
+        allowlist_renderer.render_audit(base_plan),
+    )
+    prepare = "if ! acs_prepare_context; then"
+    for script in scripts:
+        assert "TARGET_STACK=stack-rendered" in script
+        assert "TARGET_SH=sh-i-rendered" in script
+        assert "ACS_BOUND_SERVER=https://admin.splunk.com" in script
+        assert 'export ACS_BOUND_SPLUNK_CLOUD_STACK="${TARGET_STACK}"' in script
+        assert 'export ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD="${TARGET_SH}"' in script
+        assert script.index("ACS_BOUND_SPLUNK_CLOUD_STACK") < script.index(prepare)
+        assert "acs_command config use-stack" not in script
 
 
 def test_acs_admin_renderer_covers_broader_control_plane(tmp_path: Path) -> None:
@@ -64,6 +242,8 @@ def test_acs_admin_renderer_covers_broader_control_plane(tmp_path: Path) -> None
             str(ACS_RENDERER),
             "--output-dir",
             str(tmp_path / "out"),
+            "--target-stack",
+            "stack-rendered",
             "--admin-plan-file",
             str(plan_file),
             "--features",
@@ -111,6 +291,8 @@ def test_acs_admin_renderer_scopes_preflight_and_operations_to_modules(tmp_path:
             str(ACS_RENDERER),
             "--output-dir",
             str(tmp_path / "out"),
+            "--target-stack",
+            "stack-rendered",
             "--modules",
             "allowlists",
             "--admin-plan-file",
@@ -131,6 +313,8 @@ def test_acs_admin_renderer_scopes_preflight_and_operations_to_modules(tmp_path:
             str(ACS_RENDERER),
             "--output-dir",
             str(tmp_path / "scoped"),
+            "--target-stack",
+            "stack-rendered",
             "--modules",
             "limits,license,observability",
             "--admin-plan-file",
@@ -152,6 +336,8 @@ def test_acs_admin_renderer_scopes_preflight_and_operations_to_modules(tmp_path:
             str(ACS_RENDERER),
             "--output-dir",
             str(tmp_path / "scoped"),
+            "--target-stack",
+            "stack-rendered",
             "--modules",
             "limits,license,observability",
             "--admin-plan-file",
@@ -188,6 +374,8 @@ def test_acs_admin_renderer_rejects_direct_hec_token_secret(tmp_path: Path) -> N
             str(ACS_RENDERER),
             "--output-dir",
             str(tmp_path / "out"),
+            "--target-stack",
+            "stack-rendered",
             "--admin-plan-file",
             str(plan_file),
         ],

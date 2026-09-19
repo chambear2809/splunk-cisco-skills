@@ -63,10 +63,18 @@ restart_splunk_or_exit() {
 
 app_lookup_http_code() {
     local sk="$1" uri="$2" app="$3"
-    local encoded_app
-    encoded_app=$(_urlencode "${app}") || { printf '%s' "000"; return 0; }
-    splunk_curl "${sk}" --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" \
-        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null || echo "000"
+    local observe_status=0
+    if rest_observe_app "${sk}" "${uri}" "${app}"; then
+        printf '%s' "200"
+        return 0
+    else
+        observe_status=$?
+    fi
+    if (( observe_status == 1 )); then
+        printf '%s' "404"
+    else
+        printf '%s' "000"
+    fi
 }
 
 DELETE_HTTP_CODE=""
@@ -86,7 +94,8 @@ delete_app_via_rest() {
     delete_response=""
     delete_rc=0
     set +e
-    delete_response=$(splunk_curl "${sk}" --connect-timeout 10 --max-time 60 -w "\n%{http_code}" \
+    delete_response=$(splunk_curl "${sk}" --connect-timeout 10 --max-time 60 \
+        --max-filesize 1048576 -w "\n%{http_code}" \
         -X DELETE "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null)
     delete_rc=$?
     set -e
@@ -119,7 +128,12 @@ validate_app_name() {
 echo "=== Splunk App Uninstaller ==="
 echo ""
 
-if is_splunk_cloud; then
+if ! platform="$(resolve_splunk_platform)"; then
+    log "ERROR: Could not resolve the selected Splunk platform; refusing uninstall routing."
+    exit 1
+fi
+
+if [[ "${platform}" == "cloud" ]]; then
     acs_prepare_context || exit 1
 
     if [[ -z "${APP_NAME}" ]]; then
@@ -251,17 +265,38 @@ else
 fi
 
 log "Checking if app '${APP_NAME}' exists..."
-check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+bundle_target=false
+bundle_check_status=0
+if deployment_should_use_bundle_for_current_target; then
+    bundle_target=true
+else
+    bundle_check_status=$?
+    if (( bundle_check_status == 2 )) \
+        || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        log "ERROR: Could not resolve the configured deployment target; refusing REST fallback."
+        exit 1
+    fi
+fi
 
-if [[ "${check_response}" -ne 200 ]]; then
-    log "ERROR: App '${APP_NAME}' not found (HTTP ${check_response})"
-    exit 1
+# Bundle-managed removals are authorized by the deployer/manager bundle
+# evidence.  The current target may intentionally not expose the app over
+# REST, so do not use a failed REST probe as a precondition for the bundle
+# path.  Standalone REST removals retain the strict exact-entry observation.
+if [[ "${bundle_target}" != "true" ]]; then
+    check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+    if [[ "${check_response}" -ne 200 ]]; then
+        log "ERROR: App '${APP_NAME}' not found (HTTP ${check_response})"
+        exit 1
+    fi
 fi
 
 log "Removing app '${APP_NAME}'..."
-if deployment_should_use_bundle_for_current_target; then
+if [[ "${bundle_target}" == "true" ]]; then
     bundle_kind=""
-    bundle_kind="$(deployment_bundle_kind_for_current_target)"
+    if ! bundle_kind="$(deployment_bundle_kind_for_current_target)"; then
+        log "ERROR: Could not resolve the configured deployment target; refusing removal."
+        exit 1
+    fi
     case "${bundle_kind}" in
         shc)
             log "Using search-head-cluster deployer bundle removal."
@@ -276,8 +311,15 @@ if deployment_should_use_bundle_for_current_target; then
         exit 1
     fi
 
+    bundle_observation_status=0
     if deployment_bundle_app_exists_for_current_target "${APP_NAME}"; then
         log "ERROR: Bundle-managed app removal could not be verified on the control plane for '${APP_NAME}'."
+        exit 1
+    else
+        bundle_observation_status=$?
+    fi
+    if (( bundle_observation_status != 1 )); then
+        log "ERROR: Could not observe the bundle-managed app path after removal; absence is not verified."
         exit 1
     fi
 

@@ -12,6 +12,17 @@ setup() {
     export SPLUNK_USER="testuser"
     export SPLUNK_PASS="testpass"
     export SPLUNK_VERIFY_SSL="false"
+    unset SPLUNK_PROFILE SPLUNK_SEARCH_PROFILE SPLUNK_INGEST_PROFILE
+    unset SPLUNK_DEPLOYER_PROFILE SPLUNK_CLUSTER_MANAGER_PROFILE
+    unset SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_HOST SPLUNK_MGMT_PORT
+    unset SPLUNK_CLOUD_STACK SPLUNK_CLOUD_SEARCH_HEAD
+    unset ACS_BOUND_TARGET_CONTEXT ACS_BOUND_REQUIRE_CONFIG_MATCH ACS_BOUND_SERVER
+    unset ACS_BOUND_SPLUNK_CLOUD_STACK ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD
+    export _ACS_CONTEXT_PREPARED="false"
+    export _ACS_CONTEXT_TARGET=""
+    export _ACS_CONTEXT_IDENTITY=""
+    export _CREDENTIAL_FILE_WAS_USED=""
+    load_splunk_platform_settings() { :; }
 
     TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
     PROJECT_ROOT="$(cd "${TEST_DIR}/.." && pwd)"
@@ -72,6 +83,163 @@ teardown() {
     [ "$result" = "{}" ]
 }
 
+@test "ACS app inventory rejects empty malformed and schema-incomplete pages" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    acs_command() {
+        printf '%s' "${ACS_APPS_BODY}"
+    }
+    export -f acs_command
+
+    for ACS_APPS_BODY in '' 'not-json' '{}' '{"apps":{}}' '{"apps":["not-an-app-record"]}'; do
+        export ACS_APPS_BODY
+        run acs_apps_list_all_json --splunkbase
+        [ "${status}" -ne 0 ]
+    done
+
+    export ACS_APPS_BODY='{"apps":[]}'
+    run acs_apps_list_all_json --splunkbase
+    [ "${status}" -eq 0 ]
+    [ "${output}" = '{"apps": []}' ]
+}
+
+@test "allowlist describe rejects missing or malformed subnet observations" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    acs_command() {
+        printf '%s' "${ACS_ALLOWLIST_BODY}"
+    }
+    export -f acs_command
+
+    for ACS_ALLOWLIST_BODY in '' 'not-json' '{}' '{"subnets":{}}' '{"subnets":[7]}'; do
+        export ACS_ALLOWLIST_BODY
+        run acs_ipallowlist_describe search-api
+        [ "${status}" -ne 0 ]
+        run acs_ipallowlist_describe_v6 search-api
+        [ "${status}" -ne 0 ]
+    done
+}
+
+@test "allowlist apply refuses mutation when baseline observation is incomplete" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    marker="${BATS_TMPDIR}/allowlist-mutation-${BASHPID}"
+    TEST_TEMP_FILES+=("${marker}")
+    export ACS_ALLOWLIST_MUTATION_MARKER="${marker}"
+    acs_command() {
+        if [[ "$2" == "describe" ]]; then
+            printf '%s' '{}'
+            return 0
+        fi
+        touch "${ACS_ALLOWLIST_MUTATION_MARKER}"
+    }
+    export -f acs_command
+
+    run acs_ipallowlist_apply_plan search-api ipv4 198.51.100.1/32
+
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+}
+
+@test "search API access refuses allowlist creation after an incomplete observation" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    marker="${BATS_TMPDIR}/search-api-allowlist-mutation-${BASHPID}"
+    TEST_TEMP_FILES+=("${marker}")
+    export ACS_ALLOWLIST_MUTATION_MARKER="${marker}"
+    acs_prepare_context() { return 0; }
+    _detect_public_ip() { printf '%s' '198.51.100.10'; }
+    acs_command() {
+        if [[ "$1 $2 $3" == "ip-allowlist list search-api" ]]; then
+            printf '%s' '{}'
+            return 0
+        fi
+        touch "${ACS_ALLOWLIST_MUTATION_MARKER}"
+    }
+    export -f acs_prepare_context _detect_public_ip acs_command
+
+    run acs_ensure_search_api_access
+
+    [ "${status}" -ne 0 ]
+    [ ! -e "${marker}" ]
+}
+
+@test "acs_stack_status_snapshot requires observed infrastructure and restart state" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    acs_prepare_context() { return 0; }
+    acs_command() {
+        printf '%s' '{"infrastructure":{"status":"Ready"},"messages":{"restartRequired":false}}'
+    }
+    export -f acs_prepare_context acs_command
+
+    run acs_stack_status_snapshot
+    [ "$status" -eq 0 ]
+    [ "$output" = $'Ready\tfalse' ]
+}
+
+@test "acs restart status rejects empty malformed and incomplete observations" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    acs_prepare_context() { return 0; }
+    acs_command() {
+        printf '%s' "${ACS_STATUS_BODY}"
+    }
+    export -f acs_prepare_context acs_command
+
+    for ACS_STATUS_BODY in \
+        '' \
+        'not-json' \
+        '{}' \
+        '{"infrastructure":{"status":"Ready"}}' \
+        '{"infrastructure":{"status":"Ready"},"messages":{"restartRequired":"false"}}' \
+        '{"infrastructure":{"status":"Failed"},"messages":{"restartRequired":false}}' \
+        '{"infrastructure":{"status":"Pending"},"messages":{"restartRequired":false}}'; do
+        export ACS_STATUS_BODY
+        run acs_restart_required
+        [ "$status" -ne 0 ]
+        [ "$output" != "false" ]
+    done
+}
+
+@test "cloud restart refuses mutation when status observation is incomplete" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    marker="${BATS_TMPDIR}/acs-restart-marker-${BASHPID}"
+    TEST_TEMP_FILES+=("${marker}")
+    export ACS_RESTART_MARKER="${marker}"
+    acs_prepare_context() { return 0; }
+    acs_command() {
+        if [[ "$1" == "status" ]]; then
+            printf '%s' '{}'
+            return 0
+        fi
+        touch "${ACS_RESTART_MARKER}"
+    }
+    export -f acs_prepare_context acs_command
+
+    run cloud_restart_if_required 1
+    [ "$status" -ne 0 ]
+    [ ! -e "${marker}" ]
+}
+
+@test "cloud restart does not report success when restart is false but stack is not Ready" {
+    source "${LIB_DIR}/acs_helpers.sh"
+    marker="${BATS_TMPDIR}/acs-nonready-restart-marker-${BASHPID}"
+    TEST_TEMP_FILES+=("${marker}")
+    export ACS_RESTART_MARKER="${marker}"
+    acs_prepare_context() { return 0; }
+    acs_command() {
+        if [[ "$1" == "status" ]]; then
+            printf '%s' "{\"infrastructure\":{\"status\":\"${ACS_INFRA_STATUS}\"},\"messages\":{\"restartRequired\":false}}"
+            return 0
+        fi
+        touch "${ACS_RESTART_MARKER}"
+    }
+    export -f acs_prepare_context acs_command
+
+    for ACS_INFRA_STATUS in Failed Pending; do
+        export ACS_INFRA_STATUS
+        run cloud_restart_if_required 1
+        [ "$status" -ne 0 ]
+        [[ "$output" == *"not Ready"* ]]
+        [ ! -e "${marker}" ]
+    done
+}
+
 # --- cloud_requires_local_scope ---
 
 @test "cloud_requires_local_scope returns 0 when search head is set" {
@@ -114,6 +282,17 @@ EOF
     grep -q -- "--max-redirs" "${args_log}"
     grep -q -- "--globoff" "${args_log}"
     [ "$(tail -n 3 "${args_log}")" = $'--max-redirs\n0\n--globoff' ]
+}
+
+@test "acs_rest_curl propagates platform settings loader failures" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    source "${LIB_DIR}/acs_helpers.sh"
+    load_splunk_platform_settings() { return 1; }
+    export STACK_TOKEN='test-token'
+
+    run acs_rest_curl "https://admin.splunk.com/test"
+
+    [ "${status}" -ne 0 ]
 }
 
 @test "acs_rest_curl rejects plaintext, userinfo, and caller curl configuration" {
@@ -182,6 +361,35 @@ EOF
         "https://staging.admin.splunk.com/test/adminconfig/v2/status"
     [ "$status" -eq 0 ]
     [ -e "${curl_marker}" ]
+}
+
+@test "rendered ACS target binding refuses changed configured target before mutation" {
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    marker="${mock_dir}/acs-ran"
+    cat > "${mock_dir}/acs" <<'EOF'
+#!/usr/bin/env bash
+touch "${ACS_MUTATION_MARKER}"
+EOF
+    chmod +x "${mock_dir}/acs"
+
+    source "${LIB_DIR}/acs_helpers.sh"
+    load_splunk_platform_settings() { :; }
+    export ACS_SERVER="https://admin.splunk.com"
+    export SPLUNK_CLOUD_STACK="changed-stack"
+    export SPLUNK_CLOUD_SEARCH_HEAD=""
+    export ACS_BOUND_TARGET_CONTEXT=true
+    export ACS_BOUND_REQUIRE_CONFIG_MATCH=true
+    export ACS_BOUND_SERVER="https://admin.splunk.com"
+    export ACS_BOUND_SPLUNK_CLOUD_STACK="reviewed-stack"
+    export ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD=""
+    export ACS_MUTATION_MARKER="${marker}"
+
+    PATH="${mock_dir}:${PATH}" run acs_command indexes create synthetic_index
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"configured ACS stack changed"* ]]
+    [ ! -e "${marker}" ]
 }
 
 @test "ACS public IP discovery ignores curlrc and does not follow redirects" {

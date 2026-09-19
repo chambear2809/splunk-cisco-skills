@@ -88,7 +88,9 @@ when reviewing an ACS operation.
 Never paste subnet lists, JWT tokens, stack identifiers, passwords, or HEC token
 values into chat. The skill reads stack context from the project credentials
 file (`STACK_TOKEN`, `STACK_TOKEN_USER`, `SPLUNK_CLOUD_STACK`, `ACS_SERVER`) and
-reads non-secret desired state from CLI flags or a local JSON admin plan.
+reads non-secret desired state from CLI flags or a local JSON admin plan. Every
+render requires an explicit `--target-stack`; it must match the selected
+credential context before a rendered live helper will run.
 
 Prefer `--phase render` or `--phase preflight` first. Only run `--phase apply`
 after the operator has reviewed rendered assets. Broad ACS admin mutations are
@@ -102,6 +104,7 @@ Render a full ACS admin packet and allowlist plan:
 ```bash
 bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \
   --phase render \
+  --target-stack STACK_NAME \
   --admin-plan-file acs-admin-plan.json \
   --features search-api,s2s,hec \
   --search-api-subnets 198.51.100.0/24 \
@@ -114,13 +117,15 @@ Render an inventory-only packet for the broader ACS surface:
 ```bash
 bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \
   --phase render \
+  --target-stack STACK_NAME \
   --modules indexes,hec-tokens,users,roles,capabilities,app-permissions,outbound-ports,ddss,limits,maintenance-windows,restarts,license,observability
 ```
 
 Audit live allowlist state against the rendered plan:
 
 ```bash
-bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh --phase audit
+bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \
+  --phase audit --target-stack STACK_NAME
 ```
 
 Apply reviewed allowlist and admin operations:
@@ -129,6 +134,7 @@ Apply reviewed allowlist and admin operations:
 ACCEPT_ACS_ADMIN_MUTATION=true \
 bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \
   --phase apply \
+  --target-stack STACK_NAME \
   --admin-plan-file acs-admin-plan.json
 ```
 

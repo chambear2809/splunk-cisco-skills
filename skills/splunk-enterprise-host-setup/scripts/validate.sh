@@ -110,25 +110,29 @@ assert_output_contains() {
 }
 
 load_rest_auth() {
+    local rest_host="" rest_uri=""
+
     ensure_prompted_path ADMIN_PASSWORD_FILE "Admin password file path"
-    ADMIN_PASSWORD="$(read_secret_file "${ADMIN_PASSWORD_FILE}")"
+    if ! ADMIN_PASSWORD="$(read_secret_file "${ADMIN_PASSWORD_FILE}")"; then
+        log "ERROR: Could not read the selected admin password file."
+        return 1
+    fi
     # shellcheck disable=SC2034  # Consumed by get_session_key via sourced helpers.
     SPLUNK_USER="${ADMIN_USER}"
     # shellcheck disable=SC2034  # Consumed by get_session_key via sourced helpers.
     SPLUNK_PASS="${ADMIN_PASSWORD}"
     if [[ "${EXECUTION_MODE}" == "ssh" ]]; then
-        load_splunk_ssh_credentials
-        SPLUNK_HOST="${SPLUNK_SSH_HOST}"
+        load_splunk_ssh_credentials || return 1
+        rest_host="${SPLUNK_SSH_HOST}"
     fi
-    load_splunk_connection_settings
-    SPLUNK_MGMT_PORT="${MGMT_PORT}"
+    load_splunk_connection_settings || return 1
     if [[ "${EXECUTION_MODE}" == "local" ]]; then
-        SPLUNK_HOST="localhost"
-        SPLUNK_SEARCH_API_URI="https://localhost:${MGMT_PORT}"
-        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
-    elif [[ -n "${SPLUNK_HOST:-}" ]]; then
-        SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:${MGMT_PORT}"
-        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+        rest_uri="$(_format_splunk_https_endpoint "localhost" "${MGMT_PORT}")" || return 1
+    elif [[ -n "${rest_host}" ]]; then
+        rest_uri="$(_format_splunk_https_endpoint "${rest_host}" "${MGMT_PORT}")" || return 1
+    fi
+    if [[ -n "${rest_uri}" ]]; then
+        _credential_transition_runtime_route "${rest_uri}" preserve || return 1
     fi
 }
 
@@ -158,8 +162,11 @@ assert_target_command "Splunk binary exists" "$(hbs_shell_join test -x "${SPLUNK
 assert_target_command "Splunk status command succeeds" "$(splunk_cli_cmd status)"
 assert_target_command "Splunk version command succeeds" "$(splunk_cli_cmd version)"
 
-load_rest_auth
-SK="$(get_session_key "${SPLUNK_URI}")"
+load_rest_auth || exit 1
+if ! SK="$(get_session_key "${SPLUNK_URI}")" || [[ -z "${SK}" ]]; then
+    log "ERROR: REST authentication failed."
+    exit 1
+fi
 log "OK: REST authentication succeeded"
 server_info="$(splunk_curl "${SK}" "${SPLUNK_URI}/services/server/info?output_mode=json" 2>/dev/null || true)"
 if [[ "${server_info}" != *'"entry"'* ]]; then

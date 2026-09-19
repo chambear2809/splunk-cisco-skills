@@ -233,14 +233,18 @@ warn_if_cloud_pairing_missing_for_skill() {
     local declared_roles pairing_json primary_role paired_role pairing_summary platform_hint
 
     [[ -n "${skill_name}" ]] || return 0
-    platform_hint="$(_resolve_target_role_platform_hint 2>/dev/null || true)"
+    if ! platform_hint="$(_resolve_target_role_platform_hint)"; then
+        return 1
+    fi
     [[ "${platform_hint}" == "cloud" ]] || return 0
 
     pairing_json="$(shared_registry_skill_cloud_pairing_json_by_skill "${skill_name}")"
     [[ -n "${pairing_json}" && "${pairing_json}" != "[]" ]] || return 0
 
-    primary_role="$(resolve_primary_splunk_target_role)"
-    paired_role="$(resolve_search_splunk_target_role)"
+    if ! primary_role="$(resolve_primary_splunk_target_role)" \
+        || ! paired_role="$(resolve_search_splunk_target_role)"; then
+        return 1
+    fi
 
     if _cloud_pairing_is_satisfied "${pairing_json}" "${primary_role}" "${paired_role}"; then
         return 0
@@ -265,12 +269,16 @@ require_cloud_pairing_for_skill() {
     local pairing_json primary_role paired_role pairing_summary platform_hint
 
     [[ -n "${skill_name}" ]] || return 0
-    platform_hint="$(_resolve_target_role_platform_hint 2>/dev/null || true)"
+    if ! platform_hint="$(_resolve_target_role_platform_hint)"; then
+        return 1
+    fi
     [[ "${platform_hint}" == "cloud" ]] || return 0
     pairing_json="$(shared_registry_skill_cloud_pairing_json_by_skill "${skill_name}")"
     [[ -n "${pairing_json}" && "${pairing_json}" != "[]" ]] || return 0
-    primary_role="$(resolve_primary_splunk_target_role)"
-    paired_role="$(resolve_search_splunk_target_role)"
+    if ! primary_role="$(resolve_primary_splunk_target_role)" \
+        || ! paired_role="$(resolve_search_splunk_target_role)"; then
+        return 1
+    fi
     if _cloud_pairing_is_satisfied "${pairing_json}" "${primary_role}" "${paired_role}"; then
         return 0
     fi
@@ -286,7 +294,9 @@ warn_if_role_unsupported_for_app_id() {
 
     [[ -n "${app_id}" ]] || return 0
 
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     [[ -n "${role}" ]] || return 0
 
     support="$(shared_registry_app_role_support_by_id "${app_id}" "${role}")"
@@ -311,7 +321,9 @@ warn_if_role_unsupported_for_app_name() {
 
     [[ -n "${app_name}" ]] || return 0
 
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     [[ -n "${role}" ]] || return 0
 
     support="$(shared_registry_app_role_support_by_name "${app_name}" "${role}")"
@@ -340,7 +352,9 @@ warn_if_role_unsupported_for_skill() {
 
     [[ -n "${skill_name}" ]] || return 0
 
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     [[ -n "${role}" ]] || return 0
 
     support="$(shared_registry_skill_role_support_by_skill "${skill_name}" "${role}")"
@@ -378,7 +392,7 @@ warn_if_current_skill_role_unsupported() {
     skill_name="$(current_skill_name_from_script_dir)"
     [[ -n "${skill_name}" ]] || return 0
 
-    warn_if_role_unsupported_for_skill "${skill_name}"
+    warn_if_role_unsupported_for_skill "${skill_name}" || return 1
     warn_if_cloud_pairing_missing_for_skill "${skill_name}"
 }
 
@@ -390,7 +404,9 @@ require_skill_role_supported() {
     local skill_name="${1:-}" role support notes subject
 
     [[ -n "${skill_name}" ]] || return 0
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     [[ -n "${role}" ]] || return 0
     support="$(shared_registry_skill_role_support_by_skill "${skill_name}" "${role}")"
     if [[ -z "${support}" ]]; then
@@ -422,7 +438,7 @@ check_skill_role_for_validation() {
         require_skill_role_supported "${skill_name}" || return 1
         require_cloud_pairing_for_skill "${skill_name}"
     else
-        warn_if_role_unsupported_for_skill "${skill_name}"
+        warn_if_role_unsupported_for_skill "${skill_name}" || return 1
         warn_if_cloud_pairing_missing_for_skill "${skill_name}"
     fi
 }
@@ -435,7 +451,9 @@ check_current_skill_role_for_validation() {
 
 require_index_management_target_role() {
     local role
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     case "${role}" in
         heavy-forwarder|universal-forwarder|external-collector)
             log "ERROR: Refusing index creation on role '${role}'; target a search/index management endpoint instead."
@@ -447,7 +465,9 @@ require_index_management_target_role() {
 
 require_splunk_management_target_role() {
     local role
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     if [[ "${role}" == "external-collector" ]]; then
         log "ERROR: This action requires a Splunk management endpoint, not an external-collector target."
         return 1
@@ -457,7 +477,9 @@ require_splunk_management_target_role() {
 
 require_search_tier_target_role() {
     local label="${1:-This action}" role
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     case "${role}" in
         ""|search-tier) return 0 ;;
         *)

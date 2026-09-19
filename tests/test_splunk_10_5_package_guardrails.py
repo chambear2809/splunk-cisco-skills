@@ -117,10 +117,24 @@ with log_path.open("a", encoding="utf-8") as handle:
     handle.write(json.dumps(args) + "\\n")
 
 url = next((arg for arg in args if arg.startswith(("http://", "https://"))), "")
+output_target = None
+write_code = any("%{http_code}" in arg for arg in args)
+for index, arg in enumerate(args[:-1]):
+    if arg == "-o":
+        output_target = args[index + 1]
 if url.endswith("/services/auth/login"):
     print("<response><sessionKey>test-session</sessionKey></response>", end="")
-elif "/services/apps/local/" in url and "%{http_code}" in args:
-    print("200", end="")
+elif "/services/apps/local/" in url and write_code:
+    if output_target == "/dev/null":
+        print("200", end="")
+    else:
+        print(
+            json.dumps(
+                {"entry": [{"content": {"version": os.environ["INSTALLED_APP_VERSION"]}}]}
+            ),
+            end="",
+        )
+        print("\\n200", end="")
 elif "/services/apps/local/" in url:
     print(json.dumps({"entry": [{"content": {"version": os.environ["INSTALLED_APP_VERSION"]}}]}), end="")
 else:

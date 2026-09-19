@@ -134,6 +134,10 @@ MAX_SNAPSHOT_DEPTH = 32
 MAX_PARSED_JSON_ITEMS = 10_000
 MAX_PARSED_JSON_DEPTH = 32
 MAX_SECRET_FILE_BYTES = 1024 * 1024
+MAX_INTERPRETER_SYMLINKS = 64
+MAX_INTERPRETER_ROUTE_COMPONENTS = 128
+MAX_OUTPUT_ROUTE_SYMLINKS = 64
+MAX_OUTPUT_ROUTE_COMPONENTS = 256
 CANCEL_KILL_GRACE_SECONDS = 1.0
 # Maximum age (in seconds) of a stored plan before execute_plan refuses to
 # run it. Plans older than this are treated as expired so that a hash that
@@ -312,6 +316,10 @@ SECRET_FILE_FLAGS = {
     "--write-hec-token-file",
     "--write-token-file",
 }
+SECRET_OUTPUT_FILE_FLAGS = {
+    "--write-hec-token-file",
+    "--write-token-file",
+}
 
 SECRET_KEY_RE = re.compile(
     r"(^|_)(api[_-]?key|api[_-]?secret|bearer|client[_-]?secret|"
@@ -356,9 +364,19 @@ class PlannedCommand:
     executable_path: str = ""
     executable_sha256: str = ""
     repository_sha256: str = ""
+    # ``interpreter_path`` is the resolved binary used for attestation. Keep
+    # the path supplied to the launcher separately so a virtualenv symlink
+    # remains the process invocation (and retains its site-packages).
+    interpreter_invocation_path: str = ""
+    interpreter_invocation_link_target: str = ""
+    interpreter_invocation_identity: tuple[int, int, int, int, int, int] = ()
+    interpreter_invocation_chain: tuple[dict[str, Any], ...] = ()
+    interpreter_invocation_parent_route: tuple[dict[str, Any], ...] = ()
+    interpreter_environment_files: tuple[dict[str, Any], ...] = ()
     interpreter_path: str = ""
     interpreter_sha256: str = ""
     secret_file_identities: tuple[dict[str, Any], ...] = ()
+    secret_output_bindings: tuple[dict[str, Any], ...] = ()
 
 
 _PLANS: "OrderedDict[str, PlannedCommand]" = OrderedDict()
@@ -461,6 +479,42 @@ _CHILD_ENV_BLOCKED_PREFIXES = (
     "GIT_CONFIG_VALUE_",
 )
 
+# Hosted runners commonly place the active Python toolchain under a root-owned
+# operating-system path such as ``/opt/hostedtoolcache``.  Those aliases are
+# trusted route roots even when the image marks the root itself group/world
+# writable.  This is deliberately a small, absolute allowlist: arbitrary
+# writable directories (including /tmp and repository paths) remain rejected.
+_TRUSTED_INTERPRETER_OS_ROOTS = tuple(
+    Path(path)
+    for path in (
+        "/bin",
+        "/lib",
+        "/lib64",
+        "/opt",
+        "/opt/hostedtoolcache",
+        "/sbin",
+        "/usr",
+        "/System",
+        "/Library",
+    )
+)
+
+
+def _is_trusted_interpreter_os_component(
+    path: Path, metadata: os.stat_result
+) -> bool:
+    """Allow only root-owned components below known OS/toolchain roots."""
+    if os.name != "posix" or metadata.st_uid != 0:
+        return False
+    try:
+        absolute = path.absolute()
+        return any(
+            absolute == root or root in absolute.parents
+            for root in _TRUSTED_INTERPRETER_OS_ROOTS
+        )
+    except (OSError, RuntimeError):
+        return False
+
 
 def _child_environment() -> dict[str, str]:
     """Return a deployment-capable environment without loader injection hooks."""
@@ -500,8 +554,8 @@ def _child_environment() -> dict[str, str]:
     return env
 
 
-def _interpreter_path(command: list[str]) -> Path | None:
-    """Resolve a supported interpreter to a stable absolute executable."""
+def _interpreter_candidate(command: list[str]) -> Path | None:
+    """Resolve a supported interpreter name to an absolute launch path."""
     if not command:
         raise SkillMCPError("Cannot execute an empty command")
     requested = _safe_text(command[0], label="command interpreter")
@@ -518,26 +572,76 @@ def _interpreter_path(command: list[str]) -> Path | None:
             raise SkillMCPError(f"Required interpreter is not available: {requested}")
         candidate = Path(located)
     try:
-        resolved = candidate.resolve(strict=True)
-        metadata = resolved.stat()
+        candidate = candidate.absolute()
+        candidate.lstat()
     except OSError as exc:
         raise SkillMCPError(
-            f"Could not resolve interpreter {requested!r}: {exc}"
+            f"Could not inspect interpreter launcher {requested!r}: {exc}"
+        ) from exc
+    return candidate
+
+
+def _interpreter_binding(candidate: Path) -> tuple[Path, Path, str]:
+    """Validate a launcher and return its invocation/target/link binding."""
+    try:
+        launcher_metadata = candidate.lstat()
+        resolved = candidate.resolve(strict=True)
+        metadata = resolved.stat()
+    except (OSError, RuntimeError) as exc:
+        raise SkillMCPError(
+            f"Could not resolve interpreter launcher {candidate}: {exc}"
         ) from exc
     if not stat.S_ISREG(metadata.st_mode) or not os.access(resolved, os.X_OK):
         raise SkillMCPError(
             f"Interpreter is not an executable regular file: {resolved}"
         )
+    link_target = ""
+    if stat.S_ISLNK(launcher_metadata.st_mode):
+        try:
+            link_target = os.readlink(candidate)
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect interpreter launcher link {candidate}: {exc}"
+            ) from exc
+    elif not stat.S_ISREG(launcher_metadata.st_mode):
+        raise SkillMCPError(
+            f"Interpreter launcher is not a regular file or symlink: {candidate}"
+        )
     # The interpreter that is already executing this MCP process is an
-    # established process boundary.  Hosted CI images may intentionally make
+    # established process boundary. Hosted CI images may intentionally make
     # that binary's tool-cache group writable, but that cannot retroactively
-    # replace the interpreter image running this process.  Keep the stricter
-    # ownership and ancestry checks for every separately selected interpreter.
+    # replace the interpreter image running this process.
     try:
         running_interpreter = Path(sys.executable).resolve(strict=True)
     except OSError:
         running_interpreter = None
     is_running_interpreter = resolved == running_interpreter
+    direct_running_interpreter = is_running_interpreter and candidate == resolved
+    # A virtualenv launcher commonly resolves to the interpreter that is
+    # already running this MCP process. That target is an established process
+    # boundary, but the requested launcher parent remains a newly supplied
+    # route and must still satisfy the ancestry policy.
+    _interpreter_symlink_chain(
+        candidate,
+        validate_permissions=not is_running_interpreter,
+    )
+    _interpreter_parent_route(
+        candidate,
+        validate_permissions=(
+            True if is_running_interpreter and not direct_running_interpreter
+            else not direct_running_interpreter
+        ),
+    )
+    if os.name == "posix":
+        trusted_launcher_owner = launcher_metadata.st_uid in {0, os.geteuid()}
+        if not direct_running_interpreter and not trusted_launcher_owner:
+            raise SkillMCPError(
+                f"Interpreter launcher is not owned by a trusted principal: {candidate}"
+            )
+        if not is_running_interpreter and metadata.st_uid not in {0, os.geteuid()}:
+            raise SkillMCPError(
+                f"Interpreter is not owned by a trusted principal: {resolved}"
+            )
     if (
         os.name == "posix"
         and not is_running_interpreter
@@ -555,20 +659,412 @@ def _interpreter_path(command: list[str]) -> Path | None:
                 raise SkillMCPError(
                     f"Could not inspect interpreter ancestry {parent}: {exc}"
                 ) from exc
-            if parent_mode & 0o002 or (
-                parent_mode & 0o020 and parent_metadata.st_uid not in {0, os.geteuid()}
-            ):
+            trusted_owner = parent_metadata.st_uid in {0, os.geteuid()}
+            trusted_os_component = _is_trusted_interpreter_os_component(
+                parent, parent_metadata
+            )
+            sticky_shared = bool(parent_mode & stat.S_ISVTX) and trusted_owner
+            untrusted_owner_write = bool(parent_mode & stat.S_IWUSR) and not trusted_owner
+            untrusted_world_write = (
+                bool(parent_mode & stat.S_IWOTH)
+                and not sticky_shared
+                and not trusted_os_component
+            )
+            untrusted_group_write = bool(parent_mode & stat.S_IWGRP) and not trusted_owner
+            if untrusted_owner_write or untrusted_world_write or untrusted_group_write:
                 raise SkillMCPError(
                     "Interpreter ancestry is writable by an untrusted group/world "
                     "principal and cannot be "
                     f"trusted: {parent}"
                 )
-    return resolved
+    return candidate, resolved, link_target
+
+
+def _interpreter_symlink_chain(
+    candidate: Path,
+    *,
+    validate_permissions: bool = False,
+) -> tuple[dict[str, Any], ...]:
+    """Capture the launcher link chain and every route used to reach it."""
+    current = candidate
+    seen: set[tuple[int, int]] = set()
+    chain: list[dict[str, Any]] = []
+    while True:
+        parent_route = _interpreter_parent_route(
+            current,
+            validate_permissions=validate_permissions,
+        )
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect interpreter launcher component {current}: {exc}"
+            ) from exc
+        if not stat.S_ISLNK(metadata.st_mode):
+            chain.append(
+                {
+                    "path": str(current),
+                    "kind": "target",
+                    "parent_route": parent_route,
+                    "identity": (
+                        metadata.st_dev,
+                        metadata.st_ino,
+                        metadata.st_mode,
+                        getattr(metadata, "st_uid", 0),
+                        getattr(metadata, "st_gid", 0),
+                        metadata.st_ctime_ns,
+                    ),
+                }
+            )
+            return tuple(chain)
+        identity = (metadata.st_dev, metadata.st_ino)
+        if identity in seen:
+            raise SkillMCPError(
+                f"Interpreter launcher contains a symbolic-link cycle: {current}"
+            )
+        if len(chain) >= MAX_INTERPRETER_SYMLINKS:
+            raise SkillMCPError(
+                "Interpreter launcher contains too many symbolic-link indirections"
+            )
+        if os.name == "posix" and metadata.st_uid not in {0, os.geteuid()}:
+            raise SkillMCPError(
+                "Interpreter launcher contains a symbolic link owned by an "
+                f"untrusted principal: {current}"
+            )
+        try:
+            link_target = os.readlink(current)
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect interpreter launcher link {current}: {exc}"
+            ) from exc
+        chain.append(
+            {
+                "path": str(current),
+                "kind": "symlink",
+                "link_target": link_target,
+                "parent_route": parent_route,
+                "parent_route_sha256": hashlib.sha256(
+                    json.dumps(
+                        parent_route,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+                "identity": (
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    metadata.st_mode,
+                    getattr(metadata, "st_uid", 0),
+                    getattr(metadata, "st_gid", 0),
+                    metadata.st_ctime_ns,
+                ),
+            }
+        )
+        seen.add(identity)
+        target = Path(link_target)
+        if not target.is_absolute():
+            target = current.parent / target
+        # Preserve ``..`` until pathname traversal so it is applied after any
+        # preceding symlink target, matching operating-system resolution.
+        current = target
+
+
+def _interpreter_route_identity(
+    metadata: os.stat_result,
+    *,
+    directory: bool,
+) -> tuple[int, int, int, int, int] | tuple[int, int, int, int, int, int]:
+    """Return stable route identity, excluding volatile directory timestamps."""
+    if directory:
+        return (
+            metadata.st_dev,
+            metadata.st_ino,
+            stat.S_IMODE(metadata.st_mode),
+            getattr(metadata, "st_uid", 0),
+            getattr(metadata, "st_gid", 0),
+        )
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        getattr(metadata, "st_uid", 0),
+        getattr(metadata, "st_gid", 0),
+        metadata.st_ctime_ns,
+    )
+
+
+def _snapshot_interpreter_route_components(
+    path: Path,
+    *,
+    validate_permissions: bool,
+    allow_symlinks: bool,
+    seen_symlinks: frozenset[tuple[int, int]] = frozenset(),
+    remaining_components: list[int] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Inspect every component and alias used to resolve a directory route."""
+    route_path = path if path.is_absolute() else Path.cwd() / path
+    if remaining_components is None:
+        remaining_components = [MAX_INTERPRETER_ROUTE_COMPONENTS]
+
+    components: list[dict[str, Any]] = []
+    current: Path | None = None
+    route_parts = route_path.parts
+    for index, part in enumerate(route_parts):
+        if part in {"", "."}:
+            continue
+        if current is None:
+            current = Path(part)
+        elif part == "..":
+            current = current.parent
+        else:
+            current /= part
+
+        if remaining_components[0] <= 0:
+            raise SkillMCPError(
+                "Interpreter launcher parent route contains too many components"
+            )
+        remaining_components[0] -= 1
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise SkillMCPError(
+                "Could not inspect interpreter launcher parent component "
+                f"{current}: {exc}"
+            ) from exc
+
+        if stat.S_ISLNK(metadata.st_mode):
+            if not allow_symlinks:
+                raise SkillMCPError(
+                    "Interpreter launcher canonical parent unexpectedly contains "
+                    f"a symbolic link: {current}"
+                )
+            if os.name == "posix" and metadata.st_uid not in {0, os.geteuid()}:
+                raise SkillMCPError(
+                    "Interpreter launcher parent contains a symbolic link owned "
+                    f"by an untrusted principal: {current}"
+                )
+            link_identity = (metadata.st_dev, metadata.st_ino)
+            if link_identity in seen_symlinks:
+                raise SkillMCPError(
+                    "Interpreter launcher parent contains a symbolic-link cycle: "
+                    f"{current}"
+                )
+            if len(seen_symlinks) >= MAX_INTERPRETER_SYMLINKS:
+                raise SkillMCPError(
+                    "Interpreter launcher parent contains too many symbolic-link "
+                    "indirections"
+                )
+            try:
+                link_target = os.readlink(current)
+            except OSError as exc:
+                raise SkillMCPError(
+                    f"Could not inspect interpreter parent link {current}: {exc}"
+                ) from exc
+            target = Path(link_target)
+            if not target.is_absolute():
+                target = current.parent / target
+            remainder = route_parts[index + 1 :]
+            resolved_components = _snapshot_interpreter_route_components(
+                target.joinpath(*remainder),
+                validate_permissions=validate_permissions,
+                allow_symlinks=True,
+                seen_symlinks=seen_symlinks | {link_identity},
+                remaining_components=remaining_components,
+            )
+            components.append(
+                {
+                    "path": str(current),
+                    "kind": "symlink",
+                    "link_target": link_target,
+                    "identity": _interpreter_route_identity(
+                        metadata,
+                        directory=False,
+                    ),
+                    "resolved_components": resolved_components,
+                }
+            )
+            return tuple(components)
+
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise SkillMCPError(
+                f"Interpreter launcher parent is not a directory: {current}"
+            )
+        if validate_permissions and os.name == "posix":
+            mode = stat.S_IMODE(metadata.st_mode)
+            trusted_owner = metadata.st_uid in {0, os.geteuid()}
+            trusted_os_component = _is_trusted_interpreter_os_component(
+                current, metadata
+            )
+            sticky_shared = bool(mode & stat.S_ISVTX) and trusted_owner
+            untrusted_owner_write = bool(mode & stat.S_IWUSR) and not trusted_owner
+            untrusted_world_write = (
+                bool(mode & stat.S_IWOTH)
+                and not sticky_shared
+                and not trusted_os_component
+            )
+            untrusted_group_write = bool(mode & stat.S_IWGRP) and not trusted_owner
+            if (
+                untrusted_owner_write
+                or untrusted_world_write
+                or untrusted_group_write
+            ):
+                raise SkillMCPError(
+                    "Interpreter launcher ancestry is writable by an untrusted "
+                    f"principal and cannot be trusted: {current}"
+                )
+        components.append(
+            {
+                "path": str(current),
+                "kind": "directory",
+                "identity": _interpreter_route_identity(
+                    metadata,
+                    directory=True,
+                ),
+            }
+        )
+    return tuple(components)
+
+
+def _interpreter_parent_route(
+    candidate: Path,
+    *,
+    validate_permissions: bool = False,
+) -> tuple[dict[str, Any], ...]:
+    """Bind every lexical and resolved component of the launcher's parent."""
+
+    try:
+        canonical_parent = candidate.parent.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SkillMCPError(
+            f"Could not resolve interpreter launcher parent {candidate.parent}: {exc}"
+        ) from exc
+    return (
+        {
+            "route": "requested",
+            "parent": str(candidate.parent),
+            "components": _snapshot_interpreter_route_components(
+                candidate.parent,
+                validate_permissions=validate_permissions,
+                allow_symlinks=True,
+            ),
+        },
+        {
+            "route": "canonical",
+            "parent": str(canonical_parent),
+            "components": _snapshot_interpreter_route_components(
+                canonical_parent,
+                validate_permissions=validate_permissions,
+                allow_symlinks=False,
+            ),
+        },
+    )
+
+
+def _interpreter_environment_files(candidate: Path) -> tuple[dict[str, Any], ...]:
+    """Bind Python virtual-environment selectors without exposing their values."""
+    candidates = (
+        candidate.parent / "pyvenv.cfg",
+        candidate.parent.parent / "pyvenv.cfg",
+    )
+    bindings: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for path in candidates:
+        absolute = Path(os.path.abspath(path))
+        normalized = str(absolute)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        try:
+            metadata = absolute.lstat()
+        except FileNotFoundError:
+            bindings.append({"path": normalized, "exists": False})
+            continue
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect Python environment configuration {absolute}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            raise SkillMCPError(
+                "Python environment configuration must not be a symbolic link: "
+                f"{absolute}"
+            )
+        if not stat.S_ISREG(metadata.st_mode):
+            raise SkillMCPError(
+                f"Python environment configuration is not a regular file: {absolute}"
+            )
+        mode = stat.S_IMODE(metadata.st_mode)
+        if os.name == "posix":
+            if metadata.st_uid not in {0, os.geteuid()}:
+                raise SkillMCPError(
+                    "Python environment configuration is not owned by a trusted "
+                    f"principal: {absolute}"
+                )
+            if mode & 0o022:
+                raise SkillMCPError(
+                    "Python environment configuration is group/world writable and "
+                    f"cannot be trusted: {absolute}"
+                )
+        if metadata.st_size > MAX_SECRET_FILE_BYTES:
+            raise SkillMCPError(
+                "Python environment configuration exceeds the bounded file size: "
+                f"{absolute}"
+            )
+        bindings.append(
+            {
+                "path": normalized,
+                "exists": True,
+                "device": metadata.st_dev,
+                "inode": metadata.st_ino,
+                "mode": mode,
+                "uid": getattr(metadata, "st_uid", None),
+                "gid": getattr(metadata, "st_gid", None),
+                "size": metadata.st_size,
+                "mtime_ns": metadata.st_mtime_ns,
+                "ctime_ns": metadata.st_ctime_ns,
+                "sha256": _file_sha256(absolute),
+            }
+        )
+    return tuple(bindings)
+
+
+def _interpreter_launcher_identity(
+    candidate: Path,
+) -> tuple[int, int, int, int, int, int]:
+    metadata = candidate.lstat()
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        getattr(metadata, "st_uid", 0),
+        getattr(metadata, "st_gid", 0),
+        metadata.st_ctime_ns,
+    )
+
+
+def _interpreter_binding_for_command(
+    command: list[str],
+) -> tuple[Path, Path, str] | None:
+    candidate = _interpreter_candidate(command)
+    if candidate is None:
+        return None
+    return _interpreter_binding(candidate)
+
+
+def _interpreter_path(command: list[str]) -> Path | None:
+    """Resolve a supported interpreter to its attested executable target."""
+    binding = _interpreter_binding_for_command(command)
+    return None if binding is None else binding[1]
+
+
+def _interpreter_invocation_path(command: list[str]) -> Path | None:
+    """Return the stable launch path without resolving virtualenv symlinks."""
+    binding = _interpreter_binding_for_command(command)
+    return None if binding is None else binding[0]
 
 
 def _resolved_command(command: list[str]) -> list[str]:
     resolved = list(command)
-    interpreter = _interpreter_path(resolved)
+    interpreter = _interpreter_invocation_path(resolved)
     if interpreter is not None:
         resolved[0] = str(interpreter)
     return resolved
@@ -1072,8 +1568,12 @@ def _secret_file_identities(
     *,
     require_exists: bool = False,
 ) -> tuple[dict[str, Any], ...]:
+    """Capture input secret-file identities only."""
     identities = []
     for label, path in _secret_file_arguments(command):
+        flag = label.split(":", 1)[0]
+        if flag in SECRET_OUTPUT_FILE_FLAGS:
+            continue
         identities.append(
             {
                 "argument": label,
@@ -1087,12 +1587,357 @@ def _secret_file_identities(
     return tuple(identities)
 
 
+def _output_directory_identity(metadata: os.stat_result) -> dict[str, Any]:
+    return {
+        "device": metadata.st_dev,
+        "inode": metadata.st_ino,
+        "mode": stat.S_IMODE(metadata.st_mode),
+        "uid": getattr(metadata, "st_uid", None),
+        "gid": getattr(metadata, "st_gid", None),
+    }
+
+
+def _validate_output_directory(
+    path: Path,
+    metadata: os.stat_result,
+    *,
+    require_writable: bool,
+) -> dict[str, Any]:
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise SkillMCPError(f"Secret output parent is not a directory: {path}")
+    identity = _output_directory_identity(metadata)
+    if require_writable and not os.access(path, os.W_OK):
+        raise SkillMCPError(
+            f"Secret output parent is not writable by the MCP server user: {path}. "
+            "Create a secure owner-writable directory and re-run the plan."
+        )
+    if os.name == "posix":
+        trusted_owner = metadata.st_uid in {0, os.geteuid()}
+        owner_writable = bool(metadata.st_mode & stat.S_IWUSR)
+        shared_writable = bool(metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
+        sticky = bool(metadata.st_mode & stat.S_ISVTX)
+        if (owner_writable and not trusted_owner) or (
+            shared_writable and not (sticky and trusted_owner)
+        ):
+            raise SkillMCPError(
+                f"Secret output parent has unsafe ownership or permissions: {path}"
+            )
+        if require_writable and not (
+            (metadata.st_uid == os.geteuid() and owner_writable)
+            or (shared_writable and sticky and trusted_owner)
+        ):
+            raise SkillMCPError(
+                f"Secret output parent is not writable by the MCP server user: {path}. "
+                "Create a secure owner-writable directory and re-run the plan."
+            )
+    return identity
+
+
+def _output_route_identity(metadata: os.stat_result) -> dict[str, Any]:
+    return {
+        "device": metadata.st_dev,
+        "inode": metadata.st_ino,
+        "mode": metadata.st_mode,
+        "uid": getattr(metadata, "st_uid", None),
+        "gid": getattr(metadata, "st_gid", None),
+        "mtime_ns": metadata.st_mtime_ns,
+        "ctime_ns": metadata.st_ctime_ns,
+    }
+
+
+def _snapshot_output_route_components(
+    parent: Path,
+    *,
+    label: str,
+    seen_symlinks: frozenset[tuple[int, int]] = frozenset(),
+    remaining_components: list[int] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Validate a directory route, including every symlink indirection."""
+    absolute_parent = Path(os.path.abspath(parent))
+    if len(absolute_parent.parts) > MAX_OUTPUT_ROUTE_COMPONENTS:
+        raise SkillMCPError(f"{label} parent route contains too many components")
+    if remaining_components is None:
+        remaining_components = [MAX_OUTPUT_ROUTE_COMPONENTS]
+    components: list[dict[str, Any]] = []
+    current = Path(absolute_parent.anchor)
+    for index, component in enumerate(absolute_parent.parts):
+        if remaining_components[0] <= 0:
+            raise SkillMCPError(f"{label} parent route contains too many components")
+        remaining_components[0] -= 1
+        if index == 0:
+            current = Path(component)
+        else:
+            current /= component
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            raise SkillMCPError(
+                f"{label} parent directory does not exist: {current}. "
+                "Create a secure owner-writable directory and re-run the plan."
+            ) from None
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect {label} requested parent component {current}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            if os.name == "posix" and metadata.st_uid not in {0, os.geteuid()}:
+                raise SkillMCPError(
+                    f"{label} parent contains a symlink owned by an untrusted "
+                    f"principal: {current}"
+                )
+            link_identity = (metadata.st_dev, metadata.st_ino)
+            if link_identity in seen_symlinks:
+                raise SkillMCPError(
+                    f"{label} parent contains a symlink cycle: {current}"
+                )
+            if len(seen_symlinks) >= MAX_OUTPUT_ROUTE_SYMLINKS:
+                raise SkillMCPError(
+                    f"{label} parent contains too many symlink indirections"
+                )
+            try:
+                link_target = os.readlink(current)
+                if ".." in Path(link_target).parts:
+                    raise SkillMCPError(
+                        f"{label} parent symlink target contains '..': {current}. "
+                        "Replace it with a canonical target and re-run the plan."
+                    )
+            except SkillMCPError:
+                raise
+            except OSError as exc:
+                raise SkillMCPError(
+                    f"Could not inspect {label} parent symlink {current}: {exc}"
+                ) from exc
+            target = Path(link_target)
+            if not target.is_absolute():
+                target = current.parent / target
+            remainder = absolute_parent.parts[index + 1 :]
+            target_with_remainder = target.joinpath(*remainder)
+            try:
+                resolved_components = _snapshot_output_route_components(
+                    target_with_remainder,
+                    label=label,
+                    seen_symlinks=seen_symlinks | {link_identity},
+                    remaining_components=remaining_components,
+                )
+            except SkillMCPError as exc:
+                if "parent is not a directory" in str(exc):
+                    raise SkillMCPError(
+                        f"{label} parent symlink does not resolve to a directory: "
+                        f"{current}"
+                    ) from exc
+                raise
+            components.append(
+                {
+                    "path": str(current),
+                    "kind": "symlink",
+                    "link_target": link_target,
+                    "identity": _output_route_identity(metadata),
+                    "resolved_components": resolved_components,
+                }
+            )
+            return tuple(components)
+        components.append(
+            {
+                "path": str(current),
+                "kind": "directory",
+                "identity": _validate_output_directory(
+                    current,
+                    metadata,
+                    require_writable=False,
+                ),
+            }
+        )
+    return tuple(components)
+
+
+def _snapshot_requested_output_route(
+    parent: Path,
+    *,
+    label: str,
+) -> tuple[dict[str, Any], ...]:
+    """Validate the lexical route, retaining trusted directory aliases."""
+    return _snapshot_output_route_components(parent, label=label)
+
+
+def _secret_output_parent_snapshot(
+    parent: Path,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    """Bind a canonical, safe parent route and stable ancestry metadata."""
+    absolute_parent = Path(os.path.abspath(parent))
+    requested_components = _snapshot_requested_output_route(
+        absolute_parent,
+        label=label,
+    )
+    canonical_parent = Path(os.path.realpath(absolute_parent))
+    if len(canonical_parent.parts) > MAX_OUTPUT_ROUTE_COMPONENTS:
+        raise SkillMCPError(f"{label} canonical parent contains too many components")
+    try:
+        canonical_parent.lstat()
+    except FileNotFoundError:
+        raise SkillMCPError(
+            f"{label} parent directory does not exist: {absolute_parent}. "
+            "Create a secure owner-writable directory and re-run the plan."
+        ) from None
+    except OSError as exc:
+        raise SkillMCPError(
+            f"Could not inspect {label} parent directory {absolute_parent}: {exc}"
+        ) from exc
+    components: list[dict[str, Any]] = []
+    current = Path(canonical_parent.anchor)
+    root_metadata = current.lstat()
+    components.append(
+        {
+            "path": str(current),
+            "identity": _validate_output_directory(
+                current,
+                root_metadata,
+                require_writable=current == canonical_parent,
+            ),
+        }
+    )
+    for component in canonical_parent.parts[1:]:
+        current /= component
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            raise SkillMCPError(
+                f"{label} parent directory is missing component {current}. "
+                "Create a secure owner-writable directory and re-run the plan."
+            ) from None
+        except OSError as exc:
+            raise SkillMCPError(
+                f"Could not inspect {label} parent component {current}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            raise SkillMCPError(
+                f"{label} parent contains an unsafe symlink: {current}"
+            )
+        components.append(
+            {
+                "path": str(current),
+                "identity": _validate_output_directory(
+                    current,
+                    metadata,
+                    require_writable=current == canonical_parent,
+                ),
+            }
+        )
+    return {
+        "requested_parent": str(absolute_parent),
+        "canonical_parent": str(canonical_parent),
+        "requested_components": requested_components,
+        "components": tuple(components),
+    }
+
+
+def _secret_output_binding(flag: str, path_value: str) -> dict[str, Any]:
+    path_value = _safe_text(path_value, label=f"{flag} output path")
+    if not path_value:
+        raise SkillMCPError(f"{flag} requires a file path")
+    candidate = Path(path_value)
+    if (
+        not candidate.is_absolute()
+        and candidate.parts
+        and candidate.parts[0].startswith("~")
+    ):
+        raise SkillMCPError(
+            f"{flag} output path must not use '~' expansion; use a canonical "
+            "absolute path and re-run the plan"
+        )
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    if ".." in candidate.parts:
+        raise SkillMCPError(
+            f"{flag} output path must not contain '..'; use a canonical absolute "
+            "path and re-run the plan"
+        )
+    absolute = Path(os.path.abspath(candidate))
+    parent_snapshot = _secret_output_parent_snapshot(
+        absolute.parent,
+        label=flag,
+    )
+    try:
+        metadata = absolute.lstat()
+    except FileNotFoundError:
+        return {
+            "argument": flag,
+            "identity": {
+                "path": str(absolute),
+                "exists": False,
+                "parent": parent_snapshot,
+            },
+        }
+    except OSError as exc:
+        raise SkillMCPError(
+            f"Could not inspect {flag} output path {absolute}: {exc}"
+        ) from exc
+    if stat.S_ISLNK(metadata.st_mode):
+        raise SkillMCPError(f"{flag} output must not be a symbolic link: {absolute}")
+    if not stat.S_ISREG(metadata.st_mode):
+        raise SkillMCPError(f"{flag} output must be a regular file: {absolute}")
+    mode = stat.S_IMODE(metadata.st_mode)
+    if os.name == "posix":
+        if metadata.st_uid != os.geteuid():
+            raise SkillMCPError(
+                f"{flag} output must be owned by the MCP server user: {absolute}"
+            )
+        if mode & 0o077:
+            raise SkillMCPError(
+                f"{flag} output must not be accessible by group or other users: "
+                f"{absolute}"
+            )
+        if metadata.st_nlink != 1:
+            raise SkillMCPError(
+                f"{flag} output must not have multiple hard links: {absolute}"
+            )
+    if metadata.st_size > MAX_SECRET_FILE_BYTES:
+        raise SkillMCPError(
+            f"{flag} output exceeds the {MAX_SECRET_FILE_BYTES}-byte limit: {absolute}"
+        )
+    return {
+        "argument": flag,
+        "identity": {
+            "path": str(absolute),
+            "exists": True,
+            "parent": parent_snapshot,
+            "device": metadata.st_dev,
+            "inode": metadata.st_ino,
+            "mode": mode,
+            "uid": getattr(metadata, "st_uid", None),
+            "gid": getattr(metadata, "st_gid", None),
+            "size": metadata.st_size,
+            "mtime_ns": metadata.st_mtime_ns,
+            "ctime_ns": metadata.st_ctime_ns,
+        },
+    }
+
+
+def _secret_output_bindings(command: list[str]) -> tuple[dict[str, Any], ...]:
+    bindings = []
+    for label, path in _secret_file_arguments(command):
+        flag = label.split(":", 1)[0]
+        if flag in SECRET_OUTPUT_FILE_FLAGS:
+            bindings.append(_secret_output_binding(flag, path))
+    return tuple(bindings)
+
+
 def _verify_secret_file_identities(plan: PlannedCommand) -> None:
     current = _secret_file_identities(plan.command, require_exists=True)
     if current != plan.secret_file_identities:
         raise SkillMCPError(
             "A planned secret file changed after review; the plan was invalidated. "
             "Re-run the plan step."
+        )
+
+
+def _verify_secret_output_bindings(plan: PlannedCommand) -> None:
+    current = _secret_output_bindings(plan.command)
+    if current != plan.secret_output_bindings:
+        raise SkillMCPError(
+            "A reviewed secret output destination changed after planning; "
+            "the plan was invalidated. Re-run the plan step."
         )
 
 
@@ -1297,9 +2142,38 @@ def _store_plan(
     timeout_seconds = _validate_timeout(timeout_seconds)
     executable = _planned_executable(command)
     executable_sha256 = _file_sha256(executable)
-    interpreter = _interpreter_path(command)
+    interpreter_binding = _interpreter_binding_for_command(command)
+    interpreter_invocation = (
+        interpreter_binding[0] if interpreter_binding is not None else None
+    )
+    interpreter = interpreter_binding[1] if interpreter_binding is not None else None
+    interpreter_link_target = (
+        interpreter_binding[2] if interpreter_binding is not None else ""
+    )
+    interpreter_invocation_identity = (
+        _interpreter_launcher_identity(interpreter_invocation)
+        if interpreter_invocation is not None
+        else ()
+    )
+    interpreter_invocation_chain = (
+        _interpreter_symlink_chain(interpreter_invocation)
+        if interpreter_invocation is not None
+        else ()
+    )
+    interpreter_invocation_parent_route = (
+        _interpreter_parent_route(interpreter_invocation)
+        if interpreter_invocation is not None
+        else ()
+    )
+    interpreter_environment_files = (
+        _interpreter_environment_files(interpreter_invocation)
+        if interpreter_invocation is not None
+        and Path(command[0]).name.lower().startswith("python")
+        else ()
+    )
     interpreter_sha256 = _file_sha256(interpreter) if interpreter is not None else ""
     secret_file_identities = _secret_file_identities(command)
+    secret_output_bindings = _secret_output_bindings(command)
     repository_sha256 = _skills_snapshot_sha256()
     if (
         expected_repository_sha256 is not None
@@ -1322,9 +2196,18 @@ def _store_plan(
         executable_path=str(executable),
         executable_sha256=executable_sha256,
         repository_sha256=repository_sha256,
+        interpreter_invocation_path=(
+            str(interpreter_invocation) if interpreter_invocation is not None else ""
+        ),
+        interpreter_invocation_link_target=interpreter_link_target,
+        interpreter_invocation_identity=interpreter_invocation_identity,
+        interpreter_invocation_chain=interpreter_invocation_chain,
+        interpreter_invocation_parent_route=interpreter_invocation_parent_route,
+        interpreter_environment_files=interpreter_environment_files,
         interpreter_path=str(interpreter) if interpreter is not None else "",
         interpreter_sha256=interpreter_sha256,
         secret_file_identities=secret_file_identities,
+        secret_output_bindings=secret_output_bindings,
     )
     with _PLANS_LOCK:
         _purge_expired_plans_locked()
@@ -2410,14 +3293,45 @@ def _verify_plan_integrity(plan: PlannedCommand) -> None:
             "Re-run the plan step."
         )
     if plan.interpreter_path:
-        interpreter = Path(plan.interpreter_path)
+        invocation = Path(
+            plan.interpreter_invocation_path or plan.interpreter_path
+        )
+        try:
+            launcher, interpreter, link_target = _interpreter_binding(invocation)
+        except SkillMCPError:
+            raise SkillMCPError(
+                "The planned interpreter launcher changed after review; the plan "
+                "was invalidated. Re-run the plan step."
+            ) from None
         if (
-            not interpreter.is_file()
+            launcher != invocation
+            or interpreter != Path(plan.interpreter_path)
+            or link_target != plan.interpreter_invocation_link_target
+            or (
+                plan.interpreter_invocation_identity
+                and _interpreter_launcher_identity(invocation)
+                != plan.interpreter_invocation_identity
+            )
+            or (
+                plan.interpreter_invocation_chain
+                and _interpreter_symlink_chain(invocation)
+                != plan.interpreter_invocation_chain
+            )
+            or (
+                plan.interpreter_invocation_parent_route
+                and _interpreter_parent_route(invocation)
+                != plan.interpreter_invocation_parent_route
+            )
+            or (
+                plan.interpreter_environment_files
+                and _interpreter_environment_files(invocation)
+                != plan.interpreter_environment_files
+            )
             or _file_sha256(interpreter) != plan.interpreter_sha256
         ):
             raise SkillMCPError(
-                "The planned interpreter changed after review; the plan was "
-                "invalidated. Re-run the plan step."
+                "The planned interpreter launcher or target changed after review; "
+                "the plan was invalidated. Re-run the plan step."
             )
     if _skills_snapshot_sha256() != plan.repository_sha256:
         raise SkillMCPError(
@@ -2425,6 +3339,7 @@ def _verify_plan_integrity(plan: PlannedCommand) -> None:
             "Re-run the plan step."
         )
     _verify_secret_file_identities(plan)
+    _verify_secret_output_bindings(plan)
 
 
 def _cancelled_execution_payload(
@@ -2520,7 +3435,9 @@ def execute_plan(
 
         execution_command = list(plan.command)
         if plan.interpreter_path:
-            execution_command[0] = plan.interpreter_path
+            execution_command[0] = (
+                plan.interpreter_invocation_path or plan.interpreter_path
+            )
 
         def consume_immediately_before_spawn() -> None:
             # A resolver or dry-run may have occupied the subprocess worker

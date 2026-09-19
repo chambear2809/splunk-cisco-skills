@@ -153,8 +153,14 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 # Pull SPLUNK_O11Y_REALM / SPLUNK_O11Y_TOKEN_FILE / etc. from credentials when present.
-load_observability_cloud_settings
-load_splunk_connection_settings
+if ! load_observability_cloud_settings; then
+    echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+    exit 1
+fi
+if ! load_splunk_connection_settings; then
+    echo "ERROR: Could not load the selected Splunk credential target." >&2
+    exit 1
+fi
 
 if [[ -z "${REALM}" && -n "${SPLUNK_O11Y_REALM:-}" ]]; then
     REALM="${SPLUNK_O11Y_REALM}"

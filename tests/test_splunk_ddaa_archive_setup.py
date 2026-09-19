@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -90,6 +91,157 @@ class DdaaArchiveTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("DRY RUN", result.stdout + result.stderr)
+
+    def test_apply_refuses_create_when_index_observation_is_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            credentials = root / "credentials"
+            credentials.write_text(
+                "\n".join(
+                    [
+                        "SPLUNK_PLATFORM=cloud",
+                        "SPLUNK_CLOUD_STACK=reviewed-stack",
+                        "STACK_TOKEN=synthetic-token",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            credentials.chmod(0o600)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            marker = root / "mutation-ran"
+            acs = fake_bin / "acs"
+            acs.write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"$*\" in\n"
+                "  *'config current-stack'*) printf '%s\\n' 'Stack: reviewed-stack' ;;\n"
+                "  *'indexes describe'*) printf '%s' '{\"statusCode\":500}' >&2; exit 1 ;;\n"
+                f"  *'indexes create'*|*'indexes update'*) touch {str(marker)!r} ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            acs.chmod(0o700)
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+            for key in (
+                "ACS_SERVER",
+                "SPLUNK_CLOUD_SEARCH_HEAD",
+                "SPLUNK_CLOUD_STACK",
+                "SPLUNK_PLATFORM",
+                "SPLUNK_PROFILE",
+                "SPLUNK_SEARCH_PROFILE",
+                "STACK_TOKEN",
+            ):
+                env.pop(key, None)
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(SETUP),
+                    "--output-dir",
+                    str(root / "render"),
+                    "--phase",
+                    "apply",
+                    "--index",
+                    "netfw",
+                    "--searchable-days",
+                    "90",
+                    "--archival-retention-days",
+                    "365",
+                    "--accept-archive-retention",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("refusing mutation", result.stdout + result.stderr)
+            self.assertFalse(marker.exists())
+
+    def test_apply_does_not_claim_success_after_mismatching_post_readback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            credentials = root / "credentials"
+            credentials.write_text(
+                "\n".join(
+                    [
+                        "SPLUNK_PLATFORM=cloud",
+                        "SPLUNK_CLOUD_STACK=reviewed-stack",
+                        "STACK_TOKEN=synthetic-token",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            credentials.chmod(0o600)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            marker = root / "mutation-ran"
+            acs = fake_bin / "acs"
+            acs.write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"$*\" in\n"
+                "  *'config current-stack'*) printf '%s\\n' 'Stack: reviewed-stack' ;;\n"
+                "  *'indexes describe'*)\n"
+                f"    if [[ -e {str(marker)!r} ]]; then\n"
+                "      printf '%s' '{\"name\":\"netfw\",\"datatype\":\"event\",\"searchableDays\":91,\"splunkArchivalRetentionDays\":365}'\n"
+                "    else\n"
+                "      printf '%s' '{\"statusCode\":404}' >&2\n"
+                "      exit 1\n"
+                "    fi\n"
+                "    ;;\n"
+                f"  *'indexes create'*) touch {str(marker)!r} ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            acs.chmod(0o700)
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+            for key in (
+                "ACS_SERVER",
+                "SPLUNK_CLOUD_SEARCH_HEAD",
+                "SPLUNK_CLOUD_STACK",
+                "SPLUNK_PLATFORM",
+                "SPLUNK_PROFILE",
+                "SPLUNK_SEARCH_PROFILE",
+                "STACK_TOKEN",
+            ):
+                env.pop(key, None)
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(SETUP),
+                    "--output-dir",
+                    str(root / "render"),
+                    "--phase",
+                    "apply",
+                    "--index",
+                    "netfw",
+                    "--searchable-days",
+                    "90",
+                    "--archival-retention-days",
+                    "365",
+                    "--accept-archive-retention",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("status is incomplete", result.stdout + result.stderr)
+            self.assertTrue(marker.exists())
 
 
 if __name__ == "__main__":

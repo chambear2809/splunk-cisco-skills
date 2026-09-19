@@ -135,7 +135,10 @@ validate_choice "${PACKAGE_TYPE}" auto tgz rpm deb all
 validate_choice "${EXECUTION_MODE}" local ssh
 
 if [[ "${EXECUTION_MODE}" == "ssh" && "${PACKAGE_TYPE}" == "auto" ]]; then
-    load_splunk_ssh_credentials
+    if ! load_splunk_ssh_credentials; then
+        log "ERROR: Could not load the selected Splunk SSH target credentials."
+        exit 1
+    fi
 fi
 
 REQUESTED_PACKAGE_TYPES=()

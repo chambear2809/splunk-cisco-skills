@@ -138,7 +138,10 @@ if [[ "${TARGET_OS}" == "windows" || "${TARGET_OS}" =~ ^(freebsd|solaris|aix)$ |
 fi
 
 if [[ "${EXECUTION_MODE}" == "ssh" ]]; then
-    load_splunk_ssh_credentials
+    if ! load_splunk_ssh_credentials; then
+        log "ERROR: Could not load the selected Splunk SSH target credentials."
+        exit 1
+    fi
 fi
 
 assert_target_command "Universal Forwarder binary exists" "$(hbs_shell_join test -x "${SPLUNK_HOME}/bin/splunk")"

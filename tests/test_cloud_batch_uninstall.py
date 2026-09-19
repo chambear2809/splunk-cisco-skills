@@ -37,6 +37,7 @@ def save():
     state_path.write_text(json.dumps(state), encoding="utf-8")
 
 if "config current-stack" in command:
+    print("Stack: example-stack")
     print("Current Search Head: shc1")
     raise SystemExit(0)
 

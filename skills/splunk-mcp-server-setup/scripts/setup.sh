@@ -2092,7 +2092,10 @@ if [[ "${RENDER_CLIENTS}" == "true" ]]; then
             NEED_O11Y_DEFAULTS=true
         fi
         if [[ "${NEED_O11Y_DEFAULTS}" == "true" ]]; then
-            load_observability_cloud_settings
+            if ! load_observability_cloud_settings; then
+                log "ERROR: Could not load the selected Observability Cloud settings for client rendering."
+                exit 1
+            fi
             apply_gateway_defaults_from_env
         fi
     fi

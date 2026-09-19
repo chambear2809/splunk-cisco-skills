@@ -4,7 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SKILLS_ROOT}/shared/lib/credential_helpers.sh"
-load_observability_cloud_settings
+if ! load_observability_cloud_settings; then
+    echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+    exit 1
+fi
 
 RENDER=false
 UPLOAD_SOURCE_MAPS=false

@@ -732,12 +732,14 @@ registry_dependency_app_ids_for_current_target() {
 }
 
 warn_for_current_install_target_role() {
-    local target_app_id
+    local target_app_id target_role=""
 
     target_app_id="$(registry_target_app_id)"
     if [[ -n "${target_app_id}" ]]; then
-        warn_if_role_unsupported_for_app_id "${target_app_id}"
-    elif [[ -n "$(resolve_splunk_target_role)" ]]; then
+        warn_if_role_unsupported_for_app_id "${target_app_id}" || return 1
+    elif ! target_role="$(resolve_splunk_target_role)"; then
+        return 1
+    elif [[ -n "${target_role}" ]]; then
         log "INFO: No deployment-role metadata found for the requested package. Continuing without role-aware checks."
     fi
 }
@@ -752,7 +754,7 @@ dependency_install_chain_contains() {
 
 install_dependency_with_current_script() {
     local dep_id="${1:-}"
-    local dep_name dep_label dep_package current_target_id chain
+    local dep_name dep_label dep_package current_target_id chain installed_name observe_status
     local -a cmd
 
     [[ -n "${dep_id}" ]] || return 0
@@ -769,14 +771,26 @@ install_dependency_with_current_script() {
     fi
 
     if is_splunk_cloud; then
-        if [[ -n "$(cloud_resolve_splunkbase_app_name "${dep_id}" || true)" ]]; then
+        if ! installed_name="$(cloud_resolve_splunkbase_app_name "${dep_id}")"; then
+            log "ERROR: Could not observe installed Splunk Cloud apps before resolving dependency ${dep_id}."
+            return 1
+        fi
+        if [[ -n "${installed_name}" ]]; then
             log "Required companion app ${dep_label} (${dep_id}) is already installed."
             return 0
         fi
     else
-        if [[ -n "${dep_name}" ]] && rest_check_app "$SK" "$SPLUNK_URI" "${dep_name}" 2>/dev/null; then
-            log "Required companion app ${dep_label} (${dep_id}) is already installed."
-            return 0
+        if [[ -n "${dep_name}" ]]; then
+            if rest_observe_app "$SK" "$SPLUNK_URI" "${dep_name}" 2>/dev/null; then
+                log "Required companion app ${dep_label} (${dep_id}) is already installed."
+                return 0
+            else
+                observe_status=$?
+                if (( observe_status != 1 )); then
+                    log "ERROR: Could not observe Enterprise app ${dep_name}; refusing dependency installation because absence was not verified."
+                    return 1
+                fi
+            fi
         fi
     fi
 
@@ -1058,11 +1072,17 @@ prompt_update() {
 }
 
 prompt_splunk_creds() {
-    load_splunk_credentials
+    if ! load_splunk_credentials; then
+        log "ERROR: Could not load the selected Splunk credential target."
+        return 1
+    fi
 }
 
 prompt_splunkbase_creds() {
-    load_splunkbase_credentials
+    if ! load_splunkbase_credentials; then
+        log "ERROR: Could not load Splunkbase credentials."
+        return 1
+    fi
 }
 
 # ── Core functions ──────────────────────────────────────────────────
@@ -1073,7 +1093,10 @@ splunk_auth() {
         log "Authenticated to Splunk REST API with provided session key"
         return 0
     fi
-    SK=$(get_session_key "${SPLUNK_URI}")
+    if ! SK="$(get_session_key "${SPLUNK_URI}")" || [[ -z "${SK}" ]]; then
+        log "ERROR: Could not authenticate to the selected Splunk REST target."
+        return 1
+    fi
     log "Authenticated to Splunk REST API"
 }
 
@@ -1099,21 +1122,26 @@ cloud_restart_or_exit() {
 }
 
 cloud_resolve_splunkbase_app_name() {
-    local splunkbase_id="$1"
+    local splunkbase_id="$1" apps_json=""
     acs_prepare_context || return 1
-    acs_apps_list_all_json --splunkbase \
-        | acs_extract_http_response_json \
-        | python3 -c "
+    if ! apps_json="$(acs_apps_list_all_json --splunkbase)"; then
+        return 1
+    fi
+    printf '%s' "${apps_json}" | python3 -c "
 import json, sys
 target = str(sys.argv[1])
 try:
     data = json.load(sys.stdin)
-    for app in data.get('apps', []):
+    if not isinstance(data, dict) or not isinstance(data.get('apps'), list):
+        raise ValueError('invalid apps observation')
+    for app in data['apps']:
+        if not isinstance(app, dict):
+            raise ValueError('invalid app observation')
         if str(app.get('splunkbaseID', '')) == target:
             print(app.get('name', ''), end='')
             break
 except Exception:
-    pass
+    raise SystemExit(1)
 " "${splunkbase_id}"
 }
 
@@ -1174,7 +1202,10 @@ cloud_install_splunkbase_app() {
     cloud_apply_known_splunkbase_defaults
 
     if ${UPDATE}; then
-        installed_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}" || true)"
+        if ! installed_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}")"; then
+            log "ERROR: Could not observe installed Splunk Cloud apps; refusing to choose update versus fresh install."
+            exit 1
+        fi
         if [[ -n "${installed_name}" ]]; then
             cmd=(apps update "${installed_name}")
             [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
@@ -1222,7 +1253,10 @@ except Exception:
 ")"
 
     if [[ -z "${app_name}" ]]; then
-        app_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}" || true)"
+        if ! app_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}")"; then
+            log "ERROR: ACS accepted the app operation, but installed app identity could not be observed."
+            exit 1
+        fi
     fi
     CLOUD_APP_NAME="${app_name}"
     CLOUD_APP_VERSION="${version}"
@@ -1254,12 +1288,16 @@ cloud_verify_exact_app_state() {
     }
 
     while (( attempt <= attempts )); do
-        raw="$(acs_command apps describe "${app_name}" 2>/dev/null || true)"
-        describe_json="$(printf '%s' "${raw}" | acs_extract_http_response_json)"
-        metadata="$(printf '%s' "${describe_json}" | python3 -c '
+        raw=""
+        describe_json=""
+        metadata=""
+        if raw="$(acs_command apps describe "${app_name}" 2>/dev/null)" \
+            && describe_json="$(printf '%s' "${raw}" | acs_extract_http_response_json)"; then
+            metadata="$(printf '%s' "${describe_json}" | python3 -c '
 import json
 import sys
 
+expected_name = sys.argv[1]
 try:
     data = json.load(sys.stdin)
 except Exception:
@@ -1275,8 +1313,11 @@ status = data.get("status") or spec.get("status") or ""
 values = [str(name), str(version), str(status)]
 if not all(values) or any("\x1f" in value for value in values):
     raise SystemExit(1)
+if str(name) != expected_name:
+    raise SystemExit(1)
 print("\x1f".join(values), end="")
-' 2>/dev/null || true)"
+' "${app_name}" 2>/dev/null)" || metadata=""
+        fi
         if [[ -n "${metadata}" ]]; then
             IFS=$'\x1f' read -r name version status <<< "${metadata}"
             normalized="$(printf '%s' "${status}" | tr '[:upper:]' '[:lower:]')"
@@ -1442,8 +1483,8 @@ download_from_splunkbase() {
         done
     fi
 
-    prompt_splunkbase_creds
-    splunkbase_auth
+    prompt_splunkbase_creds || return 1
+    splunkbase_auth || return 1
 
     local temp_path
     temp_path="$(mktemp "${TA_CACHE}/splunkbase_${APP_ID}.XXXXXX")"
@@ -1585,19 +1626,30 @@ install_via_server_path() {
     local update_flag="$2"
 
     splunk_curl "${SK}" --connect-timeout 10 --max-time 180 \
+        --max-filesize 1048576 \
         -X POST "${SPLUNK_URI}/services/apps/local" \
         --data-urlencode "name=${source_path}" \
         -d "filename=true" \
         -d "update=${update_flag}" \
         -d "output_mode=json" \
         -w '\n%{http_code}' \
-        2>/dev/null || true
+        2>/dev/null
 }
 
 app_lookup_http_code() {
     local sk="$1" uri="$2" app="$3"
-    splunk_curl "${sk}" --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" \
-        "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null || echo "000"
+    local observe_status=0
+    if rest_observe_app "${sk}" "${uri}" "${app}"; then
+        printf '%s' "200"
+        return 0
+    else
+        observe_status=$?
+    fi
+    if (( observe_status == 1 )); then
+        printf '%s' "404"
+    else
+        printf '%s' "000"
+    fi
 }
 
 INSTALL_HTTP_CODE=""
@@ -1620,6 +1672,13 @@ install_via_server_path_with_verification() {
     response=$(install_via_server_path "${source_path}" "${update_flag}")
     install_rc=$?
     set -e
+
+    if (( install_rc != 0 )); then
+        # A partial response can still end in a plausible HTTP status and the
+        # requested app may already have existed.  Neither observation proves
+        # that this install/update completed.
+        INSTALL_INCOMPLETE_BUT_PRESENT=true
+    fi
 
     http_code=$(printf '%s\n' "${response}" | tail -1)
     body=$(printf '%s\n' "${response}" | sed '$d')
@@ -1765,9 +1824,13 @@ install_app() {
         exit 1
     fi
 
+    local bundle_check_status=0
     if deployment_should_use_bundle_for_current_target; then
         local bundle_kind
-        bundle_kind="$(deployment_bundle_kind_for_current_target)"
+        if ! bundle_kind="$(deployment_bundle_kind_for_current_target)"; then
+            log "ERROR: Could not resolve the configured deployment target; refusing installation."
+            exit 1
+        fi
         case "${bundle_kind}" in
             shc)
                 log "Installing via search-head-cluster deployer bundle delivery..."
@@ -1807,7 +1870,13 @@ install_app() {
         http_code="${INSTALL_HTTP_CODE}"
         body="${INSTALL_BODY}"
     else
-    log "Installing to ${SPLUNK_URI} ..."
+        bundle_check_status=$?
+        if (( bundle_check_status == 2 )) \
+            || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+            log "ERROR: Could not resolve the configured deployment target; refusing REST fallback."
+            exit 1
+        fi
+        log "Installing to ${SPLUNK_URI} ..."
 
     # Detect whether Splunk is local or remote.
     local splunk_host
@@ -1876,12 +1945,16 @@ except Exception:
     print('', end='')
 " 2>/dev/null || true)
 
-    if [[ -z "${app_name}" && -n "${expected_app_name}" && ( "${http_code}" == "200" || "${http_code}" == "201" ) ]]; then
+    if [[ -n "${expected_app_name}" && ( "${http_code}" == "200" || "${http_code}" == "201" ) ]]; then
+        if [[ -n "${app_name}" && "${app_name}" != "${expected_app_name}" ]]; then
+            log "ERROR: Install response identified an app other than the reviewed package target; exact installation is not verified."
+            verification_incomplete=true
+        fi
         app_name="${expected_app_name}"
     fi
 
     if ${INSTALL_INCOMPLETE_BUT_PRESENT}; then
-        log "ERROR: Install request did not finish cleanly; the app is present, but this does not prove the requested install/update completed."
+        log "ERROR: Install request did not finish cleanly; any observed app presence does not prove the requested install/update completed."
         verification_incomplete=true
     fi
 
@@ -1905,21 +1978,15 @@ except Exception:
             log "ERROR: App '${app_name}' could not be read back after the install request (HTTP ${post_install_check})."
             verification_incomplete=true
         else
-            log "SUCCESS: App '${app_name}' is present after the install request (HTTP ${http_code})"
+            log "VERIFIED: Exact app entry '${app_name}' is present after the install request (HTTP ${http_code})."
         fi
 
-        local version
-        version=$(splunk_curl "${SK}" \
-            "${SPLUNK_URI}/services/apps/local/${app_name}?output_mode=json" 2>/dev/null \
-            | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    e = data.get('entry', [{}])[0].get('content', {})
-    print(e.get('version', 'unknown'))
-except Exception:
-    print('unknown')
-" 2>/dev/null || echo "unknown")
+        local version="unknown"
+        if ! version="$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${app_name}")"; then
+            log "ERROR: App '${app_name}' exact version could not be read back safely."
+            verification_incomplete=true
+            version="unknown"
+        fi
         log "Installed path: ${SPLUNK_HOME}/etc/apps/${app_name}/"
         log "Version: ${version}"
         if [[ -n "${APP_VERSION}" && "${version}" != "${APP_VERSION}" ]]; then
@@ -1942,17 +2009,23 @@ except Exception:
 # ── Main ────────────────────────────────────────────────────────────
 
 main() {
+    local platform=""
     echo "=== Splunk App Installer ==="
     echo ""
 
     require_registry_provenance || exit 1
+
+    if ! platform="$(resolve_splunk_platform)"; then
+        log "ERROR: Could not resolve the selected Splunk platform; refusing installation routing."
+        exit 1
+    fi
 
     mkdir -p "${PROJECT_TA_DIR}"
     mkdir -p "${TA_CACHE}"
 
     prompt_source
 
-    if is_splunk_cloud; then
+    if [[ "${platform}" == "cloud" ]]; then
         case "${SOURCE}" in
             local)
                 prompt_local_file
@@ -1979,7 +2052,7 @@ main() {
         prompt_update
         apply_registry_verified_version_default
         preflight_current_install_target_compatibility
-        warn_for_current_install_target_role
+        warn_for_current_install_target_role || exit 1
         require_registry_provenance || exit 1
         install_required_dependencies
         cloud_install_app
@@ -1998,7 +2071,7 @@ main() {
             prompt_splunkbase
             apply_registry_verified_version_default
             preflight_current_install_target_compatibility
-            download_from_splunkbase
+            download_from_splunkbase || exit 1
             ;;
         *)
             log "ERROR: Unknown source '${SOURCE}'"
@@ -2012,10 +2085,10 @@ main() {
     # Bind compatibility to the exact version read from the downloaded archive
     # immediately before any dependency or target mutation.
     preflight_current_install_target_compatibility
-    warn_for_current_install_target_role
+    warn_for_current_install_target_role || exit 1
     require_registry_provenance || exit 1
-    prompt_splunk_creds
-    splunk_auth
+    prompt_splunk_creds || exit 1
+    splunk_auth || exit 1
     install_required_dependencies
     install_app "${APP_FILE}"
 }

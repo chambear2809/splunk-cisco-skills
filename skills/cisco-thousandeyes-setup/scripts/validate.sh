@@ -54,7 +54,10 @@ ensure_ingest_session() {
         fail "Could not load Splunk credentials — check credentials file"
         return 1
     fi
-    load_ingest_connection_settings
+    if ! load_ingest_connection_settings; then
+        fail "Could not load the selected Splunk ingest target settings"
+        return 1
+    fi
 
     saved_user="${SPLUNK_USER:-}"
     saved_pass="${SPLUNK_PASS:-}"
@@ -80,11 +83,15 @@ inspect_hec_token_state() {
     fi
     if type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
         && deployment_should_manage_ingest_hec_via_bundle; then
-        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
-        return 0
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null
+        return $?
+    fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        fail "Could not resolve the configured ingest deployment target; REST fallback was refused"
+        return 1
     fi
     ensure_ingest_session || return 1
-    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null
 }
 
 if [[ ${FAIL} -gt 0 ]]; then
@@ -103,13 +110,17 @@ fi
 
 log ""
 log "--- HEC Token ---"
-hec_state=$(inspect_hec_token_state "thousandeyes" 2>/dev/null || echo "unknown")
-case "${hec_state}" in
-    enabled) pass "HEC token 'thousandeyes' exists" ;;
-    disabled) warn "HEC token 'thousandeyes' exists but is disabled" ;;
-    missing) warn "HEC token 'thousandeyes' not found (run setup.sh --hec-only)" ;;
-    *) warn "Could not determine HEC token 'thousandeyes' status" ;;
-esac
+if ! hec_state=$(inspect_hec_token_state "thousandeyes" 2>/dev/null); then
+    fail "Could not inspect HEC token 'thousandeyes' on the configured target"
+    hec_state="unknown"
+else
+    case "${hec_state}" in
+        enabled) pass "HEC token 'thousandeyes' exists" ;;
+        disabled) warn "HEC token 'thousandeyes' exists but is disabled" ;;
+        missing) warn "HEC token 'thousandeyes' not found (run setup.sh --hec-only)" ;;
+        *) warn "Could not determine HEC token 'thousandeyes' status" ;;
+    esac
+fi
 
 log ""
 log "--- Indexes ---"

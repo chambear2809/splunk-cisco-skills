@@ -117,6 +117,7 @@ render_assets() {
 }
 
 apply_live() {
+    local observed_type="" observation_status=0
     if [[ "${ACCEPT_ARCHIVE_RETENTION}" != "true" ]]; then
         log "ERROR: Setting DDAA archival retention changes durable storage policy."
         log "       Re-run with --accept-archive-retention to apply via ACS."
@@ -131,20 +132,43 @@ apply_live() {
         exit 1
     fi
     acs_prepare_context || { log "ERROR: Could not prepare ACS context for the stack."; exit 1; }
-    if cloud_check_index "${INDEX}"; then
+    if observed_type="$(cloud_observe_index "${INDEX}")"; then
+        if [[ "${observed_type}" != "${INDEX_TYPE}" ]]; then
+            log "ERROR: Existing ACS index datatype does not match --index-type; refusing update."
+            return 1
+        fi
         log "Updating DDAA archival retention for existing index ${INDEX}..."
-        acs_command indexes update --name "${INDEX}" \
+        if ! acs_command indexes update --name "${INDEX}" \
             --searchable-days "${SEARCHABLE_DAYS}" \
-            --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null
+            --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null; then
+            log "ERROR: ACS index retention update failed."
+            return 1
+        fi
     else
-        log "Creating index ${INDEX} with DDAA archival retention..."
-        acs_command indexes create --name "${INDEX}" \
-            --data-type "${INDEX_TYPE}" \
-            --searchable-days "${SEARCHABLE_DAYS}" \
-            --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null
+        observation_status=$?
+        case "${observation_status}" in
+            1)
+                log "Creating index ${INDEX} with DDAA archival retention..."
+                if ! acs_command indexes create --name "${INDEX}" \
+                    --data-type "${INDEX_TYPE}" \
+                    --searchable-days "${SEARCHABLE_DAYS}" \
+                    --splunk-archival-retention-days "${ARCHIVAL_RETENTION_DAYS}" >/dev/null; then
+                    log "ERROR: ACS index creation failed."
+                    return 1
+                fi
+                ;;
+            *)
+                log "ERROR: Could not establish whether the requested ACS index exists; refusing mutation."
+                return 1
+                ;;
+        esac
     fi
-    log "DDAA archival retention set for ${INDEX}: ${ARCHIVAL_RETENTION_DAYS} days (searchable ${SEARCHABLE_DAYS})."
-    acs_command indexes describe "${INDEX}"
+    if ! cloud_verify_index_retention \
+        "${INDEX}" "${INDEX_TYPE}" "${SEARCHABLE_DAYS}" "${ARCHIVAL_RETENTION_DAYS}"; then
+        log "ERROR: DDAA mutation completed without a matching exact readback; status is incomplete."
+        return 1
+    fi
+    log "DDAA archival retention verified for ${INDEX}: ${ARCHIVAL_RETENTION_DAYS} days (searchable ${SEARCHABLE_DAYS})."
 }
 
 run_status() {
@@ -154,7 +178,12 @@ run_status() {
     fi
     acs_cli_available || { log "ERROR: acs CLI not available; install it to describe index ${INDEX}."; exit 1; }
     acs_prepare_context || { log "ERROR: Could not prepare ACS context for the stack."; exit 1; }
-    acs_command indexes describe "${INDEX}"
+    if ! cloud_verify_index_retention \
+        "${INDEX}" "${INDEX_TYPE}" "${SEARCHABLE_DAYS}" "${ARCHIVAL_RETENTION_DAYS}"; then
+        log "ERROR: DDAA status could not verify the requested retention state."
+        return 1
+    fi
+    log "DDAA archival retention readback matched the requested index settings."
 }
 
 main() {

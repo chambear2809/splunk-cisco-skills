@@ -31,6 +31,9 @@ TOKEN_FILE=""
 WRITE_TOKEN_FILE=""
 RESTART_SPLUNK="true"
 HEC_BUNDLE_KIND=""
+CLOUD_STACK=""
+CLOUD_SEARCH_HEAD=""
+CLOUD_ACS_SERVER=""
 
 usage() {
     local exit_code="${1:-0}"
@@ -63,12 +66,15 @@ Options:
   --token-file PATH
   --write-token-file PATH
   --restart-splunk true|false
+  --stack STACK
+  --search-head SEARCH_HEAD
+  --acs-server https://admin.splunk.com|https://staging.admin.splunk.com
   --help
 
 Examples:
   $(basename "$0") --platform enterprise --token-name app_hec --default-index app --allowed-indexes app
   $(basename "$0") --platform enterprise --phase apply --token-file /tmp/app_hec_token
-  $(basename "$0") --platform cloud --phase apply --write-token-file /tmp/app_hec_token
+  $(basename "$0") --platform cloud --stack my-stack --phase apply --write-token-file /tmp/app_hec_token
 
 EOF
     exit "${exit_code}"
@@ -99,6 +105,9 @@ while [[ $# -gt 0 ]]; do
         --token-file) require_arg "$1" $# || exit 1; TOKEN_FILE="$2"; shift 2 ;;
         --write-token-file) require_arg "$1" $# || exit 1; WRITE_TOKEN_FILE="$2"; shift 2 ;;
         --restart-splunk) require_arg "$1" $# || exit 1; RESTART_SPLUNK="$2"; shift 2 ;;
+        --stack) require_arg "$1" $# || exit 1; CLOUD_STACK="$2"; shift 2 ;;
+        --search-head) require_arg "$1" $# || exit 1; CLOUD_SEARCH_HEAD="$2"; shift 2 ;;
+        --acs-server) require_arg "$1" $# || exit 1; CLOUD_ACS_SERVER="$2"; shift 2 ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -144,6 +153,58 @@ validate_args() {
     else
         OUTPUT_DIR="$(resolve_abs_path "${_PROJECT_ROOT}/${DEFAULT_RENDER_DIR_NAME}")"
     fi
+    if [[ -n "${CLOUD_ACS_SERVER}" ]]; then
+        validate_choice "${CLOUD_ACS_SERVER}" https://admin.splunk.com https://staging.admin.splunk.com
+    fi
+    if [[ "${PLATFORM}" != "cloud" \
+        && ( -n "${CLOUD_STACK}" || -n "${CLOUD_SEARCH_HEAD}" || -n "${CLOUD_ACS_SERVER}" ) ]]; then
+        log "ERROR: --stack, --search-head, and --acs-server are valid only with --platform cloud."
+        exit 1
+    fi
+}
+
+resolve_cloud_target() {
+    [[ "${PLATFORM}" == "cloud" ]] || return 0
+
+    if [[ -n "${CLOUD_STACK}" ]]; then
+        SPLUNK_CLOUD_STACK="${CLOUD_STACK}"
+        export SPLUNK_CLOUD_STACK
+    fi
+    if [[ -n "${CLOUD_SEARCH_HEAD}" ]]; then
+        SPLUNK_CLOUD_SEARCH_HEAD="${CLOUD_SEARCH_HEAD}"
+        export SPLUNK_CLOUD_SEARCH_HEAD
+    fi
+    if [[ -n "${CLOUD_ACS_SERVER}" ]]; then
+        ACS_SERVER="${CLOUD_ACS_SERVER}"
+        export ACS_SERVER
+    fi
+    SPLUNK_PLATFORM="cloud"
+    export SPLUNK_PLATFORM
+    if ! load_splunk_platform_settings; then
+        log "ERROR: Could not resolve the selected Splunk Cloud target."
+        exit 1
+    fi
+    CLOUD_STACK="${SPLUNK_CLOUD_STACK:-}"
+    CLOUD_SEARCH_HEAD="${SPLUNK_CLOUD_SEARCH_HEAD:-}"
+    CLOUD_ACS_SERVER="${ACS_SERVER:-}"
+    if [[ ! "${CLOUD_STACK}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: A valid --stack or configured SPLUNK_CLOUD_STACK is required for Splunk Cloud rendering."
+        exit 1
+    fi
+    if [[ -n "${CLOUD_SEARCH_HEAD}" \
+        && ! "${CLOUD_SEARCH_HEAD}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: The resolved Splunk Cloud search-head identity is invalid."
+        exit 1
+    fi
+    case "${CLOUD_ACS_SERVER}" in
+        https://admin.splunk.com|https://staging.admin.splunk.com) ;;
+        *)
+            log "ERROR: The resolved ACS control-plane origin is not allowlisted."
+            exit 1
+            ;;
+    esac
+    ACS_SERVER="${CLOUD_ACS_SERVER}"
+    export ACS_SERVER
 }
 
 build_renderer_args() {
@@ -167,6 +228,9 @@ build_renderer_args() {
         --token-file "${TOKEN_FILE}"
         --write-token-file "${WRITE_TOKEN_FILE}"
         --restart-splunk "${RESTART_SPLUNK}"
+        --stack "${CLOUD_STACK}"
+        --search-head "${CLOUD_SEARCH_HEAD}"
+        --acs-server "${CLOUD_ACS_SERVER}"
     )
 }
 
@@ -210,6 +274,77 @@ status_script() {
     fi
 }
 
+verify_rendered_cloud_status_binding() {
+    local metadata_file
+    [[ "${PLATFORM}" == "cloud" ]] || return 0
+    metadata_file="$(render_dir)/metadata.json"
+    if ! python3 - "${metadata_file}" "${CLOUD_STACK}" "${CLOUD_SEARCH_HEAD}" "${CLOUD_ACS_SERVER}" "${TOKEN_NAME}" <<'PY'
+import json
+import os
+import stat
+import sys
+
+metadata_path = sys.argv[1]
+expected = {
+    "platform": "cloud",
+    "cloud_stack": sys.argv[2],
+    "cloud_search_head": sys.argv[3],
+    "acs_server": sys.argv[4],
+    "token_name": sys.argv[5],
+}
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+descriptor = -1
+try:
+    descriptor = os.open(metadata_path, flags)
+    before = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_size < 1
+        or before.st_size > 65536
+    ):
+        raise ValueError("metadata is not a bounded regular file")
+    with os.fdopen(descriptor, encoding="utf-8") as handle:
+        descriptor = -1
+        metadata = json.load(handle)
+        after = os.fstat(handle.fileno())
+except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+    raise SystemExit(1)
+finally:
+    if descriptor >= 0:
+        os.close(descriptor)
+before_fingerprint = (
+    before.st_dev,
+    before.st_ino,
+    before.st_mode,
+    before.st_uid,
+    before.st_size,
+    before.st_mtime_ns,
+    before.st_ctime_ns,
+    before.st_nlink,
+)
+after_fingerprint = (
+    after.st_dev,
+    after.st_ino,
+    after.st_mode,
+    after.st_uid,
+    after.st_size,
+    after.st_mtime_ns,
+    after.st_ctime_ns,
+    after.st_nlink,
+)
+if before_fingerprint != after_fingerprint:
+    raise SystemExit(1)
+if not isinstance(metadata, dict) or any(metadata.get(key) != value for key, value in expected.items()):
+    raise SystemExit(1)
+PY
+    then
+        log "ERROR: Existing rendered Cloud HEC status assets do not match the requested ACS origin, stack, search head, or token."
+        log "HANDOFF: Re-render the reviewed assets for this exact Cloud target before running status."
+        exit 1
+    fi
+}
+
 guard_enterprise_direct_apply() {
     case "${HEC_BUNDLE_KIND}" in
         idxc|shc)
@@ -221,16 +356,36 @@ guard_enterprise_direct_apply() {
 }
 
 main() {
-    local resolved_role="" bundle_kind=""
+    local resolved_role="" bundle_kind="" bundle_status=0
     validate_args
+    resolve_cloud_target
     if [[ "${PLATFORM}" == "enterprise" && "${DRY_RUN}" != "true" \
         && ( "${PHASE}" == "apply" || "${PHASE}" == "all" || "${APPLY}" == "true" ) ]]; then
-        load_splunk_connection_settings
-        resolved_role="$(resolve_splunk_target_role 2>/dev/null || true)"
+        if ! load_splunk_connection_settings; then
+            log "ERROR: Could not resolve the selected Splunk credential target."
+            exit 1
+        fi
+        if ! resolved_role="$(resolve_splunk_target_role)"; then
+            log "ERROR: Could not resolve the selected Splunk target role."
+            exit 1
+        fi
         SPLUNK_TARGET_ROLE="${resolved_role:-${SPLUNK_TARGET_ROLE:-standalone}}"
         export SPLUNK_TARGET_ROLE
-        bundle_kind="$(deployment_bundle_kind_for_current_target 2>/dev/null || true)"
-        HEC_BUNDLE_KIND="${bundle_kind}"
+        if deployment_should_use_bundle_for_current_target; then
+            if ! bundle_kind="$(deployment_bundle_kind_for_current_target)" \
+                || [[ -z "${bundle_kind}" ]]; then
+                log "ERROR: Could not determine the bundle deployment path for the selected Splunk target."
+                exit 1
+            fi
+            HEC_BUNDLE_KIND="${bundle_kind}"
+        else
+            bundle_status=$?
+            if (( bundle_status == 2 )) \
+                || [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+                log "ERROR: Could not resolve the configured Enterprise HEC deployment path; refusing direct apply."
+                exit 1
+            fi
+        fi
     fi
     build_renderer_args
     if [[ "${DRY_RUN}" == "true" ]]; then
@@ -250,7 +405,7 @@ main() {
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
         apply) render_assets; guard_enterprise_direct_apply; run_rendered_script "$(apply_script)" ;;
-        status) run_rendered_script "$(status_script)" ;;
+        status) verify_rendered_cloud_status_binding; run_rendered_script "$(status_script)" ;;
         all) render_assets; guard_enterprise_direct_apply; run_rendered_script preflight.sh; run_rendered_script "$(apply_script)"; run_rendered_script "$(status_script)" ;;
     esac
 }

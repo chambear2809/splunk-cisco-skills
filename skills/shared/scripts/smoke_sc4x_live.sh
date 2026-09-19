@@ -94,8 +94,14 @@ if [[ ! "${SC4SNMP_PORT}" =~ ^[0-9]+$ ]] || (( SC4SNMP_PORT < 1 || SC4SNMP_PORT 
     exit 1
 fi
 
-load_splunk_credentials >/dev/null
-load_splunk_ssh_credentials >/dev/null
+if ! load_splunk_credentials >/dev/null; then
+    log "ERROR: Could not load the selected Splunk credentials."
+    exit 1
+fi
+if ! load_splunk_ssh_credentials >/dev/null; then
+    log "ERROR: Could not load the selected Splunk SSH credentials."
+    exit 1
+fi
 SK="$(get_session_key "${SPLUNK_URI}")" || {
     log "ERROR: Could not authenticate to Splunk REST API."
     exit 1
