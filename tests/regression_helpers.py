@@ -414,25 +414,6 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     out("", 200)
                 stanza = unquote(path.rsplit("/", 1)[-1])
                 if stanza in conf_store:
-                    safe_content = {
-                        key: "<redacted>"
-                        if any(
-                            marker in key.lower()
-                            for marker in ("auth", "credential", "key", "pass", "secret", "token")
-                        )
-                        else value
-                        for key, value in conf_store[stanza].items()
-                    }
-                    log(
-                        "MOCK_READBACK "
-                        + json.dumps(
-                            {
-                                "label": f"security-cloud/{stanza}",
-                                "content": safe_content,
-                            },
-                            sort_keys=True,
-                        )
-                    )
                     out(
                         json.dumps(
                             {
@@ -447,33 +428,15 @@ class ShellScriptRegressionBase(unittest.TestCase):
                         200 if write_code else None,
                     )
                 if stanza == state.get("security_cloud_last_stanza"):
-                    last_fields = state.get("security_cloud_last_fields", {})
-                    safe_content = {
-                        key: "<redacted>"
-                        if any(
-                            marker in key.lower()
-                            for marker in ("auth", "credential", "key", "pass", "secret", "token")
-                        )
-                        else value
-                        for key, value in last_fields.items()
-                    }
-                    log(
-                        "MOCK_READBACK "
-                        + json.dumps(
-                            {
-                                "label": f"security-cloud/{stanza}",
-                                "content": safe_content,
-                            },
-                            sort_keys=True,
-                        )
-                    )
                     out(
                         json.dumps(
                             {
                                 "entry": [
                                     {
                                         "name": stanza,
-                                        "content": last_fields,
+                                        "content": state.get(
+                                            "security_cloud_last_fields", {}
+                                        ),
                                     }
                                 ]
                             }

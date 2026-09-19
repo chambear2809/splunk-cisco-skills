@@ -23,17 +23,6 @@ from tests.regression_helpers import (
 )
 
 
-def _mock_readback_diagnostics(curl_log: Path) -> str:
-    if not curl_log.exists():
-        return "\nMOCK DIAGNOSTICS: curl log was not created"
-    lines = [
-        line
-        for line in curl_log.read_text(encoding="utf-8").splitlines()
-        if line.startswith("MOCK_READBACK ")
-    ]
-    return "\nMOCK DIAGNOSTICS:\n" + "\n".join(lines)
-
-
 class CiscoTARegressionTests(ShellScriptRegressionBase):
     def test_new_cisco_helpers_reject_secret_equals_without_echoing_value(self):
         secret = "SECRET_SHOULD_NOT_LEAK"
@@ -90,15 +79,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 "--no-restart",
                 env=env,
             )
-            self.assertEqual(
-                setup_result.returncode,
-                0,
-                msg=(
-                    setup_result.stdout
-                    + setup_result.stderr
-                    + _mock_readback_diagnostics(curl_log)
-                ),
-            )
+            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertIn("Set CiscoSecurityCloud log level to DEBUG.", setup_result.stdout)
             self.assertIn("Installed app: CiscoSecurityCloud", setup_result.stdout)
 
@@ -1357,11 +1338,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 "--no-verify-ssl",
                 env=env,
             )
-            self.assertEqual(
-                result.returncode,
-                0,
-                msg=result.stdout + result.stderr + _mock_readback_diagnostics(curl_log),
-            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             log_text = curl_log.read_text(encoding="utf-8")
             account_posts = [
@@ -1399,11 +1376,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 "--no-verify-ssl",
                 env=env,
             )
-            self.assertEqual(
-                result.returncode,
-                0,
-                msg=result.stdout + result.stderr + _mock_readback_diagnostics(curl_log),
-            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("verify_ssl=False", result.stdout)
             self.assertIn("cisco_dc_networking_app_for_splunk_settings", result.stdout)
 
@@ -1512,11 +1485,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             self.assertEqual(
                 catalyst_result.returncode,
                 0,
-                msg=(
-                    catalyst_result.stdout
-                    + catalyst_result.stderr
-                    + _mock_readback_diagnostics(curl_log)
-                ),
+                msg=catalyst_result.stdout + catalyst_result.stderr,
             )
             self.assertIn("Skipping cisco_catalyst_dnac_swim", catalyst_result.stdout)
             self.assertIn("Skipping cisco_catalyst_dnac_application_traffic", catalyst_result.stdout)
@@ -1584,11 +1553,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 env=env,
             )
 
-            self.assertEqual(
-                result.returncode,
-                0,
-                msg=result.stdout + result.stderr + _mock_readback_diagnostics(curl_log),
-            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("Device inputs enabled (7 inputs).", result.stdout)
             self.assertIn("Live input status: total=7, enabled=7, disabled=0", result.stdout)
 
@@ -1665,22 +1630,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             def log(msg: str) -> None:
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(msg + "\\n")
-
-            def debug_readback(label: str, content: dict) -> None:
-                sensitive_markers = ("auth", "credential", "key", "pass", "secret", "token")
-                safe_content = {
-                    key: "<redacted>"
-                    if any(marker in key.lower() for marker in sensitive_markers)
-                    else value
-                    for key, value in content.items()
-                }
-                log(
-                    "MOCK_READBACK "
-                    + json.dumps(
-                        {"label": label, "content": safe_content},
-                        sort_keys=True,
-                    )
-                )
 
             def save() -> None:
                 state_path.write_text(json.dumps(state), encoding="utf-8")
@@ -1778,7 +1727,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if content_state is None:
                     out("", 404)
                 content = {key: values[-1] for key, values in content_state.items()}
-                debug_readback(normalized_path, content)
                 out(
                     json.dumps(
                         {"entry": [{"name": normalized_path.rsplit("/", 1)[-1], "content": content}]}
@@ -1799,7 +1747,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     out("", 404)
                 content = {key: values[-1] for key, values in content_state.items()}
                 content.setdefault("disabled", "0")
-                debug_readback(normalized_path, content)
                 out(
                     json.dumps(
                         {"entry": [{"name": input_name, "content": content}]}
@@ -1892,22 +1839,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             def log(msg: str) -> None:
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(msg + "\\n")
-
-            def debug_readback(label: str, content: dict) -> None:
-                sensitive_markers = ("auth", "credential", "key", "pass", "secret", "token")
-                safe_content = {
-                    key: "<redacted>"
-                    if any(marker in key.lower() for marker in sensitive_markers)
-                    else value
-                    for key, value in content.items()
-                }
-                log(
-                    "MOCK_READBACK "
-                    + json.dumps(
-                        {"label": label, "content": safe_content},
-                        sort_keys=True,
-                    )
-                )
 
             def save() -> None:
                 state_path.write_text(json.dumps(state), encoding="utf-8")
@@ -2009,10 +1940,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
                     if exists:
-                        debug_readback(
-                            f"meraki/{input_type}/{stored_name}",
-                            state["inputs"][stored_name],
-                        )
                         out(
                             json.dumps(
                                 {
