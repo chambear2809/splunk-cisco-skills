@@ -179,14 +179,14 @@
     },
     {
       "path": "tests/test_agent_mcp_core.py",
-      "line": 2185,
+      "line": 2193,
       "rule_id": "generic-api-key",
       "line_sha256": "2812cd63dd6b4f606e7d1aff0041cb5b678bc5bace31808d477d7074bfbce3ca",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_agent_mcp_core.py",
-      "line": 2203,
+      "line": 2211,
       "rule_id": "jwt",
       "line_sha256": "f79cfdfabf8d44eb5209b8c810a2097e3a281b51bba4ae7373d6ca5c3e920546",
       "category": "synthetic-security-test"
