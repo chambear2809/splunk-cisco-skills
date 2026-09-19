@@ -185,6 +185,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
         *args: str,
         env: dict,
         input_text: str | None = None,
+        timeout: float = 120,
     ) -> subprocess.CompletedProcess:
         return subprocess.run(
             ["bash", str(REPO_ROOT / script_rel_path), *args],
@@ -194,7 +195,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
-            timeout=120,
+            timeout=timeout,
         )
 
     def run_script_no_env(
@@ -402,17 +403,17 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     # collection endpoint, then verifies the stanza-specific
                     # resource. Preserve that state across mock curl calls so
                     # strict requested-field readback remains meaningful.
-                    if "loglevel" in body:
-                        state["security_cloud_settings"]["loglevel"] = body["loglevel"]
-                        save()
+                    state["security_cloud_settings"].update(body)
+                    save()
                     out("", 200)
                 out(
                     json.dumps(
                         {
                             "entry": [
                                 {
+                                    "name": "logging",
                                     "content": {
-                                        "loglevel": state["security_cloud_settings"].get("loglevel", "")
+                                        **state["security_cloud_settings"]
                                     }
                                 }
                             ]

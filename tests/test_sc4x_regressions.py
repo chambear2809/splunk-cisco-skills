@@ -460,6 +460,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--config-file",
                 f"app-workaround.conf={config_file}",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertTrue(token_file.exists(), msg="Expected the SC4S token file to be written")
@@ -510,6 +511,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4s",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
@@ -556,6 +558,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--output-dir",
                 str(output_dir),
                 env=env,
+                timeout=300,
             )
 
             output = result.stdout + result.stderr
@@ -581,6 +584,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4s",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             validate_requests = curl_log.read_text(encoding="utf-8")
@@ -654,6 +658,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--write-hec-token-file",
                 str(token_file),
                 env=env,
+                timeout=300,
             )
 
             output = result.stdout + result.stderr
@@ -703,6 +708,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4s",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)

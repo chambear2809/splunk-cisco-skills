@@ -1666,6 +1666,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             parsed = urlparse(url)
             path = parsed.path
+            normalized_path = unquote(path)
             log(f"URL={url} METHOD={method} DATA={data!r}")
 
             if "/services/auth/login" in path:
@@ -1689,7 +1690,11 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 parsed_body = parse_qs(data, keep_blank_values=True)
                 if "/configs/conf-" in path:
                     stanza = parsed_body.get("name", [""])[-1]
-                    resource_path = f"{path.rstrip('/')}/{stanza}" if stanza else path
+                    resource_path = (
+                        f"{normalized_path.rstrip('/')}/{stanza}"
+                        if stanza
+                        else normalized_path
+                    )
                     state[resource_path] = {
                         key: values for key, values in parsed_body.items() if key != "name"
                     }
@@ -1697,21 +1702,21 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 out("", 200)
 
             if method == "GET" and "/configs/conf-" in path:
-                if path not in state:
+                if normalized_path not in state:
                     out("", 404)
-                content = {key: values[-1] for key, values in state[path].items()}
+                content = {key: values[-1] for key, values in state[normalized_path].items()}
                 out(
                     json.dumps(
-                        {"entry": [{"name": path.rsplit("/", 1)[-1], "content": content}]}
+                        {"entry": [{"name": normalized_path.rsplit("/", 1)[-1], "content": content}]}
                     ),
                     200,
                 )
 
             if method == "GET" and "/data/inputs/" in path:
                 input_name = unquote(path.rsplit("/", 1)[-1])
-                if path not in state:
+                if normalized_path not in state:
                     out("", 404)
-                content = {key: values[-1] for key, values in state[path].items()}
+                content = {key: values[-1] for key, values in state[normalized_path].items()}
                 content.setdefault("disabled", "0")
                 out(
                     json.dumps(
@@ -1724,9 +1729,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 parsed_body = parse_qs(data, keep_blank_values=True)
                 posted_name = parsed_body.get("name", [""])[-1]
                 resource_path = (
-                    path.rsplit("/", 1)[0]
+                    normalized_path.rsplit("/", 1)[0]
                     if path.endswith(("/enable", "/disable"))
-                    else f"{path.rstrip('/')}/{posted_name}" if posted_name else path
+                    else f"{normalized_path.rstrip('/')}/{posted_name}" if posted_name else normalized_path
                 )
                 state.setdefault(resource_path, {})
                 state[resource_path].update(parsed_body)
@@ -1873,7 +1878,18 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 existing_name = unquote(parts[1]) if len(parts) > 1 else ""
 
                 if method == "GET":
-                    exists = existing_name in state["inputs"]
+                    stored_name = existing_name
+                    if stored_name not in state["inputs"]:
+                        requested_suffix = stored_name.rsplit("://", 1)[-1]
+                        stored_name = next(
+                            (
+                                candidate
+                                for candidate in state["inputs"]
+                                if candidate.rsplit("://", 1)[-1] == requested_suffix
+                            ),
+                            stored_name,
+                        )
+                    exists = stored_name in state["inputs"]
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
                     if exists:
@@ -1882,9 +1898,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                                 {
                                     "entry": [
                                         {
-                                            "name": existing_name,
+                                            "name": stored_name,
                                             "acl": {"app": "Splunk_TA_cisco_meraki"},
-                                            "content": state["inputs"][existing_name],
+                                            "content": state["inputs"][stored_name],
                                         }
                                     ]
                                 }

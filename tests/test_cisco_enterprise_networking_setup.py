@@ -72,6 +72,21 @@ def respond(payload="", code=200):
 
 
 decoded_path = unquote(urlparse(url).path)
+state_path = Path(os.environ["MOCK_CONF_STATE"])
+try:
+    conf_state = json.loads(state_path.read_text(encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError):
+    conf_state = {}
+
+
+def save_conf_state():
+    state_path.write_text(json.dumps(conf_state), encoding="utf-8")
+
+
+def stored_content(defaults):
+    content = dict(defaults)
+    content.update(conf_state.get(decoded_path, {}))
+    return content
 
 if decoded_path.endswith("/services/auth/login"):
     respond("<response><sessionKey>test-session</sessionKey></response>")
@@ -85,6 +100,11 @@ if "/services/apps/local/" in decoded_path:
     respond(json.dumps({"entry": [{"content": {"version": version}}]}))
 
 if method == "POST" and "/configs/conf-" in decoded_path:
+    posted = parse_qs(body, keep_blank_values=True)
+    if "name" in posted:
+        posted.pop("name", None)
+    conf_state[decoded_path] = {key: values[-1] for key, values in posted.items()}
+    save_conf_state()
     respond("{}", 200)
 
 if decoded_path.endswith(
@@ -95,11 +115,13 @@ if decoded_path.endswith(
             {
                 "entry": [
                     {
-                        "content": {
-                            "definition": os.environ["MOCK_INDEX_DEF"],
-                            "description": "Definition for all indices where Cisco SDWAN, Cisco ISE, and Cisco Catalyst Center data is stored",
-                            "iseval": "0",
-                        }
+                        "content": stored_content(
+                            {
+                                "definition": os.environ["MOCK_INDEX_DEF"],
+                                "description": "Definition for all indices where Cisco SDWAN, Cisco ISE, and Cisco Catalyst Center data is stored",
+                                "iseval": "0",
+                            }
+                        )
                     }
                 ]
             }
@@ -114,11 +136,13 @@ if decoded_path.endswith(
             {
                 "entry": [
                     {
-                        "content": {
-                            "definition": os.environ["MOCK_SDWAN_DEF"],
-                            "description": "Definition for Cisco SD-WAN-only indexes used by SD-WAN raw dashboards, especially audit logs",
-                            "iseval": "0",
-                        }
+                        "content": stored_content(
+                            {
+                                "definition": os.environ["MOCK_SDWAN_DEF"],
+                                "description": "Definition for Cisco SD-WAN-only indexes used by SD-WAN raw dashboards, especially audit logs",
+                                "iseval": "0",
+                            }
+                        )
                     }
                 ]
             }
@@ -133,11 +157,13 @@ if decoded_path.endswith(
             {
                 "entry": [
                     {
-                        "content": {
-                            "definition": os.environ["MOCK_SOURCETYPE_DEF"],
-                            "description": "Cisco sourcetypes shipped in the Enterprise Networking 3.2.20 package contract",
-                            "iseval": "0",
-                        }
+                        "content": stored_content(
+                            {
+                                "definition": os.environ["MOCK_SOURCETYPE_DEF"],
+                                "description": "Cisco sourcetypes shipped in the Enterprise Networking 3.2.20 package contract",
+                                "iseval": "0",
+                            }
+                        )
                     }
                 ]
             }
@@ -147,7 +173,7 @@ if decoded_path.endswith(
 if decoded_path.endswith(
     "/TA_cisco_catalyst/configs/conf-eventtypes/cisco_sdwan_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"search": os.environ["MOCK_TA_SDWAN_DEF"]}}]}))
+    respond(json.dumps({"entry": [{"content": stored_content({"search": os.environ["MOCK_TA_SDWAN_DEF"]})}]}))
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-datamodels/Cisco_Catalyst_App"
@@ -212,6 +238,7 @@ def _mock_env(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
             "MOCK_CURL_LOG": str(curl_log),
+            "MOCK_CONF_STATE": str(tmp_path / "mock-conf-state.json"),
             "MOCK_INDEX_DEF": index_definition,
             "MOCK_SDWAN_DEF": sdwan_definition,
             "MOCK_TA_SDWAN_DEF": ta_sdwan_definition or sdwan_definition,
