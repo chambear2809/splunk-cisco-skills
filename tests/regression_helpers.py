@@ -229,6 +229,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     "indexes": [],
                     "security_cloud_handlers": {},
                     "security_cloud_settings": {"loglevel": ""},
+                    "security_cloud_conf": {},
                     "secure_access": {
                         "org_accounts": {},
                         "collections": {
@@ -397,24 +398,40 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 )
 
             if "configs/conf-ciscosecuritycloud_settings" in path:
+                conf_store = state.setdefault("security_cloud_conf", {})
                 if method == "POST":
                     body = decode_form(data)
                     # ``rest_set_conf`` creates a missing stanza through the
                     # collection endpoint, then verifies the stanza-specific
                     # resource. Preserve that state across mock curl calls so
                     # strict requested-field readback remains meaningful.
+                    stanza = body.pop("name", "logging")
+                    conf_store.setdefault(stanza, {}).update(body)
                     state["security_cloud_settings"].update(body)
                     save()
                     out("", 200)
+                stanza = unquote(path.rsplit("/", 1)[-1])
+                if stanza in conf_store:
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": stanza,
+                                        "content": conf_store[stanza],
+                                    }
+                                ]
+                            }
+                        ),
+                        200 if write_code else None,
+                    )
                 out(
                     json.dumps(
                         {
                             "entry": [
                                 {
                                     "name": "logging",
-                                    "content": {
-                                        **state["security_cloud_settings"]
-                                    }
+                                    "content": {**state["security_cloud_settings"]},
                                 }
                             ]
                         }

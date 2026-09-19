@@ -85,7 +85,12 @@ def save_conf_state():
 
 def stored_content(defaults):
     content = dict(defaults)
-    content.update(conf_state.get(decoded_path, {}))
+    normalized_path = decoded_path.rstrip("/")
+    stored = conf_state.get(normalized_path, {})
+    if not stored:
+        stanza = normalized_path.rsplit("/", 1)[-1]
+        stored = conf_state.get(f"__stanza__:{stanza}", {})
+    content.update(stored)
     return content
 
 if decoded_path.endswith("/services/auth/login"):
@@ -102,8 +107,12 @@ if "/services/apps/local/" in decoded_path:
 if method == "POST" and "/configs/conf-" in decoded_path:
     posted = parse_qs(body, keep_blank_values=True)
     stanza = posted.pop("name", [""])[-1]
-    resource_path = f"{decoded_path.rstrip('/')}/{stanza}" if stanza else decoded_path
-    conf_state[resource_path] = {key: values[-1] for key, values in posted.items()}
+    normalized_path = decoded_path.rstrip("/")
+    resource_path = f"{normalized_path}/{stanza}" if stanza else normalized_path
+    fields = {key: values[-1] for key, values in posted.items()}
+    conf_state[resource_path] = fields
+    if stanza:
+        conf_state[f"__stanza__:{stanza}"] = fields
     save_conf_state()
     respond("{}", 200)
 

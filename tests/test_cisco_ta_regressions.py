@@ -1618,6 +1618,8 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 state = json.loads(state_path.read_text(encoding="utf-8"))
             except (FileNotFoundError, json.JSONDecodeError):
                 state = {}
+            state.setdefault("_mock_conf_by_stanza", {})
+            state.setdefault("_mock_input_by_name", {})
             args = sys.argv[1:]
             method = "GET"
             data = ""
@@ -1695,16 +1697,24 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                         if stanza
                         else normalized_path
                     )
-                    state[resource_path] = {
+                    fields = {
                         key: values for key, values in parsed_body.items() if key != "name"
                     }
+                    state[resource_path] = fields
+                    if stanza:
+                        state["_mock_conf_by_stanza"][stanza] = fields
                     save()
                 out("", 200)
 
             if method == "GET" and "/configs/conf-" in path:
-                if normalized_path not in state:
+                content_state = state.get(normalized_path)
+                if content_state is None:
+                    content_state = state["_mock_conf_by_stanza"].get(
+                        normalized_path.rsplit("/", 1)[-1]
+                    )
+                if content_state is None:
                     out("", 404)
-                content = {key: values[-1] for key, values in state[normalized_path].items()}
+                content = {key: values[-1] for key, values in content_state.items()}
                 out(
                     json.dumps(
                         {"entry": [{"name": normalized_path.rsplit("/", 1)[-1], "content": content}]}
@@ -1714,9 +1724,12 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             if method == "GET" and "/data/inputs/" in path:
                 input_name = unquote(path.rsplit("/", 1)[-1])
-                if normalized_path not in state:
+                content_state = state.get(normalized_path)
+                if content_state is None:
+                    content_state = state["_mock_input_by_name"].get(input_name)
+                if content_state is None:
                     out("", 404)
-                content = {key: values[-1] for key, values in state[normalized_path].items()}
+                content = {key: values[-1] for key, values in content_state.items()}
                 content.setdefault("disabled", "0")
                 out(
                     json.dumps(
@@ -1735,6 +1748,8 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 )
                 state.setdefault(resource_path, {})
                 state[resource_path].update(parsed_body)
+                if posted_name:
+                    state["_mock_input_by_name"][posted_name] = state[resource_path]
                 if path.endswith("/enable"):
                     state[resource_path]["disabled"] = ["0"]
                 elif path.endswith("/disable"):
@@ -1793,6 +1808,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             state_path = Path(os.environ["MOCK_STATE"])
             log_path = Path(os.environ["CURL_LOG"])
             state = json.loads(state_path.read_text(encoding="utf-8"))
+            state.setdefault("input_aliases", {})
 
             args = sys.argv[1:]
             method = "GET"
@@ -1889,6 +1905,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                             ),
                             stored_name,
                         )
+                    if stored_name not in state["inputs"]:
+                        stored_name = state["input_aliases"].get(
+                            f"{input_type}://{existing_name}", stored_name
+                        )
                     exists = stored_name in state["inputs"]
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
@@ -1911,10 +1931,13 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
                 body = decode_form(data)
                 input_name = existing_name or body.pop("name", "")
-                content = state["inputs"].get(input_name, {})
+                alias = f"{input_type}://{input_name}"
+                canonical_name = state["input_aliases"].get(alias, input_name)
+                content = state["inputs"].get(canonical_name, {})
                 content.update(body)
                 content.setdefault("disabled", "0")
-                state["inputs"][input_name] = content
+                state["inputs"][canonical_name] = content
+                state["input_aliases"][alias] = canonical_name
                 save()
                 log(f"INPUT_POST type={input_type} name={input_name} data={data!r}")
                 out("", 200 if existing_name else 201)
