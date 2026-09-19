@@ -978,6 +978,7 @@ import sys
 from urllib.parse import parse_qsl
 
 expected_names = set(sys.argv[1:])
+stage = "read bounded framed input"
 
 try:
     raw = sys.stdin.buffer.read(2 * 1024 * 1024 + 2)
@@ -991,6 +992,7 @@ try:
     if len(response_text.encode("utf-8")) > 1024 * 1024:
         raise ValueError("response is too large")
 
+    stage = "parse response envelope"
     payload = json.loads(response_text)
     entries = payload.get("entry") if isinstance(payload, dict) else None
     if not isinstance(entries, list):
@@ -1004,6 +1006,7 @@ try:
     if not isinstance(content, dict):
         raise ValueError("requested entry has no content object")
 
+    stage = "parse requested form fields"
     pairs = parse_qsl(
         form_text,
         keep_blank_values=True,
@@ -1073,11 +1076,16 @@ try:
             return (actual_bool in truthy) == (wanted_bool in truthy)
         return False
 
+    stage = "compare requested fields"
     if any(key not in content or not equivalent(content[key], value, key) for key, value in expected.items()):
         raise ValueError("requested fields did not match")
 except Exception:
+    print(
+        f"ERROR: Strict REST readback validation failed during {stage}.",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
-' "${expected_name}" "$@" 2>/dev/null
+' "${expected_name}" "$@"
 }
 
 _rest_verify_exact_resource_form_body() {

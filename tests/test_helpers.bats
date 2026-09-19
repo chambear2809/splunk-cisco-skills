@@ -1131,6 +1131,9 @@ EOF
         "ExampleApp" "macros" "dashboard_scope" \
         'definition=index+IN+%28%22main%22%29&iseval=0'
 
+    if [ "${status}" -ne 0 ]; then
+        printf '# %s\n' "${output}" >&3
+    fi
     [ "${status}" -eq 0 ]
 }
 
