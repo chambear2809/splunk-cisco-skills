@@ -414,9 +414,24 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     out("", 200)
                 stanza = unquote(path.rsplit("/", 1)[-1])
                 if stanza in conf_store:
-                    print(
-                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(conf_store[stanza]))}",
-                        file=sys.stderr,
+                    safe_content = {
+                        key: "<redacted>"
+                        if any(
+                            marker in key.lower()
+                            for marker in ("auth", "credential", "key", "pass", "secret", "token")
+                        )
+                        else value
+                        for key, value in conf_store[stanza].items()
+                    }
+                    log(
+                        "MOCK_READBACK "
+                        + json.dumps(
+                            {
+                                "label": f"security-cloud/{stanza}",
+                                "content": safe_content,
+                            },
+                            sort_keys=True,
+                        )
                     )
                     out(
                         json.dumps(
@@ -433,9 +448,24 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     )
                 if stanza == state.get("security_cloud_last_stanza"):
                     last_fields = state.get("security_cloud_last_fields", {})
-                    print(
-                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(last_fields))}",
-                        file=sys.stderr,
+                    safe_content = {
+                        key: "<redacted>"
+                        if any(
+                            marker in key.lower()
+                            for marker in ("auth", "credential", "key", "pass", "secret", "token")
+                        )
+                        else value
+                        for key, value in last_fields.items()
+                    }
+                    log(
+                        "MOCK_READBACK "
+                        + json.dumps(
+                            {
+                                "label": f"security-cloud/{stanza}",
+                                "content": safe_content,
+                            },
+                            sort_keys=True,
+                        )
                     )
                     out(
                         json.dumps(

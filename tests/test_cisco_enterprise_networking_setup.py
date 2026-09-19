@@ -99,10 +99,24 @@ def stored_content(defaults):
 
 
 def debug_readback(label, content):
-    print(
-        f"MOCK_READBACK {label} keys={','.join(sorted(content))}",
-        file=sys.stderr,
-    )
+    sensitive_markers = ("auth", "credential", "key", "pass", "secret", "token")
+    safe_content = {
+        key: "<redacted>"
+        if any(marker in key.lower() for marker in sensitive_markers)
+        else value
+        for key, value in content.items()
+    }
+    with Path(os.environ["MOCK_CURL_LOG"]).open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "debug": "MOCK_READBACK",
+                    "label": label,
+                    "content": safe_content,
+                }
+            )
+            + "\n"
+        )
 
 if decoded_path.endswith("/services/auth/login"):
     respond("<response><sessionKey>test-session</sessionKey></response>")
@@ -295,7 +309,20 @@ def _run(script: Path, env: dict[str, str], *args: str) -> subprocess.CompletedP
 
 
 def _calls(curl_log: Path) -> list[dict[str, str]]:
-    return [json.loads(line) for line in curl_log.read_text(encoding="utf-8").splitlines()]
+    return [
+        call
+        for line in curl_log.read_text(encoding="utf-8").splitlines()
+        if (call := json.loads(line)).get("debug") != "MOCK_READBACK"
+    ]
+
+
+def _readback_diagnostics(curl_log: Path) -> str:
+    diagnostics = [
+        json.loads(line)
+        for line in curl_log.read_text(encoding="utf-8").splitlines()
+        if json.loads(line).get("debug") == "MOCK_READBACK"
+    ]
+    return "\nMOCK DIAGNOSTICS: " + json.dumps(diagnostics, sort_keys=True)
 
 
 def _post_form(calls: list[dict[str, str]], path_suffix: str) -> dict[str, list[str]]:
@@ -322,7 +349,9 @@ def test_setup_writes_custom_scopes_to_app_macros_and_ta_eventtype(tmp_path: Pat
         "10.5",
     )
 
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 0, (
+        result.stdout + result.stderr + _readback_diagnostics(curl_log)
+    )
     calls = _calls(curl_log)
     expected_all = 'index IN ("catalyst_prod","sdwan-prod")'
 
