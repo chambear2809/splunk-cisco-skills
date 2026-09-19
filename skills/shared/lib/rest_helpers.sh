@@ -962,13 +962,17 @@ _rest_get_bounded_http_200_body() {
 }
 
 # Verify that one exact REST entry reflects every field in a form-urlencoded
-# mutation body. The body is read from descriptor 3 so credentials and other
-# sensitive values never appear in the Python argv or in mismatch diagnostics.
+# mutation body. Frame the form body and response together on stdin so
+# credentials and other sensitive values never appear in argv, the environment,
+# a temporary file, or mismatch diagnostics.
 _rest_response_matches_form_body() {
     local expected_name="$1" form_body="$2"
     shift 2
 
-    python3 -c '
+    {
+        printf '%s\0' "${form_body}"
+        cat
+    } | python3 -c '
 import json
 import sys
 from urllib.parse import parse_qsl
@@ -976,13 +980,16 @@ from urllib.parse import parse_qsl
 expected_names = set(sys.argv[1:])
 
 try:
-    response_text = sys.stdin.read(1024 * 1024 + 1)
+    raw = sys.stdin.buffer.read(2 * 1024 * 1024 + 2)
+    form_bytes, separator, response_bytes = raw.partition(b"\0")
+    if not separator:
+        raise ValueError("missing form/response separator")
+    form_text = form_bytes.decode("utf-8")
+    response_text = response_bytes.decode("utf-8")
+    if len(form_bytes) > 1024 * 1024:
+        raise ValueError("form body is too large")
     if len(response_text.encode("utf-8")) > 1024 * 1024:
         raise ValueError("response is too large")
-    with open(3, encoding="utf-8") as form_handle:
-        form_text = form_handle.read(1024 * 1024 + 1).rstrip("\n")
-    if len(form_text.encode("utf-8")) > 1024 * 1024:
-        raise ValueError("form body is too large")
 
     payload = json.loads(response_text)
     entries = payload.get("entry") if isinstance(payload, dict) else None
@@ -1070,7 +1077,7 @@ try:
         raise ValueError("requested fields did not match")
 except Exception:
     raise SystemExit(1)
-' "${expected_name}" "$@" 3<<<"${form_body}" 2>/dev/null
+' "${expected_name}" "$@" 2>/dev/null
 }
 
 _rest_verify_exact_resource_form_body() {
