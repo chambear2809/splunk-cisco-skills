@@ -1115,6 +1115,25 @@ EOF
     [[ "${output}" != *"observed-synthetic-value"* ]]
 }
 
+@test "rest_set_conf accepts HTTP success when requested fields read back exactly" {
+    source "${LIB_DIR}/rest_helpers.sh"
+
+    splunk_curl() {
+        printf '%s\n%s' \
+            '{"entry":[{"name":"dashboard_scope","content":{"definition":"index IN (\"main\")","iseval":"0"}}]}' \
+            '200'
+    }
+    splunk_curl_post() {
+        printf '%s\n%s' '{}' '200'
+    }
+
+    run rest_set_conf "synthetic-session-key" "https://splunk.example:8089" \
+        "ExampleApp" "macros" "dashboard_scope" \
+        'definition=index+IN+%28%22main%22%29&iseval=0'
+
+    [ "${status}" -eq 0 ]
+}
+
 @test "app presence and version readers reject non-exact HTTP 200 payloads" {
     source "${LIB_DIR}/rest_helpers.sh"
 
