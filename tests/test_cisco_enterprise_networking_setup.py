@@ -90,19 +90,57 @@ if method == "POST" and "/configs/conf-" in decoded_path:
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_app_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"definition": os.environ["MOCK_INDEX_DEF"]}}]}))
+    respond(
+        json.dumps(
+            {
+                "entry": [
+                    {
+                        "content": {
+                            "definition": os.environ["MOCK_INDEX_DEF"],
+                            "description": "Definition for all indices where Cisco SDWAN, Cisco ISE, and Cisco Catalyst Center data is stored",
+                            "iseval": "0",
+                        }
+                    }
+                ]
+            }
+        )
+    )
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_sdwan_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"definition": os.environ["MOCK_SDWAN_DEF"]}}]}))
+    respond(
+        json.dumps(
+            {
+                "entry": [
+                    {
+                        "content": {
+                            "definition": os.environ["MOCK_SDWAN_DEF"],
+                            "description": "Definition for Cisco SD-WAN-only indexes used by SD-WAN raw dashboards, especially audit logs",
+                            "iseval": "0",
+                        }
+                    }
+                ]
+            }
+        )
+    )
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_app_sourcetypes"
 ):
     respond(
         json.dumps(
-            {"entry": [{"content": {"definition": os.environ["MOCK_SOURCETYPE_DEF"]}}]}
+            {
+                "entry": [
+                    {
+                        "content": {
+                            "definition": os.environ["MOCK_SOURCETYPE_DEF"],
+                            "description": "Cisco sourcetypes shipped in the Enterprise Networking 3.2.20 package contract",
+                            "iseval": "0",
+                        }
+                    }
+                ]
+            }
         )
     )
 

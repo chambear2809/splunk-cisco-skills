@@ -437,6 +437,14 @@ class AgentMCPCoreTests(unittest.TestCase):
                 check=True,
             )
             launcher = venv / "bin" / "python"
+            # Keep this regression focused on preserving virtualenv invocation.
+            # ``venv`` may otherwise link a nested environment to
+            # ``sys._base_executable`` (for example, GitHub's intentionally
+            # world-writable /opt/hostedtoolcache route) instead of to the
+            # already-running, attested interpreter. That distinct target must
+            # remain subject to the normal ancestry rejection.
+            launcher.unlink()
+            launcher.symlink_to(Path(sys.executable).resolve(strict=True))
             site_packages = next((venv / "lib").glob("python*/site-packages"))
             (site_packages / "venv_only_module.py").write_text(
                 "VALUE = 'venv-only'\n",

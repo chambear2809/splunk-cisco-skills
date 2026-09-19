@@ -1681,15 +1681,19 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if path.endswith(unavailable_paths) and method == "GET":
                     out("", 404)
 
-            if "/configs/conf-" in path and method == "POST":
+            if (
+                ("/configs/conf-" in path or "_account" in path or "_settings" in path)
+                and method == "POST"
+            ):
                 log(f"CONF_POST path={path} data={data!r}")
                 parsed_body = parse_qs(data, keep_blank_values=True)
-                stanza = parsed_body.get("name", [""])[-1]
-                resource_path = f"{path.rstrip('/')}/{stanza}" if stanza else path
-                state[resource_path] = {
-                    key: values for key, values in parsed_body.items() if key != "name"
-                }
-                save()
+                if "/configs/conf-" in path:
+                    stanza = parsed_body.get("name", [""])[-1]
+                    resource_path = f"{path.rstrip('/')}/{stanza}" if stanza else path
+                    state[resource_path] = {
+                        key: values for key, values in parsed_body.items() if key != "name"
+                    }
+                    save()
                 out("", 200)
 
             if method == "GET" and "/configs/conf-" in path:

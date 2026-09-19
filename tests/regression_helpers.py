@@ -395,16 +395,28 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     (200 if exists else 404) if write_code else None,
                 )
 
-            if "configs/conf-ciscosecuritycloud_settings/logging" in path:
+            if "configs/conf-ciscosecuritycloud_settings" in path:
                 if method == "POST":
                     body = decode_form(data)
+                    # ``rest_set_conf`` creates a missing stanza through the
+                    # collection endpoint, then verifies the stanza-specific
+                    # resource. Preserve that state across mock curl calls so
+                    # strict requested-field readback remains meaningful.
                     if "loglevel" in body:
                         state["security_cloud_settings"]["loglevel"] = body["loglevel"]
                         save()
                     out("", 200)
                 out(
                     json.dumps(
-                        {"entry": [{"content": {"loglevel": state["security_cloud_settings"].get("loglevel", "")}}]}
+                        {
+                            "entry": [
+                                {
+                                    "content": {
+                                        "loglevel": state["security_cloud_settings"].get("loglevel", "")
+                                    }
+                                }
+                            ]
+                        }
                     ),
                     200 if write_code else None,
                 )
@@ -744,6 +756,35 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     token["default_index"] = body["index"]
                 save()
                 out("", 200)
+
+            if "/services/data/inputs/http/" in path and method == "GET":
+                encoded_name = path.rsplit("/", 1)[-1]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                token = state["hec_tokens"].get(name)
+                if token is None:
+                    out(json.dumps({"entry": []}), 404 if write_code else None)
+                out(
+                    json.dumps(
+                        {
+                            "entry": [
+                                {
+                                    "name": f"http://{name}",
+                                    "content": {
+                                        "disabled": token.get("disabled", "false"),
+                                        "useACK": token.get("useACK", "0"),
+                                        "indexes": token.get("indexes", ""),
+                                        "index": token.get("index", "sc4s"),
+                                        "default_index": token.get("default_index", token.get("index", "sc4s")),
+                                        "token": token.get("token", ""),
+                                    },
+                                }
+                            ]
+                        }
+                    ),
+                    200 if write_code else None,
+                )
 
             if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
                 encoded_name = path.rsplit("/", 2)[-2]
