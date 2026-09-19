@@ -1072,7 +1072,7 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
                 "\n".join(
                     (
                         'SPLUNK_PLATFORM="enterprise"',
-                        'SPLUNK_DELIVERY_PLANE="direct"',
+                        'SPLUNK_DELIVERY_PLANE="rest"',
                     )
                 )
                 + "\n",

@@ -1934,8 +1934,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                         )
                     if stored_name not in state["inputs"] and existing_name == state.get("last_input_name"):
                         stored_name = state["last_input_name"]
-                    if stored_name not in state["inputs"] and state.get("last_post_fields"):
-                        stored_name = state.get("last_input_name", stored_name)
                     exists = stored_name in state["inputs"]
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
