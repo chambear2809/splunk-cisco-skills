@@ -101,9 +101,9 @@ if "/services/apps/local/" in decoded_path:
 
 if method == "POST" and "/configs/conf-" in decoded_path:
     posted = parse_qs(body, keep_blank_values=True)
-    if "name" in posted:
-        posted.pop("name", None)
-    conf_state[decoded_path] = {key: values[-1] for key, values in posted.items()}
+    stanza = posted.pop("name", [""])[-1]
+    resource_path = f"{decoded_path.rstrip('/')}/{stanza}" if stanza else decoded_path
+    conf_state[resource_path] = {key: values[-1] for key, values in posted.items()}
     save_conf_state()
     respond("{}", 200)
 
