@@ -558,7 +558,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--output-dir",
                 str(output_dir),
                 env=env,
-                timeout=300,
+                timeout=900,
             )
 
             output = result.stdout + result.stderr

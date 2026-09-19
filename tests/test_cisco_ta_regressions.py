@@ -1671,7 +1671,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             normalized_path = unquote(path)
             log(f"URL={url} METHOD={method} DATA={data!r}")
 
-            if method == "POST" and data:
+            if method == "POST" and data and (
+                "/configs/conf-" in path or "/data/inputs/" in path
+            ):
                 state["_mock_last_post_fields"] = parse_qs(data, keep_blank_values=True)
                 save()
 
@@ -1881,7 +1883,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             path = parsed.path
             log(f"URL={url} METHOD={method} DATA={data!r}")
 
-            if method == "POST" and data:
+            if method == "POST" and data and "/servicesNS/nobody/Splunk_TA_cisco_meraki/data/inputs/" in path:
                 state["last_post_fields"] = decode_form(data)
                 save()
 
