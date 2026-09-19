@@ -1954,7 +1954,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                             ),
                             200 if write_code else None,
                         )
-                    out(json.dumps({"entry": []}), 200 if write_code else None)
+                    # Splunk's item endpoint reports an absent input as 404;
+                    # keep the fixture's absence signal distinct from a
+                    # successful collection response with no observations.
+                    out(json.dumps({"entry": []}), 404 if write_code else None)
 
                 body = decode_form(data)
                 input_name = existing_name or body.pop("name", "")

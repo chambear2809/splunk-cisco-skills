@@ -1082,6 +1082,7 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
 
             splunk_home = temp_root / "splunk"
             splunk_bin = splunk_home / "bin" / "splunk"
+            splunk_bin.parent.mkdir(parents=True)
             write_executable(
                 splunk_bin,
                 """\
