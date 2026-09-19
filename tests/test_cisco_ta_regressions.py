@@ -1631,6 +1631,12 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(msg + "\\n")
 
+            def debug_readback(label: str, content: dict) -> None:
+                print(
+                    f"MOCK_READBACK {label} keys={','.join(sorted(content))}",
+                    file=sys.stderr,
+                )
+
             def save() -> None:
                 state_path.write_text(json.dumps(state), encoding="utf-8")
 
@@ -1727,6 +1733,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if content_state is None:
                     out("", 404)
                 content = {key: values[-1] for key, values in content_state.items()}
+                debug_readback(normalized_path, content)
                 out(
                     json.dumps(
                         {"entry": [{"name": normalized_path.rsplit("/", 1)[-1], "content": content}]}
@@ -1747,6 +1754,7 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     out("", 404)
                 content = {key: values[-1] for key, values in content_state.items()}
                 content.setdefault("disabled", "0")
+                debug_readback(normalized_path, content)
                 out(
                     json.dumps(
                         {"entry": [{"name": input_name, "content": content}]}
@@ -1839,6 +1847,12 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             def log(msg: str) -> None:
                 with log_path.open("a", encoding="utf-8") as handle:
                     handle.write(msg + "\\n")
+
+            def debug_readback(label: str, content: dict) -> None:
+                print(
+                    f"MOCK_READBACK {label} keys={','.join(sorted(content))}",
+                    file=sys.stderr,
+                )
 
             def save() -> None:
                 state_path.write_text(json.dumps(state), encoding="utf-8")
@@ -1940,6 +1954,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
                     if exists:
+                        debug_readback(
+                            f"meraki/{input_type}/{stored_name}",
+                            state["inputs"][stored_name],
+                        )
                         out(
                             json.dumps(
                                 {

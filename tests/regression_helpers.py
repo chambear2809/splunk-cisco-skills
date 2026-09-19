@@ -414,6 +414,10 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     out("", 200)
                 stanza = unquote(path.rsplit("/", 1)[-1])
                 if stanza in conf_store:
+                    print(
+                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(conf_store[stanza]))}",
+                        file=sys.stderr,
+                    )
                     out(
                         json.dumps(
                             {
@@ -428,15 +432,18 @@ class ShellScriptRegressionBase(unittest.TestCase):
                         200 if write_code else None,
                     )
                 if stanza == state.get("security_cloud_last_stanza"):
+                    last_fields = state.get("security_cloud_last_fields", {})
+                    print(
+                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(last_fields))}",
+                        file=sys.stderr,
+                    )
                     out(
                         json.dumps(
                             {
                                 "entry": [
                                     {
                                         "name": stanza,
-                                        "content": state.get(
-                                            "security_cloud_last_fields", {}
-                                        ),
+                                        "content": last_fields,
                                     }
                                 ]
                             }
