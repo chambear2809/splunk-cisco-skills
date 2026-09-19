@@ -82,6 +82,7 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
                     handle.write(cmd + "\\n")
 
                 if cmd == "config current-stack":
+                    print("Stack: example-stack")
                     print("Current Search Head: sh-i-123")
                     raise SystemExit(0)
                 if cmd == "apps list --splunkbase --count 100 --offset 0":

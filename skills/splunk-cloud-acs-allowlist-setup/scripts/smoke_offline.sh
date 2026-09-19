@@ -11,6 +11,7 @@ trap 'rm -rf "${TMP_OUT}"' EXIT
 bash "${SCRIPT_DIR}/setup.sh" \
     --phase render \
     --output-dir "${TMP_OUT}" \
+    --target-stack synthetic-stack \
     --features search-api,s2s,hec,acs \
     --search-api-subnets 198.51.100.0/24 \
     --s2s-subnets 198.51.100.0/24,203.0.113.0/24 \

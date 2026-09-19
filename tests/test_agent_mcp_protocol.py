@@ -119,6 +119,8 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                 "get_skill_manifest",
                 "list_skill_files",
                 "read_skill_file",
+                "list_shared_documents",
+                "read_shared_document",
                 "credential_status",
                 "list_cisco_products",
                 "resolve_cisco_product",
@@ -170,6 +172,10 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(read["offset"]["minimum"], 0)
         self.assertEqual(read["max_bytes"]["minimum"], 1)
         self.assertEqual(read["max_bytes"]["maximum"], 262144)
+        shared_read = tools["read_shared_document"].input_schema["properties"]
+        self.assertEqual(shared_read["offset"]["minimum"], 0)
+        self.assertEqual(shared_read["max_bytes"]["minimum"], 1)
+        self.assertEqual(shared_read["max_bytes"]["maximum"], 262144)
 
     async def test_unknown_and_out_of_range_arguments_are_tool_errors(self) -> None:
         sentinel = "protocol-test-secret-value-do-not-echo"
@@ -318,6 +324,25 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
                     "max_bytes": 64,
                 },
             )
+            manifest = await client.call_tool(
+                "get_skill_manifest",
+                {"skill": "cisco-appdynamics-setup"},
+            )
+            shared_listing = await client.call_tool(
+                "list_shared_documents",
+                {"limit": 1},
+            )
+            shared_read = await client.call_tool(
+                "read_shared_document",
+                {
+                    "path": "skills/shared/ta_completion_gate.md",
+                    "max_bytes": 64,
+                },
+            )
+            shared_rejected = await client.call_tool(
+                "read_shared_document",
+                {"path": "skills/shared/scripts/setup.sh"},
+            )
             traversal = await client.call_tool(
                 "read_skill_file",
                 {
@@ -345,6 +370,20 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
             len(bounded_read.structured_content["text"].encode("utf-8")),
             64,
         )
+        self.assertFalse(manifest.is_error)
+        self.assertIn(
+            "skills/shared/ta_completion_gate.md",
+            manifest.structured_content["required_documents"],
+        )
+        self.assertFalse(shared_listing.is_error)
+        self.assertEqual(shared_listing.structured_content["total"], 1)
+        self.assertFalse(shared_read.is_error)
+        self.assertEqual(
+            shared_read.structured_content["uri"],
+            "skills://shared/ta_completion_gate.md",
+        )
+        self.assertTrue(shared_rejected.is_error)
+        self.assertIn("shared", shared_rejected.content[0].text.lower())
         self.assertTrue(traversal.is_error)
         self.assertIn("path", traversal.content[0].text.lower())
         self.assertTrue(script_read.is_error)
@@ -367,6 +406,20 @@ class AgentMCPProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exact legacy-name search", note)
         self.assertIn("not the complete manifest identity set", note)
         self.assertNotIn("complete traversal", note)
+
+    async def test_shared_guidance_resource_is_advertised_and_readable(self) -> None:
+        async with self.session() as client:
+            resources = await client.list_resources()
+            shared = await client.read_resource(
+                "skills://shared/ta_completion_gate.md"
+            )
+
+        self.assertIn(
+            "skills://shared/ta_completion_gate.md",
+            {str(resource.uri) for resource in resources.resources},
+        )
+        self.assertTrue(shared.contents)
+        self.assertIn("TA Completion Gate", shared.contents[0].text)
 
     async def test_prompts_are_advertised_and_reinforce_approval_boundaries(
         self,

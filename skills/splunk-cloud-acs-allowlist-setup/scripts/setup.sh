@@ -15,6 +15,8 @@ APPLY=false
 OUTPUT_DIR=""
 FEATURES="search-api,s2s,hec"
 CLOUD_PROVIDER="aws"
+ACS_SERVER_VALUE="https://admin.splunk.com"
+TARGET_STACK=""
 TARGET_SH=""
 ALLOW_ACS_LOCKOUT="false"
 STRICT_DRIFT="true"
@@ -58,6 +60,8 @@ Options:
   --output-dir PATH
   --features CSV (subset of: acs,search-api,hec,s2s,search-ui,idm-api,idm-ui)
   --cloud-provider aws|gcp
+  --acs-server https://admin.splunk.com|https://staging.admin.splunk.com
+  --target-stack NAME
   --target-search-head NAME
   --allow-acs-lockout true|false
   --strict-drift true|false
@@ -82,9 +86,9 @@ Options:
   --help
 
 Examples:
-  $(basename "$0") --features search-api,s2s --search-api-subnets 198.51.100.0/24 --s2s-subnets 198.51.100.0/24
-  $(basename "$0") --phase audit
-  $(basename "$0") --phase apply --emit-terraform true
+  $(basename "$0") --target-stack example-stack --features search-api,s2s --search-api-subnets 198.51.100.0/24 --s2s-subnets 198.51.100.0/24
+  $(basename "$0") --target-stack example-stack --phase audit
+  $(basename "$0") --target-stack example-stack --phase apply --emit-terraform true
 
 EOF
     exit "${exit_code}"
@@ -99,6 +103,8 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --features) require_arg "$1" $# || exit 1; FEATURES="$2"; shift 2 ;;
         --cloud-provider) require_arg "$1" $# || exit 1; CLOUD_PROVIDER="$2"; shift 2 ;;
+        --acs-server) require_arg "$1" $# || exit 1; ACS_SERVER_VALUE="$2"; shift 2 ;;
+        --target-stack) require_arg "$1" $# || exit 1; TARGET_STACK="$2"; shift 2 ;;
         --target-search-head) require_arg "$1" $# || exit 1; TARGET_SH="$2"; shift 2 ;;
         --allow-acs-lockout) require_arg "$1" $# || exit 1; ALLOW_ACS_LOCKOUT="$2"; shift 2 ;;
         --strict-drift) require_arg "$1" $# || exit 1; STRICT_DRIFT="$2"; shift 2 ;;
@@ -146,9 +152,18 @@ PY
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status audit validate all
     validate_choice "${CLOUD_PROVIDER}" aws gcp
+    validate_choice "${ACS_SERVER_VALUE}" https://admin.splunk.com https://staging.admin.splunk.com
     validate_choice "${ALLOW_ACS_LOCKOUT}" true false
     validate_choice "${STRICT_DRIFT}" true false
     validate_choice "${EMIT_TERRAFORM}" true false
+    if [[ ! "${TARGET_STACK}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: --target-stack must provide a bounded ACS stack identity."
+        exit 1
+    fi
+    if [[ -n "${TARGET_SH}" && ! "${TARGET_SH}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+        log "ERROR: --target-search-head must provide a bounded ACS search-head identity."
+        exit 1
+    fi
     if [[ "${PHASE}" == "apply" || "${PHASE}" == "all" || ( "${PHASE}" == "render" && "${APPLY}" == "true" ) ]]; then
         if [[ -z "${ACS_SUBNETS}${SEARCH_API_SUBNETS}${HEC_SUBNETS}${S2S_SUBNETS}${SEARCH_UI_SUBNETS}${IDM_API_SUBNETS}${IDM_UI_SUBNETS}${ACS_SUBNETS_V6}${SEARCH_API_SUBNETS_V6}${HEC_SUBNETS_V6}${S2S_SUBNETS_V6}${SEARCH_UI_SUBNETS_V6}${IDM_API_SUBNETS_V6}${IDM_UI_SUBNETS_V6}" ]]; then
             log "ERROR: apply requested no IPv4/IPv6 subnet mutation."
@@ -167,6 +182,8 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --features "${FEATURES}"
         --cloud-provider "${CLOUD_PROVIDER}"
+        --acs-server "${ACS_SERVER_VALUE}"
+        --target-stack "${TARGET_STACK}"
         --target-search-head "${TARGET_SH}"
         --allow-acs-lockout "${ALLOW_ACS_LOCKOUT}"
         --strict-drift "${STRICT_DRIFT}"
@@ -210,6 +227,41 @@ run_rendered_script() {
     fi
     if [[ ! -x "${dir}/${script_name}" ]]; then
         log "ERROR: Rendered script is missing or not executable: ${dir}/${script_name}"
+        exit 1
+    fi
+    if ! python3 - "${dir}/plan.json" "${ACS_SERVER_VALUE}" "${TARGET_STACK}" "${TARGET_SH}" <<'PY'
+import json
+import os
+import stat
+import sys
+
+path, expected_server, expected_stack, expected_search_head = sys.argv[1:]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+try:
+    descriptor = os.open(path, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot open rendered ACS plan safely: {exc}") from exc
+try:
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode) or info.st_size <= 0 or info.st_size > 1048576:
+        raise SystemExit("ERROR: rendered ACS plan is not a bounded regular file")
+    with os.fdopen(descriptor, encoding="utf-8") as handle:
+        descriptor = -1
+        plan = json.load(handle)
+finally:
+    if descriptor >= 0:
+        os.close(descriptor)
+if not isinstance(plan, dict):
+    raise SystemExit("ERROR: rendered ACS plan must be an object")
+observed_search_head = plan.get("target_search_head") or ""
+if (
+    plan.get("acs_server") != expected_server
+    or plan.get("target_stack") != expected_stack
+    or observed_search_head != expected_search_head
+):
+    raise SystemExit("ERROR: rendered ACS target does not match the requested invocation")
+PY
+    then
         exit 1
     fi
     (cd "${dir}" && "./${script_name}")

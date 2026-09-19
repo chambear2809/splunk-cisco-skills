@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import re
 import shlex
 import stat
 from pathlib import Path
@@ -66,6 +67,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--features", default="search-api,s2s,hec")
     parser.add_argument("--cloud-provider", choices=("aws", "gcp"), default="aws")
+    parser.add_argument(
+        "--acs-server",
+        choices=("https://admin.splunk.com", "https://staging.admin.splunk.com"),
+        default="https://admin.splunk.com",
+    )
+    parser.add_argument("--target-stack", required=True)
     parser.add_argument("--target-search-head", default="")
     parser.add_argument("--allow-acs-lockout", choices=("true", "false"), default="false")
     parser.add_argument("--strict-drift", choices=("true", "false"), default="true")
@@ -180,10 +187,20 @@ def build_plan(args: argparse.Namespace) -> dict:
         for ip in csv_list(args.operator_ips_v6)
     })
 
+    target_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+    target_stack = args.target_stack.strip()
+    target_search_head = args.target_search_head.strip()
+    if not target_pattern.fullmatch(target_stack):
+        die("--target-stack must be a bounded ACS stack identity.")
+    if target_search_head and not target_pattern.fullmatch(target_search_head):
+        die("--target-search-head must be a bounded ACS search-head identity.")
+
     plan = {
         "version": 1,
         "cloud_provider": args.cloud_provider,
-        "target_search_head": args.target_search_head or None,
+        "acs_server": args.acs_server,
+        "target_stack": target_stack,
+        "target_search_head": target_search_head or None,
         "allow_acs_lockout": args.allow_acs_lockout == "true",
         "strict_drift": args.strict_drift == "true",
         "force": args.force == "true",
@@ -216,11 +233,13 @@ def render_metadata(args: argparse.Namespace, plan: dict) -> str:
         {
             "skill": "splunk-cloud-acs-allowlist-setup",
             "cloud_provider": plan["cloud_provider"],
+            "acs_server": plan["acs_server"],
             "features_in_plan": sorted(plan["features"].keys()),
             "ipv4_subnet_count": sum(len(v["ipv4"]) for v in plan["features"].values()),
             "ipv6_subnet_count": sum(len(v["ipv6"]) for v in plan["features"].values()),
             "allow_acs_lockout": plan["allow_acs_lockout"],
             "strict_drift": plan["strict_drift"],
+            "target_stack": plan["target_stack"],
             "target_search_head": plan["target_search_head"],
             "emit_terraform": args.emit_terraform == "true",
         },
@@ -246,6 +265,8 @@ def render_readme(plan: dict) -> str:
 Cloud provider: `{plan['cloud_provider']}`
 Strict drift: `{plan['strict_drift']}`
 Allow ACS lock-out: `{plan['allow_acs_lockout']}`
+ACS control plane: `{plan['acs_server']}`
+Target stack: `{plan['target_stack']}`
 Target search head: `{plan.get('target_search_head') or '(stack default)'}`
 
 ## Plan summary
@@ -301,25 +322,123 @@ def helper_path() -> Path:
     return project_root / "skills/shared/lib/credential_helpers.sh"
 
 
+def render_acs_context_prologue(plan: dict) -> str:
+    acs_server = shell_quote(plan.get("acs_server") or "")
+    target_stack = shell_quote(plan.get("target_stack") or "")
+    target_sh = shell_quote(plan.get("target_search_head") or "")
+    return f'''TARGET_STACK={target_stack}
+TARGET_SH={target_sh}
+[[ -n "${{TARGET_STACK}}" ]] || {{ echo 'ERROR: rendered ACS target stack is missing.' >&2; exit 1; }}
+export ACS_BOUND_TARGET_CONTEXT=true
+export ACS_BOUND_REQUIRE_CONFIG_MATCH=true
+export ACS_BOUND_SERVER={acs_server}
+export ACS_BOUND_SPLUNK_CLOUD_STACK="${{TARGET_STACK}}"
+export ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD="${{TARGET_SH}}"
+if ! acs_prepare_context; then
+  echo 'ERROR: could not prepare and verify the rendered ACS target context.' >&2
+  exit 1
+fi'''
+
+
+def render_acs_observation_helpers() -> str:
+    return r'''read_acs_status_payload() {
+  local raw="" payload=""
+  if ! raw="$(acs_command status current-stack 2>/dev/null)"; then
+    return 1
+  fi
+  if ! payload="$(printf '%s' "${raw}" | acs_extract_http_response_json)"; then
+    return 1
+  fi
+  printf '%s' "${payload}"
+}
+
+parse_acs_status_metadata() {
+  python3 -c '
+import json
+import sys
+
+text = sys.stdin.read()
+if not text.strip() or len(text.encode("utf-8")) > 1048576:
+    raise SystemExit(1)
+try:
+    data = json.loads(text)
+except Exception:
+    raise SystemExit(1)
+if not isinstance(data, dict):
+    raise SystemExit(1)
+nested_status = data.get("status")
+if not isinstance(nested_status, dict):
+    nested_status = {}
+infra = data.get("infrastructure") or nested_status.get("infrastructure")
+if not isinstance(infra, dict):
+    raise SystemExit(1)
+infra_status = infra.get("status")
+if not isinstance(infra_status, str) or not infra_status.strip():
+    raise SystemExit(1)
+serialized = json.dumps(data).lower()
+fedramp = "true" if any(marker in serialized for marker in (
+    "fedramp-high", "fedramp_high", "govcloud-high"
+)) else "false"
+print(f"{infra_status.strip()}\t{fedramp}", end="")
+'
+}
+
+read_acs_allowlist_payload() {
+  local cli_group="$1" feature="$2" raw="" payload=""
+  if ! raw="$(acs_command "${cli_group}" describe "${feature}" 2>/dev/null)"; then
+    return 1
+  fi
+  if ! payload="$(printf '%s' "${raw}" | acs_extract_http_response_json)"; then
+    return 1
+  fi
+  printf '%s' "${payload}"
+}
+
+parse_acs_allowlist_subnets() {
+  python3 -c '
+import json
+import sys
+
+text = sys.stdin.read()
+if not text.strip() or len(text.encode("utf-8")) > 1048576:
+    raise SystemExit(1)
+try:
+    data = json.loads(text)
+except Exception:
+    raise SystemExit(1)
+if not isinstance(data, dict) or not isinstance(data.get("subnets"), list):
+    raise SystemExit(1)
+normalized = []
+for item in data["subnets"]:
+    if isinstance(item, str) and item:
+        normalized.append(item)
+    elif isinstance(item, dict) and isinstance(item.get("subnet"), str) and item["subnet"]:
+        normalized.append(item["subnet"])
+    else:
+        raise SystemExit(1)
+print(",".join(sorted(normalized)), end="")
+'
+}
+'''
+
+
 def render_preflight(plan: dict) -> str:
     helper = shell_quote(helper_path())
+    context_prologue = render_acs_context_prologue(plan)
+    observation_helpers = render_acs_observation_helpers()
     cloud_provider = shell_quote(plan["cloud_provider"])
-    target_sh = shell_quote(plan.get("target_search_head") or "")
     allow_acs_lockout = "true" if plan["allow_acs_lockout"] else "false"
 
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
-acs_prepare_context
+{context_prologue}
+
+{observation_helpers}
 
 CLOUD_PROVIDER={cloud_provider}
-TARGET_SH={target_sh}
 ALLOW_ACS_LOCKOUT={allow_acs_lockout}
 PLAN_FILE="$(dirname "$0")/plan.json"
-
-if [[ -n "${{TARGET_SH}}" ]]; then
-  acs_command config use-stack "${{SPLUNK_CLOUD_STACK}}" --target-sh "${{TARGET_SH}}" >/dev/null
-fi
 
 # 1. Capability check (sc_admin or equivalent ACS access).
 if ! acs_command status current-stack >/dev/null 2>&1; then
@@ -330,17 +449,15 @@ fi
 # 2. FedRAMP carve-out: ACS does not manage allowlists on FedRAMP High stacks.
 #    ACS surfaces the deployment type via stack metadata; we look for the
 #    FedRAMP marker in the structured response and refuse to proceed.
-status_payload=$(acs_command status current-stack 2>/dev/null | acs_extract_http_response_json || printf '%s' '{{}}')
-fedramp_high=$(printf '%s' "${{status_payload}}" | python3 -c "
-import json, sys
-raw = sys.stdin.read()
-try:
-    data = json.loads(raw) if raw.strip() else {{}}
-except Exception:
-    data = {{}}
-text = json.dumps(data).lower()
-print('true' if ('fedramp-high' in text or 'fedramp_high' in text or 'govcloud-high' in text) else 'false')
-")
+if ! status_payload="$(read_acs_status_payload)"; then
+  echo 'ERROR: could not read ACS stack status; preflight is incomplete.' >&2
+  exit 1
+fi
+if ! status_metadata="$(printf '%s' "${{status_payload}}" | parse_acs_status_metadata)"; then
+  echo 'ERROR: ACS returned an invalid or incomplete stack status; preflight is incomplete.' >&2
+  exit 1
+fi
+IFS=$'\t' read -r infrastructure_status fedramp_high <<< "${{status_metadata}}"
 if [[ "${{fedramp_high}}" == "true" ]]; then
   echo 'ERROR: This stack appears to be FedRAMP High. ACS does not manage IP allowlists there. Contact Splunk Support.' >&2
   exit 1
@@ -515,18 +632,17 @@ if [[ "${{strict}}" == "true" ]]; then
       else
         cli_group=ip-allowlist-v6
       fi
-      live=$(acs_command "${{cli_group}}" describe "${{feature}}" 2>/dev/null | acs_extract_http_response_json | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    subs = data.get('subnets', []) if isinstance(data, dict) else []
-    print(','.join(sorted([s if isinstance(s, str) else s.get('subnet', '') for s in subs])))
-except Exception:
-    print('')
-")
       planned=$(python3 -c "import json,sys; print(','.join(sorted(json.load(open(sys.argv[1]))['features'][sys.argv[2]].get(sys.argv[3], []))))" "${{PLAN_FILE}}" "${{feature}}" "${{family}}")
       if [[ -z "${{planned}}" ]]; then
         continue
+      fi
+      if ! live_json="$(read_acs_allowlist_payload "${{cli_group}}" "${{feature}}")"; then
+        echo "ERROR: could not read live ${{family}} allowlist for '${{feature}}'; preflight is incomplete." >&2
+        exit 1
+      fi
+      if ! live="$(printf '%s' "${{live_json}}" | parse_acs_allowlist_subnets)"; then
+        echo "ERROR: ACS returned an invalid ${{family}} allowlist for '${{feature}}'; preflight is incomplete." >&2
+        exit 1
       fi
       if [[ "${{live}}" != "${{planned}}" ]]; then
         printf 'WARNING: Drift detected on %s/%s (live=%s, plan=%s)\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}" >&2
@@ -547,7 +663,8 @@ echo 'OK: ACS allowlist preflight passed.'
 
 def render_apply(plan: dict, ipv6: bool) -> str:
     helper = shell_quote(helper_path())
-    target_sh = shell_quote(plan.get("target_search_head") or "")
+    context_prologue = render_acs_context_prologue(plan)
+    observation_helpers = render_acs_observation_helpers()
     family = "ipv6" if ipv6 else "ipv4"
     # Per Splunk ACS CLI docs (acs ip-allowlist --help, acs ip-allowlist-v6 --help):
     # IPv4 uses `acs ip-allowlist {describe,create,delete}`.
@@ -557,20 +674,20 @@ def render_apply(plan: dict, ipv6: bool) -> str:
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
-acs_prepare_context
+{context_prologue}
 
-TARGET_SH={target_sh}
+{observation_helpers}
+
 PLAN_FILE="$(dirname "$0")/plan.json"
 FAMILY={family!r}
 CLI_GROUP={cli_group!r}
 
-if [[ -n "${{TARGET_SH}}" ]]; then
-  acs_command config use-stack "${{SPLUNK_CLOUD_STACK}}" --target-sh "${{TARGET_SH}}" >/dev/null
-fi
-
 features=$(python3 -c "import json,sys; print(' '.join(sorted(json.load(open(sys.argv[1]))['features'].keys())))" "${{PLAN_FILE}}")
 for feature in ${{features}}; do
-  planned=$(python3 -c "import json,sys; print(','.join(sorted(json.load(open(sys.argv[1]))['features'][sys.argv[2]][sys.argv[3]])))" "${{PLAN_FILE}}" "${{feature}}" "${{FAMILY}}" 2>/dev/null || echo "")
+  if ! planned="$(python3 -c "import json,sys; print(','.join(sorted(json.load(open(sys.argv[1]))['features'][sys.argv[2]][sys.argv[3]])))" "${{PLAN_FILE}}" "${{feature}}" "${{FAMILY}}" 2>/dev/null)"; then
+    echo "ERROR: could not read the rendered ${{FAMILY}} plan for '${{feature}}'; refusing apply." >&2
+    exit 1
+  fi
 
   if [[ -z "${{planned}}" ]]; then
     log "SKIP: no ${{FAMILY}} subnets were specified for '${{feature}}'; preserving live state."
@@ -578,17 +695,14 @@ for feature in ${{features}}; do
   fi
 
   # Per Splunk ACS CLI docs, the read-only subcommand is `describe` (not `list`).
-  live_json=$(acs_command "${{CLI_GROUP}}" describe "${{feature}}" 2>/dev/null \\
-    | acs_extract_http_response_json || {{ echo "ERROR: could not read live ${{FAMILY}} allowlist for '${{feature}}'; refusing blind convergence." >&2; exit 1; }})
-  live=$(printf '%s' "${{live_json}}" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    subs = data.get('subnets', []) if isinstance(data, dict) else []
-    print(','.join(sorted([s if isinstance(s, str) else s.get('subnet', '') for s in subs])))
-except Exception:
-    print('')
-")
+  if ! live_json="$(read_acs_allowlist_payload "${{CLI_GROUP}}" "${{feature}}")"; then
+    echo "ERROR: could not read live ${{FAMILY}} allowlist for '${{feature}}'; refusing blind convergence." >&2
+    exit 1
+  fi
+  if ! live="$(printf '%s' "${{live_json}}" | parse_acs_allowlist_subnets)"; then
+    echo "ERROR: ACS returned an invalid ${{FAMILY}} allowlist for '${{feature}}'; refusing blind convergence." >&2
+    exit 1
+  fi
 
   to_add=$(python3 - "${{planned}}" "${{live}}" <<'PY'
 import sys
@@ -620,12 +734,13 @@ log "OK: ${{FAMILY}} apply complete. Run wait-for-ready.sh to confirm Ready stat
     )
 
 
-def render_wait_for_ready() -> str:
+def render_wait_for_ready(plan: dict) -> str:
     helper = shell_quote(helper_path())
+    context_prologue = render_acs_context_prologue(plan)
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
-acs_prepare_context
+{context_prologue}
 
 TIMEOUT_SECS=${{TIMEOUT_SECS:-900}}
 INTERVAL_SECS=${{INTERVAL_SECS:-10}}
@@ -633,35 +748,27 @@ waited=0
 
 # `acs status current-stack` returns
 #   {{"status": {{"infrastructure": {{"status": "Ready" | "Pending" | "Failed"}}}}}}
-parse_status() {{
-  python3 -c "
-import json, sys
-text = sys.stdin.read()
-if not text.strip():
-    print('unknown'); sys.exit(0)
-try:
-    data = json.loads(text)
-except Exception:
-    print('unknown'); sys.exit(0)
-infra = (data.get('infrastructure') or (data.get('status') or {{}}).get('infrastructure') or {{}})
-print(infra.get('status', 'unknown'))
-"
-}}
-
 while (( waited < TIMEOUT_SECS )); do
-  payload=$(acs_command status current-stack 2>/dev/null | acs_extract_http_response_json || printf '%s' '{{}}')
-  status=$(printf '%s' "${{payload}}" | parse_status)
-  case "${{status}}" in
+  if ! status_snapshot="$(acs_stack_status_snapshot)"; then
+    echo 'INCOMPLETE: could not read a valid ACS stack status; readiness was not verified.' >&2
+    exit 2
+  fi
+  IFS=$'\t' read -r infrastructure_status restart_required <<< "${{status_snapshot}}"
+  case "${{infrastructure_status}}" in
     Ready)
+      if [[ "${{restart_required}}" == "true" ]]; then
+        echo 'INCOMPLETE: ACS reports Ready, but the control plane still reports that a restart is required.' >&2
+        exit 2
+      fi
       echo "OK: ACS reports Ready."
       exit 0
       ;;
     Failed)
-      echo "ERROR: ACS reports Failed status. See ${{payload}}" >&2
+      echo "ERROR: ACS reports Failed status." >&2
       exit 1
       ;;
     *)
-      log "ACS status=${{status}}, waiting..."
+      log "ACS status=${{infrastructure_status}}, waiting..."
       sleep "${{INTERVAL_SECS}}"
       waited=$((waited + INTERVAL_SECS))
       ;;
@@ -674,12 +781,16 @@ exit 1
     )
 
 
-def render_audit() -> str:
+def render_audit(plan: dict) -> str:
     helper = shell_quote(helper_path())
+    context_prologue = render_acs_context_prologue(plan)
+    observation_helpers = render_acs_observation_helpers()
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
-acs_prepare_context
+{context_prologue}
+
+{observation_helpers}
 
 PLAN_FILE="$(dirname "$0")/plan.json"
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -699,28 +810,28 @@ for feature in ${{features}}; do
     else
       cli_group=ip-allowlist-v6
     fi
-    snapshot_path="${{AUDIT_DIR}}/${{feature}}-${{family}}.json"
-    acs_command "${{cli_group}}" describe "${{feature}}" 2>/dev/null \\
-      | acs_extract_http_response_json > "${{snapshot_path}}" || {{ echo "ERROR: could not read live ${{family}} allowlist for '${{feature}}'; audit is incomplete." >&2; exit 1; }}
-
-    live=$(python3 -c "
-import json, sys
-try:
-    data = json.load(open(sys.argv[1]))
-except Exception:
-    data = {{}}
-subs = data.get('subnets', []) if isinstance(data, dict) else []
-print(','.join(sorted([s if isinstance(s, str) else s.get('subnet', '') for s in subs])))
-" "${{snapshot_path}}" 2>/dev/null || printf '')
-    planned=$(python3 -c "
+    if ! planned="$(python3 -c "
 import json, sys
 plan = json.load(open(sys.argv[1]))
 print(','.join(sorted(plan['features'].get(sys.argv[2], {{}}).get(sys.argv[3], []))))
-" "${{PLAN_FILE}}" "${{feature}}" "${{family}}" 2>/dev/null || printf '')
+" "${{PLAN_FILE}}" "${{feature}}" "${{family}}" 2>/dev/null)"; then
+      echo "ERROR: could not read the rendered ${{family}} plan for '${{feature}}'; audit is incomplete." >&2
+      exit 2
+    fi
     if [[ -z "${{planned}}" ]]; then
       printf 'SKIP: feature=%s family=%s was unspecified; live state preserved\n' "${{feature}}" "${{family}}"
       continue
     fi
+    snapshot_path="${{AUDIT_DIR}}/${{feature}}-${{family}}.json"
+    if ! live_json="$(read_acs_allowlist_payload "${{cli_group}}" "${{feature}}")"; then
+      echo "INCOMPLETE: could not read live ${{family}} allowlist for '${{feature}}'." >&2
+      exit 2
+    fi
+    if ! live="$(printf '%s' "${{live_json}}" | parse_acs_allowlist_subnets)"; then
+      echo "INCOMPLETE: ACS returned an invalid ${{family}} allowlist for '${{feature}}'." >&2
+      exit 2
+    fi
+    printf '%s\n' "${{live_json}}" > "${{snapshot_path}}"
     if [[ "${{live}}" != "${{planned}}" ]]; then
       printf 'MISMATCH: feature=%s family=%s live=%s plan=%s\\n' "${{feature}}" "${{family}}" "${{live}}" "${{planned}}"
       mismatch=true
@@ -800,8 +911,8 @@ def render_all(args: argparse.Namespace) -> dict:
         "preflight.sh": render_preflight(plan),
         "apply-ipv4.sh": render_apply(plan, ipv6=False),
         "apply-ipv6.sh": render_apply(plan, ipv6=True),
-        "wait-for-ready.sh": render_wait_for_ready(),
-        "audit.sh": render_audit(),
+        "wait-for-ready.sh": render_wait_for_ready(plan),
+        "audit.sh": render_audit(plan),
     }
     if args.emit_terraform == "true":
         artifacts["terraform-snippets.tf"] = render_terraform_snippets(plan)

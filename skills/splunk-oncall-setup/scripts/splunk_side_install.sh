@@ -19,7 +19,10 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 # shellcheck source=/dev/null
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-load_splunk_connection_settings
+if ! load_splunk_connection_settings; then
+    echo "ERROR: Could not load the selected Splunk credential target." >&2
+    exit 1
+fi
 
 if [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
     PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python"
@@ -302,18 +305,33 @@ profile_for_install_target() {
     local target="$1" profile="" role=""
     case "${target}" in
         search_head|search-tier|shc_deployer)
-            profile="$(resolve_search_credential_profile 2>/dev/null || true)"
-            [[ -n "${profile}" ]] || profile="$(resolve_credential_profile 2>/dev/null || true)"
+            if ! profile="$(resolve_search_credential_profile)"; then
+                log "ERROR: Could not resolve SPLUNK_SEARCH_PROFILE for install_target '${target}'."
+                return 1
+            fi
+            if [[ -z "${profile}" ]] && ! profile="$(resolve_credential_profile)"; then
+                log "ERROR: Could not resolve SPLUNK_PROFILE for install_target '${target}'."
+                return 1
+            fi
             ;;
         heavy_forwarder|heavy-forwarder)
-            profile="$(resolve_ingest_credential_profile 2>/dev/null || true)"
+            if ! profile="$(resolve_ingest_credential_profile)"; then
+                log "ERROR: Could not resolve SPLUNK_INGEST_PROFILE for install_target '${target}'."
+                return 1
+            fi
             if [[ -z "${profile}" ]]; then
-                role="$(resolve_splunk_target_role 2>/dev/null || true)"
+                if ! role="$(resolve_splunk_target_role)"; then
+                    log "ERROR: Could not resolve the Splunk target role for install_target '${target}'."
+                    return 1
+                fi
                 if [[ "${role}" != "heavy-forwarder" ]]; then
                     log "ERROR: ${target} installation requires SPLUNK_INGEST_PROFILE pointing to a heavy-forwarder profile."
                     return 1
                 fi
-                profile="$(resolve_credential_profile 2>/dev/null || true)"
+                if ! profile="$(resolve_credential_profile)"; then
+                    log "ERROR: Could not resolve SPLUNK_PROFILE for install_target '${target}'."
+                    return 1
+                fi
             fi
             ;;
         *)
@@ -323,7 +341,10 @@ profile_for_install_target() {
     esac
 
     if [[ -n "${profile}" ]]; then
-        role="$(deployment_profile_target_role "${profile}" 2>/dev/null || true)"
+        if ! role="$(deployment_profile_target_role "${profile}")"; then
+            log "ERROR: Could not inspect credential profile '${profile}' for install_target '${target}'."
+            return 1
+        fi
         case "${target}:${role}" in
             search_head:|search-tier:|shc_deployer:|search_head:search-tier|search-tier:search-tier|shc_deployer:search-tier) ;;
             heavy_forwarder:heavy-forwarder|heavy-forwarder:heavy-forwarder) ;;

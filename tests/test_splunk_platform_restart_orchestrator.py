@@ -118,6 +118,474 @@ def test_setup_plan_json_is_dry_and_does_not_render_secrets(tmp_path: Path) -> N
     assert json.loads(dry_restart.stdout)["restart_plan"]["decision"] == "handoff"
 
 
+def test_restart_plan_rejects_unknown_profile_before_emitting_default_plan(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PROFILE=missing",
+                "PROFILE_known__SPLUNK_PLATFORM=enterprise",
+                "PROFILE_known__SPLUNK_URI=https://known.example.invalid:8089",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--plan-restart",
+            "--restart-mode",
+            "rest",
+            "--allow-rest-fallback",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "primary credential profile is not defined" in proc.stderr
+    assert "decision=" not in proc.stdout
+    assert "known.example.invalid" not in proc.stdout + proc.stderr
+
+
+def test_restart_plan_rejects_unknown_target_role_before_emitting_a_path(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=enterprise",
+                "SPLUNK_URI=https://restart.example.invalid:8089",
+                "SPLUNK_TARGET_ROLE=synthetic-unknown-role",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--plan-restart",
+            "--restart-mode",
+            "auto",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "Unsupported Splunk restart target role" in proc.stderr
+    assert "decision=" not in proc.stdout
+
+
+def test_restart_plan_rejects_unknown_cli_target_role(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "SPLUNK_PLATFORM=enterprise\nSPLUNK_URI=https://restart.example.invalid:8089\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--plan-restart",
+            "--target-role",
+            "synthetic-unknown-role",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "Unsupported Splunk restart target role" in proc.stderr
+    assert "decision=" not in proc.stdout
+
+
+def test_reload_refuses_enterprise_host_command_for_cloud_target(tmp_path: Path) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=cloud",
+                "SPLUNK_CLOUD_STACK=example-stack",
+                "SPLUNK_SEARCH_API_URI=https://example-stack.splunkcloud.com:8089",
+                "SPLUNK_SSH_HOST=stale-enterprise-host.example.invalid",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    marker = tmp_path / "target-command-ran"
+    fake_home = tmp_path / "fake-splunk"
+    (fake_home / "bin").mkdir(parents=True)
+    splunk = fake_home / "bin" / "splunk"
+    splunk.write_text(
+        f"#!/usr/bin/env bash\ntouch {str(marker)!r}\n",
+        encoding="utf-8",
+    )
+    splunk.chmod(0o700)
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    env["SPLUNK_HOME"] = str(fake_home)
+    env["PLATFORM_RESTART_EXECUTION"] = "local"
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_SSH_HOST",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--reload",
+            "deploy-server",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "supported only for a resolved Splunk Enterprise target" in proc.stderr
+    assert not marker.exists()
+
+
+def test_reload_refuses_deploy_server_command_for_indexer_role(tmp_path: Path) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=enterprise",
+                "SPLUNK_TARGET_ROLE=indexer",
+                "SPLUNK_URI=https://indexer.example.invalid:8089",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    marker = tmp_path / "target-command-ran"
+    fake_home = tmp_path / "fake-splunk"
+    (fake_home / "bin").mkdir(parents=True)
+    splunk = fake_home / "bin" / "splunk"
+    splunk.write_text(
+        f"#!/usr/bin/env bash\ntouch {str(marker)!r}\n",
+        encoding="utf-8",
+    )
+    splunk.chmod(0o700)
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    env["SPLUNK_HOME"] = str(fake_home)
+    env["PLATFORM_RESTART_EXECUTION"] = "local"
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--reload",
+            "deploy-server",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "incompatible with the selected Splunk target role" in proc.stderr
+    assert not marker.exists()
+
+
+def test_reload_refuses_generic_rest_command_for_indexer_role(tmp_path: Path) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=enterprise",
+                "SPLUNK_TARGET_ROLE=indexer",
+                "SPLUNK_URI=https://indexer.example.invalid:8089",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    marker = tmp_path / "curl-ran"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    curl = fake_bin / "curl"
+    curl.write_text(
+        f"#!/usr/bin/env bash\ntouch {str(marker)!r}\n",
+        encoding="utf-8",
+    )
+    curl.chmod(0o700)
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--reload",
+            "/services/server/control/restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "Generic REST reload is incompatible" in proc.stderr
+    assert not marker.exists()
+
+
+def test_reload_rejects_http_error_response_from_generic_rest_endpoint(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=enterprise",
+                "SPLUNK_TARGET_ROLE=search-tier",
+                "SPLUNK_URI=https://search.example.invalid:8089",
+                "SPLUNK_USER=synthetic-user",
+                "SPLUNK_PASS=synthetic-password",
+                "SPLUNK_VERIFY_SSL=false",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    marker = tmp_path / "reload-request-ran"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    curl = fake_bin / "curl"
+    curl.write_text(
+        "#!/usr/bin/env bash\n"
+        "case \"$*\" in\n"
+        "  *services/auth/login*) printf '%s' '<response><sessionKey>synthetic-session</sessionKey></response>' ;;\n"
+        f"  *) touch {str(marker)!r}; printf '%s' '500' ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    curl.chmod(0o700)
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+        "SPLUNK_USER",
+        "SPLUNK_PASS",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--reload",
+            "/services/properties/indexes",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "returned HTTP 500" in proc.stderr
+    assert marker.exists()
+
+
+def test_restart_plan_uses_file_backed_target_role_in_parent_context(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=enterprise",
+                "SPLUNK_TARGET_ROLE=indexer",
+                "SPLUNK_URI=https://indexer.example.invalid:8089",
+                "SPLUNK_USER=user",
+                "SPLUNK_PASS=synthetic-password",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--plan-restart",
+            "--restart-mode",
+            "auto",
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    plan = json.loads(proc.stdout)["restart_plan"]
+    assert plan["target_role"] == "indexer"
+    assert plan["decision"] == "delegate-splunk-indexer-cluster-setup"
+
+
+def test_cloud_restart_refuses_indexer_role_before_any_acs_command(
+    tmp_path: Path,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "\n".join(
+            [
+                "SPLUNK_PLATFORM=cloud",
+                "SPLUNK_CLOUD_STACK=example-stack",
+                "SPLUNK_SEARCH_API_URI=https://example-stack.splunkcloud.com:8089",
+                "SPLUNK_USER=user",
+                "SPLUNK_PASS=synthetic-password",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "acs-command-ran"
+    acs = bin_dir / "acs"
+    acs.write_text(
+        f"#!/usr/bin/env bash\ntouch {str(marker)!r}\n",
+        encoding="utf-8",
+    )
+    acs.chmod(0o700)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["SPLUNK_CREDENTIALS_FILE"] = str(credentials)
+    for key in (
+        "SPLUNK_PLATFORM",
+        "SPLUNK_PROFILE",
+        "SPLUNK_SEARCH_API_URI",
+        "SPLUNK_TARGET_ROLE",
+        "SPLUNK_URI",
+    ):
+        env.pop(key, None)
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--restart",
+            "--accept-restart",
+            "--target-role",
+            "indexer",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode != 0
+    assert "supports only standalone or search-tier targets" in proc.stderr
+    assert not marker.exists()
+    assert "synthetic-password" not in proc.stdout + proc.stderr
+
+
 def test_repo_audit_classifies_restart_patterns_and_check_passes(tmp_path: Path) -> None:
     proc = subprocess.run(
         [

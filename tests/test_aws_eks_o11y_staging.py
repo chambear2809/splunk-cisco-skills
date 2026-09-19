@@ -205,6 +205,213 @@ def test_staging_diagnostic_redactor_covers_headers_json_bearer_and_url_userinfo
         assert secret not in result.stderr
 
 
+def test_staging_redactor_covers_quoted_and_malformed_assignments(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "quoted-diagnostic.log"
+    source.write_text(
+        'token="quoted value, with spaces; and delimiters" next=visible\n'
+        "password='single quoted \\'value\\' with spaces, commas; semicolons' next=visible\n"
+        'api_key="escaped \\"quote\\" and whitespace"\n'
+        '{"token":"json quoted value, with spaces; escaped \\"quote\\"",'
+        '"next":"visible"}\n'
+        'secret="unterminated secret with spaces, commas; and trailing content\n'
+        '{"token":"unterminated json secret with spaces, commas; and trailing content\r\n'
+        'access_token=unquoted secret with spaces, commas; and trailing assignment=visible\n'
+        '{"password": unquoted json secret with spaces, commas; and trailing field}\n'
+        'next=visible\r\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(REDACTOR), str(source)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr.count("[REDACTED]") >= 8
+    for secret_fragment in (
+        "quoted value",
+        "single quoted",
+        "escaped",
+        "json quoted value",
+        "unterminated secret",
+        "unterminated json secret",
+        "unquoted secret",
+        "unquoted json secret",
+        "commas; and trailing content",
+        "trailing assignment",
+        "trailing field",
+        "trailing content",
+    ):
+        assert secret_fragment not in result.stderr
+    # Once the malformed unterminated assignment makes the stream boundary
+    # ambiguous, the redactor intentionally suppresses the remainder.
+    assert result.stderr.count("next=visible") == 2
+    assert '"next":"visible"' in result.stderr
+
+
+def test_staging_redactor_suppresses_multiline_sensitive_continuations(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "multiline-diagnostic.log"
+    source.write_text(
+        'token="FIRST_SYNTHETIC_FRAGMENT\n'
+        "SECOND_SYNTHETIC_FRAGMENT\n"
+        'THIRD_SYNTHETIC_FRAGMENT" next=visible\n'
+        '{"password":"JSON_FIRST_SYNTHETIC_FRAGMENT\n'
+        "JSON_SECOND_SYNTHETIC_FRAGMENT\n"
+        'JSON_THIRD_SYNTHETIC_FRAGMENT","safe":"visible"}\n'
+        'secret="PLAIN_FIRST_SYNTHETIC_FRAGMENT\n'
+        'PLAIN_SECOND_SYNTHETIC_FRAGMENT\n'
+        'PLAIN_SECOND_END_SYNTHETIC_FRAGMENT" next_plain=visible\n'
+        'Authorization: "AUTH_FIRST_SYNTHETIC_FRAGMENT\n'
+        'AUTH_SECOND_SYNTHETIC_FRAGMENT" next_auth=visible\n'
+        'Authorization: Bearer "AUTH_BEARER_FIRST_SYNTHETIC_FRAGMENT\n'
+        'AUTH_BEARER_SECOND_SYNTHETIC_FRAGMENT" next_bearer=visible\n'
+        "authorization=Basic 'AUTH_BASIC_FIRST_SYNTHETIC_FRAGMENT\n"
+        "AUTH_BASIC_SECOND_SYNTHETIC_FRAGMENT' next_basic=visible\n"
+        "token=\n"
+        '"PENDING_FIRST_SYNTHETIC_FRAGMENT\n'
+        'PENDING_SECOND_SYNTHETIC_FRAGMENT" next_pending=visible\n'
+        "Authorization: Bearer\n"
+        "'AUTH_PENDING_FIRST_SYNTHETIC_FRAGMENT\n"
+        "AUTH_PENDING_SECOND_SYNTHETIC_FRAGMENT' next_auth_pending=visible\n"
+        'secret="FINAL_SYNTHETIC_FRAGMENT\n'
+        "FINAL_CONTINUATION_SYNTHETIC_FRAGMENT",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(REDACTOR), str(source)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert result.stdout == ""
+    for secret_fragment in (
+        "FIRST_SYNTHETIC_FRAGMENT",
+        "SECOND_SYNTHETIC_FRAGMENT",
+        "THIRD_SYNTHETIC_FRAGMENT",
+        "JSON_FIRST_SYNTHETIC_FRAGMENT",
+        "JSON_SECOND_SYNTHETIC_FRAGMENT",
+        "JSON_THIRD_SYNTHETIC_FRAGMENT",
+        "PLAIN_FIRST_SYNTHETIC_FRAGMENT",
+        "PLAIN_SECOND_SYNTHETIC_FRAGMENT",
+        "PLAIN_SECOND_END_SYNTHETIC_FRAGMENT",
+        "AUTH_FIRST_SYNTHETIC_FRAGMENT",
+        "AUTH_SECOND_SYNTHETIC_FRAGMENT",
+        "AUTH_BEARER_FIRST_SYNTHETIC_FRAGMENT",
+        "AUTH_BEARER_SECOND_SYNTHETIC_FRAGMENT",
+        "AUTH_BASIC_FIRST_SYNTHETIC_FRAGMENT",
+        "AUTH_BASIC_SECOND_SYNTHETIC_FRAGMENT",
+        "PENDING_FIRST_SYNTHETIC_FRAGMENT",
+        "PENDING_SECOND_SYNTHETIC_FRAGMENT",
+        "AUTH_PENDING_FIRST_SYNTHETIC_FRAGMENT",
+        "AUTH_PENDING_SECOND_SYNTHETIC_FRAGMENT",
+        "FINAL_SYNTHETIC_FRAGMENT",
+        "FINAL_CONTINUATION_SYNTHETIC_FRAGMENT",
+    ):
+        assert secret_fragment not in result.stderr
+    assert "next=visible" in result.stderr
+    assert '"safe":"visible"' in result.stderr
+    assert "next_plain=visible" in result.stderr
+    assert "next_auth=visible" in result.stderr
+    assert "next_bearer=visible" in result.stderr
+    assert "next_basic=visible" in result.stderr
+    assert "next_pending=visible" in result.stderr
+    assert "next_auth_pending=visible" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("payload", "secret_fragments"),
+    (
+        (
+            'secret="OLD_COMPLETE_FIRST_SYNTHETIC_FRAGMENT\n'
+            'token="NEW_COMPLETE_SYNTHETIC_SECRET"\n'
+            'OLD_COMPLETE_SECOND_SYNTHETIC_FRAGMENT" unsafe_suffix\n'
+            "SAFE_AFTER_AMBIGUITY\n",
+            (
+                "OLD_COMPLETE_FIRST_SYNTHETIC_FRAGMENT",
+                "NEW_COMPLETE_SYNTHETIC_SECRET",
+                "OLD_COMPLETE_SECOND_SYNTHETIC_FRAGMENT",
+            ),
+        ),
+        (
+            'secret="OLD_NESTED_FIRST_SYNTHETIC_FRAGMENT\n'
+            'token="NEW_NESTED_FIRST_SYNTHETIC_FRAGMENT\n'
+            'NEW_NESTED_SECOND_SYNTHETIC_FRAGMENT"\n'
+            'OLD_NESTED_SECOND_SYNTHETIC_FRAGMENT" unsafe_suffix\n'
+            "SAFE_AFTER_AMBIGUITY\n",
+            (
+                "OLD_NESTED_FIRST_SYNTHETIC_FRAGMENT",
+                "NEW_NESTED_FIRST_SYNTHETIC_FRAGMENT",
+                "NEW_NESTED_SECOND_SYNTHETIC_FRAGMENT",
+                "OLD_NESTED_SECOND_SYNTHETIC_FRAGMENT",
+            ),
+        ),
+        (
+            'secret="OLD_JSON_FIRST_SYNTHETIC_FRAGMENT\n'
+            '"token":"NEW_JSON_COMPLETE_SYNTHETIC_SECRET"\n'
+            'OLD_JSON_SECOND_SYNTHETIC_FRAGMENT" unsafe_suffix\n'
+            "SAFE_AFTER_AMBIGUITY\n",
+            (
+                "OLD_JSON_FIRST_SYNTHETIC_FRAGMENT",
+                "NEW_JSON_COMPLETE_SYNTHETIC_SECRET",
+                "OLD_JSON_SECOND_SYNTHETIC_FRAGMENT",
+            ),
+        ),
+        (
+            "token=\n"
+            "UNBOUNDED_UNQUOTED_SYNTHETIC_FRAGMENT\n"
+            "SAFE_AFTER_AMBIGUITY\n",
+            ("UNBOUNDED_UNQUOTED_SYNTHETIC_FRAGMENT",),
+        ),
+        (
+            "token=\\\n"
+            "CONTINUED_UNQUOTED_SYNTHETIC_FRAGMENT\n"
+            "SAFE_AFTER_CONTINUATION\n",
+            (
+                "CONTINUED_UNQUOTED_SYNTHETIC_FRAGMENT",
+                "SAFE_AFTER_CONTINUATION",
+            ),
+        ),
+        (
+            'token="QUOTED_FIRST_SYNTHETIC_FRAGMENT\\\n'
+            '"QUOTED_ESCAPED_CONTINUATION_SYNTHETIC_FRAGMENT"\n'
+            "SAFE_AFTER_QUOTED_CONTINUATION\n",
+            (
+                "QUOTED_FIRST_SYNTHETIC_FRAGMENT",
+                "QUOTED_ESCAPED_CONTINUATION_SYNTHETIC_FRAGMENT",
+                "SAFE_AFTER_QUOTED_CONTINUATION",
+            ),
+        ),
+    ),
+)
+def test_staging_redactor_suppresses_remainder_after_ambiguous_multiline_value(
+    tmp_path: Path,
+    payload: str,
+    secret_fragments: tuple[str, ...],
+) -> None:
+    source = tmp_path / "ambiguous-multiline-diagnostic.log"
+    source.write_text(payload, encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(REDACTOR), str(source)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    for fragment in secret_fragments:
+        assert fragment not in result.stderr
+    assert "unsafe_suffix" not in result.stderr
+    assert "SAFE_AFTER_AMBIGUITY" not in result.stderr
+
+
 def test_runner_rejects_symlink_token_and_never_reports_token_value(tmp_path: Path) -> None:
     token_value = "SUPER_SECRET_STAGING_TOKEN_VALUE"
     token = tmp_path / "token"

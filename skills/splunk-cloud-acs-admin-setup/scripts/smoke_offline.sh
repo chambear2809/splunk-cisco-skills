@@ -90,6 +90,7 @@ JSON
 bash "${SCRIPT_DIR}/setup.sh" \
     --phase render \
     --output-dir "${TMP_OUT}" \
+    --target-stack synthetic-stack \
     --admin-plan-file "${PLAN_FILE}" \
     --features search-api,s2s,hec,acs \
     --search-api-subnets 198.51.100.0/24 \

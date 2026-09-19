@@ -287,7 +287,10 @@ require_cluster_inputs() {
 
 require_splunk_side_target_role() {
     local role
-    role="$(resolve_splunk_target_role)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        return 1
+    fi
     case "${role}" in
         ""|search-tier|indexer) return 0 ;;
         *)

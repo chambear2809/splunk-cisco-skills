@@ -262,6 +262,7 @@ SPLUNK_PROFILE_METADATA_SCRIPT = r"""
 set -euo pipefail
 source skills/shared/lib/credential_helpers.sh
 allow_flat_credentials="${1:-false}"
+compat_flat_profile=""
 python3 - "${_CRED_FILE}" <<'PY'
 import os
 import stat
@@ -311,11 +312,28 @@ if [[ -n "${SPLUNK_PROFILE:-}" ]]; then
       echo "ERROR: --allow-flat-credentials requires an existing flat credential file with target settings." >&2
       exit 2
     fi
+    # The compatibility gate intentionally permits a legacy flat file while
+    # retaining the caller's label in the report.  The shared loader must see
+    # no profile selector during resolution, otherwise it correctly rejects a
+    # name that is not defined in the flat file.
+    compat_flat_profile="${SPLUNK_PROFILE}"
+    unset SPLUNK_PROFILE
   fi
 fi
-load_splunk_connection_settings >/dev/null
-load_splunk_ssh_credentials >/dev/null || true
-load_splunk_platform_settings >/dev/null || true
+if ! load_splunk_connection_settings >/dev/null; then
+  echo "ERROR: Could not load the selected Splunk credential target." >&2
+  exit 2
+fi
+# Configuration inspection needs the selected SSH username but must not invoke
+# the password-requiring SSH loader and then hide an arbitrary loader failure.
+SPLUNK_SSH_USER="${SPLUNK_SSH_USER:-splunk}"
+if ! load_splunk_platform_settings >/dev/null; then
+  echo "ERROR: Could not resolve the selected Splunk platform settings; check SPLUNK_PLATFORM, SPLUNK_CLOUD_STACK, and SPLUNK_CLOUD_SEARCH_HEAD in the selected credential profile." >&2
+  exit 2
+fi
+if [[ -n "${compat_flat_profile}" ]]; then
+  SPLUNK_PROFILE="${compat_flat_profile}"
+fi
 export SPLUNK_PROFILE SPLUNK_PLATFORM SPLUNK_TARGET_ROLE SPLUNK_SEARCH_TARGET_ROLE
 export SPLUNK_URI SPLUNK_VERIFY_SSL SPLUNK_O11Y_REALM SPLUNK_O11Y_TOKEN_FILE SPLUNK_HOME SPLUNK_SSH_USER
 python3 - <<'PY'

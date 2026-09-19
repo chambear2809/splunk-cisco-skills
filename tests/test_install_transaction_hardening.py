@@ -48,6 +48,7 @@ def build_batch_env(tmp_path: Path, mode: str) -> tuple[dict[str, str], Path, Pa
         }
 
         if "config current-stack" in cmd:
+            print("Stack: example-stack")
             print("Current Search Head: sh-i-transaction")
             raise SystemExit(0)
 
@@ -199,3 +200,5 @@ def test_id_version_and_remote_transport_contracts_are_explicit() -> None:
     assert "--proto '=https' --proto-redir '=https'" in installer
     assert 'credential_curl_validate_url "${effective_url}" false' in installer
     assert "Ignoring unverified cached package and redownloading exact Splunkbase release" in installer
+    assert 'if raw="$(acs_command apps describe "${app_name}" 2>/dev/null)"' in installer
+    assert 'acs_command apps describe "${app_name}" 2>/dev/null || true' not in installer

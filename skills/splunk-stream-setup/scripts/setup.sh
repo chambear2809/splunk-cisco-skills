@@ -126,7 +126,9 @@ stream_setup_role() {
         return 0
     fi
 
-    STREAM_SETUP_ROLE="$(resolve_splunk_target_role 2>/dev/null || true)"
+    if ! STREAM_SETUP_ROLE="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     printf '%s' "${STREAM_SETUP_ROLE}"
 }
 
@@ -144,7 +146,10 @@ stream_role_supports_forwarder_actions() {
 stream_preflight_role_checks() {
     local role
 
-    role="$(stream_setup_role)"
+    if ! role="$(stream_setup_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     [[ -n "${role}" ]] || return 0
 
     if $FULL_SETUP; then
@@ -269,7 +274,10 @@ install_apps() {
     log "=== Installing Splunk Stream Apps ==="
     _get_session_key || exit 1
 
-    role="$(stream_setup_role)"
+    if ! role="$(stream_setup_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     if [[ -n "${role}" ]]; then
         log "Active deployment role: ${role}"
     elif [[ "${LEGACY_ALL_IN_ONE}" == "true" ]]; then
@@ -319,7 +327,10 @@ configure_streamfwd() {
     local role
 
     log "=== Configuring Stream Forwarder ==="
-    role="$(stream_setup_role)"
+    if ! role="$(stream_setup_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     if ! stream_role_supports_forwarder_actions "${role}"; then
         log "ERROR: Stream forwarder configuration belongs on a heavy or universal forwarder, not role '${role:-unknown}'."
         log "Point the run at the forwarder management endpoint or override the role for the forwarder-side target."

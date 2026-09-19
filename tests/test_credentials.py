@@ -421,7 +421,9 @@ class TestCredentialParserParity(unittest.TestCase):
         with open(cls.CREDENTIALS_SH, encoding="utf-8") as f:
             content = f.read()
 
-        start = content.index("python3 - \"$file_path\" \"$selected_profile\" <<'PY'\n")
+        start = content.index(
+            "python3 - \"$file_path\" \"$selected_profile\" \"$profile_only\" <<'PY'\n"
+        )
         start = content.index("\n", start) + 1
         end = content.index("\nPY\n", start)
         return content[start:end]
@@ -440,6 +442,7 @@ class TestCredentialParserParity(unittest.TestCase):
             "import sys\n"
             "path = sys.argv[1]\n"
             "selected_profile = sys.argv[2].strip()\n"
+            "profile_only = False\n"
         )
         body = embedded_py.split("selected_profile = sys.argv[2].strip()\n", 1)[-1]
         script = wrapper + body
@@ -452,7 +455,7 @@ class TestCredentialParserParity(unittest.TestCase):
 
         try:
             result = subprocess.run(
-                ["python3", "-c", script, cred_path, profile],
+                ["python3", "-c", script, cred_path, profile, "false"],
                 capture_output=True,
                 check=True,
             )

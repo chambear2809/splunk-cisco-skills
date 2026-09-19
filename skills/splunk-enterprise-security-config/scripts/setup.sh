@@ -322,45 +322,130 @@ set_lookup_order() {
     rest_set_global_conf "limits" "lookup" "${body}"
 }
 
+global_conf_matches_requested_body() {
+    local endpoint="$1" stanza="$2" body="$3" response=""
+    if ! response="$(splunk_curl "${SK}" "${endpoint}?output_mode=json" 2>/dev/null)"; then
+        return 1
+    fi
+    printf '%s\0%s' "${body}" "${response}" | python3 -c '
+import json
+import sys
+from urllib.parse import parse_qs
+
+expected_name = sys.argv[1]
+raw = sys.stdin.buffer.read()
+try:
+    encoded, payload_bytes = raw.split(b"\0", 1)
+    expected = parse_qs(encoded.decode("utf-8"), keep_blank_values=True, strict_parsing=True)
+    payload = json.loads(payload_bytes.decode("utf-8"))
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("missing entry collection")
+    matches = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict) and str(entry.get("name", "")) == expected_name
+    ]
+    if len(matches) != 1 or not isinstance(matches[0].get("content"), dict):
+        raise ValueError("requested entry was not observed exactly once")
+    content = matches[0]["content"]
+
+    def normalize(value):
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        text = str(value)
+        lowered = text.strip().lower()
+        if lowered in {"1", "true"}:
+            return "true"
+        if lowered in {"0", "false"}:
+            return "false"
+        return text
+
+    for key, expected_values in expected.items():
+        if key not in content:
+            raise ValueError("requested field is absent")
+        observed = content[key]
+        observed_values = observed if isinstance(observed, list) else [observed]
+        if [normalize(value) for value in observed_values] != [
+            normalize(value) for value in expected_values
+        ]:
+            raise ValueError("requested field did not match")
+except Exception:
+    raise SystemExit(1)
+' "${stanza}"
+}
+
 rest_set_global_conf() {
     local conf="$1" stanza="$2" body="$3"
-    local create_body encoded_stanza http_code response
+    local create_body encoded_stanza endpoint collection_endpoint http_code response
+    local observe_status=0 exists=false
 
     if type deployment_should_manage_search_config_via_bundle >/dev/null 2>&1 \
         && deployment_should_manage_search_config_via_bundle; then
         deployment_bundle_set_conf_for_current_target "${APP_NAME}" "${conf}" "${stanza}" "${body}"
         return $?
     fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        log "ERROR: Could not resolve the configured search-tier deployment target; refusing REST fallback."
+        return 1
+    fi
 
     encoded_stanza="$(_urlencode "${stanza}")"
-    response="$(splunk_curl_post "${SK}" "${body}" \
-        "${SPLUNK_URI}/services/configs/conf-${conf}/${encoded_stanza}" \
-        -w '\n%{http_code}' 2>/dev/null || echo "000")"
-    http_code="$(printf '%s\n' "${response}" | tail -1)"
-    case "${http_code}" in
-        200|201|204) return 0 ;;
-        # 404 means the stanza does not yet exist, so fall through to create.
-        404) ;;
-        # Any other 2xx is unusual but should be treated as success rather
-        # than blindly attempting a create that would race the existing one.
-        2*) return 0 ;;
-    esac
-
-    create_body="$(form_urlencode_pairs name "${stanza}")" || return 1
-    if [[ -n "${body}" ]]; then
-        create_body="${create_body}&${body}"
-    fi
-    response="$(splunk_curl_post "${SK}" "${create_body}" \
-        "${SPLUNK_URI}/services/configs/conf-${conf}" \
-        -w '\n%{http_code}' 2>/dev/null || echo "000")"
-    http_code="$(printf '%s\n' "${response}" | tail -1)"
-    case "${http_code}" in
-        200|201|204|409) return 0 ;;
-        *)
-            log "ERROR: Set global conf-${conf}/${stanza} failed (HTTP ${http_code})."
+    endpoint="${SPLUNK_URI}/services/configs/conf-${conf}/${encoded_stanza}"
+    collection_endpoint="${SPLUNK_URI}/services/configs/conf-${conf}"
+    if _rest_observe_exact_resource "${SK}" "${endpoint}?output_mode=json" "${stanza}"; then
+        exists=true
+    else
+        observe_status=$?
+        if (( observe_status != 1 )); then
+            log "ERROR: Could not observe global conf-${conf}/${stanza} exactly; refusing mutation."
             return 1
-            ;;
-    esac
+        fi
+    fi
+
+    if [[ "${exists}" == "true" ]]; then
+        if ! response="$(splunk_curl_post "${SK}" "${body}" "${endpoint}" \
+            -w '\n%{http_code}' 2>/dev/null)"; then
+            log "ERROR: Update global conf-${conf}/${stanza} failed before a response was received."
+            return 1
+        fi
+        http_code="$(printf '%s\n' "${response}" | tail -1)"
+        case "${http_code}" in
+            200|201|204) ;;
+            *)
+                log "ERROR: Update global conf-${conf}/${stanza} failed (HTTP ${http_code})."
+                return 1
+                ;;
+        esac
+    else
+        create_body="$(form_urlencode_pairs name "${stanza}")" || return 1
+        if [[ -n "${body}" ]]; then
+            create_body="${create_body}&${body}"
+        fi
+        if ! response="$(splunk_curl_post "${SK}" "${create_body}" "${collection_endpoint}" \
+            -w '\n%{http_code}' 2>/dev/null)"; then
+            log "ERROR: Create global conf-${conf}/${stanza} failed before a response was received."
+            return 1
+        fi
+        http_code="$(printf '%s\n' "${response}" | tail -1)"
+        case "${http_code}" in
+            200|201|204) ;;
+            409)
+                log "ERROR: Create global conf-${conf}/${stanza} raced with another writer; refusing to claim success."
+                return 1
+                ;;
+            *)
+                log "ERROR: Create global conf-${conf}/${stanza} failed (HTTP ${http_code})."
+                return 1
+                ;;
+        esac
+    fi
+
+    if ! _rest_observe_exact_resource "${SK}" "${endpoint}?output_mode=json" "${stanza}" \
+        || ! global_conf_matches_requested_body "${endpoint}" "${stanza}" "${body}"; then
+        log "ERROR: Set global conf-${conf}/${stanza} returned HTTP ${http_code}, but exact requested-state readback failed."
+        return 1
+    fi
 }
 
 set_managed_roles() {

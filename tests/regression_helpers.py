@@ -185,6 +185,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
         *args: str,
         env: dict,
         input_text: str | None = None,
+        timeout: float = 120,
     ) -> subprocess.CompletedProcess:
         return subprocess.run(
             ["bash", str(REPO_ROOT / script_rel_path), *args],
@@ -194,7 +195,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
-            timeout=120,
+            timeout=timeout,
         )
 
     def run_script_no_env(
@@ -228,6 +229,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     "indexes": [],
                     "security_cloud_handlers": {},
                     "security_cloud_settings": {"loglevel": ""},
+                    "security_cloud_conf": {},
                     "secure_access": {
                         "org_accounts": {},
                         "collections": {
@@ -371,8 +373,11 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if installed else 404)
                 if installed:
-                    out(json.dumps({"entry": [{"name": app, "content": {"version": installed["version"]}}]}))
-                out(json.dumps({"entry": []}))
+                    out(
+                        json.dumps({"entry": [{"name": app, "content": {"version": installed["version"]}}]}),
+                        200 if write_code else None,
+                    )
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/indexes") and method == "POST":
                 body = decode_form(data)
@@ -387,16 +392,77 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 exists = idx in state["indexes"]
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if exists else 404)
-                out(json.dumps({"entry": [{"name": idx}]} if exists else {"entry": []}))
+                out(
+                    json.dumps({"entry": [{"name": idx}]} if exists else {"entry": []}),
+                    (200 if exists else 404) if write_code else None,
+                )
 
-            if "configs/conf-ciscosecuritycloud_settings/logging" in path:
+            if "configs/conf-ciscosecuritycloud_settings" in path:
+                conf_store = state.setdefault("security_cloud_conf", {})
                 if method == "POST":
                     body = decode_form(data)
-                    if "loglevel" in body:
-                        state["security_cloud_settings"]["loglevel"] = body["loglevel"]
-                        save()
+                    # ``rest_set_conf`` creates a missing stanza through the
+                    # collection endpoint, then verifies the stanza-specific
+                    # resource. Preserve that state across mock curl calls so
+                    # strict requested-field readback remains meaningful.
+                    stanza = body.pop("name", "logging")
+                    conf_store.setdefault(stanza, {}).update(body)
+                    state["security_cloud_last_stanza"] = stanza
+                    state["security_cloud_last_fields"] = conf_store[stanza]
+                    state["security_cloud_settings"].update(body)
+                    save()
                     out("", 200)
-                out(json.dumps({"entry": [{"content": {"loglevel": state["security_cloud_settings"].get("loglevel", "")}}]}))
+                stanza = unquote(path.rsplit("/", 1)[-1])
+                if stanza in conf_store:
+                    print(
+                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(conf_store[stanza]))}",
+                        file=sys.stderr,
+                    )
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": stanza,
+                                        "content": conf_store[stanza],
+                                    }
+                                ]
+                            }
+                        ),
+                        200 if write_code else None,
+                    )
+                if stanza == state.get("security_cloud_last_stanza"):
+                    last_fields = state.get("security_cloud_last_fields", {})
+                    print(
+                        f"MOCK_READBACK security-cloud/{stanza} keys={','.join(sorted(last_fields))}",
+                        file=sys.stderr,
+                    )
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": stanza,
+                                        "content": last_fields,
+                                    }
+                                ]
+                            }
+                        ),
+                        200 if write_code else None,
+                    )
+                out(
+                    json.dumps(
+                        {
+                            "entry": [
+                                {
+                                    "name": "logging",
+                                    "content": {**state["security_cloud_settings"]},
+                                }
+                            ]
+                        }
+                    ),
+                    200 if write_code else None,
+                )
 
             if "/servicesNS/nobody/CiscoSecurityCloud/CiscoSecurityCloud_" in path:
                 handler = path.split("/servicesNS/nobody/CiscoSecurityCloud/", 1)[1].split("?", 1)[0]
@@ -694,15 +760,20 @@ class ShellScriptRegressionBase(unittest.TestCase):
                                     }
                                 ]
                             }
-                        )
+                        ),
+                        200 if write_code else None,
                     )
-                out(json.dumps({"entry": []}))
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/inputs/http") and method == "POST":
                 body = decode_form(data)
                 name = body.get("name", "sc4s")
                 state["hec_tokens"][name] = {
-                    "disabled": body.get("disabled", "false"),
+                    "disabled": (
+                        "true"
+                        if os.environ.get("SC4X_FORCE_CREATED_HEC_DISABLED") == "true"
+                        else body.get("disabled", "false")
+                    ),
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
                     "index": body.get("index", "sc4s"),
@@ -728,6 +799,35 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     token["default_index"] = body["index"]
                 save()
                 out("", 200)
+
+            if "/services/data/inputs/http/" in path and method == "GET":
+                encoded_name = path.rsplit("/", 1)[-1]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                token = state["hec_tokens"].get(name)
+                if token is None:
+                    out(json.dumps({"entry": []}), 404 if write_code else None)
+                out(
+                    json.dumps(
+                        {
+                            "entry": [
+                                {
+                                    "name": f"http://{name}",
+                                    "content": {
+                                        "disabled": token.get("disabled", "false"),
+                                        "useACK": token.get("useACK", "0"),
+                                        "indexes": token.get("indexes", ""),
+                                        "index": token.get("index", "sc4s"),
+                                        "default_index": token.get("default_index", token.get("index", "sc4s")),
+                                        "token": token.get("token", ""),
+                                    },
+                                }
+                            ]
+                        }
+                    ),
+                    200 if write_code else None,
+                )
 
             if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
                 encoded_name = path.rsplit("/", 2)[-2]
@@ -758,7 +858,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                             },
                         }
                     )
-                out(json.dumps({"entry": entries}))
+                out(json.dumps({"entry": entries}), 200 if write_code else None)
 
             if path.endswith("/services/search/jobs") and method == "POST":
                 out(json.dumps({"results": [{"count": str(state.get("startup_count", 0))}]}))
@@ -922,15 +1022,20 @@ class ShellScriptRegressionBase(unittest.TestCase):
                                     }
                                 ]
                             }
-                        )
+                        ),
+                        200 if write_code else None,
                     )
-                out(json.dumps({"entry": []}))
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if path.endswith("/services/data/inputs/http") and method == "POST":
                 body = decode_form(data)
                 name = body.get("name", "sc4snmp")
                 state["hec_tokens"][name] = {
-                    "disabled": body.get("disabled", "false"),
+                    "disabled": (
+                        "true"
+                        if os.environ.get("SC4X_FORCE_CREATED_HEC_DISABLED") == "true"
+                        else body.get("disabled", "false")
+                    ),
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
                     "index": body.get("index", "netops"),
@@ -986,7 +1091,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                             },
                         }
                     )
-                out(json.dumps({"entry": entries}))
+                out(json.dumps({"entry": entries}), 200 if write_code else None)
 
             if path.endswith("/services/search/jobs") and method == "POST":
                 out(json.dumps({"results": [{"count": str(state.get("data_count", 0))}]}))
@@ -1096,7 +1201,10 @@ class ShellScriptRegressionBase(unittest.TestCase):
             if f"/services/apps/local/{app_name}" in path:
                 if output_target == "/dev/null" and write_code:
                     out(code=200)
-                out(json.dumps({"entry": [{"name": app_name, "content": {"version": app_version}}]}))
+                out(
+                    json.dumps({"entry": [{"name": app_name, "content": {"version": app_version}}]}),
+                    200 if write_code else None,
+                )
 
             out("", 200)
             """,
@@ -1216,8 +1324,11 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if installed else 404)
                 if installed:
-                    out(json.dumps({"entry": [{"name": app, "content": {"version": installed.get("version", "unknown")}}]}))
-                out(json.dumps({"entry": []}))
+                    out(
+                        json.dumps({"entry": [{"name": app, "content": {"version": installed.get("version", "unknown")}}]}),
+                        200 if write_code else None,
+                    )
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if "/services/data/indexes/" in path:
                 idx = path.rsplit("/", 1)[-1]
@@ -1225,8 +1336,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 if output_target == "/dev/null" and write_code:
                     out(code=200 if exists else 404)
                 if exists:
-                    out(json.dumps({"entry": [{"name": idx}]}))
-                out(json.dumps({"entry": []}))
+                    out(json.dumps({"entry": [{"name": idx}]}), 200 if write_code else None)
+                out(json.dumps({"entry": []}), 404 if write_code else None)
 
             if "/servicesNS/nobody/" in path and "/configs/conf-" in path:
                 app = path.split("/servicesNS/nobody/", 1)[1].split("/", 1)[0]
@@ -1294,7 +1405,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 #!/usr/bin/env python3
                 import sys
 
-                if " ".join(sys.argv[1:]) == "config current-stack":
+                if "config current-stack" in " ".join(sys.argv[1:]):
+                    print("Stack: example-stack")
                     print("Current Search Head: {acs_search_head}")
                     raise SystemExit(0)
 

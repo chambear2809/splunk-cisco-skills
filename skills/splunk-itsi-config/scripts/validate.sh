@@ -77,7 +77,10 @@ trap 'rm -f "${SPEC_JSON}"' EXIT
 ruby "${SCRIPT_DIR}/spec_to_json.rb" --spec "${SPEC_PATH}" --output "${SPEC_JSON}"
 python3 "${SCRIPT_DIR}/lint_spec.py" --workflow "${WORKFLOW}" --spec-json "${SPEC_JSON}" --source-path "${SPEC_PATH}" --quiet
 
-load_splunk_connection_settings >/dev/null 2>&1 || true
+if ! load_splunk_connection_settings >/dev/null; then
+  echo "Failed to resolve Splunk connection settings; refusing validation against an implicit target." >&2
+  exit 1
+fi
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
 fi

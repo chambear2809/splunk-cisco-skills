@@ -75,14 +75,19 @@ stream_configure_role() {
         return 0
     fi
 
-    STREAM_CONFIGURE_ROLE="$(resolve_splunk_target_role 2>/dev/null || true)"
+    if ! STREAM_CONFIGURE_ROLE="$(resolve_splunk_target_role)"; then
+        return 1
+    fi
     printf '%s' "${STREAM_CONFIGURE_ROLE}"
 }
 
 stream_configure_preflight_role_checks() {
     local role
 
-    role="$(stream_configure_role)"
+    if ! role="$(stream_configure_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     [[ -z "${role}" || "${role}" == "search-tier" ]] && return 0
 
     log "ERROR: Stream protocol configuration is search-tier only and cannot run against role '${role}'."
@@ -91,13 +96,26 @@ stream_configure_preflight_role_checks() {
 }
 
 set_stream_api_base() {
-    local splunk_web_url=""
+    local splunk_web_url="" cloud_api_uri="" cloud_host=""
 
     if [[ -z "${SPLUNK_URI:-}" ]]; then
         load_splunk_connection_settings || return 1
     fi
 
     splunk_web_url="${SPLUNK_WEB_URL:-}"
+    if [[ -z "${splunk_web_url}" ]] && is_splunk_cloud; then
+        # Stream's web surface follows the reviewed ACS search-head target,
+        # not an enterprise search/ingest profile that may also be present in
+        # the credential file.
+        if ! cloud_api_uri="$(_primary_cloud_search_api_uri)"; then
+            return 1
+        fi
+        cloud_host="$(splunk_host_from_uri "${cloud_api_uri}")"
+        if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
+            cloud_host="${SPLUNK_CLOUD_SEARCH_HEAD}.${cloud_host}"
+        fi
+        splunk_web_url="https://${cloud_host}:443"
+    fi
     if [[ -z "${splunk_web_url}" ]]; then
         # Derive the Web URL from the management URL via urllib.parse so we
         # do not corrupt hostnames or non-default management ports that

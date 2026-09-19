@@ -255,7 +255,10 @@ SSH_USER_MGR={shell_quote(args.manager_ssh_user)}
 MANAGER_URI={cluster_uri}
 # Import the operator's SSH trust pin. push_conf dynamically scopes the
 # per-host SSH identity before invoking the shared host-key policy.
-load_splunk_connection_settings >/dev/null
+if ! load_splunk_connection_settings >/dev/null; then
+  echo "ERROR: Could not load the selected Splunk credential target." >&2
+  exit 1
+fi
 
 require() {{
   for path in "$@"; do

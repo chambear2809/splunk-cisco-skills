@@ -78,7 +78,10 @@ EOF
 ensure_search_tier_target() {
     local role
 
-    role="$(resolve_splunk_target_role 2>/dev/null || true)"
+    if ! role="$(resolve_splunk_target_role)"; then
+        log "ERROR: Could not resolve the selected Splunk target role."
+        exit 1
+    fi
     if [[ -n "${role}" && "${role}" != "search-tier" ]]; then
         log "ERROR: ${APP_NAME} belongs on the search tier, not role '${role}'."
         exit 1

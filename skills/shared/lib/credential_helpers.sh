@@ -5,9 +5,9 @@
 #
 # Contract:
 #   - These libraries are designed to be sourced into scripts that use
-#     'set -euo pipefail'. Functions that check state (rest_check_app,
-#     rest_check_index, etc.) return non-zero on "not found" — callers
-#     MUST use 'if', '||', or '&&' to handle the exit status.
+#     'set -euo pipefail'. Exact REST presence probes return 0 for present,
+#     1 only for an observed HTTP 404, and 2 for policy/transport/schema
+#     failures. Mutation callers MUST distinguish 1 from 2 before creating.
 #   - Functions that perform actions (rest_create_index, rest_set_conf, etc.)
 #     return non-zero on failure and print an error message to stderr.
 

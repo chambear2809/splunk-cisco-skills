@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shlex
@@ -164,6 +165,57 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
 
 def make_script(body: str) -> str:
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + body.lstrip()
+
+
+def status_identity_sha256(args: argparse.Namespace) -> str:
+    identity = {
+        key: value
+        for key, value in vars(args).items()
+        if key not in {"output_dir", "json", "dry_run"}
+    }
+    serialized = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def rendered_metadata_guard(args: argparse.Namespace, operation: str | None = None) -> str:
+    expected_operation = operation or args.operation
+    expected_status_identity = status_identity_sha256(args)
+    return f'''lifecycle_render_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+python3 - "${{lifecycle_render_dir}}/metadata.json" {shell_quote(args.platform)} {shell_quote(args.deployment)} {shell_quote(expected_operation)} {shell_quote(expected_status_identity)} <<'PY'
+import json
+import os
+import stat
+import sys
+
+path, expected_platform, expected_deployment, expected_operation, expected_status_identity = sys.argv[1:]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+try:
+    descriptor = os.open(path, flags)
+except OSError as exc:
+    raise SystemExit(f"ERROR: cannot open rendered metadata safely: {{exc}}") from exc
+try:
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode):
+        raise SystemExit("ERROR: rendered metadata must be a regular file")
+    if info.st_size <= 0 or info.st_size > 65536:
+        raise SystemExit("ERROR: rendered metadata size is outside the accepted bounds")
+    with os.fdopen(descriptor, encoding="utf-8") as handle:
+        descriptor = -1
+        data = json.load(handle)
+finally:
+    if descriptor >= 0:
+        os.close(descriptor)
+
+if not isinstance(data, dict) or data.get("target") != "index-lifecycle":
+    raise SystemExit("ERROR: rendered metadata does not identify the index lifecycle workflow")
+expected = (expected_platform, expected_deployment, expected_operation)
+observed = (data.get("platform"), data.get("deployment"), data.get("operation"))
+if observed != expected:
+    raise SystemExit("ERROR: rendered lifecycle metadata does not match this helper")
+if data.get("status_identity_sha256") != expected_status_identity:
+    raise SystemExit("ERROR: rendered lifecycle status identity does not match this helper")
+PY
+'''
 
 
 def enterprise_version_gate(args: argparse.Namespace) -> str:
@@ -964,7 +1016,7 @@ SmartStore renders also include:
 - `preflight.sh`
 - `apply-cluster-manager.sh`
 - `apply-standalone-indexer.sh`
-- `status.sh`
+- `status.sh` (operation-specific read-only evidence; unsupported manual or peer-level proof exits `2`)
 
 Destructive operations fail closed unless approval, backup, dependency evidence,
 the explicit accept flag, and exact confirmation tokens are provided.
@@ -1009,6 +1061,14 @@ stack={stack}
 '''
         )
     splunk_home = shell_quote(args.splunk_home)
+    if args.operation == "inventory":
+        return make_script(
+            enterprise_version_gate(args)
+            + f"""splunk_home={splunk_home}
+test -x "${{splunk_home}}/bin/splunk"
+"${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null
+"""
+        )
     return make_script(
         enterprise_version_gate(args)
         + f"""splunk_home={splunk_home}
@@ -1149,7 +1209,7 @@ if not token:
     raise SystemExit(f"ERROR: token file is empty: {{token_path}}")
 if any(char.isspace() for char in token):
     raise SystemExit(f"ERROR: token file must contain one whitespace-free token: {{token_path}}")
-escaped = token.replace("\\", "\\\\").replace('"', '\\"')
+escaped = token.replace("\\\\", "\\\\\\\\").replace('"', '\\\\"')
 flags = os.O_WRONLY
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
@@ -1265,12 +1325,35 @@ def extract_index_record(value, name):
         child = value.get(key) if isinstance(value, dict) else None
         if isinstance(child, list):
             candidates.extend(item for item in child if isinstance(item, dict))
+    identity_keys = ("name", "title", "indexName")
+    identified = []
+    exact = []
     for candidate in candidates:
-        if candidate.get("name") == name or candidate.get("title") == name:
-            return candidate
-    for candidate in candidates:
-        if any(key in candidate for key in ("searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays")):
-            return candidate
+        identities = [
+            candidate.get(key)
+            for key in identity_keys
+            if key in candidate and candidate.get(key) not in (None, "")
+        ]
+        if identities:
+            identified.append(candidate)
+            if all(identity == name for identity in identities):
+                exact.append(candidate)
+    if any(candidate not in exact for candidate in identified):
+        raise RuntimeError(f"ACS readback contained a nonmatching index record for {name}")
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        raise RuntimeError(f"ACS readback contained ambiguous index records for {name}")
+    nameless = [
+        candidate
+        for candidate in candidates
+        if not any(key in candidate for key in identity_keys)
+        and any(key in candidate for key in ("searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays"))
+    ]
+    if len(nameless) == 1:
+        return nameless[0]
+    if len(nameless) > 1:
+        raise RuntimeError(f"ACS readback contained ambiguous nameless index records for {name}")
     raise RuntimeError(f"ACS readback did not contain an index record for {name}")
 
 def equivalent(actual, expected):
@@ -1398,9 +1481,14 @@ import sys
 
 splunk_home = sys.argv[1]
 expected = json.loads({expected_literal})
+if not any(settings for stanzas in expected.values() for settings in stanzas.values()):
+    print("INCOMPLETE: no expected settings were rendered for readback.", file=sys.stderr)
+    raise SystemExit(2)
 failures = []
 for conf_name, stanzas in expected.items():
     for stanza, settings in stanzas.items():
+        if not settings:
+            continue
         result = subprocess.run(
             [f"{{splunk_home}}/bin/splunk", "btool", conf_name, "list", stanza],
             text=True,
@@ -1408,26 +1496,224 @@ for conf_name, stanzas in expected.items():
             check=False,
         )
         if result.returncode != 0:
-            failures.append(f"{{conf_name}} [{{stanza}}]: btool failed: {{result.stderr.strip()}}")
+            failures.append(f"{{conf_name}} [{{stanza}}]: btool failed (exit {{result.returncode}})")
             continue
         actual = {{}}
+        in_target_stanza = False
+        saw_target_stanza = False
         for line in result.stdout.splitlines():
+            header = re.match(r"^\\s*\\[([^\\]]+)\\]\\s*$", line)
+            if header:
+                in_target_stanza = header.group(1) == stanza
+                saw_target_stanza = saw_target_stanza or in_target_stanza
+                continue
+            if not in_target_stanza:
+                continue
             match = re.match(r"^\\s*([^#;][^=]*?)\\s*=\\s*(.*?)\\s*$", line)
             if match:
                 actual[match.group(1).strip()] = match.group(2)
+        if not saw_target_stanza:
+            failures.append(f"{{conf_name}} [{{stanza}}]: target stanza was not observed")
+            continue
         for key, wanted in settings.items():
             observed = actual.get(key)
             if wanted == "__NONEMPTY_SECRET__":
                 if not observed or observed.startswith("__SMARTSTORE_"):
                     failures.append(f"{{conf_name}} [{{stanza}}] {{key}}: secret value is missing or unresolved")
             elif observed != wanted:
-                failures.append(f"{{conf_name}} [{{stanza}}] {{key}}: expected {{wanted!r}}, got {{observed!r}}")
+                failures.append(f"{{conf_name}} [{{stanza}}] {{key}}: requested value was not observed")
 if failures:
     print("ERROR: post-activation btool readback did not match the rendered configuration:", file=sys.stderr)
     for failure in failures:
         print(f"  - {{failure}}", file=sys.stderr)
     raise SystemExit(1)
 print("Post-activation btool readback matched all rendered settings.")
+'''
+
+
+def btool_index_presence_readback_python(indexes: list[str], operation: str = "delete") -> str:
+    indexes_literal = repr(indexes)
+    return f'''import re
+import subprocess
+import sys
+
+splunk_home = sys.argv[1]
+indexes = {indexes_literal}
+errors = []
+still_present = []
+verified_absent = []
+diagnostic_limit = 20
+name_limit = 128
+
+def bounded_name(value):
+    return value if len(value) <= name_limit else value[:name_limit] + "..."
+
+def bounded_names(values):
+    shown = [bounded_name(value) for value in values[:diagnostic_limit]]
+    if len(values) > diagnostic_limit:
+        shown.append(f"... and {{len(values) - diagnostic_limit}} more")
+    return ", ".join(shown)
+
+for name in indexes:
+    try:
+        result = subprocess.run(
+            [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        errors.append(f"{{bounded_name(name)}}: btool could not be executed")
+        continue
+    if result.returncode != 0:
+        errors.append(f"{{bounded_name(name)}}: btool readback failed (exit {{result.returncode}})")
+        continue
+    if re.search(rf"(?m)^\\s*\\[{{re.escape(name)}}\\]\\s*$", result.stdout):
+        still_present.append(name)
+    else:
+        verified_absent.append(name)
+
+for name in verified_absent[:diagnostic_limit]:
+    print(f"VERIFIED ABSENT: {{bounded_name(name)}}")
+if len(verified_absent) > diagnostic_limit:
+    print(f"VERIFIED ABSENT: ... and {{len(verified_absent) - diagnostic_limit}} more")
+if still_present:
+    print(
+        "ERROR: {operation} readback still finds index stanza(s): " + bounded_names(still_present),
+        file=sys.stderr,
+    )
+if errors:
+    print("ERROR: {operation} readback failed:", file=sys.stderr)
+    for error in errors[:diagnostic_limit]:
+        print(f"  - {{error}}", file=sys.stderr)
+    if len(errors) > diagnostic_limit:
+        print(f"  - ... and {{len(errors) - diagnostic_limit}} more", file=sys.stderr)
+if still_present or errors:
+    raise SystemExit(1)
+print("Post-{operation} btool readback verified index stanza absence.")
+'''
+
+
+def btool_disabled_readback_python(indexes: list[str]) -> str:
+    indexes_literal = repr(indexes)
+    return f'''import re
+import subprocess
+import sys
+
+splunk_home = sys.argv[1]
+indexes = {indexes_literal}
+failures = []
+for name in indexes:
+    result = subprocess.run(
+        [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        failures.append(f"{{name}}: btool readback failed")
+        continue
+    in_target_stanza = False
+    saw_target_stanza = False
+    disabled_value = None
+    for line in result.stdout.splitlines():
+        header = re.match(r"^\\s*\\[([^\\]]+)\\]\\s*$", line)
+        if header:
+            in_target_stanza = header.group(1) == name
+            saw_target_stanza = saw_target_stanza or in_target_stanza
+            continue
+        if not in_target_stanza:
+            continue
+        match = re.match(r"^\\s*disabled\\s*=\\s*(\\S+)\\s*$", line)
+        if match:
+            disabled_value = match.group(1)
+    if not saw_target_stanza:
+        failures.append(f"{{name}}: target stanza was not observed")
+        continue
+    if disabled_value is None or disabled_value.lower() not in ("1", "true", "yes"):
+        failures.append(f"{{name}}: disabled=true was not observed")
+if failures:
+    print("ERROR: post-disable btool readback failed:", file=sys.stderr)
+    for failure in failures:
+        print(f"  - {{failure}}", file=sys.stderr)
+    raise SystemExit(1)
+print("Post-disable btool readback verified: " + ", ".join(indexes))
+'''
+
+
+def btool_inventory_status_python() -> str:
+    return r'''import re
+import subprocess
+import sys
+
+splunk_home = sys.argv[1]
+result = subprocess.run(
+    [f"{splunk_home}/bin/splunk", "btool", "indexes", "list"],
+    text=True,
+    capture_output=True,
+    check=False,
+)
+if result.returncode != 0:
+    raise SystemExit(f"ERROR: index inventory btool readback failed (exit code {result.returncode})")
+allowed_keys = {
+    "homePath",
+    "coldPath",
+    "thawedPath",
+    "disabled",
+    "frozenTimePeriodInSecs",
+    "maxTotalDataSizeMB",
+    "maxGlobalDataSizeMB",
+    "maxGlobalRawDataSizeMB",
+    "repFactor",
+}
+saw_stanza = False
+for line in result.stdout.splitlines():
+    stanza = re.match(r"^\s*\[([^\]]+)\]\s*$", line)
+    if stanza:
+        saw_stanza = True
+        print(f"[{stanza.group(1)}]")
+        continue
+    setting = re.match(r"^\s*([^#;][^=]*?)\s*=\s*(.*?)\s*$", line)
+    if setting and setting.group(1).strip() in allowed_keys:
+        print(f"{setting.group(1).strip()} = {setting.group(2)}")
+if not saw_stanza:
+    print("INCOMPLETE: index inventory btool readback returned no index stanzas.", file=sys.stderr)
+    raise SystemExit(2)
+'''
+
+
+def btool_config_status_python(conf_name: str, stanza: str) -> str:
+    return f'''import re
+import subprocess
+import sys
+
+splunk_home = sys.argv[1]
+result = subprocess.run(
+    [f"{{splunk_home}}/bin/splunk", "btool", {conf_name!r}, "list", {stanza!r}],
+    text=True,
+    capture_output=True,
+    check=False,
+)
+if result.returncode != 0:
+    raise SystemExit(
+        f"ERROR: btool {conf_name} [{stanza}] readback failed "
+        f"(exit {{result.returncode}})"
+    )
+allowed_keys = {{
+    "cleanRemoteStorageByDefault",
+    "eviction_policy",
+    "max_cache_size",
+    "eviction_padding",
+    "hotlist_recency_secs",
+    "hotlist_bloom_filter_recency_hours",
+    "bucket_localize_acquire_lock_timeout_sec",
+    "bucket_localize_connect_timeout_max_retries",
+    "bucket_localize_max_timeout_sec",
+}}
+for line in result.stdout.splitlines():
+    setting = re.match(r"^\\s*([^#;][^=]*?)\\s*=\\s*(.*?)\\s*$", line)
+    if setting and setting.group(1).strip() in allowed_keys:
+        print(f"{{setting.group(1).strip()}} = {{setting.group(2)}}")
 '''
 
 
@@ -1453,7 +1739,8 @@ def render_apply(args: argparse.Namespace, cluster: bool) -> str:
     )
     final_block = bundle_block if cluster else restart_block
     return make_script(
-        enterprise_version_gate(args)
+        rendered_metadata_guard(args, "smartstore")
+        + enterprise_version_gate(args)
         + f"""rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "smartstore" ]] || {{ echo "ERROR: this helper was not rendered for a SmartStore operation." >&2; exit 2; }}
 splunk_home={splunk_home}
@@ -1478,19 +1765,71 @@ fi
 
 
 def render_cloud_status(args: argparse.Namespace) -> str:
+    metadata_guard = rendered_metadata_guard(args)
+    if args.operation not in {"inventory", "retention", "delete-index"}:
+        return make_script(
+            metadata_guard
+            + f'''
+echo "INCOMPLETE: Splunk Cloud {args.operation} status is a handoff; no generic readback is supported by this workflow." >&2
+exit 2
+'''
+        )
+    if args.operation == "retention" and not target_indexes(args):
+        return make_script(
+            metadata_guard
+            + '''echo "INCOMPLETE: Cloud retention status requires explicit --indexes; collection inventory cannot prove requested fields for --indexes all." >&2
+exit 2
+'''
+        )
     token_file = shell_quote(str(Path(args.acs_token_file).expanduser()))
     base = shell_quote(args.acs_base.rstrip("/"))
     stack = shell_quote(args.stack)
     indexes_csv = shell_quote(",".join(target_indexes(args)))
     operation = shell_quote(args.operation)
+    retention_expectation_guard = ""
+    if args.operation == "retention":
+        retention_expectation_guard = r'''python3 - "${indexes_csv}" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+indexes = [item for item in sys.argv[1].split(",") if item]
+payload_path = Path("acs-index-update-payload.json")
+if payload_path.is_symlink() or not payload_path.is_file():
+    raise SystemExit(f"ERROR: ACS payload must be a regular, non-symlink file: {payload_path}")
+try:
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"ERROR: cannot parse ACS payload: {exc}") from exc
+items = payload.get("indexes") if isinstance(payload, dict) else None
+if not isinstance(items, list):
+    raise SystemExit("ERROR: ACS payload indexes must be a list.")
+allowed_fields = {"searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays"}
+expected_by_name = {
+    item["name"]: {key: value for key, value in item.items() if key in allowed_fields}
+    for item in items
+    if isinstance(item, dict) and isinstance(item.get("name"), str)
+}
+missing = [name for name in indexes if not expected_by_name.get(name)]
+if missing:
+    shown = ", ".join(missing[:20])
+    suffix = f" ... and {len(missing) - 20} more" if len(missing) > 20 else ""
+    print(
+        "INCOMPLETE: Cloud retention status has no expected settings for: " + shown + suffix,
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+PY
+'''
     return make_script(
-        f'''token_file={token_file}
+        metadata_guard
+        + f'''token_file={token_file}
 acs_base={base}
 stack={stack}
 indexes_csv={indexes_csv}
 operation={operation}
 [[ -n "${{stack}}" ]] || {{ echo "ERROR: --stack is required for Splunk Cloud status." >&2; exit 1; }}
-{secure_curl_context('token_file', 'Bearer')}python3 - "${{acs_base}}" "${{stack}}" "${{curl_config}}" "${{indexes_csv}}" "${{operation}}" <<'PY'
+{retention_expectation_guard}{secure_curl_context('token_file', 'Bearer')}python3 - "${{acs_base}}" "${{stack}}" "${{curl_config}}" "${{indexes_csv}}" "${{operation}}" <<'PY'
 {acs_http_runtime_python()}
 indexes_csv, operation = sys.argv[4:6]
 indexes = [item for item in indexes_csv.split(",") if item]
@@ -1500,16 +1839,35 @@ if operation == "retention":
     if payload_path.is_symlink() or not payload_path.is_file():
         raise SystemExit(f"ERROR: ACS payload must be a regular, non-symlink file: {{payload_path}}")
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    allowed_fields = {{"searchableDays", "maxDataSizeMB", "splunkArchivalRetentionDays"}}
     expected_by_name = {{
-        item["name"]: {{key: value for key, value in item.items() if key not in ("name", "datatype")}}
+        item["name"]: {{key: value for key, value in item.items() if key in allowed_fields}}
         for item in payload.get("indexes", [])
         if isinstance(item, dict) and item.get("name")
     }}
+    missing = [name for name in indexes if not expected_by_name.get(name)]
+    if missing:
+        shown = ", ".join(missing[:20])
+        suffix = f" ... and {{len(missing) - 20}} more" if len(missing) > 20 else ""
+        print(
+            "INCOMPLETE: Cloud retention status has no expected settings for: " + shown + suffix,
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
 if not indexes:
     status, raw = request("GET", collection_url())
     if status < 200 or status >= 300:
         raise SystemExit(f"ERROR: ACS index inventory failed with HTTP {{status}}: {{response_summary(raw)}}")
+    try:
+        inventory = json.loads(raw)
+    except Exception as exc:
+        raise SystemExit(f"ERROR: ACS index inventory returned invalid JSON: {{exc}}") from exc
+    if not isinstance(inventory, (dict, list)):
+        raise SystemExit(
+            "ERROR: ACS index inventory returned JSON type "
+            f"{{type(inventory).__name__}}, expected object or collection"
+        )
     print(response_summary(raw, None))
     raise SystemExit(0)
 
@@ -1550,25 +1908,136 @@ def render_status(args: argparse.Namespace) -> str:
     if args.platform == "cloud":
         return render_cloud_status(args)
     splunk_home = shell_quote(args.splunk_home)
-    volume = shell_quote(f"volume:{args.volume_name}")
+    operation = args.operation
+    operation_guard = rendered_metadata_guard(args)
     cluster_status = (
         '"${splunk_home}/bin/splunk" show cluster-bundle-status\n'
         if args.deployment == "cluster"
         else 'echo "INFO: standalone deployment; cluster bundle status is not applicable."\n'
     )
+
+    if operation == "inventory":
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+python3 - "${{splunk_home}}" <<'PY'
+{btool_inventory_status_python()}
+PY
+'''
+        )
+
+    if operation in {"retention", "smartstore"} and args.deployment == "cluster":
+        target_note = (
+            " No target-specific settings were rendered for --indexes all;"
+            if operation == "retention" and not target_indexes(args)
+            else ""
+        )
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+echo "INCOMPLETE: cluster-bundle status is control-plane evidence only; peer {operation} settings require peer-side btool evidence.{target_note}" >&2
+{cluster_status}
+exit 2
+'''
+        )
+
+    if operation == "retention" and not target_indexes(args):
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + '''echo "INCOMPLETE: retention status requires explicit --indexes; no target-specific btool readback is available for --indexes all." >&2
+exit 2
+'''
+        )
+
+    if operation == "retention":
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+python3 - "${{splunk_home}}" <<'PY'
+{btool_readback_python(retention_expected_settings(args))}
+PY
+{cluster_status}'''
+        )
+
+    if operation == "smartstore":
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+python3 - "${{splunk_home}}" <<'PY'
+{btool_readback_python(smartstore_expected_settings(args))}
+PY
+python3 - "${{splunk_home}}" <<'PY'
+{btool_config_status_python("server", "cachemanager")}
+PY
+python3 - "${{splunk_home}}" <<'PY'
+{btool_config_status_python("limits", "remote_storage")}
+PY
+{cluster_status}'''
+        )
+
+    if operation == "disable-index":
+        if args.deployment == "cluster":
+            return make_script(
+                enterprise_version_gate(args)
+                + operation_guard
+                + f'''splunk_home={splunk_home}
+echo "INFO: cluster disable status is based on cluster-bundle status; peer-level btool evidence is collected separately." >&2
+{cluster_status}
+echo "INCOMPLETE: cluster-bundle status does not prove peer disable state; collect peer-level btool evidence." >&2
+exit 2
+'''
+            )
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+python3 - "${{splunk_home}}" <<'PY'
+{btool_disabled_readback_python(target_indexes(args))}
+PY
+'''
+        )
+
+    if operation == "delete-index":
+        if args.deployment == "cluster":
+            return make_script(
+                enterprise_version_gate(args)
+                + operation_guard
+                + f'''splunk_home={splunk_home}
+echo "INCOMPLETE: cluster-bundle status does not prove peer index-data removal; collect peer evidence using peer-cleanup-runbook.md." >&2
+{cluster_status}
+exit 2
+'''
+            )
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + f'''splunk_home={splunk_home}
+python3 - "${{splunk_home}}" <<'PY'
+{btool_index_presence_readback_python(target_indexes(args), "delete")}
+PY
+'''
+        )
+
+    if operation == "clean-data":
+        return make_script(
+            enterprise_version_gate(args)
+            + operation_guard
+            + '''echo "INCOMPLETE: clean-data has no supported independent readback in this workflow; capture dbinspect or search evidence after the indexer returns to service." >&2
+exit 2
+'''
+        )
+
     return make_script(
         enterprise_version_gate(args)
-        + f"""rendered_operation={shell_quote(args.operation)}
-[[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
-splunk_home={splunk_home}
-volume_output="$("${{splunk_home}}/bin/splunk" btool indexes list {volume} --debug)"
-printf '%s\n' "${{volume_output}}" | grep -v -E 'remote\\.(s3|gs|azure)\\.(access|secret|key)' || echo "INFO: no non-secret settings found for {volume}."
-indexes_output="$("${{splunk_home}}/bin/splunk" btool indexes list --debug)"
-printf '%s\n' "${{indexes_output}}" | grep -E 'frozenTimePeriodInSecs|maxTotalDataSizeMB|maxGlobal(Data|Raw)SizeMB|disabled' || echo "INFO: no lifecycle overrides found."
-"${{splunk_home}}/bin/splunk" btool server list cachemanager --debug
-"${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug
-{cluster_status}
-"""
+        + operation_guard
+        + f'''echo "INCOMPLETE: Enterprise {operation} status is a manual handoff; no generic readback is supported by this workflow." >&2
+exit 2
+'''
     )
 
 
@@ -1594,8 +2063,11 @@ def render_apply_retention_enterprise(args: argparse.Namespace) -> str:
         )
     )
     return make_script(
-        enterprise_version_gate(args)
-        + f"""splunk_home={splunk_home}
+        rendered_metadata_guard(args, "retention")
+        + enterprise_version_gate(args)
+        + f"""rendered_operation={shell_quote(args.operation)}
+[[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
+splunk_home={splunk_home}
 app_name={app_name}
 target_dir="{base}/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
@@ -1611,7 +2083,8 @@ def render_apply_retention_cloud(args: argparse.Namespace) -> str:
     base = shell_quote(args.acs_base.rstrip("/"))
     stack = shell_quote(args.stack)
     return make_script(
-        f'''rendered_operation={shell_quote(args.operation)}
+        rendered_metadata_guard(args, "retention")
+        + f'''rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "retention" ]] || {{ echo "ERROR: this helper was not rendered for a retention operation." >&2; exit 2; }}
 token_file={token_file}
 acs_base={base}
@@ -1705,7 +2178,7 @@ def render_disable_script(args: argparse.Namespace) -> str:
     app_name = shell_quote(f"{args.app_name}_disable")
     owner_file = shell_quote(str(Path(args.owner_approval_file).expanduser())) if args.owner_approval_file else "''"
     evidence_file = shell_quote(str(Path(args.evidence_file).expanduser())) if args.evidence_file else "''"
-    operation_guard = f'''rendered_operation={shell_quote(args.operation)}
+    operation_guard = rendered_metadata_guard(args, "disable-index") + f'''rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "disable-index" ]] || {{ echo "ERROR: this helper was not rendered for a disable-index operation." >&2; exit 2; }}
 '''
     if args.platform == "cloud":
@@ -1758,25 +2231,7 @@ for idx in "${{indexes[@]}}"; do
   "${{splunk_home}}/bin/splunk" disable index "${{idx}}"
 done
 python3 - "${{splunk_home}}" "${{indexes_csv}}" <<'PY'
-import re
-import subprocess
-import sys
-
-splunk_home, indexes_csv = sys.argv[1:3]
-failures = []
-for name in (item for item in indexes_csv.split(",") if item):
-    result = subprocess.run(
-        [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    match = re.search(r"(?m)^\\s*disabled\\s*=\\s*(\\S+)\\s*$", result.stdout)
-    if result.returncode != 0 or not match or match.group(1).lower() not in ("1", "true", "yes"):
-        failures.append(name)
-if failures:
-    raise SystemExit("ERROR: post-disable btool readback did not show disabled=true for: " + ", ".join(failures))
-print("Post-disable btool readback verified: " + ", ".join(item for item in indexes_csv.split(",") if item))
+{btool_disabled_readback_python(target_indexes(args))}
 PY
 """
     )
@@ -1874,7 +2329,7 @@ def render_delete_script(args: argparse.Namespace) -> str:
     backup_file = shell_quote(str(Path(args.backup_evidence_file).expanduser())) if args.backup_evidence_file else "''"
     confirm_tokens = shell_quote(",".join(args.confirm_token))
     accept = "true" if args.accept_destructive_index_delete else "false"
-    gate = f"""rendered_operation={shell_quote(args.operation)}
+    gate = rendered_metadata_guard(args, "delete-index") + f"""rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "delete-index" ]] || {{ echo "ERROR: this helper was not rendered for a delete-index operation." >&2; exit 2; }}
 accept_destructive={accept}
 evidence_file={evidence_file}
@@ -2022,24 +2477,7 @@ for idx in "${{indexes[@]}}"; do
   "${{splunk_home}}/bin/splunk" remove index "${{idx}}"
 done
 python3 - "${{splunk_home}}" "${{indexes_csv}}" <<'PY'
-import re
-import subprocess
-import sys
-
-splunk_home, indexes_csv = sys.argv[1:3]
-still_present = []
-for name in (item for item in indexes_csv.split(",") if item):
-    result = subprocess.run(
-        [f"{{splunk_home}}/bin/splunk", "btool", "indexes", "list", name],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if re.search(rf"(?m)^\\s*\\[{{re.escape(name)}}\\]\\s*$", result.stdout):
-        still_present.append(name)
-if still_present:
-    raise SystemExit("ERROR: post-delete btool readback still finds index stanza(s): " + ", ".join(still_present))
-print("Post-delete btool readback verified index stanza absence.")
+{btool_index_presence_readback_python(target_indexes(args))}
 PY
 """
     )
@@ -2054,7 +2492,8 @@ def render_clean_data_script(args: argparse.Namespace) -> str:
     confirm_tokens = shell_quote(",".join(args.confirm_token))
     accept = "true" if args.accept_destructive_index_delete else "false"
     return make_script(
-        f"""rendered_operation={shell_quote(args.operation)}
+        rendered_metadata_guard(args, "clean-data")
+        + f"""rendered_operation={shell_quote(args.operation)}
 [[ "${{rendered_operation}}" == "clean-data" ]] || {{ echo "ERROR: this helper was not rendered for a clean-data operation." >&2; exit 2; }}
 accept_destructive={accept}
 splunk_home={splunk_home}
@@ -2163,6 +2602,7 @@ def render(args: argparse.Namespace) -> dict:
                 "platform": args.platform,
                 "deployment": args.deployment,
                 "operation": args.operation,
+                "status_identity_sha256": status_identity_sha256(args),
                 "scope": args.scope,
                 "remote_provider": args.remote_provider,
                 "volume_name": args.volume_name,

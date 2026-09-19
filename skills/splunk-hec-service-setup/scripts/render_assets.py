@@ -96,6 +96,9 @@ EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk HEC service assets.")
     parser.add_argument("--platform", choices=("enterprise", "cloud"), default="enterprise")
+    parser.add_argument("--stack", default="")
+    parser.add_argument("--search-head", default="")
+    parser.add_argument("--acs-server", default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--app-name", default="splunk_httpinput")
@@ -158,6 +161,17 @@ def no_newline(value: str, option: str) -> None:
         die(f"{option} must not contain newlines.")
 
 
+def cloud_identity(value: str, option: str, *, required: bool = False) -> None:
+    if not value and not required:
+        return
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value or ""):
+        requirement = " is required and" if required else ""
+        die(
+            f"{option}{requirement} must contain only letters, numbers, "
+            "underscore, dot, or hyphen."
+        )
+
+
 def positive_port(value: str, option: str) -> int:
     if not re.fullmatch(r"[0-9]+", value or ""):
         die(f"{option} must be a TCP port number.")
@@ -198,6 +212,9 @@ def validate(args: argparse.Namespace) -> None:
         die("--default-index must also appear in --allowed-indexes.")
     positive_port(args.port, "--port")
     for value, option in (
+        (args.stack, "--stack"),
+        (args.search_head, "--search-head"),
+        (args.acs_server, "--acs-server"),
         (args.description, "--description"),
         (args.source, "--source"),
         (args.sourcetype, "--sourcetype"),
@@ -205,6 +222,19 @@ def validate(args: argparse.Namespace) -> None:
         (args.write_token_file, "--write-token-file"),
     ):
         no_newline(value, option)
+    if args.platform == "cloud":
+        cloud_identity(args.stack, "--stack", required=True)
+        cloud_identity(args.search_head, "--search-head")
+        if args.acs_server not in {
+            "https://admin.splunk.com",
+            "https://staging.admin.splunk.com",
+        }:
+            die(
+                "--acs-server must be https://admin.splunk.com or "
+                "https://staging.admin.splunk.com for Splunk Cloud rendering."
+            )
+    elif args.stack or args.search_head or args.acs_server:
+        die("--stack, --search-head, and --acs-server are valid only with --platform cloud.")
 
 
 def render_inputs_template(args: argparse.Namespace) -> str:
@@ -255,10 +285,17 @@ def render_readme(args: argparse.Namespace, token_path: str) -> str:
             "support for indexer acknowledgement is constrained to supported "
             "ingest paths such as AWS Kinesis Firehose. Validate this before use.\n"
         )
+    cloud_target_note = ""
+    if args.platform == "cloud":
+        cloud_target_note = (
+            f"ACS control plane: `{args.acs_server}`\n"
+            f"Cloud stack: `{args.stack}`\n"
+            f"Cloud search head: `{args.search_head or '(stack default)'}`\n"
+        )
     return f"""# Splunk HEC Service Rendered Assets
 
 Platform: `{args.platform}`
-Token name: `{args.token_name}`
+{cloud_target_note}Token name: `{args.token_name}`
 Default index: `{args.default_index}`
 
 Files:
@@ -296,6 +333,18 @@ def helper_path() -> Path:
     return project_root / "skills/shared/lib/credential_helpers.sh"
 
 
+def cloud_target_binding(args: argparse.Namespace) -> str:
+    return f'''ACS_BOUND_TARGET_CONTEXT=true
+ACS_BOUND_REQUIRE_CONFIG_MATCH=true
+ACS_BOUND_SERVER={shell_quote(args.acs_server)}
+ACS_BOUND_SPLUNK_CLOUD_STACK={shell_quote(args.stack)}
+ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD={shell_quote(args.search_head)}
+SPLUNK_PLATFORM=cloud
+export ACS_BOUND_TARGET_CONTEXT ACS_BOUND_REQUIRE_CONFIG_MATCH ACS_BOUND_SERVER
+export ACS_BOUND_SPLUNK_CLOUD_STACK ACS_BOUND_SPLUNK_CLOUD_SEARCH_HEAD SPLUNK_PLATFORM
+'''
+
+
 def enterprise_version_gate(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     return f'''_script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
@@ -323,11 +372,20 @@ test -x "${{splunk_home}}/bin/splunk"
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
-acs_prepare_context
-if acs_command hec-token list --count 1 >/dev/null 2>&1; then
-  acs_command hec-token list --count 1 >/dev/null
-else
+{cloud_target_binding(args)}
+if ! acs_prepare_context; then
+  echo "ERROR: Unable to prepare the requested ACS context." >&2
+  exit 1
+fi
+# Select a local command surface before the remote check; never use a remote
+# auth/transport failure as evidence that a legacy fallback is appropriate.
+if command acs hec-token list --help >/dev/null 2>&1; then
+  acs_command hec-token list --count 1 --offset 0 >/dev/null
+elif command acs http-event-collectors describe --help >/dev/null 2>&1; then
   acs_command http-event-collectors list >/dev/null
+else
+  echo "ERROR: No supported ACS HEC observation command group is available." >&2
+  exit 1
 fi
 """
     )
@@ -533,6 +591,7 @@ def render_cloud_apply(args: argparse.Namespace) -> str:
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
+{cloud_target_binding(args)}
 TOKEN_NAME={token_name}
 DEFAULT_INDEX={default_index}
 ALLOWED_INDEXES={allowed_indexes}
@@ -548,12 +607,13 @@ log_local() {{
 }}
 
 acs_hec_command_group() {{
-  if acs_command hec-token list --count 1 >/dev/null 2>&1; then
+  # Detect only the local CLI surface; a remote/auth failure must not select a fallback.
+  if command acs hec-token list --help >/dev/null 2>&1; then
     printf '%s' "hec-token"
-  elif acs_command http-event-collectors list >/dev/null 2>&1; then
+  elif command acs http-event-collectors describe --help >/dev/null 2>&1; then
     printf '%s' "http-event-collectors"
   else
-    log_local "ERROR: Unable to list ACS HEC tokens with either supported command group."
+    log_local "ERROR: Unable to locate a supported ACS HEC observation command group."
     return 1
   fi
 }}
@@ -618,51 +678,258 @@ add_allowed_indexes_if_supported() {{
   return 0
 }}
 
-cloud_get_hec_token_state() {{
-  local token_name="$1" cmd_group hec_list tmp
-  cmd_group="$(acs_hec_command_group)"
-  if [[ "${{cmd_group}}" == "hec-token" ]]; then
-    if ! hec_list=$(acs_command hec-token list --count 100 2>/dev/null | acs_extract_http_response_json); then
-      printf '%s' "unknown"
-      return 0
-    fi
-  else
-    if ! hec_list=$(acs_command http-event-collectors list 2>/dev/null | acs_extract_http_response_json); then
-      printf '%s' "unknown"
-      return 0
-    fi
+cloud_describe_hec_token_state() {{
+  local token_name="$1" cmd_group="$2" output command_succeeded=false
+  if output="$(acs_command "${{cmd_group}}" describe "${{token_name}}" 2>&1)"; then
+    command_succeeded=true
   fi
-  tmp="$(mktemp)"
-  chmod 600 "${{tmp}}"
-  printf '%s' "${{hec_list}}" > "${{tmp}}"
-  python3 - "${{token_name}}" "${{tmp}}" <<'PY'
+  printf '%s' "${{output}}" | python3 -c '
+import json
+import re
+import sys
+
+requested = sys.argv[1]
+command_succeeded = sys.argv[2] == "true"
+raw = sys.stdin.read()
+if not raw.strip() or len(raw.encode("utf-8")) > 1024 * 1024:
+    raise SystemExit(1)
+try:
+    parsed = json.loads(raw)
+except Exception:
+    parsed = None
+
+def walk(value, depth=0):
+    if depth > 8:
+        return
+    yield value
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "response" and isinstance(child, str):
+                try:
+                    child = json.loads(child)
+                except Exception:
+                    continue
+            yield from walk(child, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            yield from walk(child, depth + 1)
+
+def state_from_disabled(value):
+    if isinstance(value, bool):
+        return "disabled" if value else "enabled"
+    normalized = str(value).strip().lower()
+    if normalized in ("1", "true"):
+        return "disabled"
+    if normalized in ("0", "false"):
+        return "enabled"
+    raise ValueError("invalid disabled value")
+
+if command_succeeded:
+    if parsed is None:
+        raise SystemExit(1)
+    if isinstance(parsed, list):
+        http_items = [
+            item for item in parsed
+            if isinstance(item, dict) and item.get("type") == "http"
+        ]
+        if len(http_items) != 1:
+            raise SystemExit(1)
+        status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+        statuses = [http_items[0][key] for key in status_keys if key in http_items[0]]
+        if statuses:
+            if any(not str(value).isdigit() for value in statuses):
+                raise SystemExit(1)
+            normalized_statuses = {{int(value) for value in statuses}}
+            if len(normalized_statuses) != 1 or not 200 <= next(iter(normalized_statuses)) <= 299:
+                raise SystemExit(1)
+    observations = []
+    for node in walk(parsed):
+        if not isinstance(node, dict):
+            continue
+        spec = node.get("spec")
+        if isinstance(spec, dict) and isinstance(spec.get("name"), str) and spec["name"]:
+            if "disabled" in spec:
+                disabled_value = spec["disabled"]
+            elif "disabled" in node:
+                disabled_value = node["disabled"]
+            else:
+                raise SystemExit(1)
+            observations.append((spec["name"], state_from_disabled(disabled_value)))
+        direct_name = node.get("name") or node.get("tokenName")
+        if isinstance(direct_name, str) and direct_name and "disabled" in node:
+            observations.append((direct_name, state_from_disabled(node["disabled"])))
+    names = {{name for name, _state in observations}}
+    states = {{state for name, state in observations if name == requested}}
+    if names != {{requested}} or len(states) != 1:
+        raise SystemExit(1)
+    print(states.pop(), end="")
+    raise SystemExit(0)
+
+status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+
+def has_404(value):
+    if not isinstance(value, dict):
+        return False
+    values = [str(value[key]).strip() for key in status_keys if key in value]
+    return bool(values) and all(item == "404" for item in values)
+
+def exact_http_404(value):
+    if isinstance(value, dict):
+        return has_404(value)
+    if not isinstance(value, list):
+        return False
+    http_items = [
+        item for item in value
+        if isinstance(item, dict) and item.get("type") == "http"
+    ]
+    return len(http_items) == 1 and has_404(http_items[0])
+
+if parsed is not None and exact_http_404(parsed):
+    print("missing", end="")
+    raise SystemExit(0)
+
+plain = " ".join(raw.split())
+plain = re.sub(r"^error:\s*", "", plain, flags=re.IGNORECASE).rstrip(".")
+for marker in (chr(34), chr(39), "[", "]"):
+    plain = plain.replace(marker, "")
+escaped = re.escape(requested)
+patterns = (
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{{escaped}}\s+(?:is\s+|was\s+)?not[ -]?found$",
+    rf"^no such (?:hec[ -]?token|http event collector|token|resource)\s*:?\s*{{escaped}}$",
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{{escaped}}\s+does not exist$",
+)
+if any(re.fullmatch(pattern, plain, flags=re.IGNORECASE) for pattern in patterns):
+    print("missing", end="")
+    raise SystemExit(0)
+raise SystemExit(1)
+' "${{token_name}}" "${{command_succeeded}}" 2>/dev/null
+}}
+
+cloud_get_hec_token_state() {{
+  local token_name="$1" cmd_group raw tmp rc=0 page_result page_count page_state
+  local count=100 offset=0 page_number=0 max_pages=100
+  if ! cmd_group="$(acs_hec_command_group)"; then
+    return 1
+  fi
+  if [[ "${{cmd_group}}" == "http-event-collectors" ]]; then
+    cloud_describe_hec_token_state "${{token_name}}" "${{cmd_group}}"
+    return $?
+  fi
+  while (( page_number < max_pages )); do
+    if ! raw="$(acs_command hec-token list --count "${{count}}" --offset "${{offset}}" 2>/dev/null)"; then
+      return 1
+    fi
+    tmp="$(mktemp)" || return 1
+    if ! chmod 600 "${{tmp}}" || ! printf '%s' "${{raw}}" > "${{tmp}}"; then
+      rm -f "${{tmp}}"
+      return 1
+    fi
+    if page_result="$(python3 - "${{token_name}}" "${{tmp}}" "${{count}}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 target = sys.argv[1]
 payload_path = Path(sys.argv[2])
+page_limit = int(sys.argv[3])
 try:
-    data = json.loads(payload_path.read_text(encoding="utf-8"))
-    collectors = (
-        data.get("http-event-collectors")
-        or data.get("http_event_collectors")
-        or data.get("tokens")
-        or []
-    )
-    for collector in collectors:
-        spec = collector.get("spec", {{}}) if isinstance(collector, dict) else {{}}
-        name = spec.get("name") or collector.get("name", "")
-        if name != target:
-            continue
-        disabled = str(spec.get("disabled", collector.get("disabled", False))).strip().lower()
-        print("disabled" if disabled in ("1", "true") else "enabled", end="")
-        raise SystemExit(0)
-    print("missing", end="")
+    text = payload_path.read_text(encoding="utf-8")
+    if not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("ACS HEC inventory page was empty or oversized")
+    structured = json.loads(text)
 except Exception:
-    print("unknown", end="")
+    raise SystemExit(1)
+
+data = structured
+if isinstance(structured, list):
+    http_items = [
+        item for item in structured
+        if isinstance(item, dict) and item.get("type") == "http"
+    ]
+    if len(http_items) != 1:
+        raise SystemExit(1)
+    item = http_items[0]
+    status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+    statuses = [item[key] for key in status_keys if key in item]
+    if statuses:
+        if any(not str(value).isdigit() for value in statuses):
+            raise SystemExit(1)
+        normalized_statuses = {{int(value) for value in statuses}}
+        if len(normalized_statuses) != 1 or not 200 <= next(iter(normalized_statuses)) <= 299:
+            raise SystemExit(1)
+    response = item.get("response")
+    if not isinstance(response, str) or not response.strip():
+        raise SystemExit(1)
+    try:
+        data = json.loads(response)
+    except Exception:
+        raise SystemExit(1)
+if not isinstance(data, dict):
+    raise SystemExit(1)
+
+keys = ("http-event-collectors", "http_event_collectors", "tokens")
+present = [key for key in keys if key in data]
+if len(present) != 1 or not isinstance(data[present[0]], list):
+    raise SystemExit(1)
+collectors = data[present[0]]
+if len(collectors) > page_limit:
+    raise SystemExit(1)
+matches = []
+for collector in collectors:
+    if not isinstance(collector, dict):
+        raise SystemExit(1)
+    spec = collector.get("spec", {{}})
+    if not isinstance(spec, dict):
+        raise SystemExit(1)
+    name = spec.get("name") or collector.get("name", "")
+    if not isinstance(name, str) or not name:
+        raise SystemExit(1)
+    if name != target:
+        continue
+    if "disabled" in spec:
+        disabled_value = spec["disabled"]
+    elif "disabled" in collector:
+        disabled_value = collector["disabled"]
+    else:
+        raise SystemExit(1)
+    disabled = str(disabled_value).strip().lower()
+    if disabled in ("1", "true"):
+        matches.append("disabled")
+    elif disabled in ("0", "false"):
+        matches.append("enabled")
+    else:
+        raise SystemExit(1)
+if len(matches) > 1:
+    raise SystemExit(1)
+state = matches[0] if matches else "absent"
+print(f"{{len(collectors)}}:{{state}}", end="")
 PY
-  rm -f "${{tmp}}"
+    )"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    rm -f "${{tmp}}"
+    (( rc == 0 )) || return "${{rc}}"
+    page_count="${{page_result%%:*}}"
+    page_state="${{page_result#*:}}"
+    [[ "${{page_count}}" =~ ^[0-9]+$ ]] || return 1
+    case "${{page_state}}" in
+      enabled|disabled)
+        printf '%s' "${{page_state}}"
+        return 0
+        ;;
+      absent) ;;
+      *) return 1 ;;
+    esac
+    if (( page_count < count )); then
+      printf 'missing'
+      return 0
+    fi
+    offset=$((offset + count))
+    page_number=$((page_number + 1))
+  done
+  return 1
 }}
 
 write_token_from_output() {{
@@ -744,13 +1011,24 @@ PY
   rm -f "${{tmp}}"
 }}
 
-acs_prepare_context
-cmd_group="$(acs_hec_command_group)"
-state="$(cloud_get_hec_token_state "${{TOKEN_NAME}}")"
-if [[ "${{state}}" == "unknown" ]]; then
-  log_local "ERROR: Could not determine whether HEC token '${{TOKEN_NAME}}' already exists. Aborting to avoid duplicate token creation."
+if ! acs_prepare_context; then
+  log_local "ERROR: Unable to prepare the requested ACS context."
   exit 1
 fi
+if ! cmd_group="$(acs_hec_command_group)"; then
+  exit 1
+fi
+if ! state="$(cloud_get_hec_token_state "${{TOKEN_NAME}}")"; then
+  log_local "ERROR: Could not obtain a trustworthy HEC token inventory through ACS; refusing mutation."
+  exit 1
+fi
+case "${{state}}" in
+  enabled|disabled|missing) ;;
+  *)
+    log_local "ERROR: ACS returned an invalid HEC token state; refusing mutation."
+    exit 1
+    ;;
+esac
 if [[ "${{state}}" != "missing" && -n "${{WRITE_TOKEN_FILE}}" ]]; then
   if [[ ! -f "${{WRITE_TOKEN_FILE}}" || -L "${{WRITE_TOKEN_FILE}}" ]] \
       || ! LC_ALL=C grep -q '[^[:space:]]' "${{WRITE_TOKEN_FILE}}"; then
@@ -779,13 +1057,26 @@ if [[ "${{state}}" == "missing" ]]; then
   add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || unsupported_flag_handoff "defaultSourcetype" "${{cmd_group}}"
   add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || unsupported_flag_handoff "disabled" "${{cmd_group}}"
   add_ack_flag_if_supported "${{help_text}}" "${{USE_ACK}}" || unsupported_flag_handoff "useACK" "${{cmd_group}}"
-  output="$(acs_command "${{ACS_ARGS[@]}}" 2>&1)" || {{ printf '%s\\n' "${{output}}" >&2; exit 1; }}
+  if ! output="$(acs_command "${{ACS_ARGS[@]}}" 2>&1)"; then
+    log_local "ERROR: ACS failed to create HEC token '${{TOKEN_NAME}}'; refusing to print a potentially sensitive response."
+    exit 1
+  fi
   if ! write_token_from_output "${{output}}"; then
-    log_local "ERROR: ACS created HEC token '${{TOKEN_NAME}}', but its one-time token value was not returned or could not be written."
+    log_local "ERROR: The ACS create command returned success for HEC token '${{TOKEN_NAME}}', but its one-time token value was not returned or could not be written; creation is not verified."
     log_local "HANDOFF: Rotate or recreate the token in the supported Splunk Cloud HEC surface, store it in '${{WRITE_TOKEN_FILE}}', then run status-cloud-acs.sh."
     exit 1
   fi
-  log_local "Created HEC token '${{TOKEN_NAME}}' via ACS command group '${{cmd_group}}'."
+  if ! observed_state="$(cloud_get_hec_token_state "${{TOKEN_NAME}}")"; then
+    log_local "ERROR: ACS create returned success, but HEC token '${{TOKEN_NAME}}' could not be read back."
+    exit 1
+  fi
+  expected_state="enabled"
+  [[ "${{DISABLED}}" == "true" ]] && expected_state="disabled"
+  if [[ "${{observed_state}}" != "${{expected_state}}" ]]; then
+    log_local "ERROR: ACS create returned success, but HEC token '${{TOKEN_NAME}}' read back as '${{observed_state}}' instead of '${{expected_state}}'."
+    exit 1
+  fi
+  log_local "Created and read back HEC token '${{TOKEN_NAME}}' via ACS command group '${{cmd_group}}'."
 else
   if [[ "${{cmd_group}}" == "hec-token" ]]; then
     help_text="$(acs_command hec-token update --help 2>&1 || true)"
@@ -796,13 +1087,26 @@ else
     add_optional_flag_if_supported "${{help_text}}" "--default-sourcetype" "${{DEFAULT_SOURCETYPE}}" || unsupported_flag_handoff "defaultSourcetype" "${{cmd_group}}"
     add_boolean_flag_if_supported "${{help_text}}" "--disabled" "${{DISABLED}}" || unsupported_flag_handoff "disabled" "${{cmd_group}}"
     add_ack_flag_if_supported "${{help_text}}" "${{USE_ACK}}" || unsupported_flag_handoff "useACK" "${{cmd_group}}"
-    acs_command "${{ACS_ARGS[@]}}" >/dev/null
+    if ! acs_command "${{ACS_ARGS[@]}}" >/dev/null; then
+      log_local "ERROR: ACS failed to update HEC token '${{TOKEN_NAME}}'."
+      exit 1
+    fi
+    if ! observed_state="$(cloud_get_hec_token_state "${{TOKEN_NAME}}")"; then
+      log_local "ERROR: ACS update returned success, but HEC token '${{TOKEN_NAME}}' could not be read back."
+      exit 1
+    fi
+    expected_state="enabled"
+    [[ "${{DISABLED}}" == "true" ]] && expected_state="disabled"
+    if [[ "${{observed_state}}" != "${{expected_state}}" ]]; then
+      log_local "ERROR: ACS update returned success, but HEC token '${{TOKEN_NAME}}' read back as '${{observed_state}}' instead of '${{expected_state}}'."
+      exit 1
+    fi
   else
     log_local "ERROR: Existing HEC token '${{TOKEN_NAME}}' cannot be reconciled by legacy ACS command group '${{cmd_group}}'."
     log_local "HANDOFF: Apply acs-hec-token.json in the supported Splunk Cloud HEC management surface, then run status-cloud-acs.sh."
     exit 1
   fi
-  log_local "HEC token '${{TOKEN_NAME}}' already exists with state '${{state}}'."
+  log_local "Updated and read back HEC token '${{TOKEN_NAME}}' with state '${{observed_state}}'."
 fi
 
 if [[ "${{USE_ACK}}" == "true" ]]; then
@@ -837,37 +1141,161 @@ def render_status_cloud(args: argparse.Namespace) -> str:
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
+{cloud_target_binding(args)}
 TOKEN_NAME={token_name}
-acs_prepare_context
-tmp="$(mktemp)"
-chmod 600 "${{tmp}}"
-trap 'rm -f "${{tmp}}"' EXIT
-if acs_command hec-token describe "${{TOKEN_NAME}}" >"${{tmp}}" 2>/dev/null; then
-  cat "${{tmp}}" | acs_extract_http_response_json
+if ! acs_prepare_context; then
+  echo "ERROR: Unable to prepare the requested ACS context." >&2
+  exit 1
+fi
+raw_tmp="$(mktemp)"
+payload_tmp="$(mktemp)"
+chmod 600 "${{raw_tmp}}" "${{payload_tmp}}"
+trap 'rm -f "${{raw_tmp}}" "${{payload_tmp}}"' EXIT
+if command acs hec-token describe --help >/dev/null 2>&1; then
+  if ! acs_command hec-token describe "${{TOKEN_NAME}}" >"${{raw_tmp}}" 2>/dev/null; then
+    echo "ERROR: Unable to describe HEC token '${{TOKEN_NAME}}' through ACS." >&2
+    exit 1
+  fi
+elif command acs http-event-collectors describe --help >/dev/null 2>&1; then
+  if ! acs_command http-event-collectors describe "${{TOKEN_NAME}}" >"${{raw_tmp}}" 2>/dev/null; then
+    echo "ERROR: Unable to describe HEC token '${{TOKEN_NAME}}' through ACS." >&2
+    exit 1
+  fi
 else
-  acs_command http-event-collectors describe "${{TOKEN_NAME}}" 2>/dev/null | acs_extract_http_response_json
-fi | python3 -c '
+  echo "ERROR: No supported ACS HEC describe command group is available." >&2
+  exit 1
+fi
+if ! python3 - "${{raw_tmp}}" "${{payload_tmp}}" <<'PY'
 import json
 import sys
+from pathlib import Path
+
+raw_path = Path(sys.argv[1])
+payload_path = Path(sys.argv[2])
+try:
+    text = raw_path.read_text(encoding="utf-8")
+    if not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("empty or oversized ACS response")
+    structured = json.loads(text)
+except Exception:
+    raise SystemExit(1)
+
+payload = structured
+if isinstance(structured, list):
+    http_items = [
+        item for item in structured
+        if isinstance(item, dict) and item.get("type") == "http"
+    ]
+    if len(http_items) != 1:
+        raise SystemExit(1)
+    item = http_items[0]
+    status_keys = ("code", "status", "statusCode", "status_code", "httpStatus", "http_status")
+    statuses = [item[key] for key in status_keys if key in item]
+    if statuses:
+        if any(not str(value).isdigit() for value in statuses):
+            raise SystemExit(1)
+        normalized_statuses = {{int(value) for value in statuses}}
+        if len(normalized_statuses) != 1 or not 200 <= next(iter(normalized_statuses)) <= 299:
+            raise SystemExit(1)
+    response = item.get("response")
+    if not isinstance(response, str) or not response.strip():
+        raise SystemExit(1)
+    try:
+        payload = json.loads(response)
+    except Exception:
+        raise SystemExit(1)
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+payload_path.write_text(json.dumps(payload), encoding="utf-8")
+PY
+then
+  echo "ERROR: ACS returned an unreadable HEC token description." >&2
+  exit 1
+fi
+python3 - "${{TOKEN_NAME}}" "${{payload_tmp}}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+target = sys.argv[1]
+payload_path = Path(sys.argv[2])
+sensitive_fragments = (
+    "token",
+    "secret",
+    "password",
+    "credential",
+    "authorization",
+    "api_key",
+    "apikey",
+    "private_key",
+    "cookie",
+)
 
 def redact(value):
     if isinstance(value, dict):
-        return {{k: ("<redacted>" if k.lower() == "token" else redact(v)) for k, v in value.items()}}
+        return {{
+            k: (
+                "<redacted>"
+                if any(fragment in str(k).lower() for fragment in sensitive_fragments)
+                else redact(v)
+            )
+            for k, v in value.items()
+        }}
     if isinstance(value, list):
         return [redact(item) for item in value]
     return value
 
+def collect_hec_names(value):
+    names = []
+    if isinstance(value, dict):
+        hec_fields = {{
+            "disabled",
+            "defaultIndex",
+            "defaultindex",
+            "default_index",
+            "allowedIndexes",
+            "useACK",
+            "useAck",
+            "token",
+            "tokenValue",
+        }}
+        spec = value.get("spec")
+        if isinstance(spec, dict):
+            spec_name = spec.get("name")
+            if isinstance(spec_name, str) and spec_name:
+                names.append(spec_name)
+        direct_name = value.get("name") or value.get("tokenName")
+        if (
+            isinstance(direct_name, str)
+            and direct_name
+            and bool(hec_fields.intersection(value))
+        ):
+            names.append(direct_name)
+        for child in value.values():
+            names.extend(collect_hec_names(child))
+    elif isinstance(value, list):
+        for child in value:
+            names.extend(collect_hec_names(child))
+    return names
+
 try:
-    data = json.load(sys.stdin)
-except Exception as exc:
-    print(f"ERROR: ACS returned invalid JSON: {{exc}}", file=sys.stderr)
+    text = payload_path.read_text(encoding="utf-8")
+    if not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("empty or oversized description")
+    data = json.loads(text)
+except Exception:
+    print("ERROR: ACS returned an invalid HEC token description.", file=sys.stderr)
     raise SystemExit(1)
 if data in ({{}}, []):
     print("ERROR: ACS returned an empty HEC token description.", file=sys.stderr)
     raise SystemExit(1)
+observed_names = set(collect_hec_names(data))
+if observed_names != {{target}}:
+    print("ERROR: ACS HEC token description did not identify the requested token.", file=sys.stderr)
+    raise SystemExit(1)
 print(json.dumps(redact(data), indent=2, sort_keys=True))
-'
-rm -f "${{tmp}}"
+PY
+rm -f "${{raw_tmp}}" "${{payload_tmp}}"
 trap - EXIT
 """
     )
@@ -885,6 +1313,9 @@ def render(args: argparse.Namespace) -> dict:
             "metadata.json": json.dumps(
                 {
                     "platform": args.platform,
+                    "cloud_stack": args.stack if args.platform == "cloud" else "",
+                    "cloud_search_head": args.search_head if args.platform == "cloud" else "",
+                    "acs_server": args.acs_server if args.platform == "cloud" else "",
                     "app_name": args.app_name,
                     "token_name": args.token_name,
                     "default_index": args.default_index,
@@ -923,6 +1354,9 @@ def render(args: argparse.Namespace) -> dict:
     return {
         "target": "hec-service",
         "platform": args.platform,
+        "cloud_stack": args.stack if args.platform == "cloud" else "",
+        "cloud_search_head": args.search_head if args.platform == "cloud" else "",
+        "acs_server": args.acs_server if args.platform == "cloud" else "",
         "output_dir": str(output_dir),
         "render_dir": str(render_dir),
         "assets": assets,

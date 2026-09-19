@@ -44,7 +44,10 @@ run_render(){ local cmd=(python3 "${RENDER_SCRIPT}" --phase render --index "${IN
 warn_if_current_skill_role_unsupported
 if [[ "${INSTALL}" == "true" && "${DRY_RUN}" != "true" ]]; then
   require_current_skill_role_supported
-  role="$(resolve_splunk_target_role)"
+  if ! role="$(resolve_splunk_target_role)"; then
+    echo "ERROR: Could not resolve the selected Splunk target role." >&2
+    exit 1
+  fi
   [[ "${role}" != "external-collector" ]] || { echo "ERROR: --install requires a Splunk management endpoint, not an external-collector target." >&2; exit 2; }
 fi
 run_render

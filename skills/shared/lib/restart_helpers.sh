@@ -8,6 +8,7 @@ _RESTART_HELPERS_LOADED=true
 
 PLATFORM_RESTART_DEFAULT_TIMEOUT="${PLATFORM_RESTART_DEFAULT_TIMEOUT:-600}"
 PLATFORM_RESTART_CONNECT_TIMEOUT="${PLATFORM_RESTART_CONNECT_TIMEOUT:-10}"
+_PLATFORM_RESTART_RESOLVED_PLATFORM=""
 
 _platform_restart_bool() {
     case "${1:-}" in
@@ -20,6 +21,26 @@ _platform_restart_safe_unit() {
     [[ "${1:-}" =~ ^[A-Za-z0-9_.@-]+\.service$ ]]
 }
 
+_platform_restart_resolve_platform() {
+    local platform=""
+    _PLATFORM_RESTART_RESOLVED_PLATFORM=""
+    # Resolve in the current shell so file-backed URI, SSH, and role settings
+    # are available to the execution-mode decision that follows.
+    if ! resolve_splunk_platform >/dev/null; then
+        return 1
+    fi
+    platform="${_RESOLVED_SPLUNK_PLATFORM:-}"
+    case "${platform}" in
+        cloud|enterprise)
+            _PLATFORM_RESTART_RESOLVED_PLATFORM="${platform}"
+            ;;
+        *)
+            echo "ERROR: SPLUNK_PLATFORM must be cloud or enterprise; refusing restart routing." >&2
+            return 1
+            ;;
+    esac
+}
+
 _platform_restart_uri_host() {
     local uri="${1:-${SPLUNK_URI:-}}"
     if type splunk_host_from_uri >/dev/null 2>&1; then
@@ -30,15 +51,34 @@ _platform_restart_uri_host() {
 }
 
 platform_restart_execution_mode() {
-    local host
+    local host mode=""
 
     if [[ -n "${PLATFORM_RESTART_EXECUTION:-}" ]]; then
-        printf '%s' "${PLATFORM_RESTART_EXECUTION}"
-        return 0
+        case "${PLATFORM_RESTART_EXECUTION}" in
+            local|ssh)
+                printf '%s' "${PLATFORM_RESTART_EXECUTION}"
+                return 0
+                ;;
+            *)
+                echo "ERROR: PLATFORM_RESTART_EXECUTION must be local or ssh; refusing restart routing." >&2
+                return 1
+                ;;
+        esac
     fi
     if type deployment_execution_mode_for_profile >/dev/null 2>&1; then
-        deployment_execution_mode_for_profile ""
-        return 0
+        if ! mode="$(deployment_execution_mode_for_profile "")"; then
+            return 1
+        fi
+        case "${mode}" in
+            local|ssh)
+                printf '%s' "${mode}"
+                return 0
+                ;;
+            *)
+                echo "ERROR: Resolved restart execution mode must be local or ssh; refusing restart routing." >&2
+                return 1
+                ;;
+        esac
     fi
 
     host="$(_platform_restart_uri_host "${SPLUNK_URI:-}")"
@@ -71,9 +111,13 @@ _platform_restart_run() {
 }
 
 platform_restart_detect_systemd_unit() {
-    local execution_mode="${1:-$(platform_restart_execution_mode)}"
+    local execution_mode="${1:-}"
     local unit raw_cmd
     local -a candidates=()
+
+    if [[ -z "${execution_mode}" ]] && ! execution_mode="$(platform_restart_execution_mode)"; then
+        return 1
+    fi
 
     if [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" ]]; then
         candidates+=("${SPLUNK_SYSTEMD_UNIT}")
@@ -92,8 +136,12 @@ platform_restart_detect_systemd_unit() {
 }
 
 platform_restart_has_noninteractive_privilege() {
-    local execution_mode="${1:-$(platform_restart_execution_mode)}"
+    local execution_mode="${1:-}"
     local uid
+
+    if [[ -z "${execution_mode}" ]] && ! execution_mode="$(platform_restart_execution_mode)"; then
+        return 1
+    fi
 
     uid="$(_platform_restart_capture "${execution_mode}" "id -u" 2>/dev/null || true)"
     if [[ "${uid}" == "0" ]]; then
@@ -103,8 +151,12 @@ platform_restart_has_noninteractive_privilege() {
 }
 
 _platform_restart_command_prefix() {
-    local execution_mode="${1:-$(platform_restart_execution_mode)}"
+    local execution_mode="${1:-}"
     local uid
+
+    if [[ -z "${execution_mode}" ]] && ! execution_mode="$(platform_restart_execution_mode)"; then
+        return 1
+    fi
 
     uid="$(_platform_restart_capture "${execution_mode}" "id -u" 2>/dev/null || true)"
     if [[ "${uid}" == "0" ]]; then
@@ -126,7 +178,9 @@ _platform_restart_cli() {
     splunk_bin="${splunk_home%/}/bin/splunk"
     cmd="$(hbs_shell_join "${splunk_bin}" restart)"
     if [[ "${use_sudo}" == "true" ]]; then
-        prefix="$(_platform_restart_command_prefix "${execution_mode}")"
+        if ! prefix="$(_platform_restart_command_prefix "${execution_mode}")"; then
+            return 1
+        fi
         cmd="${prefix}${cmd}"
     fi
     stdin_content="$(_platform_restart_stdin_auth)"
@@ -141,9 +195,16 @@ _platform_restart_rest_fallback_allowed() {
 platform_restart_handoff() {
     local operation="${1:-changes}"
     local reason="${2:-No safe noninteractive restart path was detected.}"
+    local platform=""
+
+    if ! _platform_restart_resolve_platform; then
+        log "ERROR: Could not resolve the selected Splunk platform; refusing restart guidance."
+        return 1
+    fi
+    platform="${_PLATFORM_RESTART_RESOLVED_PLATFORM}"
 
     log "Restart handoff required for ${operation}: ${reason}"
-    if is_splunk_cloud 2>/dev/null; then
+    if [[ "${platform}" == "cloud" ]]; then
         log "Splunk Cloud: run 'acs status current-stack' and restart only if restartRequired=true."
     else
         log "Enterprise: run the restart with the host's supported service manager, then verify ${SPLUNK_URI:-https://localhost:8089}/services/server/info."
@@ -153,7 +214,13 @@ platform_restart_handoff() {
 
 platform_reload_or_restart_guidance() {
     local prefix="${1:-changes}"
-    if is_splunk_cloud 2>/dev/null; then
+    local platform=""
+    if ! _platform_restart_resolve_platform; then
+        echo "ERROR: Could not resolve the selected Splunk platform; refusing restart guidance." >&2
+        return 1
+    fi
+    platform="${_PLATFORM_RESTART_RESOLVED_PLATFORM}"
+    if [[ "${platform}" == "cloud" ]]; then
         echo "Splunk Cloud: check 'acs status current-stack' after ${prefix} and run 'acs restart current-stack' only if restartRequired=true."
     elif [[ "${prefix}" == *"deploy"* || "${prefix}" == *"serverclass"* ]]; then
         echo "Deployment server: prefer 'splunk reload deploy-server' after ${prefix}; client restarts depend on serverclass issueReload/restartIfNeeded/restartSplunkd."
@@ -164,16 +231,54 @@ platform_reload_or_restart_guidance() {
     fi
 }
 
+_platform_restart_validate_target_role() {
+    case "${1:-}" in
+        standalone|search-tier|indexer|heavy-forwarder|universal-forwarder|external-collector)
+            return 0
+            ;;
+        *)
+            echo "ERROR: Unsupported Splunk restart target role '${1:-}'; refusing restart routing." >&2
+            return 1
+            ;;
+    esac
+}
+
+_platform_restart_validate_platform_role() {
+    local platform="${1:-}" target_role="${2:-}"
+    if [[ "${platform}" == "cloud" ]]; then
+        case "${target_role}" in
+            standalone|search-tier) return 0 ;;
+            *)
+                echo "ERROR: Splunk Cloud restart routing supports only standalone or search-tier targets; refusing ACS restart." >&2
+                return 1
+                ;;
+        esac
+    fi
+    return 0
+}
+
 platform_restart_plan() {
     local operation="${1:-changes}" target_role="${2:-${SPLUNK_TARGET_ROLE:-standalone}}" restart_mode="${3:-${PLATFORM_RESTART_MODE:-auto}}"
-    local execution_mode splunk_home systemd_unit decision
+    local execution_mode splunk_home systemd_unit decision platform=""
 
-    execution_mode="$(platform_restart_execution_mode 2>/dev/null || echo "unknown")"
+    if ! _platform_restart_resolve_platform; then
+        return 1
+    fi
+    if ! _platform_restart_validate_target_role "${target_role}"; then
+        return 1
+    fi
+    platform="${_PLATFORM_RESTART_RESOLVED_PLATFORM}"
+    if ! _platform_restart_validate_platform_role "${platform}" "${target_role}"; then
+        return 1
+    fi
+    if ! execution_mode="$(platform_restart_execution_mode)"; then
+        return 1
+    fi
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
     systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" 2>/dev/null || true)"
     decision="handoff"
 
-    if is_splunk_cloud 2>/dev/null; then
+    if [[ "${platform}" == "cloud" ]]; then
         decision="acs"
     elif [[ "${restart_mode}" == "none" || "${restart_mode}" == "handoff" ]]; then
         decision="handoff"
@@ -215,24 +320,43 @@ platform_restart_or_exit() {
     local skip_msg="${4:-Restart manually before relying on the updated state.}"
     local restart_mode="${PLATFORM_RESTART_MODE:-auto}"
     local target_role="${SPLUNK_TARGET_ROLE:-standalone}"
-    local execution_mode splunk_home systemd_unit rc
+    local execution_mode splunk_home systemd_unit rc platform=""
 
     if [[ "${RESTART_SPLUNK:-true}" != "true" ]]; then
         log "Skipping Splunk restart (--no-restart). ${skip_msg}"
         return 0
     fi
 
-    if is_splunk_cloud 2>/dev/null; then
+    if ! _platform_restart_validate_target_role "${target_role}"; then
+        log "ERROR: Invalid restart target role; refusing restart."
+        return 1
+    fi
+
+    if ! _platform_restart_resolve_platform; then
+        log "ERROR: Could not resolve the selected Splunk platform; refusing restart."
+        return 1
+    fi
+    platform="${_PLATFORM_RESTART_RESOLVED_PLATFORM}"
+
+    if ! _platform_restart_validate_platform_role "${platform}" "${target_role}"; then
+        log "ERROR: Restart target role is incompatible with the selected platform."
+        return 1
+    fi
+
+    if [[ "${platform}" == "cloud" ]]; then
         cloud_app_restart_or_exit "${operation}" "${skip_msg}"
         return $?
     fi
 
-    execution_mode="$(platform_restart_execution_mode 2>/dev/null || echo "unknown")"
+    if ! execution_mode="$(platform_restart_execution_mode)"; then
+        log "ERROR: Could not resolve the selected Splunk restart execution target; refusing restart."
+        return 1
+    fi
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
 
     case "${restart_mode}" in
         none|handoff)
-            platform_restart_handoff "${operation}" "Restart mode is ${restart_mode}."
+            platform_restart_handoff "${operation}" "Restart mode is ${restart_mode}." || return 1
             return 0
             ;;
         acs)
@@ -240,11 +364,11 @@ platform_restart_or_exit() {
             return 1
             ;;
         idxc)
-            platform_restart_handoff "${operation}" "Indexer cluster restarts are delegated to splunk-indexer-cluster-setup."
+            platform_restart_handoff "${operation}" "Indexer cluster restarts are delegated to splunk-indexer-cluster-setup." || return 1
             return 0
             ;;
         shc)
-            platform_restart_handoff "${operation}" "Use 'splunk rolling-restart shcluster-members -searchable true' or the SHC captain restart endpoint after health checks."
+            platform_restart_handoff "${operation}" "Use 'splunk rolling-restart shcluster-members -searchable true' or the SHC captain restart endpoint after health checks." || return 1
             return 0
             ;;
         rest)
@@ -258,21 +382,21 @@ platform_restart_or_exit() {
     esac
 
     if [[ "${target_role}" == "indexer" && "${restart_mode}" == "auto" ]]; then
-        platform_restart_handoff "${operation}" "Indexer target detected; use cluster-aware rolling restart or peer offline/start semantics."
+        platform_restart_handoff "${operation}" "Indexer target detected; use cluster-aware rolling restart or peer offline/start semantics." || return 1
         return 0
     fi
 
     systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" 2>/dev/null || true)"
     if [[ "${restart_mode}" == "systemd" || ( "${restart_mode}" == "auto" && -n "${systemd_unit}" ) ]]; then
         if [[ -z "${systemd_unit}" ]]; then
-            platform_restart_handoff "${operation}" "No Splunk systemd unit was detected."
+            platform_restart_handoff "${operation}" "No Splunk systemd unit was detected." || return 1
             return 0
         fi
         if ! platform_restart_has_noninteractive_privilege "${execution_mode}"; then
             if _platform_restart_rest_fallback_allowed; then
                 log "WARNING: No noninteractive systemd privilege detected; using explicit REST fallback for ${operation}."
             else
-                platform_restart_handoff "${operation}" "Detected ${systemd_unit}, but no noninteractive sudo/polkit restart privilege is available."
+                platform_restart_handoff "${operation}" "Detected ${systemd_unit}, but no noninteractive sudo/polkit restart privilege is available." || return 1
                 return 0
             fi
         else
@@ -343,6 +467,6 @@ platform_restart_or_exit() {
         esac
     fi
 
-    platform_restart_handoff "${operation}" "No safe local, SSH, or systemd restart path was detected, and REST fallback was not explicitly allowed."
+    platform_restart_handoff "${operation}" "No safe local, SSH, or systemd restart path was detected, and REST fallback was not explicitly allowed." || return 1
     return 0
 }

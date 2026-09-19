@@ -7,7 +7,10 @@ PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 source "${PROJECT_ROOT}/skills/shared/lib/k8s_apply_helpers.sh"
-load_observability_cloud_settings
+if ! load_observability_cloud_settings; then
+    echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+    exit 1
+fi
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-cisco-nexus-rendered"
 DEFAULT_SPEC="${SKILL_DIR}/template.example"

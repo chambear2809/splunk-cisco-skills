@@ -72,6 +72,37 @@ def respond(payload="", code=200):
 
 
 decoded_path = unquote(urlparse(url).path)
+state_path = Path(os.environ["MOCK_CONF_STATE"])
+try:
+    conf_state = json.loads(state_path.read_text(encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError):
+    conf_state = {}
+
+
+def save_conf_state():
+    state_path.write_text(json.dumps(conf_state), encoding="utf-8")
+
+
+def stored_content(defaults):
+    content = dict(defaults)
+    normalized_path = decoded_path.rstrip("/")
+    stored = conf_state.get(normalized_path, {})
+    if not stored:
+        stanza = normalized_path.rsplit("/", 1)[-1]
+        stored = conf_state.get(f"__stanza__:{stanza}", {})
+        if not stored and conf_state.get("__last_stanza__") == stanza:
+            stored = conf_state.get("__last_fields__", {})
+        if not stored:
+            stored = conf_state.get("__last_post_fields__", {})
+    content.update(stored)
+    return content
+
+
+def debug_readback(label, content):
+    print(
+        f"MOCK_READBACK {label} keys={','.join(sorted(content))}",
+        file=sys.stderr,
+    )
 
 if decoded_path.endswith("/services/auth/login"):
     respond("<response><sessionKey>test-session</sessionKey></response>")
@@ -85,31 +116,95 @@ if "/services/apps/local/" in decoded_path:
     respond(json.dumps({"entry": [{"content": {"version": version}}]}))
 
 if method == "POST" and "/configs/conf-" in decoded_path:
+    posted = parse_qs(body, keep_blank_values=True)
+    stanza = posted.pop("name", [""])[-1]
+    normalized_path = decoded_path.rstrip("/")
+    resource_path = f"{normalized_path}/{stanza}" if stanza else normalized_path
+    fields = {key: values[-1] for key, values in posted.items()}
+    conf_state["__last_post_fields__"] = fields
+    conf_state[resource_path] = fields
+    if stanza:
+        conf_state[f"__stanza__:{stanza}"] = fields
+        conf_state["__last_stanza__"] = stanza
+        conf_state["__last_fields__"] = fields
+    save_conf_state()
     respond("{}", 200)
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_app_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"definition": os.environ["MOCK_INDEX_DEF"]}}]}))
+    content = stored_content(
+        {
+            "definition": os.environ["MOCK_INDEX_DEF"],
+            "description": "Definition for all indices where Cisco SDWAN, Cisco ISE, and Cisco Catalyst Center data is stored",
+            "iseval": "0",
+        }
+    )
+    debug_readback(decoded_path, content)
+    respond(
+        json.dumps(
+            {
+                "entry": [
+                    {
+                        "content": content
+                    }
+                ]
+            }
+        )
+    )
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_sdwan_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"definition": os.environ["MOCK_SDWAN_DEF"]}}]}))
+    content = stored_content(
+        {
+            "definition": os.environ["MOCK_SDWAN_DEF"],
+            "description": "Definition for Cisco SD-WAN-only indexes used by SD-WAN raw dashboards, especially audit logs",
+            "iseval": "0",
+        }
+    )
+    debug_readback(decoded_path, content)
+    respond(
+        json.dumps(
+            {
+                "entry": [
+                    {
+                        "content": content
+                    }
+                ]
+            }
+        )
+    )
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-macros/cisco_catalyst_app_sourcetypes"
 ):
+    content = stored_content(
+        {
+            "definition": os.environ["MOCK_SOURCETYPE_DEF"],
+            "description": "Cisco sourcetypes shipped in the Enterprise Networking 3.2.20 package contract",
+            "iseval": "0",
+        }
+    )
+    debug_readback(decoded_path, content)
     respond(
         json.dumps(
-            {"entry": [{"content": {"definition": os.environ["MOCK_SOURCETYPE_DEF"]}}]}
+            {
+                "entry": [
+                    {
+                        "content": content
+                    }
+                ]
+            }
         )
     )
 
 if decoded_path.endswith(
     "/TA_cisco_catalyst/configs/conf-eventtypes/cisco_sdwan_index"
 ):
-    respond(json.dumps({"entry": [{"content": {"search": os.environ["MOCK_TA_SDWAN_DEF"]}}]}))
+    content = stored_content({"search": os.environ["MOCK_TA_SDWAN_DEF"]})
+    debug_readback(decoded_path, content)
+    respond(json.dumps({"entry": [{"content": content}]}))
 
 if decoded_path.endswith(
     "/cisco-catalyst-app/configs/conf-datamodels/Cisco_Catalyst_App"
@@ -174,6 +269,7 @@ def _mock_env(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
             "MOCK_CURL_LOG": str(curl_log),
+            "MOCK_CONF_STATE": str(tmp_path / "mock-conf-state.json"),
             "MOCK_INDEX_DEF": index_definition,
             "MOCK_SDWAN_DEF": sdwan_definition,
             "MOCK_TA_SDWAN_DEF": ta_sdwan_definition or sdwan_definition,

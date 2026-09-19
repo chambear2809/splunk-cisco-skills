@@ -89,7 +89,10 @@ _check_splunk_transport_uri() {
     local operation="${2:-Authenticated Splunk REST request}"
     local allow_http=false authority=""
     if declare -F load_splunk_transport_policy >/dev/null 2>&1; then
-        load_splunk_transport_policy
+        if ! load_splunk_transport_policy; then
+            echo "ERROR: Could not resolve the selected Splunk transport policy; refusing the request." >&2
+            return 1
+        fi
     fi
     authority="${uri#*://}"
     authority="${authority%%[/?#]*}"
@@ -126,14 +129,20 @@ _check_splunk_transport_uri() {
 }
 
 _prepare_splunk_transport_for_uri() {
-    _reset_splunk_transport_curl_args
-    _check_splunk_transport_uri "$1" "${2:-Authenticated Splunk REST request}"
+    if ! _reset_splunk_transport_curl_args; then
+        return 1
+    fi
+    if ! _check_splunk_transport_uri "$1" "${2:-Authenticated Splunk REST request}"; then
+        return 1
+    fi
 }
 
 _prepare_splunk_transport_for_curl_args() {
     local argument="" uri="" expect_url=false expect_option_value=false
     local option_name="" header_name="" url_count=0
-    _reset_splunk_transport_curl_args
+    if ! _reset_splunk_transport_curl_args; then
+        return 1
+    fi
     for argument in "$@"; do
         if [[ "${expect_url}" == "true" ]]; then
             _check_splunk_transport_uri "${argument}" "Authenticated Splunk REST request" || return 1
@@ -230,7 +239,7 @@ _prepare_splunk_transport_for_curl_args() {
                 ;;
             -X|--request|-o|--output|-w|--write-out|-H|--header|-d|--data|\
             --data-ascii|--data-binary|--data-raw|--data-urlencode|-F|--form|\
-            --connect-timeout|--max-time)
+            --connect-timeout|--max-time|--max-filesize)
                 expect_option_value=true
                 option_name="${argument}"
                 ;;
@@ -843,28 +852,322 @@ print("&".join(parts), end="")
     printf '%s' "${output}"
 }
 
-rest_check_app() {
+_rest_response_has_exact_entry() {
+    local expected_name="$1"
+    shift
+    python3 -c '
+import json
+import sys
+
+expected = set(sys.argv[1:])
+try:
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("response is too large")
+    payload = json.loads(raw)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("missing entry collection")
+    if len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ValueError("response did not contain one entry")
+    if str(entries[0].get("name", "")) not in expected:
+        raise ValueError("requested entry was not observed")
+except Exception:
+    raise SystemExit(1)
+' "${expected_name}" "$@" 2>/dev/null
+}
+
+_rest_response_has_single_bound_entry() {
+    local expected_name="$1"
+    shift
+    python3 -c '
+import json
+import sys
+
+expected = set(sys.argv[1:])
+try:
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("response is too large")
+    payload = json.loads(raw)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ValueError("response did not contain one entry")
+    name = str(entries[0].get("name", ""))
+    if name and name not in expected:
+        raise ValueError("response entry name conflicted with the bound endpoint")
+except Exception:
+    raise SystemExit(1)
+' "${expected_name}" "$@" 2>/dev/null
+}
+
+_rest_response_exact_app_version() {
+    local expected_name="$1"
+    python3 -c '
+import json
+import sys
+
+expected_name = sys.argv[1]
+try:
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("response is too large")
+    payload = json.loads(raw)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("missing entry collection")
+    if len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ValueError("response did not contain one app entry")
+    entry_name = str(entries[0].get("name", ""))
+    if entry_name and entry_name != expected_name:
+        raise ValueError("requested app was not observed exactly once")
+    content = entries[0].get("content")
+    if not isinstance(content, dict):
+        raise ValueError("requested app has no content object")
+    version = content.get("version")
+    if not isinstance(version, (str, int, float)) or isinstance(version, bool):
+        raise ValueError("requested app has no scalar version")
+    version_text = str(version).strip()
+    if not version_text or len(version_text) > 128 or "\n" in version_text or "\r" in version_text:
+        raise ValueError("requested app has an invalid version")
+    print(version_text, end="")
+except Exception:
+    raise SystemExit(1)
+' "${expected_name}" 2>/dev/null
+}
+
+_rest_get_bounded_http_200_body() {
+    local sk="$1" endpoint="$2"
+    local response http_code body fallback_body
+
+    if ! response=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+        --max-filesize 1048576 "${endpoint}" -w '\n%{http_code}' 2>/dev/null); then
+        return 1
+    fi
+    http_code=$(printf '%s\n' "${response}" | tail -n 1)
+    body=$(printf '%s\n' "${response}" | sed '$d')
+    [[ "${http_code}" == "200" ]] || return 1
+    # A few curl-compatible wrappers emit only the write-out status when a
+    # ``--write-out`` argument is present.  Retry the bounded read without the
+    # status trailer before treating that as an empty observation.  Real curl
+    # responses already contain a JSON body and never take this branch.
+    if [[ -z "${body//[[:space:]]/}" ]]; then
+        if fallback_body=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+            --max-filesize 1048576 "${endpoint}" 2>/dev/null) \
+            && [[ -n "${fallback_body//[[:space:]]/}" ]]; then
+            body="${fallback_body}"
+        fi
+    fi
+    printf '%s' "${body}"
+}
+
+# Verify that one exact REST entry reflects every field in a form-urlencoded
+# mutation body. The body is read from descriptor 3 so credentials and other
+# sensitive values never appear in the Python argv or in mismatch diagnostics.
+_rest_response_matches_form_body() {
+    local expected_name="$1" form_body="$2"
+    shift 2
+
+    python3 -c '
+import json
+import sys
+from urllib.parse import parse_qsl
+
+expected_names = set(sys.argv[1:])
+
+try:
+    response_text = sys.stdin.read(1024 * 1024 + 1)
+    if len(response_text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("response is too large")
+    with open(3, encoding="utf-8") as form_handle:
+        form_text = form_handle.read(1024 * 1024 + 1).rstrip("\n")
+    if len(form_text.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("form body is too large")
+
+    payload = json.loads(response_text)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("missing entry collection")
+    if len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ValueError("response did not contain one entry")
+    entry_name = str(entries[0].get("name", ""))
+    if entry_name and entry_name not in expected_names:
+        raise ValueError("requested entry was not observed exactly once")
+    content = entries[0].get("content")
+    if not isinstance(content, dict):
+        raise ValueError("requested entry has no content object")
+
+    pairs = parse_qsl(
+        form_text,
+        keep_blank_values=True,
+        strict_parsing=True,
+        max_num_fields=256,
+        encoding="utf-8",
+        errors="strict",
+    ) if form_text else []
+    expected = {}
+    for key, value in pairs:
+        if not key or key in expected:
+            raise ValueError("form body has an empty or duplicate field")
+        expected[key] = value
+
+    truthy = {"1", "true", "yes", "on"}
+    falsey = {"0", "false", "no", "off"}
+
+    def scalar_text(value):
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if value is None:
+            return ""
+        return str(value)
+
+    def equivalent(actual, wanted, key):
+        if isinstance(actual, list):
+            actual_text = ",".join(scalar_text(item) for item in actual)
+        else:
+            actual_text = scalar_text(actual)
+        if actual_text == wanted:
+            return True
+        # Splunk normalizes search and macro expressions inconsistently (for
+        # example, it may insert a space after a comma).  Ignore whitespace
+        # outside quoted strings, while preserving spaces that are part of a
+        # literal value.
+        if key in {"definition", "search", "query"}:
+            def normalize_expression(value):
+                normalized = []
+                quote = None
+                escaped = False
+                for character in value:
+                    if escaped:
+                        normalized.append(character)
+                        escaped = False
+                        continue
+                    if character == "\\" and quote is not None:
+                        normalized.append(character)
+                        escaped = True
+                        continue
+                    if quote is not None:
+                        normalized.append(character)
+                        if character == quote:
+                            quote = None
+                        continue
+                    if character in {"'", '"'}:
+                        quote = character
+                        normalized.append(character)
+                    elif not character.isspace():
+                        normalized.append(character)
+                return "".join(normalized)
+
+            if normalize_expression(actual_text) == normalize_expression(wanted):
+                return True
+        actual_bool = actual_text.strip().lower()
+        wanted_bool = wanted.strip().lower()
+        if actual_bool in truthy | falsey and wanted_bool in truthy | falsey:
+            return (actual_bool in truthy) == (wanted_bool in truthy)
+        return False
+
+    if any(key not in content or not equivalent(content[key], value, key) for key, value in expected.items()):
+        raise ValueError("requested fields did not match")
+except Exception:
+    raise SystemExit(1)
+' "${expected_name}" "$@" 3<<<"${form_body}" 2>/dev/null
+}
+
+_rest_verify_exact_resource_form_body() {
+    local sk="$1" endpoint="$2" expected_name="$3" form_body="$4"
+    shift 4
+    local response_body
+
+    if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" "${endpoint}")"; then
+        return 1
+    fi
+    printf '%s' "${response_body}" \
+        | _rest_response_matches_form_body "${expected_name}" "${form_body}" "$@"
+}
+
+_rest_observe_exact_resource() {
+    local sk="$1" endpoint="$2" expected_name="$3"
+    shift 3
+    local http_code response body
+
+    if ! response=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+        --max-filesize 1048576 "${endpoint}" -w '\n%{http_code}' 2>/dev/null); then
+        return 2
+    fi
+    http_code=$(printf '%s\n' "${response}" | tail -n 1)
+    body=$(printf '%s\n' "${response}" | sed '$d')
+    case "${http_code}" in
+        200)
+            if [[ -z "${body//[[:space:]]/}" ]]; then
+                if ! body=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+                    --max-filesize 1048576 "${endpoint}" 2>/dev/null); then
+                    return 2
+                fi
+            fi
+            if [[ -z "${body//[[:space:]]/}" ]]; then
+                return 2
+            fi
+            if printf '%s' "${body}" | python3 -c '
+import json
+import sys
+try:
+    payload = json.load(sys.stdin)
+    raise SystemExit(0 if isinstance(payload, dict) and payload.get("entry") == [] else 1)
+except Exception:
+    raise SystemExit(1)
+' 2>/dev/null; then
+                return 1
+            fi
+            printf '%s' "${body}" \
+                | _rest_response_has_single_bound_entry "${expected_name}" "$@" \
+                || return 2
+            return 0
+            ;;
+        404) return 1 ;;
+        *) return 2 ;;
+    esac
+}
+
+rest_observe_app() {
     local sk="$1" uri="$2" app="$3"
-    local encoded_app http_code
+    local encoded_app http_code response body
+    encoded_app=$(_urlencode "${app}") || return 2
+    if ! response=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+        --max-filesize 1048576 \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" \
+        -w '\n%{http_code}' 2>/dev/null); then
+        return 2
+    fi
+    http_code=$(printf '%s\n' "${response}" | tail -n 1)
+    body=$(printf '%s\n' "${response}" | sed '$d')
+    case "${http_code}" in
+        200)
+            printf '%s' "${body}" | _rest_response_has_exact_entry "${app}" || return 2
+            return 0
+            ;;
+        404) return 1 ;;
+        *) return 2 ;;
+    esac
+}
+
+rest_check_app() {
+    local sk="$1" uri="$2" app="$3" encoded_app http_code
     encoded_app=$(_urlencode "${app}") || return 1
     http_code=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
-        "${uri}/services/apps/local/${encoded_app}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+        --max-filesize 1048576 -o /dev/null -w '%{http_code}' \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 
 rest_get_app_version() {
     local sk="$1" uri="$2" app="$3"
-    local encoded_app
+    local encoded_app body
     encoded_app=$(_urlencode "${app}") || return 1
-    splunk_curl "${sk}" \
-        "${uri}/services/apps/local/${encoded_app}?output_mode=json" 2>/dev/null \
-        | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-entries = d.get('entry', [])
-print(entries[0].get('content', {}).get('version', 'unknown') if entries else 'unknown')
-" 2>/dev/null || echo "unknown"
+    if ! body="$(_rest_get_bounded_http_200_body "${sk}" \
+        "${uri}/services/apps/local/${encoded_app}?output_mode=json")"; then
+        return 1
+    fi
+    printf '%s' "${body}" | _rest_response_exact_app_version "${app}"
 }
 
 _py_json_field() {
@@ -920,41 +1223,63 @@ validate_splunk_index_name() {
     return 0
 }
 
-rest_check_index() {
+rest_observe_index() {
     local sk="$1" uri="$2" idx="$3"
-    local http_code
-    validate_splunk_index_name "${idx}" || return 1
-    http_code=$(splunk_curl "${sk}" \
+    local http_code response body
+    validate_splunk_index_name "${idx}" || return 2
+    if ! response=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
+        --max-filesize 1048576 \
         "${uri}/services/data/indexes/${idx}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
-    [[ "${http_code}" == "200" ]]
+        -w '\n%{http_code}' 2>/dev/null); then
+        return 2
+    fi
+    http_code=$(printf '%s\n' "${response}" | tail -n 1)
+    body=$(printf '%s\n' "${response}" | sed '$d')
+    case "${http_code}" in
+        200)
+            printf '%s' "${body}" | _rest_response_has_exact_entry "${idx}" || return 2
+            return 0
+            ;;
+        404) return 1 ;;
+        *) return 2 ;;
+    esac
+}
+
+rest_check_index() {
+    rest_observe_index "$@"
 }
 
 rest_get_index_datatype() {
     local sk="$1" uri="$2" idx="$3"
+    local response_body=""
     validate_splunk_index_name "${idx}" || return 1
-    splunk_curl "${sk}" \
-        "${uri}/services/data/indexes/${idx}?output_mode=json" 2>/dev/null \
-        | python3 -c "
+    if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" \
+        "${uri}/services/data/indexes/${idx}?output_mode=json")"; then
+        return 1
+    fi
+    printf '%s' "${response_body}" | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
-    entries = d.get('entry', [])
-    datatype = ''
-    if entries:
-        datatype = str(entries[0].get('content', {}).get('datatype', '')).strip()
-    if datatype:
-        print(datatype, end='')
-    else:
-        print('event', end='')
+    entries = d.get('entry') if isinstance(d, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError('missing entry collection')
+    entry = next(
+        (item for item in entries if isinstance(item, dict) and str(item.get('name', '')) == sys.argv[1]),
+        None,
+    )
+    if entry is None or not isinstance(entry.get('content', {}), dict):
+        raise ValueError('requested index entry was not observed')
+    datatype = str(entry.get('content', {}).get('datatype', '')).strip()
+    print(datatype or 'event', end='')
 except Exception:
-    print('', end='')
-" 2>/dev/null || echo ""
+    raise SystemExit(1)
+" "${idx}" 2>/dev/null
 }
 
 rest_create_index() {
     local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
-    local body http_code resp
+    local body http_code resp observe_status=0 observed_type=""
     validate_splunk_index_name "${idx}" || return 1
     case "${index_type}" in
         metric)
@@ -968,45 +1293,109 @@ rest_create_index() {
             return 1
             ;;
     esac
+    if rest_observe_index "${sk}" "${uri}" "${idx}"; then
+        if ! observed_type="$(rest_get_index_datatype "${sk}" "${uri}" "${idx}")"; then
+            echo "ERROR: Existing index '${idx}' could not be read back exactly." >&2
+            return 1
+        fi
+        if [[ "${observed_type}" != "${index_type:-event}" ]]; then
+            echo "ERROR: Existing index '${idx}' datatype does not match the requested datatype." >&2
+            return 1
+        fi
+        return 0
+    else
+        observe_status=$?
+        if (( observe_status != 1 )); then
+            echo "ERROR: Index '${idx}' observation failed; refusing create because absence was not verified." >&2
+            return 1
+        fi
+    fi
     resp=$(splunk_curl_post "${sk}" \
         "${body}" \
         "${uri}/services/data/indexes" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
-        201|200) return 0 ;;
-        409) return 0 ;;
+        200|201|409) ;;
         *) echo "ERROR: Create index '${idx}' failed (HTTP ${http_code})" >&2; return 1 ;;
     esac
+    if ! rest_observe_index "${sk}" "${uri}" "${idx}"; then
+        echo "ERROR: Create index '${idx}' returned HTTP ${http_code}, but exact post-create readback failed." >&2
+        return 1
+    fi
+    if ! observed_type="$(rest_get_index_datatype "${sk}" "${uri}" "${idx}")"; then
+        echo "ERROR: Create index '${idx}' returned HTTP ${http_code}, but datatype readback failed." >&2
+        return 1
+    fi
+    if [[ "${observed_type}" != "${index_type:-event}" ]]; then
+        echo "ERROR: Create index '${idx}' returned HTTP ${http_code}, but datatype readback did not match." >&2
+        return 1
+    fi
 }
 
 rest_set_conf() {
     local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" body="$6"
-    local create_body encoded_stanza http_code resp
+    local create_body encoded_stanza endpoint collection_endpoint http_code resp
+    local observe_status=0 exists=false
 
     if type deployment_should_manage_search_config_via_bundle >/dev/null 2>&1 \
         && deployment_should_manage_search_config_via_bundle; then
         deployment_bundle_set_conf_for_current_target "${app}" "${conf}" "${stanza}" "${body}"
         return $?
     fi
+    if [[ "${_DEPLOYMENT_BUNDLE_CHECK_ERROR:-false}" == "true" ]]; then
+        return 1
+    fi
 
     encoded_stanza=$(_urlencode "${stanza}")
-    resp=$(splunk_curl_post "${sk}" "${body}" \
-        "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}" \
-        -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-    [[ "${http_code}" == "200" ]] && return 0
-    create_body=$(form_urlencode_pairs name "${stanza}") || return 1
-    if [[ -n "${body}" ]]; then
-        create_body="${create_body}&${body}"
+    endpoint="${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}"
+    collection_endpoint="${uri}/servicesNS/nobody/${app}/configs/conf-${conf}"
+    if _rest_observe_exact_resource "${sk}" "${endpoint}?output_mode=json" "${stanza}"; then
+        exists=true
+    else
+        observe_status=$?
+        if (( observe_status != 1 )); then
+            echo "ERROR: Could not observe conf-${conf}/${stanza} exactly; refusing mutation." >&2
+            return 1
+        fi
     fi
-    resp=$(splunk_curl_post "${sk}" "${create_body}" \
-        "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}" \
-        -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-    case "${http_code}" in
-        201|200|409) return 0 ;;
-        *) echo "ERROR: Set conf-${conf}/${stanza} failed (HTTP ${http_code})" >&2; return 1 ;;
-    esac
+
+    if [[ "${exists}" == "true" ]]; then
+        if ! resp=$(splunk_curl_post "${sk}" "${body}" "${endpoint}" \
+            -w '\n%{http_code}' 2>/dev/null); then
+            echo "ERROR: Update conf-${conf}/${stanza} failed before a response was received." >&2
+            return 1
+        fi
+        http_code=$(printf '%s\n' "${resp}" | tail -n 1)
+        if [[ "${http_code}" != "200" ]]; then
+            echo "ERROR: Update conf-${conf}/${stanza} failed (HTTP ${http_code})." >&2
+            return 1
+        fi
+    else
+        create_body=$(form_urlencode_pairs name "${stanza}") || return 1
+        if [[ -n "${body}" ]]; then
+            create_body="${create_body}&${body}"
+        fi
+        if ! resp=$(splunk_curl_post "${sk}" "${create_body}" "${collection_endpoint}" \
+            -w '\n%{http_code}' 2>/dev/null); then
+            echo "ERROR: Create conf-${conf}/${stanza} failed before a response was received." >&2
+            return 1
+        fi
+        http_code=$(printf '%s\n' "${resp}" | tail -n 1)
+        case "${http_code}" in
+            200|201) ;;
+            409)
+                echo "ERROR: Create conf-${conf}/${stanza} raced with another writer; refusing to claim the requested settings were applied." >&2
+                return 1
+                ;;
+            *) echo "ERROR: Create conf-${conf}/${stanza} failed (HTTP ${http_code})" >&2; return 1 ;;
+        esac
+    fi
+
+    if ! _rest_verify_exact_resource_form_body \
+        "${sk}" "${endpoint}?output_mode=json" "${stanza}" "${body}"; then
+        echo "ERROR: Set conf-${conf}/${stanza} returned HTTP ${http_code}, but exact requested-field readback failed." >&2
+        return 1
+    fi
 }
 
 rest_set_verify_ssl() {
@@ -1112,67 +1501,144 @@ except Exception:
 
 rest_get_hec_token_state() {
     local sk="$1" uri="$2" token_name="$3"
-    splunk_curl "${sk}" \
-        "${uri}/services/data/inputs/http?output_mode=json&count=0" \
-        2>/dev/null \
-        | python3 -c "
+    local response_body
+    if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" \
+        "${uri}/services/data/inputs/http?output_mode=json&count=0")"; then
+        return 1
+    fi
+    printf '%s' "${response_body}" | python3 -c "
 import json, sys
 target = sys.argv[1]
 aliases = {target, f'http://{target}'}
 try:
-    data = json.load(sys.stdin)
-    for entry in data.get('entry', []):
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode('utf-8')) > 1024 * 1024:
+        raise ValueError('HEC response is too large')
+    data = json.loads(raw)
+    entries = data.get('entry') if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError('missing HEC entry collection')
+    matches = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError('invalid HEC entry')
         name = entry.get('name', '')
+        if not isinstance(name, str) or not name:
+            raise ValueError('invalid HEC entry name')
         if name not in aliases:
             continue
-        disabled = str(entry.get('content', {}).get('disabled', False)).strip().lower()
+        content = entry.get('content')
+        if not isinstance(content, dict):
+            raise ValueError('invalid HEC entry content')
+        if 'disabled' not in content:
+            raise ValueError('missing HEC disabled state')
+        disabled = str(content['disabled']).strip().lower()
         if disabled in ('1', 'true'):
-            print('disabled', end='')
+            matches.append('disabled')
+        elif disabled in ('0', 'false'):
+            matches.append('enabled')
         else:
-            print('enabled', end='')
-        raise SystemExit(0)
-    print('missing', end='')
+            raise ValueError('invalid HEC disabled state')
+    if len(matches) > 1:
+        raise ValueError('duplicate HEC token observations')
+    print(matches[0] if matches else 'missing', end='')
 except Exception:
-    print('unknown', end='')
-" "${token_name}" 2>/dev/null || echo "unknown"
+    raise SystemExit(1)
+" "${token_name}" 2>/dev/null
+}
+
+# Return success only when the requested HEC token name is present in a
+# bounded, successful collection response. This deliberately does not infer
+# enabled/disabled state; callers use it only for a narrowly scoped
+# post-creation compatibility transition.
+rest_hec_token_presence() {
+    local sk="$1" uri="$2" token_name="$3" response_body
+    if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" \
+        "${uri}/services/data/inputs/http?output_mode=json&count=0")"; then
+        return 1
+    fi
+    printf '%s' "${response_body}" | python3 -c '
+import json
+import sys
+
+target = sys.argv[1]
+aliases = {target, f"http://{target}"}
+try:
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise ValueError("HEC response is too large")
+    payload = json.loads(raw)
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("missing HEC entry collection")
+    found = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("name") in aliases
+    ]
+    if len(found) > 1:
+        raise ValueError("duplicate HEC token observations")
+    print("present" if found else "missing", end="")
+except Exception:
+    raise SystemExit(1)
+' "${token_name}" 2>/dev/null | grep -qx 'present'
 }
 
 rest_get_hec_token_record() {
     local sk="$1" uri="$2" token_name="$3"
-    splunk_curl "${sk}" \
-        "${uri}/services/data/inputs/http?output_mode=json&count=0" \
-        2>/dev/null \
-        | python3 -c "
+    local response_body
+    if ! response_body="$(_rest_get_bounded_http_200_body "${sk}" \
+        "${uri}/services/data/inputs/http?output_mode=json&count=0")"; then
+        return 1
+    fi
+    printf '%s' "${response_body}" | python3 -c "
 import json
 import sys
 
 target = sys.argv[1]
 aliases = {target, f'http://{target}'}
 try:
-    data = json.load(sys.stdin)
-    for entry in data.get('entry', []):
+    raw = sys.stdin.read(1024 * 1024 + 1)
+    if len(raw.encode('utf-8')) > 1024 * 1024:
+        raise ValueError('HEC response is too large')
+    data = json.loads(raw)
+    entries = data.get('entry') if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError('missing HEC entry collection')
+    matches = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError('invalid HEC entry')
         name = entry.get('name', '')
+        if not isinstance(name, str) or not name:
+            raise ValueError('invalid HEC entry name')
         if name not in aliases:
             continue
-        content = entry.get('content', {}) or {}
+        content = entry.get('content')
+        if not isinstance(content, dict):
+            raise ValueError('invalid HEC entry content')
+        if 'disabled' not in content:
+            raise ValueError('missing HEC disabled state')
+        disabled = str(content['disabled']).strip().lower()
+        if disabled not in ('0', '1', 'true', 'false'):
+            raise ValueError('invalid HEC disabled state')
         indexes = content.get('indexes', '')
         if isinstance(indexes, list):
             indexes = ','.join(str(item) for item in indexes)
-        record = {
+        matches.append({
             'name': name,
-            'disabled': str(content.get('disabled', '')),
+            'disabled': str(content['disabled']),
             'useACK': str(content.get('useACK', content.get('useAck', ''))),
             'indexes': str(indexes),
             'default_index': str(content.get('index', '')),
             'token': str(content.get('token', '')),
-        }
-        print(json.dumps(record), end='')
-        raise SystemExit(0)
-except Exception as e:
-    print(f'WARNING: rest_get_hec_token_record: {e}', file=sys.stderr)
-
-print('{}', end='')
-" "${token_name}"
+        })
+    if len(matches) != 1:
+        raise ValueError('requested HEC token was not observed exactly once')
+    print(json.dumps(matches[0]), end='')
+except Exception:
+    raise SystemExit(1)
+" "${token_name}" 2>/dev/null
 }
 
 rest_json_field() {
@@ -1206,7 +1672,7 @@ rest_list_ta_stanzas() {
 rest_apply_input_enable_state() {
     local sk="$1" uri="$2" app="$3" input_type="$4" input_name="$5" enable_state="${6:-}"
     local endpoint="${uri}/servicesNS/nobody/${app}/data/inputs/${input_type}"
-    local encoded_name resp http_code
+    local encoded_name resp http_code expected_disabled=""
     encoded_name=$(_urlencode "${input_name}")
 
     case "${enable_state}" in
@@ -1215,53 +1681,96 @@ rest_apply_input_enable_state() {
                 "${endpoint}/${encoded_name}/enable" -w '\n%{http_code}' 2>/dev/null)
             http_code=$(echo "${resp}" | tail -1)
             [[ "${http_code}" == "200" ]] || { echo "ERROR: Enable ${input_type}://${input_name} failed (HTTP ${http_code})" >&2; return 1; }
+            expected_disabled="0"
             ;;
         1|true|True)
             resp=$(splunk_curl_post "${sk}" "" \
                 "${endpoint}/${encoded_name}/disable" -w '\n%{http_code}' 2>/dev/null)
             http_code=$(echo "${resp}" | tail -1)
             [[ "${http_code}" == "200" ]] || { echo "ERROR: Disable ${input_type}://${input_name} failed (HTTP ${http_code})" >&2; return 1; }
+            expected_disabled="1"
             ;;
         *)
             ;;
     esac
+
+    if [[ -n "${expected_disabled}" ]] \
+        && ! _rest_verify_exact_resource_form_body "${sk}" \
+            "${endpoint}/${encoded_name}?output_mode=json" \
+            "${input_type}://${input_name}" "disabled=${expected_disabled}" "${input_name}"; then
+        echo "ERROR: ${input_type}://${input_name} did not read back with the requested enabled/disabled state." >&2
+        return 1
+    fi
 }
 
 rest_create_input() {
     local sk="$1" uri="$2" app="$3" input_type="$4" input_name="$5" body="$6"
     local endpoint="${uri}/servicesNS/nobody/${app}/data/inputs/${input_type}"
     local create_body encoded_name http_code resp enable_state body_without_disabled
+    local state_readback_context=""
+    local resource_endpoint qualified_name observe_status=0 exists=false
     encoded_name=$(_urlencode "${input_name}")
+    resource_endpoint="${endpoint}/${encoded_name}"
+    qualified_name="${input_type}://${input_name}"
 
     if [[ "${body}" =~ (^|&)disabled=([^&]+) ]]; then
         enable_state="${BASH_REMATCH[2]}"
     else
         enable_state=""
     fi
+    case "${enable_state}" in
+        ""|0|false|False|1|true|True) ;;
+        *)
+            echo "ERROR: Input disabled state must be a supported Boolean value; refusing mutation." >&2
+            return 1
+            ;;
+    esac
+    if [[ -n "${enable_state}" ]]; then
+        state_readback_context="; requested enabled/disabled state was not verified"
+    fi
 
     body_without_disabled=$(printf '%s' "${body}" \
         | sed -E 's/(^|&)disabled=[^&]*//g; s/^&//; s/&+$//; s/&&+/\&/g')
 
-    http_code=$(splunk_curl "${sk}" \
-        "${endpoint}/${encoded_name}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null)
-    if [[ "${http_code}" == "200" ]]; then
+    if _rest_observe_exact_resource "${sk}" \
+        "${resource_endpoint}?output_mode=json" "${qualified_name}" "${input_name}"; then
+        exists=true
+    else
+        observe_status=$?
+        if (( observe_status != 1 )); then
+            echo "ERROR: Could not observe ${qualified_name} exactly${state_readback_context}; refusing mutation." >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${exists}" == "true" ]]; then
         if [[ -n "${body_without_disabled}" ]]; then
-            resp=$(splunk_curl_post "${sk}" "${body_without_disabled}" \
-                "${endpoint}/${encoded_name}" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
-            case "${http_code}" in
-                200) ;;
-                *)
-                    if ! rest_set_conf "${sk}" "${uri}" "${app}" "inputs" "${input_type}://${input_name}" "${body_without_disabled}"; then
-                        echo "ERROR: Update ${input_type}://${input_name} failed (HTTP ${http_code})" >&2
-                        return 1
-                    fi
-                    ;;
-            esac
+            if ! resp=$(splunk_curl_post "${sk}" "${body_without_disabled}" \
+                "${resource_endpoint}" -w '\n%{http_code}' 2>/dev/null); then
+                echo "ERROR: Update ${qualified_name} failed before a response was received." >&2
+                return 1
+            fi
+            http_code=$(printf '%s\n' "${resp}" | tail -n 1)
+            if [[ "${http_code}" != "200" ]]; then
+                echo "ERROR: Update ${qualified_name} failed (HTTP ${http_code})." >&2
+                return 1
+            fi
+            if ! _rest_verify_exact_resource_form_body "${sk}" \
+                "${resource_endpoint}?output_mode=json" "${qualified_name}" \
+                "${body_without_disabled}" "${input_name}"; then
+                echo "ERROR: Update ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed${state_readback_context}." >&2
+                return 1
+            fi
         fi
 
-        rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"
+        if ! rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"; then
+            return 1
+        fi
+        if ! _rest_verify_exact_resource_form_body "${sk}" \
+            "${resource_endpoint}?output_mode=json" "${qualified_name}" "${body}" "${input_name}"; then
+            echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state; requested enabled/disabled state was not verified." >&2
+            return 1
+        fi
         return 0
     fi
 
@@ -1269,13 +1778,33 @@ rest_create_input() {
     if [[ -n "${body_without_disabled}" ]]; then
         create_body="${create_body}&${body_without_disabled}"
     fi
-    resp=$(splunk_curl_post "${sk}" "${create_body}" \
-        "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    if ! resp=$(splunk_curl_post "${sk}" "${create_body}" \
+        "${endpoint}" -w '\n%{http_code}' 2>/dev/null); then
+        echo "ERROR: Create ${qualified_name} failed before a response was received." >&2
+        return 1
+    fi
+    http_code=$(printf '%s\n' "${resp}" | tail -n 1)
     case "${http_code}" in
-        201|200|409)
-            rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"
+        201|200)
+            if ! _rest_verify_exact_resource_form_body "${sk}" \
+                "${resource_endpoint}?output_mode=json" "${qualified_name}" \
+                "${body_without_disabled}" "${input_name}"; then
+                echo "ERROR: Create ${qualified_name} returned HTTP ${http_code}, but exact requested-field readback failed${state_readback_context}." >&2
+                return 1
+            fi
+            if ! rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"; then
+                return 1
+            fi
+            if ! _rest_verify_exact_resource_form_body "${sk}" \
+                "${resource_endpoint}?output_mode=json" "${qualified_name}" "${body}" "${input_name}"; then
+                echo "ERROR: Exact requested-field readback of ${qualified_name} failed after applying its enable state; requested enabled/disabled state was not verified." >&2
+                return 1
+            fi
             return 0
+            ;;
+        409)
+            echo "ERROR: Create ${qualified_name} raced with another writer; refusing to claim the requested settings were applied." >&2
+            return 1
             ;;
         *)
             echo "ERROR: Create ${input_type}://${input_name} failed (HTTP ${http_code})" >&2
@@ -1302,6 +1831,12 @@ print(r[0].get(field, '0') if r else '0')
 
 rest_restart_splunk() {
     local sk="$1" uri="$2"
+    # Validate target and transport policy before issuing a restart.  The curl
+    # call may still lose its response while Splunk exits (reported as 000),
+    # but a local policy/reset failure must never be mistaken for that case.
+    if ! _prepare_splunk_transport_for_uri "${uri}" "Splunk REST restart"; then
+        return 1
+    fi
     splunk_curl_post "${sk}" "" "${uri}/services/server/control/restart" \
         -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000"
 }
@@ -1336,7 +1871,10 @@ restart_splunk_and_wait() {
     local sk="$1" uri="$2" shutdown_timeout="${3:-90}" startup_timeout="${4:-300}"
 
     # shellcheck disable=SC2034  # read by callers after restart_splunk_and_wait returns
-    SPLUNK_RESTART_HTTP_CODE=$(rest_restart_splunk "${sk}" "${uri}")
+    if ! SPLUNK_RESTART_HTTP_CODE="$(rest_restart_splunk "${sk}" "${uri}")"; then
+        SPLUNK_RESTART_HTTP_CODE=""
+        return 1
+    fi
     case "${SPLUNK_RESTART_HTTP_CODE}" in
         000|200|201|204) ;;
         *) return 1 ;;
