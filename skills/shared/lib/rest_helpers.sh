@@ -1061,7 +1061,9 @@ try:
                         if character == quote:
                             quote = None
                         continue
-                    if character in {"'", '"'}:
+                    # This Python program is embedded in a shell single-quoted
+                    # string, so spell quote characters without quote literals.
+                    if character in {chr(39), chr(34)}:
                         quote = character
                         normalized.append(character)
                     elif not character.isspace():
