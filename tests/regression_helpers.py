@@ -407,6 +407,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                     # strict requested-field readback remains meaningful.
                     stanza = body.pop("name", "logging")
                     conf_store.setdefault(stanza, {}).update(body)
+                    state["security_cloud_last_stanza"] = stanza
+                    state["security_cloud_last_fields"] = conf_store[stanza]
                     state["security_cloud_settings"].update(body)
                     save()
                     out("", 200)
@@ -419,6 +421,22 @@ class ShellScriptRegressionBase(unittest.TestCase):
                                     {
                                         "name": stanza,
                                         "content": conf_store[stanza],
+                                    }
+                                ]
+                            }
+                        ),
+                        200 if write_code else None,
+                    )
+                if stanza == state.get("security_cloud_last_stanza"):
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": stanza,
+                                        "content": state.get(
+                                            "security_cloud_last_fields", {}
+                                        ),
                                     }
                                 ]
                             }

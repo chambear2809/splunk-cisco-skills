@@ -90,6 +90,10 @@ def stored_content(defaults):
     if not stored:
         stanza = normalized_path.rsplit("/", 1)[-1]
         stored = conf_state.get(f"__stanza__:{stanza}", {})
+        if not stored and conf_state.get("__last_stanza__") == stanza:
+            stored = conf_state.get("__last_fields__", {})
+        if not stored:
+            stored = conf_state.get("__last_post_fields__", {})
     content.update(stored)
     return content
 
@@ -110,9 +114,12 @@ if method == "POST" and "/configs/conf-" in decoded_path:
     normalized_path = decoded_path.rstrip("/")
     resource_path = f"{normalized_path}/{stanza}" if stanza else normalized_path
     fields = {key: values[-1] for key, values in posted.items()}
+    conf_state["__last_post_fields__"] = fields
     conf_state[resource_path] = fields
     if stanza:
         conf_state[f"__stanza__:{stanza}"] = fields
+        conf_state["__last_stanza__"] = stanza
+        conf_state["__last_fields__"] = fields
     save_conf_state()
     respond("{}", 200)
 
