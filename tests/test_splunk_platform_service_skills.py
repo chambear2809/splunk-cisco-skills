@@ -1063,6 +1063,81 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
             self.assertIn("refusing direct apply", result.stdout + result.stderr)
             self.assertFalse(output_dir.exists())
 
+    def test_hec_default_standalone_apply_reaches_rendered_apply_script(self) -> None:
+        """Deferred regression: the implicit standalone role remains a direct target."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_root = Path(tmpdir)
+            credentials_file = temp_root / "credentials"
+            credentials_file.write_text(
+                "\n".join(
+                    (
+                        'SPLUNK_PLATFORM="enterprise"',
+                        'SPLUNK_DELIVERY_PLANE="direct"',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            credentials_file.chmod(0o600)
+
+            splunk_home = temp_root / "splunk"
+            splunk_bin = splunk_home / "bin" / "splunk"
+            write_executable(
+                splunk_bin,
+                """\
+                #!/usr/bin/env bash
+                if [[ "${1:-}" == "version" ]]; then
+                    printf '%s\n' 'Splunk 10.4.0'
+                    exit 0
+                fi
+                exit 1
+                """,
+            )
+
+            output_dir = temp_root / "rendered"
+            env = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith(("SPLUNK_", "STACK_", "SB_", "ACS_"))
+            }
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(HEC_SETUP),
+                    "--platform",
+                    "enterprise",
+                    "--phase",
+                    "apply",
+                    "--output-dir",
+                    str(output_dir),
+                    "--splunk-home",
+                    str(splunk_home),
+                    "--restart-splunk",
+                    "false",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+
+            combined_output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=combined_output)
+            self.assertNotIn("refusing direct apply", combined_output)
+            self.assertTrue(
+                (
+                    splunk_home
+                    / "etc/apps/splunk_httpinput/local/inputs.conf"
+                ).is_file()
+            )
+            self.assertTrue(
+                (output_dir / "hec-service/.cisco_skills_hec.token").is_file()
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
