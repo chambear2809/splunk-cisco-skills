@@ -1883,10 +1883,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             path = parsed.path
             log(f"URL={url} METHOD={method} DATA={data!r}")
 
-            if method == "POST" and data and "/servicesNS/nobody/Splunk_TA_cisco_meraki/data/inputs/" in path:
-                state["last_post_fields"] = decode_form(data)
-                save()
-
             if "/services/auth/login" in path:
                 out("<response><sessionKey>test-session</sessionKey></response>")
 
@@ -1932,8 +1928,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                         stored_name = state["input_aliases"].get(
                             f"{input_type}://{existing_name}", stored_name
                         )
-                    if stored_name not in state["inputs"] and existing_name == state.get("last_input_name"):
-                        stored_name = state["last_input_name"]
                     exists = stored_name in state["inputs"]
                     if output_target == "/dev/null" and write_code:
                         out(code=200 if exists else 404)
@@ -1966,8 +1960,6 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 content.setdefault("disabled", "0")
                 state["inputs"][canonical_name] = content
                 state["input_aliases"][alias] = canonical_name
-                state["last_input_name"] = canonical_name
-                state["last_input_content"] = content
                 save()
                 log(f"INPUT_POST type={input_type} name={input_name} data={data!r}")
                 out("", 200 if existing_name else 201)
