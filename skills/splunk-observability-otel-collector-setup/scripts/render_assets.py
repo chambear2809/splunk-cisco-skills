@@ -582,9 +582,17 @@ def validate_extra_values(path: Path) -> None:
                     )
                 referenced_secret_envs.add(match.group("name"))
 
+    def is_headers_setter_component_id(value: str) -> bool:
+        """Recognize the base and named headers_setter component IDs."""
+        return value == "headers_setter" or value.startswith("headers_setter/")
+
+    def location_component_id(location: str) -> str:
+        """Return the final mapping key from an inspection location."""
+        return location.rsplit(".", 1)[-1]
+
     def inspect(node: object, location: str = "") -> None:
         if isinstance(node, dict):
-            if location.rsplit(".", 1)[-1] == "headers_setter":
+            if is_headers_setter_component_id(location_component_id(location)):
                 validate_headers_setter(node, location)
             semantic_name = str(node.get("name", ""))
             semantic_value = node.get("value")
@@ -626,11 +634,11 @@ def validate_extra_values(path: Path) -> None:
                 # Its header values are checked structurally above so nested
                 # values can still be inspected without rejecting the component
                 # mapping before the Secret-backed reference is resolved.
-                if normalized == "headerssetter":
+                if is_headers_setter_component_id(key):
                     sensitive_key = False
                 if (
                     normalized == "headers"
-                    and location.rsplit(".", 1)[-1] == "headers_setter"
+                    and is_headers_setter_component_id(location_component_id(location))
                 ):
                     sensitive_key = False
                 if normalized in {

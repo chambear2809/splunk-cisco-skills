@@ -623,6 +623,8 @@ def component_version_is_supported(target_type: str, version: str) -> bool:
         return parsed >= (5, 7)
     if target_type == "mariadb":
         return parse_database_version(version) >= (10, 5)
+    if target_type == "mongodb":
+        return parse_database_version(version) >= (4, 0)
     return True
 
 
@@ -1215,6 +1217,16 @@ def validate_connection_fields(target: dict[str, Any]) -> None:
                 raise RenderError(f"mongodb/{name} query samples and top queries require self-managed MongoDB 7.0 or Atlas dedicated M10+.")
             if target["platform"] not in {"self-hosted", "mongodb-atlas"}:
                 raise RenderError(f"mongodb/{name} query events are unsupported for platform {target['platform']!r}.")
+        if target.get("advanced", {}).get("direct_connection") is True:
+            if target["platform"] == "mongodb-atlas":
+                raise RenderError(
+                    f"mongodb/{name} direct_connection=true requires a non-SRV endpoint; "
+                    "Atlas targets use mongodb+srv."
+                )
+            if len(endpoints) != 1:
+                raise RenderError(
+                    f"mongodb/{name} direct_connection=true requires exactly one endpoint."
+                )
 
     if mode == "direct" and target_type in {
         "postgresql",
@@ -1226,7 +1238,7 @@ def validate_connection_fields(target: dict[str, Any]) -> None:
         if target_type == "mongodb":
             for endpoint in target.get("endpoints") or []:
                 if target["platform"] == "mongodb-atlas":
-                    validate_hostname_or_ip(endpoint, label=f"mongodb/{name} Atlas host")
+                    validate_hostname(endpoint, label=f"mongodb/{name} Atlas host")
                 else:
                     validate_host_port(endpoint, label=f"mongodb/{name} endpoint")
         else:
@@ -1256,6 +1268,29 @@ def validate_hostname_or_ip(value: str, *, label: str) -> None:
         raise RenderError(
             f"{label} must be a hostname or IP address only; datasource options, "
             "delimiters, whitespace, and credentials are forbidden."
+        )
+    if any(
+        not part or len(part) > 63 or part.startswith("-") or part.endswith("-")
+        for part in candidate.split(".")
+    ):
+        raise RenderError(f"{label} is not a valid DNS hostname.")
+
+
+def validate_hostname(value: str, *, label: str) -> None:
+    """Accept a DNS hostname, excluding literal IP addresses."""
+    candidate = value.strip()
+    try:
+        ipaddress.ip_address(candidate.strip("[]"))
+    except ValueError:
+        pass
+    else:
+        raise RenderError(f"{label} must be a DNS hostname; IP literals are forbidden.")
+    if len(candidate) > 253 or not re.fullmatch(
+        r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?", candidate
+    ):
+        raise RenderError(
+            f"{label} must be a DNS hostname; datasource options, delimiters, "
+            "whitespace, and credentials are forbidden."
         )
     if any(
         not part or len(part) > 63 or part.startswith("-") or part.endswith("-")

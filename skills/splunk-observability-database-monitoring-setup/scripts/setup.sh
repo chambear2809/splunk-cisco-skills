@@ -199,6 +199,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${CANONICAL_REPO}" == "true" ]]; then
+    # Load the selected Observability settings before rendering so the
+    # renderer can resolve a credentials-backed realm and child API validation
+    # receives the token-file path without putting the token in the command
+    # line.  Keep the values exported for validate.sh, which runs in a child
+    # process.  Loading after argument parsing keeps --help usable even when a
+    # credentials file has not been configured yet.
+    if ! load_observability_cloud_settings; then
+        echo "ERROR: Could not load the selected Observability Cloud settings." >&2
+        exit 1
+    fi
+    export SPLUNK_O11Y_REALM SPLUNK_O11Y_TOKEN_FILE
+fi
+
 action_count=0
 for selected in "${MODE_APPLY_K8S}" "${MODE_APPLY_LINUX}" "${MODE_ROLLBACK_K8S}" "${MODE_ROLLBACK_LINUX}"; do
     if [[ "${selected}" == "true" ]]; then action_count=$((action_count + 1)); fi
