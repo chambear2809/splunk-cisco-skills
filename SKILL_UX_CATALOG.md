@@ -1,6 +1,6 @@
 # Skill UX Catalog
 
-_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
 
 This product-first catalog is the user-facing entry point for choosing and
 consuming a skill. Canonical skill directories remain flat at
@@ -25,7 +25,7 @@ skill summary to identify cross-product handoffs.
 | [Splunk Enterprise](#splunk-enterprise) | Self-managed Splunk Enterprise runtime, topology, storage, security, and operational administration. | 13 |
 | [Splunk Enterprise Security and Security Portfolio](#splunk-enterprise-security-and-security-portfolio) | Splunk Enterprise Security lifecycle, security content, adjacent security products, and security-specific integrations. | 13 |
 | [Splunk IT Service Intelligence](#splunk-it-service-intelligence) | Installation, configuration, service modeling, KPIs, and content-pack operations for Splunk IT Service Intelligence. | 2 |
-| [Splunk Observability Cloud](#splunk-observability-cloud) | Instrumentation, integrations, AI evaluation telemetry, monitoring, dashboards, and native operations for Splunk Observability Cloud. | 37 |
+| [Splunk Observability Cloud](#splunk-observability-cloud) | Instrumentation, integrations, AI evaluation telemetry, monitoring, dashboards, and native operations for Splunk Observability Cloud. | 38 |
 | [Splunk SOAR](#splunk-soar) | Deployment and lifecycle management for Splunk SOAR on-premises, cloud, clustering, and Automation Broker workflows. | 1 |
 | [Splunk On-Call](#splunk-on-call) | Teams, routing, escalation, integrations, and incident-response lifecycle management for Splunk On-Call. | 1 |
 | [AppDynamics](#appdynamics) | Direct AppDynamics platform administration, agents, application monitoring, content, security, and integrations. | 20 |
@@ -222,7 +222,7 @@ Instrumentation, integrations, AI evaluation telemetry, monitoring, dashboards, 
 | Skill | Lifecycle | Plain-language purpose | Splunk 10.5 compatibility | Start here | Safe first command | Validation | Deeper docs |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `lemonade-splunk-otel` | Canonical | Upgrade and operate Lemonade on Debian or AMD Ryzen AI hosts, enable privacy-safe native OTLP traces, render one full loopback collector config... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/lemonade-splunk-otel/scripts/setup.sh --help` | `bash skills/lemonade-splunk-otel/scripts/validate.sh --help` | `reference.md` plus 3 more |
-| `splunk-observability-ai-agent-monitoring-setup` | Canonical | Render, validate, diagnose, and safely apply AI Agent Monitoring setup plans, including GenAI Python instrumentation packages... | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-observability-ai-agent-monitoring-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-ai-agent-monitoring-setup/scripts/validate.sh --help` | `reference.md` plus 4 more |
+| `splunk-observability-ai-agent-monitoring-setup` | Canonical | Render, validate, diagnose, and safely apply the legacy Splunk AI Agent Monitoring APM setup plans, including GenAI Python instrumentation... | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-observability-ai-agent-monitoring-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-ai-agent-monitoring-setup/scripts/validate.sh --help` | `reference.md` plus 4 more |
 | `splunk-observability-aws-lambda-apm-setup` | Canonical | Render, validate, and optionally apply Splunk OpenTelemetry Lambda layer (`signalfx/splunk-otel-lambda`, beta, publisher `254067382080`) APM... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-aws-lambda-apm-setup/scripts/validate.sh --help` | `reference.md`, `references/splunk-doc-feature-matrix.md` |
 | `splunk-observability-browser-rum-setup` | Canonical | Render CDN, npm/TypeScript, Next.js, Vite, Webpack, source-map upload, CSP, Session Replay privacy, and RUM-to-APM validation assets for... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/splunk-observability-browser-rum-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-browser-rum-setup/scripts/validate.sh --help` | `reference.md` |
 | `splunk-observability-claude-code-instrumentation-setup` | Canonical | Render, validate, diagnose, and safely apply Claude Code native OTel telemetry for Splunk Observability Cloud and Galileo; covers local-collector... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/splunk-observability-claude-code-instrumentation-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-claude-code-instrumentation-setup/scripts/validate.sh --help` | `reference.md` |
@@ -233,6 +233,12 @@ Instrumentation, integrations, AI evaluation telemetry, monitoring, dashboards, 
 | `splunk-observability-k8s-frontend-rum-setup` | Canonical | Standalone reusable (RUM beacons direct to `rum-ingest.<realm>.observability.splunkcloud.com`, no OTel collector required): render, apply, verify... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/splunk-observability-k8s-frontend-rum-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-k8s-frontend-rum-setup/scripts/validate.sh --help` | `reference.md` plus 13 more |
 | `splunk-observability-mobile-rum-setup` | Canonical | Render-first Splunk Observability Cloud Mobile RUM setup for native iOS, native Android, React Native, and Flutter. | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/splunk-observability-mobile-rum-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-mobile-rum-setup/scripts/validate.sh --help` | `reference.md` plus 6 more |
 | `splunk-observability-otel-collector-setup` | Canonical | Render, preflight, apply, validate, diagnose, and remove pinned Kubernetes/Linux Collector deployments; audit and atomically stage... | Splunk Cloud Platform 10.5.2605: conditional. | Start with `template.example` | `bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh --help` | `bash skills/splunk-observability-otel-collector-setup/scripts/validate.sh --help` | `reference.md` plus 2 more |
+
+### Agentic Application Observability
+
+| Skill | Lifecycle | Plain-language purpose | Splunk 10.5 compatibility | Start here | Safe first command | Validation | Deeper docs |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `splunk-agent-observability-setup` | Canonical | Operate the post-rebrand Splunk Agent Observability product across SaaS and on-premises: discover access, instrument agent applications, configure... | No direct Splunk Platform runtime dependency. | Start with `SKILL.md` and the safe command | `bash skills/splunk-agent-observability-setup/scripts/setup.sh --help` | `bash skills/splunk-agent-observability-setup/scripts/validate.sh --help` | `reference.md`, `references/live-validation-runbook.md` |
 
 ### Galileo AI Observability
 

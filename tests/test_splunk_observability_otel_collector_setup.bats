@@ -88,6 +88,8 @@ kind: Deployment
 metadata:
   name: splunk-otel-collector-k8s-cluster-receiver
 spec:
+  strategy:
+    type: Recreate
   template:
     spec:
       containers:
@@ -413,6 +415,8 @@ kind: Deployment
 metadata:
   name: splunk-otel-collector-k8s-cluster-receiver
 spec:
+  strategy:
+    type: Recreate
   template:
     spec:
       containers:

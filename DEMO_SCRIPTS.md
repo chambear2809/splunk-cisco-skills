@@ -1,5 +1,8 @@
 # Demo Scripts
 
+For the live, interactive 45-minute operator demo, use
+[`LIVE_DEMO_45_MIN.md`](LIVE_DEMO_45_MIN.md).
+
 Speaker cues are shown in brackets, for example `[pause]` and `[emphasize]`.
 
 ## Repeatable Sales Demo Script

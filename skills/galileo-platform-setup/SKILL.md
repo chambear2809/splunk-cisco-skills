@@ -46,9 +46,14 @@ metadata:
 Follow the documented read-only or render-first path whenever it is available.
 This skill does not imply permission to mutate live systems. Require explicit
 apply flags, protected credentials, an exact tenant onboarding date, and
-operator review for state changes. This implementation applies only the legacy
-Galileo contract for tenants onboarded before August 7, 2026. Unknown, exact-
-boundary, and later onboarding dates are render-only.
+operator review for state changes. This repository's guarded helper currently
+permits legacy Galileo apply only for tenants with a verified onboarding date
+before August 7, 2026. That is a repository implementation gate tied to its
+reviewed documentation epoch, not an authoritative Splunk tenant migration or
+contract cutoff. For a later, boundary, or unknown date, keep this helper
+render-only and verify the actual tenant product/API contract with the customer
+or Splunk before choosing a workflow. Use `splunk-agent-observability-setup`
+for confirmed new-product tenants.
 
 ## Examples
 
@@ -100,9 +105,12 @@ Before any apply, also ask for the tenant's exact onboarding date. Pass it as
 `--tenant-onboarding-date YYYY-MM-DD` or set `galileo.onboarding_date` in the
 spec. A missing date does not block rendering, validation, or doctor output,
 but it records an `unconfirmed` epoch and blocks every operational apply. Only
-a date before `2026-08-07` enables the reviewed legacy Galileo apply contract.
-The exact boundary and later dates use materially different Splunk Agent
-Observability names, SDKs, and API surfaces that this skill does not implement.
+a date before `2026-08-07` passes this repository's conservative apply gate.
+The date is not a vendor-established migration cutoff. For the exact boundary,
+later dates, or missing date, this legacy skill's helpers remain disabled;
+confirm the actual tenant product and contract before routing. Use
+`splunk-agent-observability-setup` when the tenant is confirmed to run the new
+product.
 
 ## Supported Paths
 

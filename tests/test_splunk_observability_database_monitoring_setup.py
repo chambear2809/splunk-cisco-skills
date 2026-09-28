@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -250,19 +251,21 @@ def test_template_and_render_cover_release_engines_runtimes_and_actions(
         "oracledb",
         "mysql",
         "mariadb",
+        "mongodb",
     }
     assert set(metadata["validation_metrics"]) == {
         "postgresql.database.count",
         "sqlserver.lock.wait.rate",
         "oracledb.executions",
         "mysql.buffer_pool.usage",
+        "mongodb.connection.count",
     }
-    assert len(metadata["validation_probes"]) == 5
+    assert len(metadata["validation_probes"]) == 6
     assert {item["target"] for item in metadata["validation_probes"]} == {
         item["name"] for item in metadata["targets"]
     }
     normalized = dbmon_api_probe.normalize_metadata_probes(metadata, [])
-    assert len(normalized) == 5
+    assert len(normalized) == 6
     assert all(item["filters"] for item in normalized)
     assert metadata["collector_kube_context"] == "production-cluster-admin"
 
@@ -529,6 +532,30 @@ def test_generated_actions_bind_context_detect_duplicates_and_track_drift(
     assert "cpu.cfs_quota_us" in linux and "cpuset.cpus.effective" in linux
 
 
+def test_k8s_overlay_accepts_audited_digest_only_collector_image(
+    tmp_path: Path,
+) -> None:
+    output = render(tmp_path)
+    helper = output / "scripts/apply-dbmon-overlay.sh"
+    helper_text = helper.read_text(encoding="utf-8")
+
+    tagged_image = (
+        "quay.io/signalfx/splunk-otel-collector:0.158.0"
+        "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
+    )
+    digest_only_image = (
+        "quay.io/signalfx/splunk-otel-collector"
+        "@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"
+    )
+    assert f'AUDITED_IMAGE="{tagged_image}"' in helper_text
+    assert f'AUDITED_IMAGE_DIGEST_ONLY="{digest_only_image}"' in helper_text
+    assert 'grep -Fxv "${AUDITED_IMAGE}"' in helper_text
+    assert 'grep -Fxv "${AUDITED_IMAGE_DIGEST_ONLY}"' in helper_text
+    assert 'if [[ -n "${unreviewed_images}" ]]; then' in helper_text
+    assert 'safe_detectors = [name for name in detectors if name in ("env", "system")]' in helper_text
+    assert "disabled nonlocal resource detectors in its temporary config" in helper_text
+
+
 @pytest.mark.parametrize(
     ("helm_version", "incompatible", "deprecated_alias"),
     [
@@ -556,6 +583,8 @@ def test_k8s_upgrade_component_gate_and_helm_version_paths(
     assert "build_target_component_inventory" in helper_text
     assert "existing-role-configs.jsonl" in helper_text
     assert "merged-role-configs.jsonl" in helper_text
+    assert '"otlp_http/dbmon_secondary"' in helper_text
+    assert 'startswith(("DBMON_", "SPLUNK_DBMON_"))' in helper_text
     assert "target-role-validation" not in helper_text
     assert '.spec.strategy = {"type": "Recreate", "rollingUpdate": null}' in helper_text
     assert 'strategy.get("rollingUpdate") is not None' in helper_text
@@ -849,13 +878,15 @@ exec "${REAL_PYTHON}" "$@"
 
 @pytest.mark.parametrize(
     "scenario",
-    ["commit", "rollback", "rollback-history-failure", "rollback-state-failure"],
+    ["commit", "generic-error", "rollback", "rollback-history-failure", "rollback-state-failure"],
 )
 def test_k8s_non_dry_run_post_upgrade_commit_and_rollback_trap(
     tmp_path: Path, scenario: str
 ) -> None:
     """Exercise the generated mutation lifecycle without contacting a cluster."""
-    rollout_fails = scenario != "commit"
+    rollout_fails = scenario in {
+        "rollback", "rollback-history-failure", "rollback-state-failure"
+    }
     spec = base_spec(outputs={"kubernetes": True, "linux": False, "windows": False})
     spec["targets"] = [spec["targets"][0]]
     spec["sizing_evidence"]["target_count"] = 1
@@ -1071,7 +1102,11 @@ elif [[ "$*" == *"get pod -l"* ]]; then
 {"items":[{"status":{"containerStatuses":[{"name":"otel-collector","ready":true,"imageID":"docker-pullable://quay.io/signalfx/splunk-otel-collector@sha256:27a458cd6873d6fef7d3d88fe0a266dffe83d5fe222df738f1937593d8c43357"}]}}]}
 JSON
 elif [[ "$*" == *"logs deployment/"* ]]; then
-  printf '%s\n' 'info receiver postgresql/orders_postgres started'
+  if [[ "${FAKE_GENERIC_ERROR:-false}" == "true" ]]; then
+    printf '%s\n' '2026-09-28T00:00:00Z severity=error receiver=postgresql/orders_postgres transient collection warning'
+  else
+    printf '%s\n' 'info receiver postgresql/orders_postgres started'
+  fi
 else
   printf 'unexpected fake kubectl invocation: %s\n' "$*" >&2
   exit 96
@@ -1125,6 +1160,7 @@ exec "${REAL_PYTHON}" "$@"
             "FAKE_KUBECTL_ARGS": str(kubectl_args),
             "FAKE_DOCKER_ARGS": str(docker_args),
             "FAKE_ROLLOUT_FAIL": str(rollout_fails).lower(),
+            "FAKE_GENERIC_ERROR": str(scenario == "generic-error").lower(),
             "FAKE_HISTORY_FAIL_AFTER_ROLLBACK": str(
                 scenario == "rollback-history-failure"
             ).lower(),
@@ -1833,6 +1869,8 @@ def test_oracle_event_grants_include_session_event_for_query_events(
     output = render(tmp_path, spec_data)
     runbook = (output / "prerequisites/erp_oracle.md").read_text(encoding="utf-8")
     assert "GRANT SELECT ON SYS.V_$SESSION_EVENT TO OTEL_USER;" in runbook
+    assert "GRANT SELECT ON SYS.V_$SQL_PLAN_STATISTICS_ALL TO OTEL_USER;" in runbook
+    assert "GRANT SELECT ON SYS.V_$SQL_PLAN TO OTEL_USER;" not in runbook
     assert "GRANT CREATE SESSION TO OTEL_USER;" in runbook
     for required_view in (
         "SYS.V_$ROWCACHE",
@@ -2009,6 +2047,117 @@ def test_current_mysql_mariadb_product_matrix_and_plan_gaps(
     assert "unsupported-target opt-in is render/validate-only" in helper
 
 
+def test_current_mongodb_dbmon_platform_and_event_boundaries(tmp_path: Path) -> None:
+    spec = base_spec()
+    mongodb = {
+        "name": "customer_mongodb",
+        "type": "mongodb",
+        "platform": "self-hosted",
+        "version": "7.0",
+        "endpoint": "mongo.example.internal:27017",
+        "auth_source": "admin",
+        "credentials": credentials("customer-mongodb", "DBMON_CUSTOMER_MONGODB"),
+        "events": {"query_sample": True, "top_query": True},
+        "advanced": {"tls": {"insecure": False, "insecure_skip_verify": False}},
+    }
+    spec["targets"] = [mongodb]
+    output = render(tmp_path / "mongodb", spec, validate=True)
+    config = load_yaml(output / "linux/collector-dbmon.yaml")
+    receiver = config["receivers"]["mongodb/customer_mongodb"]
+    assert receiver["hosts"] == [{"endpoint": "mongo.example.internal:27017"}]
+    assert receiver["events"]["db.server.query_sample"]["enabled"] is True
+    assert receiver["resource_attributes"]["service.instance.id"]["override_value"] == "mongo.example.internal:27017"
+    coverage = json.loads((output / "coverage.json").read_text(encoding="utf-8"))
+    assert coverage["targets"][0]["query_plan_support"] == "supported"
+    runbook = (output / "prerequisites/customer_mongodb.md").read_text(encoding="utf-8")
+    assert "system.profile" in runbook
+    assert "100 ms" in runbook
+    assert 'db.createRole({' in runbook
+    assert 'db.createRole({{' not in runbook
+
+    mongodb["platform"] = "mongodb-atlas"
+    mongodb["endpoint"] = "cluster0.example.mongodb.net"
+    mongodb["tier"] = "M10"
+    spec["targets"] = [mongodb]
+    output = render(tmp_path / "atlas", spec)
+    receiver = load_yaml(output / "linux/collector-dbmon.yaml")["receivers"]["mongodb/customer_mongodb"]
+    assert receiver["scheme"] == "mongodb+srv"
+
+    mongodb["tier"] = "M0"
+    result = run_setup("--render", "--spec", str(write_spec(tmp_path / "atlas-free.json", spec)))
+    assert result.returncode == 1
+    assert "M10 or higher" in combined(result)
+
+    mongodb["platform"] = "self-hosted"
+    mongodb["version"] = "6.0"
+    del mongodb["tier"]
+    result = run_setup("--render", "--spec", str(write_spec(tmp_path / "mongodb-6.json", spec)))
+    assert result.returncode == 1
+    assert "self-managed MongoDB 7.0" in combined(result)
+
+    mongodb["platform"] = "self-hosted"
+    mongodb["version"] = "7.0"
+    mongodb.pop("tier", None)
+    mongodb.pop("endpoint", None)
+    mongodb["endpoints"] = [
+        "mongo-a.example.internal:27017",
+        "mongo-b.example.internal:27017",
+    ]
+    mongodb["replica_set"] = "orders-rs"
+    mongodb["validation_filters"] = {"service.instance.id": "orders-prod"}
+    spec["targets"] = [mongodb]
+    output = render(tmp_path / "replica-set", spec, validate=True)
+    receiver = load_yaml(output / "linux/collector-dbmon.yaml")["receivers"]["mongodb/customer_mongodb"]
+    assert receiver["hosts"] == [
+        {"endpoint": "mongo-a.example.internal:27017"},
+        {"endpoint": "mongo-b.example.internal:27017"},
+    ]
+    assert receiver["replica_set"] == "orders-rs"
+    assert receiver["resource_attributes"]["service.instance.id"]["override_value"] == "orders-prod"
+
+    mongodb["advanced"]["metrics"] = {"mongodb.health": True}
+    mongodb["advanced"]["resource_attributes"] = {
+        "service.name": {"enabled": True, "override_value": "orders-db"}
+    }
+    output = render(tmp_path / "optional-metrics-and-identity", spec, validate=True)
+    receiver = load_yaml(output / "linux/collector-dbmon.yaml")["receivers"]["mongodb/customer_mongodb"]
+    assert receiver["metrics"]["mongodb.health"] == {"enabled": True}
+    assert receiver["resource_attributes"]["service.name"]["override_value"] == "orders-db"
+    assert receiver["resource_attributes"]["service.instance.id"]["override_value"] == "orders-prod"
+
+    mongodb["advanced"]["resource_attributes"] = {
+        "service.instance.id": {"enabled": False}
+    }
+    result = run_setup("--render", "--spec", str(write_spec(tmp_path / "invalid-identity.json", spec)))
+    assert result.returncode == 1
+    assert "must match validation_filters.service.instance.id" in combined(result)
+
+
+def test_expanded_oracle_and_postgresql_official_matrix(tmp_path: Path) -> None:
+    spec = base_spec()
+    oracle = next(item for item in spec["targets"] if item["type"] == "oracledb")
+    oracle["version"] = "21c"
+    oracle["events"] = {"query_sample": True, "top_query": True}
+    spec["targets"] = [oracle]
+    output = render(tmp_path / "oracle-21c", spec)
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["targets"][0]["support_status"] == "official"
+
+    postgres = next(item for item in base_spec()["targets"] if item["type"] == "postgresql")
+    postgres["platform"] = "aws-aurora"
+    postgres["version"] = "17.7"
+    spec["targets"] = [postgres]
+    output = render(tmp_path / "aurora-pg", spec)
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["targets"][0]["support_status"] == "official"
+
+    postgres["platform"] = "edb"
+    postgres["version"] = "18.4"
+    spec["targets"] = [postgres]
+    output = render(tmp_path / "edb-pg", spec)
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["targets"][0]["support_status"] == "official"
+
 def test_v0155_tls_schema_and_metric_inventory_are_strict(tmp_path: Path) -> None:
     spec = base_spec()
     mysql = next(item for item in spec["targets"] if item["type"] == "mysql")
@@ -2041,7 +2190,7 @@ def test_v0155_tls_schema_and_metric_inventory_are_strict(tmp_path: Path) -> Non
         "--render", "--spec", str(write_spec(tmp_path / "fake-metric.json", bad))
     )
     assert result.returncode == 1
-    assert "exact v0.155" in combined(result)
+    assert "exact v0.158" in combined(result)
 
 
 def test_managed_sqlserver_requires_secure_datasource(tmp_path: Path) -> None:
@@ -2082,6 +2231,33 @@ def test_output_symlink_and_unreviewed_sizing_are_rejected(tmp_path: Path) -> No
     )
     assert result.returncode == 1
     assert "below sizing_evidence.peak_memory_mib" in combined(result)
+
+
+def test_copied_skill_keeps_output_outside_its_package(tmp_path: Path) -> None:
+    pytest.importorskip("yaml")
+    copied_skill = tmp_path / SKILL.name
+    shutil.copytree(SKILL, copied_skill)
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    command = [
+        "bash", str(copied_skill / "scripts/setup.sh"), "--render",
+        "--spec", str(copied_skill / "template.example"),
+    ]
+    for output_dir in (copied_skill / "rendered", tmp_path):
+        result = subprocess.run(
+            [*command, "--output-dir", str(output_dir)], cwd=caller,
+            capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 1
+        assert "Refusing dangerous output directory" in combined(result)
+
+    rendered = caller / "rendered"
+    result = subprocess.run(
+        [*command, "--output-dir", str(rendered)], cwd=caller,
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, combined(result)
+    assert (rendered / "metadata.json").is_file()
 
 
 def test_static_validator_rejects_old_exporter_and_replicas(tmp_path: Path) -> None:
@@ -2258,6 +2434,19 @@ def test_live_validation_scans_bounded_previous_logs_after_restart(
     assert all("--since=30s" in line for line in log_calls)
     assert all("--tail=-1" in line for line in log_calls)
     assert all("--limit-bytes=10485761" in line for line in log_calls)
+
+
+def test_live_validation_tolerates_generic_receiver_error_severity(
+    tmp_path: Path,
+) -> None:
+    output = render(tmp_path)
+    env, _ = fake_kubectl_env(
+        tmp_path,
+        "2026-09-28T00:00:00Z severity=error "
+        "receiver=postgresql/orders_postgres transient collection warning",
+    )
+    result = run_validate(output, "--live", "--live-since", "30s", env=env)
+    assert result.returncode == 0, combined(result)
 
 
 def test_live_validation_fails_closed_when_previous_logs_are_unavailable(
@@ -2989,6 +3178,74 @@ def test_collector_validate_pins_exact_image(tmp_path: Path) -> None:
     assert "quay.io/signalfx/splunk-otel-collector:0.158.0" in args
     assert "validate --config=/etc/otel/collector/dbmon.yaml" in args
     assert "--network=none" in args
+
+
+def test_collector_validate_mounts_external_receiver_tls_files_read_only(
+    tmp_path: Path,
+) -> None:
+    spec = base_spec(outputs={"kubernetes": True, "linux": False, "windows": False})
+    ca_file = tmp_path / "mongodb-ca.pem"
+    ca_file.write_text("test CA certificate fixture\n", encoding="utf-8")
+    spec["targets"] = [spec["targets"][0]]
+    spec["targets"][0]["advanced"] = {
+        "tls": {
+            "insecure": False,
+            "insecure_skip_verify": False,
+            "ca_file": str(ca_file),
+        }
+    }
+    output = render(tmp_path, spec)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    args_file = tmp_path / "container.args"
+    docker = bin_dir / "docker"
+    docker.write_text(
+        """#!/usr/bin/env bash
+printf '%s\\n' "$@" > "${CONTAINER_ARGS}"
+""",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "CONTAINER_ARGS": str(args_file)}
+
+    result = run_validate(output, "--collector-validate", env=env)
+
+    assert result.returncode == 0, combined(result)
+    args = args_file.read_text(encoding="utf-8").splitlines()
+    assert "--volume" in args
+    assert f"{ca_file}:{ca_file}:ro" in args
+
+
+def test_collector_validate_refuses_missing_external_receiver_tls_file(
+    tmp_path: Path,
+) -> None:
+    spec = base_spec(outputs={"kubernetes": True, "linux": False, "windows": False})
+    missing_ca = tmp_path / "missing-ca.pem"
+    spec["targets"] = [spec["targets"][0]]
+    spec["targets"][0]["advanced"] = {
+        "tls": {
+            "insecure": False,
+            "insecure_skip_verify": False,
+            "ca_file": str(missing_ca),
+        }
+    }
+    output = render(tmp_path, spec)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text(
+        """#!/usr/bin/env bash
+exit 99
+""",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    result = run_validate(output, "--collector-validate", env=env)
+
+    assert result.returncode != 0
+    assert "TLS file to exist as a regular, non-symlink file" in combined(result)
 
 
 def test_collector_validate_cleans_k8s_temp_config_after_runtime_failure(

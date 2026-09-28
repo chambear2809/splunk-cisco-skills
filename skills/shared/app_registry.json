@@ -767,6 +767,15 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-agent-observability-setup",
+        "label": "`splunk-agent-observability-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Splunk Agent Observability is SaaS in Splunk Observability Cloud or a separate customer-managed on-premises product",
+        "cloud_config_path": "Stage the splunk-ao SDK and application instrumentation, use documented Agent Observability REST/API or currently exposed MCP actions when available, and validate approved traces, evaluators, experiments, or guardrails",
+        "notes": "Post-rebrand action-oriented product workflow for SaaS and on-premises. Distinct from legacy APM AI Agent Monitoring and legacy Galileo tenant contracts; the 2026-08-07 public on-premises announcement is not a tenant migration cutoff or a complete install/upgrade runbook, and the documented MCP server remains under construction."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-observability-database-monitoring-setup",
         "label": "`splunk-observability-database-monitoring-setup`",
         "splunkbase_id": "N/A",
@@ -1508,6 +1517,20 @@
         "external-collector"
       ],
       "notes": "Render-first orchestration for Splunk AI Agent Monitoring and AI Infrastructure Monitoring. Requires external collector runtime for traces/metrics/logs, Splunk Platform HEC and Log Observer Connect prerequisites for evaluation/content event correlation, and delegates dashboards/detectors to native Observability skills. UI-only AI Agent Monitoring connection/index selection remains a deeplink handoff."
+    },
+    {
+      "skill": "splunk-agent-observability-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Separate Agent Observability product, not a Splunk Platform add-on: instrument the user's external agent application with the splunk-ao SDK/API, then configure and validate supported evaluations, experiments, Agent Control, Signals, and usage."
     },
     {
       "skill": "splunk-observability-coding-agent-instrumentation-setup",

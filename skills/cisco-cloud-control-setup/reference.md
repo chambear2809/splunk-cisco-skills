@@ -68,7 +68,8 @@ separately classified handoffs rather than being promoted to matrix rows.
 | Federation | Dedicated parent covers Splunk, Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, DDSS, and Amazon Security Lake independently, plus legacy FSS3 migration and Cisco SAL boundaries |
 | AI activation | Dedicated parent distinguishes AI Toolkit `6.0.2` with PSC `4.3.4`, open CTSM, GA hosted CDTSM, GA Splunk AI Toolkit Agent Launchpad, the separate announced/roadmap Cloud Control Studio Agent Builder, MCP, and AI Canvas CA |
 | MCP | `splunk-mcp-server-setup` when `mcp.splunk_mcp_url` is set; `cisco-thousandeyes-mcp-setup` can render without Splunk credentials |
-| AI agent monitoring | `splunk-observability-ai-agent-monitoring-setup` |
+| Current Splunk Agent Observability app, also reachable from Cisco Cloud Control | `splunk-agent-observability-setup` |
+| Legacy AI Agent Monitoring APM experience | `splunk-observability-ai-agent-monitoring-setup` |
 | Observability dashboards | `splunk-observability-dashboard-builder` |
 | Observability detectors | `splunk-observability-native-ops` |
 | Domain readiness | Product setup skills and product-router handoffs for Intersight, Nexus, Nexus Hyperfabric, ThousandEyes, Meraki, Catalyst, Catalyst SD-WAN, Security Cloud Control, Secure Access, Duo, ISE, Secure Firewall, Splunk Cloud, Collaboration Control Hub, and Cisco IQ |

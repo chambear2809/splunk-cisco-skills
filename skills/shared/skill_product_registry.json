@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5"
+    "sha256": "3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd"
   },
   "skill_records": [
     {
@@ -602,6 +602,11 @@
       "replaced_by": null
     },
     {
+      "name": "splunk-agent-observability-setup",
+      "status": "canonical",
+      "replaced_by": null
+    },
+    {
       "name": "splunk-observability-coding-agent-instrumentation-setup",
       "status": "canonical",
       "replaced_by": null
@@ -1083,6 +1088,13 @@
             "splunk-observability-k8s-frontend-rum-setup",
             "splunk-observability-mobile-rum-setup",
             "splunk-observability-otel-collector-setup"
+          ]
+        },
+        {
+          "id": "agentic-application-observability",
+          "name": "Agentic Application Observability",
+          "skills": [
+            "splunk-agent-observability-setup"
           ]
         },
         {

@@ -1,0 +1,802 @@
+{
+  "schema_version": 1,
+  "product_area": "Splunk Agent Observability SaaS and on-premises product workflows",
+  "last_verified": "2026-09-28",
+  "source_urls": [
+    "https://agent-observability-docs.splunk.com/what-is-splunk-agent-observability",
+    "https://agent-observability-docs.splunk.com/saas/overview",
+    "https://agent-observability-docs.splunk.com/saas/billing-and-usage",
+    "https://agent-observability-docs.splunk.com/getting-started/quickstart",
+    "https://agent-observability-docs.splunk.com/concepts/evaluators/overview",
+    "https://agent-observability-docs.splunk.com/sdk-api/experiments/experiments",
+    "https://agent-observability-docs.splunk.com/concepts/agent-control/overview",
+    "https://agent-observability-docs.splunk.com/getting-started/mcp/setup-splunk-ao-mcp",
+    "https://agent-observability-docs.splunk.com/api/getting-started",
+    "https://agent-observability-docs.splunk.com/concepts/cisco-cloud-control",
+    "https://agent-observability-docs.splunk.com/concepts/annotations/overview",
+    "https://agent-observability-docs.splunk.com/luna-studio",
+    "https://help.splunk.com/en/splunk-observability-cloud/get-started/free-edition/splunk-observability-cloud-free-edition",
+    "https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/splunk-ai-agent-monitoring",
+    "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics-concepts",
+    "https://agent-observability-docs.splunk.com/saas/capabilities",
+    "https://agent-observability-docs.splunk.com/concepts/access-control",
+    "https://agent-observability-docs.splunk.com/references/faqs/find-keys",
+    "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/create-a-control",
+    "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/initialize-and-configure-agent-control",
+    "https://docs.agentcontrol.dev/concepts/evaluators/built-in-evaluators",
+    "https://docs.agentcontrol.dev/how-to/decorate-llm-tool-calls",
+    "https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/splunk-ai-infrastructure-monitoring",
+    "https://agent-observability-docs.splunk.com/getting-started/sample-projects/sample-projects",
+    "https://agent-observability-docs.splunk.com/release-notes",
+    "https://agent-observability-docs.splunk.com/sdk-api/third-party-integrations/overview",
+    "https://agent-observability-docs.splunk.com/concepts/logging/sessions/sessions-overview",
+    "https://agent-observability-docs.splunk.com/api-reference/trace/query-traces",
+    "https://agent-observability-docs.splunk.com/api-reference/trace/delete-traces",
+    "https://agent-observability-docs.splunk.com/how-to-guides/basics/create-views",
+    "https://agent-observability-docs.splunk.com/sdk-api/logging/splunk-ao-logger",
+    "https://agent-observability-docs.splunk.com/concepts/logging/multimodal-observability",
+    "https://agent-observability-docs.splunk.com/sdk-api/logging/distributed-tracing-otel",
+    "https://agent-observability-docs.splunk.com/how-to-guides/basics/log-mcp-server-calls/log-mcp-server-calls",
+    "https://agent-observability-docs.splunk.com/concepts/logging/configure-evaluators/configure-evaluators",
+    "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/composite-evaluators",
+    "https://agent-observability-docs.splunk.com/sdk-api/experiments/datasets",
+    "https://agent-observability-docs.splunk.com/getting-started/experiments",
+    "https://agent-observability-docs.splunk.com/concepts/projects",
+    "https://agent-observability-docs.splunk.com/api-reference/protect/invoke",
+    "https://agent-observability-docs.splunk.com/concepts/signals",
+    "https://agent-observability-docs.splunk.com/how-to-guides/basics/set-up-alerts-on-logs",
+    "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/list-dashboards",
+    "https://agent-observability-docs.splunk.com/api-reference/run_insights_settings/get-settings",
+    "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics",
+    "https://agent-observability-docs.splunk.com/concepts/costs/model-pricing-settings",
+    "https://agent-observability-docs.splunk.com/getting-started/add-users-and-assign-roles",
+    "https://agent-observability-docs.splunk.com/api-reference/api_keys/create-api-key",
+    "https://agent-observability-docs.splunk.com/security/sso",
+    "https://agent-observability-docs.splunk.com/references/faqs/troubleshooting",
+    "https://agent-observability-docs.splunk.com/how-to-guides/third-party-integrations/nvidia-nim-models",
+    "https://agent-observability-docs.splunk.com/api-reference/trace/export-records",
+    "https://agent-observability-docs.splunk.com/api-reference/trace/recompute-metrics",
+    "https://agent-observability-docs.splunk.com/api-reference/organization-jobs/delete-by-metadata",
+    "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/test-evaluators",
+    "https://agent-observability-docs.splunk.com/how-to-guides/evaluators/create-local-evaluator/create-local-evaluator",
+    "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/create-widget",
+    "https://agent-observability-docs.splunk.com/api-reference/run_insights_settings/upsert-insights-config",
+    "https://agent-observability-docs.splunk.com/concepts/costs/integration-costs",
+    "https://agent-observability-docs.splunk.com/api-reference/groups/add-user-to-group",
+    "https://agent-observability-docs.splunk.com/api-reference/api_keys/delete-api-key",
+    "https://agent-observability-docs.splunk.com/concepts/ai-assistant",
+    "https://agent-observability-docs.splunk.com/api-reference/log_stream/create-log-stream",
+    "https://agent-observability-docs.splunk.com/api-reference/log_stream/update-metric-settings",
+    "https://agent-observability-docs.splunk.com/api-reference/logstream-insights/get-logstream-insights-token-usages",
+    "https://agent-observability-docs.splunk.com/api-reference/log_stream/delete-log-stream",
+    "https://agent-observability-docs.splunk.com/luna-studio/sdk/overview",
+    "https://agent-observability-docs.splunk.com/luna-studio/ui/quickstart",
+    "https://agent-observability-docs.splunk.com/api-reference/datasets/query-dataset-versions",
+    "https://agent-observability-docs.splunk.com/api-reference/datasets/get-dataset-synthetic-extend-status",
+    "https://agent-observability-docs.splunk.com/api-reference/datasets/bulk-delete-datasets"
+  ],
+  "supported_statuses": [
+    "direct_apply",
+    "handoff",
+    "render_runbook",
+    "validate_only"
+  ],
+  "feature_count": 49,
+  "features": [
+    {
+      "id": "product-deployments-and-entitlement",
+      "name": "SaaS and on-premises deployment selection and entitlement",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect the selected tenant and documented entitlement; do not claim account provisioning or paid feature enablement without evidence.",
+      "validation_evidence": "Deployment, product release, realm or API base URL, entitlement, and target organization recorded in the readiness report.",
+      "source_url": "https://agent-observability-docs.splunk.com/what-is-splunk-agent-observability"
+    },
+    {
+      "id": "saas-free-edition-access",
+      "name": "Observability Cloud Free Edition access and limits",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Verify the tenant's current Free Edition access; do not promise eligibility or infer product roles from the public signup page.",
+      "validation_evidence": "Free Edition path and current documented 15-host limit checked against the target tenant.",
+      "source_url": "https://help.splunk.com/en/splunk-observability-cloud/get-started/free-edition/splunk-observability-cloud-free-edition"
+    },
+    {
+      "id": "sample-projects-and-first-run-readiness",
+      "name": "Sample projects and first-run learning path",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect the target tenant sample projects and roles before creating duplicate resources; a sample-project 403 can require role-assignment propagation in Free Edition.",
+      "validation_evidence": "Sample project visibility, selected example, and any entitlement or role gap recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/sample-projects/sample-projects"
+    },
+    {
+      "id": "onprem-install-upgrade-and-operations",
+      "name": "On-premises installation, upgrade, and platform operations",
+      "status": "handoff",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "The public product announcement is not an installation procedure; require current entitled release-specific documentation and customer/support deployment procedure before making infrastructure changes.",
+      "validation_evidence": "Handoff records exact product release, deployment prerequisites, support-owned steps, and installation/upgrade evidence still required.",
+      "source_url": "https://agent-observability-docs.splunk.com/release-notes",
+      "deployments": [
+        "on-premises"
+      ]
+    },
+    {
+      "id": "first-trace-python-sdk",
+      "name": "First trace and Python SDK application instrumentation",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Stage only the requested application-code and dependency changes; inspect before running because SDK initialization can create a project and Agent Stream.",
+      "validation_evidence": "Staged diff, dependency/environment review, and approved test trace visible in the intended Agent Stream.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/quickstart",
+      "object_ids": [
+        "trace-span-session"
+      ]
+    },
+    {
+      "id": "agent-stream-lifecycle-and-metric-settings",
+      "name": "Agent Stream creation, updates, metric settings, and deletion",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect the project and existing Agent Streams first. Use the target-supported SDK/API/UI to create or update the exact stream and metric settings; confirm owner/resource role. Require exact-ID confirmation before stream deletion.",
+      "validation_evidence": "Project and Agent Stream IDs, requested settings, collaborator access, and resulting stream state or approved deletion recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/log_stream/create-log-stream",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/log_stream/update-metric-settings",
+        "https://agent-observability-docs.splunk.com/api-reference/log_stream/delete-log-stream"
+      ],
+      "object_ids": [
+        "agent-stream"
+      ]
+    },
+    {
+      "id": "provider-and-framework-integrations",
+      "name": "LLM providers and agent framework integrations",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Apply only an exact documented provider/framework integration supported by the target SDK/version, including NVIDIA NIM when requested; preserve app behavior and stage dependency/code changes. NIM application model traces are distinct from infrastructure metrics.",
+      "validation_evidence": "Selected framework/provider docs, package versions, staged code diff, and a verified staging trace.",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/third-party-integrations/overview",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/how-to-guides/third-party-integrations/nvidia-nim-models"
+      ],
+      "object_ids": [
+        "trace-span-session",
+        "llm-provider-integration"
+      ]
+    },
+    {
+      "id": "agent-streams-sessions-traces-and-spans",
+      "name": "Agent Streams, sessions, traces, and spans",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect telemetry through an approved interface; do not expose prompt, response, or tool payload content in reports by default.",
+      "validation_evidence": "Sanitized project/stream identifiers and expected trace/session/span relationships confirmed.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/logging/sessions/sessions-overview"
+    },
+    {
+      "id": "trace-search-export-and-metric-recompute",
+      "name": "Trace/span/session search, export, and metric recomputation",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use the documented tenant API/SDK for the exact project and filters; export only authorized content, and recompute only a bounded requested range because it can consume resources.",
+      "validation_evidence": "Query count and time range, export artifact destination or recomputation job/status, and sanitized record sample verified.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/trace/query-traces",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/trace/export-records",
+        "https://agent-observability-docs.splunk.com/api-reference/trace/recompute-metrics"
+      ],
+      "object_ids": [
+        "trace-span-session",
+        "agent-stream"
+      ]
+    },
+    {
+      "id": "agent-stream-insights-token-usage",
+      "name": "Agent Stream Insights token usage and metrics",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Query the documented Insights endpoint only when supported on the target release; label project/stream, time range, and metric provenance. Distinguish app model token usage from Tokenomics coding-tool adoption.",
+      "validation_evidence": "Stream ID, time range, supported endpoint, returned usage summary, and any data gaps recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/logstream-insights/get-logstream-insights-token-usages"
+    },
+    {
+      "id": "trace-data-deletion",
+      "name": "Trace, span, session, and organization-wide data deletion",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Preview exact project/organization filters and match count; require explicit approval for irreversible deletion, then use the documented endpoint and verify the remaining count.",
+      "validation_evidence": "Approved filters, pre-delete match count, operation/job ID, and post-delete count recorded without exposing content.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/trace/delete-traces",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/organization-jobs/delete-by-metadata"
+      ],
+      "object_ids": [
+        "trace-span-session",
+        "trace-data-deletion-job"
+      ]
+    },
+    {
+      "id": "saved-investigation-views",
+      "name": "Saved views for Agent Streams and experiments",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use the documented deployment-specific UI flow to save columns, order, and filters; confirm whether a view is private or visible to project members before saving.",
+      "validation_evidence": "View name, access level, columns/filters, and successful reload in the intended stream or experiment.",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/basics/create-views",
+      "object_ids": [
+        "saved-view"
+      ]
+    },
+    {
+      "id": "custom-logging-context-tags-and-metadata",
+      "name": "Custom logging, context, tags, and metadata",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Change only the requested application instrumentation and metadata; exclude credentials and minimize personal or sensitive fields.",
+      "validation_evidence": "Staged code diff and sanitized trace showing the requested metadata keys without disallowed values.",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/logging/splunk-ao-logger",
+      "object_ids": [
+        "trace-span-session"
+      ]
+    },
+    {
+      "id": "multimodal-content-instrumentation",
+      "name": "Multimodal traces and content instrumentation",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Treat image, audio, document, and other payloads as sensitive; stage the exact instrumentation and require approval before sending real content.",
+      "validation_evidence": "Staged instrumentation diff and staging-only trace verified without exposing media or content in the report.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/logging/multimodal-observability",
+      "object_ids": [
+        "trace-span-session"
+      ]
+    },
+    {
+      "id": "opentelemetry-distributed-tracing",
+      "name": "Distributed tracing and OpenTelemetry context propagation",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Implement only the documented OpenTelemetry integration for the selected deployment and application; do not reroute unrelated telemetry destinations.",
+      "validation_evidence": "Staged collector/application configuration and trace correlation verified across the intended boundary.",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/logging/distributed-tracing-otel",
+      "object_ids": [
+        "trace-span-session"
+      ]
+    },
+    {
+      "id": "mcp-tool-call-instrumentation",
+      "name": "Application-side MCP tool call tracing",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Instrument only the user application MCP client path with documented tool spans; distinguish this telemetry from installing the Splunk Agent Observability MCP server.",
+      "validation_evidence": "Staged code diff and sanitized trace with the expected MCP tool name, timing, and parent-child relationship.",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/basics/log-mcp-server-calls/log-mcp-server-calls",
+      "object_ids": [
+        "trace-span-session"
+      ]
+    },
+    {
+      "id": "evaluators-and-provider-integration",
+      "name": "Built-in evaluators and LLM provider integration",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect existing evaluator/provider settings, then configure only the requested supported evaluator and provider through the target UI/API with secure provider-key entry, reviewed sampling and usage cost.",
+      "validation_evidence": "Evaluator plan records evaluation target, node type, provider, deployment availability, sampling, and projected usage.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/overview",
+      "object_ids": [
+        "evaluator-assignment-sampling",
+        "llm-provider-integration"
+      ]
+    },
+    {
+      "id": "agent-stream-evaluator-configuration",
+      "name": "Agent Stream evaluator assignment, node types, and sampling",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect existing evaluator settings and supported node types; assign only requested evaluators with a reviewed sample rate, provider, and cost impact.",
+      "validation_evidence": "Persisted evaluator assignment, sampling setting, and a sanitized result on an approved trace.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/logging/configure-evaluators/configure-evaluators",
+      "object_ids": [
+        "evaluator-assignment-sampling"
+      ]
+    },
+    {
+      "id": "custom-llm-judge-evaluators-and-autotune",
+      "name": "Custom LLM-as-a-judge evaluators and Autotune",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Create or tune only the requested judge after reviewing provider/model, evaluator prompt, feedback data, sampling, expected spend, deployment support, and rollback; validate before/after results.",
+      "validation_evidence": "Versioned evaluator definition, reviewed feedback sample, deployment feature check, and before/after evaluation result.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/overview",
+      "object_ids": [
+        "custom-llm-judge-evaluator",
+        "evaluator-scorer-version"
+      ]
+    },
+    {
+      "id": "custom-code-evaluator-availability",
+      "name": "Custom code evaluator deployment availability",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Check the SaaS/on-premises feature table; custom code evaluators are unavailable in SaaS and available on-premises.",
+      "validation_evidence": "Deployment option and current custom-code evaluator availability recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/overview",
+      "deployments": [
+        "on-premises"
+      ]
+    },
+    {
+      "id": "composite-and-local-evaluator-workflows",
+      "name": "Composite evaluators and local Python evaluators",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Composite evaluators require code-based custom evaluators and are on-premises-only. Local experiment evaluators can be implemented in application code for a supported deployment. Validate required_metric dependencies, owned code, and safe fixture results before use; do not claim SaaS hosted composite support.",
+      "validation_evidence": "Required evaluator dependency order, deployment support, staged local/composite code, and custom evaluator test against manual input, existing logs, or labeled dataset.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/composite-evaluators",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/test-evaluators",
+        "https://agent-observability-docs.splunk.com/how-to-guides/evaluators/create-local-evaluator/create-local-evaluator"
+      ],
+      "object_ids": [
+        "composite-evaluator",
+        "local-experiment-evaluator"
+      ]
+    },
+    {
+      "id": "luna-studio-enterprise-deployment",
+      "name": "Luna Studio Enterprise deployment and integration readiness",
+      "status": "handoff",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Luna Studio infrastructure is Enterprise-tier and deployed by Splunk into the customer cluster/cloud. Confirm entitlement, instance, provider and Splunk Agent Observability integration before training; hand installation/infrastructure changes to the deployment owner.",
+      "validation_evidence": "Enterprise entitlement, Luna Studio URL, deployment owner, integration state, and prerequisites recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio",
+      "deployments": [
+        "on-premises"
+      ]
+    },
+    {
+      "id": "luna-studio-training-and-registration",
+      "name": "Luna Studio dataset preparation, fine-tuning, evaluation, and evaluator registration",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "When Enterprise Luna Studio is available, use its documented UI or SDK to prepare labeled data, run a bounded training job, inspect quality/cost, and register only an approved evaluator. The UI quickstart currently requires a CSV test set of at least 300 rows and 100 examples per class; check the selected path/version.",
+      "validation_evidence": "Dataset schema/size, job ID and status, held-out evaluation result, cost/usage, registered evaluator ID, and a safe sample result in Agent Observability.",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio/sdk/overview",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/luna-studio/ui/quickstart"
+      ],
+      "object_ids": [
+        "luna-studio-project",
+        "luna-studio-dataset",
+        "luna-studio-training-run",
+        "luna-trained-evaluator"
+      ],
+      "deployments": [
+        "on-premises"
+      ]
+    },
+    {
+      "id": "experiments-datasets-and-prompts",
+      "name": "Experiment runs, datasets, and prompt templates",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use a connected product MCP action only if its current exposed schema supports the exact request; otherwise use documented SDK/UI paths. Confirm before sending sensitive data to an evaluator/provider or incurring material evaluation cost.",
+      "validation_evidence": "Requested dataset/prompt/run identifiers, job status, evaluator configuration, and sanitized result summary.",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/experiments",
+      "object_ids": [
+        "dataset",
+        "prompt-template",
+        "experiment-run"
+      ]
+    },
+    {
+      "id": "dataset-query-export-and-maintenance",
+      "name": "Dataset preview, query, export, versions, synthetic extension, and maintenance",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Select the documented dataset SDK/API operation and exact dataset/version; inspect schema, content sensitivity, and generated-data cost before preview, export, synthetic extension, or bulk changes. Require exact IDs before deletion.",
+      "validation_evidence": "Dataset/version identity, schema, row count/sample, extension or bulk-operation status, and authorized export destination or post-change state.",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/datasets",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/datasets/query-dataset-versions",
+        "https://agent-observability-docs.splunk.com/api-reference/datasets/get-dataset-synthetic-extend-status",
+        "https://agent-observability-docs.splunk.com/api-reference/datasets/bulk-delete-datasets"
+      ],
+      "object_ids": [
+        "dataset",
+        "dataset-record-version"
+      ]
+    },
+    {
+      "id": "experiment-groups-comparison-and-regression",
+      "name": "Experiment groups, comparison, playground, unit tests, and regression workflows",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Implement the requested repeatable evaluation in the target experiment group, playground, code, or unit-test workflow. Preserve dataset/evaluator baseline and do not change CI secrets or enforce release gates outside the requested scope.",
+      "validation_evidence": "Documented comparison baseline, repeatable test command, and staged CI/test change where requested.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/experiments",
+      "object_ids": [
+        "experiment-group",
+        "experiment-ranking"
+      ]
+    },
+    {
+      "id": "project-and-resource-lifecycle",
+      "name": "Projects and resource lifecycle",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect before creating; do not delete projects, datasets, prompts, runs, or traces without confirmation and exact identifiers.",
+      "validation_evidence": "Target resource identity and state captured; destructive actions have exact-ID confirmation and completion evidence.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/projects",
+      "object_ids": [
+        "project",
+        "project-collaborator"
+      ]
+    },
+    {
+      "id": "agent-control-runtime-guardrails",
+      "name": "Agent Control input/output guardrails and runtime enforcement",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Stage the documented SDK/runtime changes in an owned application. For SaaS, require token control CRUD capabilities and Owner or Editor project access for binding/runtime use; a control attachment clones the source control. Record clone IDs only if exposed and use documented binding-removal actions. The public setup guide does not document tenant runtime-JWT acquisition; report that gap if its sample cannot initialize. Do not claim protection is active until both expected allow and block cases validate in staging.",
+      "validation_evidence": "Global control ID, bound Agent Stream ID, any exposed clone ID, staged runtime configuration, sanitized control result evidence, and separate allow/block test outcomes.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/agent-control/overview",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/concepts/agent-control/overview",
+        "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/create-a-control",
+        "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/initialize-and-configure-agent-control",
+        "https://docs.agentcontrol.dev/concepts/evaluators/built-in-evaluators",
+        "https://docs.agentcontrol.dev/how-to/decorate-llm-tool-calls"
+      ],
+      "object_ids": [
+        "agent-control-global-policy",
+        "agent-control-stream-binding-clone",
+        "agent-control-evaluator-policy-type",
+        "agent-control-agent-registration"
+      ]
+    },
+    {
+      "id": "protect-invoke-api-compatibility",
+      "name": "Protect invoke API compatibility with Agent Control",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "The API reference still lists /v2/protect/invoke from the Galileo v2 OpenAPI source. Treat it as a separate compatibility surface; verify that the target deployment supports it before recommending or invoking it.",
+      "validation_evidence": "Product release, actual available endpoint, auth scope, and whether the task requires legacy Protect or Agent Control recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/protect/invoke"
+    },
+    {
+      "id": "annotations-human-feedback-and-evaluator-improvement",
+      "name": "Annotations, Annotation Queues, human feedback, and evaluator improvement",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use the documented UI/API for requested annotations, feedback templates/ratings, or Annotation Queue work. Check project/queue collaborator roles, record visibility, and how feedback changes evaluator tuning before applying.",
+      "validation_evidence": "Requested annotation/feedback or queue ID, role, trace scope, and sanitized persisted result recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/annotations/overview",
+      "object_ids": [
+        "annotation-queue",
+        "annotation-queue-field",
+        "annotation-queue-record-user",
+        "annotation-template-rating",
+        "feedback-template-rating-v2"
+      ]
+    },
+    {
+      "id": "signals-and-agent-stream-investigation",
+      "name": "Signals and Agent Stream failure investigation",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Read and summarize authorized signal/trace metadata; assistant suggestions remain unapproved recommendations until the user requests a fix.",
+      "validation_evidence": "Signal identifiers, affected stream/time window, evidence references, and sanitized findings.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/signals"
+    },
+    {
+      "id": "onprem-ai-assistant-investigation",
+      "name": "On-premises AI Assistant investigation",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Available only on on-premises, standalone, and custom deployments. The assistant is read-only and has no cross-conversation memory; verify its cited traces and apply requested fixes through a separate supported workflow.",
+      "validation_evidence": "Deployment, LLM integration, assistant question, cited trace/session evidence, and independently checked recommendation recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/ai-assistant",
+      "deployments": [
+        "on-premises"
+      ]
+    },
+    {
+      "id": "agent-stream-alerts",
+      "name": "Agent Stream alerts and notification validation",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Configure evaluator, aggregation, threshold, and time window in the requested Agent Stream. Review email recipients and Slack/generic webhook destination; keep webhook tokens/passwords in secure entry (the product stores them write-only). Send only a safe staging test event.",
+      "validation_evidence": "Alert identity/settings, evaluator readiness, destination owner, notification Active/Failed state, and one safe email or webhook test event.",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/basics/set-up-alerts-on-logs",
+      "object_ids": [
+        "agent-stream-alert"
+      ]
+    },
+    {
+      "id": "trends-dashboards-and-widgets",
+      "name": "Trends dashboards, sections, widgets, and favorites",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Inspect the target release and actual dashboard API/UI support before editing; scope changes to the requested Agent Stream/dashboard and review visibility and deletion effects.",
+      "validation_evidence": "Dashboard and widget IDs, owner/access, saved configuration, and populated result in the intended stream.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/list-dashboards",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/create-widget"
+      ]
+    },
+    {
+      "id": "run-insights-settings",
+      "name": "Run Insights configuration and visibility",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use current tenant-supported Run Insights settings API only after checking the exact schema, scope, and existing state; avoid assuming SaaS parity from the OpenAPI listing.",
+      "validation_evidence": "Existing/new settings, target project/stream, operation response, and resulting insights view recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/run_insights_settings/get-settings",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/run_insights_settings/upsert-insights-config"
+      ]
+    },
+    {
+      "id": "tokenomics-usage-and-cost-attribution",
+      "name": "Tokenomics provider integrations, fiscal calendar, organization hierarchy, adoption, and cost attribution",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "For supported AI coding tools only (Claude Code, Codex, Cursor, GitHub Copilot, Windsurf), configure requested provider integrations, fiscal calendar, and approved Workday hierarchy through Tokenomics Settings with secure credential entry and email-join/privacy review. This is not general app LLM accounting. Data refreshes daily without backfill; costs are provider-reported or estimated.",
+      "validation_evidence": "Admin role and deployment path confirmed; provider integrations, fiscal calendar and hierarchy state recorded; daily refresh/no-backfill and vendor cost provenance included in the report.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics",
+      "object_ids": [
+        "tokenomics-provider-connection",
+        "tokenomics-fiscal-calendar",
+        "tokenomics-organization-directory"
+      ]
+    },
+    {
+      "id": "model-pricing-and-integration-costs",
+      "name": "Model pricing settings and evaluator integration cost review",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Only an organization admin may change model prices through the documented UI; review affected model and price before save. Price edits affect new logs/experiments, not history; Integration Costs is read-only for organization users and tracks LLM-as-a-judge provider cost.",
+      "validation_evidence": "Before/after price, effective future-cost behavior, role, and Integration Costs time range/source recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/costs/model-pricing-settings",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/concepts/costs/integration-costs"
+      ],
+      "object_ids": [
+        "model-price",
+        "integration-cost-report"
+      ]
+    },
+    {
+      "id": "access-control-api-keys-and-roles",
+      "name": "API keys, capabilities, project collaborators, and user roles",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Apply least privilege; resource role and API token capability must both allow an operation. For SaaS, check whether Unified Identity with centralized RBAC disables product role assignment. Never collect or disclose key values.",
+      "validation_evidence": "Requested action mapped to current capability plus collaborator role and identity model; key scope verified without exposing the secret.",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/capabilities",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/concepts/access-control",
+        "https://agent-observability-docs.splunk.com/references/faqs/find-keys"
+      ]
+    },
+    {
+      "id": "organization-users-groups-and-invitations",
+      "name": "Organization user invites, group membership, and roles",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use the deployment-specific identity workflow and documented UI/API for the exact organization; verify Unified Identity restrictions before changing product roles and review recipient/role scope.",
+      "validation_evidence": "Invited user or group ID, effective role/membership, propagation state, and access check without exposing personal data unnecessarily.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/add-users-and-assign-roles",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/groups/add-user-to-group"
+      ],
+      "object_ids": [
+        "user-invitation-role",
+        "group-membership",
+        "authorization-role-capability-policy",
+        "onprem-role-assignment"
+      ]
+    },
+    {
+      "id": "api-key-creation-rotation-and-deletion",
+      "name": "API key creation, rotation, inventory, and deletion",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use documented product API/UI with least privilege; write new key material only to a protected secret store/file, never a transcript. Confirm exact key identity and dependent clients before revocation.",
+      "validation_evidence": "Key ID/scope and creation or revocation state verified without disclosing the value; dependent client health checked after rotation.",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/api_keys/create-api-key",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/api-reference/api_keys/delete-api-key"
+      ],
+      "object_ids": [
+        "onprem-ao-api-key",
+        "saas-observability-access-token"
+      ]
+    },
+    {
+      "id": "sso-and-enterprise-identity",
+      "name": "SSO and enterprise identity integration",
+      "status": "handoff",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Coordinate with the identity and product administrators; do not change production SSO, IdP secrets, redirect URIs, or user access without a reviewed owner-approved plan.",
+      "validation_evidence": "Current docs, IdP/tenant owner, tested identity path, and rollback/contact handoff captured.",
+      "source_url": "https://agent-observability-docs.splunk.com/security/sso"
+    },
+    {
+      "id": "mcp-server-capabilities-and-maturity",
+      "name": "Splunk Agent Observability MCP server setup and available actions",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "The docs label the MCP server under construction. Inspect live tool schemas, endpoint, auth, and action side effects; do not treat documentation examples as proof a tool is generally available.",
+      "validation_evidence": "Current server version/status and exposed tool names/schemas verified; no committed API key.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/mcp/setup-splunk-ao-mcp"
+    },
+    {
+      "id": "mcp-server-client-configuration",
+      "name": "MCP client setup in a supported IDE",
+      "status": "direct_apply",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use the current under-construction MCP setup guide and target IDE configuration surface. Stage a tenant-specific URL and secret reference without committing key material; verify the connected server exposes the expected tools before requesting actions.",
+      "validation_evidence": "IDE/client config location, tenant endpoint, secret storage method, connection status, live tool list/schema, and one safe read-only tool result.",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/mcp/setup-splunk-ao-mcp",
+      "object_ids": [
+        "mcp-client-connection"
+      ]
+    },
+    {
+      "id": "api-sdk-endpoints-and-retries",
+      "name": "REST API and SDK endpoints, authentication, and retry behavior",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Follow current endpoint and authentication reference for the exact SaaS realm or on-premises instance; never infer route shapes from legacy Galileo APIs.",
+      "validation_evidence": "Exact deployment endpoint, auth type, supported method, and retry strategy verified against current docs.",
+      "source_url": "https://agent-observability-docs.splunk.com/api/getting-started"
+    },
+    {
+      "id": "saas-billing-and-ingest-limits",
+      "name": "SaaS span/Luna usage billing and system limits",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Review current contracted SKU limits before workload tests or production changes; do not infer billable units from general marketing material.",
+      "validation_evidence": "Current subscription usage, span/token dimensions, throughput limits, and dropped-span behavior checked.",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/billing-and-usage"
+    },
+    {
+      "id": "cisco-cloud-control-entry-point",
+      "name": "Agent Observability access from Cisco Cloud Control",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Treat Cisco Cloud Control as a product entry point/integration surface; do not conflate its AI Assistant or AI Canvas with the Agent Observability application features.",
+      "validation_evidence": "Current Cloud Control availability and the specific linked Agent Observability tenant are checked.",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/cisco-cloud-control"
+    },
+    {
+      "id": "troubleshooting-release-and-feature-availability",
+      "name": "Release notes, common errors, and troubleshooting",
+      "status": "validate_only",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Use current deployment-specific official release/error docs; report only sanitized diagnostics and retain manual/support gaps.",
+      "validation_evidence": "Release date/version, error reference, observed sanitized symptom, and validation result recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/references/faqs/troubleshooting"
+    },
+    {
+      "id": "rankings-capability-and-availability",
+      "name": "Rankings capability and tenant-supported workflow",
+      "status": "render_runbook",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Verify the o11y_edit_ranking_project_shared capability, resource role, deployment, and an actual supported edit interface; do not infer ranking configuration steps from the capability name alone.",
+      "validation_evidence": "Target ranking, owner role, exposed edit interface, and persisted ranking state or an explicit unsupported gap recorded.",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/capabilities"
+    },
+    {
+      "id": "ai-infrastructure-monitoring-adjacent-workflow",
+      "name": "Adjacent Splunk Observability Cloud AI Infrastructure Monitoring",
+      "status": "handoff",
+      "owners": [
+        "splunk-agent-observability-setup"
+      ],
+      "automation_boundary": "Route AI infrastructure telemetry collection (such as GPUs, model serving, or vector databases) to the AI Infrastructure Monitoring and OTel Collector workflows; do not claim it is configured by Agent Observability application instrumentation.",
+      "validation_evidence": "Infrastructure scope, supported collector/integration, destination, and child workflow validation evidence are recorded.",
+      "source_url": "https://help.splunk.com/en/splunk-observability-cloud/observability-for-ai/splunk-ai-infrastructure-monitoring"
+    }
+  ]
+}

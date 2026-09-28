@@ -4,15 +4,32 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
-
-source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
-if ! load_observability_cloud_settings; then
-    echo "ERROR: Could not load the selected Observability Cloud settings." >&2
-    exit 1
+CANONICAL_REPO=false
+if [[ -f "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh" \
+    && -f "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/SKILL.md" ]]; then
+    CANONICAL_REPO=true
 fi
-if [[ -n "${SPLUNK_O11Y_REALM:-}" ]]; then export SPLUNK_O11Y_REALM; fi
 
-DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-database-monitoring-rendered"
+# Credential loading is only needed for --api. Keep render/help usable when
+# this skill directory is installed without the parent repository helpers.
+if [[ "${CANONICAL_REPO}" == "true" ]]; then
+    source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
+fi
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+require_arg() {
+    if [[ "$2" -lt 2 ]]; then
+        log "ERROR: Option '$1' requires a value."
+        return 1
+    fi
+}
+reject_secret_arg() {
+    log "ERROR: $1 would expose a secret in process listings. Write the secret to a chmod 600 file and use $2."
+    return 1
+}
+
+# A copied skill must never place output in an inferred parent directory.
+DEFAULT_OUTPUT_DIR="${PWD}/splunk-observability-database-monitoring-rendered"
 DEFAULT_SPEC="${SKILL_DIR}/template.example"
 
 usage() {
@@ -20,7 +37,7 @@ usage() {
 Splunk Observability Database Monitoring setup (collector/chart 0.158.0)
 
 Usage:
-  bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh [mode] [options]
+  bash scripts/setup.sh [mode] [options]
 
 Modes:
   --render                  Render production DBMon assets (default)

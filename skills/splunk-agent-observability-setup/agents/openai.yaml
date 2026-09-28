@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Agent Observability Setup"
+  short_description: "Instrument, evaluate, and operate agentic AI safely."
+  default_prompt: "Use $splunk-agent-observability-setup to inspect the target deployment, perform the requested Splunk Agent Observability setup or investigation, and validate it with sanitized evidence. Distinguish SaaS, on-premises, legacy Galileo, and legacy AI Agent Monitoring workflows."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,8 @@
+[mcp_servers.splunk-cisco-skills]
+command = "bash"
+args = ["-c", 'repo_root=$(git rev-parse --show-toplevel) || exit 1; exec python3 -I "$repo_root/agent/run-splunk-cisco-skills-mcp.py"']
+
+[mcp_servers.splunk-cisco-skills.env]
+SPLUNK_SKILLS_MCP_ALLOW_GENERIC_EXECUTION = "0"
+SPLUNK_SKILLS_MCP_ALLOW_MUTATION = "0"
+SPLUNK_SKILLS_MCP_ENABLE_EXECUTION = "1"

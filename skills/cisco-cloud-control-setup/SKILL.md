@@ -4,7 +4,7 @@ description: "Use when the user asks to prepare Cisco Cloud Control, AgenticOps,
   Cloud Control Workflows, or governed Cisco/Splunk agent execution workflows. Render, validate, doctor,
   and optionally execute delegated setup plans for Cisco Cloud Control adoption, AI Canvas readiness,
   Cloud Control Studio handoffs, official Cloud Control feature coverage, Cisco Workflows API readiness,
-  delegated Cisco Data Fabric architecture coverage, MCP connectors, Splunk AI Agent Monitoring,
+  delegated Cisco Data Fabric architecture coverage, MCP connectors, Agent Observability access handoffs,
   Observability content, and Cisco domain readiness."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
 metadata:
@@ -90,7 +90,11 @@ executable child-skill handoffs where supported.
    `mcp.splunk_mcp_url` is set, because the child skill otherwise needs
    Splunk credentials to derive the endpoint. ThousandEyes MCP can render
    independently.
-3. **Agent observability**: delegate Splunk AI Agent Monitoring setup.
+3. **Splunk Agent Observability in Cisco Cloud Control**: use
+   `splunk-agent-observability-setup` for the Agent Observability app, SaaS
+   access, and its telemetry/evaluation workflows. The executable
+   `agent-observability` child section below remains the legacy Splunk AI Agent
+   Monitoring APM workflow; use it only when that APM experience is requested.
 4. **Observability content**: delegate dashboards and detectors to existing
    Observability skills.
 5. **Official Cloud Control surfaces**: render coverage for onboarding,

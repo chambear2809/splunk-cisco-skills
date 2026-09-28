@@ -23,7 +23,7 @@ FILTER_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:/-]{0,255}$")
 METRIC_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:/-]{0,511}$")
 TARGET_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 RECEIVER_PATTERN = re.compile(
-    r"^(?:postgresql|sqlserver|oracledb|mysql)/[A-Za-z0-9_-]{1,128}$"
+    r"^(?:postgresql|sqlserver|oracledb|mysql|mongodb)/[A-Za-z0-9_-]{1,128}$"
 )
 SECRET_KEY_PARTS = (
     "accesskey",

@@ -72,8 +72,9 @@ Configuration:
   --luna-recompute-limit NUM    Log-record recompute batch limit (default: 100)
   --galileo-api-base URL        Galileo REST API base (default: https://api.galileo.ai)
   --galileo-console-url URL     Galileo console URL; used to derive API base when supplied
-  --tenant-onboarding-date DATE Tenant onboarding date (YYYY-MM-DD). Operational apply
-                                is supported only before the 2026-08-07 docs boundary.
+  --tenant-onboarding-date DATE Tenant onboarding date (YYYY-MM-DD). Passes this
+                                repository's conservative apply gate only before 2026-08-07;
+                                this is not a vendor migration cutoff.
   --galileo-otel-endpoint URL   Galileo OTLP traces endpoint
   --experiment-id ID            Galileo experiment ID for export/evaluation assets
   --metrics-testing-id ID       Galileo metrics testing ID for export/evaluation assets

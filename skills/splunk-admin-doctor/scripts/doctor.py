@@ -378,14 +378,25 @@ PRODUCT_ROUTE_CATALOG = [
     {
         "id": "splunk-observability",
         "name": "Splunk Observability Cloud",
-        "aliases": ["splunk observability", "observability cloud", "splunk_ta_sim", "splunk_ta_otel"],
+        "aliases": [
+            "splunk observability",
+            "observability cloud",
+            "agent observability",
+            "splunk agent observability",
+            "splunk_ta_sim",
+            "splunk_ta_otel",
+        ],
         "handoff_skills": [
             "splunk-observability-cloud-integration-setup",
             "splunk-observability-deep-native-workflows",
             "splunk-observability-native-ops",
+            "splunk-agent-observability-setup",
             "lemonade-splunk-otel",
         ],
-        "covered_skill_names": ["lemonade-splunk-otel"],
+        "covered_skill_names": [
+            "lemonade-splunk-otel",
+            "splunk-agent-observability-setup",
+        ],
         "covered_skill_prefixes": ["splunk-observability-"],
         "source_doc": SOURCE_DOCS["products"],
     },
