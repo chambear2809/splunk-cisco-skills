@@ -1,5 +1,5 @@
 schema_version: 1
-skill_count: 169
+skill_count: 170
 alias_count: 0
 shared_sections:
   local_skill_mcp_server: |-
@@ -124,6 +124,9 @@ taxonomy:
     - product: "splunk-observability-cloud"
       id: "collection-and-instrumentation"
       name: "Collection and Instrumentation"
+    - product: "splunk-observability-cloud"
+      id: "agentic-application-observability"
+      name: "Agentic Application Observability"
     - product: "splunk-observability-cloud"
       id: "galileo-ai-observability"
       name: "Galileo AI Observability"
@@ -1108,10 +1111,18 @@ skills:
   - name: "splunk-observability-ai-agent-monitoring-setup"
     path: "skills/splunk-observability-ai-agent-monitoring-setup/SKILL.md"
     target: "Splunk AI Agent Monitoring + AI Infrastructure Monitoring"
-    purpose: "Render, validate, diagnose, and safely apply AI Agent Monitoring setup plans, including GenAI Python instrumentation packages, instrumentation-side evaluations, histogram collector readiness, HEC/Log Observer Connect handoffs, dashboards, detectors, and full AI Infrastructure Monitoring product coverage"
-    command_summary: "Render, validate, diagnose, and safely apply Splunk Observability Cloud AI Agent Monitoring setup plans."
+    purpose: "Render, validate, diagnose, and safely apply the legacy Splunk AI Agent Monitoring APM setup plans, including GenAI Python instrumentation packages, instrumentation-side evaluations, histogram collector readiness, HEC/Log Observer Connect handoffs, dashboards, detectors, and AI Infrastructure Monitoring coverage; for the separate current Splunk Agent Observability product use splunk-agent-observability-setup"
+    command_summary: "Render, validate, and safely apply legacy Splunk AI Agent Monitoring APM setup plans; route current Splunk Agent Observability to its dedicated skill."
     product: "splunk-observability-cloud"
     capability: "collection-and-instrumentation"
+    status: "canonical"
+  - name: "splunk-agent-observability-setup"
+    path: "skills/splunk-agent-observability-setup/SKILL.md"
+    target: "Splunk Agent Observability SaaS and on-premises product workflows"
+    purpose: "Operate the post-rebrand Splunk Agent Observability product across SaaS and on-premises: discover access, instrument agent applications, configure evaluations and experiments, validate Agent Control, review Signals and Tokenomics, manage product MCP/API/SDK paths, and route legacy Galileo and APM AI Monitoring separately"
+    command_summary: "Set up, instrument, evaluate, secure, and troubleshoot Splunk Agent Observability across SaaS and on-premises deployments."
+    product: "splunk-observability-cloud"
+    capability: "agentic-application-observability"
     status: "canonical"
   - name: "splunk-observability-coding-agent-instrumentation-setup"
     path: "skills/splunk-observability-coding-agent-instrumentation-setup/SKILL.md"
@@ -1140,8 +1151,8 @@ skills:
   - name: "splunk-observability-database-monitoring-setup"
     path: "skills/splunk-observability-database-monitoring-setup/SKILL.md"
     target: "Splunk Observability Cloud Database Monitoring"
-    purpose: "Render, collector-validate, safely apply/roll back Kubernetes and Linux DBMon, and emit Windows action handoffs for Microsoft SQL Server, MySQL 5.7+, MariaDB 10.5+, Oracle, and provider-paired PostgreSQL; records explain-plan gaps for MySQL 5.7 and MariaDB; pins Collector/chart 0.158.0 and enforces support matrices, isolated metrics/event pipelines, single scrape ownership, reviewed sizing/transport/secrets, APM/AI handoffs, and applicable product UI evidence"
-    command_summary: "Render and validate Splunk Observability Cloud Database Monitoring collector configuration for PostgreSQL, Microsoft SQL Server, and Oracle Database through the Splunk OTel Collector. Keeps secrets out of chat, argv, and rendered files; DB credentials are referenced through Kubernetes Secrets or local env vars."
+    purpose: "Render, collector-validate, safely apply/roll back Kubernetes and Linux DBMon, and emit Windows action handoffs for Microsoft SQL Server, MySQL, MariaDB, MongoDB, Oracle, and provider/version-specific PostgreSQL; enforces MongoDB Atlas/self-managed query-event limits, MySQL/MariaDB explain-plan gaps, current engine/platform support matrices, isolated metrics/event pipelines, one scrape owner, reviewed sizing/transport/secrets, and APM/AI/UI evidence"
+    command_summary: "Render and validate Splunk Observability Cloud Database Monitoring collector configuration for MongoDB, PostgreSQL, Microsoft SQL Server, MySQL, MariaDB, and Oracle through the Splunk OTel Collector. Keeps secrets out of chat, argv, and rendered files; DB credentials are referenced through Kubernetes Secrets or local env vars."
     product: "splunk-observability-cloud"
     capability: "collection-and-instrumentation"
     status: "canonical"

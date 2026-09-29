@@ -242,7 +242,7 @@
     },
     {
       "path": "tests/test_splunk_observability_database_monitoring_setup.py",
-      "line": 2900,
+      "line": 3089,
       "rule_id": "aws-access-token",
       "line_sha256": "c562d1c8d092d2f3bea7981654ce3e49746af0c0d73698465e0d308a091c81fd",
       "category": "synthetic-security-test"
@@ -263,21 +263,21 @@
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3216,
+      "line": 3346,
       "rule_id": "private-key",
       "line_sha256": "673a0a9100129e94f2d983c24a2c8429ed90e77243a8dccc34f7acb193204f57",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3218,
+      "line": 3348,
       "rule_id": "private-key",
       "line_sha256": "adaad9d9280d7199d1a8507e2b972789ed7aa0e87f15feab619ebbc80193a4cc",
       "category": "synthetic-security-test"
     },
     {
       "path": "tests/test_splunk_observability_otel_collector_setup.py",
-      "line": 3220,
+      "line": 3350,
       "rule_id": "private-key",
       "line_sha256": "4915d3d567984166387437262abbaa7731c2e7d061bb2466e79576aa770c90f8",
       "category": "synthetic-security-test"

@@ -1,6 +1,6 @@
 # Splunk 10.5 Skill Compatibility
 
-_Generated from `skills/catalog.yaml` (SHA-256 `1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
+_Generated from `skills/catalog.yaml` (SHA-256 `3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
 
 This matrix classifies every repository skill against Splunk Cloud Platform
 `10.5.2605`. It does not invent a self-managed Splunk Enterprise 10.5 runtime:
@@ -14,7 +14,7 @@ self-managed workflows retain the current public 10.4 baseline.
 | Conditional | 90 | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | Blocked | 0 | Splunk Cloud Platform 10.5.2605: blocked for the primary package because no repo-selected or otherwise approved release has 10.5 compatibility evidence; render or hand off only unless an explicit approved override is recorded. |
 | Self-managed 10.4 | 9 | Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline. |
-| Not applicable | 61 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
+| Not applicable | 62 | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | Delegated | 6 | Splunk Cloud Platform 10.5.2605: delegated. Compatibility is determined by the canonical replacement or selected child skill; this compatibility alias or router does not own a runtime or package. |
 
 `Blocked` means no repo-selected or otherwise approved primary package
@@ -64,6 +64,7 @@ topology, customer-managed runtime, or product-specific prerequisites.
 | `lemonade-splunk-otel` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `splunk-admin-doctor` | Canonical | Supported | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable. |
 | `splunk-agent-management-setup` | Canonical | Conditional | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
+| `splunk-agent-observability-setup` | Canonical | Not applicable | No direct Splunkbase package | No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs. |
 | `splunk-ai-assistant-setup` | Canonical | Conditional | primary: 7245 `Splunk_AI_Assistant_Cloud` (latest 2.2.0: supported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `splunk-ai-ml-toolkit-setup` | Canonical | Conditional | primary: 2882 `Splunk_SA_Scientific_Python_linux_x86_64` (latest 4.3.4: supported), primary: 2883 `Splunk_SA_Scientific_Python_windows_x86_64` (latest 4.3.4: supported), primary: 2881 `Splunk_SA_Scientific_Python_darwin_x86_64` (latest 4.3.4: supported), primary: 6785 `Splunk_SA_Scientific_Python_darwin_arm64` (latest 4.3.4: supported), primary: 2890 `Splunk_ML_Toolkit` (latest 6.0.2: supported), primary: 4607 `mltk-container` (latest 5.2.4: supported), legacy-replaced: 6843 `Splunk_App_for_Anomaly_Detection` (latest 1.1.2: unsupported), legacy-replaced: 2884 `Splunk_SA_Scientific_Python_linux_x86` (latest 1.3: unsupported), legacy-replaced: 6415 `Smart_Alerts_Assistant` (latest 0.1.20: unsupported) | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |
 | `splunk-amazon-kinesis-firehose-setup` | Canonical | Conditional | No direct Splunkbase package | Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline. |

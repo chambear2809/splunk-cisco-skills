@@ -1,0 +1,847 @@
+{
+  "schema_version": 1,
+  "last_verified": "2026-09-28",
+  "basis": "Public Splunk Agent Observability documentation index, SaaS capabilities, product guides, and Python SDK reference. A documented route is a candidate action, not proof of tenant entitlement or live success.",
+  "api_reference_groups": [
+    "annotation",
+    "annotation_queue",
+    "annotation_queue_records",
+    "api_keys",
+    "auth",
+    "data",
+    "datasets",
+    "experiment",
+    "feedback",
+    "groups",
+    "health",
+    "integrations",
+    "log_stream",
+    "logstream-insights",
+    "organization-jobs",
+    "projects",
+    "protect",
+    "run_insights_settings",
+    "system_users",
+    "trace",
+    "trends_dashboard",
+    "users"
+  ],
+  "objects": [
+    {
+      "id": "project",
+      "deployment": "both",
+      "api_groups": [
+        "projects"
+      ],
+      "create": "documented: Projects.create / create_project or Projects API Create Project",
+      "update": "documented: rename through Update Project; share through collaborator actions",
+      "delete": "documented: Delete Project by exact ID, including dependent objects",
+      "verify": "Get Project by exact ID and inspect collaborator roles",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/python/reference/projects"
+    },
+    {
+      "id": "project-collaborator",
+      "deployment": "both",
+      "api_groups": [
+        "projects"
+      ],
+      "create": "documented: Create User or Group Project Collaborators",
+      "update": "documented: Update User or Group Project Collaborator role",
+      "delete": "documented: Delete User or Group Project Collaborator",
+      "verify": "List project collaborators and confirm effective role",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/projects/create-user-project-collaborators"
+    },
+    {
+      "id": "agent-stream",
+      "deployment": "both",
+      "api_groups": [
+        "log_stream"
+      ],
+      "create": "documented: Create Log Stream in a project; SDK create_agent_stream where supported",
+      "update": "documented: Update Log Stream and metric settings",
+      "delete": "documented: Delete Log Stream by exact ID",
+      "verify": "Get Log Stream and confirm intended project and metric settings",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/log_stream/create-log-stream"
+    },
+    {
+      "id": "trace-span-session",
+      "deployment": "both",
+      "api_groups": [
+        "trace"
+      ],
+      "create": "documented: SDK logger/OTel trace and spans; Trace API Create Session",
+      "update": "documented: Update Trace or Update Span only where tenant API supports it",
+      "delete": "documented: filtered Delete Traces, Delete Spans, or Delete Sessions after exact filter review",
+      "verify": "Query unique marker and inspect trace, span, session, stream, and ingestion time",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/logging/splunk-ao-logger"
+    },
+    {
+      "id": "trace-data-deletion-job",
+      "deployment": "verify",
+      "api_groups": [
+        "organization-jobs"
+      ],
+      "create": "not-applicable: this is an organization-wide data deletion operation, not an object to create for coverage validation",
+      "update": "not-applicable: deletion jobs are not edited",
+      "delete": "documented in REST reference: Delete By Metadata starts organization-wide deletion; requires a separately scoped data-deletion request, exact filter and match count",
+      "verify": "Get Org Job Status and confirm exact metadata filter and completion",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/organization-jobs/delete-by-metadata",
+      "risk": "destructive_organization_wide"
+    },
+    {
+      "id": "saved-view",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: create a view from Agent Stream or experiment filter UI",
+      "update": "documented: open saved view actions menu and follow target UI management options; verify edit operation before applying",
+      "delete": "not-documented: guide shows a management menu but does not specify delete; inspect target UI first",
+      "verify": "Reopen saved view and confirm saved filters return intended data",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/basics/create-views"
+    },
+    {
+      "id": "dataset",
+      "deployment": "both",
+      "api_groups": [
+        "datasets"
+      ],
+      "create": "documented: SDK create_dataset, UI Create dataset, or REST Create Dataset",
+      "update": "documented: SDK/API content, metadata, and version actions",
+      "delete": "documented: SDK/API Delete Dataset by exact ID",
+      "verify": "Get dataset, row count, field mapping, and current version",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/datasets"
+    },
+    {
+      "id": "dataset-record-version",
+      "deployment": "both",
+      "api_groups": [
+        "datasets"
+      ],
+      "create": "documented: add rows or synthetic records; dataset content changes create versions",
+      "update": "documented: Update Dataset Content, Upsert Dataset Content, or Update Dataset Version",
+      "delete": "documented: remove selected rows/content through supported dataset workflow; verify version behavior",
+      "verify": "Query exact dataset version and record IDs, then confirm count and content safely",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/datasets/update-dataset-content"
+    },
+    {
+      "id": "dataset-collaborator",
+      "deployment": "both",
+      "api_groups": [
+        "datasets"
+      ],
+      "create": "documented: Create User or Group Dataset Collaborators",
+      "update": "documented: Update User or Group Dataset Collaborator role",
+      "delete": "documented: Delete User or Group Dataset Collaborator",
+      "verify": "Read dataset collaborators and effective roles",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/datasets/create-user-dataset-collaborators"
+    },
+    {
+      "id": "prompt-template",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: UI Create prompt or SDK create_prompt",
+      "update": "documented: SDK update_prompt renames a global template; content edits require a separately verified version/create workflow",
+      "delete": "documented: SDK delete_prompt by exact ID",
+      "verify": "Read prompt name, version, variables, and rendered safe example",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/prompts",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/sdk-api/python/reference/prompts"
+      ]
+    },
+    {
+      "id": "experiment-run",
+      "deployment": "both",
+      "api_groups": [
+        "experiment"
+      ],
+      "create": "documented: SDK run_experiment/create_experiment, playground, unit test, or REST Create Experiment",
+      "update": "documented: Update Experiment and supported run tags",
+      "delete": "documented: Delete Experiment by exact ID",
+      "verify": "Read run ID, dataset/prompt/evaluator versions, results, and status",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/experiments"
+    },
+    {
+      "id": "experiment-group",
+      "deployment": "both",
+      "api_groups": [
+        "experiment"
+      ],
+      "create": "documented: set experiment_group during SDK run/create or select new group while moving in UI; SDK requires splunk-ao >=2.2.0",
+      "update": "documented: move experiments between groups and edit group ranking in UI",
+      "delete": "not-documented: inspect current UI for group deletion before attempting it",
+      "verify": "List experiment groups and confirm member runs and ranking",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/experiment-groups"
+    },
+    {
+      "id": "experiment-ranking",
+      "deployment": "both",
+      "api_groups": [
+        "experiment"
+      ],
+      "create": "documented: configure Ranking weighted evaluator criteria for an experiment group in UI",
+      "update": "documented: edit the group's ranking criteria in UI",
+      "delete": "not-documented: verify whether ranking reset/removal is supported in target UI",
+      "verify": "Reopen ranking and inspect ordered results; SaaS needs ranking edit capability",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/experiments/experiment-groups"
+    },
+    {
+      "id": "evaluator-assignment-sampling",
+      "deployment": "both",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: assign and enable supported evaluator on Agent Stream via SDK enable_evaluators or metric-settings API; configure sampling in UI after schema check",
+      "update": "documented: SDK enable_evaluators replaces enabled set; metric-settings PATCH sets scorer IDs/filters; sampling API fields are unverified",
+      "delete": "documented: remove assignment; do not delete global evaluator unless separately requested",
+      "verify": "Read stream evaluator state and observe result on approved trace",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/logging/configure-evaluators/configure-evaluators"
+    },
+    {
+      "id": "preset-evaluator",
+      "deployment": "both",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: select preset evaluator or create preset scorer version where exposed",
+      "update": "documented: tune supported preset configuration through evaluator/stream interface",
+      "delete": "not-applicable: shipped presets are product assets; remove assignment instead",
+      "verify": "Check evaluator name, availability, version, and a safe result",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/evaluator-comparison",
+      "variants": [
+        {
+          "name": "Action Advancement",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/action-advancement.md"
+        },
+        {
+          "name": "Action Completion",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/action-completion.md"
+        },
+        {
+          "name": "Agent Efficiency",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/agent-efficiency.md"
+        },
+        {
+          "name": "Agent Flow",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/agent-flow.md"
+        },
+        {
+          "name": "Conversation Quality",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/conversation-quality.md"
+        },
+        {
+          "name": "Reasoning Coherence",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/reasoning-coherence.md"
+        },
+        {
+          "name": "Tool Selection Quality",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/tool-selection-quality.md"
+        },
+        {
+          "name": "Tool Error",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/tool-error.md"
+        },
+        {
+          "name": "User Intent Change",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/agentic/intent-change.md"
+        },
+        {
+          "name": "Tone",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/expression-and-readability/tone.md"
+        },
+        {
+          "name": "Visual Quality",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/multimodal-quality/visual-quality.md"
+        },
+        {
+          "name": "Visual Fidelity",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/multimodal-quality/visual-fidelity.md"
+        },
+        {
+          "name": "Interruption Detection",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/multimodal-quality/interruption-detection.md"
+        },
+        {
+          "name": "Ground Truth Adherence",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/response-quality/ground-truth-adherence.md"
+        },
+        {
+          "name": "Correctness",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/response-quality/correctness.md"
+        },
+        {
+          "name": "Instruction Adherence",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/response-quality/instruction-adherence.md"
+        },
+        {
+          "name": "Chunk Relevance",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/retrieval-quality/chunk-relevance.md"
+        },
+        {
+          "name": "Context Relevance (Query Adherence)",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/retrieval-quality/context-relevance.md"
+        },
+        {
+          "name": "Context Precision",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/retrieval-quality/context-precision.md"
+        },
+        {
+          "name": "Precision @ K",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/retrieval-quality/precision-at-k.md"
+        },
+        {
+          "name": "Context Adherence",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/generation-quality/context-adherence.md"
+        },
+        {
+          "name": "Completeness",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/rag/generation-quality/completeness.md"
+        },
+        {
+          "name": "Prompt Injection",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/safety-and-compliance/prompt-injection.md"
+        },
+        {
+          "name": "PII",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/safety-and-compliance/pii.md"
+        },
+        {
+          "name": "Sexism",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/safety-and-compliance/sexism.md"
+        },
+        {
+          "name": "Toxicity",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/safety-and-compliance/toxicity.md"
+        },
+        {
+          "name": "SQL Correctness",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/text2sql/sql-correctness.md"
+        },
+        {
+          "name": "SQL Adherence",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/text2sql/sql-adherence.md"
+        },
+        {
+          "name": "SQL Injection",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/text2sql/sql-injection.md"
+        },
+        {
+          "name": "SQL Efficiency",
+          "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/text2sql/sql-efficiency.md"
+        }
+      ]
+    },
+    {
+      "id": "custom-llm-judge-evaluator",
+      "deployment": "both",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: Evaluators > Create evaluator in UI or SDK custom evaluator; scorer version API",
+      "update": "documented: create/update version, test, and apply autotune where entitled",
+      "delete": "documented: delete owned evaluator/scorer by exact ID",
+      "verify": "Test against safe manual input or labeled dataset and inspect version and judge integration",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/custom-evaluators-ui-llm"
+    },
+    {
+      "id": "custom-code-evaluator",
+      "deployment": "on-premises",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: register custom code evaluator in supported on-premises deployment",
+      "update": "documented: register a new version after code validation",
+      "delete": "documented: delete owned evaluator/scorer by exact ID where supported",
+      "verify": "Run documented test and inspect version, permissions, and result",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/custom-evaluators-ui-code"
+    },
+    {
+      "id": "composite-evaluator",
+      "deployment": "on-premises",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: create code-based custom evaluator with required_metrics dependencies in on-premises UI or SDK",
+      "update": "documented: revise definition/version after dependency and execution-order review",
+      "delete": "documented: delete owned evaluator by exact ID where supported",
+      "verify": "Test dependency results and final composite result",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/evaluators/custom-evaluators/composite-evaluators"
+    },
+    {
+      "id": "luna-trained-evaluator",
+      "deployment": "on-premises",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented: Luna Studio training run then register evaluator; Luna scorer version API where supported",
+      "update": "documented: train/register a new version after labeled dataset review",
+      "delete": "documented: delete owned evaluator by exact ID where supported",
+      "verify": "Check registered model/version, evaluation result, and serving readiness",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio/sdk/deployment/register-evaluator-in-splunk-ao"
+    },
+    {
+      "id": "llm-provider-integration",
+      "deployment": "both",
+      "api_groups": [
+        "integrations"
+      ],
+      "create": "documented: provider-specific create-or-update Integration API or Integrations UI",
+      "update": "documented: provider-specific create-or-update and integration selection",
+      "delete": "documented: Delete Integration by exact ID; named custom integration has separate delete action",
+      "verify": "Read integration status and run safe evaluator/provider connection check",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/integrations/list-available-integrations",
+      "variants": [
+        "Anthropic",
+        "AWS Bedrock",
+        "AWS SageMaker",
+        "Azure",
+        "custom named/unnamed",
+        "Databricks",
+        "Mistral",
+        "NVIDIA",
+        "OpenAI",
+        "Vegas Gateway",
+        "Vertex AI",
+        "Writer"
+      ]
+    },
+    {
+      "id": "llm-integration-collaborator",
+      "deployment": "both",
+      "api_groups": [
+        "integrations"
+      ],
+      "create": "documented: Create User or Group Integration Collaborators",
+      "update": "documented: Update User or Group Integration Collaborator role",
+      "delete": "documented: Delete User or Group Integration Collaborator",
+      "verify": "Read collaborator list without exposing integration credentials",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/integrations/create-user-integration-collaborators"
+    },
+    {
+      "id": "annotation-template-rating",
+      "deployment": "verify",
+      "api_groups": [
+        "annotation"
+      ],
+      "create": "documented in REST reference: Create Annotation Template and Create Annotation Rating or Log Record Annotation Rating",
+      "update": "documented: Update or Reorder Annotation Templates; rating update availability must be checked",
+      "delete": "documented: Delete Annotation Template or exact Rating",
+      "verify": "Read template/rating and confirm project, trace or log record scope",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/annotation/create-annotation-template"
+    },
+    {
+      "id": "feedback-template-rating-v2",
+      "deployment": "verify",
+      "api_groups": [
+        "feedback"
+      ],
+      "create": "documented in REST reference: Create Feedback Template V2 or Feedback Rating V2",
+      "update": "documented: Update or Reorder Feedback Templates; inspect rating update support",
+      "delete": "documented: Delete Feedback Template or Feedback Rating V2",
+      "verify": "Read feedback template/rating and confirm target trace",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/feedback/create-feedback-template-v2"
+    },
+    {
+      "id": "annotation-queue",
+      "deployment": "verify",
+      "api_groups": [
+        "annotation_queue"
+      ],
+      "create": "documented: SDK AnnotationQueues.create / create_annotation_queue",
+      "update": "documented: SDK AnnotationQueues.update and share",
+      "delete": "documented: SDK AnnotationQueues.delete by exact ID",
+      "verify": "Read queue, collaborator roles, and assigned record count",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/python/reference/annotation_queues"
+    },
+    {
+      "id": "annotation-queue-field",
+      "deployment": "verify",
+      "api_groups": [
+        "annotation_queue"
+      ],
+      "create": "documented: SDK create_annotation_queue_field",
+      "update": "documented: SDK update_annotation_queue_field",
+      "delete": "documented: SDK delete_annotation_queue_field by exact ID",
+      "verify": "List queue fields and inspect schema",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/python/reference/annotation_queues"
+    },
+    {
+      "id": "annotation-queue-record-user",
+      "deployment": "verify",
+      "api_groups": [
+        "annotation_queue_records",
+        "annotation_queue"
+      ],
+      "create": "documented: SDK add_records_to_annotation_queue and share_annotation_queue",
+      "update": "documented: update_annotation_queue_user role or annotate assigned record",
+      "delete": "documented: remove_records_from_annotation_queue or remove_annotation_queue_user",
+      "verify": "Get queue records/users and export only when approved",
+      "source_url": "https://agent-observability-docs.splunk.com/sdk-api/python/reference/annotation_queues"
+    },
+    {
+      "id": "agent-control-global-policy",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Controls > Create new control, choose evaluator, stage, selector, action, environment, configuration, Save",
+      "update": "documented: edit global control; existing stream clones do not inherit changes",
+      "delete": "not-documented: generic Agent Control server documents DELETE /api/v1/controls/{control_id}, but verify AO deployment route and clone dependencies before using",
+      "verify": "Read global control ID/configuration, then test allow and deny in staging after binding",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/create-a-control",
+      "variants": [
+        "pre",
+        "post",
+        "tool",
+        "llm",
+        "step_names",
+        "step_name_regex",
+        "selector",
+        "and",
+        "or",
+        "not",
+        "deny",
+        "steer",
+        "observe",
+        "server",
+        "client"
+      ],
+      "source_urls": [
+        "https://docs.agentcontrol.dev/core/reference",
+        "https://docs.agentcontrol.dev/concepts/controls",
+        "https://agent-observability-docs.splunk.com/saas/capabilities"
+      ]
+    },
+    {
+      "id": "agent-control-stream-binding-clone",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Agent Stream > Controls > Add control; attachment creates independent clone",
+      "update": "documented: edit stream clone independently of global control",
+      "delete": "not-documented: generic Agent Control server documents DELETE /api/v1/agents/{agent_name}/controls/{control_id}; verify AO log_stream binding semantics and clone identity before using",
+      "verify": "Read stream binding and prove safe allow plus deny through runtime; inspect Control View and traces",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/agent-control/create-a-control",
+      "source_urls": [
+        "https://docs.agentcontrol.dev/core/reference",
+        "https://docs.agentcontrol.dev/concepts/controls",
+        "https://agent-observability-docs.splunk.com/saas/capabilities"
+      ]
+    },
+    {
+      "id": "agent-control-evaluator-policy-type",
+      "deployment": "verify",
+      "api_groups": [],
+      "create": "documented: Agent Control library lists list, regex, json, sql, and custom evaluators; verify each is exposed in target AO control UI/runtime before creating",
+      "update": "documented: edit type-specific evaluator configuration on global control or stream clone",
+      "delete": "not-applicable: evaluator type is not a standalone tenant object; delete or detach the owning control only through the verified AO deployment action",
+      "verify": "For each chosen type, validate a matching deny case and safe allow case at configured Pre/Post stage",
+      "source_url": "https://docs.agentcontrol.dev/concepts/evaluators/built-in-evaluators",
+      "variants": [
+        "list",
+        "regex",
+        "json",
+        "sql",
+        "custom",
+        "galileo.luna2 (package and entitlement gated)"
+      ]
+    },
+    {
+      "id": "agent-stream-alert",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Agent Stream > Alerts > Create alert with evaluator, aggregation, threshold, window, and destination",
+      "update": "not-documented: inspect target Alerts UI for exact edit or disable action",
+      "delete": "not-documented: inspect target Alerts UI for exact delete action before removing an alert",
+      "verify": "Read saved alert and Active/Failed destination status; send safe test event",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/basics/set-up-alerts-on-logs"
+    },
+    {
+      "id": "custom-dashboard",
+      "deployment": "verify",
+      "api_groups": [
+        "trends_dashboard"
+      ],
+      "create": "not-documented: SaaS capability names dashboard creation; inspect target UI or supported create-dashboard endpoint before creating",
+      "update": "documented in REST reference: Update Trends and widget/section updates",
+      "delete": "documented in REST reference: Delete Dashboard by exact ID",
+      "verify": "List dashboards and confirm owner, visibility, and populated widgets",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/list-dashboards"
+    },
+    {
+      "id": "dashboard-section-widget",
+      "deployment": "verify",
+      "api_groups": [
+        "trends_dashboard"
+      ],
+      "create": "documented in REST reference: Create Section and Create Widget",
+      "update": "documented: Update Section or Update Widget",
+      "delete": "documented: Delete Section or Delete Widget; section deletion may ungroup widgets",
+      "verify": "Get Trends/dashboard and confirm order, section, query, and result",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/trends_dashboard/create-widget"
+    },
+    {
+      "id": "run-insights-config",
+      "deployment": "verify",
+      "api_groups": [
+        "run_insights_settings",
+        "logstream-insights"
+      ],
+      "create": "documented in REST reference: Upsert Insights Config for a run",
+      "update": "documented: Upsert Insights Config",
+      "delete": "not-documented: inspect release-specific API before removal",
+      "verify": "Get Settings and compare resulting Run Insights or token usage view",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/run_insights_settings/upsert-insights-config"
+    },
+    {
+      "id": "model-price",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: organization admin User menu > Model Pricing > Add new model and price",
+      "update": "documented: edit price or reset default; applies only to new logs and experiments",
+      "delete": "not-documented: reset-to-default is documented; inspect UI before removing custom model entry",
+      "verify": "Read saved model/price and verify future-only cost behavior",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/costs/model-pricing-settings"
+    },
+    {
+      "id": "tokenomics-provider-connection",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Tokenomics > Settings > Provider integrations > add supported provider analytics connection",
+      "update": "not-documented: SaaS capability names update; inspect settings UI for exact edit operation",
+      "delete": "not-documented: SaaS capability names delete; inspect settings UI for exact removal operation",
+      "verify": "Read provider connection status and next daily refresh; no historical backfill",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics",
+      "variants": [
+        "Claude Code",
+        "Codex",
+        "Cursor",
+        "GitHub Copilot",
+        "Windsurf"
+      ]
+    },
+    {
+      "id": "tokenomics-fiscal-calendar",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Tokenomics > Settings > Fiscal configuration > save calendar",
+      "update": "documented: edit fiscal configuration after reporting-period review",
+      "delete": "not-documented: inspect UI for reset/remove action",
+      "verify": "Read fiscal reporting periods in Tokenomics view",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics"
+    },
+    {
+      "id": "tokenomics-organization-directory",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: Tokenomics > Settings > Organization directory > upload approved Workday CSV",
+      "update": "documented: replace/update directory CSV after email-join/privacy review",
+      "delete": "not-documented: inspect UI for removal action and data retention effect",
+      "verify": "Read hierarchy and sampled joins without exposing employee personal data",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/tokenomics/tokenomics"
+    },
+    {
+      "id": "onprem-ao-api-key",
+      "deployment": "on-premises",
+      "api_groups": [
+        "api_keys"
+      ],
+      "create": "documented: AO Create API Key for current user through /v2/users/api_keys or product UI",
+      "update": "not-documented: rotate by creating a new key, migrating clients, verifying, then revoking the old key",
+      "delete": "documented: Delete API Key by exact ID",
+      "verify": "Get key metadata and test intended AO API permission without exposing value",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/api_keys/create-api-key"
+    },
+    {
+      "id": "user-invitation-role",
+      "deployment": "verify",
+      "api_groups": [
+        "users",
+        "system_users",
+        "auth"
+      ],
+      "create": "documented: Invite Users; SaaS Unified Identity may require central Observability Cloud identity UI",
+      "update": "documented: Update User or role through deployment-specific identity workflow",
+      "delete": "documented: Delete User where supported; verify tenant identity ownership before removal",
+      "verify": "Read effective user role and project/queue access after propagation",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/add-users-and-assign-roles"
+    },
+    {
+      "id": "group-membership",
+      "deployment": "verify",
+      "api_groups": [
+        "groups"
+      ],
+      "create": "documented in REST reference: Create Group and Add User To Group; verify SaaS identity model",
+      "update": "documented: Update Group and Update Group Member",
+      "delete": "documented: Delete Group Member or Delete Group by exact ID",
+      "verify": "List group members and effective resource roles",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/groups/create-group"
+    },
+    {
+      "id": "sso-integration",
+      "deployment": "on-premises",
+      "api_groups": [
+        "auth"
+      ],
+      "create": "documented: configure SSO with IdP and AO cluster per release-specific SSO guide",
+      "update": "documented: update IdP metadata/configuration with identity owner",
+      "delete": "not-documented: verify supported disable/rollback path with identity owner",
+      "verify": "Test sign-in, callback, role mapping, and recovery account",
+      "source_url": "https://agent-observability-docs.splunk.com/security/sso"
+    },
+    {
+      "id": "organization-settings",
+      "deployment": "verify",
+      "api_groups": [],
+      "create": "not-applicable: organization settings exist with the tenant",
+      "update": "not-documented: SaaS capability names update; inspect exact supported setting and interface before mutation",
+      "delete": "not-applicable: organization settings container is not deleted",
+      "verify": "Read changed setting and affected users/resources",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/capabilities"
+    },
+    {
+      "id": "signals",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "not-applicable: Signals are discovered by product processing, not user-created policy objects",
+      "update": "not-documented: inspect current UI for triage/status action",
+      "delete": "not-documented: inspect current UI for supported dismissal/removal action",
+      "verify": "Read signal ID, stream, time window, and linked evidence",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/signals"
+    },
+    {
+      "id": "integration-cost-report",
+      "deployment": "both",
+      "api_groups": [
+        "integrations"
+      ],
+      "create": "not-applicable: cost report is derived from provider/evaluator usage",
+      "update": "not-applicable: edit underlying integration or model price instead",
+      "delete": "not-applicable: no standalone report object",
+      "verify": "Read Integration Costs time range and provider provenance",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/costs/integration-costs"
+    },
+    {
+      "id": "health-auth-protect-compatibility",
+      "deployment": "verify",
+      "api_groups": [
+        "health",
+        "protect"
+      ],
+      "create": "not-applicable: Health and Auth are service endpoints; legacy Protect Invoke is not an AO Agent Control policy object",
+      "update": "not-applicable: verify deployment-specific auth and legacy Protect compatibility only",
+      "delete": "not-applicable: no managed resource here",
+      "verify": "Check current release, available endpoint, authentication, and whether requested task is Agent Control or legacy Protect",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/protect/invoke"
+    },
+    {
+      "id": "authorization-role-capability-policy",
+      "deployment": "saas",
+      "api_groups": [
+        "users",
+        "auth"
+      ],
+      "create": "not-applicable: AO SaaS offers built-in roles and token capabilities; no public custom-role or capability-policy authoring contract",
+      "update": "documented: assign built-in agent_observability role via SaaS Manage Roles UI; token capability scope is set through approved token administration",
+      "delete": "not-documented: verify centralized role removal workflow and dependent access before change",
+      "verify": "Read token role/capability metadata and effective resource collaborator access without exposing key material",
+      "source_url": "https://agent-observability-docs.splunk.com/saas/capabilities",
+      "source_urls": [
+        "https://agent-observability-docs.splunk.com/concepts/access-control"
+      ]
+    },
+    {
+      "id": "agent-control-agent-registration",
+      "deployment": "verify",
+      "api_groups": [],
+      "create": "documented: Agent Control SDK init or generic server POST /api/v1/agents/initAgent with AO target_type log_stream and stream ID; verify deployment URL",
+      "update": "documented: generic server PATCH /api/v1/agents/{agent_name}; verify AO target semantics before mutation",
+      "delete": "not-documented: generic reference does not list agent deletion; inspect target deployment",
+      "verify": "Read registered agent target and attached controls, then run safe runtime check",
+      "source_url": "https://docs.agentcontrol.dev/core/reference"
+    },
+    {
+      "id": "evaluator-scorer-version",
+      "deployment": "verify",
+      "api_groups": [
+        "data"
+      ],
+      "create": "documented in REST reference: Create LLM, Code, Preset, Luna, or Luna3 Scorer Version subject to deployment availability",
+      "update": "documented: validate and restore scorer versions or update scorer scope where metrics_rbac is enabled",
+      "delete": "not-documented: no general scorer-version delete route in public REST reference",
+      "verify": "Read exact scorer/version ID, type, scope, and safe evaluation result",
+      "source_url": "https://agent-observability-docs.splunk.com/api-reference/data/create-llm-scorer-version"
+    },
+    {
+      "id": "luna-studio-project",
+      "deployment": "on-premises",
+      "api_groups": [],
+      "create": "documented: create Luna Studio project in its UI for a training use case",
+      "update": "documented: manage project details and linked runs in Luna Studio UI",
+      "delete": "not-documented: inspect Luna Studio release UI for exact project deletion action",
+      "verify": "Read project ID, owner, integrations, and runs",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio/ui/projects/overview"
+    },
+    {
+      "id": "luna-studio-training-run",
+      "deployment": "on-premises",
+      "api_groups": [],
+      "create": "documented: choose evaluator, labeled test set, base model/config, then launch bounded Luna Studio run",
+      "update": "not-applicable: launched training run is recorded; start a new run for changed configuration",
+      "delete": "not-documented: inspect Luna Studio UI for run deletion or cancellation action",
+      "verify": "Read run ID, status, held-out evaluation, artifacts, and registered evaluator ID",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio/ui/runs/new-run/overview"
+    },
+    {
+      "id": "luna-studio-dataset",
+      "deployment": "on-premises",
+      "api_groups": [],
+      "create": "documented: Luna Studio Add a dataset by upload, URL fetch, or AO import after privacy review",
+      "update": "documented: validate and replace training/test set through release-supported UI workflow",
+      "delete": "not-documented: inspect Luna Studio UI for exact dataset deletion action",
+      "verify": "Read dataset ID, source, schema, validation result, and row count",
+      "source_url": "https://agent-observability-docs.splunk.com/luna-studio/ui/datasets/add-a-dataset"
+    },
+    {
+      "id": "mcp-client-connection",
+      "deployment": "verify",
+      "api_groups": [],
+      "create": "documented: configure supported IDE MCP client with AO endpoint and protected key reference after checking server maturity",
+      "update": "documented: update endpoint or secret reference in approved client configuration",
+      "delete": "documented: remove the exact client server registration if no longer used",
+      "verify": "Connect and inspect live tool names/schemas with a read-only request",
+      "source_url": "https://agent-observability-docs.splunk.com/getting-started/mcp/setup-splunk-ao-mcp"
+    },
+    {
+      "id": "local-experiment-evaluator",
+      "deployment": "both",
+      "api_groups": [],
+      "create": "documented: define local Python evaluator in application code and pass it to an experiment",
+      "update": "documented: edit owned evaluator code and rerun bounded experiment",
+      "delete": "documented: remove evaluator from local experiment configuration/code; no hosted scorer object unless separately registered",
+      "verify": "Run local evaluator against a safe fixture and confirm experiment result",
+      "source_url": "https://agent-observability-docs.splunk.com/how-to-guides/evaluators/create-local-evaluator/create-local-evaluator"
+    },
+    {
+      "id": "onprem-role-assignment",
+      "deployment": "on-premises",
+      "api_groups": [
+        "users"
+      ],
+      "create": "not-applicable: Admin, Manager, User, and Read-only are built-in roles; no documented custom-role creation",
+      "update": "documented: admin/manager uses Users UI to assign a built-in role to an existing user; Manager is Enterprise-only",
+      "delete": "not-documented: inspect Users UI for role unassignment or set an approved replacement role before removing access",
+      "verify": "Read effective user role and project/group collaborator access after change",
+      "source_url": "https://agent-observability-docs.splunk.com/concepts/access-control"
+    },
+    {
+      "id": "saas-observability-access-token",
+      "deployment": "saas",
+      "api_groups": [],
+      "create": "documented: Splunk Observability Cloud Settings > Access tokens > Create Token; select INGEST and API token with roles, then assign agent_observability_admin or least required AO role",
+      "update": "documented: edit token API roles or rotate through Observability Cloud token administration; restage protected consumers and verify before revocation",
+      "delete": "not-applicable: Splunk Observability Cloud org access tokens cannot be deleted; deactivate the exact validation token after dependents stop",
+      "verify": "Read token name/ID, scopes, roles, expiry, and safe AO API plus ingest checks without revealing token value",
+      "source_url": "https://agent-observability-docs.splunk.com/references/faqs/find-keys",
+      "source_urls": [
+        "https://help.splunk.com/en/splunk-observability-cloud/administer/authentication-and-security/authentication-tokens/org-access-tokens"
+      ]
+    }
+  ]
+}

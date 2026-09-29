@@ -4,10 +4,30 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
+CANONICAL_REPO=false
+if [[ -f "${PROJECT_ROOT}/skills/shared/lib/yaml_compat.py" \
+    && -f "${PROJECT_ROOT}/skills/splunk-observability-database-monitoring-setup/SKILL.md" ]]; then
+    CANONICAL_REPO=true
+fi
+if [[ "${CANONICAL_REPO}" == "true" ]]; then
+    YAML_COMPAT_DIR="${PROJECT_ROOT}/skills/shared/lib"
+else
+    YAML_COMPAT_DIR="${SCRIPT_DIR}"
+fi
 
-source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
+if [[ "${CANONICAL_REPO}" == "true" ]]; then
+    source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
+fi
 
-OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-database-monitoring-rendered"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+require_arg() {
+    if [[ "$2" -lt 2 ]]; then
+        log "ERROR: Option '$1' requires a value."
+        return 1
+    fi
+}
+
+OUTPUT_DIR="${PWD}/splunk-observability-database-monitoring-rendered"
 LIVE=false
 LIVE_SINCE="5m"
 API=false
@@ -21,7 +41,7 @@ usage() {
 Splunk Observability Database Monitoring validation
 
 Usage:
-  bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh [options]
+  bash scripts/validate.sh [options]
 
 Options:
   --output-dir DIR          Rendered output directory
@@ -58,7 +78,7 @@ if ! [[ "${API_LOOKBACK_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
-PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib" python3 - "${OUTPUT_DIR}" <<'PY'
+PYTHONPATH="${YAML_COMPAT_DIR}" python3 - "${OUTPUT_DIR}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -111,7 +131,7 @@ if cpu_cores < float(sizing["peak_cpu_cores"]):
 targets = metadata.get("targets") or []
 if not isinstance(targets, list) or not targets:
     raise SystemExit("ERROR: metadata.json has no DBMon targets.")
-allowed_types = {"postgresql", "sqlserver", "oracledb", "mysql", "mariadb"}
+allowed_types = {"postgresql", "sqlserver", "oracledb", "mysql", "mariadb", "mongodb"}
 target_types = {item.get("type") for item in targets if isinstance(item, dict)}
 if not target_types <= allowed_types:
     raise SystemExit(f"ERROR: metadata contains unsupported engines: {sorted(target_types - allowed_types)}")
@@ -199,7 +219,7 @@ for path in out.rglob("*"):
         if secretish.search(text):
             raise SystemExit(f"ERROR: Rendered file appears to contain secret material: {path}")
 
-receiver_prefixes = ("postgresql/", "sqlserver/", "oracledb/", "mysql/")
+receiver_prefixes = ("postgresql/", "sqlserver/", "oracledb/", "mysql/", "mongodb/")
 expected_receiver_ids = sorted(
     str(item.get("receiver_id")) for item in targets if isinstance(item, dict)
 )
@@ -277,7 +297,7 @@ def assert_dbmon_config(config: dict[str, Any], source: Path) -> None:
             if (events.get(event_name) or {}).get("enabled") is not expected_events.get(metadata_name):
                 raise SystemExit(f"ERROR: {source} {receiver_id} event settings differ from metadata.")
         target_type = target.get("type")
-        if target_type in {"postgresql", "mysql", "mariadb"}:
+        if target_type in {"postgresql", "mysql", "mariadb", "mongodb"}:
             tls = receiver.get("tls") or {}
             if tls.get("insecure") is not False or tls.get("insecure_skip_verify") is not False:
                 raise SystemExit(
@@ -301,6 +321,22 @@ def assert_dbmon_config(config: dict[str, Any], source: Path) -> None:
                 raise SystemExit(
                     f"ERROR: {source} {receiver_id} must emit mysql.instance.endpoint."
                 )
+        if target_type == "mongodb":
+            expected_instance_id = next(
+                (item.get("value") for item in target.get("validation_filters", [])
+                 if item.get("key") == "service.instance.id"),
+                None,
+            )
+            attrs = receiver.get("resource_attributes") or {}
+            identity = attrs.get("service.instance.id") or {}
+            if identity.get("enabled") is not True or identity.get("override_value") != expected_instance_id:
+                raise SystemExit(
+                    f"ERROR: {source} {receiver_id} must emit the reviewed stable MongoDB instance identity."
+                )
+            if "resource_attributes" in (receiver.get("metrics") or {}) or "logs" in receiver:
+                raise SystemExit(f"ERROR: {source} {receiver_id} uses MongoDB resource attribute nesting unsupported by the pinned collector.")
+            if target.get("platform") == "mongodb-atlas" and receiver.get("scheme") != "mongodb+srv":
+                raise SystemExit(f"ERROR: {source} {receiver_id} Atlas targets must use mongodb+srv.")
         if target_type == "sqlserver" and target.get("platform") in {
             "azure-managed-instance",
             "azure-sql-database",
@@ -592,7 +628,7 @@ if [[ "${COLLECTOR_VALIDATE}" == "true" ]]; then
     if [[ ! -f "${config_path}" && -f "${OUTPUT_DIR}/k8s/values.dbmon.clusterreceiver.yaml" ]]; then
         temporary_config="$(mktemp)"
         trap cleanup_temporary_config EXIT
-        PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib" python3 - \
+        PYTHONPATH="${YAML_COMPAT_DIR}" python3 - \
             "${OUTPUT_DIR}/k8s/values.dbmon.clusterreceiver.yaml" "${temporary_config}" <<'PY'
 import json
 import sys
@@ -613,12 +649,46 @@ PY
     fi
     collector_memory_mib="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["collector_memory_mib"])' "${OUTPUT_DIR}/metadata.json")"
     env_args=(-e "SPLUNK_MEMORY_LIMIT_MIB=${collector_memory_mib}")
+    tls_mount_args=()
+    while IFS= read -r tls_path; do
+        [[ -n "${tls_path}" ]] || continue
+        if [[ "${tls_path}" == *:* || "${tls_path}" == *,* ]]; then
+            log "ERROR: --collector-validate cannot safely mount a TLS file path containing ':' or ',': ${tls_path}"
+            exit 1
+        fi
+        if [[ ! -f "${tls_path}" || -L "${tls_path}" ]]; then
+            log "ERROR: --collector-validate requires each configured receiver TLS file to exist as a regular, non-symlink file: ${tls_path}"
+            exit 1
+        fi
+        tls_mount_args+=(--volume "${tls_path}:${tls_path}:ro")
+    done < <(PYTHONPATH="${YAML_COMPAT_DIR}" python3 - "${config_path}" <<'PY'
+import sys
+from yaml_compat import load_yaml_or_json
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    config = load_yaml_or_json(handle.read(), source=sys.argv[1])
+paths = set()
+for receiver in (config.get("receivers") or {}).values():
+    tls = receiver.get("tls") if isinstance(receiver, dict) else None
+    if not isinstance(tls, dict):
+        continue
+    for key in ("ca_file", "cert_file", "key_file"):
+        value = tls.get(key)
+        if value:
+            if not isinstance(value, str) or not value.startswith("/"):
+                raise SystemExit("ERROR: configured receiver TLS file paths must be absolute.")
+            paths.add(value)
+for value in sorted(paths):
+    print(value)
+PY
+    )
     while IFS= read -r env_name; do
         [[ -n "${env_name}" ]] && env_args+=(-e "${env_name}=dbmon-static-validation")
     done < <(grep -Eo '\$\{env:[A-Z][A-Z0-9_]*\}' "${config_path}" | sed -E 's/^\$\{env:|\}$//g' | sort -u)
     log "  Validating DBMon config with quay.io/signalfx/splunk-otel-collector:0.158.0"
     "${runtime}" run --rm --network=none \
         -v "${config_path}:/etc/otel/collector/dbmon.yaml:ro" \
+        "${tls_mount_args[@]}" \
         "${env_args[@]}" \
         --entrypoint /otelcol \
         --pull=always \
@@ -773,7 +843,7 @@ PY
     grep -Eiv 'postgresqlreceiver@v[0-9.]+/(client|scraper)\.go:[0-9]+[[:space:]]+failed to explain (statement|query)' \
         "${relevant_log}" >"${actionable_log}" || true
     hard_fatal='unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|authentication failed|password authentication failed|access denied|login failed|connection refused|connection reset|broken pipe|bad connection|unexpected EOF|server closed the connection|connection (was )?closed|no such host|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to export|export(ing)? (failed|failure)|error exporting|unable to export'
-    fatal='(^|[[:space:]"=:])(error|fatal)([[:space:]"=:]|$)|(level|severity)["= :]+(error|fatal)|unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|authentication failed|access denied|login failed|permission denied|operation not permitted|connection refused|deadline exceeded|no such host|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to (start|export|fetch|collect|scrape|connect|query)|export(ing)? (failed|failure)|error (exporting|scraping|reading|collecting|querying)|unable to (export|connect|collect|query)|cannot start|invalid configuration|duplicate scraper|ORA-[0-9]+'
+    fatal='(^|[[:space:]"=:])fatal([[:space:]"=:]|$)|(level|severity)["= :]+fatal|unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|authentication failed|access denied|login failed|permission denied|operation not permitted|connection refused|deadline exceeded|no such host|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to (start|export|fetch|collect|scrape|connect|query)|export(ing)? (failed|failure)|error (exporting|scraping|reading|collecting|querying)|unable to (export|connect|collect|query)|cannot start|invalid configuration|duplicate scraper|ORA-[0-9]+'
     if grep -Eiq "${hard_fatal}" "${relevant_log}" \
         || grep -Eiq "${fatal}" "${actionable_log}"; then
         log "ERROR: Recent scoped DBMon collector logs contain a critical failure; raw lines are suppressed because they may contain database material."
@@ -786,8 +856,13 @@ PY
 fi
 
 if [[ "${API}" == "true" ]]; then
-    if ! load_observability_cloud_settings; then
-        log "ERROR: Could not load the selected Observability Cloud settings."
+    if declare -F load_observability_cloud_settings >/dev/null 2>&1; then
+        if ! load_observability_cloud_settings; then
+            log "ERROR: Could not load the selected Observability Cloud settings."
+            exit 1
+        fi
+    elif [[ -z "${SPLUNK_O11Y_REALM:-}" || -z "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
+        log "ERROR: --api requires SPLUNK_O11Y_REALM and SPLUNK_O11Y_TOKEN_FILE when repository credential helpers are unavailable."
         exit 1
     fi
     if [[ -n "${SPLUNK_O11Y_REALM:-}" ]]; then export SPLUNK_O11Y_REALM; fi

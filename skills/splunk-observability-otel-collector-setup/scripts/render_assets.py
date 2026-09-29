@@ -500,8 +500,100 @@ def validate_extra_values(path: Path) -> None:
                 return False
         return True
 
+    def safe_secret_volume_reference(value: object) -> bool:
+        """Allow a reference to an externally-created Secret, never its data."""
+        if not isinstance(value, dict) or set(value) - {
+            "secretName",
+            "defaultMode",
+            "optional",
+            "items",
+        }:
+            return False
+        name = value.get("secretName")
+        if not isinstance(name, str) or not re.fullmatch(
+            r"[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?", name
+        ):
+            return False
+        if "defaultMode" in value and (
+            isinstance(value["defaultMode"], bool)
+            or not isinstance(value["defaultMode"], int)
+            or not 0 <= value["defaultMode"] <= 0o777
+        ):
+            return False
+        if "optional" in value and not isinstance(value["optional"], bool):
+            return False
+        items = value.get("items", [])
+        if not isinstance(items, list):
+            return False
+        for item in items:
+            if not isinstance(item, dict) or set(item) - {"key", "path", "mode"}:
+                return False
+            if not isinstance(item.get("key"), str) or not item["key"]:
+                return False
+            item_path = item.get("path")
+            if (
+                not isinstance(item_path, str)
+                or not item_path
+                or item_path.startswith("/")
+                or ".." in item_path.split("/")
+                or any(character in item_path for character in "\\\\\x00\n\r")
+            ):
+                return False
+            if "mode" in item and (
+                isinstance(item["mode"], bool)
+                or not isinstance(item["mode"], int)
+                or not 0 <= item["mode"] <= 0o777
+            ):
+                return False
+        return True
+
+    def validate_headers_setter(node: object, location: str) -> None:
+        """Accept header-setter secrets only through Collector env references."""
+        if not isinstance(node, dict):
+            return
+        headers = node.get("headers") or []
+        if not isinstance(headers, list):
+            raise SystemExit(
+                f"--extra-values-file headers_setter.headers must be a list at {location}."
+            )
+        for index, header in enumerate(headers):
+            if not isinstance(header, dict):
+                continue
+            header_name = str(header.get("key") or "")
+            sensitive_header = bool(
+                SECRET_KEY_PATTERN.search(header_name)
+                or re.search(r"(?i)(authorization|credential)", header_name)
+            )
+            if not sensitive_header:
+                continue
+            for field in ("value", "default_value"):
+                value = header.get(field)
+                if value in (None, ""):
+                    continue
+                match = (
+                    safe_env_reference.fullmatch(value)
+                    if isinstance(value, str)
+                    else None
+                )
+                if not match:
+                    raise SystemExit(
+                        "--extra-values-file contains inline secret-like header material at "
+                        f"{location}.headers[{index}].{field}. Use a Secret-backed environment reference."
+                    )
+                referenced_secret_envs.add(match.group("name"))
+
+    def is_headers_setter_component_id(value: str) -> bool:
+        """Recognize the base and named headers_setter component IDs."""
+        return value == "headers_setter" or value.startswith("headers_setter/")
+
+    def location_component_id(location: str) -> str:
+        """Return the final mapping key from an inspection location."""
+        return location.rsplit(".", 1)[-1]
+
     def inspect(node: object, location: str = "") -> None:
         if isinstance(node, dict):
+            if is_headers_setter_component_id(location_component_id(location)):
+                validate_headers_setter(node, location)
             semantic_name = str(node.get("name", ""))
             semantic_value = node.get("value")
             if semantic_name and "value" in node and semantic_value not in (None, ""):
@@ -538,6 +630,17 @@ def validate_extra_values(path: Path) -> None:
                     or SECRET_KEY_PATTERN.search(key)
                     or normalized in {"authorization", "xsf token".replace(" ", "")}
                 )
+                # `headers_setter` is a component name, not a credential field.
+                # Its header values are checked structurally above so nested
+                # values can still be inspected without rejecting the component
+                # mapping before the Secret-backed reference is resolved.
+                if is_headers_setter_component_id(key):
+                    sensitive_key = False
+                if (
+                    normalized == "headers"
+                    and is_headers_setter_component_id(location_component_id(location))
+                ):
+                    sensitive_key = False
                 if normalized in {
                     "valuefrom",
                     "secretkeyref",
@@ -559,6 +662,14 @@ def validate_extra_values(path: Path) -> None:
                     and isinstance(value, str)
                     and bool(safe_env_reference.fullmatch(value))
                 )
+                safe_secret_volume = bool(
+                    key == "secret"
+                    and re.fullmatch(
+                        r"(?:agent|clusterReceiver|gateway)\.extraVolumes\[\d+\]\.secret",
+                        child_location,
+                    )
+                    and safe_secret_volume_reference(value)
+                )
                 safe_env_match = (
                     safe_env_reference.fullmatch(value) if isinstance(value, str) else None
                 )
@@ -568,6 +679,7 @@ def validate_extra_values(path: Path) -> None:
                 if (
                     sensitive_key
                     and not root_secret_mapping
+                    and not safe_secret_volume
                     and not safe_header_value
                     and value not in (None, "", {})
                 ):
@@ -575,6 +687,8 @@ def validate_extra_values(path: Path) -> None:
                         f"--extra-values-file contains inline secret material at {child_location}: {path}. "
                         "Use this skill's file-backed secret options instead."
                     )
+                if safe_secret_volume:
+                    continue
                 inspect(value, child_location)
         elif isinstance(node, list):
             for index, value in enumerate(node):
@@ -635,6 +749,12 @@ def validate_extra_values(path: Path) -> None:
                 )
 
     inspect(payload)
+    # The Splunk chart injects this environment variable from the externally
+    # managed token Secret whenever `secret.create` is false.  It is therefore
+    # a chart-owned Secret reference even though it is not listed under
+    # `gateway.extraEnvs` or `agent.extraEnvs` in user values.
+    if secret_block.get("create") is not True:
+        secret_backed_envs.add("SPLUNK_OBSERVABILITY_ACCESS_TOKEN")
     inline_references = sorted(referenced_secret_envs & inline_envs)
     if inline_references:
         raise SystemExit(
@@ -1104,7 +1224,7 @@ sys.stdout.write(text)
 """
 
 
-def k8s_image_post_renderer_script(targets: list[dict[str, str]]) -> str:
+def k8s_image_post_renderer_script(targets: list[dict[str, object]]) -> str:
     """Return the audited, fail-closed image allowlist post-renderer."""
 
     source_pins = {
@@ -1329,10 +1449,121 @@ def validate_all_images(
             )
 
 
+def cluster_receiver_targets() -> list[dict[str, str]]:
+    return [target for target in TARGETS if target.get("singleton_recreate") is True]
+
+
+def strategy_bounds(lines: list[str], kind: str, name: str) -> tuple[int, int] | None:
+    if identity(lines) != (kind, name):
+        return None
+    if kind != "Deployment":
+        fail("singleton Recreate strategy is only valid for the cluster-receiver Deployment")
+    spec_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if indentation(line) == 0 and line.strip() == "spec:"
+    ]
+    if len(spec_indexes) != 1:
+        fail(f"expected one Deployment spec for cluster receiver {name!r}")
+    spec_index = spec_indexes[0]
+    spec_end = next(
+        (
+            index
+            for index in range(spec_index + 1, len(lines))
+            if lines[index].strip()
+            and not lines[index].lstrip().startswith("#")
+            and indentation(lines[index]) == 0
+        ),
+        len(lines),
+    )
+    strategies = [
+        index
+        for index in range(spec_index + 1, spec_end)
+        if indentation(lines[index]) == 2 and lines[index].strip() == "strategy:"
+    ]
+    if len(strategies) > 1:
+        fail(f"cluster receiver {name!r} has multiple Deployment strategies")
+    if strategies:
+        start = strategies[0]
+        end = start + 1
+        while end < spec_end:
+            line = lines[end]
+            if (
+                line.strip()
+                and not line.lstrip().startswith("#")
+                and indentation(line) <= 2
+            ):
+                break
+            end += 1
+        return start, end
+    template_indexes = [
+        index
+        for index in range(spec_index + 1, spec_end)
+        if indentation(lines[index]) == 2 and lines[index].strip() == "template:"
+    ]
+    if len(template_indexes) != 1:
+        fail(f"cluster receiver {name!r} Deployment has no unambiguous Pod template")
+    return template_indexes[0], template_indexes[0]
+
+
+def enforce_cluster_receiver_strategy(documents: list[list[str]]) -> None:
+    for target in cluster_receiver_targets():
+        matching = [
+            index
+            for index, lines in enumerate(documents)
+            if identity(lines) == (target["kind"], target["name"])
+        ]
+        if len(matching) != 1:
+            fail(
+                f"expected one cluster-receiver {target['kind']} named "
+                f"{target['name']!r}, found {len(matching)}"
+            )
+        lines = documents[matching[0]]
+        bounds = strategy_bounds(lines, target["kind"], target["name"])
+        if bounds is None:
+            fail(f"could not inspect cluster receiver {target['name']!r} strategy")
+        start, end = bounds
+        lines[start:end] = ["  strategy:\n", "    type: Recreate\n"]
+
+
+def verify_cluster_receiver_strategy(documents: list[list[str]]) -> None:
+    for target in cluster_receiver_targets():
+        matching = [
+            lines
+            for lines in documents
+            if identity(lines) == (target["kind"], target["name"])
+        ]
+        if len(matching) != 1:
+            fail(
+                f"expected one cluster-receiver {target['kind']} named "
+                f"{target['name']!r}, found {len(matching)}"
+            )
+        bounds = strategy_bounds(matching[0], target["kind"], target["name"])
+        if bounds is None:
+            fail(f"could not inspect cluster receiver {target['name']!r} strategy")
+        start, end = bounds
+        block = matching[0][start:end]
+        strategy_types = [
+            scalar(line, "type")
+            for line in block
+            if indentation(line) == 4 and scalar(line, "type") is not None
+        ]
+        rolling_updates = [
+            line
+            for line in block
+            if indentation(line) == 4 and line.strip().startswith("rollingUpdate:")
+        ]
+        if strategy_types != ["Recreate"] or rolling_updates:
+            fail(
+                f"cluster receiver {target['name']!r} must use Recreate without rollingUpdate"
+            )
+
+
 def rewrite(text: str) -> str:
     documents = split_documents(text)
     locations = target_locations(documents, "source")
     validate_all_images(documents, locations, rewritten=False)
+    enforce_cluster_receiver_strategy(documents)
     for lines in documents:
         for index, line in enumerate(lines):
             image = scalar(line, "image")
@@ -1342,6 +1573,7 @@ def rewrite(text: str) -> str:
             lines[index] = f"{' ' * indentation(line)}image: {SOURCE_PINS[image]}{ending}"
     pinned_locations = target_locations(documents, "pinned")
     validate_all_images(documents, pinned_locations, rewritten=True)
+    verify_cluster_receiver_strategy(documents)
     return "".join("".join(lines) for lines in documents)
 
 
@@ -1349,12 +1581,13 @@ def verify_manifest(text: str) -> None:
     documents = split_documents(text)
     locations = target_locations(documents, "pinned")
     validate_all_images(documents, locations, rewritten=True)
+    verify_cluster_receiver_strategy(documents)
 
 
-def verify_json_images(value: object) -> None:
+def verify_json_images(value: object, *, in_spec: bool = False) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            if key == "image" and isinstance(child, str):
+            if in_spec and key == "image" and isinstance(child, str):
                 if is_collector_image(child):
                     if child not in {target["pinned"] for target in TARGETS}:
                         fail(f"live object has unaudited Collector image {child!r}")
@@ -1362,10 +1595,10 @@ def verify_json_images(value: object) -> None:
                     fail(f"live object has an unknown digest for an audited image repository: {child!r}")
                 elif not audited_pins_for(child) and not DIGEST_IMAGE.fullmatch(child):
                     fail(f"live object has mutable or unaudited image {child!r}")
-            verify_json_images(child)
+            verify_json_images(child, in_spec=in_spec or key == "spec")
     elif isinstance(value, list):
         for child in value:
-            verify_json_images(child)
+            verify_json_images(child, in_spec=in_spec)
 
 
 def controller_owner(payload: dict):
@@ -1550,7 +1783,7 @@ if __name__ == "__main__":
 '''
     return (
         template.replace("__SOURCE_PINS__", json.dumps(source_pins, sort_keys=True))
-        .replace("__TARGETS__", json.dumps(targets, sort_keys=True))
+        .replace("__TARGETS__", repr(targets))
         .replace("__COLLECTOR_REPOSITORIES__", json.dumps(collector_repositories))
     )
 
@@ -3606,6 +3839,8 @@ def render_k8s(args: argparse.Namespace, output_dir: Path) -> None:
             collector_source_image,
             collector_pinned_image,
         )
+        if cluster_kind == "Deployment":
+            image_targets[-1]["singleton_recreate"] = True
         if args.distribution == "eks/fargate":
             add_image_target(
                 "StatefulSet",

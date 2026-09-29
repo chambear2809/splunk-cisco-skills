@@ -1,8 +1,9 @@
 ---
 name: splunk-observability-ai-agent-monitoring-setup
-description: "Use when setting up or auditing Splunk AI Agent Monitoring, GenAI telemetry packages, AI agent
-  evaluation telemetry, or adjacent AI infrastructure observability. Render, validate, diagnose, and
-  safely apply Splunk Observability Cloud AI Agent Monitoring setup plans, including GenAI Python
+description: "Use when setting up or auditing the legacy Splunk AI Agent Monitoring APM experience, GenAI
+  telemetry packages, AI agent evaluation telemetry, or adjacent AI infrastructure observability. For the
+  separate Splunk Agent Observability product, use splunk-agent-observability-setup. Render, validate,
+  diagnose, and safely apply Splunk Observability Cloud AI Agent Monitoring setup plans, including GenAI Python
   instrumentation, instrumentation-side evaluations, Log Observer Connect handoffs, histogram collector
   readiness, and AI Infrastructure Monitoring coverage."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
@@ -33,6 +34,8 @@ metadata:
 
 - Setting up or auditing Splunk AI Agent Monitoring, GenAI telemetry packages, AI agent evaluation telemetry, or
   adjacent AI infrastructure observability.
+- Migrating from the legacy AI Agent Monitoring APM experience to Splunk Agent Observability; use
+  `splunk-agent-observability-setup` for the destination product.
 - Preview and review the splunk observability ai agent monitoring setup workflow before any live apply phase.
 - Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
 

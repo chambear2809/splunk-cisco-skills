@@ -4,7 +4,9 @@ This reference records the production contract for the
 `splunk-observability-database-monitoring-setup` skill. It was verified against
 the official Splunk Database Monitoring documentation and the Splunk
 OpenTelemetry Collector/chart `0.158.0` pair on 2026-08-20, when the pin
-advanced from the `0.155.0` pair. Repository frontmatter's
+advanced from the `0.155.0` pair. The support matrix and MongoDB renderer were
+rechecked against current Splunk documentation and the pinned collector binary
+on 2026-09-28. Repository frontmatter's
 `compatibility_verified` date is the repository-wide Splunk Cloud Platform
 compatibility date and is deliberately not changed by a collector pin advance.
 
@@ -38,27 +40,34 @@ compatibility date and is deliberately not changed by a collector pin advance.
   Oracle also improved SQL obfuscation so approved leading-comment tags remain
   extractable while query text is anonymized, and clamps negative query and
   session-duration values to zero.
-- Upstream OpenTelemetry Collector Contrib `v0.159.0` is not the current Splunk
-  production target. Do not adopt its additional Oracle/PostgreSQL/SQL Server
-  schema or grant changes until matching Splunk collector and chart releases
-  are published and audited.
+- Newer Splunk collector and chart releases are available. This skill still
+  renders the audited `0.158.0` pair; the newer receiver schema and grants
+  need a separate audit before this production pin advances. In particular,
+  AWS IAM database authentication for RDS and Aurora PostgreSQL requires
+  Collector `v0.159.0` or later, so this pinned workflow uses a database
+  password for those targets.
 
 ## Official Database Monitoring support matrix
 
 | Engine | Database versions | Published platforms | Minimum collector |
 |---|---|---|---|
-| Microsoft SQL Server | 2016, 2017, 2019, 2022 | Azure Managed Instance, Azure SQL Database, AWS RDS, self-hosted | `v0.148.0` |
+| Microsoft SQL Server | 2016, 2017, 2019, 2022 | Azure Managed Instance, Azure SQL Database, AWS RDS, self-hosted | `v0.154.0` |
 | MySQL | Product floor 5.7+; pinned `v0.158.0` receiver verifies 5.7.x, 8.0.x, 8.4.x, and 9.x | AWS RDS, standalone | `v0.154.0` |
 | MariaDB | Product floor 10.5+; pinned `v0.158.0` receiver verifies 10.5.x–10.11.x and 11.x | AWS RDS, standalone | `v0.154.0` |
-| Oracle Database | 19c, 26ai | AWS RDS, Oracle RAC, self-hosted | `v0.148.0` |
-| PostgreSQL | Azure Flexible Server 14.20 or 17.7; Amazon RDS 14.15 or 17.5 | Azure Flexible Server or Amazon RDS, paired with the listed provider versions | `v0.147.0` |
+| MongoDB | Metrics: 4.0+; query samples, top queries, and plans: self-managed 7.0 or Atlas dedicated M10+ | Self-managed or MongoDB Atlas (use `mongodb+srv` for Atlas SRV endpoints) | `v0.158.0` |
+| Oracle Database | 12c, 18c, 19c, 21c, 26ai | AWS RDS, Oracle RAC, self-hosted | `v0.156.0` |
+| PostgreSQL | Azure Flexible Server 14.20 or 17.7; Amazon RDS 14.15 or 17.5; Amazon Aurora PostgreSQL 17.7; EDB Postgres Advanced Server 18.4 | Provider/version pairs are exact; EDB is a separate supported platform | `v0.147.0` |
 
 Interpret the matrix conservatively:
 
-- PostgreSQL versions are provider-specific pairs. Do not treat the four
-  numbers as interchangeable between Azure and AWS.
+- PostgreSQL managed-service versions are provider-specific pairs. Aurora and
+  EDB have their own version rows; do not infer support for other releases.
 - For Oracle RAC, define a separate target and receiver connection for every
   node.
+- The architecture overview's engine list has not caught up with the
+  receiver-specific MongoDB documentation. Use the receiver-specific support
+  matrices and dated product release notes as the source of truth for this
+  skill; MongoDB DBMon was announced on August 19, 2026.
 - The generic architecture page mentions additional hosting examples, but the
   receiver-specific pages above are the production allow-list for this skill.
   A generic example such as Google Cloud SQL does not widen a receiver's
@@ -68,6 +77,42 @@ Interpret the matrix conservatively:
   but records `unsupported_opt_in` in the rendered metadata and coverage
   report. Generated apply helpers refuse it. Never describe that result as
   Splunk-supported production coverage.
+
+### MongoDB feature boundary
+
+The MongoDB DBMon path requires the `mongodb` receiver (minimum Splunk OTel
+Collector `v0.158.0`), not the `mongodb_atlas` metrics-only receiver or the
+deprecated Smart Agent monitor. The receiver emits metrics from MongoDB
+`dbStats` and `serverStatus`; query events flow through `logs/dbmon` to the
+canonical `otlp_http/dbmon` exporter.
+
+- Metrics support covers MongoDB 4.0+ on self-managed/standalone deployments
+  and Atlas. Query samples, top queries, and explain plans have a narrower
+  product matrix: self-managed MongoDB 7.0 or Atlas dedicated M10+ clusters.
+- Atlas targets use SRV DNS (`scheme: mongodb+srv`) and require the explicit
+  non-secret Atlas tier in the intake so the renderer can enforce M10+ for
+  DBMon query events.
+- Replica sets can declare multiple seed hosts and a `replica_set` name for
+  node discovery. Sharded clusters can declare the `mongos` seed-host list.
+  Multi-host targets require a reviewed explicit `service.instance.id` probe
+  value; the renderer assigns it as the stable product identity.
+- Use `clusterMonitor` and `readAnyDatabase` on `admin` for DBMon collection;
+  query-event collection additionally requires a custom role with `find` and
+  `indexStats` on `system.profile`.
+- For reliable self-managed top-query collection, Splunk documents profiling
+  level 1 with a 100 ms slow-operation threshold. Atlas profiler settings reset
+  on reboot; the receiver uses its documented fallback path.
+- MongoDB's default `service.instance.id` is a UUID v5 derived from the host
+  address and port. Set a reviewed unique service identity when that default
+  does not uniquely identify the intended database instance.
+- The standalone metrics-only MongoDB receiver docs are older and omit DBMon
+  event support. Follow the Database Monitoring receiver page and August 2026
+  Database Monitoring release note for product features.
+- The pinned receiver exposes 47 optional/default MongoDB metric names. The
+  current web page imports a live metric catalog with five newer WiredTiger
+  metrics absent from the pinned `v0.158.0` receiver. Keep the renderer's
+  allowlist tied to the [v0.158.0 receiver metadata](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.158.0/receiver/mongodbreceiver/metadata.yaml)
+  until the collector pin advances.
 
 ### MySQL and MariaDB version-dependent gaps
 
@@ -92,7 +137,7 @@ version-aware feature boundaries inside the production matrix:
 ## Required review evidence
 
 Every packet must set explicit `collector.memory_mib` and
-`collector.cpu_limit`. PostgreSQL, MySQL, and MariaDB additionally require a
+`collector.cpu_limit`. PostgreSQL, MySQL, MariaDB, and MongoDB additionally require a
 representative-load record, and the production template carries the same
 schema for consistent review:
 
@@ -127,7 +172,8 @@ Use these exact component and pipeline identifiers in newly rendered Splunk
 Distribution configurations:
 
 - Database receiver IDs: `sqlserver/<name>`, `mysql/<name>`,
-  `oracledb/<name>`, or `postgresql/<name>`. MariaDB uses the `mysql` receiver.
+  `mongodb/<name>`, `oracledb/<name>`, or `postgresql/<name>`. MariaDB uses the
+  `mysql` receiver.
 - Single-family infrastructure metrics pipeline: `metrics/dbmon`.
 - Single-family query-event pipeline: `logs/dbmon`.
 - DBMon event exporter: `otlp_http/dbmon`.
@@ -136,7 +182,7 @@ When a packet combines MySQL/MariaDB with any other engine, split the pipelines
 deterministically:
 
 - `metrics/dbmon_core` and `logs/dbmon_core` contain PostgreSQL, SQL Server,
-  and Oracle receivers.
+  Oracle, and MongoDB receivers.
 - `metrics/dbmon_mysql` and `logs/dbmon_mysql` contain MySQL and MariaDB
   receivers.
 
@@ -237,7 +283,12 @@ Other supported advanced controls include:
   Oracle do not accept that generic receiver-level TLS block; put their
   driver-specific TLS/trust options in a secret-backed datasource string.
 - Optional receiver metrics and basic resource-attribute enablement (plus SQL
-  Server `override_value`). Per-metric attribute/aggregation tuning and SQL
+  Server and MongoDB `override_value`). Collector `v0.158.0` requires MongoDB
+  attributes under the receiver's top-level `resource_attributes`. The current
+  Splunk web page shows `metrics.resource_attributes` and
+  `logs.resource_attributes`, but the pinned binary rejects both keys during
+  `otelcol validate`; recheck this placement when the collector pin advances.
+  Per-metric attribute/aggregation tuning and SQL
   Server's experimental include/exclude resource filters are intentionally
   gated from production. `postgresql.wal.delay` is the audited default; legacy
   `postgresql.wal.lag` needs an unaudited feature gate and is rejected. SQL Server built-in
@@ -510,7 +561,7 @@ reviewed migration that removes or rolls back the previous scraper first.
   owning Windows secret workflow, then run tenant/product validation. The
   rendered rollback packet is intentionally non-mutating for the same reason.
 - SQL Server local/named-instance Performance Counter mode is Windows-only.
-  PostgreSQL, Oracle, MySQL, MariaDB, and remote SQL Server use network
+  PostgreSQL, Oracle, MySQL, MariaDB, MongoDB, and remote SQL Server use network
   receiver connections even when the collector runs on Windows.
 
 ### Gateway routing
@@ -539,7 +590,7 @@ network policy and TLS; never expose unauthenticated OTLP/HTTP broadly.
   should start from the published 2-vCPU host guidance while distinguishing
   host capacity from the collector memory limit.
 - Splunk's published performance page does not provide equivalent sizing tests
-  for PostgreSQL, MySQL, or MariaDB. Record that gap, benchmark representative
+  for PostgreSQL, MySQL, MariaDB, or MongoDB. Record that gap, benchmark representative
   workloads, and do not extrapolate the SQL/Oracle test result as a support
   guarantee.
 - Keep the production receiver sample interval fixed at `10s`. The advanced
@@ -570,8 +621,8 @@ product behavior.
 | Collector | Pinned-binary configuration validation passes; service/pod is healthy; recent logs have no receiver auth, required-system-view permission, connection, export, throttle, or duplicate-scrape failures. PostgreSQL per-statement best-effort EXPLAIN denials are recorded separately and do not make the receiver unhealthy. |
 | Infrastructure Monitoring | Every target appears under Infrastructure > Datastores with stable instance identity and expected infrastructure metrics. |
 | DBMon Overview | Every network DBMon target appears under APM > Database monitoring > Overview; Windows Performance Counter targets are infrastructure-metrics-only. |
-| Navigator | Queries, Query samples, Query metrics, Dependencies, and Metadata are validated only when the target's rendered event controls enable them; disabled surfaces are recorded as not applicable. |
-| Query analysis | Normalized statements, execution/duration/CPU/wait-state data, query samples, and eligible explain plans are visible. SQL Server and Oracle also require a stored-procedure review when used. |
+| Navigator | Queries, Query samples, Query metrics, Dependencies, Metadata, and supported blocking-session relationships are validated only where the selected engine and rendered events provide them; disabled or unsupported surfaces are recorded as not applicable. |
+| Query analysis | Normalized statements, execution/duration/CPU/wait-state data, query samples, and engine/version-eligible explain plans are visible. SQL Server and Oracle also expose a Stored Procedures subtab. |
 | Alerts | The instance navigator exposes associated alerts; custom detector creation is handed to `splunk-observability-native-ops`. |
 | APM correlation | For an explicitly supported language/engine pair, a sampled query links to a trace and the trace links back to normalized query details. |
 | AI query help | When licensed and enabled by Splunk Support, the Query statement flyout can summarize a normalized query and generate recommendations. Record `ui_handoff_required` until a human verifies it. |
@@ -585,11 +636,15 @@ enough to be sampled.
 
 | Application instrumentation | Database | Minimum app agent | Minimum collector |
 |---|---|---|---|
-| Splunk OTel .NET | Microsoft SQL Server | `v1.11.0` | `v0.148.0` |
-| Splunk OTel Java JDBC | Microsoft SQL Server | `v2.20.1` | `v0.148.0` |
+| Splunk OTel .NET | Microsoft SQL Server | `v1.14.0` | `v0.154.0` |
+| Splunk OTel Java JDBC | Microsoft SQL Server | `v2.20.1` | `v0.154.0` |
 | Splunk OTel Java JDBC | MySQL | `v2.26.1` | `v0.154.0` |
-| Splunk OTel Java JDBC | Oracle Database | `v2.20.1` | `v0.148.0` |
+| Splunk OTel Java JDBC | Oracle Database | `v2.20.1` | `v0.156.0` |
 | Splunk OTel Java JDBC | PostgreSQL | `v2.22.0` | `v0.147.0` |
+
+MongoDB is not currently listed as a supported APM query-correlation pair in
+Splunk's published matrix. Do not infer a MongoDB/Java or MongoDB/.NET
+correlation promise from MongoDB's DBMon support.
 
 Application-side propagation is a separate mutation and requires its own
 approval. Java requires
@@ -681,6 +736,7 @@ Product and collection:
 - Architecture and deployment options: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/architecture-and-deployment-options>
 - Performance overhead and sizing: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/performance-overhead>
 - Microsoft SQL Server receiver: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/microsoft-sql-server-receiver>
+- MongoDB DBMon receiver and event support: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/mongodb-receiver>
 - MySQL and MariaDB DBMon receiver/product support (MySQL 5.7+, MariaDB 10.5+, AWS RDS and standalone; Collector 0.154.0+): <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/mysql-receiver>
 - Oracle Database receiver: <https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/get-data-in/configure-receivers/oracle-database-receiver>
 - AWS RDS Oracle SYS-object grants: <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.Oracle.CommonDBATasks.TransferPrivileges.html>
@@ -708,4 +764,7 @@ Release and component provenance:
 - Upstream MySQL receiver compatibility at `v0.158.0`: <https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.158.0/receiver/mysqlreceiver/README.md>
 - Realm/component availability: <https://help.splunk.com/en/splunk-observability-cloud/get-started/service-description/splunk-observability-cloud-service-description>
 - Splunk OTel Collector repository: <https://github.com/signalfx/splunk-otel-collector>
+- August 2026 Database Monitoring feature release (MongoDB and expanded receiver metrics): <https://help.splunk.com/en/splunk-observability-cloud/release-notes/august-2026>
+- July 2026 Database Monitoring release (MySQL/MariaDB and APM service-map correlation): <https://help.splunk.com/en/splunk-observability-cloud/release-notes/july-2026>
+- April 2026 Stored Procedures subtab release: <https://help.splunk.com/en/splunk-observability-cloud/release-notes/april-2026>
 - Splunk OTel Collector chart repository: <https://github.com/signalfx/splunk-otel-collector-chart>

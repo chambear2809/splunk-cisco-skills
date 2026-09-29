@@ -44,20 +44,22 @@ schema, HEC envelope shape, or collector handoff flags.
 
 ## Apply Sections
 
-Operational apply is supported only when `--tenant-onboarding-date` (or
-`galileo.onboarding_date`) is a valid date before `2026-08-07`. A missing date,
-the exact boundary date, or a later date produces a complete render/validation
-packet but blocks all apply sections. The post-boundary product uses Splunk
-Agent Observability names and contracts that are not implemented by these
-legacy Galileo helpers. The generated wrappers enforce the same gate even when
-run directly. `cleanup-object-lifecycle.sh` is the sole exception so an
+This repository's helper permits operational apply only when
+`--tenant-onboarding-date` (or `galileo.onboarding_date`) is a valid date before
+`2026-08-07`. A missing date, the exact boundary date, or a later date produces
+a complete render/validation packet but blocks all apply sections. This is a
+repository-local conservative gate tied to the helper's reviewed documentation
+epoch; the date is not an authoritative Splunk tenant migration or contract
+cutoff. Confirm the actual tenant product/API contract before routing a later
+or boundary tenant. The generated wrappers enforce this repository gate even
+when run directly. `cleanup-object-lifecycle.sh` is the sole exception so an
 existing exact-ID ownership ledger remains recoverable.
 
 The copied Python lifecycle, export, and Luna helpers are internal
 implementation details behind the guarded wrappers; do not treat them as
 independent public apply entry points. The alert relay is a standalone helper:
-its handoff emits a runnable launch command only for a verified pre-boundary
-tenant and is explicitly render-only for every blocked epoch.
+its handoff emits a runnable launch command only when the repository-local gate
+passes and is explicitly render-only for every blocked epoch.
 
 | Section | Owner | Purpose |
 | --- | --- | --- |

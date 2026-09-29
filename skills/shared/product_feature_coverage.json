@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "router_count": 10,
+  "router_count": 11,
   "maximum_source_age_days": 180,
   "allowed_coverage_statuses": [
     "delegated_apply",
@@ -498,6 +498,59 @@
       "feature_count": 57,
       "feature_ids_sha256": "50b3ae7c73b3787f7a867a9c4a2bd27dd65b0f4dc353f3e62730ed86616a4951",
       "feature_contracts_sha256": "2027c28474786b3867acf68ae6917926e07f5446abcd1bdb64e30dc4d1035ff2"
+    },
+    {
+      "id": "splunk-agent-observability",
+      "product_area": "Splunk Agent Observability SaaS and on-premises product workflows",
+      "router_skill": "splunk-agent-observability-setup",
+      "inventory_classification": "coverage_owner",
+      "adapter": "splunk_agent_observability_json_matrix",
+      "source_path": "skills/splunk-agent-observability-setup/references/product-feature-matrix.json",
+      "reference_path": "skills/splunk-agent-observability-setup/reference.md",
+      "validation_path": "skills/splunk-agent-observability-setup/scripts/validate.sh",
+      "allowed_source_hosts": [
+        "agent-observability-docs.splunk.com",
+        "docs.agentcontrol.dev",
+        "help.splunk.com"
+      ],
+      "provenance": [
+        {
+          "path": "skills/splunk-agent-observability-setup/references/product-feature-matrix.json",
+          "format": "json",
+          "date_field": "last_verified",
+          "url_fields": [
+            "source_urls"
+          ]
+        }
+      ],
+      "require_row_boundary_statuses": [
+        "direct_apply",
+        "handoff",
+        "render_runbook",
+        "validate_only"
+      ],
+      "require_row_validation": true,
+      "status_contracts": {
+        "direct_apply": {
+          "coverage_status": "direct_apply",
+          "automation_boundary": "Make only the exact requested and documented application or product change; preserve staging, credential, privacy, and validation gates."
+        },
+        "handoff": {
+          "coverage_status": "handoff",
+          "automation_boundary": "Do not infer an undocumented live operation; provide a source-backed owner/support handoff and state the evidence still required."
+        },
+        "render_runbook": {
+          "coverage_status": "render_runbook",
+          "automation_boundary": "Prepare the documented action, scope, inputs, and validation evidence; apply only through an approved interface and the user's requested scope."
+        },
+        "validate_only": {
+          "coverage_status": "validate_only",
+          "automation_boundary": "Perform read-only validation and retain sanitized evidence without changing target state."
+        }
+      },
+      "feature_count": 49,
+      "feature_ids_sha256": "a4c5f1b711ea611f051c24af84be71c49f4b6e46911348ccd138049706eda23e",
+      "feature_contracts_sha256": "ef45f20029fb1903b8c1ed93371dab723f7011ccb55959db8a960ed5aadbd2eb"
     },
     {
       "id": "galileo-on-prem",

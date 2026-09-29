@@ -687,37 +687,37 @@ def adapt_appdynamics_taxonomy(router: dict[str, Any]) -> AdapterResult:
     return AdapterResult(tuple(features), frozenset(observed))
 
 
-def _adapt_galileo_json_matrix(
+def _adapt_json_product_matrix(
     router: dict[str, Any], expected_product_area: str
 ) -> AdapterResult:
-    """Normalize one reviewed Galileo feature matrix without executing code."""
+    """Normalize one reviewed product feature matrix without executing code."""
 
     matrix = load_json(repo_path(router["source_path"]))
     if matrix.get("schema_version") != 1:
-        raise ValueError("Galileo feature matrix schema_version must be 1")
+        raise ValueError("product feature matrix schema_version must be 1")
     product_area = str(matrix.get("product_area", "")).strip()
     if product_area != expected_product_area:
         raise ValueError(
-            "Galileo feature matrix product_area mismatch: "
+            "product feature matrix product_area mismatch: "
             f"expected {expected_product_area!r}, got {product_area!r}"
         )
     rows = matrix.get("features", [])
     if not isinstance(rows, list):
-        raise ValueError("Galileo feature matrix features must be a list")
+        raise ValueError("product feature matrix features must be a list")
     if matrix.get("feature_count") != len(rows):
-        raise ValueError("Galileo feature matrix feature_count does not match rows")
+        raise ValueError("product feature matrix feature_count does not match rows")
     declared = {
         str(value).strip()
         for value in matrix.get("supported_statuses", [])
         if str(value).strip()
     }
     if not declared:
-        raise ValueError("Galileo feature matrix supported_statuses is empty")
+        raise ValueError("product feature matrix supported_statuses is empty")
 
     features: list[FeatureCoverage] = []
     for row in rows:
         if not isinstance(row, dict):
-            raise ValueError("Galileo feature matrix rows must be objects")
+            raise ValueError("product feature matrix rows must be objects")
         owners = _as_string_list(row.get("owners"))
         if not owners:
             owners = _as_string_list(row.get("owner"))
@@ -740,7 +740,7 @@ def _adapt_galileo_json_matrix(
     if official_inventory is not None:
         if not isinstance(official_inventory, list) or not official_inventory:
             raise ValueError(
-                "Galileo feature matrix official_source_inventory must be nonempty"
+                "product feature matrix official_source_inventory must be nonempty"
             )
         official_urls: set[str] = set()
         for source in official_inventory:
@@ -750,15 +750,15 @@ def _adapt_galileo_json_matrix(
                 "scope",
             }:
                 raise ValueError(
-                    "Galileo official source rows require exactly url, title, and scope"
+                    "product official source rows require exactly url, title, and scope"
                 )
             url = str(source.get("url", "")).strip()
             title = str(source.get("title", "")).strip()
             scope = str(source.get("scope", "")).strip()
             if not url or not title or not scope:
-                raise ValueError("Galileo official source row fields must be nonempty")
+                raise ValueError("product official source row fields must be nonempty")
             if url in official_urls:
-                raise ValueError(f"duplicate Galileo official source URL: {url}")
+                raise ValueError(f"duplicate product official source URL: {url}")
             official_urls.add(url)
         covered_urls = {
             url for feature in features for url in feature.source_urls
@@ -767,12 +767,12 @@ def _adapt_galileo_json_matrix(
         missing_urls = sorted(official_urls - covered_urls)
         if extra_urls:
             raise ValueError(
-                "Galileo feature rows use URLs absent from official_source_inventory: "
+                "product feature rows use URLs absent from official_source_inventory: "
                 + ", ".join(extra_urls)
             )
         if missing_urls:
             raise ValueError(
-                "Galileo official source inventory has uncovered URLs: "
+                "product official source inventory has uncovered URLs: "
                 + ", ".join(missing_urls)
             )
     observed = {
@@ -780,22 +780,31 @@ def _adapt_galileo_json_matrix(
     }
     if observed - declared:
         raise ValueError(
-            "Galileo feature matrix uses undeclared statuses: "
+            "product feature matrix uses undeclared statuses: "
             + ", ".join(sorted(observed - declared))
         )
     return AdapterResult(tuple(features), frozenset(declared))
 
 
 def adapt_galileo_on_prem_matrix(router: dict[str, Any]) -> AdapterResult:
-    return _adapt_galileo_json_matrix(
+    return _adapt_json_product_matrix(
         router, "Galileo On-Prem Kubernetes deployment surfaces"
     )
 
 
 def adapt_galileo_platform_matrix(router: dict[str, Any]) -> AdapterResult:
-    return _adapt_galileo_json_matrix(
+    return _adapt_json_product_matrix(
         router,
         "Galileo application and integration surfaces for an already-running instance",
+    )
+
+
+def adapt_splunk_agent_observability_matrix(
+    router: dict[str, Any],
+) -> AdapterResult:
+    return _adapt_json_product_matrix(
+        router,
+        "Splunk Agent Observability SaaS and on-premises product workflows",
     )
 
 
@@ -1119,6 +1128,7 @@ ADAPTERS = {
     "galileo_platform_json_matrix": adapt_galileo_platform_matrix,
     "observability_markdown_matrix": adapt_observability_matrix,
     "security_catalog": adapt_security_catalog,
+    "splunk_agent_observability_json_matrix": adapt_splunk_agent_observability_matrix,
     "supported_addons_catalog": adapt_supported_addons,
     "widefield_markdown_router": adapt_widefield_router,
 }

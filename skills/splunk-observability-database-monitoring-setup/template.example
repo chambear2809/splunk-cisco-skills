@@ -35,7 +35,7 @@ outputs:
   linux: true
   windows: true
 
-# Required when PostgreSQL, MySQL, or MariaDB is selected. Replace this example
+# Required when PostgreSQL, MySQL, MariaDB, or MongoDB is selected. Replace this example
 # with the ticket/report proving representative-load sizing for this collector.
 sizing_evidence:
   reference: CHANGE-1234-load-test-report
@@ -43,7 +43,7 @@ sizing_evidence:
   reviewed_at: "2026-07-07"
   peak_memory_mib: 3072
   peak_cpu_cores: 1.5
-  target_count: 5
+  target_count: 6
 
 # Keep false in production. The explicit opt-in exists only for lab validation
 # of combinations outside Splunk's published DBMon support matrix.
@@ -191,6 +191,32 @@ targets:
       linux_env:
         username_var: DBMON_IDENTITY_MARIADB_USERNAME
         password_var: DBMON_IDENTITY_MARIADB_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
+    advanced:
+      tls:
+        insecure: false
+        insecure_skip_verify: false
+
+  # MongoDB 4.0+ supports metrics. DBMon query samples, top queries, and plans
+  # require self-managed 7.0 or Atlas dedicated M10+. For Atlas use the SRV
+  # hostname and declare tier so the renderer can enforce the product floor.
+  - name: profile_mongodb
+    type: mongodb
+    platform: self-hosted
+    version: "7.0"
+    endpoint: mongo-profile.example.internal:27017
+    auth_source: admin
+    credentials:
+      kubernetes_secret:
+        name: dbmon-profile-mongodb
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_PROFILE_MONGODB_USERNAME
+        password_var: DBMON_PROFILE_MONGODB_PASSWORD
     events:
       query_sample: true
       top_query: true

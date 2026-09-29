@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "skill": "splunk-agent-observability-setup",
+  "sanitization": "No tenant IDs, project or Agent Stream IDs, endpoints, credentials, trace content, prompts, or application data are recorded.",
+  "runs": [
+    {
+      "id": "2026-09-28-standalone-offline-portability",
+      "date": "2026-09-28",
+      "environment": {
+        "mode": "offline",
+        "package": "temporary standalone copy of the skill directory",
+        "working_directory": "outside the skill and repository"
+      },
+      "result": "partial",
+      "checks": {
+        "agent_skills_frontmatter": "All 170 repository skills passed the frontmatter, local resource link, and agents/openai.yaml audit.",
+        "feature_and_action_contract": "The skill validator accepted 49 feature rows, 55 object action rows, and 22 API reference groups.",
+        "standalone_copy": "The copied skill validated and generated first-trace, Agent Control create, and SaaS access-token verification plans from an unrelated working directory.",
+        "repo_readiness": "The initial repository readiness run exposed a stale Agent Observability feature-contract snapshot; the manifest hash was refreshed to match the reviewed current matrix contract and the final repository audits passed."
+      },
+      "limitations": [
+        "No live Splunk Agent Observability project or Agent Stream was available for synthetic trace readback.",
+        "Agent Control policy creation, stream binding, allow/deny runtime behavior, and tenant cleanup were not tested.",
+        "This result validates skill packaging and its offline coverage/planning contract only; it does not prove SaaS feature behavior."
+      ],
+      "cleanup": "The temporary standalone copy was removed automatically. No tenant or cloud resources were changed."
+    },
+    {
+      "id": "2026-09-28-isovalent-demo-saas-live",
+      "date": "2026-09-28",
+      "environment": {
+        "mode": "Splunk Agent Observability SaaS",
+        "cluster": "isovalent-demo",
+        "namespace": "otel-splunk",
+        "runtime": "bounded Kubernetes Jobs with protected-token SecretRef"
+      },
+      "result": "partial",
+      "checks": {
+        "authenticated_api": "AO project API accepted the replacement INGEST plus API token; project and Agent Stream create/read succeeded.",
+        "telemetry": "Synthetic-only SDK Job completed; AO query returned the validation trace, tool span, and marked session in the exact disposable Agent Stream. The SDK also generated an additional session.",
+        "control_management": "Created a global list evaluator control, cloned and bound it to the disposable Agent Stream, read its policy and binding through the tenant Agent Control API, and changed only its clone.",
+        "runtime": "Agent Control SDK 8.5.0 in isovalent-demo allowed the safe input, denied the marker input with ControlViolationError, and executed the protected function only for the safe input.",
+        "control_telemetry": "AO returned two control spans from an earlier unmatched policy attempt. The later successful deny check was independently observed at the Kubernetes runtime; a corresponding deny span was not verified.",
+        "configuration_corrections": "splunk-ao 0.4.0 rejected SaaS O11y and standalone API variables together. The tool input was wrapped, so selector input with contains matched where selector * with exact did not."
+      },
+      "limitations": [
+        "The 55 object/action families and policy dimensions are documentation-mapped, not all live-created. SaaS-inapplicable and unavailable external-provider objects were not exercised.",
+        "The passing allow/deny runtime check and the ingested control spans came from separate attempts; a single trace showing the final deny action was not verified.",
+        "Agent Control SDK init registered a unique agent record with zero steps and zero evaluators. The tenant OpenAPI exposes no delete-agent action, and that record still existed after project deletion.",
+        "Deactivation of the newly provisioned Splunk Observability access token was not verified."
+      ],
+      "cleanup": "Exact binding detach returned deleted=true; the control clone and global control were deleted and returned 404 on readback. Synthetic span, trace, and session searches returned zero before the Agent Stream and project were deleted; both returned 404 afterward. Validation Jobs, ConfigMaps, and the dedicated Secret were removed and Kubernetes readback found none. A control-free Agent Control registration remains and requires a supported vendor or tenant-admin removal path."
+    }
+  ]
+}

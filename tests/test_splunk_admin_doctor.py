@@ -488,6 +488,14 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertEqual(route["id"], "galileo-agent-control")
         self.assertEqual(route["handoff_skills"], ["galileo-agent-control-setup"])
 
+        agent_observability = doctor.build_product_coverage(
+            {"products": {"detected": ["Splunk Agent Observability"]}},
+            "cloud",
+        )
+        route = next(item for item in agent_observability["routes"] if item["detected"])
+        self.assertEqual(route["id"], "splunk-observability")
+        self.assertIn("splunk-agent-observability-setup", route["handoff_skills"])
+
         for label in (
             "Galileo On-Prem",
             "Galileo On-Prem Kubernetes",

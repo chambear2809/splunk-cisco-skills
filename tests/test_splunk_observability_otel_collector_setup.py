@@ -1245,6 +1245,12 @@ kind: Deployment
 metadata:
   name: splunk-otel-collector-k8s-cluster-receiver
 spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
   template:
     spec:
       containers:
@@ -1273,6 +1279,8 @@ spec:
     assert ubi_source + "\n" not in rendered.stdout
     assert rendered.stdout.count(standard_pin) == 2
     assert ubi_pin in rendered.stdout
+    assert "  strategy:\n    type: Recreate\n" in rendered.stdout
+    assert "rollingUpdate:" not in rendered.stdout
     rendered_manifest = tmp_path / "post-rendered.yaml"
     rendered_manifest.write_text(rendered.stdout, encoding="utf-8")
     verified = subprocess.run(
@@ -1348,6 +1356,14 @@ spec:
 
     accepted_pod = json.loads(json.dumps(moved_core_pod))
     accepted_pod["spec"]["containers"][0]["image"] = standard_pin
+    accepted_pod["status"]["containerStatuses"] = [
+        {
+            "name": "otel-collector",
+            "image": "sha256:" + "f" * 64,
+            "imageID": standard_pin,
+            "ready": True,
+        }
+    ]
     accepted = subprocess.run(
         [
             "python3",
@@ -3198,6 +3214,120 @@ def test_extra_values_cannot_override_file_backed_secret_contract(tmp_path: Path
         )
         assert result.returncode != 0
         assert "INLINE_SECRET" not in result.stdout
+
+
+def test_extra_values_accept_chart_owned_token_in_headers_setter(tmp_path: Path) -> None:
+    safe_overlay = tmp_path / "headers-setter-secret-ref.yaml"
+    safe_overlay.write_text(
+        "gateway:\n"
+        "  config:\n"
+        "    extensions:\n"
+        "      headers_setter:\n"
+        "        headers:\n"
+        "          - action: upsert\n"
+        "            key: X-SF-Token\n"
+        '            default_value: "${env:SPLUNK_OBSERVABILITY_ACCESS_TOKEN}"\n'
+        "            from_context: service.name\n",
+        encoding="utf-8",
+    )
+    accepted = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us0",
+        "--cluster-name",
+        "demo",
+        "--extra-values-file",
+        str(safe_overlay),
+        "--output-dir",
+        str(tmp_path / "safe-headers-setter-render"),
+    )
+    assert accepted.returncode == 0, accepted.stdout
+
+    unsafe_overlay = tmp_path / "headers-setter-inline-token.yaml"
+    sentinel = "INLINE_HEADER_TOKEN_MUST_NOT_RENDER"
+    unsafe_overlay.write_text(
+        "gateway:\n"
+        "  config:\n"
+        "    extensions:\n"
+        "      headers_setter:\n"
+        "        headers:\n"
+        "          - action: upsert\n"
+        "            key: X-SF-Token\n"
+        f"            default_value: {sentinel}\n",
+        encoding="utf-8",
+    )
+    rejected = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us0",
+        "--cluster-name",
+        "demo",
+        "--extra-values-file",
+        str(unsafe_overlay),
+        "--output-dir",
+        str(tmp_path / "unsafe-headers-setter-render"),
+    )
+    assert rejected.returncode != 0
+    assert sentinel not in rejected.stdout
+
+
+def test_extra_values_accept_reference_only_secret_volume_and_reject_secret_data(
+    tmp_path: Path,
+) -> None:
+    safe_overlay = tmp_path / "external-secret-volume.yaml"
+    safe_overlay.write_text(
+        "clusterReceiver:\n"
+        "  extraVolumes:\n"
+        "    - name: mongodb-ca\n"
+        "      secret:\n"
+        "        secretName: dbmon-mongodb-ca\n"
+        "        defaultMode: 256\n"
+        "        items:\n"
+        "          - key: ca.crt\n"
+        "            path: ca.crt\n"
+        "  extraVolumeMounts:\n"
+        "    - name: mongodb-ca\n"
+        "      mountPath: /etc/dbmon/mongodb-ca\n"
+        "      readOnly: true\n",
+        encoding="utf-8",
+    )
+    accepted = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us0",
+        "--cluster-name",
+        "dbmon-secret-volume",
+        "--extra-values-file",
+        str(safe_overlay),
+        "--output-dir",
+        str(tmp_path / "safe-render"),
+    )
+    assert accepted.returncode == 0, accepted.stdout
+
+    unsafe_overlay = tmp_path / "inline-secret-volume.yaml"
+    sentinel = "INLINE_SECRET_VOLUME_MUST_NOT_RENDER"
+    unsafe_overlay.write_text(
+        "clusterReceiver:\n"
+        "  extraVolumes:\n"
+        "    - name: credentials\n"
+        "      secret:\n"
+        "        secretName: dbmon-credentials\n"
+        f"        data: {sentinel}\n",
+        encoding="utf-8",
+    )
+    rejected = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us0",
+        "--cluster-name",
+        "dbmon-secret-volume",
+        "--extra-values-file",
+        str(unsafe_overlay),
+        "--output-dir",
+        str(tmp_path / "unsafe-render"),
+    )
+    assert rejected.returncode != 0
+    assert sentinel not in rejected.stdout
 
 
 def test_extra_values_reject_credentials_hidden_in_arbitrary_scalars(

@@ -26,6 +26,9 @@ AUDITED_COLLECTOR_MANIFEST_DIGEST = (
 AUDITED_COLLECTOR_IMAGE = (
     f"{AUDITED_COLLECTOR_REPOSITORY}:0.158.0@{AUDITED_COLLECTOR_MANIFEST_DIGEST}"
 )
+AUDITED_COLLECTOR_IMAGE_DIGEST_ONLY = (
+    f"{AUDITED_COLLECTOR_REPOSITORY}@{AUDITED_COLLECTOR_MANIFEST_DIGEST}"
+)
 # Per-platform sub-manifest digests behind the 0.158.0 manifest list, in the
 # order linux/amd64, linux/arm64, linux/ppc64le. A running pod reports the
 # platform digest rather than the list digest, so apply-time image verification
@@ -48,7 +51,7 @@ AUDITED_IMAGE_DIGEST_CASE_PATTERN = ("|\\\n" + " " * 8).join(
     )
 )
 ALLOWED_REALMS = {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
-TARGET_TYPES = {"postgresql", "sqlserver", "oracledb", "mysql", "mariadb"}
+TARGET_TYPES = {"postgresql", "sqlserver", "oracledb", "mysql", "mariadb", "mongodb"}
 TYPE_ALIASES = {
     "postgres": "postgresql",
     "postgresql": "postgresql",
@@ -64,21 +67,26 @@ TYPE_ALIASES = {
     "mysql": "mysql",
     "maria-db": "mariadb",
     "mariadb": "mariadb",
+    "mongo": "mongodb",
+    "mongodb": "mongodb",
 }
 VERSION_FLOORS = {
     "postgresql": "v0.147.0",
-    "sqlserver": "v0.148.0",
-    "oracledb": "v0.148.0",
+    "sqlserver": "v0.154.0",
+    "oracledb": "v0.156.0",
     "mysql": "v0.154.0",
     "mariadb": "v0.154.0",
+    "mongodb": "v0.158.0",
 }
 SUPPORTED = {
     "postgresql": {
-        "versions": {"14.20", "17.7", "14.15", "17.5"},
-        "platforms": {"azure-flexible-server", "aws-rds"},
+        "versions": {"14.20", "17.7", "14.15", "17.5", "18.4"},
+        "platforms": {"azure-flexible-server", "aws-rds", "aws-aurora", "edb"},
         "platform_versions": {
             "azure-flexible-server": {"14.20", "17.7"},
             "aws-rds": {"14.15", "17.5"},
+            "aws-aurora": {"17.7"},
+            "edb": {"18.4"},
         },
     },
     "sqlserver": {
@@ -91,7 +99,7 @@ SUPPORTED = {
         },
     },
     "oracledb": {
-        "versions": {"19c", "26ai"},
+        "versions": {"12c", "18c", "19c", "21c", "26ai"},
         "platforms": {"aws-rds", "oracle-rac", "self-hosted"},
     },
     "mysql": {
@@ -104,6 +112,11 @@ SUPPORTED = {
         "version_label": "10.5.x through 10.11.x, or 11.x",
         "platforms": {"aws-rds", "standalone"},
     },
+    "mongodb": {
+        "minimum_version": (4, 0),
+        "version_label": "4.0+",
+        "platforms": {"self-hosted", "mongodb-atlas"},
+    },
 }
 RECEIVER_TYPES = {
     "postgresql": "postgresql",
@@ -111,6 +124,7 @@ RECEIVER_TYPES = {
     "oracledb": "oracledb",
     "mysql": "mysql",
     "mariadb": "mysql",
+    "mongodb": "mongodb",
 }
 DEFAULT_VALIDATION_METRICS = {
     "postgresql": "postgresql.database.count",
@@ -118,6 +132,7 @@ DEFAULT_VALIDATION_METRICS = {
     "oracledb": "oracledb.executions",
     "mysql": "mysql.buffer_pool.usage",
     "mariadb": "mysql.buffer_pool.usage",
+    "mongodb": "mongodb.connection.count",
 }
 METRIC_INVENTORY = {
     "postgresql": set(
@@ -194,6 +209,22 @@ mysql.table.io.wait.time mysql.table.lock_wait.read.count mysql.table.lock_wait.
 mysql.table.lock_wait.write.count mysql.table.lock_wait.write.time mysql.table.rows mysql.table.size
 mysql.table_open_cache mysql.threads mysql.tmp_resources mysql.uptime""".split()
     ),
+    "mongodb": set(
+        """mongodb.active.reads mongodb.active.writes mongodb.cache.operations
+mongodb.collection.count mongodb.commands.rate mongodb.connection.count mongodb.cursor.count
+mongodb.cursor.timeout.count mongodb.data.size mongodb.database.count mongodb.deletes.rate
+mongodb.document.operation.count mongodb.extent.count mongodb.flushes.rate mongodb.getmores.rate
+mongodb.global_lock.time mongodb.health mongodb.index.access.count mongodb.index.count
+mongodb.index.size mongodb.inserts.rate mongodb.lock.acquire.count mongodb.lock.acquire.time
+mongodb.lock.acquire.wait_count mongodb.lock.deadlock.count mongodb.memory.usage
+mongodb.network.io.receive mongodb.network.io.transmit mongodb.network.request.count
+mongodb.object.count mongodb.operation.count mongodb.operation.latency.time
+mongodb.operation.repl.count mongodb.operation.time mongodb.page_faults mongodb.queries.rate
+mongodb.repl_commands_per_sec mongodb.repl_deletes_per_sec mongodb.repl_getmores_per_sec
+mongodb.repl_inserts_per_sec mongodb.repl_queries_per_sec mongodb.repl_updates_per_sec
+mongodb.session.count mongodb.storage.size mongodb.updates.rate mongodb.uptime
+mongodb.wtcache.bytes.read""".split()
+    ),
 }
 METRIC_INVENTORY["mariadb"] = METRIC_INVENTORY["mysql"]
 K8S_DISTRIBUTIONS = {
@@ -240,6 +271,13 @@ RESOURCE_ATTRIBUTES = {
     },
     "mysql": {"mysql.instance.endpoint", "service.instance.id"},
     "mariadb": {"mysql.instance.endpoint", "service.instance.id"},
+    "mongodb": {
+        "server.address",
+        "server.port",
+        "service.instance.id",
+        "service.name",
+        "service.namespace",
+    },
 }
 RECEIVER_RESOURCE_ATTRIBUTES = {
     target_type: (
@@ -293,8 +331,13 @@ SECRET_VALUE_KEYS_NORMALIZED = {
     re.sub(r"[^a-z0-9]", "", key.lower()) for key in SECRET_VALUE_KEYS
 }
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(PROJECT_ROOT / "skills" / "shared" / "lib"))
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT_CANDIDATE = Path(__file__).resolve().parents[3]
+if (
+    (PROJECT_ROOT_CANDIDATE / "skills" / "shared" / "lib" / "yaml_compat.py").is_file()
+    and (PROJECT_ROOT_CANDIDATE / "skills" / SKILL_NAME / "SKILL.md").is_file()
+):
+    sys.path.insert(0, str(PROJECT_ROOT_CANDIDATE / "skills" / "shared" / "lib"))
 from yaml_compat import dump_yaml, load_yaml_or_json  # noqa: E402
 
 
@@ -396,7 +439,7 @@ def normalize_type(raw: Any) -> str:
     if target_type not in TARGET_TYPES:
         raise RenderError(
             f"Unsupported target type {raw!r}; expected postgresql, sqlserver, "
-            "oracledb, mysql, or mariadb."
+            "oracledb, mysql, mariadb, or mongodb."
         )
     return target_type
 
@@ -487,7 +530,7 @@ def normalized_sizing_evidence(
     if raw is None:
         if required:
             raise RenderError(
-                "sizing_evidence is required for PostgreSQL, MySQL, and MariaDB. "
+                "sizing_evidence is required for PostgreSQL, MySQL, MariaDB, and MongoDB. "
                 "Record a reviewed representative-load benchmark before production apply."
             )
         return None
@@ -580,6 +623,8 @@ def component_version_is_supported(target_type: str, version: str) -> bool:
         return parsed >= (5, 7)
     if target_type == "mariadb":
         return parse_database_version(version) >= (10, 5)
+    if target_type == "mongodb":
+        return parse_database_version(version) >= (4, 0)
     return True
 
 
@@ -642,6 +687,7 @@ def normalize_targets(
             "oracledb": {"endpoint", "service"},
             "mysql": {"endpoint"},
             "mariadb": {"endpoint"},
+            "mongodb": {"auth_source", "endpoint", "endpoints", "replica_set", "tier"},
         }[target_type]
         unknown_fields = sorted(set(raw) - common_fields - type_fields)
         if unknown_fields:
@@ -654,6 +700,13 @@ def normalize_targets(
         seen.add(name)
 
         platform = normalize_platform(raw.get("platform"))
+        if target_type == "mongodb" and platform in {"atlas", "mongodb-atlas"}:
+            platform = "mongodb-atlas"
+        if target_type == "postgresql":
+            if platform in {"aurora-postgresql", "amazon-aurora-postgresql"}:
+                platform = "aws-aurora"
+            elif platform in {"edb-postgres-advanced-server", "edb-postgres"}:
+                platform = "edb"
         if target_type in {"mysql", "mariadb"} and platform == "self-hosted":
             platform = "standalone"
         version = str(raw.get("version", "")).strip()
@@ -664,7 +717,7 @@ def normalize_targets(
                 f"{target_type}/{name} version must be major.minor or major.minor.patch."
             )
         if not component_version_is_supported(target_type, version):
-            floor = "5.7+" if target_type == "mysql" else "10.5+"
+            floor = {"mysql": "5.7+", "mariadb": "10.5+", "mongodb": "4.0+"}.get(target_type, "supported")
             raise RenderError(
                 f"{target_type}/{name} version {version!r} is below Splunk's "
                 f"published DBMon product floor {floor}."
@@ -712,6 +765,21 @@ def normalize_targets(
         normalized["receiver_id"] = f"{normalized['receiver_type']}/{name}"
         normalized["platform"] = platform
         normalized["version"] = version
+        if target_type == "mongodb":
+            normalized["tier"] = str(raw.get("tier") or "").strip().upper()
+            raw_endpoints = raw.get("endpoints")
+            if raw.get("endpoint") not in (None, "") and raw_endpoints is not None:
+                raise RenderError(f"mongodb/{name} may set endpoint or endpoints, not both.")
+            if raw_endpoints is None:
+                normalized["endpoints"] = [str(raw["endpoint"])] if raw.get("endpoint") else []
+            elif (
+                not isinstance(raw_endpoints, list)
+                or not raw_endpoints
+                or not all(isinstance(item, str) and item.strip() for item in raw_endpoints)
+            ):
+                raise RenderError(f"mongodb/{name} endpoints must be a nonempty list of host endpoints.")
+            else:
+                normalized["endpoints"] = [item.strip() for item in raw_endpoints]
         normalized["support_status"] = (
             "unsupported_opt_in" if support_notes else "official"
         )
@@ -987,6 +1055,8 @@ def normalized_advanced(target_type: str, raw: Any) -> dict[str, Any]:
     }
     if target_type == "postgresql":
         allowed |= {"exclude_databases", "connection_pool", "transport", "tls"}
+    if target_type == "mongodb":
+        allowed |= {"tls", "direct_connection"}
     if target_type in {"mysql", "mariadb"}:
         allowed |= {
             "database",
@@ -1008,6 +1078,10 @@ def normalized_advanced(target_type: str, raw: Any) -> dict[str, Any]:
         value = normalized.get(section)
         if value is not None and not isinstance(value, dict):
             raise RenderError(f"target.advanced.{section} must be a mapping.")
+    if target_type == "mongodb" and "direct_connection" in normalized and not isinstance(
+        normalized["direct_connection"], bool
+    ):
+        raise RenderError("mongodb advanced.direct_connection must be a boolean.")
     return normalized
 
 
@@ -1116,16 +1190,61 @@ def validate_connection_fields(target: dict[str, Any]) -> None:
     elif target_type in {"mysql", "mariadb"}:
         if not target.get("endpoint"):
             raise RenderError(f"{target_type}/{name} requires endpoint.")
+    elif target_type == "mongodb":
+        if mode == "datasource":
+            raise RenderError("mongodb does not support datasource mode.")
+        endpoints = target.get("endpoints") or []
+        if not endpoints:
+            raise RenderError(f"mongodb/{name} requires endpoint or endpoints.")
+        if target["platform"] == "mongodb-atlas" and len(endpoints) != 1:
+            raise RenderError(f"mongodb/{name} Atlas SRV targets require exactly one endpoint.")
+        if target["platform"] == "mongodb-atlas":
+            if target.get("tier") and not re.fullmatch(r"M\d+", target["tier"]):
+                raise RenderError(f"mongodb/{name} tier must use the Atlas M-tier form, such as M10.")
+            if target["events"]["query_sample"] or target["events"]["top_query"]:
+                tier_match = re.fullmatch(r"M(\d+)", target.get("tier", ""))
+                if not tier_match or int(tier_match.group(1)) < 10:
+                    raise RenderError(f"mongodb/{name} DBMon query events require an Atlas dedicated cluster tier M10 or higher.")
+        elif target.get("tier"):
+            raise RenderError(f"mongodb/{name} tier is only valid for Atlas targets.")
+        for field in ("auth_source", "replica_set"):
+            if target.get(field):
+                validate_identifier(
+                    str(target[field]), label=f"mongodb/{name} {field}", max_length=128
+                )
+        if target["events"]["query_sample"] or target["events"]["top_query"]:
+            if target["platform"] == "self-hosted" and parse_database_version(target["version"])[0:2] != (7, 0):
+                raise RenderError(f"mongodb/{name} query samples and top queries require self-managed MongoDB 7.0 or Atlas dedicated M10+.")
+            if target["platform"] not in {"self-hosted", "mongodb-atlas"}:
+                raise RenderError(f"mongodb/{name} query events are unsupported for platform {target['platform']!r}.")
+        if target.get("advanced", {}).get("direct_connection") is True:
+            if target["platform"] == "mongodb-atlas":
+                raise RenderError(
+                    f"mongodb/{name} direct_connection=true requires a non-SRV endpoint; "
+                    "Atlas targets use mongodb+srv."
+                )
+            if len(endpoints) != 1:
+                raise RenderError(
+                    f"mongodb/{name} direct_connection=true requires exactly one endpoint."
+                )
 
     if mode == "direct" and target_type in {
         "postgresql",
         "oracledb",
         "mysql",
         "mariadb",
+        "mongodb",
     }:
-        validate_host_port(
-            str(target.get("endpoint") or ""), label=f"{target_type}/{name} endpoint"
-        )
+        if target_type == "mongodb":
+            for endpoint in target.get("endpoints") or []:
+                if target["platform"] == "mongodb-atlas":
+                    validate_hostname(endpoint, label=f"mongodb/{name} Atlas host")
+                else:
+                    validate_host_port(endpoint, label=f"mongodb/{name} endpoint")
+        else:
+            validate_host_port(
+                str(target.get("endpoint") or ""), label=f"{target_type}/{name} endpoint"
+            )
 
     interval = str(target.get("collection_interval") or "10s")
     if interval != "10s":
@@ -1149,6 +1268,29 @@ def validate_hostname_or_ip(value: str, *, label: str) -> None:
         raise RenderError(
             f"{label} must be a hostname or IP address only; datasource options, "
             "delimiters, whitespace, and credentials are forbidden."
+        )
+    if any(
+        not part or len(part) > 63 or part.startswith("-") or part.endswith("-")
+        for part in candidate.split(".")
+    ):
+        raise RenderError(f"{label} is not a valid DNS hostname.")
+
+
+def validate_hostname(value: str, *, label: str) -> None:
+    """Accept a DNS hostname, excluding literal IP addresses."""
+    candidate = value.strip()
+    try:
+        ipaddress.ip_address(candidate.strip("[]"))
+    except ValueError:
+        pass
+    else:
+        raise RenderError(f"{label} must be a DNS hostname; IP literals are forbidden.")
+    if len(candidate) > 253 or not re.fullmatch(
+        r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?", candidate
+    ):
+        raise RenderError(
+            f"{label} must be a DNS hostname; datasource options, delimiters, "
+            "whitespace, and credentials are forbidden."
         )
     if any(
         not part or len(part) > 63 or part.startswith("-") or part.endswith("-")
@@ -1204,8 +1346,15 @@ def normalized_validation_filters(
                     f"{service_id_from_endpoint(target['endpoint'], target_type=target_type, name=name)}/{target['service']}"
                 )
             }
+        elif target_type == "mongodb":
+            endpoints = target.get("endpoints") or []
+            if len(endpoints) != 1:
+                raise RenderError(
+                    f"mongodb/{name} multiple hosts require an explicit validation_filters.service.instance.id."
+                )
+            raw = {"service.instance.id": endpoints[0]}
         else:
-            # The v0.155 MySQL identity processor copies the endpoint verbatim,
+            # The v0.158 MySQL identity processor copies the endpoint verbatim,
             # including IPv6 brackets.
             raw = {"service.instance.id": str(target["endpoint"])}
     if not isinstance(raw, dict) or not raw:
@@ -1218,7 +1367,7 @@ def normalized_validation_filters(
         if key_text not in RESOURCE_ATTRIBUTES[target_type]:
             raise RenderError(
                 f"{target_type}/{name} validation filter {key_text!r} is not a known "
-                "v0.155 receiver resource attribute."
+                "v0.158 receiver resource attribute."
             )
         normalized_key = re.sub(r"[^a-z0-9]", "", key_text.lower())
         if any(
@@ -1400,7 +1549,7 @@ def validate_advanced(target: dict[str, Any]) -> None:
     for metric, value in metrics.items():
         if str(metric) not in METRIC_INVENTORY[target_type]:
             raise RenderError(
-                f"{target_type}/{name} metric {metric!r} is not in the exact v0.155 "
+                f"{target_type}/{name} metric {metric!r} is not in the exact v0.158 "
                 f"{metric_prefix!r} receiver inventory."
             )
         if isinstance(value, bool):
@@ -1429,14 +1578,16 @@ def validate_advanced(target: dict[str, Any]) -> None:
     for attribute, value in resource_attributes.items():
         if attribute not in RECEIVER_RESOURCE_ATTRIBUTES[target_type]:
             raise RenderError(
-                f"{target_type}/{name} resource attribute {attribute!r} is not in the v0.155 schema."
+                f"{target_type}/{name} resource attribute {attribute!r} is not in the v0.158 schema."
             )
         if not isinstance(value, dict) or not isinstance(value.get("enabled"), bool):
             raise RenderError(
                 f"{target_type}/{name} resource attribute {attribute!r} requires enabled: true|false."
             )
         extra = set(value) - (
-            {"enabled", "override_value"} if target_type == "sqlserver" else {"enabled"}
+            {"enabled", "override_value"}
+            if target_type in {"sqlserver", "mongodb"}
+            else {"enabled"}
         )
         if extra:
             raise RenderError(
@@ -1447,12 +1598,12 @@ def validate_advanced(target: dict[str, Any]) -> None:
             value["override_value"], expected_override_type
         ):
             raise RenderError(
-                f"sqlserver/{name} resource attribute {attribute!r} override_value must be "
+                f"{target_type}/{name} resource attribute {attribute!r} override_value must be "
                 f"{expected_override_type.__name__}."
             )
 
     tls = advanced.get("tls")
-    if target_type in {"postgresql", "mysql", "mariadb"}:
+    if target_type in {"postgresql", "mysql", "mariadb", "mongodb"}:
         if not isinstance(tls, dict):
             raise RenderError(
                 f"{target_type}/{name} requires advanced.tls with certificate verification "
@@ -1463,7 +1614,7 @@ def validate_advanced(target: dict[str, Any]) -> None:
             raise RenderError(
                 f"{target_type}/{name} advanced.tls has unsupported fields: {', '.join(unknown_tls)}."
             )
-        if target_type == "postgresql":
+        if target_type in {"postgresql", "mongodb"}:
             rejected_pg_tls = sorted(
                 set(tls)
                 & {
@@ -1474,7 +1625,7 @@ def validate_advanced(target: dict[str, Any]) -> None:
             )
             if rejected_pg_tls:
                 raise RenderError(
-                    f"postgresql/{name} receiver v0.155 does not support TLS fields: "
+                f"{target_type}/{name} receiver v0.158 does not support TLS fields: "
                     f"{', '.join(rejected_pg_tls)}."
                 )
         if (
@@ -1784,6 +1935,17 @@ def receiver_config(target: dict[str, Any]) -> dict[str, Any]:
     elif target["type"] in {"mysql", "mariadb"}:
         config["endpoint"] = str(target["endpoint"])
         config["resource_attributes"] = {"mysql.instance.endpoint": {"enabled": True}}
+    elif target["type"] == "mongodb":
+        config["hosts"] = [
+            {"endpoint": str(endpoint)} for endpoint in target["endpoints"]
+        ]
+        config["auth_source"] = str(target.get("auth_source") or "admin")
+        if target["platform"] == "mongodb-atlas":
+            config["scheme"] = "mongodb+srv"
+        if target.get("replica_set"):
+            config["replica_set"] = str(target["replica_set"])
+        if target.get("advanced", {}).get("direct_connection") is not None:
+            config["direct_connection"] = bool(target["advanced"]["direct_connection"])
 
     # These attributes drive stable product identity and built-in content for
     # both discrete and datasource connection modes.
@@ -1807,6 +1969,26 @@ def receiver_config(target: dict[str, Any]) -> dict[str, Any]:
         )
 
     config = deep_merge(config, target["advanced"])
+    if target["type"] == "mongodb":
+        expected_id = next(
+            item["value"]
+            for item in target["validation_filters"]
+            if item["key"] == "service.instance.id"
+        )
+        resource_attributes = config.get("resource_attributes") or {}
+        identity = resource_attributes.get("service.instance.id", {})
+        if identity.get("enabled", True) is not True or identity.get(
+            "override_value", expected_id
+        ) != expected_id:
+            raise RenderError(
+                f"mongodb/{target['name']} resource_attributes.service.instance.id "
+                "must match validation_filters.service.instance.id and remain enabled."
+            )
+        resource_attributes["service.instance.id"] = {
+            "enabled": True,
+            "override_value": expected_id,
+        }
+        config["resource_attributes"] = resource_attributes
     return config
 
 
@@ -2360,6 +2542,7 @@ CHART_VERSION="{collector["chart_version"]}"
 CHART_SHA256="{AUDITED_CHART_SHA256}"
 COLLECTOR_VERSION="{collector["version"].lstrip("v")}"
 AUDITED_IMAGE="{AUDITED_COLLECTOR_IMAGE}"
+AUDITED_IMAGE_DIGEST_ONLY="{AUDITED_COLLECTOR_IMAGE_DIGEST_ONLY}"
 KUBE_CONTEXT="{collector["kube_context"]}"
 SELECTOR="app=splunk-otel-collector,component=otel-k8s-cluster-receiver,release=${{RELEASE}}"
 TLS_FILE_REQUIREMENTS_JSON='{json.dumps(tls_file_requirements(targets), separators=(",", ":"))}'
@@ -3167,11 +3350,14 @@ current_images="$(kubectl_ctx -n "${{NAMESPACE}}" get deployment,daemonset,state
     echo 'ERROR: no current otel-collector workload images were found for the release.' >&2
     exit 1
 }}
-if printf '%s\n' "${{current_images}}" | grep -Fxvq "${{AUDITED_IMAGE}}"; then
+unreviewed_images="$(printf '%s\n' "${{current_images}}" \
+    | grep -Fxv "${{AUDITED_IMAGE}}" \
+    | grep -Fxv "${{AUDITED_IMAGE_DIGEST_ONLY}}" || true)"
+if [[ -n "${{unreviewed_images}}" ]]; then
     UPGRADE_REQUESTED=true
     if [[ "${{ACCEPT_COLLECTOR_UPGRADE:-false}}" != "true" ]]; then
         echo 'ERROR: the DBMon overlay pins the global collector image tag and would change one or more chart workloads:' >&2
-        printf '  %s\n' "${{current_images}}" >&2
+        printf '  %s\n' "${{unreviewed_images}}" >&2
         echo '       Review the release-wide image change and pass --accept-collector-upgrade.' >&2
         exit 1
     fi
@@ -3242,7 +3428,7 @@ import sys
 base = json.load(open(sys.argv[1], encoding="utf-8"))
 overlay = json.load(open(sys.argv[2], encoding="utf-8"))
 allow_reconfigure = sys.argv[4] == "true"
-types = ("postgresql", "sqlserver", "oracledb", "mysql")
+types = ("postgresql", "sqlserver", "oracledb", "mysql", "mongodb")
 
 def is_db_id(value):
     text = str(value)
@@ -3293,7 +3479,7 @@ for name, pipeline in (((current.get("service") or {{}}).get("pipelines") or {{}
         changes.append(f"replace DB pipeline {{name}}")
 
 managed_components = {{
-    "exporters": {{"otlp_http/dbmon", "signalfx/dbmon"}},
+    "exporters": {{"otlp_http/dbmon", "otlp_http/dbmon_secondary", "signalfx/dbmon"}},
     "processors": {{
         "memory_limiter/dbmon",
         "batch/dbmon",
@@ -3326,7 +3512,7 @@ if any(
     )
 known = {{item.get("name"): item for item in base_envs if isinstance(item, dict) and item.get("name")}}
 desired_env_names = {{item.get("name") for item in overlay_envs}}
-stale_env_names = {{name for name in known if str(name).startswith("DBMON_") and name not in desired_env_names}}
+stale_env_names = {{name for name in known if str(name).startswith(("DBMON_", "SPLUNK_DBMON_")) and name not in desired_env_names}}
 if stale_env_names:
     changes.append("remove DB credential env references: " + ", ".join(sorted(stale_env_names)))
 changed_env_names = set()
@@ -3517,6 +3703,48 @@ check_secret_key "${{token_secret}}" "${{token_key}}" token
 yq ea -r 'select(.kind == "ConfigMap" and (.metadata.name | test("otel-k8s-cluster-receiver$"))) | .data.relay' \
     "${{TMPDIR_LOCAL}}/rendered-manifests.yaml" > "${{TMPDIR_LOCAL}}/collector.yaml"
 [[ -s "${{TMPDIR_LOCAL}}/collector.yaml" ]] || {{ echo 'ERROR: Could not extract the cluster-receiver collector config.' >&2; exit 1; }}
+# Collector's validate command constructs active pipelines. The local container
+# has no Kubernetes/cloud API, so keep only env/system resource detectors in
+# this temporary validation copy; the rendered deployment config remains exact.
+validation_json="${{TMPDIR_LOCAL}}/collector-validation.json"
+yq -o=json '.' "${{TMPDIR_LOCAL}}/collector.yaml" > "${{validation_json}}"
+python3 - "${{validation_json}}" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    config = json.load(handle)
+processors = config.get("processors") or {{}}
+pipelines = ((config.get("service") or {{}}).get("pipelines") or {{}})
+disabled = []
+for processor_id, processor_config in list(processors.items()):
+    if not isinstance(processor_config, dict):
+        continue
+    detectors = processor_config.get("detectors")
+    if not isinstance(detectors, list):
+        continue
+    safe_detectors = [name for name in detectors if name in ("env", "system")]
+    if safe_detectors == detectors:
+        continue
+    disabled.extend(name for name in detectors if name not in ("env", "system"))
+    if safe_detectors:
+        processor_config["detectors"] = safe_detectors
+        continue
+    processors.pop(processor_id, None)
+    for pipeline in pipelines.values():
+        if not isinstance(pipeline, dict):
+            continue
+        configured = pipeline.get("processors")
+        if isinstance(configured, list):
+            pipeline["processors"] = [name for name in configured if name != processor_id]
+if disabled:
+    print("Offline Collector validation disabled nonlocal resource detectors in its temporary config.")
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(config, handle, sort_keys=True)
+    handle.write("\n")
+PY
+mv -- "${{validation_json}}" "${{TMPDIR_LOCAL}}/collector.yaml"
 grep -Eo '\$\{{(env:)?[A-Za-z_][A-Za-z0-9_]*\}}' "${{TMPDIR_LOCAL}}/collector.yaml" \
     | sed -E 's/^\$\{{(env:)?//; s/\}}$//' | sort -u > "${{TMPDIR_LOCAL}}/env-names"
 : > "${{TMPDIR_LOCAL}}/validate.env"
@@ -3842,7 +4070,7 @@ PY
     if printf '%s\n' "${{relevant_logs}}" \
         | grep -Eqi 'unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|authentication failed|password authentication failed|access denied|login failed|connection refused|connection reset|broken pipe|bad connection|unexpected EOF|server closed the connection|connection (was )?closed|no such host|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to export|export(ing)? (failed|failure)|error exporting|unable to export' \
         || printf '%s\n' "${{actionable_logs}}" \
-        | grep -Eqi '(^|[[:space:]"=:])(error|fatal)([[:space:]"=:]|$)|unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|deadline exceeded|no such host|authentication failed|access denied|login failed|permission denied|connection refused|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to (start|export|fetch|collect|scrape|connect|query)|export(ing)? (failed|failure)|error (exporting|scraping|reading|collecting|querying)|unable to (export|connect|collect|query)|cannot start|duplicate scraper|ORA-[0-9]+'; then
+        | grep -Eqi '(^|[[:space:]"=:])fatal([[:space:]"=:]|$)|unauthorized|forbidden|(^|[^0-9])(401|403|429)([^0-9]|$)|too many requests|resource.?exhausted|rate.?limit|throttl|queue.*full|dropp?(ed|ing).*(telemetry|data)|deadline exceeded|no such host|authentication failed|access denied|login failed|permission denied|connection refused|no route to host|i/o timeout|x509:|certificate.*(invalid|unknown)|failed to (start|export|fetch|collect|scrape|connect|query)|export(ing)? (failed|failure)|error (exporting|scraping|reading|collecting|querying)|unable to (export|connect|collect|query)|cannot start|duplicate scraper|ORA-[0-9]+'; then
         echo 'ERROR: DBMon receiver logged a critical startup/connectivity failure.' >&2
         echo '       Raw collector lines are suppressed because they can contain database connection or query material.' >&2
         rollback_failed_apply 'Critical DBMon receiver log validation failed.'
@@ -4501,7 +4729,7 @@ except (OSError, UnicodeError, json.JSONDecodeError) as exc:
 if not isinstance(parsed, dict):
     raise SystemExit("ERROR: base collector config must be a mapping.")
 
-types = ("postgresql", "sqlserver", "oracledb", "mysql")
+types = ("postgresql", "sqlserver", "oracledb", "mysql", "mongodb")
 
 
 def db_id(value):
@@ -4517,7 +4745,7 @@ if any(db_id(key) for key in receivers):
     )
 reserved = []
 for section, names in (
-    ("exporters", {"otlp_http/dbmon", "signalfx/dbmon"}),
+    ("exporters", {"otlp_http/dbmon", "otlp_http/dbmon_secondary", "signalfx/dbmon"}),
     (
         "processors",
         {
@@ -5970,7 +6198,7 @@ $BaseText = [IO.File]::ReadAllText($BaseConfig)
 if ($BaseText.TrimStart().StartsWith("{") -or $BaseText -match '(?m)^\s*receivers\s*:\s*\{') {
     throw "JSON/flow-style base receiver maps require a separately reviewed Windows handoff; duplicate ownership cannot be proven safely"
 }
-if ($BaseText -match '(?m)^\s+["'']?(postgresql|sqlserver|oracledb|mysql)(/[^:"''\s]+)?["'']?\s*:') {
+if ($BaseText -match '(?m)^\s+["'']?(postgresql|sqlserver|oracledb|mysql|mongodb)(/[^:"''\s]+)?["'']?\s*:') {
     throw "Base collector config already contains a DB receiver; migrate it before using the sole-scraper handoff"
 }
 foreach ($TlsFile in $TlsFiles) {
@@ -6097,7 +6325,13 @@ def prerequisite_runbook(target: dict[str, Any]) -> str:
     )
     target_type = target["type"]
     if target_type == "postgresql":
-        body = """## Required database changes
+        pg_notes = {
+            "azure-flexible-server": "For Azure Flexible Server, also configure `azure.extensions=pg_stat_statements`, `shared_preload_libraries=pg_stat_statements`, `pg_stat_statements.track=all`, `pg_stat_statements.max=10000`, and `pg_stat_statements.track_utility=on`, then perform the provider-required restart.",
+            "aws-aurora": "For Aurora PostgreSQL, use the instance endpoint rather than the cluster endpoint. Confirm `pg_stat_statements` is loaded and create the extension in each target database.",
+            "aws-rds": "For RDS PostgreSQL, use the primary DB instance endpoint. Confirm `pg_stat_statements` is loaded and create the extension in each target database.",
+            "edb": "For EDB Postgres Advanced Server, preserve its existing `shared_preload_libraries` entries while adding `pg_stat_statements`, then restart the server and create the extension in each target database.",
+        }.get(target["platform"], "For self-hosted PostgreSQL, load `pg_stat_statements` at startup, restart when required, and create the extension in each target database.")
+        body = f"""## Required database changes
 
 ```sql
 GRANT pg_monitor TO "otel-user";
@@ -6105,11 +6339,7 @@ GRANT SELECT ON pg_stat_database TO "otel-user";
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 ```
 
-Create `pg_stat_statements` in every database the receiver scrapes. For Azure
-Flexible Server, also configure `azure.extensions=pg_stat_statements`,
-`shared_preload_libraries=pg_stat_statements`, `pg_stat_statements.track=all`,
-`pg_stat_statements.max=10000`, and `pg_stat_statements.track_utility=on`, then
-perform the provider-required restart.
+Create `pg_stat_statements` in every database the receiver scrapes. {pg_notes}
 """
     elif target_type == "sqlserver":
         permission = (
@@ -6170,7 +6400,7 @@ targets have `sqlserver.database.count` disabled automatically by the renderer.
             )
             plan_note = (
                 "MariaDB 10.5+ is a supported DBMon target for metrics and query events. "
-                "The v0.155 receiver does not provide MariaDB explain plans because MariaDB "
+                "The v0.158 receiver does not provide MariaDB explain plans because MariaDB "
                 "does not expose MySQL's `query_sample_text`; record plan evidence as not supported."
             )
         platform_note = (
@@ -6216,8 +6446,49 @@ WHERE NAME = 'events_waits_current';
 
 On AWS RDS this setting resets after restart or failover. Use reviewed DBA or
 provider startup automation to re-enable it and record a post-failover evidence
-check; the v0.155 receiver itself does not prove that mutation. Do not grant
+check; the v0.158 receiver itself does not prove that mutation. Do not grant
 broader Performance Schema writes.
+"""
+    elif target_type == "mongodb":
+        if target["platform"] == "mongodb-atlas":
+            source_kind = "MongoDB Atlas"
+            profiling = (
+                "Atlas profiler settings do not persist across reboot; the receiver uses its documented fallback mechanism."
+            )
+            event_role = (
+                "For Atlas, grant the documented `clusterMonitor` and `readAnyDatabase` roles on `admin`; "
+                "do not add self-managed-only `system.profile` privileges."
+            )
+        else:
+            source_kind = "Self-managed MongoDB"
+            profiling = "For reliable top-query collection, configure profiling level 1 and a 100 ms slow-operation threshold, then restart only through the database owner's reviewed change process."
+            event_role = (
+                "Query-event collection additionally requires a custom role granting `find` and `indexStats` "
+                "on `system.profile`."
+            )
+        role_commands = """```javascript
+use admin
+db.createRole({
+  role: "otelSystemProfileIndexStats",
+  privileges: [{ resource: { db: "", collection: "system.profile" }, actions: ["find", "indexStats"] }],
+  roles: []
+})
+db.grantRolesToUser("otel-user", [{ role: "otelSystemProfileIndexStats", db: "admin" }])
+```""" if target["platform"] != "mongodb-atlas" else ""
+        body = f"""## Required database changes
+
+{source_kind}: create a dedicated receiver user in the `admin` database with
+`clusterMonitor` and `readAnyDatabase` roles. {event_role}
+
+{role_commands}
+
+{profiling}
+
+MongoDB metrics are supported from 4.0. Query samples, top queries, and explain
+plans are supported only for self-managed MongoDB 7.0 or Atlas dedicated clusters
+M10 and higher. Atlas connections use SRV DNS (`scheme: mongodb+srv`). Keep TLS
+certificate verification enabled. The `mongodb_atlas` metrics receiver is not a
+substitute because it does not emit the DBMon query events.
 """
     else:
         grants = [
@@ -6242,7 +6513,7 @@ broader Performance Schema writes.
             grants.extend(
                 [
                     "SYS.V_$SQL",
-                    "SYS.V_$SQL_PLAN",
+                    "SYS.V_$SQL_PLAN_STATISTICS_ALL",
                     "SYS.V_$SESSION_EVENT",
                     "SYS.V_$LOCK",
                     "SYS.V_$CONTAINERS",
@@ -6281,8 +6552,9 @@ GRANT CREATE SESSION TO OTEL_USER;
 Set the account secret outside this file. {platform_note} Configure one receiver
 per RAC node. The event-view grants, including `V_$SESSION_EVENT`, are emitted whenever
 query samples, top queries, or session-wait samples are enabled because the
-audited v0.155 receiver requires that complete event grant set. Do not add the
-upstream v0.156 `V_$SQL_PLAN_STATISTICS_ALL` grant until Splunk ships it.
+audited v0.158 receiver requires that complete event grant set. Do not add the
+obsolete `V_$SQL_PLAN` grant in place of `V_$SQL_PLAN_STATISTICS_ALL`;
+the pinned receiver queries the latter for plan details.
 """
     return heading + common + body
 
@@ -6299,7 +6571,10 @@ Configured engines: {", ".join(engines)}
   `OTEL_DOTNET_EXPERIMENTAL_SQLCLIENT_ENABLE_TRACE_CONTEXT_PROPAGATION=true`.
 - Minimum Java agents: SQL Server/Oracle 2.20.1, PostgreSQL 2.22.0,
   MySQL 2.26.1. MariaDB correlation is not explicitly listed by Splunk.
-- Minimum .NET agent for SQL Server: 1.11.0.
+- Minimum .NET agent for SQL Server: 1.14.0; collector v0.154.0 or later.
+- Minimum collector versions for query correlation are v0.154.0 for SQL Server/MySQL,
+  v0.156.0 for Oracle, and v0.147.0 for PostgreSQL. This skill's audited
+  v0.158.0 collector meets each published floor.
 - Restart the application after applying instrumentation changes, then validate
   both Query details > Traces and APM Trace Analyzer navigation.
 
@@ -6322,7 +6597,7 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
         for target in targets
     ):
         release_checks.append(
-            "For collector v0.155, verify `sqlserver.query.plan.creation_time` on enabled top-query events."
+            "For collector v0.158, verify `sqlserver.query.plan.creation_time` on enabled top-query events."
         )
     sql_service_attributes = sorted(
         {
@@ -6338,7 +6613,7 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
     )
     if sql_service_attributes:
         release_checks.append(
-            "Verify enabled SQL Server v0.155 service resource attributes are populated: "
+            "Verify enabled SQL Server v0.158 service resource attributes are populated: "
             + ", ".join(f"`{name}`" for name in sql_service_attributes)
             + "."
         )
@@ -6365,7 +6640,7 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
         for target in targets
     ):
         release_checks.append(
-            "For collector v0.155, verify `oracledb.plan.first_load` and the "
+            "For collector v0.158, verify `oracledb.plan.first_load` and the "
             "`OBJECT_NAME`, `OBJECT_TYPE`, `FILTER_PREDICATES`, `PARTITION_START`, "
             "and `PARTITION_STOP` plan-step fields on enabled Oracle query-plan events."
         )
@@ -6374,7 +6649,7 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
         for target in targets
     ):
         release_checks.append(
-            "For collector v0.155, verify `oracle.db.service` and corrected `db.namespace` "
+            "For collector v0.158, verify `oracle.db.service` and corrected `db.namespace` "
             "values on enabled Oracle events."
         )
     comment_tag_targets = [
@@ -6403,6 +6678,13 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
         release_checks.append(
             "Verify `mysql.events_waits_current.timer_wait` is nonzero under representative load, "
             "and repeat after an AWS RDS restart/failover."
+        )
+    mongo_targets = [target for target in targets if target["type"] == "mongodb"]
+    if mongo_targets:
+        release_checks.append(
+            "For MongoDB, confirm metrics under Datastores. Query samples, top queries, and explain plans "
+            "require self-managed MongoDB 7.0 or Atlas dedicated M10+; Atlas uses SRV DNS. "
+            "Do not use the `mongodb_atlas` receiver for DBMon query events."
         )
     if any(target["connection_mode"] == "windows" for target in targets):
         release_checks.append(
@@ -6478,7 +6760,7 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
             )
         if plan_gap_targets:
             sections.append(
-                "- Explain plans are not provided by the v0.155 receiver for MariaDB or "
+                "- Explain plans are not provided by the v0.158 receiver for MariaDB or "
                 "MySQL 5.7; record plans as not supported while still validating metrics, "
                 "top queries, and query samples for: "
                 + ", ".join(f"`{name}`" for name in plan_gap_targets)
@@ -6511,9 +6793,9 @@ def product_validation_reference(targets: list[dict[str, Any]]) -> str:
     sections.extend(
         [
             "",
-            "## v0.155 and target-specific evidence",
+            "## v0.158 and target-specific evidence",
             "",
-            release_section or "- No additional target-specific v0.155 evidence is required.",
+            release_section or "- No additional target-specific v0.158 evidence is required.",
             "",
             "Record screenshots or operator evidence in the change ticket. The public API probe validates metrics, but Splunk does not document a public DBMon event-query API that proves query samples/top queries reached the product UI.",
             "",
@@ -6555,8 +6837,18 @@ def coverage_payload(
                     "supported"
                     if target["type"] == "mysql"
                     and parse_database_version(target["version"]) >= (8, 0)
+                    else "supported"
+                    if target["type"] == "mongodb"
+                    and (
+                        target["platform"] == "mongodb-atlas"
+                        and re.fullmatch(r"M(\d+)", target.get("tier", ""))
+                        and int(re.fullmatch(r"M(\d+)", target["tier"]).group(1)) >= 10
+                        or target["platform"] == "self-hosted"
+                        and parse_database_version(target["version"])[0:2] == (7, 0)
+                    )
                     else "not_supported"
                     if target["type"] == "mariadb"
+                    or target["type"] == "mongodb"
                     or (
                         target["type"] == "mysql"
                         and parse_database_version(target["version"]) < (8, 0)
@@ -6592,7 +6884,7 @@ def coverage_payload(
             "postgresql_wal_lag_legacy_feature_gate": (
                 "intentionally-gated-use-postgresql.wal.delay"
             ),
-            "resource_attributes": "enabled-and-sqlserver-override-value-supported",
+            "resource_attributes": "enabled-with-sqlserver-and-mongodb-override-values-supported",
             "sqlserver_experimental_resource_attribute_filters": (
                 "intentionally-gated-not-production-supported"
             ),
@@ -6733,7 +7025,7 @@ def merge_base_values(
     distribution: str,
 ) -> dict[str, Any]:
     reject_base_value_secrets(base)
-    receiver_types = {"postgresql", "sqlserver", "oracledb", "mysql"}
+    receiver_types = {"postgresql", "sqlserver", "oracledb", "mysql", "mongodb"}
 
     def is_db_receiver(value: Any) -> bool:
         text = str(value)
@@ -6825,7 +7117,7 @@ def merge_base_values(
                 "with a different value; refusing to replace it."
             )
     managed_components = {
-        "exporters": {"otlp_http/dbmon", "signalfx/dbmon"},
+        "exporters": {"otlp_http/dbmon", "otlp_http/dbmon_secondary", "signalfx/dbmon"},
         "processors": {
             "memory_limiter/dbmon",
             "batch/dbmon",
@@ -6962,7 +7254,7 @@ def rendered_metadata(
             "APM query-to-trace correlation requires a separate Splunk APM license and application instrumentation.",
             *(
                 [
-                    "MariaDB 10.5+ and MySQL 5.7+ are supported DBMon product targets, but the v0.155 receiver does not provide explain plans for MariaDB or MySQL 5.7."
+                    "MariaDB 10.5+ and MySQL 5.7+ are supported DBMon product targets, but the v0.158 receiver does not provide explain plans for MariaDB or MySQL 5.7."
                 ]
                 if any(
                     target["type"] == "mariadb"
@@ -7176,9 +7468,14 @@ def build_plan(
 def prepare_rendered_output(out: Path) -> Path:
     """Create a clean, owned packet root without following a user-controlled link."""
     out = Path(os.path.abspath(os.fspath(out.expanduser())))
-    skill_root = PROJECT_ROOT / "skills" / SKILL_NAME
-    forbidden = {Path(out.anchor), PROJECT_ROOT, skill_root, Path.home()}
-    if out in forbidden:
+    resolved_out = out.resolve(strict=False)
+    if (
+        resolved_out == Path(resolved_out.anchor)
+        or resolved_out == Path.home().resolve()
+        or resolved_out == SKILL_ROOT
+        or resolved_out in SKILL_ROOT.parents
+        or SKILL_ROOT in resolved_out.parents
+    ):
         raise RenderError(f"Refusing dangerous output directory: {out}")
 
     if out.exists() or out.is_symlink():

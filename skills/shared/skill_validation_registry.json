@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "1bb9838f3842c5bcecf4b2069d52a9b1e752de071d18025160416eec500213a5"
+    "sha256": "3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -44,6 +44,7 @@
     "lemonade-splunk-otel",
     "splunk-admin-doctor",
     "splunk-agent-management-setup",
+    "splunk-agent-observability-setup",
     "splunk-ai-assistant-setup",
     "splunk-ai-ml-toolkit-setup",
     "splunk-amazon-kinesis-firehose-setup",
@@ -385,6 +386,26 @@
         "notes": "Official-latest Lemonade 10.10.0 and Collector health, exact-binary validation, durable organization-bound Splunk APM readback, content-sentinel privacy scan, coordinated rollback, restored-baseline backend readback, and reapply passed. Post-wake synthetic and native Lemonade telemetry again reached Splunk with empty queues. Status remains partial because the exposed combined ingest/API organization token requires authenticated org-admin replacement and AI Agent Monitoring histogram/UI evidence was not proven."
       }
     },
+    "splunk-agent-observability-setup": {
+      "integration_mock": {
+        "status": "partial",
+        "targets": [
+          "Temporary standalone copy of the Agent Observability skill; offline planner and feature/action matrices"
+        ],
+        "last_verified": "2026-09-28",
+        "evidence": [
+          "skills/shared/references/splunk_agent_observability_validation_evidence.json"
+        ],
+        "notes": "Frontmatter, feature/action matrix validation, standalone-copy portability, and feature/object planning passed. This is offline packaging and contract evidence only; live trace readback and Agent Control allow/deny enforcement were not exercised."
+      },
+      "live_apply_e2e": {
+        "status": "blocked",
+        "targets": [],
+        "last_verified": null,
+        "evidence": [],
+        "notes": "Live SaaS validation needs an approved disposable project and Agent Stream, scoped Agent Observability credentials, and a disposable runtime. None was configured for this run; no production trace or Agent Control object was created."
+      }
+    },
     "splunk-enterprise-kubernetes-setup": {
       "live_apply_e2e": {
         "status": "partial",
@@ -409,7 +430,7 @@
         "evidence": [
           "skills/shared/references/splunk_observability_dbmon_validation_evidence.json"
         ],
-        "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai. Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified."
+        "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai on Collector/chart 0.155.0. Collector/chart 0.158.0, MongoDB, the expanded Oracle/PostgreSQL support rows, Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified live."
       }
     },
     "splunk-stream-windows-setup": {

@@ -1,14 +1,15 @@
 ---
 name: splunk-observability-database-monitoring-setup
 description: "Use when handling DBMon receiver setup, database query analysis, explain-plan readiness, or database
-  collector lifecycle work, including version-aware MySQL and MariaDB feature gaps. Render, validate,
+  collector lifecycle work, including MongoDB and version-aware MySQL and MariaDB feature gaps. Render, validate,
   apply, verify, and roll back production Splunk Observability Cloud Database Monitoring configurations
-  for Microsoft SQL Server, MySQL, MariaDB, Oracle Database, and PostgreSQL through the Splunk
+  for Microsoft SQL Server, MySQL, MariaDB, MongoDB, Oracle Database, and PostgreSQL through the Splunk
   Distribution of OpenTelemetry Collector. Covers Kubernetes, Linux, and Windows outputs; query samples
   and top queries; infrastructure metrics; product UI validation; APM query correlation handoffs; and
   DBMon query AI Assistant readiness."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  runtime_requirements: "Requires Bash and Python 3. For copied-skill use, install PyYAML; live and apply modes additionally require the documented kubectl, Helm, yq, Docker, or Podman tools."
   splunk_cloud_10_5: "not-applicable"
   collector_release: "0.158.0"
   helm_chart_release: "0.158.0"
@@ -19,11 +20,21 @@ metadata:
 
 ## Prerequisites
 
+This workflow has no direct Splunk Platform runtime dependency. It can be used
+alongside Splunk Cloud Platform 10.5.2605 through documented external APIs or
+handoffs.
+
 | Tool or access | Purpose | Verify |
 |---|---|---|
 | Bash and Python 3 | Run bundled setup and validation helpers | `bash --version && python3 --version` |
+| PyYAML (copied-skill installs) | Parse YAML when the parent repository helper is unavailable | `python3 -c 'import yaml'` |
 | Required product/platform access | Inspect or configure the selected target | Complete the documented preflight |
 | Credential files for live modes | Keep secrets out of chat | Verify paths only |
+
+Mode-specific external tools are required only for the matching phase: Docker or
+Podman for `--collector-validate`; `kubectl` for `--live` and Kubernetes
+actions; and Helm plus `yq` for Kubernetes apply/rollback helpers. The offline
+render and static validation paths need only Bash, Python, and YAML support.
 
 ## Workflow Overview
 
@@ -51,7 +62,7 @@ apply flags, protected credentials, and operator review for state changes.
 Inspect the supported setup modes before selecting one:
 
 ```bash
-bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh --help
+bash scripts/setup.sh --help
 ```
 
 Expected output: usage, supported modes, and required arguments are displayed
@@ -60,7 +71,7 @@ without changing the target environment.
 Inspect validation modes before running completion checks:
 
 ```bash
-bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh --help
+bash scripts/validate.sh --help
 ```
 
 Expected output: offline, live, and completion options are displayed when the
@@ -85,13 +96,19 @@ because the collector starts.
 Pin new deployments to Splunk OTel Collector `v0.158.0` and Helm chart
 `0.158.0`. Enforce these receiver-specific floors and platform/version pairs:
 
+AWS IAM database authentication for RDS and Aurora PostgreSQL requires
+Collector `v0.159.0` or later. This audited `v0.158.0` workflow uses a
+database password for those targets; see `reference.md` before describing
+newer collector features as covered by a rendered packet.
+
 | Engine | Production support | Collector floor |
 |---|---|---|
-| Microsoft SQL Server | 2016/2017/2019/2022 on Azure Managed Instance, Azure SQL Database, AWS RDS, or self-hosted | `v0.148.0` |
+| Microsoft SQL Server | 2016/2017/2019/2022 on Azure Managed Instance, Azure SQL Database, AWS RDS, or self-hosted | `v0.154.0` |
 | MySQL | Product floor 5.7+ on AWS RDS or standalone; pinned receiver verifies 5.7.x, 8.0.x, 8.4.x, and 9.x; explain plans require 8.0+ | `v0.154.0` |
 | MariaDB | Product floor 10.5+ on AWS RDS or standalone; pinned receiver verifies 10.5.x–10.11.x and 11.x; explain plans are unavailable | `v0.154.0` |
-| Oracle Database | 19c/26ai on AWS RDS, Oracle RAC, or self-hosted; one target per RAC node | `v0.148.0` |
-| PostgreSQL | Azure Flexible Server 14.20/17.7 or Amazon RDS 14.15/17.5; keep versions paired with their provider | `v0.147.0` |
+| MongoDB | Metrics: 4.0+; DBMon query samples/top queries and plans: self-managed 7.0, or Atlas dedicated M10+ using `scheme: mongodb+srv` | `v0.158.0` |
+| Oracle Database | 12c/18c/19c/21c/26ai on AWS RDS, Oracle RAC, or self-hosted; one target per RAC node | `v0.156.0` |
+| PostgreSQL | Azure Flexible Server 14.20/17.7; RDS 14.15/17.5; Aurora PostgreSQL 17.7; EDB Postgres Advanced Server 18.4; keep provider/version pairs exact | `v0.147.0` |
 
 MySQL 5.7+ and MariaDB 10.5+ are production-supported product targets. Enforce
 the narrower pinned-receiver rows above and preserve their version-aware
@@ -134,7 +151,7 @@ URL-form datasource with certificate verification.
 3. Render and run static plus pinned-collector configuration validation:
 
    ```bash
-   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+   bash scripts/setup.sh \
      --render --validate --collector-validate \
      --spec /secure/path/dbmon.yaml \
      --output-dir splunk-observability-database-monitoring-rendered
@@ -150,12 +167,12 @@ URL-form datasource with certificate verification.
 
    ```bash
    # Kubernetes
-   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+   bash scripts/setup.sh \
      --apply-k8s --accept-k8s-apply --collector-validate \
      --spec /secure/path/dbmon.yaml
 
    # Linux
-   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+   bash scripts/setup.sh \
      --apply-linux --accept-linux-apply --collector-validate \
      --spec /secure/path/dbmon.yaml \
      --db-credentials-env-file /secure/path/dbmon.env
@@ -168,7 +185,7 @@ URL-form datasource with certificate verification.
 7. Run live and tenant-side read-only validation:
 
    ```bash
-   bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh \
+   bash scripts/validate.sh \
      --output-dir splunk-observability-database-monitoring-rendered \
      --api
    ```
@@ -187,11 +204,11 @@ URL-form datasource with certificate verification.
 9. If apply validation fails, use the captured rollback state:
 
    ```bash
-   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+   bash scripts/setup.sh \
      --rollback-k8s --accept-k8s-rollback \
      --output-dir splunk-observability-database-monitoring-rendered
 
-   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+   bash scripts/setup.sh \
      --rollback-linux --accept-linux-rollback \
      --output-dir splunk-observability-database-monitoring-rendered
    ```
@@ -327,7 +344,7 @@ current flags and acceptance requirements.
   Server/Oracle uses `2048 MiB`.
 - Require explicit `collector.memory_mib`, `collector.cpu_limit`, and reviewed
   `sizing_evidence` for every packet. Splunk publishes no equivalent
-  performance baseline for PostgreSQL, MySQL, or MariaDB; require a
+  performance baseline for PostgreSQL, MySQL, MariaDB, or MongoDB; require a
   representative load test instead of inventing a support claim.
 - Allow only DBMon realms `us0`, `us1`, `eu0`, `eu1`, `eu2`, `au0`, `jp0`, and
   `sg0`; reject `us2` and unknown realms.
