@@ -1,6 +1,6 @@
 # Skill UX Catalog
 
-_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (schema 1, SHA-256 `099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967`), repo-local skill files, and the manifest-generated `skills/shared/skill_product_registry.json` by `skills/shared/scripts/generate_skill_ux_catalog.py`; do not edit manually._
 
 This product-first catalog is the user-facing entry point for choosing and
 consuming a skill. Canonical skill directories remain flat at
@@ -29,7 +29,7 @@ skill summary to identify cross-product handoffs.
 | [Splunk SOAR](#splunk-soar) | Deployment and lifecycle management for Splunk SOAR on-premises, cloud, clustering, and Automation Broker workflows. | 1 |
 | [Splunk On-Call](#splunk-on-call) | Teams, routing, escalation, integrations, and incident-response lifecycle management for Splunk On-Call. | 1 |
 | [AppDynamics](#appdynamics) | Direct AppDynamics platform administration, agents, application monitoring, content, security, and integrations. | 20 |
-| [Cisco and Partner Ecosystem](#cisco-and-partner-ecosystem) | Cisco-native and partner-product workflows that do not have one primary Splunk product as their target. | 9 |
+| [Cisco and Partner Ecosystem](#cisco-and-partner-ecosystem) | Cisco-native and partner-product workflows that do not have one primary Splunk product as their target. | 8 |
 | [Shared and Cross-Product](#shared-and-cross-product) | Routers and readiness workflows that deliberately span multiple Splunk or Cisco product families. | 5 |
 
 ## Splunk Platform
@@ -347,7 +347,6 @@ Cisco-native and partner-product workflows that do not have one primary Splunk p
 
 | Skill | Lifecycle | Plain-language purpose | Splunk 10.5 compatibility | Start here | Safe first command | Validation | Deeper docs |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cisco-defenseclaw-deskside-setup` | Canonical | Install or upgrade the official Cisco release, select a local Qwen model, configure the loopback LLM endpoint, and verify the gateway with a... | No direct Splunk Platform runtime dependency. | Start with `SKILL.md` and the safe command | `bash skills/cisco-defenseclaw-deskside-setup/scripts/setup.sh --help` | `bash skills/cisco-defenseclaw-deskside-setup/scripts/validate.sh --help` | `reference.md` |
 | `cisco-isovalent-platform-setup` | Canonical | Install the Isovalent platform itself: OSS (`cilium/cilium` + `cilium/tetragon` from `helm.cilium.io`) or Enterprise (`isovalent/*` from... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/cisco-isovalent-platform-setup/scripts/setup.sh --help` | `bash skills/cisco-isovalent-platform-setup/scripts/validate.sh --help` | `reference.md` plus 6 more |
 | `cisco-meraki-aam-thousandeyes-setup` | Canonical | Render, capture, validate, and safely operate Meraki AAM workflows that link Meraki Dashboard to ThousandEyes, deploy MX-hosted agents, create... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/cisco-meraki-aam-thousandeyes-setup/scripts/setup.sh --help` | `bash skills/cisco-meraki-aam-thousandeyes-setup/scripts/validate.sh --help` | `reference.md`, `references/har-capture.md` |
 | `cisco-thousandeyes-mcp-setup` | Canonical | Render and apply Model Context Protocol client configurations for Cursor / Claude Code / Codex / VS Code / AWS Kiro; gates the write/Instant-Test... | No direct Splunk Platform runtime dependency. | Start with `template.example` | `bash skills/cisco-thousandeyes-mcp-setup/scripts/setup.sh --help` | `bash skills/cisco-thousandeyes-mcp-setup/scripts/validate.sh --help` | `reference.md` plus 3 more |
