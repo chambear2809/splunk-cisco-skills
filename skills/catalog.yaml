@@ -1,5 +1,5 @@
 schema_version: 1
-skill_count: 170
+skill_count: 169
 alias_count: 0
 shared_sections:
   local_skill_mcp_server: |-
@@ -505,14 +505,6 @@ skills:
     target: "Official ThousandEyes MCP Server (`https://api.thousandeyes.com/mcp`)"
     purpose: "Render and apply Model Context Protocol client configurations for Cursor / Claude Code / Codex / VS Code / AWS Kiro; gates the write/Instant-Test tool group behind `--accept-te-mcp-write-tools`"
     command_summary: "Register the official Cisco ThousandEyes MCP Server with Cursor, Claude Code, OpenAI Codex, VS Code, or AWS Kiro so AI assistants can query and manage ThousandEyes via Model Context Protocol tools."
-    product: "cisco-and-partner-ecosystem"
-    capability: "cisco-native-products"
-    status: "canonical"
-  - name: "cisco-defenseclaw-deskside-setup"
-    path: "skills/cisco-defenseclaw-deskside-setup/SKILL.md"
-    target: "Cisco AI Defense DefenseClaw on Linux Lemonade desksides"
-    purpose: "Install or upgrade the official Cisco release, select a local Qwen model, configure the loopback LLM endpoint, and verify the gateway with a pinned SSH host key."
-    command_summary: "Deploy, upgrade, configure, or validate Cisco AI Defense DefenseClaw on a Linux Lemonade deskside with pinned SSH host identity and loopback model endpoints."
     product: "cisco-and-partner-ecosystem"
     capability: "cisco-native-products"
     status: "canonical"

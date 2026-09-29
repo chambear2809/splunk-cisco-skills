@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd"
+    "sha256": "099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -15,7 +15,6 @@
     "cisco-collaboration-setup",
     "cisco-data-fabric-setup",
     "cisco-dc-networking-setup",
-    "cisco-defenseclaw-deskside-setup",
     "cisco-enterprise-networking-setup",
     "cisco-intersight-setup",
     "cisco-isovalent-platform-setup",

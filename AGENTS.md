@@ -33,10 +33,10 @@ verify shipped dashboards are visible, macro-aligned, and returning data, or
 record explicit evidence that the package ships no pre-built dashboards.
 
 <!-- BEGIN GENERATED SKILL CATALOG -->
-<!-- source: skills/catalog.yaml; schema: 1; sha256: 3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd -->
+<!-- source: skills/catalog.yaml; schema: 1; sha256: 099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967 -->
 ## Skill Index
 
-The complete 170-entry catalog is maintained in `skills/catalog.yaml`. If a product term or alias does not clearly match a skill name below, search that catalog for the term before selecting a skill. Read only the selected skill's `SKILL.md` on demand.
+The complete 169-entry catalog is maintained in `skills/catalog.yaml`. If a product term or alias does not clearly match a skill name below, search that catalog for the term before selecting a skill. Read only the selected skill's `SKILL.md` on demand.
 
 | Skill | Instructions | Lifecycle |
 | --- | --- | --- |
@@ -83,7 +83,6 @@ The complete 170-entry catalog is maintained in `skills/catalog.yaml`. If a prod
 | `cisco-enterprise-networking-setup` | `skills/cisco-enterprise-networking-setup/SKILL.md` | Canonical |
 | `cisco-thousandeyes-setup` | `skills/cisco-thousandeyes-setup/SKILL.md` | Canonical |
 | `cisco-thousandeyes-mcp-setup` | `skills/cisco-thousandeyes-mcp-setup/SKILL.md` | Canonical |
-| `cisco-defenseclaw-deskside-setup` | `skills/cisco-defenseclaw-deskside-setup/SKILL.md` | Canonical |
 | `cisco-isovalent-platform-setup` | `skills/cisco-isovalent-platform-setup/SKILL.md` | Canonical |
 | `widefield-security-setup` | `skills/widefield-security-setup/SKILL.md` | Canonical |
 | `widefield-okta-integration-setup` | `skills/widefield-okta-integration-setup/SKILL.md` | Canonical |
@@ -221,7 +220,7 @@ after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
 <!-- BEGIN GENERATED LOCAL SKILL MCP SAFETY -->
-<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: 3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd -->
+<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: 099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967 -->
 ## Local Skill MCP Server
 
 The project also exposes a local `splunk-cisco-skills` MCP server through

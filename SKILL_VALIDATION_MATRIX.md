@@ -1,6 +1,6 @@
 # Skill Validation Matrix
 
-_Generated from `skills/catalog.yaml` (SHA-256 `3688c9fcad0c3b3d6e8100afb52d022898e85e479a6461a9f7ef3c67ae64aebd`), checked-in skill/test surfaces, and the manifest-generated identity plus maintained evidence in `skills/shared/skill_validation_registry.json` by `skills/shared/scripts/generate_skill_validation_matrix.py`; do not edit manually._
+_Generated from `skills/catalog.yaml` (SHA-256 `099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967`), checked-in skill/test surfaces, and the manifest-generated identity plus maintained evidence in `skills/shared/skill_validation_registry.json` by `skills/shared/scripts/generate_skill_validation_matrix.py`; do not edit manually._
 
 This matrix separates checked-in validation capability from observed target
 results. A working `--help` interface is an interface contract; it is never
@@ -13,16 +13,16 @@ automatically.
 
 | Dimension | Skills | What the count means |
 | --- | ---: | --- |
-| Interface contract | 170 / 170 | CI can invoke the checked-in validator help surface. |
-| Direct automated test reference | 168 / 170 | At least one test file names the exact skill or is its dedicated module; this does not imply full behavioral coverage. |
-| Dedicated test module | 61 / 170 | A `test_<skill_name>` Python or Bats module exists. |
-| Standalone offline smoke | 20 / 170 | The skill ships `scripts/smoke_offline.sh`. |
-| Advertised live mode | 71 / 170 | Validator help explicitly exposes `--live`; availability is not a pass result. |
-| Strict/completion mode | 56 / 170 | Validator help exposes `--strict` or `--completion`. |
-| TA/app completion gate | 71 / 170 | The skill requires ingest plus dashboard/macro evidence, or no-dashboard proof. |
-| Recorded integration/mock result | 9 / 170 | A sanitized result is checked into the evidence registry. |
-| Recorded live read-only result | 6 / 170 | A sanitized target-backed read-only result is checked in. |
-| Recorded live apply/E2E result | 6 / 170 | A sanitized apply/readback/rollback or E2E result is checked in. |
+| Interface contract | 169 / 169 | CI can invoke the checked-in validator help surface. |
+| Direct automated test reference | 167 / 169 | At least one test file names the exact skill or is its dedicated module; this does not imply full behavioral coverage. |
+| Dedicated test module | 60 / 169 | A `test_<skill_name>` Python or Bats module exists. |
+| Standalone offline smoke | 20 / 169 | The skill ships `scripts/smoke_offline.sh`. |
+| Advertised live mode | 70 / 169 | Validator help explicitly exposes `--live`; availability is not a pass result. |
+| Strict/completion mode | 56 / 169 | Validator help exposes `--strict` or `--completion`. |
+| TA/app completion gate | 71 / 169 | The skill requires ingest plus dashboard/macro evidence, or no-dashboard proof. |
+| Recorded integration/mock result | 9 / 169 | A sanitized result is checked into the evidence registry. |
+| Recorded live read-only result | 6 / 169 | A sanitized target-backed read-only result is checked in. |
+| Recorded live apply/E2E result | 6 / 169 | A sanitized apply/readback/rollback or E2E result is checked in. |
 
 ## Interpretation
 
@@ -76,7 +76,6 @@ record secrets, local credential paths, or unsanitized live-run output.
 | [`cisco-collaboration-setup`](skills/cisco-collaboration-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-collaboration-setup/scripts/validate.sh)<br>default path only | 3 refs: [test_cisco_collaboration_setup.py](tests/test_cisco_collaboration_setup.py), [test_cisco_product_setup.py](tests/test_cisco_product_setup.py) +1 more | Not provided | [Required](skills/shared/ta_completion_gate.md) | Not recorded | Not recorded | Not recorded |
 | [`cisco-data-fabric-setup`](skills/cisco-data-fabric-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-data-fabric-setup/scripts/validate.sh)<br>default path only | 2 refs: [test_cisco_cloud_control_setup.py](tests/test_cisco_cloud_control_setup.py), [test_cisco_data_fabric_setup.py](tests/test_cisco_data_fabric_setup.py) | Not provided | Not referenced | Not recorded | Not recorded | Not recorded |
 | [`cisco-dc-networking-setup`](skills/cisco-dc-networking-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-dc-networking-setup/scripts/validate.sh)<br>`--completion`; `--strict` | 6 refs: [test_cisco_product_setup.py](tests/test_cisco_product_setup.py), [test_cisco_ta_regressions.py](tests/test_cisco_ta_regressions.py) +4 more | Not provided | [Required](skills/shared/ta_completion_gate.md) | Not recorded | Not recorded | Not recorded |
-| [`cisco-defenseclaw-deskside-setup`](skills/cisco-defenseclaw-deskside-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-defenseclaw-deskside-setup/scripts/validate.sh)<br>`--live`; 1 explicit check/probe mode | 1 ref: [test_cisco_defenseclaw_deskside_setup.py](tests/test_cisco_defenseclaw_deskside_setup.py) | Not provided | Not referenced | Not recorded | Not recorded | Not recorded |
 | [`cisco-enterprise-networking-setup`](skills/cisco-enterprise-networking-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-enterprise-networking-setup/scripts/validate.sh)<br>`--completion`; `--strict` | 6 refs: [test_cisco_enterprise_networking_setup.py](tests/test_cisco_enterprise_networking_setup.py), [test_flag_parsing.bats](tests/test_flag_parsing.bats) +4 more | Not provided | [Required](skills/shared/ta_completion_gate.md) | Not recorded | Not recorded | Not recorded |
 | [`cisco-intersight-setup`](skills/cisco-intersight-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-intersight-setup/scripts/validate.sh)<br>`--completion`; `--strict` | 8 refs: [test_cisco_product_setup.py](tests/test_cisco_product_setup.py), [test_cisco_ta_regressions.py](tests/test_cisco_ta_regressions.py) +6 more | Not provided | [Required](skills/shared/ta_completion_gate.md) | Not recorded | Not recorded | Not recorded |
 | [`cisco-isovalent-platform-setup`](skills/cisco-isovalent-platform-setup/SKILL.md) | Canonical | [validate.sh](skills/cisco-isovalent-platform-setup/scripts/validate.sh)<br>`--live` | 3 refs: [test_cisco_isovalent_platform_setup.py](tests/test_cisco_isovalent_platform_setup.py), [test_ta_completion_gate.py](tests/test_ta_completion_gate.py) +1 more | Not provided | Not referenced | Not recorded | Not recorded | Not recorded |
