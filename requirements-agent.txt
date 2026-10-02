@@ -8,4 +8,4 @@ idna==3.20
 pydantic-settings==2.15.0
 PyJWT[crypto]==2.15.1
 python-multipart==0.0.32
-starlette==1.6.0
+starlette==1.7.0
