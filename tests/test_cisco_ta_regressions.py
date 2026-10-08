@@ -2877,16 +2877,8 @@ EOF
             web_conf = (system_local / "web.conf").read_text(encoding="utf-8")
             self.assertIn("[kvstore]\nport = 28191", server_conf)
             self.assertIn("[ipc_broker]\nport = 28194", server_conf)
-            self.assertIn("postgres:postgres:address = 5432", server_conf)
-            self.assertIn("postgres:traefik_primary:address = 5433", server_conf)
-            self.assertIn("postgres:traefik_replica:address = 5434", server_conf)
-            self.assertIn("postgres:postgres-primary:address = 5433", server_conf)
-            self.assertIn("postgres:postgres-replica:address = 5434", server_conf)
-            self.assertIn("postgres:patroni:address = 8008", server_conf)
-            self.assertIn("postgres:pgbouncer:address = 6432", server_conf)
-            self.assertIn("postgres:postgres_nanny:address = 5435", server_conf)
-            self.assertIn("nascent:etcd_peer:address = 2380", server_conf)
-            self.assertIn("nascent:etcd_client:address = 2379", server_conf)
+            self.assertNotIn("postgres:postgres:address", server_conf)
+            self.assertNotIn("nascent:etcd_peer:address", server_conf)
             self.assertIn("mgmtHostPort = 0.0.0.0:28189", web_conf)
             self.assertIn("httpport = 28000", web_conf)
             self.assertIn("appServerPorts = 28065", web_conf)
@@ -2932,6 +2924,8 @@ EOF
 
     def test_host_bootstrap_rejects_duplicate_sidecar_ports(self):
         with tempfile.TemporaryDirectory() as tmpdir:
+            package_file = Path(tmpdir) / "splunk-10.6.0.5-linux-x86_64.tgz"
+            package_file.write_bytes(b"")
             credentials_file = Path(tmpdir) / "credentials"
             credentials_file.write_text("", encoding="utf-8")
             env = os.environ.copy()
@@ -2942,6 +2936,8 @@ EOF
                 "--phase", "install",
                 "--execution", "local",
                 "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
                 "--postgres-port", "8191",
                 env=env,
             )
@@ -2951,6 +2947,8 @@ EOF
 
     def test_host_bootstrap_rejects_privileged_sidecar_ports(self):
         with tempfile.TemporaryDirectory() as tmpdir:
+            package_file = Path(tmpdir) / "splunk-10.6.0.5-linux-x86_64.tgz"
+            package_file.write_bytes(b"")
             credentials_file = Path(tmpdir) / "credentials"
             credentials_file.write_text("", encoding="utf-8")
             env = os.environ.copy()
@@ -2961,6 +2959,8 @@ EOF
                 "--phase", "install",
                 "--execution", "local",
                 "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
                 "--postgres-port", "1023",
                 env=env,
             )

@@ -51,7 +51,7 @@ def test_existing_cache_is_preserved_and_no_login_is_attempted(tmp_path):
     cache = tmp_path / "cache"
     cache.mkdir()
     cache.chmod(0o700)
-    existing = cache / "authToken_existing"
+    existing = cache / "authToken_localhost_8089"
     existing.write_text("token")
     existing.chmod(0o600)
     pw = tmp_path / "password"
@@ -65,6 +65,28 @@ def test_existing_cache_is_preserved_and_no_login_is_attempted(tmp_path):
     )
     assert result.returncode == 0
     assert existing.read_text() == "token"
+    assert not (cache / "logout_args").exists()
+
+
+def test_unrelated_cached_target_does_not_suppress_default_login(tmp_path):
+    cli = _fake_cli(tmp_path)
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    cache.chmod(0o700)
+    unrelated = cache / "authToken_remote_8089"
+    unrelated.write_text("token")
+    unrelated.chmod(0o600)
+    pw = tmp_path / "password"
+    pw.write_text("secret\n")
+    pw.chmod(0o600)
+    result = subprocess.run(
+        [sys.executable, HELPER, "--splunk", str(cli), "--username", "admin",
+         "--password-file", str(pw), "--cache-dir", str(cache), "--command", "true"],
+        env=dict(os.environ, FAKE_CACHE=str(cache)), capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert unrelated.read_text() == "token"
+    assert "logout" in (cache / "logout_args").read_text()
 
 
 def test_native_service_cache_traversal_permissions_are_accepted(tmp_path):
@@ -72,7 +94,7 @@ def test_native_service_cache_traversal_permissions_are_accepted(tmp_path):
     cache = tmp_path / "cache"
     cache.mkdir()
     cache.chmod(0o710)
-    existing = cache / "authToken_existing"
+    existing = cache / "authToken_localhost_8089"
     existing.write_text("token")
     existing.chmod(0o600)
     pw = tmp_path / "password"

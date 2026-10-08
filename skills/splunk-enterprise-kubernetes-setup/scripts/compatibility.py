@@ -78,7 +78,7 @@ def check_sok_compatibility(
             ((10, 6, 0, 0), (10, 6, 0, 6)),
         )
     )
-    separation_line = supported_splunk and splunk[:2] in {(10, 2), (10, 4)}
+    separation_line = supported_splunk and splunk[:2] in {(10, 2), (10, 4), (10, 6)}
 
     if not kubernetes_version:
         supported_lines = supported_splunk
@@ -94,7 +94,7 @@ def check_sok_compatibility(
                 False,
                 True,
                 "Indexing and ingestion separation requires Splunk Enterprise "
-                "on the listed 10.2.x or 10.4.x release lines.",
+                "on the listed 10.2.x, 10.4.x, or 10.6.x release lines.",
             )
         return CompatibilityResult(
             True,

@@ -58,7 +58,7 @@ def test_contract_is_bound_to_actual_digest_and_exact_member_set() -> None:
 def test_verified_bundle_fails_closed_before_rest_or_automatic_extraction() -> None:
     source = INSTALLER.read_text(encoding="utf-8")
     assert "is_verified_itsi_bundle_contract" in source
-    assert "is not accepted by REST upload" in source
+    assert "is not accepted by generic bundle or REST upload" in source
     assert "Stop Splunk, back up the existing app directories" in source
     assert "Restore reviewed local configuration" in source
     assert "install_verified_itsi_bundle_local" not in source

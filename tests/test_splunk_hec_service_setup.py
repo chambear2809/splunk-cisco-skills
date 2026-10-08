@@ -41,7 +41,8 @@ class HecServiceOwnershipTests(unittest.TestCase):
             self.assertIn('os.environ.get("SPLUNK_SERVICE_USER"', script)
             self.assertIn("pwd.getpwuid(home_owner)", script)
             self.assertIn("os.chown(path, account.pw_uid, account.pw_gid)", script)
-            self.assertIn("secure_owner(token_path, 0o600)", script)
+            self.assertNotIn("secure_owner(token_path, 0o600)", script)
+            self.assertIn("source token ownership preserved", script)
             self.assertIn("secure_owner(target_path, 0o640)", script)
             self.assertIn("refusing to assign HEC files to root", script)
 

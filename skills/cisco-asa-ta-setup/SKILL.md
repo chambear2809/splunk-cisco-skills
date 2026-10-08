@@ -84,8 +84,9 @@ pre-built/package-shipped dashboards are visible, macro-aligned, and returning
 data. For the verified 6.1.2 package, completion also requires the shipped
 `cisco_asa_dashboard` view to be present, enabled, visible, and backed by
 queries that resolve the selected index and return data. Do not replace this
-check with a generic no-dashboard claim; qualify a different package version
-only with package evidence.
+check with a generic no-dashboard claim. Use the no-dashboard path only when
+package evidence shows the package ships no dashboards; record that evidence
+before applying it to a different package version.
 
 Render-first workflow for `Splunk_TA_cisco-asa` and Cisco ASA/FTD syslog data.
 The skill emits reviewed placement notes, syslog handoffs, validation SPL, and
