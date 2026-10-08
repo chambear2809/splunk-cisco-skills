@@ -52,6 +52,14 @@ def test_four_part_splunk_format_does_not_certify_four_part_operator_or_kubernet
         assert not module.check_sok_compatibility("3.2.0.99", "10.6.0.5", "1.36.0").supported
         assert not module.check_sok_compatibility("3.2.0", "10.6.0.5", "1.36.0.99").supported
         assert not module.check_sok_compatibility("3.2.0", "10.6.0.5", "1.31.0").supported
+        for splunk_version in ("10.3.0", "10.5.0", "10.6.0.6", "9.4.14"):
+            assert not module.check_sok_compatibility(
+                "3.2.0", splunk_version, "1.36.0"
+            ).supported
+        for splunk_version in ("9.4.15", "10.0.0", "10.2.0", "10.4.0", "10.6.0.5"):
+            assert module.check_sok_compatibility(
+                "3.2.0", splunk_version, "1.36.0", indexing_ingestion_separation=True
+            ).supported
     finally:
         sys.modules.pop(spec.name, None)
 
