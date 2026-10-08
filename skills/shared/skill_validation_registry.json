@@ -497,7 +497,7 @@
     },
     "splunk-federated-search-setup": {
       "live_apply_e2e": {
-        "status": "partial",
+        "status": "pass",
         "targets": [
           "Enterprise10.6.0.5 standard provider and disposable Ubuntu24.04 consumer; CA and hostname verified"
         ],
@@ -505,7 +505,7 @@
         "evidence": [
           "skills/shared/references/enterprise-10.6-federated-search-evidence.json"
         ],
-        "notes": "Selected standard apply, provider lifecycle, four-record query, controlled restart, TLS negative controls and owning live validator passed. Exact Splunk objects/reader identity/password removed; temporary AWS rule cleanup awaits Duo refresh. Standalone OS hostname workaround qualified; global toggle fails closed."
+        "notes": "Selected standard REST provider/index lifecycle, TLS negative controls, corrected restart listener and four unique retained records passed. Exact Splunk objects/reader identity/password and PKI staging copies removed; exact two temporary AWS rules revoked and verified absent. Disposable consumer and disk deleted on October 8. Standalone-only loopback hostname workaround remains qualified; global toggle unsupported and refused before mutation."
       }
     },
     "splunk-hec-service-setup": {

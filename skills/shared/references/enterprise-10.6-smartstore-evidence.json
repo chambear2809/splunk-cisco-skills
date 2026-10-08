@@ -32,7 +32,7 @@
     "cache_after_search": "local; journal and tsidx available; failure_code=0"
   },
   "qualification": "Standalone S3 workflow only. Clustered SmartStore, other providers and archive/destructive lifecycle operations remain separate. REST and HEC CA verification used loopback with hostname matching disabled; S3 server CA verification remained enabled. Small canary proves functionality, not production sizing.",
-  "cleanup": "Canary and bucket retained temporarily for final restart and cleanup verification; run-owned bucket object versions and IAM profile must be removed at final teardown.",
+  "cleanup": "2026-10-08: owned HEC stanza, SmartStore app/configuration and canary index data removed while the retained lab was stopped. Restart succeeded with current/cohosted KV ready and working search. Temporary instance profile detached; all 12 owned bucket versions removed; bucket, profile and scoped role deletion verified. Historical October 7 functional evidence remains unchanged.",
   "sources": [
     "https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.4/deploy-smartstore/deploy-smartstore-on-a-new-standalone-indexer",
     "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.6/configuration-file-reference/10.6.0-configuration-file-reference/server.conf",

@@ -395,12 +395,12 @@
       "notes": "Selected one-off Galileo Observe export sent one trace to CA/hostname-verified Enterprise HEC; exact correlation and one-event retention after restart passed. Owned Splunk input/index/token/data deleted. Tenant MinIO refuses connections and child/parent deletion return HTTP500; exact owned Galileo project/stream remain HTTP200. External infrastructure owner and exact-ID cleanup next action recorded; onboarding date remains unknown under existing run-scoped authorization."
     },
     "splunk-federated-search-setup": {
-      "status": "partial",
+      "status": "pass",
       "last_verified": "2026-10-08",
       "evidence": [
         "skills/shared/references/enterprise-10.6-federated-search-evidence.json"
       ],
-      "notes": "Selected standard REST provider/index lifecycle, TLS negative controls, corrected restart listener and four unique retained records passed. Exact Splunk objects/reader identity/password removed. Two owned AWS rules and PKI staging cleanup remain pending authentication refresh. Standalone-only loopback hostname workaround is explicitly qualified; global toggle remains unsupported and refused before mutation."
+      "notes": "Selected standard REST provider/index lifecycle, TLS negative controls, corrected restart listener and four unique retained records passed. Exact Splunk objects/reader identity/password and PKI staging copies removed; exact two temporary AWS rules revoked and verified absent. Disposable consumer and disk deleted on October 8. Standalone-only loopback hostname workaround remains qualified; global toggle unsupported and refused before mutation."
     },
     "splunk-observability-otel-collector-setup": {
       "status": "pass",

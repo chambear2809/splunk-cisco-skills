@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T13:23:52.508724+00:00",
+  "status": "pass",
+  "scope": "Exact owned disposable Enterprise 10.6 validation resources; no protected demo mutations",
+  "deleted": {
+    "ec2_instances": 9,
+    "attached_ebs_volumes": 9,
+    "s3_buckets": 1,
+    "s3_versions_or_markers": 12,
+    "iam_roles": 2,
+    "instance_profiles": 1,
+    "temporary_network_rules": 2,
+    "native_security_groups": 1,
+    "native_key_pairs": 1,
+    "obsolete_secret_bearing_local_files": 13
+  },
+  "verification": "Termination states, volume-not-found responses and exact resource absence responses retained in protected local evidence",
+  "protected_clusters": {
+    "isovalent-demo": {
+      "cluster_status": "ACTIVE",
+      "nodegroup_configurations_unchanged": true,
+      "timestamp_changes": {}
+    },
+    "genailens": {
+      "cluster_status": "ACTIVE",
+      "nodegroup_configurations_unchanged": true,
+      "timestamp_changes": {}
+    },
+    "streaming-eks-delay-demo": {
+      "cluster_status": "ACTIVE",
+      "nodegroup_configurations_unchanged": true,
+      "timestamp_changes": {
+        "private": {
+          "modifiedAt_before": "2026-10-08T09:08:52.609000-04:00",
+          "modifiedAt_after": "2026-10-08T09:18:57.039000-04:00",
+          "configuration_status_scaling_unchanged": true
+        }
+      }
+    }
+  },
+  "preserved": "Primary lab, recovery artifacts, existing reusable AWS Splunk lab, reusable lab security group/key and persistent user product credentials",
+  "retained_lab_health": {
+    "enterprise_version": "10.6.0.5",
+    "current_kv": "ready",
+    "cohosted_kv": "ready",
+    "search_count": 1,
+    "smartstore_fixture_removed": true
+  },
+  "qualification": "Streaming private nodegroup modifiedAt timestamp advanced during observation; configuration, scaling, status and retained instance states/disks/security groups unchanged. No cleanup mutations targeted any protected cluster or its resources. Existing prior validation EKS stacks were already deleted.",
+  "external_cleanup_blocker": {
+    "product": "Galileo",
+    "status": "blocked",
+    "reason": "Previously observed MinIO connection refusal and HTTP500 child/parent deletion",
+    "owner": "Galileo tenant infrastructure administrator",
+    "next_action": "Restore tenant storage, delete only recorded owned project/stream IDs, verify object and physical storage cleanup"
+  },
+  "sanitization": "No credentials, account identifiers, raw records, bucket identifiers or exact AWS resource IDs"
+}

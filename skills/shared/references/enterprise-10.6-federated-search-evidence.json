@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "collected_at": "2026-10-08T06:35:39.480791+00:00",
-  "status": "partial",
+  "status": "pass",
   "selected_workflow": "Standard Splunk-to-Splunk REST provider and index lifecycle",
   "environment": {
     "consumer": "Disposable unclustered Ubuntu 24.04 x86_64, 8 vCPU, 32 GiB RAM",
@@ -53,14 +53,13 @@
     "provider_reader_role_http": 404,
     "provider_index_http": 404,
     "reader_password_file": "deleted",
-    "temporary_aws_rules": "pending expired AWS session refresh",
-    "consumer_host": "retained for sequential Deployment Server workflow",
-    "active_consumer_pki": "Retained on disposable host for sequential validation. Unused remote/controller staging private keys, password and remote staging input directory deleted; public CA artifacts retained."
+    "temporary_aws_rules": "Exact two owned rules revoked on 2026-10-08; absence verified",
+    "consumer_host": "Terminated during authorized 2026-10-08 cleanup; attached disk verified absent",
+    "active_consumer_pki": "Destroyed with disposable host and disk; unused secret-bearing controller staging files deleted"
   },
   "remaining": [
-    "Remove exact two owned AWS private-federation network rules after Duo refresh and verify absence",
-    "Remove unused PKI staging secret copies",
     "Transparent providers, alternative dataset types and global switch are separately unqualified"
   ],
-  "sanitization": "No host addresses, account identifiers, credentials, exact resource IDs or raw data"
+  "sanitization": "No host addresses, account identifiers, credentials, exact resource IDs or raw data",
+  "cleanup_verified_at": "2026-10-08"
 }
