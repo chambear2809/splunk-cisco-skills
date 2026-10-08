@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import subprocess
 from pathlib import Path
 
@@ -236,6 +238,81 @@ def test_ai_ml_toolkit_rejects_direct_secret_flags() -> None:
     result = run_setup("--render", "--token", "abc123", check=False)
     assert result.returncode != 0
     assert "would expose a secret" in result.stdout + result.stderr
+
+
+def test_ai_ml_validate_treats_explicitly_omitted_dsdl_as_pass(tmp_path: Path) -> None:
+    """Exercise DSDL expectation states against a mocked REST endpoint."""
+    validate = REPO_ROOT / "skills/splunk-ai-ml-toolkit-setup/scripts/validate.sh"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text(
+        """#!/usr/bin/env python3
+import json, os, sys
+url = next((x for x in reversed(sys.argv[1:]) if x.startswith(('http://', 'https://'))), '')
+if url.endswith('/services/auth/login'):
+    print('<response><sessionKey>mock-session</sessionKey></response>')
+elif '/services/apps/local/' in url:
+    app = url.split('/services/apps/local/', 1)[1].split('?', 1)[0]
+    installed = {
+        'Splunk_SA_Scientific_Python_linux_x86_64': os.environ.get('MOCK_PSC') == 'true',
+        'Splunk_ML_Toolkit': os.environ.get('MOCK_MLTK') == 'true',
+        'mltk-container': os.environ.get('MOCK_DSDL') == 'true',
+    }.get(app, False)
+    print(json.dumps({'entry': [{'name': app}] if installed else []}))
+else:
+    print('{}')
+""",
+        encoding="utf-8",
+    )
+    fake_curl.chmod(fake_curl.stat().st_mode | stat.S_IXUSR)
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        'SPLUNK_PLATFORM="enterprise"\n'
+        'SPLUNK_URI="https://localhost:8089"\n'
+        'SPLUNK_USER="mock-user"\n'
+        'SPLUNK_PASS="mock-pass"\n',
+        encoding="utf-8",
+    )
+    credentials.chmod(0o600)
+
+    def run_validate(
+        expect: str | None, dsdl_installed: bool, completion: bool = True
+    ) -> subprocess.CompletedProcess[str]:
+        args = ["bash", str(validate)]
+        if completion:
+            args.append("--completion")
+        if expect is not None:
+            args.extend(["--expect-dsdl", expect])
+        env = os.environ.copy()
+        env.update(
+            {
+                "PATH": f"{fake_bin}:{env['PATH']}",
+                "SPLUNK_CREDENTIALS_FILE": str(credentials),
+                "SPLUNK_VERIFY_SSL": "false",
+                "SPLUNK_TARGET_ROLE": "search-tier",
+                "MOCK_PSC": "true",
+                "MOCK_MLTK": "true",
+                "MOCK_DSDL": "true" if dsdl_installed else "false",
+            }
+        )
+        return subprocess.run(args, cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False)
+
+    absent_explicit = run_validate("false", False)
+    assert absent_explicit.returncode == 0, absent_explicit.stdout + absent_explicit.stderr
+    assert "explicitly not expected" in absent_explicit.stdout
+
+    absent_required = run_validate("true", False)
+    assert absent_required.returncode != 0
+    assert "DSDL app is not installed" in absent_required.stdout
+
+    absent_unspecified = run_validate(None, False, completion=False)
+    assert absent_unspecified.returncode == 0
+    assert "WARN: DSDL app is not installed" in absent_unspecified.stdout
+
+    present_forbidden = run_validate("false", True)
+    assert present_forbidden.returncode != 0
+    assert "DSDL is installed but --expect-dsdl false" in present_forbidden.stdout
 
 
 def test_ai_ml_toolkit_registry_metadata_tracks_current_apps() -> None:

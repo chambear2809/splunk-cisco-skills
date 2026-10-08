@@ -3255,8 +3255,8 @@ def parse_args() -> argparse.Namespace:
         except ValueError as exc:
             parser.error(f"--ta-collector-cmd-arg rejected: {exc}")
     listed_versions = set(TA_SPLUNKBASE_METADATA["compatible_splunk_versions"]["listed"])
-    if args.splunk_version and not re.fullmatch(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?", args.splunk_version):
-        parser.error("--splunk-version must be an exact MAJOR.MINOR or MAJOR.MINOR.PATCH version")
+    if args.splunk_version and not re.fullmatch(r"[0-9]+\.[0-9]+(?:\.[0-9]+){0,2}", args.splunk_version):
+        parser.error("--splunk-version must use two, three, or four numeric segments")
     requested_version = version_tuple(args.splunk_version) if args.splunk_version else ()
     requested_train = ".".join(str(part) for part in requested_version[:2])
     if args.splunk_version and requested_train not in listed_versions:

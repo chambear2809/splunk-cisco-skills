@@ -4,8 +4,10 @@ description: "Use when the outcome is ITSI product/package installation, upgrade
   health, or installation validation; route post-install entities, services, KPIs, dependencies, Event
   Analytics configuration, and content-pack import to splunk-itsi-config. Install and validate Splunk IT
   Service Intelligence (ITSI) on Splunk Cloud or Splunk Enterprise."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -112,16 +114,20 @@ automatically; a missing-product finding is an explicit user-visible handoff.
 installer pins the repository-verified release by default. If Splunkbase is
 unavailable, fall back to the local package in `splunk-ta/`.
 
-The repository-verified package and configuration baseline is ITSI `4.21.2`,
-which also advertises Splunk 10.5, so the default install path needs no
-override. The current public listing is `5.0.1` and advertises Splunk 10.5 too,
-but its package and native-object contracts have not been verified here: the
-Splunkbase download for `1841` is entitlement-gated and returns HTTP 403 without
-an ITSI entitlement, so `5.0.1` could not be downloaded, unpacked, or inspected.
-The shared installer therefore defaults to `4.21.2`; only an explicit
-`--accept-unverified-release` follows public `5.0.1`. After that override,
-limit this skill to package installation and core-health validation, then
-review ITSI 5.0 before handing native object changes to `splunk-itsi-config`.
+The shared package registry pins ITSI `5.0.2`. Splunkbase lists Enterprise
+10.6, 10.5, 10.4, 10.3, and 10.2 for this release. The locally obtained package
+was identified as `SA-ITOA` 5.0.2 build 117138 and checksum-verified
+(`88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b`). This
+supports package identity and platform selection; it does not automatically
+validate every ITSI native-object or content-pack workflow. Review ITSI 5.0
+object contracts before using `splunk-itsi-config`.
+
+ITSI 5.0.x is compatible with Enterprise 10.6, but requires postponing the
+Enterprise 10.6 cohosted PostgreSQL KV Store migration. Follow the documented
+`postgresMigrateOnStartup = false` procedure in the Enterprise host and KV
+Store admin skills, retaining all ordinary backup, restore-test, topology,
+health, and capacity gates. This is a migration sequencing constraint, not an
+Enterprise compatibility block.
 
 After installation, use this skill to validate the deployment and check
 integration readiness for dependent apps (e.g., ThousandEyes).
@@ -167,9 +173,9 @@ bash skills/splunk-app-install/scripts/install_app.sh \
   --source splunkbase --app-id 1841
 ```
 
-That command defaults to the repository-reviewed `4.21.2` package. To request
-public `5.0.1`, add `--accept-unverified-release` and follow the compatibility
-review boundary above.
+That command defaults to the registry-pinned `5.0.2` package. Review the
+ITSI 5.0 native-object contract before applying configuration through the
+separate `splunk-itsi-config` skill.
 
 If Splunkbase is unavailable, fall back to a local package:
 

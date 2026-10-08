@@ -40,12 +40,12 @@ manager, and indexer roles and then apply the standalone settings in Splunk Web.
 
 ```ini
 [settings]
-mc_auto_config = enabled
+# Enterprise 10.6 does not accept mc_auto_config in this conf file.
 ```
 
-Automatic distributed mode configuration only works after search peers already
-exist. A restart applies it immediately; otherwise Splunk applies it on its
-normal hourly cycle.
+Automatic distributed mode configuration is managed through the 10.6
+Monitoring Console UI/feature flag after search peers exist. The renderer keeps
+the requested intent in metadata but omits the removed `mc_auto_config` key.
 
 `savedsearches.conf`:
 

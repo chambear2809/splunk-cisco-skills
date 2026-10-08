@@ -7,8 +7,10 @@ description: "Use when the user asks to onboard, configure, render, or validate 
   hands off Universal Forwarder rollout, constrains readiness to the Sysmon source, and validates
   XmlWinEventLog Sysmon data. Use for Sysmon, WEC Sysmon, Microsoft Sysinternals Sysmon, or
   Splunk_TA_microsoft_sysmon onboarding."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

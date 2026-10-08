@@ -271,8 +271,8 @@ def ready_pod_inventory(name: str, container: str) -> str:
 
 
 def live_validation_env(bin_dir: Path, *, edition: str = "oss") -> dict[str, str]:
-    cilium_version = "1.18.8" if edition == "enterprise" else "1.18.10"
-    tetragon_version = "1.18.1" if edition == "enterprise" else "1.7.0"
+    cilium_version = "1.18.8" if edition == "enterprise" else "1.20.2"
+    tetragon_version = "1.18.1" if edition == "enterprise" else "1.7.1"
     return {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "FAKE_HELM_RELEASES_JSON": json.dumps(
@@ -383,10 +383,10 @@ def test_oss_render_produces_helm_values_and_install_scripts(tmp_path: Path) -> 
     assert "kubeProxyReplacement: true" in cilium
     assert "method: cronJob" in cilium
     metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata["helm_charts"]["cilium"]["version"] == "1.18.10"
-    assert metadata["helm_charts"]["tetragon"]["version"] == "1.7.0"
-    assert '--version "1.18.10"' in install_cilium
-    assert '--version "1.7.0"' in (output / "scripts/install-tetragon.sh").read_text(
+    assert metadata["helm_charts"]["cilium"]["version"] == "1.20.2"
+    assert metadata["helm_charts"]["tetragon"]["version"] == "1.7.1"
+    assert '--version "1.20.2"' in install_cilium
+    assert '--version "1.7.1"' in (output / "scripts/install-tetragon.sh").read_text(
         encoding="utf-8"
     )
 
@@ -421,8 +421,8 @@ def test_gke_oss_render_rejects_known_bad_cilium_1_18_8_baseline(tmp_path: Path)
     assert result.returncode == 0, combined_output(result)
     metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
     install = (output / "scripts/install-cilium.sh").read_text(encoding="utf-8")
-    assert metadata["helm_charts"]["cilium"]["version"] == "1.18.10"
-    assert '--version "1.18.10"' in install
+    assert metadata["helm_charts"]["cilium"]["version"] == "1.20.2"
+    assert '--version "1.20.2"' in install
     assert '--version "1.18.8"' not in install
 
 
@@ -480,7 +480,7 @@ def test_static_validation_rejects_tampered_chart_contract(tmp_path: Path) -> No
     result = run_static_validate(output)
 
     assert result.returncode != 0
-    assert "must pin audited version 1.18.10" in combined_output(result)
+    assert "must pin audited version 1.20.2" in combined_output(result)
 
 
 @pytest.mark.parametrize(
@@ -969,7 +969,7 @@ def test_live_validation_fails_when_required_helm_release_is_missing(tmp_path: P
                 "name": "tetragon",
                 "namespace": "tetragon",
                 "status": "deployed",
-                "chart": "tetragon-1.7.0",
+                "chart": "tetragon-1.7.1",
             }
         ]
     )
@@ -1329,6 +1329,40 @@ def test_live_validation_rejects_positive_degraded_or_failed_hive_status_without
     assert 'status="degraded"' not in output_text
 
 
+def test_live_validation_checks_each_cilium_agent_health_metric(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    fake_bin = tmp_path / "bin"
+    write_fake_live_validation_tools(fake_bin)
+    env = live_validation_env(fake_bin)
+    bad_pod = "cilium-agent-degraded"
+    healthy_pod = "cilium-agent-healthy"
+    env["FAKE_CILIUM_PODS_JSON"] = json.dumps(
+        {
+            "items": [
+                json.loads(ready_pod_inventory(healthy_pod, "cilium-agent"))["items"][0],
+                json.loads(ready_pod_inventory(bad_pod, "cilium-agent"))["items"][0],
+            ]
+        }
+    )
+    env["FAKE_HIVE_HEALTH_PATH"] = f"/pods/{bad_pod}:9962/proxy/metrics"
+    env["FAKE_HIVE_METRICS_TEXT"] = '\n'.join(
+        (
+            'cilium_hive_status{status="degraded"} 1',
+            'cilium_hive_status{status="ok"} 124',
+        )
+    )
+
+    result = run_validate(output, env=env)
+
+    assert result.returncode != 0
+    output_text = combined_output(result)
+    assert f"Cilium agent {bad_pod}:9962: cilium_hive_status rule=degraded-or-failed-positive count=1" in output_text
+    assert f"Cilium agent {healthy_pod}:9962: reachable" in output_text
+
+
 def test_live_validation_allows_zero_degraded_and_positive_stopped_hive_status(tmp_path: Path) -> None:
     output = tmp_path / "rendered"
     spec = write_spec(tmp_path / "spec.json")
@@ -1366,7 +1400,7 @@ def test_live_validation_rejects_duplicate_release_names_across_namespaces(tmp_p
             "name": "cilium",
             "namespace": "shadow-system",
             "status": "deployed",
-            "chart": "cilium-1.18.10",
+            "chart": "cilium-1.20.2",
         }
     )
     env["FAKE_HELM_RELEASES_JSON"] = json.dumps(releases)
@@ -1376,8 +1410,8 @@ def test_live_validation_rejects_duplicate_release_names_across_namespaces(tmp_p
     assert result.returncode != 0
     output_text = combined_output(result)
     assert "duplicate Helm releases named cilium found across namespaces" in output_text
-    assert "kube-system/cilium-1.18.10" in output_text
-    assert "shadow-system/cilium-1.18.10" in output_text
+    assert "kube-system/cilium-1.20.2" in output_text
+    assert "shadow-system/cilium-1.20.2" in output_text
 
 
 def test_live_validation_rejects_wrong_chart_hidden_behind_core_release_name(tmp_path: Path) -> None:

@@ -90,8 +90,18 @@ platform_restart_execution_mode() {
 
 _platform_restart_can_use_ssh() {
     [[ -n "${SPLUNK_SSH_HOST:-}" || -n "${SPLUNK_HOST:-}" || -n "${SPLUNK_URI:-}" ]] || return 1
-    [[ -n "${SPLUNK_SSH_PASS:-}" ]] || return 1
-    command -v sshpass >/dev/null 2>&1
+    case "${SPLUNK_SSH_AUTH_METHOD:-password}" in
+        password)
+            [[ -n "${SPLUNK_SSH_PASS:-}" ]] || return 1
+            command -v sshpass >/dev/null 2>&1
+            ;;
+        key)
+            command -v ssh >/dev/null 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 _platform_restart_capture() {
@@ -112,26 +122,40 @@ _platform_restart_run() {
 
 platform_restart_detect_systemd_unit() {
     local execution_mode="${1:-}"
-    local unit raw_cmd
+    local splunk_home="${2:-${SPLUNK_HOME:-/opt/splunk}}"
+    local splunk_bin expected_bin unit raw_cmd
     local -a candidates=()
 
     if [[ -z "${execution_mode}" ]] && ! execution_mode="$(platform_restart_execution_mode)"; then
         return 1
     fi
+    [[ "${splunk_home}" != *$'\n'* && "${splunk_home}" != *$'\r'* ]] || return 1
+    splunk_bin="${splunk_home%/}/bin/splunk"
+    # Resolve the selected target executable before inspecting units. A unit is
+    # usable only when its ExecStart names this exact canonical executable.
+    expected_bin="$(_platform_restart_capture "${execution_mode}" "if command -v realpath >/dev/null 2>&1; then realpath -e -- $(printf '%q' "${splunk_bin}") 2>/dev/null || realpath -- $(printf '%q' "${splunk_bin}"); elif command -v readlink >/dev/null 2>&1; then readlink -f -- $(printf '%q' "${splunk_bin}"); else printf '%s' $(printf '%q' "${splunk_bin}"); fi" 2>/dev/null || true)"
+    [[ -n "${expected_bin}" && "${expected_bin}" != *$'\n'* ]] || return 1
 
     if [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" ]]; then
+        # An explicit unit is an operator assertion. Never silently fall back
+        # to another service when that assertion points at the wrong target.
         candidates+=("${SPLUNK_SYSTEMD_UNIT}")
+    else
+        candidates+=(Splunkd.service splunk.service splunkd.service SplunkForwarder.service)
     fi
-    candidates+=(Splunkd.service splunk.service splunkd.service SplunkForwarder.service)
 
     for unit in "${candidates[@]}"; do
-        _platform_restart_safe_unit "${unit}" || continue
-        raw_cmd="command -v systemctl >/dev/null 2>&1 && systemctl show $(printf '%q' "${unit}") -p ExecStart --value 2>/dev/null | grep -q '_internal_launch_under_systemd' && printf '%s' $(printf '%q' "${unit}")"
+        if ! _platform_restart_safe_unit "${unit}"; then
+            [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" ]] && return 2
+            continue
+        fi
+        printf -v raw_cmd 'command -v systemctl >/dev/null 2>&1 || exit 1; expected=%q; exec_start="$(systemctl show %q -p ExecStart --value 2>/dev/null)"; printf "%%s\n" "$exec_start" | grep -q "_internal_launch_under_systemd" || exit 1; while IFS= read -r path; do [ -n "$path" ] || continue; actual="$(realpath -e -- "$path" 2>/dev/null || realpath -- "$path" 2>/dev/null || readlink -f -- "$path" 2>/dev/null || printf "%%s" "$path")"; if [ "$actual" = "$expected" ]; then printf "%%s" %q; exit 0; fi; done < <(printf "%%s\n" "$exec_start" | sed -n "s/.*path=\\([^ ;}]*\\).*/\\1/p; s#^\\([^ ]*/bin/splunk\\) .*#\\1#p"); exit 1' "$expected_bin" "$unit" "$unit"
         if _platform_restart_capture "${execution_mode}" "${raw_cmd}" 2>/dev/null | grep -q .; then
             printf '%s' "${unit}"
             return 0
         fi
     done
+    [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" ]] && return 2
     return 1
 }
 
@@ -171,17 +195,71 @@ _platform_restart_stdin_auth() {
     fi
 }
 
+_platform_restart_resolve_cli_owner() {
+    local execution_mode="$1" splunk_home="$2" splunk_bin="$3"
+    local current_uid owner_uid home_uid configured_uid pid proc_uid expected_daemon actual_daemon owner_name pid_file
+
+    current_uid="$(_platform_restart_capture "${execution_mode}" "id -u" 2>/dev/null || true)"
+    owner_uid="$(_platform_restart_capture "${execution_mode}" "stat -c %u -- $(printf '%q' "${splunk_bin}") 2>/dev/null || stat -f %u $(printf '%q' "${splunk_bin}") 2>/dev/null" 2>/dev/null || true)"
+    home_uid="$(_platform_restart_capture "${execution_mode}" "stat -c %u -- $(printf '%q' "${splunk_home}") 2>/dev/null || stat -f %u $(printf '%q' "${splunk_home}") 2>/dev/null" 2>/dev/null || true)"
+    [[ "${current_uid}" =~ ^[0-9]+$ && "${owner_uid}" =~ ^[0-9]+$ && "${home_uid}" =~ ^[0-9]+$ ]] || return 1
+    # A root-owned executable/home does not prove that root owns the running
+    # Splunk service. Refuse any binary/home ownership disagreement first.
+    [[ "${owner_uid}" == "${home_uid}" ]] || return 1
+    if [[ "${current_uid}" == "${owner_uid}" && "${owner_uid}" != 0 ]]; then
+        return 0
+    fi
+
+    if [[ -n "${SPLUNK_OS_USER:-}" ]]; then
+        [[ "${SPLUNK_OS_USER}" =~ ^[A-Za-z_][A-Za-z0-9_.@-]*$ ]] || return 1
+        configured_uid="$(_platform_restart_capture "${execution_mode}" "id -u -- $(printf '%q' "${SPLUNK_OS_USER}")" 2>/dev/null || true)"
+        [[ "${configured_uid}" == "${owner_uid}" ]] || return 1
+        printf '%s' "${SPLUNK_OS_USER}"
+        return 0
+    fi
+
+    pid_file="${splunk_home%/}/var/run/splunk/splunkd.pid"
+    pid="$(_platform_restart_capture "${execution_mode}" "head -n 1 -- $(printf '%q' "${pid_file}")" 2>/dev/null || true)"
+    if [[ -z "${pid}" && "${SPLUNK_REMOTE_SUDO:-false}" == "true" ]]; then
+        pid="$(_platform_restart_capture "${execution_mode}" "sudo -n -- head -n 1 -- $(printf '%q' "${pid_file}")" 2>/dev/null || true)"
+    fi
+    [[ "${pid}" =~ ^[0-9]+$ && "${pid}" != 0 ]] || return 1
+    expected_daemon="$(_platform_restart_capture "${execution_mode}" "realpath -e -- $(printf '%q' "${splunk_home%/}/bin/splunkd") 2>/dev/null || realpath -- $(printf '%q' "${splunk_home%/}/bin/splunkd") 2>/dev/null || readlink -f -- $(printf '%q' "${splunk_home%/}/bin/splunkd") 2>/dev/null" 2>/dev/null || true)"
+    actual_daemon="$(_platform_restart_capture "${execution_mode}" "realpath -e -- /proc/${pid}/exe 2>/dev/null || realpath -- /proc/${pid}/exe 2>/dev/null || readlink -f -- /proc/${pid}/exe 2>/dev/null" 2>/dev/null || true)"
+    proc_uid="$(_platform_restart_capture "${execution_mode}" "stat -c %u -- /proc/${pid} 2>/dev/null || stat -f %u /proc/${pid} 2>/dev/null" 2>/dev/null || true)"
+    if [[ "${SPLUNK_REMOTE_SUDO:-false}" == "true" ]]; then
+        if [[ -z "${actual_daemon}" ]]; then
+            actual_daemon="$(_platform_restart_capture "${execution_mode}" "sudo -n -- realpath -e -- /proc/${pid}/exe 2>/dev/null || sudo -n -- realpath -- /proc/${pid}/exe 2>/dev/null || sudo -n -- readlink -f -- /proc/${pid}/exe 2>/dev/null" 2>/dev/null || true)"
+        fi
+        if [[ -z "${proc_uid}" ]]; then
+            proc_uid="$(_platform_restart_capture "${execution_mode}" "sudo -n -- stat -c %u -- /proc/${pid} 2>/dev/null || sudo -n -- stat -f %u /proc/${pid} 2>/dev/null" 2>/dev/null || true)"
+        fi
+    fi
+    [[ -n "${expected_daemon}" && "${actual_daemon}" == "${expected_daemon}" && "${proc_uid}" == "${owner_uid}" ]] || return 1
+    owner_name="$(_platform_restart_capture "${execution_mode}" "getent passwd $(printf '%q' "${owner_uid}") | cut -d: -f1" 2>/dev/null || true)"
+    [[ "${owner_name}" =~ ^[A-Za-z_][A-Za-z0-9_.@-]*$ ]] || return 1
+    printf '%s' "${owner_name}"
+}
+
 _platform_restart_cli() {
     local execution_mode="$1" splunk_home="$2" use_sudo="${3:-false}"
-    local splunk_bin cmd prefix stdin_content
+    local splunk_bin cmd prefix stdin_content owner_name
 
     splunk_bin="${splunk_home%/}/bin/splunk"
+    if ! _platform_restart_capture "${execution_mode}" "$(hbs_shell_join test -x "${splunk_bin}")" >/dev/null 2>&1; then
+        return 1
+    fi
     cmd="$(hbs_shell_join "${splunk_bin}" restart)"
     if [[ "${use_sudo}" == "true" ]]; then
         if ! prefix="$(_platform_restart_command_prefix "${execution_mode}")"; then
             return 1
         fi
         cmd="${prefix}${cmd}"
+    else
+        owner_name="$(_platform_restart_resolve_cli_owner "${execution_mode}" "${splunk_home}" "${splunk_bin}")" || return 1
+        if [[ -n "${owner_name}" ]]; then
+            cmd="sudo -n -u $(printf '%q' "${owner_name}") -- ${cmd}"
+        fi
     fi
     stdin_content="$(_platform_restart_stdin_auth)"
     _platform_restart_run "${execution_mode}" "${cmd}" "${stdin_content}"
@@ -259,7 +337,7 @@ _platform_restart_validate_platform_role() {
 
 platform_restart_plan() {
     local operation="${1:-changes}" target_role="${2:-${SPLUNK_TARGET_ROLE:-standalone}}" restart_mode="${3:-${PLATFORM_RESTART_MODE:-auto}}"
-    local execution_mode splunk_home systemd_unit decision platform=""
+    local execution_mode splunk_home systemd_unit decision platform="" detection_rc
 
     if ! _platform_restart_resolve_platform; then
         return 1
@@ -275,7 +353,16 @@ platform_restart_plan() {
         return 1
     fi
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
-    systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" 2>/dev/null || true)"
+    if systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" "${splunk_home}" 2>/dev/null)"; then
+        :
+    else
+        detection_rc=$?
+        if [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" && "${detection_rc}" -eq 2 ]]; then
+            echo "ERROR: SPLUNK_SYSTEMD_UNIT does not match selected Splunk home; refusing restart routing." >&2
+            return 1
+        fi
+        systemd_unit=""
+    fi
     decision="handoff"
 
     if [[ "${platform}" == "cloud" ]]; then
@@ -320,7 +407,7 @@ platform_restart_or_exit() {
     local skip_msg="${4:-Restart manually before relying on the updated state.}"
     local restart_mode="${PLATFORM_RESTART_MODE:-auto}"
     local target_role="${SPLUNK_TARGET_ROLE:-standalone}"
-    local execution_mode splunk_home systemd_unit rc platform=""
+    local execution_mode splunk_home systemd_unit rc platform="" detection_rc
 
     if [[ "${RESTART_SPLUNK:-true}" != "true" ]]; then
         log "Skipping Splunk restart (--no-restart). ${skip_msg}"
@@ -386,7 +473,16 @@ platform_restart_or_exit() {
         return 0
     fi
 
-    systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" 2>/dev/null || true)"
+    if systemd_unit="$(platform_restart_detect_systemd_unit "${execution_mode}" "${splunk_home}" 2>/dev/null)"; then
+        :
+    else
+        detection_rc=$?
+        if [[ -n "${SPLUNK_SYSTEMD_UNIT:-}" && "${detection_rc}" -eq 2 ]]; then
+            log "ERROR: SPLUNK_SYSTEMD_UNIT does not match selected Splunk home; refusing restart."
+            return 1
+        fi
+        systemd_unit=""
+    fi
     if [[ "${restart_mode}" == "systemd" || ( "${restart_mode}" == "auto" && -n "${systemd_unit}" ) ]]; then
         if [[ -z "${systemd_unit}" ]]; then
             platform_restart_handoff "${operation}" "No Splunk systemd unit was detected." || return 1

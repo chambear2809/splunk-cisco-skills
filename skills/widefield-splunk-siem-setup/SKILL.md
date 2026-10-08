@@ -5,8 +5,10 @@ description: "Use when the user asks to send WideField Security events to Splunk
   detections. Render, apply, and validate Splunk SIEM readiness for WideField Security events using a
   WideField index, HEC token, schema-light spath searches, saved searches, macros, and starter dashboard
   assets."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

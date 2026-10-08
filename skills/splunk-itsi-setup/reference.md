@@ -13,8 +13,8 @@ trees) lives in the separate `splunk-itsi-config` skill.
 | Product name | Splunk IT Service Intelligence |
 | Premium license | Required (separate from Splunk Enterprise license) |
 | Splunkbase listing | [App ID 1841](https://splunkbase.splunk.com/app/1841) |
-| Repository-verified baseline | `4.21.2` |
-| Current public release | `5.0.1` (lists Splunk 10.5; download is entitlement-gated, so the package is not verified here) |
+| Repository-verified package | `5.0.2`, build 117138 (`SA-ITOA`), SHA-256 `88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b` |
+| Current public release | `5.0.2` (Splunkbase lists Enterprise 10.6, 10.5, 10.4, 10.3, and 10.2) |
 | Primary internal app | `SA-ITOA` (the engine; UI ships in `itsi`) |
 | Bundled apps | `SA-ITOA`, `itsi`, `SA-UserAccess`, `SA-ITSI-Licensechecker`, plus optional `DA-ITSI-*` content packs |
 | Deployment placement | Search-tier role (search head, SHC member via deployer) |
@@ -25,11 +25,13 @@ Refer to Splunk Docs for canonical version compatibility:
 - [Splunk products version compatibility matrix](https://help.splunk.com/en/splunk-enterprise/release-notes-and-updates/compatibility-matrix/splunk-products-version-compatibility/splunk-products-version-compatibility-matrix)
 - [Plan your ITSI deployment, including Splunk Cloud requirements](https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/install-and-upgrade/5.0/planning/plan-your-itsi-deployment)
 
-The shared installer defaults to verified `4.21.2`; only the explicit
-`--accept-unverified-release` override follows public `5.0.1`. Public
-compatibility metadata is not package verification. After that override,
-install and health-check 5.0 independently, then review its native-object
-contracts before using `splunk-itsi-config`.
+The shared installer defaults to verified `5.0.2`. Package identity and
+checksum verification do not validate every native-object or content-pack
+workflow; review ITSI 5.0 contracts before using `splunk-itsi-config`. Although
+ITSI 5.0.x is supported on Enterprise 10.6, postpone the cohosted PostgreSQL
+KV Store migration using `postgresMigrateOnStartup = false` until the installed
+apps permit migration. See the host and KV Store admin skills for the gated
+upgrade procedure.
 
 ## Topology Placement
 
@@ -93,9 +95,11 @@ The validator confirms presence of these signals:
 5. **Restart semantics.** Enterprise: `splunk restart` on the search head
    (members via SHC deployer push). Cloud: `acs status current-stack` first,
    only restart when ACS asks.
-6. **ITSI 5.0 boundary.** The public `5.0.1` listing advertises Splunk 10.5,
-   but the package and native-object API shapes are not repository-verified.
-   Do not promote 4.21.2 configuration assumptions to 5.0 without review.
+6. **ITSI 5.0 boundary.** ITSI `5.0.2` package identity is checksum-verified
+   and Splunkbase lists Enterprise 10.6 support. Native-object and content-pack
+   workflows still require review; do not promote 4.21.2 configuration
+   assumptions to 5.0 without validation. Defer 10.6's cohosted KV Store
+   migration while ITSI 5.0.x requires it.
 
 ## Troubleshooting
 

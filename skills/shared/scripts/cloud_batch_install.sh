@@ -226,7 +226,7 @@ import re
 import sys
 
 value = sys.argv[1].strip()
-match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+)?", value)
+match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+){0,2}", value)
 if not match:
     raise SystemExit(1)
 print(f"{match.group(1)}.{match.group(2)}", end="")
@@ -239,7 +239,7 @@ resolve_target_splunk_version() {
         raw="$(spv_cloud_doc_train_default)"
     fi
     if ! TARGET_SPLUNK_VERSION="$(normalize_splunk_minor_version "${raw}")"; then
-        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        log "ERROR: Target Splunk version '${raw}' must use two, three, or four numeric segments."
         return 1
     fi
     export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"

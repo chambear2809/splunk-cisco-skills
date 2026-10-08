@@ -8,6 +8,8 @@ description: "Use when wiring Cilium, Tetragon, or Hubble metrics into Splunk Ob
   handoff scripts for base collector, HEC, and Cisco Security Cloud ingestion."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"
 ---
@@ -178,8 +180,12 @@ bash skills/splunk-observability-isovalent-integration/scripts/validate.sh
 Static checks: overlay shape, token-scrub assertion, dashboard JSON validity, sourcetype/index match. With `--live`:
 
 - `helm status` for the OTel collector release.
-- Pod-IP scrape probes for the seven Prometheus ports (uses `kubectl get --raw` for Tetragon, NOT `kubectl exec`).
+- Per-pod Prometheus endpoint probes for every selected Isovalent pod (uses Kubernetes pod proxies, never `kubectl exec`).
+- Live receiver and ordered pipeline checks that accept the native `hostmetrics`, `kubeletstats`, and `resourcedetection` names used by the Helm chart when the rendered overlay uses their underscore aliases.
+- Tetragon filelog checks that accept cluster-name enrichment on the receiver or in the downstream logs `resource` processor.
 - Optional SignalFlow probe for `cilium_*`, `hubble_*`, `tetragon_*` series presence.
 - Optional Splunk Platform search check: `index=cisco_isovalent sourcetype=cisco:isovalent` returns events. With Hubble flow export enabled, it also requires a `sourcetype=cilium:hubble:flow` event in its index whose JSON contains a `flow` object.
+
+Kubernetes checks prove that scrape targets are reachable and return metrics; they do not prove that the backend accepted or indexed telemetry. Use the SignalFlow and Splunk search checks with protected file-based credentials for end-to-end delivery evidence.
 
 See `reference.md` and the `references/` annexes for collector-overlay details, Splunk Platform paths, Tetragon hostPath coordination, sourcetype reference, dashboards catalog, and troubleshooting.

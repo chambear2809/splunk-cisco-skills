@@ -12,10 +12,10 @@
 
 | Release | Chart | Exact version |
 |---|---|---:|
-| OSS Cilium | `cilium/cilium` | `1.18.10` |
+| OSS Cilium | `cilium/cilium` | `1.20.2` |
 | Enterprise Cilium | `isovalent/cilium-enterprise` | `1.18.8` |
 | EKS OCI Cilium mirror | `oci://public.ecr.aws/eks/cilium/cilium` | `1.18.8` |
-| OSS Tetragon | `cilium/tetragon` | `1.7.0` |
+| OSS Tetragon | `cilium/tetragon` | `1.7.1` |
 | Enterprise Tetragon | `isovalent/tetragon` | `1.18.1` |
 | Cilium DNSProxy | `isovalent/cilium-dnsproxy` | `1.18.8` |
 | Hubble Enterprise | `isovalent/hubble-enterprise` | `1.18.8` |
@@ -33,11 +33,13 @@ The private Hubble charts additionally require entitled repository access.
 Consequently, exact version resolution is fail-closed, but origin/archive
 integrity remains an explicit review gap rather than a fabricated checksum.
 
-OSS and Enterprise pins are intentionally separate. Upstream Cilium `1.18.10`
-is the current 1.18 maintenance baseline; the skill does not reuse the
-cluster-validated Enterprise `1.18.8` pin for public GKE installs because that
-upstream version has a documented GKE regression. Enterprise and EKS-mirror
-versions remain separate evidence contracts rather than inferred upgrades.
+OSS and Enterprise pins are intentionally separate. Upstream Cilium `1.20.2`
+and Tetragon `1.7.1` were the latest stable chart releases confirmed from the
+public upstream indexes on 2026-09-30. Enterprise and EKS-mirror versions remain
+separate evidence contracts: `1.18.8`/`1.18.1` are the repository's last
+cluster-validated Enterprise pins, and their private chart indexes were not
+available for independent latest-version verification. Reconfirm Enterprise
+chart versions and the EKS mirror before production upgrades.
 
 ## Rendered layout
 
@@ -125,6 +127,8 @@ Helm inventory uses explicit status flags supported by Helm 3 and Helm 4, not
 large bodies cannot false-fail through `grep -q`/`pipefail` SIGPIPE behavior.
 For required Cilium and enabled DNSProxy responses, positive
 `cilium_hive_status` samples with status `degraded` or `failed` fail closed.
+Cilium agent Hive health is checked through each agent pod as well as the
+shared metrics service so load balancing cannot hide an unhealthy agent.
 Output reports only the metric name, rule identifier, and aggregate positive
 count; label content is not echoed. Positive `stopped` is recorded as ordinary
 sample evidence and is not treated as unhealthy without documented semantics.
@@ -183,7 +187,8 @@ Limits:
 
 ## Preflights
 
-- **Kernel >= 5.10**: required for Cilium v1.18.x. Renderer emits a per-node check.
+- **Kernel**: Cilium 1.20.2 requires Linux 5.10 or equivalent; upstream lists RHEL 8.10's 4.18 kernel as an equivalent backport. The renderer emits a conservative numeric per-node check, so it may warn on a validated backported kernel. The AWS EKS Hybrid mirror has separate, stricter OS exclusions.
+- **Kubernetes**: Cilium 1.20.2 documents Kubernetes 1.33–1.36 as e2e-tested. Confirm Enterprise chart compatibility independently; the private chart support matrix is not inferred from upstream Cilium.
 - **EKS BYOCNI**: Cilium on EKS requires the cluster created with `--network-plugin none`. Renderer warns if `aws-node` DaemonSet is found.
 - **CNI conflict**: Cilium fails if AWS VPC CNI is still installed. Same check as EKS BYOCNI.
 

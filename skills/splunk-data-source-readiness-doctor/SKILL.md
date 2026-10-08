@@ -5,8 +5,10 @@ description: "Use when the user asks for data-source readiness, ES/ITSI/ARI read
   enrichment, federated data usability, ITSI summary health, or fix handoffs after app/input setup.
   Diagnose whether onboarded Splunk data sources are usable by Enterprise Security, ITSI, Asset and Risk
   Intelligence, CIM, OCSF, and dashboards."
-compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
+compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain separate Enterprise version and package evidence; see the Enterprise 10.6 matrix."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "supported"
   compatibility_verified: "2026-08-20"
 ---

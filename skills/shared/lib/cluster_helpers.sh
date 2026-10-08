@@ -30,13 +30,64 @@ fi
 
 # cluster_bundle_validate <manager_uri> <sk> [check_restart]
 # POST /services/cluster/manager/control/default/validate_bundle
+_cluster_bundle_post_checked() {
+    local sk="$1" body="$2" url="$3" response structured_error
+    if ! response="$(splunk_curl_post "${sk}" "${body}" "${url}")"; then
+        return 1
+    fi
+    # Splunk can return HTTP 200 while reporting an asynchronous validation or
+    # apply failure in JSON messages[]. Treat structured ERROR messages as a
+    # failed operation instead of allowing callers to report false success.
+    if ! structured_error="$(printf '%s' "${response}" | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    print("INVALID: malformed or empty JSON bundle response")
+    raise SystemExit(0)
+if not isinstance(payload, dict):
+    print("INVALID: bundle response must be a JSON object")
+    raise SystemExit(0)
+
+def walk(value):
+    if isinstance(value, dict):
+        for key in ("type", "severity", "level"):
+            if str(value.get(key, "")).upper() == "ERROR":
+                text = value.get("text") or value.get("message") or "structured bundle error"
+                print(" ".join(str(text).split())[:240])
+                return True
+        for child in value.values():
+            if walk(child):
+                return True
+    elif isinstance(value, list):
+        for child in value:
+            if walk(child):
+                return True
+    return False
+
+walk(payload)
+')"; then
+        log "ERROR: unable to parse bundle endpoint response"
+        return 1
+    fi
+    if [[ "${structured_error}" == INVALID:* ]]; then
+        log "ERROR: ${structured_error}"
+        return 1
+    fi
+    if [[ -n "${structured_error}" ]]; then
+        log "ERROR: bundle endpoint reported an error: ${structured_error}"
+        return 1
+    fi
+    printf '%s\n' "${response}"
+}
+
 cluster_bundle_validate() {
     local manager_uri="$1" sk="$2"
     local check_restart="${3:-false}" body=""
     if _bool_is_true "${check_restart}"; then
         body="check-restart=true"
     fi
-    splunk_curl_post "${sk}" "${body}" \
+    _cluster_bundle_post_checked "${sk}" "${body}" \
         "${manager_uri}/services/cluster/manager/control/default/validate_bundle?output_mode=json"
 }
 
@@ -58,7 +109,7 @@ cluster_bundle_apply() {
     if [[ "${1:-}" == "--skip-validation" ]]; then
         body="ignore_validation_errors=true"
     fi
-    splunk_curl_post "${sk}" "${body}" \
+    _cluster_bundle_post_checked "${sk}" "${body}" \
         "${manager_uri}/services/cluster/manager/control/default/apply?output_mode=json"
 }
 
@@ -90,8 +141,8 @@ cluster_rolling_restart() {
             return 1
             ;;
     esac
-    splunk_curl_post "${sk}" "${body}" \
-        "${manager_uri}/services/cluster/manager/control/default/rolling_restart?output_mode=json"
+    _cluster_bundle_post_checked "${sk}" "${body}" \
+        "${manager_uri}/services/cluster/manager/control/default/restart?output_mode=json"
 }
 
 # cluster_peer_offline_fast <peer_uri> <sk> [timeout_secs]

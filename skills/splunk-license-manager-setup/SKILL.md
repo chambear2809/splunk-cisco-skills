@@ -6,8 +6,10 @@ description: "Use when the user asks about configuring a Splunk Enterprise licen
   including license install, license group activation (Enterprise, Forwarder, Free, Trial), license
   stacks, license pools (with byte or MAX quota and per-peer slave lists), license peer configuration via
   splunk edit licenser-localpeer, license messages and violations, and license usage reporting."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---

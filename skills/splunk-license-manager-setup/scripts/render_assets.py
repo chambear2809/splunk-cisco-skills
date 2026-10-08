@@ -444,12 +444,17 @@ def render_configure_peer(args: argparse.Namespace, host: str, ssh_user: str) ->
             'SK="$(get_session_key_from_password_file "${PEER_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n',
         )
         + (
-            'result="$(license_localpeer_set_manager_uri "${PEER_URI}" "${SK}" "${MANAGER_URI}")"\n'
-            "case \"${result}\" in\n"
-            '  OK_MANAGER_URI) echo "OK: localpeer manager_uri set on ${HOST}" ;;\n'
-            '  OK_MASTER_URI) echo "OK: localpeer master_uri set on ${HOST} (8.x compatibility path)" ;;\n'
-            '  *) echo "ERROR: license_localpeer_set_manager_uri failed: ${result}" >&2; exit 1 ;;\n'
-            "esac\n"
+            '# Splunk 10.x requires the localpeer resource name in the POST\n'
+            '# target; posting to /localpeer without that target returns 400.\n'
+            'http_code="$(splunk_curl "${SK}" -o /dev/null -w "%{http_code}" \\\n'
+            '  -X POST --data-urlencode "manager_uri=${MANAGER_URI}" \\\n'
+            '  "${PEER_URI}/services/licenser/localpeer/license?output_mode=json")"\n'
+            'if [[ "${http_code}" == "200" ]]; then\n'
+            '  echo "OK: localpeer manager_uri set on ${HOST}"\n'
+            'else\n'
+            '  echo "ERROR: localpeer manager_uri update failed on ${HOST} (HTTP ${http_code})" >&2\n'
+            '  exit 1\n'
+            'fi\n'
         )
         + (
             "# Localpeer changes only take effect after a Splunk restart on\n"
@@ -503,7 +508,7 @@ def render_validate(args: argparse.Namespace) -> str:
             '  python3 - "${manager_version}" "${peer_version}" "${host}" <<\'PY\'\n'
             'import re, sys\n'
             'def parsed(value):\n'
-            '    match = re.fullmatch(r"(\\d+)\\.(\\d+)(?:\\.(\\d+))?", value)\n'
+            '    match = re.fullmatch(r"(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?", value)\n'
             '    if not match:\n'
             '        raise SystemExit(f"ERROR: unparseable Splunk version: {value}")\n'
             '    return tuple(int(part or 0) for part in match.groups())\n'

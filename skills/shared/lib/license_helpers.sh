@@ -59,12 +59,16 @@ license_install_files() {
             log "ERROR: License file missing, empty, or not named *.lic: ${file}"
             return 1
         fi
-        # The default REST wrapper rejects @PATH body arguments. Stream the
-        # descriptor-validated .lic on stdin through its explicit @- form.
-        credential_curl_stream_file "${file}" | splunk_curl "${sk}" -X POST \
-            -F "license=@-" \
-            "${manager_uri}/services/licenser/licenses?output_mode=json" >/dev/null \
-            || { log "ERROR: License install failed for ${file}"; return 1; }
+        # Stream the descriptor-validated license into a form encoder. The
+        # REST endpoint requires an explicit filename and payload; keep the
+        # upload on the shared credential-aware curl transport.
+        if ! credential_curl_stream_file "${file}" | python3 -c \
+            'import sys; from urllib.parse import urlencode; print(urlencode({"name": sys.argv[1], "payload": sys.stdin.buffer.read().decode("utf-8")}), end="")' \
+            "${file##*/}" | splunk_curl "${sk}" --fail-with-body --show-error -X POST -d @- \
+            "${manager_uri}/services/licenser/licenses?output_mode=json" >/dev/null 2>/dev/null; then
+            log "ERROR: License install failed for ${file}"
+            return 1
+        fi
     done
 }
 
@@ -101,7 +105,7 @@ license_localpeer_set_manager_uri() {
     # Try modern manager_uri.
     http_code=$(splunk_curl "${sk}" -o /dev/null -w '%{http_code}' \
         -X POST --data-urlencode "manager_uri=${manager_uri}" \
-        "${peer_uri}/services/licenser/localpeer?output_mode=json")
+        "${peer_uri}/services/licenser/localpeer/license?output_mode=json")
     if [[ "${http_code}" == "200" ]]; then
         printf '%s' "OK_MANAGER_URI"
         return 0
@@ -110,7 +114,7 @@ license_localpeer_set_manager_uri() {
     # Fall back to legacy master_uri (Splunk 8.x peers).
     http_code=$(splunk_curl "${sk}" -o /dev/null -w '%{http_code}' \
         -X POST --data-urlencode "master_uri=${manager_uri}" \
-        "${peer_uri}/services/licenser/localpeer?output_mode=json")
+        "${peer_uri}/services/licenser/localpeer/license?output_mode=json")
     if [[ "${http_code}" == "200" ]]; then
         printf '%s' "OK_MASTER_URI"
         return 0
@@ -169,14 +173,25 @@ else:
         "${manager_uri}/services/licenser/pools/${name}?output_mode=json")
     case "${http_code}" in
         200)
-            splunk_curl "${sk}" -X POST "${body_args[@]}" \
+            # The target name identifies an existing pool; Splunk rejects a
+            # duplicate `name` form field on update as a create request.
+            # Exclude only the name pair; stack_id, quota, slaves, and any
+            # supplied description are mutable pool fields on update.
+            local -a update_args=("${body_args[@]:2}")
+            if ! splunk_curl "${sk}" --fail-with-body --show-error -X POST "${update_args[@]}" \
                 "${manager_uri}/services/licenser/pools/${name}?output_mode=json" \
-                >/dev/null
+                >/dev/null 2>/dev/null; then
+                log "ERROR: license_pool_apply: ${name}: pool update request failed."
+                return 1
+            fi
             ;;
         404)
-            splunk_curl "${sk}" -X POST "${body_args[@]}" \
+            if ! splunk_curl "${sk}" --fail-with-body --show-error -X POST "${body_args[@]}" \
                 "${manager_uri}/services/licenser/pools?output_mode=json" \
-                >/dev/null
+                >/dev/null 2>/dev/null; then
+                log "ERROR: license_pool_apply: ${name}: pool create request failed."
+                return 1
+            fi
             ;;
         401|403)
             log "ERROR: license_pool_apply: ${name}: HTTP ${http_code} on existence check (auth/permission). Refusing to POST blindly."

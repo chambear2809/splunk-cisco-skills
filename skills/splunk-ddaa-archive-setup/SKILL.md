@@ -6,13 +6,21 @@ description: "Use when the user asks to archive expired Splunk Cloud index data 
   validate, and apply Splunk Cloud Platform Dynamic Data Active Archive (DDAA): per-index archival
   retention via the ACS index splunkArchivalRetentionDays setting, retention math validation, and restore
   and disable runbooks for the Splunk Web-only operations."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-08"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Cloud DDAA Archive Setup
+
+## Enterprise applicability
+
+DDAA archives Splunk Cloud indexes in a Splunk-managed archive. The default workflow does not configure a self-managed Enterprise
+10.6 feature. Keep its Splunk Cloud validation separate. See the
+[documented service scope](https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.4.2604/manage-your-indexes-and-data-in-splunk-cloud-platform/store-expired-splunk-cloud-platform-data-in-a-splunk-managed-archive).
 
 ## Prerequisites
 

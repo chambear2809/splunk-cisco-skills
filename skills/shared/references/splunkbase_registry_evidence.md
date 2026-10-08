@@ -12,6 +12,24 @@ This is metadata/release provenance only. It does **not** download, hash, or
 verify the contents of a `.spl`, `.tgz`, or other package binary. A snapshot
 source hash must never be described as a package checksum.
 
+## Current snapshot
+
+The tracked snapshot is dated `2026-10-06` and covers 120 numeric apps. The
+registry and JSON snapshot are authoritative for current selected releases;
+the August snapshot notes below preserve the earlier review history.
+
+- ITSI (`1841`) now selects checksum-verified `5.0.2`; the earlier `4.21.2`
+  entitlement hold is resolved. Its Enterprise 10.6 workflow still requires
+  postponing cohosted KV Store migration for ITSI 5.0.x.
+- Enterprise Security (`263`) retains reviewed `8.5.1` behind public `8.7.1`.
+- Google Workspace (`5556`) retains `4.0.0` behind public `5.0.1`, and
+  Intersight (`7828`) retains `3.1.1` behind public `3.2.2`.
+- Five selected pins now carry historical-only provenance: Cisco Cloud
+  Security (`7569`, `1.0.53`), Connect for OTLP (`8704`, `0.4.1`), GCP
+  (`3088`, `5.1.1`), GitHub (`6254`, `4.0.0`), and CyberArk EPM
+  (`5160`, `5.0.0`). They require the historical-pin acknowledgement and
+  separate platform evidence gates described below.
+
 ## Audit and refresh
 
 Run the fail-closed offline audit in CI or before using registry pins:

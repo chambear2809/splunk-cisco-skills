@@ -10,6 +10,18 @@ PROJECT_PKG_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 SERVICE_USER="${SERVICE_USER:-splunk}"
 MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
+WEB_PORT="${SPLUNK_WEB_PORT:-8000}"
+APPSERVER_PORT="${SPLUNK_APPSERVER_PORT:-8065}"
+KVSTORE_PORT="${SPLUNK_KVSTORE_PORT:-8191}"
+IPC_BROKER_PORT="${SPLUNK_IPC_BROKER_PORT:-8194}"
+POSTGRES_PORT="${SPLUNK_POSTGRES_PORT:-5432}"
+POSTGRES_PRIMARY_PORT="${SPLUNK_POSTGRES_PRIMARY_PORT:-5433}"
+POSTGRES_REPLICA_PORT="${SPLUNK_POSTGRES_REPLICA_PORT:-5434}"
+POSTGRES_PATRONI_PORT="${SPLUNK_POSTGRES_PATRONI_PORT:-8008}"
+POSTGRES_PGBOUNCER_PORT="${SPLUNK_POSTGRES_PGBOUNCER_PORT:-6432}"
+POSTGRES_NANNY_PORT="${SPLUNK_POSTGRES_NANNY_PORT:-5435}"
+NASCENT_ETCD_PEER_PORT="${SPLUNK_NASCENT_ETCD_PEER_PORT:-2380}"
+NASCENT_ETCD_CLIENT_PORT="${SPLUNK_NASCENT_ETCD_CLIENT_PORT:-2379}"
 RECEIVER_PORT="9997"
 REPLICATION_PORT="9887"
 REPLICATION_FACTOR="3"
@@ -85,7 +97,24 @@ Core options:
   --splunk-home PATH
   --service-user USER
   --advertise-host HOST
-  --mgmt-port PORT
+  --mgmt-port PORT (default: 8089; fresh installs)
+  --web-port PORT (default: 8000; fresh installs; enables Splunk Web)
+  --appserver-port PORT (default: 8065; fresh installs)
+  --kvstore-port PORT (default: 8191; fresh installs)
+  --ipc-broker-port PORT (default: 8194; fresh installs)
+  --postgres-port PORT (default: 5432; fresh installs)
+  --postgres-primary-port PORT (default: 5433; fresh installs)
+  --postgres-replica-port PORT (default: 5434; fresh installs)
+  --postgres-patroni-port PORT (default: 8008; fresh installs)
+  --postgres-pgbouncer-port PORT (default: 6432; fresh installs)
+  --postgres-nanny-port PORT (default: 5435; fresh installs)
+  --nascent-etcd-peer-port PORT (default: 2380; fresh installs)
+  --nascent-etcd-client-port PORT (default: 2379; fresh installs)
+
+Port options accept non-standard values. Omit them to use Splunk's standard
+ports. Fresh installs verify that the selected ports are free and configure
+them before the first start, including the PostgreSQL and Nascent sidecar ports
+used by Splunk Enterprise 10.6.
 
 If --url is omitted or set to latest for a remote/authenticated download, the
 script resolves the latest official Splunk Enterprise Linux package from
@@ -422,6 +451,41 @@ resolve_requested_package_version() {
     printf '%s' "${package_version}"
 }
 
+enterprise_106_sidecars_enabled() {
+    [[ "${PACKAGE_VERSION:-}" =~ ^10\.6(\.|$) ]]
+}
+
+validate_sidecar_port_values() {
+    enterprise_106_sidecars_enabled || return 0
+    local i j port_value
+    local -a sidecar_ports=(
+        "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
+        "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+        "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+        "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+    )
+    for port_value in "${sidecar_ports[@]}"; do
+        if [[ ! "${port_value}" =~ ^[1-9][0-9]{0,4}$ ]] || (( port_value > 65535 )); then
+            log "ERROR: Configured service ports must be numeric values from 1 through 65535."
+            return 1
+        fi
+    done
+    for port_value in "${sidecar_ports[@]:5}"; do
+        if (( port_value < 1024 )); then
+            log "ERROR: PostgreSQL and Nascent sidecar ports must be from 1024 through 65535."
+            return 1
+        fi
+    done
+    for ((i = 0; i < ${#sidecar_ports[@]}; i++)); do
+        for ((j = i + 1; j < ${#sidecar_ports[@]}; j++)); do
+            if [[ "${sidecar_ports[i]}" == "${sidecar_ports[j]}" ]]; then
+                log "ERROR: All selected Splunk service and sidecar ports must be distinct."
+                return 1
+            fi
+        done
+    done
+}
+
 capture_installed_splunk_version() {
     local version_output version
     version_output="$(capture_splunk_as_service_user "$(splunk_cli_cmd version)" 2>/dev/null || true)"
@@ -509,6 +573,32 @@ validate_inputs() {
     validate_choice "${DEPLOYMENT_MODE}" standalone clustered
     validate_choice "${CLUSTER_SITE}" single
 
+    local -a configured_ports=(
+        "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
+    )
+    if enterprise_106_sidecars_enabled; then
+        configured_ports+=(
+            "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+            "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+            "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+        )
+    fi
+    local i j port_value
+    for port_value in "${configured_ports[@]}"; do
+        if [[ ! "${port_value}" =~ ^[1-9][0-9]{0,4}$ ]] || (( port_value > 65535 )); then
+            log "ERROR: Configured service ports must be numeric values from 1 through 65535."
+            exit 1
+        fi
+    done
+    for ((i = 0; i < ${#configured_ports[@]}; i++)); do
+        for ((j = i + 1; j < ${#configured_ports[@]}; j++)); do
+            if [[ "${configured_ports[i]}" == "${configured_ports[j]}" ]]; then
+                log "ERROR: All selected Splunk service and sidecar ports must be distinct."
+                exit 1
+            fi
+        done
+    done
+
     if [[ -n "${HOST_BOOTSTRAP_ROLE}" ]]; then
         validate_choice "${HOST_BOOTSTRAP_ROLE}" standalone-search-tier standalone-indexer heavy-forwarder cluster-manager indexer-peer shc-deployer shc-member
     fi
@@ -538,7 +628,7 @@ ensure_service_user_exists() {
     local create_cmd
     create_cmd="id -u $(hbs_shell_join "${SERVICE_USER}") >/dev/null 2>&1 || useradd -r -m -d $(hbs_shell_join "${SPLUNK_HOME}") -s /bin/false $(hbs_shell_join "${SERVICE_USER}")"
     hbs_run_target_cmd "${EXECUTION_MODE}" \
-        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "${create_cmd}")" >/dev/null 2>&1 || {
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join bash -c "${create_cmd}")")" >/dev/null 2>&1 || {
         log "ERROR: Failed to ensure service user ${SERVICE_USER} exists on target."
         exit 1
     }
@@ -554,6 +644,33 @@ ensure_splunk_ownership() {
 
 write_splunk_config() {
     local target_path="$1" content="$2"
+    local apps_root="${SPLUNK_HOME}/etc/apps" relative_path app_name app_relative app_dir local_dir
+    # Role drop-ins are the only files written through this helper. Create and
+    # own their dedicated app root before hbs_write_target_file creates metadata
+    # or the local file; never chown a shared Splunk parent or arbitrary path.
+    if [[ "${target_path}" != "${apps_root}/ZZZ_cisco_skills_"* ]]; then
+        log "ERROR: Refusing managed config outside ZZZ_cisco_skills_* app roots: ${target_path}"
+        exit 1
+    fi
+    relative_path="${target_path#${apps_root}/}"
+    app_name="${relative_path%%/*}"
+    app_relative="${relative_path#*/}"
+    if [[ "${app_name}" != ZZZ_cisco_skills_* || "${app_relative}" != local/* || "${app_relative}" == *..* ]]; then
+        log "ERROR: Refusing unsafe managed config path: ${target_path}"
+        exit 1
+    fi
+    app_dir="${apps_root}/${app_name}"
+    local_dir="${app_dir}/local"
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join install -d -m 750 "${app_dir}" "${local_dir}")")" || {
+        log "ERROR: Failed to create managed app directories: ${app_dir}"
+        exit 1
+    }
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}" "${app_dir}" "${local_dir}")")" || {
+        log "ERROR: Failed to set managed app directory ownership: ${app_dir}"
+        exit 1
+    }
     hbs_write_target_file "${EXECUTION_MODE}" "${target_path}" "600" "${content}" || {
         log "ERROR: Failed to write Splunk configuration: ${target_path}"
         exit 1
@@ -563,6 +680,35 @@ write_splunk_config() {
         log "ERROR: Failed to set Splunk config ownership on ${target_path}."
         exit 1
     }
+}
+
+write_shc_member_system_local_config() {
+    local content="$1" fragment_local helper_local fragment_target helper_target target_path merge_cmd rc
+    fragment_local="$(mktemp)"
+    printf '%s' "${content}" > "${fragment_local}"
+    helper_local="$(mktemp)"
+    cp "${SCRIPT_DIR}/merge_server_conf_sections.py" "${helper_local}"
+    chmod 600 "${helper_local}"
+    fragment_target="$(hbs_stage_file_for_execution "${EXECUTION_MODE}" "${fragment_local}" "splunk-shc-member-server.$$.$RANDOM")" || {
+        rm -f "${fragment_local}" "${helper_local}"
+        return 1
+    }
+    helper_target="$(hbs_stage_file_for_execution "${EXECUTION_MODE}" "${helper_local}" "splunk-merge-server-conf.$$.$RANDOM.py")" || {
+        rm -f "${fragment_local}" "${helper_local}"
+        hbs_remove_target_path "${EXECUTION_MODE}" "${fragment_target}"
+        return 1
+    }
+    target_path="${SPLUNK_HOME}/etc/system/local/server.conf"
+    merge_cmd="$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join python3 "${helper_target}" "${target_path}" "${fragment_target}" --owner-user "${SERVICE_USER}")")"
+    if hbs_run_target_cmd "${EXECUTION_MODE}" "${merge_cmd}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    rm -f "${fragment_local}" "${helper_local}"
+    hbs_remove_target_path "${EXECUTION_MODE}" "${fragment_target}"
+    hbs_remove_target_path "${EXECUTION_MODE}" "${helper_target}"
+    return "${rc}"
 }
 
 install_package_to_target() {
@@ -640,6 +786,19 @@ def safe_relative_path(value):
     return bool(normalized) and not path.is_absolute() and ".." not in path.parts
 
 
+def safe_link_target(member, destination, member_target):
+    linkname = str(member.linkname or "").replace("\\\\", "/")
+    link_path = PurePosixPath(linkname)
+    if not linkname or link_path.is_absolute():
+        return False
+    base = os.path.dirname(member_target) if member.issym() else destination
+    link_target = os.path.abspath(os.path.join(base, linkname))
+    try:
+        return os.path.commonpath([destination, link_target]) == destination
+    except ValueError:
+        return False
+
+
 archive_path, destination = sys.argv[1], sys.argv[2]
 destination = os.path.abspath(destination)
 with tarfile.open(archive_path, "r:*") as archive:
@@ -653,18 +812,16 @@ with tarfile.open(archive_path, "r:*") as archive:
         if member.isdev() or member.isfifo():
             fail(f"{member.name} uses a special file type")
         if member.issym() or member.islnk():
-            if not safe_relative_path(member.linkname):
-                fail(f"{member.name} -> {member.linkname}")
-            link_target = os.path.abspath(os.path.join(os.path.dirname(target), member.linkname))
-            if os.path.commonpath([destination, link_target]) != destination:
+            if not safe_link_target(member, destination, target):
                 fail(f"{member.name} -> {member.linkname}")
     try:
         archive.extractall(destination, members=members, filter="data")
     except TypeError:
         archive.extractall(destination, members=members)
 PY
-if [[ ! -d "\${extract_dir}/splunk" ]]; then
+if ! run_privileged test -d "\${extract_dir}/splunk"; then
     echo "ERROR: Extracted package did not contain a splunk/ directory." >&2
+    run_privileged ls -la "\${extract_dir}" 2>/dev/null | head -n 20 >&2 || true
     exit 1
 fi
 
@@ -706,7 +863,10 @@ write_user_seed() {
     content+="USERNAME = ${ADMIN_USER}"$'\n'
     content+="PASSWORD = ${ADMIN_PASSWORD}"$'\n'
     cleanup_user_seed_artifacts
-    hbs_write_target_file "${EXECUTION_MODE}" "${user_seed_path}" "600" "${content}" "false"
+    hbs_write_target_file "${EXECUTION_MODE}" "${user_seed_path}" "600" "${content}" "false" || return 1
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}" "${user_seed_path}")")" || return 1
+    log "Wrote the initial admin seed with mode 600 and owner ${SERVICE_USER}."
 }
 
 splunk_cli_cmd() {
@@ -729,17 +889,96 @@ capture_splunk_as_service_user() {
     hbs_capture_as_user_cmd "${EXECUTION_MODE}" "${SERVICE_USER}" "${raw_cmd}"
 }
 
-splunk_auth_stdin() {
-    printf '%s\n%s\n' "${ADMIN_USER}" "${ADMIN_PASSWORD}"
-}
-
 run_splunk_authenticated() {
     local raw_cmd="${1:-}"
-    run_splunk_as_service_user_with_input "${raw_cmd}" "$(splunk_auth_stdin)"
+    local auth_cmd auth_file="${SPLUNK_HOME}/.cisco-skills-admin-password.$$" helper_file="${SPLUNK_HOME}/.cisco-skills-auth-pty.$$" rc
+    hbs_write_target_file "${EXECUTION_MODE}" "${auth_file}" "600" "${ADMIN_PASSWORD}" "false" || return 1
+    hbs_copy_file_to_target "${EXECUTION_MODE}" "${SCRIPT_DIR}/splunk_cli_auth_pty.py" "${helper_file}" "700" "false" || {
+        hbs_remove_target_path "${EXECUTION_MODE}" "${auth_file}"
+        return 1
+    }
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}" "${auth_file}" "${helper_file}")")" || {
+        hbs_remove_target_path "${EXECUTION_MODE}" "${auth_file}"
+        hbs_remove_target_path "${EXECUTION_MODE}" "${helper_file}"
+        return 1
+    }
+    auth_cmd="$(hbs_shell_join python3 "${helper_file}" \
+        --splunk "${SPLUNK_HOME}/bin/splunk" --username "${ADMIN_USER}" \
+        --password-file "${auth_file}" --cache-dir "${SPLUNK_HOME}/.splunk" \
+        --command "${raw_cmd}")"
+    if run_splunk_as_service_user "${auth_cmd}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_remove_target_path "${EXECUTION_MODE}" "${auth_file}"
+    hbs_remove_target_path "${EXECUTION_MODE}" "${helper_file}"
+    return "${rc}"
 }
 
 start_splunk() {
     run_splunk_as_service_user "$(splunk_cli_cmd start --accept-license --answer-yes --no-prompt)"
+}
+
+configure_fresh_install_ports() {
+    [[ "${INSTALL_ACTION}" == "fresh-install" ]] || return 0
+    local system_local server_conf web_conf start_web_server
+    system_local="${SPLUNK_HOME}/etc/system/local"
+    server_conf=$'[kvstore]\nport = '"${KVSTORE_PORT}"$'\n\n[ipc_broker]\n'
+    server_conf+=$'port = '"${IPC_BROKER_PORT}"$'\n'
+    if enterprise_106_sidecars_enabled; then
+        server_conf+=$'postgres:postgres:address = '"${POSTGRES_PORT}"$'\n'
+        # Splunk 10.6's default file retains these deprecated aliases; keep their
+        # values aligned with the canonical primary/replica sidecar addresses.
+        server_conf+=$'postgres:traefik_primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
+        server_conf+=$'postgres:traefik_replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
+        server_conf+=$'postgres:postgres-primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
+        server_conf+=$'postgres:postgres-replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
+        server_conf+=$'postgres:patroni:address = '"${POSTGRES_PATRONI_PORT}"$'\n'
+        server_conf+=$'postgres:pgbouncer:address = '"${POSTGRES_PGBOUNCER_PORT}"$'\n'
+        server_conf+=$'postgres:postgres_nanny:address = '"${POSTGRES_NANNY_PORT}"$'\n'
+        server_conf+=$'nascent:etcd_peer:address = '"${NASCENT_ETCD_PEER_PORT}"$'\n'
+        server_conf+=$'nascent:etcd_client:address = '"${NASCENT_ETCD_CLIENT_PORT}"$'\n'
+    fi
+    start_web_server=0
+    [[ "${ENABLE_WEB}" != "true" ]] || start_web_server=1
+    web_conf=$'[settings]\nmgmtHostPort = 0.0.0.0:'"${MGMT_PORT}"$'\nhttpport = '"${WEB_PORT}"$'\n'
+    web_conf+=$'appServerPorts = '"${APPSERVER_PORT}"$'\n'
+    web_conf+=$'startwebserver = '"${start_web_server}"$'\n'
+    hbs_write_target_file "${EXECUTION_MODE}" "${system_local}/server.conf" "600" "${server_conf}" "false" || return 1
+    hbs_write_target_file "${EXECUTION_MODE}" "${system_local}/web.conf" "600" "${web_conf}" "false" || return 1
+    hbs_run_target_cmd "${EXECUTION_MODE}" \
+        "$(hbs_prefix_with_sudo "${EXECUTION_MODE}" "$(hbs_shell_join chown "${SERVICE_USER}" "${system_local}/server.conf" "${system_local}/web.conf")")" || return 1
+}
+
+assert_fresh_install_ports_free() {
+    [[ "${INSTALL_ACTION}" == "fresh-install" ]] || return 0
+    local port output
+    local -a configured_ports=(
+        "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
+    )
+    local selected_port_log="mgmt=${MGMT_PORT}, web=${WEB_PORT}, appserver=${APPSERVER_PORT}, kvstore=${KVSTORE_PORT}, ipc_broker=${IPC_BROKER_PORT}"
+    if enterprise_106_sidecars_enabled; then
+        configured_ports+=(
+            "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+            "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+            "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+        )
+        selected_port_log+=", postgres=${POSTGRES_PORT}/${POSTGRES_PRIMARY_PORT}/${POSTGRES_REPLICA_PORT}/${POSTGRES_PATRONI_PORT}/${POSTGRES_PGBOUNCER_PORT}/${POSTGRES_NANNY_PORT}, nascent=${NASCENT_ETCD_PEER_PORT}/${NASCENT_ETCD_CLIENT_PORT}"
+    fi
+    log "Checking selected ports: ${selected_port_log}"
+    for port in "${configured_ports[@]}"; do
+        if ! output="$(hbs_capture_target_cmd "${EXECUTION_MODE}" \
+            "if command -v ss >/dev/null 2>&1; then $(hbs_shell_join ss -H -ltn "sport = :${port}"); elif command -v lsof >/dev/null 2>&1; then $(hbs_shell_join lsof -nP "-iTCP:${port}" -sTCP:LISTEN -t) || [[ \$? -eq 1 ]]; else exit 127; fi")"; then
+            log "ERROR: Could not verify target port ${port}; install halted before mutation."
+            return 1
+        fi
+        if [[ -n "${output}" ]]; then
+            log "ERROR: Target port ${port} is already listening; choose a free alternate port."
+            return 1
+        fi
+    done
 }
 
 restart_splunk() {
@@ -750,6 +989,35 @@ restart_splunk() {
     fi
 }
 
+verify_user_seed_readable() {
+    [[ "${INSTALL_ACTION}" == "fresh-install" ]] || return 0
+    local user_seed_path raw_cmd metadata
+    user_seed_path="${SPLUNK_HOME}/etc/system/local/user-seed.conf"
+    raw_cmd="$(hbs_shell_join test -r "${user_seed_path}") && $(hbs_shell_join test -s "${user_seed_path}")"
+    if ! hbs_run_as_user_cmd "${EXECUTION_MODE}" "${SERVICE_USER}" "${raw_cmd}"; then
+        metadata="$(hbs_capture_target_cmd "${EXECUTION_MODE}" \
+            "if [[ -e $(hbs_shell_join "${user_seed_path}") ]]; then $(hbs_shell_join stat -c '%U %a %s' "${user_seed_path}"); else printf absent; fi" 2>/dev/null || true)"
+        log "ERROR: Initial admin user-seed.conf is missing, empty, or unreadable by ${SERVICE_USER} (target metadata: ${metadata:-unavailable}); refusing to report a successful install."
+        return 1
+    fi
+    log "Verified the initial admin seed is present and readable by ${SERVICE_USER}."
+}
+
+verify_initial_admin_account() {
+    [[ "${INSTALL_ACTION}" == "fresh-install" ]] || return 0
+    local passwd_path attempt
+    passwd_path="${SPLUNK_HOME}/etc/passwd"
+    for ((attempt = 1; attempt <= 10; attempt++)); do
+        if hbs_run_as_user_cmd "${EXECUTION_MODE}" "${SERVICE_USER}" "$(hbs_shell_join test -s "${passwd_path}")" >/dev/null 2>&1; then
+            log "Verified Splunk created its initial local account database."
+            return 0
+        fi
+        sleep 1
+    done
+    log "ERROR: Splunk started without creating ${passwd_path} from user-seed.conf; initial admin setup is incomplete."
+    return 1
+}
+
 enable_boot_start() {
     local cmd
     cmd="$(splunk_cli_cmd enable boot-start -user "${SERVICE_USER}" --accept-license --answer-yes --no-prompt)"
@@ -758,6 +1026,10 @@ enable_boot_start() {
 
 enable_web_if_needed() {
     [[ "${ENABLE_WEB}" == "true" ]] || return 0
+    if [[ "${INSTALL_ACTION}" == "fresh-install" ]]; then
+        log "Splunk Web was configured before the first start; no authenticated CLI change is needed."
+        return 0
+    fi
     run_splunk_authenticated "$(splunk_cli_cmd enable webserver)"
 }
 
@@ -955,7 +1227,7 @@ configure_cluster_role() {
                 fi
             fi
 
-            write_splunk_config "${SPLUNK_HOME}/etc/apps/ZZZ_cisco_skills_enterprise_role/local/server.conf" "$(render_shc_member_server_conf "${local_mgmt_uri}")"
+            write_shc_member_system_local_config "$(render_shc_member_server_conf "${local_mgmt_uri}")"
             restart_splunk
 
             if [[ "${BOOTSTRAP_SHC}" == "true" ]]; then
@@ -1002,8 +1274,11 @@ register_install_cleanup() {
 finalize_install() {
     ensure_service_user_exists
     ensure_splunk_ownership
+    configure_fresh_install_ports
     write_user_seed
+    verify_user_seed_readable || return 1
     start_splunk
+    verify_initial_admin_account || return 1
     remove_user_seed
     if [[ "${BOOT_START}" == "true" ]]; then
         enable_boot_start
@@ -1073,6 +1348,18 @@ while [[ $# -gt 0 ]]; do
         --service-user) require_arg "$1" $# || exit 1; SERVICE_USER="$2"; shift 2 ;;
         --advertise-host) require_arg "$1" $# || exit 1; ADVERTISE_HOST="$2"; shift 2 ;;
         --mgmt-port) require_arg "$1" $# || exit 1; MGMT_PORT="$2"; shift 2 ;;
+        --web-port) require_arg "$1" $# || exit 1; WEB_PORT="$2"; ENABLE_WEB="true"; shift 2 ;;
+        --appserver-port) require_arg "$1" $# || exit 1; APPSERVER_PORT="$2"; shift 2 ;;
+        --kvstore-port) require_arg "$1" $# || exit 1; KVSTORE_PORT="$2"; shift 2 ;;
+        --ipc-broker-port) require_arg "$1" $# || exit 1; IPC_BROKER_PORT="$2"; shift 2 ;;
+        --postgres-port) require_arg "$1" $# || exit 1; POSTGRES_PORT="$2"; shift 2 ;;
+        --postgres-primary-port) require_arg "$1" $# || exit 1; POSTGRES_PRIMARY_PORT="$2"; shift 2 ;;
+        --postgres-replica-port) require_arg "$1" $# || exit 1; POSTGRES_REPLICA_PORT="$2"; shift 2 ;;
+        --postgres-patroni-port) require_arg "$1" $# || exit 1; POSTGRES_PATRONI_PORT="$2"; shift 2 ;;
+        --postgres-pgbouncer-port) require_arg "$1" $# || exit 1; POSTGRES_PGBOUNCER_PORT="$2"; shift 2 ;;
+        --postgres-nanny-port) require_arg "$1" $# || exit 1; POSTGRES_NANNY_PORT="$2"; shift 2 ;;
+        --nascent-etcd-peer-port) require_arg "$1" $# || exit 1; NASCENT_ETCD_PEER_PORT="$2"; shift 2 ;;
+        --nascent-etcd-client-port) require_arg "$1" $# || exit 1; NASCENT_ETCD_CLIENT_PORT="$2"; shift 2 ;;
         --admin-user) require_arg "$1" $# || exit 1; ADMIN_USER="$2"; shift 2 ;;
         --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
         --idxc-secret-file) require_arg "$1" $# || exit 1; IDXC_SECRET_FILE="$2"; shift 2 ;;
@@ -1129,6 +1416,9 @@ if phase_includes_install; then
         pick_package_path
     fi
     determine_install_action
+    validate_install_constraints
+    validate_sidecar_port_values || exit 1
+    assert_fresh_install_ports_free || exit 1
 fi
 
 load_secret_values

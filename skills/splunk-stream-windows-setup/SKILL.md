@@ -1,8 +1,10 @@
 ---
 name: splunk-stream-windows-setup
 description: "Use when the user asks to investigate, install, upgrade, configure, validate, troubleshoot, or roll back Splunk Stream Forwarder on a Windows host. Provides action-capable local PowerShell, Windows OpenSSH, WinRM, and AWS Systems Manager paths; enforces a drift-bound investigation and plan before installing the Windows x64 Splunk_TA_stream payload and bundled Npcap driver."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   parent_skill: "splunk-stream-setup"
   splunk_stream_version: "8.1.6"
   splunk_cloud_10_5: "conditional"

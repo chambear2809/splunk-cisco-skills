@@ -1,0 +1,214 @@
+{
+  "deferred_ids": {
+    "7569": "No candidate promoted: only listed release lacks 10.6 evidence.",
+    "8704": "No candidate promoted: listed releases lack 10.6 evidence."
+  },
+  "entries": [
+    {
+      "app_id": "3088",
+      "app_name": "Splunk_TA_google-cloudplatform",
+      "archive": {
+        "filename": "splunk-add-on-for-google-cloud-platform_501.tgz",
+        "links": [],
+        "member_count": 4616,
+        "sha256": "c43cab4edb68dd91906e9b578539534ceb5afd7b2bc088c7dfe1172eb37115c8",
+        "size_bytes": 63963133,
+        "unsafe_paths": []
+      },
+      "candidate_release": "5.0.1",
+      "dependency_metadata": {
+        "requirement_count": 59,
+        "requirement_names": [
+          "cachetools==5.5.2",
+          "certifi==2025.8.3",
+          "cffi==1.15.1",
+          "charset-normalizer==3.3.2",
+          "configparser==6.0.1",
+          "cryptography==45.0.7",
+          "defusedxml==0.7.1",
+          "deprecation==2.1.0",
+          "google-api-core==2.24.2",
+          "google-api-python-client==2.182.0",
+          "google-auth-httplib2==0.2.0",
+          "google-auth==2.38.0",
+          "google-cloud-bigquery==3.38.0",
+          "google-cloud-core==2.4.3",
+          "google-cloud-pubsub==2.31.1",
+          "google-cloud-pubsublite==1.12.0",
+          "google-cloud-storage==3.4.0",
+          "google-crc32c==1.5.0",
+          "google-resumable-media==2.7.2",
+          "googleapis-common-protos==1.70.0",
+          "grpc-google-iam-v1==0.14.2",
+          "grpcio-status==1.48.2",
+          "grpcio==1.75.0",
+          "httplib2==0.22.0",
+          "httplib2shim==0.0.3",
+          "idna==3.10",
+          "importlib-metadata==6.7.0",
+          "oauth2client==4.1.3",
+          "opentelemetry-api==1.37.0",
+          "opentelemetry-sdk==1.37.0",
+          "opentelemetry-semantic-conventions==0.58b0",
+          "overrides==6.5.0",
+          "packaging==25.0",
+          "proto-plus==1.26.1",
+          "protobuf==6.32.1",
+          "pyasn1-modules==0.3.0",
+          "pyasn1==0.5.1",
+          "pycparser==2.21",
+          "pyparsing==3.1.4",
+          "pyrfc3339==1.1",
+          "pysocks==1.7.1",
+          "python-dateutil==2.9.0.post0",
+          "pytz==2023.4",
+          "remote-pdb==2.1.0",
+          "requests==2.32.5",
+          "rsa==4.9",
+          "six==1.16.0",
+          "solnlib==6.3.0",
+          "sortedcontainers==2.4.0",
+          "splunk-sdk==2.1.0",
+          "splunksdc",
+          "splunktalib==3.0.6",
+          "splunktaucclib==6.6.0",
+          "typing-extensions==4.15.0",
+          "u-msgpack-python==2.8.0",
+          "uritemplate==4.1.1",
+          "urllib3==1.26.19",
+          "win-inet-pton==1.1.0",
+          "zipp==3.19.1"
+        ],
+        "requirements_file_present": true
+      },
+      "identity": {
+        "id.name": "Splunk_TA_google-cloudplatform",
+        "id.version": "5.0.1",
+        "launcher.version": "5.0.1",
+        "package.id": "Splunk_TA_google-cloudplatform"
+      },
+      "install_state": "downloaded_and_safely_extracted_for_review_only",
+      "registry_latest": "5.2.0",
+      "requested_release": "5.1.1",
+      "selection_reason": "older than requested and latest; candidate explicitly lists 10.6"
+    },
+    {
+      "app_id": "3449",
+      "app_name": "DA-ESS-ContentUpdate",
+      "archive": {
+        "filename": "splunk-es-content-update_680.tar.gz",
+        "links": [],
+        "member_count": 113,
+        "sha256": "9ceff1337bd7626682c476c4b4619693ba8019dbaf4c0ad33e177643eb11f67d",
+        "size_bytes": 2832969,
+        "unsafe_paths": []
+      },
+      "candidate_release": "6.8.0",
+      "dependency_metadata": {
+        "requirement_count": 0,
+        "requirement_names": [],
+        "requirements_file_present": false
+      },
+      "identity": {
+        "id.name": "DA-ESS-ContentUpdate",
+        "id.version": "6.8.0",
+        "launcher.version": "6.8.0",
+        "package.id": "DA-ESS-ContentUpdate"
+      },
+      "install_state": "downloaded_and_safely_extracted_for_review_only",
+      "registry_latest": "6.8.0",
+      "requested_release": "6.4.0",
+      "selection_reason": "requested pin was absent; candidate is current and explicitly lists 10.6"
+    },
+    {
+      "app_id": "5160",
+      "app_name": "Splunk_TA_cyberark_epm",
+      "archive": {
+        "filename": "splunk-add-on-for-cyberark-epm_400.spl",
+        "links": [],
+        "member_count": 416,
+        "sha256": "12187dff4f2dbf0fb7ef7b179648915f5a78cce0a5618c87e6185e711193ad94",
+        "size_bytes": 5627367,
+        "unsafe_paths": []
+      },
+      "candidate_release": "4.0.0",
+      "dependency_metadata": {
+        "requirement_count": 13,
+        "requirement_names": [
+          "certifi==2026.2.25",
+          "charset-normalizer==3.4.5",
+          "defusedxml==0.7.1",
+          "deprecation==2.1.0",
+          "idna==3.10",
+          "packaging==24.0",
+          "pysocks==1.7.1",
+          "requests==2.31.0",
+          "solnlib==7.0.0",
+          "sortedcontainers==2.4.0",
+          "splunk-sdk==2.1.0",
+          "splunktaucclib==8.0.0",
+          "urllib3==1.26.19"
+        ],
+        "requirements_file_present": true
+      },
+      "identity": {
+        "id.name": "Splunk_TA_cyberark_epm",
+        "id.version": "4.0.0",
+        "launcher.version": "4.0.0",
+        "package.id": "Splunk_TA_cyberark_epm"
+      },
+      "install_state": "downloaded_and_safely_extracted_for_review_only",
+      "registry_latest": "5.0.1",
+      "requested_release": "5.0.0",
+      "selection_reason": "older than requested and latest; candidate explicitly lists 10.6"
+    },
+    {
+      "app_id": "6254",
+      "app_name": "Splunk_TA_github",
+      "archive": {
+        "filename": "splunk-add-on-for-github_331.spl",
+        "links": [],
+        "member_count": 438,
+        "sha256": "fa2298cc59fc134270ed110dcd19a24596ca1c1678d9e07cd06f1f80dc0fb1b0",
+        "size_bytes": 5261731,
+        "unsafe_paths": []
+      },
+      "candidate_release": "3.3.1",
+      "dependency_metadata": {
+        "requirement_count": 13,
+        "requirement_names": [
+          "certifi==2025.4.26",
+          "charset-normalizer==3.3.2",
+          "defusedxml==0.7.1",
+          "deprecation==2.1.0",
+          "idna==3.10",
+          "packaging==24.0",
+          "pysocks==1.7.1",
+          "requests==2.31.0",
+          "solnlib==6.3.0",
+          "sortedcontainers==2.4.0",
+          "splunk-sdk==2.1.0",
+          "splunktaucclib==8.0.0",
+          "urllib3==1.26.20"
+        ],
+        "requirements_file_present": true
+      },
+      "identity": {
+        "id.name": "Splunk_TA_github",
+        "id.version": "3.3.1",
+        "launcher.version": "3.3.1",
+        "package.id": "Splunk_TA_github"
+      },
+      "install_state": "downloaded_and_safely_extracted_for_review_only",
+      "registry_latest": "4.0.1",
+      "requested_release": "4.0.0",
+      "selection_reason": "older than requested and latest; candidate explicitly lists 10.6"
+    }
+  ],
+  "generated_date": "2026-10-07",
+  "next_owner_action": "Root must review exact package identity, checksum, candidate compatibility, and full workflow evidence before changing any ledger pin.",
+  "safety": "No installation, Splunk service, or package mutation performed. Archives and extracted trees remain under the protected run directory.",
+  "schema_version": 1,
+  "scope": "Four approved candidate packages for Enterprise 10.6 review.",
+  "source": "Authenticated Splunkbase helper download into protected disposable run directory; safe extractor; local archive inspection."
+}

@@ -3,13 +3,15 @@ name: splunk-enterprise-public-exposure-hardening
 description: "Use when the user asks to expose Splunk Enterprise on the public internet, harden a Splunk search head
   against internet exposure, configure TLS / HSTS / CSP / mTLS / per-IP rate limit / DMZ heavy forwarder,
   lock down splunkd or the KV store, fix splunk.secret / pass4SymmKey defaults, evaluate against the
-  latest SVD floor (10.4.0 / 10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx / HAProxy / WAF reference
+  latest SVD floor (10.6.0 / 10.4.0 / 10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx / HAProxy / WAF reference
   configs in front of Splunk. Render, preflight, apply, and validate hardening of an on-prem Splunk
   Enterprise deployment for public-internet exposure across all four edge surfaces (Splunk Web on 8000,
   HEC on 8088, Splunk-to-Splunk on 9997, splunkd REST on 8089) plus reference reverse-proxy / WAF /
   firewall templates and a structured operator handoff."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
@@ -290,6 +292,7 @@ Under the project root in `splunk-public-exposure-rendered/`:
 
 | Series | Required version | Source |
 |---|---|---|
+| 10.6.x | 10.6.0 | Current 10.6 GA baseline; use latest 10.6 maintenance and review future advisories |
 | 10.4.x | 10.4.0 | Not affected by SVD-2026-0304/0303 at GA; use latest 10.4.x maintenance |
 | 10.2.x | 10.2.2 | SVD-2026-0304, SVD-2026-0303 |
 | 10.0.x | 10.0.5 | SVD-2026-0303, SVD-2025-1006 |

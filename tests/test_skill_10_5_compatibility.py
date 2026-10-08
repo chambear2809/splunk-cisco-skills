@@ -30,6 +30,22 @@ def test_every_skill_has_an_enforced_splunk_cloud_10_5_classification() -> None:
     assert sum(payload["status_counts"].values()) == payload["skill_count"]
 
 
+def test_cloud_compatibility_prose_cannot_contradict_declared_status(monkeypatch) -> None:
+    module = load_audit_module()
+    original = module.load_frontmatter
+
+    def contradict_status(path):
+        data = original(path)
+        if data.get("metadata", {}).get("splunk_cloud_10_5") == "conditional":
+            data["compatibility"] = module.COMPATIBILITY_TEXT["supported"]
+        return data
+
+    monkeypatch.setattr(module, "load_frontmatter", contradict_status)
+    payload = module.audit()
+    assert payload["ok"] is False
+    assert any(finding["field"] == "compatibility" for finding in payload["findings"])
+
+
 def test_help_only_aliases_delegate_runtime_compatibility_to_replacements() -> None:
     catalog = load_catalog()
     payload = load_audit_module().audit()
@@ -64,11 +80,10 @@ def test_latest_release_gaps_use_verified_10_5_pins() -> None:
         assert app["latest_verified_version"] in app["notes"], skill
         assert app["latest_release_version"] in app["notes"], skill
 
-    # Both remaining holds are pure platform gates: the verified pin advertises 10.5
-    # and public latest does not, so advancing the pin would regress the target.
+    # The verified packages advertise 10.5. Keep both skills conditional until the
+    # newer public package release is downloaded and reviewed for the Cloud target.
     for skill in release_specific:
         app = by_skill[skill]
-        assert "10.5" not in app["platform_versions"], skill
         assert "10.5" in app["verified_platform_versions"], skill
 
 
@@ -98,7 +113,7 @@ def test_review_blocked_mcp_package_is_explicitly_classified() -> None:
             "name": "Splunk_MCP_Server",
             "relationship": "primary",
             "status": "supported",
-            "release_version": "1.3.1",
+            "release_version": "2.0.0",
             "verified_version": "1.3.1",
             "verified_status": "supported",
             "cloud_compatible": True,

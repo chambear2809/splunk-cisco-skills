@@ -1786,14 +1786,17 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             == "historical-review-only-not-currently-reproducible"
         )
 
+        # These packages no longer have reproducible public downloads. Keep their
+        # historical status explicit so both installers require acknowledgement.
         self.assertEqual(
             historical,
-            [],
-            msg=(
-                "Historical-review-only pins are not reproducible from Splunkbase. "
-                "Verify a currently downloadable package and advance the pin, or keep "
-                "the status and re-add installer coverage for the acknowledgement gate."
-            ),
+            [
+                "3088/Splunk_TA_google-cloudplatform",
+                "5160/Splunk_TA_cyberark_epm",
+                "6254/Splunk_TA_github",
+                "7569/TA-cisco-cloud-security-addon",
+                "8704/splunk-connect-for-otlp",
+            ],
         )
 
     def test_historical_review_only_pin_gate_stays_wired_in_both_installers(self):
@@ -1884,6 +1887,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "splunkbase",
                 "--app-id",
                 "8704",
+                "--accept-historical-review-only-pin",
                 "--no-update",
                 "--no-restart",
                 env=env,
@@ -1897,6 +1901,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             batch = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-historical-review-only-pin",
                 "8704",
                 env=env,
             )
@@ -1909,6 +1914,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             approved = self.run_script(
                 "skills/shared/scripts/cloud_batch_install.sh",
                 "--no-restart",
+                "--accept-historical-review-only-pin",
                 "--accept-unsupported-platform",
                 "8704",
                 env=env,
@@ -2057,7 +2063,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd == "apps describe Splunk_AI_Assistant_Cloud":
-                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.2.0", "status": "updated"}))
+                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.3.3", "status": "updated"}))
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):
@@ -2090,7 +2096,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             env["ACS_LOG"] = str(acs_log)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
-            # The reviewed 2.0.0 pin is no longer reproducible from the public release
+            # The reviewed 2.2.0 pin is no longer reproducible from the public release
             # API and has no current platform evidence, so review public latest instead.
             result = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
@@ -2391,7 +2397,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     if not output_target:
                         raise SystemExit(1)
                     Path(output_target).write_bytes(buffer.getvalue())
-                    emit_text("", code=200, effective_url="https://cdn.splunkbase.invalid/remote-test-app_123.tgz")
+                    emit_text(
+                        "",
+                        code=200,
+                        effective_url=(
+                            "https://cdn.splunkbase.invalid/remote-test-app_123.tgz"
+                            "?X-Amz-Credential=secret-user&X-Amz-Signature=secret-signature"
+                        ),
+                    )
 
                 if path.endswith("/services/apps/local") and method == "POST":
                     emit_text(json.dumps({"entry": [{"name": "remote_test_app"}]}), code=201)
@@ -2481,6 +2494,8 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("Downloading app 99999 v1.2.3 from Splunkbase...", output)
             self.assertIn("Source URL: https://splunkbase.splunk.com/app/99999/release/1.2.3/download/", output)
             self.assertIn("Resolved URL: https://cdn.splunkbase.invalid/remote-test-app_123.tgz", output)
+            self.assertNotIn("X-Amz-Credential", output)
+            self.assertNotIn("secret-signature", output)
             self.assertIn("Copying package to splunk@192.0.2.5:/tmp/", output)
             self.assertIn("Installing staged package from /tmp/", output)
             self.assertIn("Version: 1.2.3", output)

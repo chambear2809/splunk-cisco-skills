@@ -659,3 +659,332 @@ def test_cluster_and_license_adoption_avoid_default_rest_restart() -> None:
     assert "/services/server/control/restart" not in license_renderer
     assert "platform_restart_or_exit" in license_renderer
     assert "platform_restart_handoff" in license_renderer
+
+
+def test_systemd_detection_binds_execstart_to_selected_home_and_fails_closed() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+_platform_restart_capture() {{
+    local raw="$2"
+    case "$raw" in
+        if*realpath*)
+            case "$raw" in
+                *"/selected/bin/splunk"*) printf '%s' '/selected/bin/splunk' ;;
+                *"/other/bin/splunk"*) printf '%s' '/other/bin/splunk' ;;
+            esac
+            ;;
+        *systemctl*)
+            case "$raw" in
+                *"/selected/bin/splunk"*)
+                    case "$raw" in *wrong.service*) ;; *) printf '%s' 'Splunkd.service' ;; esac
+                    ;;
+            esac
+            ;;
+    esac
+}}
+unset SPLUNK_SYSTEMD_UNIT
+[ "$(platform_restart_detect_systemd_unit local /selected)" = 'Splunkd.service' ]
+if result="$(platform_restart_detect_systemd_unit local /other 2>/dev/null)"; then
+    test -z "$result"
+else
+    test -z "$result"
+fi
+SPLUNK_SYSTEMD_UNIT=wrong.service
+if result="$(platform_restart_detect_systemd_unit local /selected 2>/dev/null)"; then
+    test -z "$result"
+else
+    test -z "$result"
+fi
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_switches_to_binary_owner_with_noninteractive_sudo() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runlog=''
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u --"*) printf '%s' '2000' ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*) printf '%s' '2000' ;;
+        *"stat -c %U"*) printf '%s' 'splunk' ;;
+    esac
+}}
+_platform_restart_run() {{ runlog="$2"; return 0; }}
+SPLUNK_OS_USER=splunk
+_platform_restart_cli local /selected false
+case "$runlog" in *'sudo -n -u splunk'*) ;; *) exit 1 ;; esac
+case "$runlog" in *restart*) ;; *) exit 1 ;; esac
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_fails_closed_for_unusable_binary_owner() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runs=0
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*) printf '%s' '2000' ;;
+        *"stat -c %U"*) printf '%s' 'user with spaces' ;;
+    esac
+}}
+_platform_restart_run() {{ runs=$((runs + 1)); return 0; }}
+SPLUNK_OS_USER='user with spaces'
+if _platform_restart_cli local /selected false; then exit 1; fi
+test "$runs" -eq 0
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_rejects_root_owned_install_with_other_service_user() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runs=0
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u --"*) printf '%s' '2000' ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*) printf '%s' '0' ;;
+    esac
+}}
+_platform_restart_run() {{ runs=$((runs + 1)); return 0; }}
+SPLUNK_OS_USER=splunk
+if _platform_restart_cli local /selected false; then exit 1; fi
+test "$runs" -eq 0
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_explicit_systemd_unit_mismatch_aborts_plan(tmp_path: Path) -> None:
+    home = tmp_path / "splunk"
+    (home / "bin").mkdir(parents=True)
+    splunk = home / "bin" / "splunk"
+    splunk.write_text("#!/bin/sh\n", encoding="utf-8")
+    splunk.chmod(0o755)
+    credentials = tmp_path / "credentials"
+    credentials.write_text(
+        "SPLUNK_PLATFORM=enterprise\nSPLUNK_URI=https://localhost:8089\n"
+        "SPLUNK_USER=admin\nSPLUNK_PASS=fixture\nSPLUNK_VERIFY_SSL=false\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "SPLUNK_CREDENTIALS_FILE": str(credentials),
+            "PLATFORM_RESTART_EXECUTION": "local",
+            "SPLUNK_HOME": str(home),
+            "SPLUNK_SYSTEMD_UNIT": "wrong.service",
+        }
+    )
+    proc = subprocess.run(
+        [
+            "bash",
+            str(SKILL_DIR / "scripts/setup.sh"),
+            "--plan-restart",
+            "--operation",
+            "unit mismatch",
+            "--restart-mode",
+            "auto",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    assert proc.returncode != 0
+    assert "does not match selected Splunk home" in proc.stderr
+
+
+def test_non_systemd_cli_root_cannot_bypass_missing_service_identity_proof() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runs=0
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u"*) printf '%s' '0' ;;
+        *"stat -c %u"*) printf '%s' '0' ;;
+        *) return 1 ;;
+    esac
+}}
+_platform_restart_run() {{ runs=$((runs + 1)); return 0; }}
+unset SPLUNK_OS_USER SPLUNK_REMOTE_SUDO
+if _platform_restart_cli local /selected false; then exit 1; fi
+test "$runs" -eq 0
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_uses_guarded_sudo_readonly_probes_when_pid_is_denied() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runlog=''
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u --"*) return 1 ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*"/selected/bin/splunk"*) printf '%s' '1002' ;;
+        *"stat -c %u"*"/selected"*) printf '%s' '1002' ;;
+        *"sudo -n -- head -n 1 --"*) printf '3983361\n' ;;
+        *"head -n 1 --"*"splunkd.pid"*) return 1 ;;
+        *"realpath -e"*"/selected/bin/splunkd"*) printf '%s' '/selected/bin/splunkd' ;;
+        *"sudo -n -- realpath -e"*) printf '%s' '/selected/bin/splunkd' ;;
+        *"realpath -e"*"/proc/3983361/exe"*) return 1 ;;
+        *"sudo -n -- stat -c %u"*) printf '%s' '1002' ;;
+        *"stat -c %u"*"/proc/3983361"*) return 1 ;;
+        *"getent passwd"*) printf '%s' 'splunk' ;;
+    esac
+}}
+_platform_restart_run() {{ runlog="$2"; return 0; }}
+SPLUNK_REMOTE_SUDO=true
+_platform_restart_cli local /selected false
+case "$runlog" in *'sudo -n -u splunk'*) ;; *) exit 1 ;; esac
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_rejects_malformed_first_pid_line() -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+runs=0
+_platform_restart_capture() {{
+    case "$2" in
+        *"test -x"*) return 0 ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*) printf '%s' '1002' ;;
+        *"head -n 1"*) printf '%s' 'not-a-pid' ;;
+    esac
+}}
+_platform_restart_run() {{ runs=$((runs + 1)); return 0; }}
+if _platform_restart_cli local /selected false; then exit 1; fi
+test "$runs" -eq 0
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_non_systemd_cli_accepts_first_line_of_multiline_pid_fixture(tmp_path: Path) -> None:
+    helper = REPO_ROOT / "skills/shared/lib/restart_helpers.sh"
+    fixture = tmp_path / "splunkd.pid"
+    fixture.write_text("3983361\n3983362\n", encoding="utf-8")
+    script = f"""
+set -euo pipefail
+source {helper!s}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+_platform_restart_capture() {{
+    case "$2" in
+        *"id -u --"*) return 1 ;;
+        *"id -u"*) printf '%s' '1000' ;;
+        *"stat -c %u"*) printf '%s' '1002' ;;
+        *"head -n 1"*) head -n 1 -- {fixture} ;;
+        *"realpath -e"*"/selected/bin/splunkd"*) printf '%s' '/selected/bin/splunkd' ;;
+        *"realpath -e"*"/proc/3983361/exe"*) printf '%s' '/selected/bin/splunkd' ;;
+        *"stat -c %u"*"/proc/3983361"*) printf '%s' '1002' ;;
+        *"getent passwd"*) printf '%s' 'splunk' ;;
+    esac
+}}
+_platform_restart_resolve_cli_owner local /selected /selected/bin/splunk
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def _expected_port_probe_function() -> str:
+    setup = (SKILL_DIR / "scripts/setup.sh").read_text(encoding="utf-8")
+    start = setup.index("validate_expected_ports_after_restart() {")
+    end = setup.index("\nrun_reload() {", start)
+    return setup[start:end]
+
+
+def test_expected_port_probe_uses_plain_remote_python_and_preserves_ssh_helper() -> None:
+    function = _expected_port_probe_function()
+    script = f"""
+set -euo pipefail
+{function}
+EXPECTED_PORTS=8089
+calls=''
+log() {{ printf '%s\\n' "$*" >&2; }}
+plan_value() {{ case "$1" in execution_mode) printf '%s' ssh ;; splunk_home) printf '%s' /opt/splunk ;; esac; }}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+_platform_restart_capture() {{ calls="$2"; case "$1" in ssh) ;; *) exit 20 ;; esac; return 0; }}
+validate_expected_ports_after_restart ignored
+case "$calls" in
+  *"python3 -c"*) ;;
+  *) exit 21 ;;
+esac
+case "$calls" in
+  *"splunk cmd"*|*"/bin/splunk"*) exit 22 ;;
+esac
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+
+
+def test_expected_port_probe_fails_closed_when_remote_listener_is_unavailable() -> None:
+    function = _expected_port_probe_function()
+    script = f"""
+set -euo pipefail
+{function}
+EXPECTED_PORTS=8089
+log() {{ printf '%s\\n' "$*" >&2; }}
+plan_value() {{ case "$1" in execution_mode) printf '%s' ssh ;; splunk_home) printf '%s' /opt/splunk ;; esac; }}
+hbs_shell_join() {{ printf '%q' "$1"; shift; for arg in "$@"; do printf ' %q' "$arg"; done; }}
+_platform_restart_capture() {{ return 1; }}
+if validate_expected_ports_after_restart ignored; then exit 30; fi
+"""
+    proc = subprocess.run(
+        ["bash", "-c", script], cwd=REPO_ROOT, text=True, capture_output=True
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    assert "not reachable" in proc.stderr

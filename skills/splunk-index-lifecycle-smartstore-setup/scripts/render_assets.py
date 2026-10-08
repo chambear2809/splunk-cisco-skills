@@ -115,6 +115,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--s3-kms-auth-region", default="")
     parser.add_argument("--s3-ssl-verify-server-cert", choices=("true", "false", "unset"), default="unset")
     parser.add_argument("--s3-ssl-versions", default="")
+    parser.add_argument("--s3-ssl-root-ca-path", default="", help="Absolute path to the S3 TLS CA bundle.")
+    parser.add_argument("--imds-version", choices=("v1", "v2", "unset"), default="unset", help="Explicit EC2 IMDS version for server.conf.")
     parser.add_argument("--s3-access-key-file", default="")
     parser.add_argument("--s3-secret-key-file", default="")
     parser.add_argument("--gcs-credential-file", default="")
@@ -328,6 +330,7 @@ def validate(args: argparse.Namespace) -> None:
         (args.s3_kms_key_id, "--s3-kms-key-id"),
         (args.s3_kms_auth_region, "--s3-kms-auth-region"),
         (args.s3_ssl_versions, "--s3-ssl-versions"),
+        (args.s3_ssl_root_ca_path, "--s3-ssl-root-ca-path"),
         (args.s3_access_key_file, "--s3-access-key-file"),
         (args.s3_secret_key_file, "--s3-secret-key-file"),
         (args.gcs_credential_file, "--gcs-credential-file"),
@@ -403,8 +406,11 @@ def validate(args: argparse.Namespace) -> None:
         or args.s3_kms_auth_region
         or args.s3_ssl_verify_server_cert != "unset"
         or args.s3_ssl_versions
+        or args.s3_ssl_root_ca_path
     ):
         die("remote.s3 settings can only be used with --remote-provider s3.")
+    if args.s3_ssl_root_ca_path and not Path(args.s3_ssl_root_ca_path).is_absolute():
+        die("--s3-ssl-root-ca-path must be an absolute path.")
     if args.remote_provider != "gcs" and args.gcs_credential_file:
         die("--gcs-credential-file can only be used with --remote-provider gcs.")
     if args.remote_provider != "azure" and (args.azure_endpoint or args.azure_container_name):
@@ -582,6 +588,8 @@ def render_indexes(args: argparse.Namespace) -> str:
             lines.append(f"remote.s3.sslVerifyServerCert = {args.s3_ssl_verify_server_cert}")
         if args.s3_ssl_versions:
             lines.append(f"remote.s3.sslVersions = {args.s3_ssl_versions}")
+        if args.s3_ssl_root_ca_path:
+            lines.append(f"remote.s3.sslRootCAPath = {args.s3_ssl_root_ca_path}")
         if args.s3_access_key_file:
             lines.append("remote.s3.access_key = __SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__")
             lines.append("remote.s3.secret_key = __SMARTSTORE_S3_SECRET_KEY_FROM_FILE__")
@@ -653,6 +661,8 @@ def render_server(args: argparse.Namespace) -> str:
         lines.append("[cachemanager]")
         lines.extend(cache_lines)
         lines.append("")
+    if args.imds_version != "unset":
+        lines.extend(["[imds]", f"imds_version = {args.imds_version}", ""])
     if len(lines) == 1:
         lines.append("# No server.conf SmartStore cache-manager settings requested.")
     return "\n".join(lines).rstrip() + "\n"
@@ -1389,6 +1399,7 @@ def smartstore_expected_settings(args: argparse.Namespace) -> dict[str, dict[str
             "remote.s3.kms.key_id": args.s3_kms_key_id,
             "remote.s3.kms.auth_region": args.s3_kms_auth_region,
             "remote.s3.sslVersions": args.s3_ssl_versions,
+            "remote.s3.sslRootCAPath": args.s3_ssl_root_ca_path,
         }
         volume.update({key: value for key, value in optional.items() if value})
         for key, value in (
@@ -1447,6 +1458,8 @@ def smartstore_expected_settings(args: argparse.Namespace) -> dict[str, dict[str
     }
     if cache:
         server["cachemanager"] = cache
+    if args.imds_version != "unset":
+        server["imds"] = {"imds_version": args.imds_version}
     limits = {
         key: value
         for key, value in (
@@ -2611,6 +2624,8 @@ def render(args: argparse.Namespace) -> dict:
                 "s3_encryption": args.s3_encryption,
                 "s3_access_key_file": args.s3_access_key_file,
                 "s3_secret_key_file": args.s3_secret_key_file,
+                "s3_ssl_root_ca_path": args.s3_ssl_root_ca_path,
+                "imds_version": args.imds_version,
             },
             indent=2,
             sort_keys=True,

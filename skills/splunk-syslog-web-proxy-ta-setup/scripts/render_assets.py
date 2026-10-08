@@ -71,7 +71,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "label": "Tomcat",
         "app": "Splunk_TA_tomcat",
         "id": "2911",
-        "version": "4.0.3",
+        "version": "4.0.4",
         "transport": "local_file_uf",
         "index_arg": "index",
         "sourcetypes": [

@@ -98,6 +98,58 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             failed_help = run("help-fail")
             self.assertNotEqual(failed_help.returncode, 0)
 
+    def test_sok_repo_update_uses_portable_bounded_python_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = self.run_renderer(
+                "--target", "sok", "--architecture", "s1",
+                "--output-dir", tmpdir, "--accept-splunk-general-terms",
+            )
+            self.assertEqual(output.returncode, 0, msg=output.stderr)
+            preflight = (Path(tmpdir) / "sok" / "preflight.sh").read_text()
+            operator = (Path(tmpdir) / "sok" / "helm-install-operator.sh").read_text()
+            for script in (preflight, operator):
+                self.assertIn("subprocess.run", script)
+                self.assertIn("timeout=120", script)
+                self.assertNotIn("helm repo update splunk --timeout", script)
+
+    def test_sok_32_live_contract_accepts_operator_added_runtime_env(self) -> None:
+        source = RENDERER.read_text(encoding="utf-8")
+        self.assertIn('operator_version = sys.argv[7] if len(sys.argv) > 7 else "3.1.0"', source)
+        self.assertIn('"SPLUNK_KVSTORE_DEFAULT_TYPE": "local"', source)
+        self.assertIn('"SPLUNK_NODE_SIDECAR_POSTGRES_DISABLED": "true"', source)
+        self.assertIn('role == "license-manager" and operator_version == "3.2.0"', source)
+        self.assertIn('f"splunk-{contract[\'owner_name\']}-license-manager-service.', source)
+        self.assertIn('operator_version == "3.2.0"', source)
+        self.assertIn('target_architecture == "m4"', source)
+        self.assertIn('role == "cluster-manager"', source)
+        self.assertIn("expected_env_variants = [m4_without_legacy, expected_env_values]", source)
+        self.assertIn('expected_defaults_revision = (', source)
+        self.assertIn('monitoring_console_config_hash(', source)
+        self.assertIn('def normalized_app_context_repo(spec_repo, actual_repo):', source)
+        self.assertIn('actual_defaults.get("premiumAppsProps") == empty_premium', source)
+        self.assertIn('shell_quote(args.operator_version)} {shell_quote(args.architecture)} {shell_quote(startup_probe_failure_threshold(args))} <"${{controller_health_input}}"', source)
+
+    def test_sok_startup_probe_budget_is_architecture_aware_and_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for architecture, threshold in (("s1", 12), ("c3", 60), ("m4", 60)):
+                result = self.run_renderer(
+                    "--target", "sok", "--architecture", architecture,
+                    "--output-dir", str(Path(tmpdir) / architecture),
+                    "--accept-splunk-general-terms",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                values = (Path(tmpdir) / architecture / "sok" / "enterprise-values.yaml").read_text()
+                self.assertIn(f"  failureThreshold: {threshold}\n", values)
+            for bad in (11, 121):
+                result = self.run_renderer(
+                    "--target", "sok", "--architecture", "c3",
+                    "--startup-probe-failure-threshold", str(bad),
+                    "--output-dir", str(Path(tmpdir) / f"bad-{bad}"),
+                    "--accept-splunk-general-terms",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("between 12 and 120", result.stderr)
+
     @staticmethod
     def embedded_renderer_code(assignment_name: str) -> str:
         tree = ast.parse(RENDERER.read_text(encoding="utf-8"))
@@ -306,11 +358,18 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
 
             def run_contract(
                 candidate_crds: list[dict[str, object]],
+                candidate_live: dict[str, object] | None = None,
+                candidate_expected: dict[str, object] | None = None,
             ) -> subprocess.CompletedProcess:
+                candidate_live = candidate_live or live_standalone
+                candidate_expected = candidate_expected or expected_enterprise
+                expected_path.write_text(
+                    json.dumps(candidate_expected), encoding="utf-8"
+                )
                 live_path.write_text(
                     json.dumps(
                         {
-                            "items": [live_standalone],
+                            "items": [candidate_live],
                             "schemas": {"Standalone": standalone_schema},
                             "crds": candidate_crds,
                         }
@@ -422,6 +481,371 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             live_standalone["metadata"]["annotations"].pop(
                 "enterprise.splunk.com/admin-managed-pv"
             )
+
+
+    def test_sok_32_cm_operator_default_expansions_are_narrowly_normalized(self) -> None:
+        contract_code = self.embedded_renderer_code("cr_contract_code")
+        catalog = {
+            "standalones": "Standalone",
+            "clustermanagers": "ClusterManager",
+            "indexerclusters": "IndexerCluster",
+            "searchheadclusters": "SearchHeadCluster",
+            "licensemanagers": "LicenseManager",
+            "monitoringconsoles": "MonitoringConsole",
+            "ingestorclusters": "IngestorCluster",
+            "queues": "Queue",
+            "objectstorages": "ObjectStorage",
+        }
+
+        def crd(plural: str, kind: str) -> dict[str, object]:
+            return {
+                "apiVersion": "apiextensions.k8s.io/v1",
+                "kind": "CustomResourceDefinition",
+                "metadata": {"name": f"{plural}.enterprise.splunk.com"},
+                "spec": {
+                    "group": "enterprise.splunk.com",
+                    "names": {"kind": kind, "plural": plural},
+                    "scope": "Namespaced",
+                    "versions": [{
+                        "name": "v4", "served": True, "storage": True,
+                        "schema": {"openAPIV3Schema": {"type": "object", "properties": {
+                            "spec": {"type": "object", "properties": {
+                                "image": {"type": "string"},
+                                "imagePullPolicy": {"type": "string"},
+                                "licenseManagerRef": {"type": "object"},
+                                "monitoringConsoleRef": {"type": "object"},
+                                "livenessProbe": {"type": "object"},
+                                "readinessProbe": {"type": "object"},
+                                "startupProbe": {"type": "object"},
+                                "resources": {"type": "object"},
+                            }},
+                            "status": {"type": "object"},
+                        }}},
+                        "subresources": {"status": {}},
+                    }],
+                },
+                "status": {"conditions": [
+                    {"type": "Established", "status": "True"},
+                    {"type": "NamesAccepted", "status": "True"},
+                ], "storedVersions": ["v4"]},
+            }
+
+        crds = [crd(plural, kind) for plural, kind in catalog.items()]
+        expected = {
+            "apiVersion": "enterprise.splunk.com/v4",
+            "kind": "ClusterManager",
+            "metadata": {"name": "cm", "namespace": "splunk"},
+            "spec": {
+                "image": "splunk/splunk:10.6.0.5",
+                "imagePullPolicy": "IfNotPresent",
+                "licenseManagerRef": {"name": "lm"},
+                "monitoringConsoleRef": {"name": "mc"},
+                "livenessProbe": {"failureThreshold": 3, "initialDelaySeconds": 30,
+                                    "periodSeconds": 30, "timeoutSeconds": 30},
+                "readinessProbe": {"failureThreshold": 3, "initialDelaySeconds": 10,
+                                    "periodSeconds": 5, "timeoutSeconds": 5},
+                "startupProbe": {"failureThreshold": 60, "initialDelaySeconds": 40,
+                                  "periodSeconds": 30, "timeoutSeconds": 30},
+                "resources": {"requests": {"cpu": "1"}, "limits": {"cpu": "1"}},
+            },
+        }
+        defaults = {
+            "Mock": False,
+            "affinity": {},
+            "appRepo": {"appInstallPeriodSeconds": 90,
+                         "defaults": {"premiumAppsProps": {"esDefaults": {}}},
+                         "installMaxRetries": 2},
+            "clusterManagerRef": {}, "clusterMasterRef": {}, "defaults": "",
+            "defaultsUrl": "", "defaultsUrlApps": "", "licenseUrl": "",
+            "licenseMasterRef": {},
+            "serviceTemplate": {"metadata": {}, "spec": {},
+                                "status": {"loadBalancer": {}}},
+            "smartstore": {"cacheManager": {}, "defaults": {}},
+        }
+        live = json.loads(json.dumps(expected))
+        live["metadata"].update({
+            "annotations": {"meta.helm.sh/release-name": "splunk-enterprise",
+                             "meta.helm.sh/release-namespace": "splunk"},
+            "generation": 1, "resourceVersion": "7", "uid": "cm-uid",
+        })
+        live["spec"].update(json.loads(json.dumps(defaults)))
+        live["status"] = {"phase": "Ready", "message": "", "appContext": {
+            "version": 1, "isDeploymentInProgress": False, "appRepo": defaults["appRepo"]
+        }}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            expected_path, crd_path, live_path = (root / n for n in ("expected.json", "crds.json", "live.json"))
+            crd_path.write_text(json.dumps({"apiVersion": "v1", "kind": "List", "items": crds}), encoding="utf-8")
+
+            def run_contract(expected_item: dict[str, object], live_item: dict[str, object], version: str = "3.2.0") -> subprocess.CompletedProcess:
+                expected_path.write_text(json.dumps(expected_item), encoding="utf-8")
+                schemas = {"ClusterManager": crds[1]["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]}
+                live_path.write_text(json.dumps({"items": [live_item], "schemas": schemas, "crds": crds}), encoding="utf-8")
+                return subprocess.run([
+                    sys.executable, "-c", contract_code, str(expected_path), str(live_path),
+                    str(crd_path), "splunk-enterprise", "splunk", "", "", version,
+                ], cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30)
+
+            accepted = run_contract(expected, live)
+            self.assertEqual(accepted.returncode, 0, msg=accepted.stderr)
+            for key in defaults:
+                with self.subTest(default_key=key):
+                    tampered = json.loads(json.dumps(live))
+                    value = tampered["spec"][key]
+                    if isinstance(value, bool):
+                        tampered["spec"][key] = True
+                    elif isinstance(value, str):
+                        tampered["spec"][key] = "tampered"
+                    elif key == "appRepo":
+                        tampered["spec"][key]["installMaxRetries"] = 3
+                    else:
+                        tampered["spec"][key] = {"tampered": True}
+                    rejected = run_contract(expected, tampered)
+                    self.assertNotEqual(rejected.returncode, 0)
+            bool_type = json.loads(json.dumps(live))
+            bool_type["spec"]["Mock"] = 0
+            self.assertNotEqual(run_contract(expected, bool_type).returncode, 0)
+            unknown = json.loads(json.dumps(live))
+            unknown["spec"]["operatorInjectedUnknown"] = True
+            self.assertNotEqual(run_contract(expected, unknown).returncode, 0)
+            explicit = json.loads(json.dumps(expected))
+            explicit["spec"]["affinity"] = {}
+            self.assertEqual(run_contract(explicit, live).returncode, 0)
+            explicit_live = json.loads(json.dumps(live))
+            explicit_live["spec"]["affinity"] = {"tampered": True}
+            self.assertNotEqual(run_contract(explicit, explicit_live).returncode, 0)
+
+            app_repo = {
+                "appInstallPeriodSeconds": 90,
+                "appSources": [{"name": "local", "location": "local/"}],
+                "appsRepoPollIntervalSeconds": 0,
+                "defaults": {"scope": "local", "volumeName": "apps"},
+                "installMaxRetries": 2,
+                "volumes": [{"name": "apps", "storageType": "s3"}],
+            }
+            app_expected = json.loads(json.dumps(expected))
+            app_live = json.loads(json.dumps(live))
+            app_expected["spec"]["appRepo"] = app_repo
+            app_live["spec"]["appRepo"] = app_repo
+            app_live["status"]["appContext"] = {
+                "version": 1,
+                "isDeploymentInProgress": False,
+                "lastAppInfoCheckTime": 1,
+                "appRepo": {
+                    **app_repo,
+                    "defaults": {
+                        **app_repo["defaults"],
+                        "premiumAppsProps": {"esDefaults": {}},
+                    },
+                    "appSources": [{
+                        **app_repo["appSources"][0],
+                        "premiumAppsProps": {"esDefaults": {}},
+                    }],
+                },
+                "appSrcDeployStatus": {"local": {"appDeploymentInfo": []}},
+            }
+            app_live["status"]["appContext"]["appRepo"].pop(
+                "appsRepoPollIntervalSeconds"
+            )
+            injected = run_contract(app_expected, app_live)
+            self.assertEqual(injected.returncode, 0, msg=injected.stderr)
+            nonzero_expected = json.loads(json.dumps(app_expected))
+            nonzero_expected["spec"]["appRepo"]["appsRepoPollIntervalSeconds"] = 900
+            self.assertNotEqual(
+                run_contract(nonzero_expected, app_live).returncode, 0
+            )
+            bool_poll = json.loads(json.dumps(app_live))
+            bool_poll["status"]["appContext"]["appRepo"][
+                "appsRepoPollIntervalSeconds"
+            ] = False
+            self.assertNotEqual(run_contract(app_expected, bool_poll).returncode, 0)
+            plain_expected = json.loads(json.dumps(app_expected))
+            plain_live = json.loads(json.dumps(app_live))
+            plain_live["status"]["appContext"]["appRepo"]["defaults"].pop(
+                "premiumAppsProps"
+            )
+            plain_live["status"]["appContext"]["appRepo"]["appSources"][0].pop(
+                "premiumAppsProps"
+            )
+            self.assertEqual(run_contract(plain_expected, plain_live).returncode, 0)
+            false_expected = json.loads(json.dumps(plain_expected))
+            false_expected["spec"]["appRepo"]["appsRepoPollIntervalSeconds"] = False
+            plain_false_live = json.loads(json.dumps(plain_live))
+            plain_false_live["spec"]["appRepo"]["appsRepoPollIntervalSeconds"] = False
+            self.assertNotEqual(run_contract(false_expected, plain_false_live).returncode, 0)
+            false_live = json.loads(json.dumps(plain_live))
+            false_live["status"]["appContext"]["appRepo"][
+                "appsRepoPollIntervalSeconds"
+            ] = False
+            self.assertNotEqual(run_contract(plain_expected, false_live).returncode, 0)
+            integer_live = json.loads(json.dumps(plain_live))
+            integer_live["status"]["appContext"]["appRepo"][
+                "appsRepoPollIntervalSeconds"
+            ] = 0
+            self.assertEqual(run_contract(plain_expected, integer_live).returncode, 0)
+            tampered_context = json.loads(json.dumps(app_live))
+            tampered_context["status"]["appContext"]["appRepo"]["defaults"][
+                "premiumAppsProps"
+            ]["esDefaults"] = {"unexpected": True}
+            self.assertNotEqual(
+                run_contract(app_expected, tampered_context).returncode, 0
+            )
+            cluster_expected = json.loads(json.dumps(app_expected))
+            cluster_live = json.loads(json.dumps(app_live))
+            cluster_expected["spec"]["appRepo"]["defaults"]["scope"] = "cluster"
+            cluster_live["spec"]["appRepo"]["defaults"]["scope"] = "cluster"
+            cluster_live["status"]["appContext"]["appRepo"]["defaults"]["scope"] = "cluster"
+            cluster_live["status"]["appContext"]["bundlePushStatus"] = {"bundlePushStage": 3}
+            cluster_live["status"]["appContext"]["appSrcDeployStatus"] = {
+                "local": {"appDeploymentInfo": [{
+                    "appName": "fixture", "repoState": 1, "deployStatus": 1,
+                    "phaseInfo": {"phase": "install", "status": 303},
+                }]}
+            }
+            cluster_accepted = run_contract(cluster_expected, cluster_live)
+            self.assertEqual(cluster_accepted.returncode, 0, msg=cluster_accepted.stderr)
+            cluster_bad = json.loads(json.dumps(cluster_live))
+            cluster_bad["status"]["appContext"]["bundlePushStatus"]["bundlePushStage"] = 2
+            self.assertNotEqual(run_contract(cluster_expected, cluster_bad).returncode, 0)
+            cluster_float = json.loads(json.dumps(cluster_live))
+            cluster_float["status"]["appContext"]["bundlePushStatus"]["bundlePushStage"] = 3.0
+            self.assertNotEqual(run_contract(cluster_expected, cluster_float).returncode, 0)
+
+            expected_path.write_text(json.dumps(expected), encoding="utf-8")
+            live_path.write_text(json.dumps({"items": [live], "schemas": {
+                "ClusterManager": crds[1]["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]
+            }, "crds": crds}), encoding="utf-8")
+            legacy = subprocess.run([
+                sys.executable, "-c", contract_code, str(expected_path), str(live_path),
+                str(crd_path), "splunk-enterprise", "splunk", "", "", "3.1.0",
+            ], cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30)
+            self.assertNotEqual(legacy.returncode, 0)
+            legacy_expected = json.loads(json.dumps(expected))
+            legacy_expected["spec"]["appRepo"] = defaults["appRepo"]
+            legacy_live = json.loads(json.dumps(expected))
+            legacy_live["metadata"].update(live["metadata"])
+            legacy_live["spec"]["appRepo"] = defaults["appRepo"]
+            legacy_live["status"] = live["status"]
+            expected_path.write_text(json.dumps(legacy_expected), encoding="utf-8")
+            live_path.write_text(json.dumps({"items": [legacy_live], "schemas": {
+                "ClusterManager": crds[1]["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]
+            }, "crds": crds}), encoding="utf-8")
+            legacy_inert = subprocess.run([
+                sys.executable, "-c", contract_code, str(expected_path), str(live_path),
+                str(crd_path), "splunk-enterprise", "splunk", "", "", "3.1.0",
+            ], cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30)
+            self.assertNotEqual(legacy_inert.returncode, 0)
+            self.assertIn("no appSources", legacy_inert.stderr)
+            legacy_poll_expected = json.loads(json.dumps(app_expected))
+            legacy_poll_live = json.loads(json.dumps(app_live))
+            legacy_poll_live["spec"]["appRepo"]["appsRepoPollIntervalSeconds"] = False
+            legacy_poll_live["status"]["appContext"]["appRepo"][
+                "appsRepoPollIntervalSeconds"
+            ] = False
+            legacy_poll = run_contract(
+                legacy_poll_expected, legacy_poll_live, "3.1.0"
+            )
+            self.assertNotEqual(legacy_poll.returncode, 0)
+
+    def test_sok_32_monitoring_console_operator_defaults_are_narrow(self) -> None:
+        code = self.embedded_renderer_code("cr_contract_code")
+        kinds = {
+            "standalones": "Standalone", "clustermanagers": "ClusterManager",
+            "indexerclusters": "IndexerCluster", "searchheadclusters": "SearchHeadCluster",
+            "licensemanagers": "LicenseManager", "monitoringconsoles": "MonitoringConsole",
+            "ingestorclusters": "IngestorCluster", "queues": "Queue", "objectstorages": "ObjectStorage",
+        }
+        crds = []
+        for plural, kind in kinds.items():
+            crds.append({
+                "apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
+                "metadata": {"name": f"{plural}.enterprise.splunk.com"},
+                "spec": {"group": "enterprise.splunk.com", "names": {"kind": kind, "plural": plural},
+                         "scope": "Namespaced", "versions": [{"name": "v4", "served": True, "storage": True,
+                         "schema": {"openAPIV3Schema": {"type": "object", "properties": {"spec": {"type": "object"}}}},
+                         "subresources": {"status": {}}}]},
+                "status": {"conditions": [{"type": "Established", "status": "True"},
+                                             {"type": "NamesAccepted", "status": "True"}], "storedVersions": ["v4"]},
+            })
+        expected = {"apiVersion": "enterprise.splunk.com/v4", "kind": "MonitoringConsole",
+                    "metadata": {"name": "mc", "namespace": "splunk"}, "spec": {
+                        "clusterManagerRef": {"name": "cm"}, "licenseManagerRef": {"name": "lm"},
+                        "image": "splunk/splunk:10.6.0.5", "imagePullPolicy": "IfNotPresent",
+                        "livenessInitialDelaySeconds": 300, "readinessInitialDelaySeconds": 10,
+                        "startupProbe": {"failureThreshold": 60, "initialDelaySeconds": 40, "periodSeconds": 30, "timeoutSeconds": 30},
+                    }}
+        defaults = {"Mock": False, "affinity": {}, "appRepo": {"appInstallPeriodSeconds": 90,
+                    "defaults": {"premiumAppsProps": {"esDefaults": {}}}, "installMaxRetries": 2},
+                    "clusterMasterRef": {}, "defaults": "", "defaultsUrl": "", "defaultsUrlApps": "",
+                    "licenseMasterRef": {}, "licenseUrl": "", "monitoringConsoleRef": {},
+                    "serviceTemplate": {"metadata": {}, "spec": {}, "status": {"loadBalancer": {}}}}
+        live = json.loads(json.dumps(expected))
+        live["metadata"].update({"annotations": {
+            "meta.helm.sh/release-name": "splunk-enterprise", "meta.helm.sh/release-namespace": "splunk"},
+            "generation": 1, "resourceVersion": "7", "uid": "mc-uid"})
+        live["spec"].update(defaults)
+        live["status"] = {"phase": "Ready", "message": "", "appContext": {"version": 1,
+                       "isDeploymentInProgress": False, "appRepo": defaults["appRepo"]}}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            expected_path = root / "expected.json"
+            live_path = root / "live.json"
+            crd_path = root / "crds.json"
+            crd_path.write_text(json.dumps({"apiVersion": "v1", "kind": "List", "items": crds}), encoding="utf-8")
+            schema = {"MonitoringConsole": crds[5]["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]}
+            def check(expected_item, live_item, version="3.2.0"):
+                expected_path.write_text(json.dumps(expected_item), encoding="utf-8")
+                live_path.write_text(json.dumps({"items": [live_item], "schemas": schema, "crds": crds}), encoding="utf-8")
+                return subprocess.run([sys.executable, "-c", code, str(expected_path), str(live_path), str(crd_path),
+                                       "splunk-enterprise", "splunk", "", "", version], cwd=REPO_ROOT,
+                                      capture_output=True, text=True, check=False, timeout=30)
+            self.assertEqual(check(expected, live).returncode, 0)
+            for key in defaults:
+                with self.subTest(default_key=key):
+                    bad = json.loads(json.dumps(live))
+                    value = bad["spec"][key]
+                    bad["spec"][key] = (True if isinstance(value, bool) else "tampered" if isinstance(value, str)
+                                        else {"tampered": True})
+                    self.assertNotEqual(check(expected, bad).returncode, 0)
+            bad_ref = json.loads(json.dumps(live))
+            bad_ref["spec"]["clusterManagerRef"] = {"name": "wrong"}
+            self.assertNotEqual(check(expected, bad_ref).returncode, 0)
+            bad_self_ref = json.loads(json.dumps(live))
+            bad_self_ref["spec"]["monitoringConsoleRef"] = {"name": "wrong"}
+            self.assertNotEqual(check(expected, bad_self_ref).returncode, 0)
+            unknown = json.loads(json.dumps(live))
+            unknown["spec"]["operatorInjectedUnknown"] = True
+            self.assertNotEqual(check(expected, unknown).returncode, 0)
+            self.assertNotEqual(check(expected, live, "3.1.0").returncode, 0)
+
+    def test_sok_32_monitoring_console_revision_uses_utf8_byte_lengths(self) -> None:
+        data = {"z": "café", "é": "🚀"}
+        expected = hashlib.sha256(
+            b"1:z5:caf\xc3\xa9"
+            b"2:\xc3\xa94:\xf0\x9f\x9a\x80"
+        ).hexdigest()
+        digest = hashlib.sha256()
+        for key in sorted(data):
+            key_bytes = key.encode("utf-8")
+            value_bytes = data[key].encode("utf-8")
+            digest.update(
+                str(len(key_bytes)).encode("ascii") + b":" + key_bytes
+                + str(len(value_bytes)).encode("ascii") + b":" + value_bytes
+            )
+        self.assertEqual(digest.hexdigest(), expected)
+        source = RENDERER.read_text(encoding="utf-8")
+        self.assertIn('operator_version == "3.2.0"', source)
+        self.assertIn('monitoring_revision', source)
+        self.assertIn('monitoring_map.get("metadata", {}).get("resourceVersion")', source)
+
+    def test_sok_ondelete_rollout_uses_pod_revision_labels(self) -> None:
+        source = RENDERER.read_text(encoding="utf-8")
+        self.assertIn('update_strategy == "RollingUpdate"', source)
+        self.assertIn('stateful_strategy == "OnDelete"', source)
+        self.assertIn('controller-revision-hash', source)
+        self.assertIn('"updateRevision"', source)
+        self.assertIn("OnDelete StatefulSet pod has not adopted update revision", source)
 
     def test_sok_fresh_install_guard_fails_closed_before_mutation(self) -> None:
         guard = self.embedded_renderer_code("fresh_install_guard_code")
@@ -2052,6 +2476,9 @@ else:
                         "metadata": {
                             "name": f"{contract['name']}-{ordinal}",
                             "uid": f"runtime-{contract['name']}-{ordinal}",
+                            "labels": {
+                                "controller-revision-hash": stateful["status"]["updateRevision"]
+                            },
                             "ownerReferences": [
                                 {
                                     "apiVersion": "apps/v1",
@@ -2788,6 +3215,10 @@ else:
                             {
                                 "name": "manager",
                                 "image": "operator:3.1.0",
+                                "resources": {
+                                    "requests": {"cpu": "1000m", "memory": "2000Mi"},
+                                    "limits": {"cpu": "1000m", "memory": "2000Mi"},
+                                },
                                 "ports": [
                                     {"name": "http", "containerPort": 8080}
                                 ],
@@ -2814,6 +3245,13 @@ else:
             0
         ]["protocol"] = "TCP"
         live = json.loads(json.dumps(server_expected))
+        # The API server may return an equivalent canonical quantity.
+        live["spec"]["template"]["spec"]["containers"][0]["resources"][
+            "requests"
+        ]["cpu"] = "1"
+        live["spec"]["template"]["spec"]["containers"][0]["resources"][
+            "limits"
+        ]["cpu"] = "1"
         live["metadata"].update(
             {
                 "annotations": {
@@ -3044,31 +3482,45 @@ else:
                 reviewed.returncode, 0, msg=reviewed.stdout + reviewed.stderr
             )
 
-    def test_sok_enforces_release_3_1_compatibility_matrix(self) -> None:
+    def test_sok_enforces_release_3_2_compatibility_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             cases = (
-                ("k8s-1.25-splunk-9.4.3", "1.25", "9.4.3", True, ""),
-                ("k8s-1.34-splunk-9.4.9", "1.34", "9.4.9", True, ""),
+                ("k8s-1.32-splunk-9.4.15", "1.32", "9.4.15", True, ""),
+                ("k8s-1.36-splunk-10.6.0.5", "1.36", "10.6.0.5", True, ""),
                 (
-                    "k8s-1.34-splunk-9.4.8",
-                    "1.34",
-                    "9.4.8",
+                    "k8s-1.32-splunk-9.4.14",
+                    "1.32",
+                    "9.4.14",
                     False,
-                    "Kubernetes 1.34 requires Splunk Enterprise",
+                    "supports Splunk Enterprise 9.4.15 through 10.6.0",
                 ),
                 (
-                    "k8s-1.35-splunk-10.4.0",
-                    "1.35",
+                    "k8s-1.31-splunk-10.4.0",
+                    "1.31",
                     "10.4.0",
                     False,
-                    "supports Kubernetes 1.25 through 1.34",
+                    "supports Kubernetes 1.32 through 1.36",
                 ),
                 (
-                    "k8s-1.33-unlisted-future-splunk",
-                    "1.33",
+                    "k8s-1.32-unlisted-enterprise-10.7",
+                    "1.32",
+                    "10.7.0",
+                    False,
+                    "supports Splunk Enterprise 9.4.15 through 10.6.0",
+                ),
+                (
+                    "k8s-1.36-enterprise-10.4",
+                    "1.36",
+                    "10.4.1",
+                    True,
+                    "",
+                ),
+                (
+                    "k8s-1.36-unlisted-future-splunk",
+                    "1.36",
                     "11.0.0",
                     False,
-                    "listed 10.2.x and 10.4.x release lines",
+                    "supports Splunk Enterprise 9.4.15 through 10.6.0",
                 ),
             )
             for name, kubernetes, splunk, supported, message in cases:
@@ -3474,7 +3926,7 @@ else:
                 output_dir / "sok" / "enterprise-values.yaml"
             ).read_text(encoding="utf-8")
             self.assertIn(
-                'image:\n  repository: "splunk/splunk:10.4.1"\n  imagePullPolicy: "IfNotPresent"',
+                'image:\n  repository: "splunk/splunk:10.6.0.5"\n  imagePullPolicy: "IfNotPresent"',
                 enterprise_values,
             )
             self.assertNotIn('\nimagePullPolicy: "IfNotPresent"', enterprise_values)
@@ -3508,6 +3960,8 @@ else:
             )
             self.assertIn("Ready standalone", status)
             self.assertNotIn("Ready licensemanager", status)
+            self.assertIn("def normalized_resources(value):", status)
+            self.assertIn("Deployment container {name}.resources", status)
 
     def test_sok_production_requires_storage_smartstore_license_and_identity(
         self,
@@ -3858,9 +4312,7 @@ else:
                 (render_dir / "metadata.json").read_text(encoding="utf-8")
             )
             status = (render_dir / "status.sh").read_text(encoding="utf-8")
-            self.assertIn(
-                "kind: Queue\n    metadata:\n      name: ingest-queue", values
-            )
+            self.assertIn('queue:\n  enabled: true\n  name: "ingest-queue"', values)
             self.assertIn(
                 'objectStorage:\n  enabled: true\n  name: "ingest-object-storage"',
                 values,
@@ -3869,10 +4321,12 @@ else:
                 'ingestorCluster:\n  enabled: true\n  name: "ingestor"\n  replicaCount: 4',
                 values,
             )
-            self.assertEqual(values.count('name: "ingest-queue"'), 2)
+            self.assertEqual(values.count('name: "ingest-queue"'), 3)
             self.assertEqual(values.count('name: "ingest-object-storage"'), 3)
             self.assertNotIn("serviceAccount: ingest-workload", values)
-            self.assertIn('secretRef: "queue-credentials"', values)
+            self.assertIn('secretKeyRef:', values)
+            self.assertIn('key: "s3_access_key"', values)
+            self.assertIn('key: "s3_secret_key"', values)
             self.assertTrue(metadata["indexing_ingestion_separation"])
             self.assertIn("Ready ingestorcluster", status)
 
@@ -3910,9 +4364,10 @@ else:
                 encoding="utf-8"
             )
             secret_preflight = (secret_dir / "preflight.sh").read_text(encoding="utf-8")
-            self.assertIn("extraManifests:", secret_values)
+            self.assertIn("secretKeyRef:", secret_values)
             self.assertIn('provider: "sqs_cp"', secret_values)
-            self.assertIn('secretRef: "queue-credentials"', secret_values)
+            self.assertIn('key: "s3_access_key"', secret_values)
+            self.assertNotIn("secretRef: \"queue-credentials\"", secret_values)
             self.assertNotIn("volumes:\n        authRegion:", secret_values)
             self.assertIn("unsupported immutable change", secret_preflight)
             self.assertIn("chart downgrade is unsupported", secret_preflight)
@@ -3925,7 +4380,7 @@ else:
                 "--output-dir",
                 str(Path(tmpdir) / "unsupported"),
                 "--splunk-version",
-                "10.2.0",
+                "9.4.14",
                 "--kubernetes-version",
                 "1.34",
                 "--indexing-ingestion-separation",
@@ -3942,10 +4397,7 @@ else:
                 "--accept-splunk-general-terms",
             )
             self.assertNotEqual(unsupported.returncode, 0)
-            self.assertIn(
-                "Kubernetes 1.34 requires Splunk Enterprise", unsupported.stderr
-            )
-            self.assertIn("10.4+", unsupported.stderr)
+            self.assertIn("supports Splunk Enterprise 9.4.15 through 10.6.0", unsupported.stderr)
 
     def test_sok_copies_and_applies_values_overlays(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -4586,9 +5038,11 @@ else:
                 "--output-dir",
                 tmpdir,
                 "--splunk-image",
-                f"registry.example/splunk:10.4.0@sha256:{digest}",
+                f"registry.example/splunk:10.6.0.5@sha256:{digest}",
+                "--splunk-version",
+                "10.6.0.5",
                 "--operator-image",
-                f"registry.example/operator:3.1.0@sha256:{digest}",
+                f"registry.example/operator:3.2.0@sha256:{digest}",
                 "--accept-splunk-general-terms",
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)

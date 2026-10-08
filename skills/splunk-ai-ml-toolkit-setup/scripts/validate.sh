@@ -222,6 +222,8 @@ if app_installed "mltk-container"; then
 else
     if [[ "${EXPECT_DSDL}" == "true" ]]; then
         fail "DSDL app is not installed."
+    elif [[ "${EXPECT_DSDL}" == "false" ]]; then
+        pass "DSDL app is not installed (explicitly not expected)."
     else
         warn "DSDL app is not installed."
     fi

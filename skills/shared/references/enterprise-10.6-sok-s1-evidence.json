@@ -1,0 +1,44 @@
+{
+  "last_verified": "2026-10-07",
+  "target": {
+    "kubernetes": "EKS1.34.11",
+    "operator": "3.2.0",
+    "enterprise": "10.6.0.5",
+    "architecture": "S1",
+    "storage": "encryptedgp3,10Gi etc/100Gi var"
+  },
+  "workflow": {
+    "render_preflight_apply_status": "passed after correcting Helm3 repo timeout and Operator3.2 environment contract",
+    "ready_conditions": "observedGeneration1 matches metadata generation1; ReadyTrue ProgressingFalse PausedFalse StalledFalse",
+    "operator_image_digest": "sha256:7cbd870f48465ed973a529c917cc16a4191eebccaf4f84033e1d85b4191f46b5",
+    "enterprise_image_digest": "sha256:9280f9ce267b212e5596aa1832cdfd3f9be886c378da35ebc87499323ee447a4",
+    "ingest_search_before": [
+      {
+        "count": "1"
+      }
+    ],
+    "ingest_search_after": [
+      {
+        "count": "1"
+      }
+    ],
+    "app_delivery": "synthetic private app1.0.0 staged via kubectlcp and installed through authenticated REST; enabled and retained",
+    "kv_fixture_count_before": 1,
+    "kv_fixture_count_after": 1,
+    "pod_uid_changed": true,
+    "post_replacement_server": {
+      "version": "10.6.0.5",
+      "build": "86587d4e3b27",
+      "kvStoreStatus": "ready",
+      "health_info": "green"
+    }
+  },
+  "transport": "CA validated; default pod certificate hostname check off over authenticated loopback Kubernetes port-forward",
+  "limitations": [
+    "S1functional qualification only; C3/M4 sequential validation pending.",
+    "Synthetic REST app delivery qualifies app persistence; remote AppFramework source delivery remains unvalidated.",
+    "PODcoupled10.4.0_1.6.0 bundle remains independently unqualified for Enterprise10.6.",
+    "Preview PostgreSQL disabled; Operator3.2 default localKV behavior observed."
+  ],
+  "cleanup": "S1Enterprise/operatorHelmreleases andnamespace deleted; all3recordedEBSvolumes absent inAWSdescribe-volumes filter. Disposablecluster retained forC3/M4waves."
+}

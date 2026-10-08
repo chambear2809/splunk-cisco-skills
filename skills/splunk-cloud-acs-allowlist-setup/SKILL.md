@@ -5,13 +5,21 @@ description: "Use when an existing handoff or slash command still references spl
   setup for new ACS work, including allowlists, indexes, HEC tokens, users, roles, capabilities, app
   permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, and
   restarts."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-08"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Cloud ACS Allowlist Setup
+
+## Enterprise applicability
+
+This alias delegates to the Splunk Cloud ACS allowlist workflow. The default workflow does not configure a self-managed Enterprise
+10.6 feature. Keep its Splunk Cloud validation separate. See the
+[documented service scope](https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/welcome-to-the-admin-config-service-acs/about-the-admin-config-service-acs-api).
 
 ## Prerequisites
 

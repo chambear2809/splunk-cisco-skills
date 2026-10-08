@@ -429,7 +429,7 @@ PY
     [ "$status" -eq 0 ]
     log_text="$(cat "${K8S_CMD_LOG}")"
     [[ "${log_text}" =~ "helm repo add splunk https://splunk.github.io/splunk-operator/ --force-update" ]]
-    [[ "${log_text}" =~ "helm pull splunk/splunk-operator --version 3.1.0 --untar" ]]
+    [[ "${log_text}" =~ "helm pull splunk/splunk-operator --version 3.2.0 --untar" ]]
     [[ "${log_text}" =~ "helm lint" ]]
     [[ "${log_text}" =~ "helm template splunk-operator" ]]
     [[ "${log_text}" =~ "helm template splunk-enterprise" ]]
@@ -470,7 +470,7 @@ PY
     [[ "${log_text}" =~ "kubectl cluster-info" ]]
     [[ "${log_text}" =~ "kubectl version -o json" ]]
     [[ "${log_text}" =~ "kubectl create --raw /apis/authorization.k8s.io/v1/selfsubjectaccessreviews -f -" ]]
-    [[ "${log_text}" =~ "helm show chart splunk/splunk-operator --version 3.1.0" ]]
+    [[ "${log_text}" =~ "helm show chart splunk/splunk-operator --version 3.2.0" ]]
     [[ "${log_text}" =~ "python3 staged-crd-download" ]]
     [[ "${log_text}" =~ "python3 staged-crd-hash-check" ]]
     [[ ! "${log_text}" =~ "python3 offline-url-check" ]]

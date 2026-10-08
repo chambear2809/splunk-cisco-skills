@@ -1,13 +1,16 @@
 ---
 name: cisco-isovalent-platform-setup
-description: "Use when installing or validating Cilium, Tetragon, Hubble, or Isovalent platform workflows on
-  Kubernetes. Install and operate Cisco Isovalent on Kubernetes: Cilium, Tetragon, Enterprise add-ons, and
-  gated private Isovalent product packs. Renders OSS or Enterprise Helm assets, distribution and CNI-
+description: "Use when installing or validating Cisco Isovalent products, or when mapping a product request to a
+  supported, gated, or handoff workflow. Installs and operates the Kubernetes Cilium/Tetragon slice with
+  Enterprise add-ons; inventories Isovalent Networking for Virtualization, Runtime Security, Isovalent Load
+  Balancer, and unified-platform feature coverage. Renders OSS or Enterprise Helm assets, distribution and CNI-
   conflict preflights, feature coverage, apply plans, doctor reports, live validation, and day-2
   discover/backup/upgrade/rollback/uninstall runbooks. NOT a Splunk TA skill; Splunk telemetry wiring is
-  delegated to splunk-observability-isovalent-integration."
+  delegated to the relevant Splunk integration skills."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"
 ---
@@ -33,6 +36,7 @@ metadata:
 ## When to Activate
 
 - Installing or validating Cilium, Tetragon, Hubble, or Isovalent platform workflows on Kubernetes.
+- Reviewing whether an Isovalent Networking for Virtualization, Runtime Security, or Load Balancer workflow is supported here, access-gated, or requires a product-specific handoff.
 - Preview and review the cisco isovalent platform setup workflow before any live apply phase.
 - Diagnose failed prerequisites, generated assets, configuration, or validation evidence.
 
@@ -87,6 +91,19 @@ For the Splunk Observability Cloud + Splunk Platform integration with this stack
   - Mutating Enterprise apply paths require `--isovalent-license-file`; optionally `--isovalent-pull-secret-file` for the private registry.
 - **EKS-AWS mirror**: `oci://public.ecr.aws/eks/cilium/cilium` for EKS Hybrid Nodes (set `--eks-mirror`).
 
+## Product coverage boundary
+
+The Isovalent portfolio has expanded beyond Kubernetes CNI installation. Current
+product materials cover Isovalent Networking for Kubernetes, Networking for
+Virtualization, Runtime Security, and Isovalent Load Balancer, including a
+unified Enterprise Platform release line. This skill automates Kubernetes
+deployments of Cilium and Tetragon plus the listed Enterprise add-ons. It does
+not claim deployment coverage for VM/private-network migration, standalone
+load-balancer appliances, or standalone Tetragon hosts. Those product areas
+are recorded in the feature catalog as explicit handoffs or access-gated
+coverage, rather than being implied by Kubernetes chart support. See
+[`references/product-coverage.md`](references/product-coverage.md).
+
 ## Feature Catalog and Coverage
 
 Every Cisco Isovalent target product feature is tracked in `catalog.json` and every render writes:
@@ -119,7 +136,8 @@ Scoped Cilium feature sections render their own values overlays under `helm/cili
 
 ## Preflights
 
-- **Kernel >= 5.10** for Cilium v1.18.x; not supported on Ubuntu 20.04 or RHEL 8 (per AWS EKS Hybrid Nodes docs).
+- **Cilium OSS 1.20.2 kernel baseline**: Linux 5.10 or equivalent; upstream documents RHEL 8.10's 4.18 kernel as an equivalent backport. Review feature-specific kernel requirements too. The EKS Hybrid OCI mirror has stricter AWS distribution exclusions, including Ubuntu 20.04 and RHEL 8.
+- **Kubernetes version**: upstream Cilium 1.20.2 documents Kubernetes 1.33–1.36 as e2e-tested. Confirm the exact Kubernetes and distribution support matrix for the selected Enterprise chart; this skill does not infer that matrix from OSS compatibility.
 - **EKS BYOCNI**: Cilium on EKS requires the cluster created with `--network-plugin none`. Renderer emits a preflight warning + `eksctl` example.
 - **CNI conflict**: Cilium fails if the AWS VPC CNI is still installed. Renderer warns.
 
@@ -129,9 +147,9 @@ validated before executable assets are rendered.
 
 ## Audited chart versions
 
-- Cilium OSS: `1.18.10`; Cilium Enterprise: `1.18.8`; EKS OCI mirror: separately classified `1.18.8`.
-- Tetragon OSS: `1.7.0`; Tetragon Enterprise: `1.18.1`.
-- Cilium DNSProxy, Hubble Enterprise, and Hubble Timescape: `1.18.8`.
+- Cilium OSS: `1.20.2`; Tetragon OSS: `1.7.1` (upstream stable chart versions confirmed 2026-09-30).
+- Cilium Enterprise: `1.18.8`; Enterprise Tetragon: `1.18.1`; these remain the repository's last cluster-validated pins, not latest-version claims.
+- EKS OCI mirror: separately reviewed `1.18.8`. Cilium DNSProxy, Hubble Enterprise, and Hubble Timescape: `1.18.8`; private repository availability prevents independent latest-version verification here.
 
 Generated Helm scripts verify and install the exact version with atomic,
 wait/timeout-bound transactions. `metadata.json` and `apply-plan.json` record

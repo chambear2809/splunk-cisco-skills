@@ -14,6 +14,7 @@ JSON_OUTPUT=false
 APPLY=false
 OUTPUT_DIR=""
 SPLUNK_HOME_VALUE="/opt/splunk"
+ENTERPRISE_VERSION=""
 ENABLE_AUTO_CONFIG="true"
 ENABLE_FORWARDER_MONITORING="false"
 FORWARDER_CRON="*/15 * * * *"
@@ -41,6 +42,7 @@ Options:
   --json
   --output-dir PATH
   --splunk-home PATH
+  --enterprise-version VERSION (defaults to shared platform version)
   --enable-auto-config true|false
   --enable-forwarder-monitoring true|false
   --forwarder-cron CRON
@@ -67,6 +69,7 @@ while [[ $# -gt 0 ]]; do
         --json) JSON_OUTPUT=true; shift ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
+        --enterprise-version) require_arg "$1" $# || exit 1; ENTERPRISE_VERSION="$2"; shift 2 ;;
         --enable-auto-config) require_arg "$1" $# || exit 1; ENABLE_AUTO_CONFIG="$2"; shift 2 ;;
         --enable-forwarder-monitoring) require_arg "$1" $# || exit 1; ENABLE_FORWARDER_MONITORING="$2"; shift 2 ;;
         --forwarder-cron) require_arg "$1" $# || exit 1; FORWARDER_CRON="$2"; shift 2 ;;
@@ -139,6 +142,7 @@ build_renderer_args() {
         --mode "${MODE}"
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
+        --enterprise-version "${ENTERPRISE_VERSION}"
         --enable-auto-config "${ENABLE_AUTO_CONFIG}"
         --enable-forwarder-monitoring "${ENABLE_FORWARDER_MONITORING}"
         --forwarder-cron "${FORWARDER_CRON}"

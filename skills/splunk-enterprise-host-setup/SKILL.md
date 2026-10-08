@@ -6,8 +6,10 @@ description: "Use when the user asks to bootstrap a Splunk host, install a heavy
   indexer peer, search head cluster deployer, or search head cluster member. Supports local or SSH
   execution, official URL or local package sources, role-aware forwarding, and single-site clustered
   topologies."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
@@ -109,6 +111,10 @@ bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_shc_secret
   operator-reviewed `SPLUNK_SSH_KNOWN_HOSTS_FILE` or a verified
   `SPLUNK_SSH_HOST_KEY_FINGERPRINT`. The warned
   `SPLUNK_SSH_ALLOW_TOFU=true` escape hatch is for disposable labs only.
+- SSH defaults to password authentication. Set `SPLUNK_SSH_AUTH_METHOD=key`
+  to use the local OpenSSH key or agent instead; do not set
+  `SPLUNK_SSH_PASS` in key mode. Key mode still requires the same host-key
+  trust pin.
 
 ## Package Model
 
@@ -196,7 +202,14 @@ green.
 ### validate.sh
 
 Checks package install state, service health, role-specific config, and
-clustered status where relevant.
+clustered status where relevant. It also waits up to 300 seconds for an enabled
+KV Store to become ready. Enterprise 10.6 with the cohosted store configured
+must report both member and cohosted-store readiness. Use
+`--kvstore-ready-timeout-seconds` when a host needs a longer startup window; a
+timeout reports the observed states and the relevant logs to inspect.
+In SSH mode, REST checks run against the target's loopback management endpoint
+through SSH, so the management port does not need to be reachable from the
+controller machine. Password and session-key data travel over SSH stdin.
 
 ```bash
 bash skills/splunk-enterprise-host-setup/scripts/validate.sh \
@@ -226,11 +239,14 @@ bash skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh \
 - SHC member adds require `--current-shc-member-uri` unless `--bootstrap-shc`
   is used to create a brand-new cluster
 
-## Enterprise upgrade ladder (10.4)
+## Enterprise upgrade ladder (10.6)
 
-Splunk Enterprise has **no 10.3 release train**. Supported paths to **10.4**
-include **10.2 → 10.4**, **10.0 → 10.2 → 10.4**, and fresh installs on
-**10.4.1** (default in this repo).
+Splunk Enterprise has no 10.3 or 10.5 self-managed release train. The current
+baseline is **10.6.0.5**. Splunk documents direct upgrades from Enterprise
+10.4.x, 10.2.x, and 10.0.x to 10.6.x; therefore **10.4.3 → 10.6** is a
+supported version path. All application, topology, backup, and KV Store gates
+must still pass before apply. Enterprise 9.4.x must first upgrade to 10.0.x or
+10.2.x; older unsupported trains need a separately verified upgrade plan.
 
 Invalid or high-risk jumps this skill should warn about during planning:
 
@@ -240,9 +256,56 @@ Invalid or high-risk jumps this skill should warn about during planning:
   `splunk-enterprise-public-exposure-hardening` or
   `skills/shared/references/splunk_platform_versions.json`).
 
-Enterprise **10.4** also removes TLS **1.0/1.1** negotiation and applies KV
-Store MongoDB **8** automatically when upgrading from **10.x**. Route PKI and
-KV Store preflight work to `splunk-platform-pki-setup` and
+Enterprise 10.6 automatically migrates the MongoDB-backed KV Store to the
+cohosted PostgreSQL storage sidecar. Before upgrading, require KV Store server
+7.0 or higher, more than 50% free space on the KV Store data filesystem, an
+authenticated `splunk show kvstore-status` health check, a parallel backup,
+confirmed restore evidence, application compatibility review, and a maintenance
+window that allows KV Store read-only operation. On SHCs, verify stable captain
+and healthy membership; never upgrade one member outside its coordinated
+rolling-upgrade procedure. ITSI 5.0.x is supported on Enterprise 10.6, but
+requires postponing this KV Store migration. For this documented Enterprise
+10.4-to-10.6 branch, before upgrade render and review `server.conf` with
+`bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --defer-postgres-migration true`;
+distribute `[kvstore] postgresMigrateOnStartup = false` through the host's
+normal configuration-management path and confirm its effective value with
+`splunk btool server list kvstore --debug`. Keep the ordinary backup,
+restore-test, health, topology, and disk-readiness gates. After upgrade, confirm
+the flag remains false, `migrationStatus : NotStarted`, KV Store data is
+readable and service is ready; check startup logs for
+`reason="startup_flag_disabled"`. Do not claim the PostgreSQL migration
+completed. Plan and validate a later ITSI-compatible maintenance window before
+re-enabling migration. For the normal migration branch, wait for
+`migrationStatus : Migration_Succeeded`, KV Store
+`status : ready`, and cohosted store `status : ready`. Authentication failures
+mean the gate is unverified, not passed.
+
+10.6 also introduces four-part version strings such as `10.6.0.5`; scripts and
+CMDB integrations must parse all four numeric segments. Federated Search remote
+providers must be 10.4 or higher before upgrading. Clustered deployments must
+allow the documented PostgreSQL network ports between all members. Review
+public TLS certificates for Client Authentication EKU removal, and keep
+inter-Splunk TLS at 1.2 or higher. A custom Debian-derived OS can be used for
+functional validation only when Splunk does not list that exact distribution as
+supported.
+
+For a side-by-side fresh-install test, use an isolated `SPLUNK_HOME`,
+`--no-boot-start`, and distinct ports for all services. The management, Web,
+app-server, KV Store, and IPC Broker defaults are `8089`, `8000`, `8065`,
+`8191`, and `8194`. Enterprise 10.6 also uses PostgreSQL sidecar ports `5432`,
+`5433`, `5434`, `8008`, `6432`, and `5435`, plus Nascent ports `2380` and
+`2379`. Each can be overridden with its matching `--*-port` flag or
+`SPLUNK_*_PORT` environment variable. Keep the defaults when they are free. If
+any are occupied or the operator requests alternates, ask for the preferred
+port policy; when the user delegates selection, inspect the target, choose
+distinct free ports for every collision, and report the selected values before
+installation. The script checks every selected port on the target immediately
+before a fresh install and configures them before first start. Pass the selected
+management port to `validate.sh --mgmt-port` and use the selected Web port when
+opening Splunk Web. Validate the new instance, stop it, then remove only its
+dedicated test directory; never remove `/opt/splunk` as test cleanup.
+
+Route PKI and KV Store preparation to `splunk-platform-pki-setup` and
 `splunk-kvstore-admin-setup` before executing host upgrades.
 
 ## References

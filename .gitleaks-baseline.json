@@ -95,7 +95,7 @@
     },
     {
       "path": "skills/splunk-cloud-data-manager-setup/SKILL.md",
-      "line": 86,
+      "line": 94,
       "rule_id": "generic-api-key",
       "line_sha256": "37a44e8fa33e97155b7fa42cdc32aa0beb860b6db3355519f910fb6c45d5993c",
       "category": "documentation-placeholder"
@@ -214,7 +214,7 @@
     },
     {
       "path": "tests/test_splunk_enterprise_kubernetes_setup.py",
-      "line": 4538,
+      "line": 4990,
       "rule_id": "private-key",
       "line_sha256": "6bd539a72ffc59fb36b844d60c7b943db4d79c468921debe23887f339170eb3d",
       "category": "synthetic-security-test"
@@ -256,7 +256,7 @@
     },
     {
       "path": "tests/test_splunk_observability_gcp_integration.py",
-      "line": 3003,
+      "line": 3004,
       "rule_id": "private-key",
       "line_sha256": "83ad8979707e896042e49af1d8ec5e7474cc5d36f1aa73a12647f298bb37060d",
       "category": "synthetic-security-test"

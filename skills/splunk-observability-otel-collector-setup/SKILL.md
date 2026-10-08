@@ -5,8 +5,10 @@ description: "Use when rendering, preflighting, applying, validating, diagnosing
   8699 through deployment servers, Linux heavy forwarders, or Linux Universal Forwarders; configure
   guarded Splunk Platform HEC or Splunk Connect for OTLP destinations; and route specialized Observability
   products to their owning skills."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

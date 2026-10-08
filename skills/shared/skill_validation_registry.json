@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967"
+    "sha256": "c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426"
   },
   "description": "Catalog parity and sanitized environment-specific validation evidence for the generated skill validation matrix.",
   "skills": [
@@ -178,6 +178,42 @@
     "widefield-splunk-siem-setup"
   ],
   "evidence": {
+    "cisco-asa-ta-setup": {
+      "integration_mock": {
+        "status": "pass",
+        "targets": [
+          "Actual ASA6.1.2 dashboard contract and targeted regressions"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "tests/test_cisco_asa_ta_setup.py"
+        ],
+        "notes": "Eleven targeted tests passed. Execute the embedded dashboard/visibility/response parsers for token defaults, query kinds, foreign ACL, hidden app, unknown pivot/token, version6.1.2 text and zero-filled/positive timechart and trend metrics; additional source guards cover app-context/search-prefix wiring."
+      },
+      "live_read_only": {
+        "status": "pass",
+        "targets": [
+          "Enterprise10.6.0.5 isolated Ubuntu24.04 x86_64 standalone"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-asa-evidence.json"
+        ],
+        "notes": "Authenticated selected app/index/parser/dashboard queries and version readback passed."
+      },
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise10.6.0.5 isolated Ubuntu24.04 x86_64 standalone; controlled syslog source"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-asa-dashboard.png",
+          "skills/shared/references/enterprise-10.6-asa-evidence.json"
+        ],
+        "notes": "ASA6.1.2 install and controlled SC4S3.47.0 TCP/UDP ingest, canonical parsed fields, enabled shipped dashboard with populated main panels and successful optional CIM pivots, four-record restart persistence and owned asset/token cleanup passed. Existing internal diagnostics follow normal retention; real hardware variant unqualified. Reusable lab current/cohosted KV ready after reserving custom listener ports."
+      }
+    },
     "galileo-agent-control-setup": {
       "live_read_only": {
         "status": "pass",
@@ -405,17 +441,150 @@
         "notes": "Live SaaS validation needs an approved disposable project and Agent Stream, scoped Agent Observability credentials, and a disposable runtime. None was configured for this run; no production trace or Agent Control object was created."
       }
     },
+    "splunk-cim-data-model-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise 10.6.0.5 isolated Ubuntu 24.04 x86_64 standalone; CA and hostname verified REST"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-cim-evidence.json"
+        ],
+        "notes": "Selected CIM 8.5.0 Authentication install/governance, normalized searches and accelerated summaries, setup/audit browser views, controlled restart preserving three test events and model settings, and exact configuration/index cleanup passed. Deprecated/configuration-only views qualified separately."
+      }
+    },
+    "splunk-dashboard-studio-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise 10.6.0.5 isolated standalone lab on custom Debian-derived AMD host; lab106_validation app"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-core-objects-evidence.json",
+          "skills/shared/references/enterprise-10.6-dashboard-browser.png"
+        ],
+        "notes": "Corrected skill apply/status and ACL readback passed. View and data-source SPL persisted after restart; browser-rendered single-value visualization displayed two retained synthetic events with Last30days selected."
+      }
+    },
+    "splunk-enterprise-host-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Disposable Ubuntu 24.04 x86_64; Enterprise 10.6.0.5"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md",
+          "skills/shared/references/enterprise-10.6-ubuntu-fresh-evidence.json"
+        ],
+        "notes": "Corrected host setup installed Enterprise 10.6.0.5 on Ubuntu 24.04 x86_64. Selected ports were free and the package checksum was verified. Standalone search tier installation without boot start and authenticated host validation passed, including cohosted KV readiness."
+      }
+    },
     "splunk-enterprise-kubernetes-setup": {
       "live_apply_e2e": {
         "status": "partial",
         "targets": [
-          "AWS EKS isolated-worker lab; Kubernetes 1.34.8; Splunk Operator for Kubernetes 3.1.0; Splunk Enterprise 10.4.1; S1 standalone"
+          "SOK3.2.0 S1, EKS1.34.11, Enterprise10.6.0.5 build86587d4e3b27"
         ],
-        "last_verified": "2026-07-08",
+        "last_verified": "2026-10-07",
         "evidence": [
-          "skills/shared/references/splunk_enterprise_kubernetes_validation_evidence.json"
+          "skills/shared/references/enterprise-10.6-sok-s1-evidence.json"
         ],
-        "notes": "An isolated EKS run verified the pinned SOK 3.1.0 and Splunk Enterprise 10.4.1 S1 lifecycle from a clean baseline through strict render, preflight, guarded apply, status and live validation, real SPL search, authenticated receiver ingest, pod recreation, canary search using preserved storage, and zero-residue cleanup. The run used the development profile with production-shaped isolated compute and encrypted gp3 storage; external licensing and SmartStore, C3/M4, Splunk POD, upgrades, backup and restore, disaster recovery, UI behavior, and failure-domain continuity remain unverified."
+        "notes": "S1liveapply/status, HECingest/search, RESTsyntheticappdelivery, KVrecord and indexedcanarypersisted throughpodreplacement. C3/M4/AppFramework/POD are not qualified byS1."
+      }
+    },
+    "splunk-federated-search-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise10.6.0.5 standard provider and disposable Ubuntu24.04 consumer; CA and hostname verified"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-federated-search-evidence.json"
+        ],
+        "notes": "Selected standard REST provider/index lifecycle, TLS negative controls, corrected restart listener and four unique retained records passed. Exact Splunk objects/reader identity/password and PKI staging copies removed; exact two temporary AWS rules revoked and verified absent. Disposable consumer and disk deleted on October 8. Standalone-only loopback hostname workaround remains qualified; global toggle unsupported and refused before mutation."
+      }
+    },
+    "splunk-hec-service-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Disposable Ubuntu 24.04 x86_64; Enterprise 10.6.0.5"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md",
+          "skills/shared/references/enterprise-10.6-ubuntu-fresh-evidence.json"
+        ],
+        "notes": "Corrected HEC skill apply and status passed on Ubuntu 24.04 with Enterprise 10.6.0.5. Configuration was owned by splunk with mode 0640 and the token file with mode 0600. After restart, TLS HEC returned Success and search found the new canary. The initial ownership failure was reproduced and corrected in the repository."
+      }
+    },
+    "splunk-ingest-actions-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise 10.6.0.5 isolated Ubuntu 24.04 x86_64 standalone; CA and hostname verified REST"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-ingest-actions-evidence.json"
+        ],
+        "notes": "Selected conf-REST mask/eval/drop apply and indexed fixture results passed; three transformed events and rules survived controlled restart. Owned app/index and effective rule configuration absent after cleanup restart. S3 routing is a separate handoff."
+      }
+    },
+    "splunk-knowledge-objects-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Enterprise 10.6.0.5 isolated standalone lab on custom Debian-derived AMD host; lab106_validation app"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-core-objects-evidence.json"
+        ],
+        "notes": "Corrected skill apply/status passed for selected macro, disabled saved search and CSV lookup; content and ACL readback passed. Following restart, objects were retained, macro search returned two retained events and inputlookup returned one row. Optional object kinds remain outside this selected workflow qualification."
+      }
+    },
+    "splunk-kvstore-admin-setup": {
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "Legacy Enterprise10.4.3 Ubuntu24.04 x86_64; cohosted Enterprise10.6.0.5 isolated standalone lab"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-kv-evidence.json"
+        ],
+        "notes": "Fresh corrected-script parallel backup/restore passed on legacy10.4.3 and cohosted10.6.0.5; collection/lookup definitions existed before restore and one legacy row survived. Migration and upgrade lifecycle branches remain pending."
+      }
+    },
+    "splunk-license-manager-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Disposable Ubuntu 24.04 x86_64; Enterprise 10.6.0.5 manager and peer"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-license-evidence.json"
+        ],
+        "notes": "Corrected shared transport installed the verified Enterprise artifact after a controlled Free-group transition and removal on the disposable lab. Enterprise activation, peer registration, two 25 GiB pools, restart persistence, usage readback and HEC/search canary passed on manager and peer version 10.6.0.5. Version-skew and alternative license types remain outside this selected workflow."
+      }
+    },
+    "splunk-monitoring-console-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "Isolated standalone Enterprise 10.6.0.5 build86587d4e3b27; custom Debian-derived lab host"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-monitoring-console-evidence.json"
+        ],
+        "notes": "Corrected standalone 10.6 render/apply/status passed. Unsupported mc_auto_config omitted; configuration validation passed. After restart health was green, KV ready, two indexed canaries retained; 111 shipped views were visible and representative shipped indexer/process/license searches returned data. This qualifies standalone MC; distributed MC remains a separate topology qualification."
       }
     },
     "splunk-observability-database-monitoring-setup": {
@@ -430,6 +599,32 @@
           "skills/shared/references/splunk_observability_dbmon_validation_evidence.json"
         ],
         "notes": "Across two isolated EKS runs, certificate-verifying TLS, controlled query traffic, positive DBMon exporter counters, identity-filtered per-target SignalFlow, guarded apply/readback, automatic and explicit rollback, and cleanup passed for MySQL, MariaDB, Amazon RDS PostgreSQL 17.5, SQL Server 2022, and Oracle Database 26ai on Collector/chart 0.155.0. Collector/chart 0.158.0, MongoDB, the expanded Oracle/PostgreSQL support rows, Product UI and explain-plan display, APM correlation, AI assistance, AWS RDS MySQL/MariaDB, Azure variants, managed SQL Server/Oracle, Oracle RAC, and Linux/Windows runtime apply remain unverified live."
+      }
+    },
+    "splunk-observability-otel-collector-setup": {
+      "live_apply_e2e": {
+        "status": "pass",
+        "targets": [
+          "External Linux collector0.158.0 on Ubuntu24.04 x86_64; Enterprise10.6.0.5 on same isolated host; Observability Cloud us1"
+        ],
+        "last_verified": "2026-10-08",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-otel-collector-evidence.json"
+        ],
+        "notes": "Pinned official Linux installer and owning validator passed. Exact-host recent CPU/memory SignalFlow data, one correlated APM span, restart metric recovery, owning uninstall and runtime/secret-copy cleanup verified. Enterprise TA and Platform pairing variants unqualified. Persistent user token preserved."
+      }
+    },
+    "splunk-platform-pki-setup": {
+      "live_apply_e2e": {
+        "status": "partial",
+        "targets": [
+          "Existing isolated standalone lab; custom Debian-derived host"
+        ],
+        "last_verified": "2026-10-07",
+        "evidence": [
+          "skills/shared/references/enterprise-10.6-web-pki-evidence.json"
+        ],
+        "notes": "Private CA and leaf creation, strict chain verification, Web TLS apply and authenticated health after restart passed. REST, HEC, forwarding, mutual TLS and distributed certificate workflows remain pending."
       }
     },
     "splunk-stream-windows-setup": {

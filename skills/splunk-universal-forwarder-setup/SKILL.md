@@ -5,13 +5,21 @@ description: "Use when the user asks to install, upgrade, enroll, or check Unive
   Forwarder runtimes on Linux, macOS, and Windows, resolve official UF downloads, render first-class
   enrollment assets for deployment servers, static Enterprise indexers, or Splunk Cloud credentials
   packages, and validate installed forwarders."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Universal Forwarder Setup
+
+Splunk's Enterprise 10.6 release notes certify Universal Forwarder 10.6 on
+Enterprise and Cloud 10.6 and document direct UF upgrades from 10.0.x and later.
+Use the shared four-segment parser for version strings such as `10.6.0.5`.
+Package release compatibility remains conditional until the selected UF package
+has explicit 10.6 evidence in the package registry.
 
 ## Prerequisites
 
@@ -98,12 +106,20 @@ bash skills/splunk-universal-forwarder-setup/scripts/setup.sh \
   --url latest|URL \
   --file PATH \
   --package-type auto|tgz|rpm|deb|msi|dmg|pkg|txz|p5p|tar-z
+  --mgmt-port PORT --ipc-broker-port PORT (alias: --ipc-port)
 ```
 
 Useful additions:
 
 - `--target-arch auto|amd64|arm64|ppc64le|s390x|x64|x86|intel|universal2|freebsd13-amd64|freebsd14-amd64|sparc|powerpc`
 - `--allow-stale-latest`
+- `--mgmt-port` (default `8089`, env `SPLUNK_MGMT_PORT`) and
+  `--ipc-broker-port` (alias `--ipc-port`; default `8194`, env
+  `SPLUNK_IPC_BROKER_PORT` with legacy `SPLUNK_IPC_PORT` support) support
+  isolated Unix-like UF instances. Fresh installs check both ports and write
+  `web.conf` / `server.conf` before
+  first start. Upgrades preserve the existing port configuration. Windows
+  handoffs retain MSI defaults.
 - `--output-dir PATH`
 - `--accept-forwarder-mutation` for a reviewed live install, upgrade, or
   enrollment

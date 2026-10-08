@@ -53,13 +53,13 @@ bash skills/cisco-isovalent-platform-setup/scripts/setup.sh \
   --accept-k8s-apply
 ```
 
-## Cilium pods crash-loop on Ubuntu 20.04 / RHEL 8
+## Kernel preflight warns on Ubuntu 20.04 or RHEL 8
 
-Symptom: `cilium` pods enter `CrashLoopBackOff`. Logs include `eBPF program load failed` or `kernel feature missing`.
+The skill reports the node kernel and warns when its numeric version is below the configured minimum. That comparison is conservative and does not recognize distro backports such as RHEL 8.10's Cilium-supported 5.10-equivalent kernel.
 
-Cause: kernel < 5.10 (Cilium v1.18.x requires 5.10+).
+For public Cilium 1.20.2, check the upstream system requirements and feature-specific kernel table for the node distribution. Cilium documents Linux 5.10 or equivalent as the base requirement. The AWS EKS Hybrid mirror has separate AWS support constraints and does not support Ubuntu 20.04 or RHEL 8.
 
-Fix: upgrade the kernel (`kernel-ml` from ELRepo for RHEL 8; `linux-image-generic-hwe-22.04` for Ubuntu 20.04) OR pin Cilium to v1.17.x in `cilium.image.tag`.
+Resolve a warning using the selected chart's official compatibility guidance and kernel feature requirements. Do not switch to an older Cilium line solely to suppress the warning; the EKS Hybrid mirror exclusions apply specifically to that AWS deployment path.
 
 ## Live validation reports unsupported kubectl skew
 

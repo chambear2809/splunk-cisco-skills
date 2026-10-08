@@ -107,6 +107,12 @@ Hard blocks and protected defaults:
   operation but remain required settings.
 - Remote volume paths must be unique to a single running standalone indexer or
   indexer cluster.
+- On EC2, pass `--imds-version v1` or `--imds-version v2` to render an explicit
+  `[imds] imds_version` setting. The default `unset` omits the stanza and keeps
+  the Splunk default.
+- For S3 TLS trust, pass `--s3-ssl-root-ca-path` with a literal absolute PEM
+  bundle path. The renderer writes `remote.s3.sslRootCAPath` and includes it in
+  standalone post-apply `btool` readback expectations when supplied.
 - Keep `enableTsidxReduction = false` and `maxDataSize = auto` at defaults for
   SmartStore unless Splunk Support directs otherwise.
 - Live cluster apply requires `--apply-cluster-bundle true`. The generated

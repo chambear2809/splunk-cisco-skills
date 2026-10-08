@@ -1,0 +1,55 @@
+{
+  "last_verified": "2026-10-07",
+  "status": "pass",
+  "target": {
+    "enterprise": "10.6.0.5",
+    "kv_store": "fresh cohosted",
+    "os": "Ubuntu 24.04 x86_64",
+    "runtime": "Docker Compose"
+  },
+  "collectors": {
+    "SC4S": {
+      "image_version": "3.47.0",
+      "image_digest": "sha256:1f403ad06d9de8741ccdc0fbeb8515fc02840cf652cf63a36c53ab949aba017b",
+      "repository_validation": {
+        "pass": 30,
+        "warning": 0,
+        "failure": 0
+      },
+      "parsed_asa": {
+        "index": "netfw",
+        "sourcetype": "cisco:asa",
+        "count": 3
+      },
+      "startup_events": 2
+    },
+    "SC4SNMP": {
+      "image_version": "1.17",
+      "image_digest": "sha256:bcdaba66c33c6b6080cbee9aa28a9e002394971fca202effcfac5a1d1177bad6",
+      "repository_validation": {
+        "pass": 12,
+        "warning": 0,
+        "failure": 0
+      },
+      "polling_events": 75,
+      "trap_events": 30,
+      "metric_measurements": 510
+    }
+  },
+  "transport": "Authenticated HEC and REST with CA and hostname verified. Synthetic local SNMP v2c source uses a protected community file.",
+  "dashboard_package_evidence": "Filesystem inspection of both exact collector container images found no Splunk data/ui/views files. These selected external collector packages ship no Splunk dashboards; companion TA/dashboard packages require separate ingest and view qualification.",
+  "limitations": [
+    "Optional collector self-monitoring streams em_logs/em_metrics were not populated; no self-monitoring qualification.",
+    "No production load, TLS syslog listener, SNMP v3, HA, Helm or external hardware claim."
+  ],
+  "cleanup": {
+    "owned_containers_before": 10,
+    "owned_containers_remaining": 0,
+    "owned_volumes_remaining": 0,
+    "fixture_processes_terminated": 2,
+    "hec_inputs_deleted_and_readback_404": 2,
+    "temporary_runtime_secret_and_agent_directories_removed": true,
+    "retained_synthetic_indexed_data": "Disposable target retained for other validation; deletion is part of final target cleanup."
+  },
+  "sanitization": "No secrets, license contents, source addresses or AWS resource identifiers."
+}

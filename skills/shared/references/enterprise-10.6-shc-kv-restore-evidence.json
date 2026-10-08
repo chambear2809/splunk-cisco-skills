@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-10-08",
+  "enterprise_version": "10.6.0.5",
+  "environment": "Disposable EKS 1.34.11, Operator 3.2.0 C3 development resource overrides",
+  "status": "pass",
+  "store_type": "legacy",
+  "storage_engine": "wiredTiger",
+  "members": 3,
+  "definitions_preexisting_before_restore": true,
+  "replicate": true,
+  "fields": [
+    "marker:string",
+    "version:string"
+  ],
+  "records_per_member": 1,
+  "backup_mode": "parallel",
+  "archive_bytes": 17905,
+  "archive_sha256": "5bda19171d98261657302d94e2c9b9427bd1a2d14e4bafef32cb7099a4d5fa29",
+  "controlled_record_perturbation": true,
+  "restore_exit_code": 0,
+  "restored_definition_and_record_hashes_match_all_members": true,
+  "all_members_kv_ready": true,
+  "numeric_kv_server_version": "not exposed; stable upgrade state only",
+  "consistency_limit": "Parallel backups do not guarantee point-in-time consistency. This unique fixture was quiescent during backup and restore.",
+  "corrected_defect": "Parallel SHC restore no longer enables point-in-time FULL_LOCK maintenance mode. Initial attempt exited before restore because the captain was dynamic.",
+  "tls_qualification": "Readback verifies pod CA over owned loopback forwards with hostname checking disabled for vendor default certificates. Collection apply used explicit client verification opt-out on the owned disposable loopback route; this is not production PKI qualification.",
+  "evidence_receipt_sha256": {
+    "before.json": "bddf8b71c74f47e4b684739d9a85d43f62b52e64dbcd0c7591c4cfe69ff8fa86",
+    "after.json": "cdb4af837a0a3b51b30a9d390ce05c38ea0087480c891cdb3cd3a757008b940b",
+    "fixture-perturb-receipt.json": "273a64636bc0883c2d59762084515a2319be4705464feaf5256757e063369cd3",
+    "backup.log": "f74b5b1320dab488a74e1c4d8e09728b5c990762e07eba8fe96c02d0f86be9b2",
+    "restore-mode-corrected.log": "e8140f8459b4935e721e1c8751016b65761935210e0d50f7a259b3df7177e4b4"
+  },
+  "cleanup": {
+    "status": "complete",
+    "collected_at_utc": "2026-10-08T01:03:53.002263+00:00",
+    "helm_releases_deleted": 2,
+    "namespace_absent": true,
+    "recorded_ebs_volumes_absent": 21,
+    "scoped_iam_user_and_access_key_absent": true,
+    "fixture_prefix_empty_including_versions": true,
+    "protected_local_access_files_deleted": 8,
+    "receipt_sha256": "d801431f7095303a40bba8d800ce6ab8a3e4999d0b5fe06fb40e8c36504f5dc9",
+    "qualification": "EKS cluster deletion is a separate operation now in progress. Private sanitized test receipts and protected recovery archive retained."
+  }
+}

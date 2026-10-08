@@ -231,6 +231,22 @@ class KnowledgeObjectsTests(unittest.TestCase):
             self.assertIn("LOOKUP-asset_lookup = asset_lookup OUTPUT risk", props)
             self.assertTrue((render_dir / "lookup-stub.csv").exists())
 
+    def test_wildcard_read_role_is_valid_and_scheduled_apply_uses_is_scheduled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--object-kind", "macro",
+                "--name", "wildcard_macro",
+                "--definition", "index=main",
+                "--read-roles", "*",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            acl = json.loads((Path(tmpdir) / "knowledge-objects" / "acl-plan.json").read_text(encoding="utf-8"))
+            self.assertEqual(acl["read_roles"], ["*"])
+        source = SETUP.read_text(encoding="utf-8")
+        self.assertIn('form_urlencode_pairs is_scheduled 1', source)
+        self.assertNotIn('form_urlencode_pairs enableSched 1', source)
+
     def test_savedsearch_requires_search(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_renderer(

@@ -4,13 +4,18 @@ description: "Use when the user asks to configure distributed or standalone Moni
   splunk_monitoring_console_assets.conf auto-config, distsearch.conf search peer groups, forwarder
   monitoring, platform alerts, search peer onboarding checks, or Monitoring Console status validation.
   Render, preflight, apply, and validate Splunk Enterprise Monitoring Console configuration."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Monitoring Console Setup
+
+After an Enterprise 10.6 upgrade, validate the updated Monitoring Console KV
+Store dashboards alongside the usual deployment health and peer status checks.
 
 ## Prerequisites
 
@@ -101,6 +106,7 @@ Render distributed Monitoring Console assets with auto-config:
 ```bash
 bash skills/splunk-monitoring-console-setup/scripts/setup.sh \
   --mode distributed \
+  --enterprise-version 10.6.0.5 \
   --search-peers cm01.example.com:8089,sh01.example.com:8089 \
   --peer-username admin \
   --enable-auto-config true
@@ -127,7 +133,11 @@ bash skills/splunk-monitoring-console-setup/scripts/setup.sh \
 
 ## What It Renders
 
-- `splunk_monitoring_console_assets.conf` with `mc_auto_config`
+- `splunk_monitoring_console_assets.conf` review file; Enterprise 10.6 manages
+  auto-config through the Monitoring Console UI/feature flag and rejects the
+  removed `mc_auto_config` key. Pass `--enterprise-version 10.4.1` for a
+  legacy 10.4 render, where the key remains supported; generated apply/status
+  scripts fail if the installed version differs from the requested version.
 - `distsearch.conf` review file for search peers and custom distributed search groups
 - `savedsearches.conf` overrides for forwarder monitoring and platform alerts
 - `app.conf` local app visibility/configuration metadata

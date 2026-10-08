@@ -1,0 +1,41 @@
+{
+  "secondary_cohosted": {
+    "runtime": "/opt/splunk-10.6-lab-core-20261005",
+    "version": "10.6.0.5",
+    "status": "ready",
+    "type": "Pdl",
+    "backup": "passed fresh corrected script, selected parallel, backupRestoreStatus=Ready",
+    "restore": "passed fresh corrected script, selected parallel, backupRestoreStatus=Ready",
+    "post_restore_restart_row_count": 1,
+    "collection": "skills_validation",
+    "app": "lab106_validation"
+  },
+  "legacy_10_4_3": {
+    "runtime": "/opt/splunk",
+    "status": "ready",
+    "parallel_backup": "passed, selected parallel, backupRestoreStatus=Ready",
+    "parallel_restore": "passed, selected parallel, backupRestoreStatus=Ready",
+    "definition_before_restore": "legacy_parallel_validation collection + legacy_parallel_lookup definition read back",
+    "rows_before": 1,
+    "rows_after": 1,
+    "fixture_marker": "legacy_parallel_fixture"
+  },
+  "artifacts": [
+    "cohosted-parallel-backup.txt",
+    "cohosted-parallel-restore.txt",
+    "legacy-parallel-fixture-backup.txt",
+    "legacy-parallel-fixture-restore.txt",
+    "legacy-fixture-before.json",
+    "legacy-fixture-after.json",
+    "legacy-definition-readback.json"
+  ],
+  "consistency_limitations": [
+    "Parallel backup/restore does not guarantee a consistent snapshot across collections during concurrent writes. These tests use quiescent synthetic fixtures; no cross-collection transactional consistency is claimed."
+  ],
+  "cleanup_identities": [
+    "legacy_parallel_validation",
+    "legacy_parallel_lookup",
+    "legacy-row-1"
+  ],
+  "last_verified": "2026-10-07"
+}

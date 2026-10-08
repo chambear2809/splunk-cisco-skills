@@ -64,19 +64,20 @@ ENTERPRISE_TIMESCAPE_CHART = "isovalent/hubble-timescape"
 
 EKS_AWS_MIRROR_OCI = "oci://public.ecr.aws/eks/cilium/cilium"
 
-# Exact chart versions are part of the rendered execution contract.  Cilium
-# Enterprise Cilium/cilium-dnsproxy 1.18.8 plus Enterprise Tetragon 1.18.1 are
-# the versions validated by the repository's isovalent-demo acceptance
-# evidence. OSS uses the separately sourced upstream maintenance baselines:
-# Cilium 1.18.10 and Tetragon 1.7.0. The EKS OCI mirror retains its separately
-# reviewed 1.18.8 contract and must not be conflated with the public chart.
+# Exact chart versions are part of the rendered execution contract. Enterprise
+# Cilium/cilium-dnsproxy 1.18.8 plus Enterprise Tetragon 1.18.1 are the versions
+# validated by the repository's isovalent-demo acceptance evidence; this is a
+# validation pin, not a claim that these are the latest Enterprise charts.
+# OSS uses the current stable upstream baselines confirmed 2026-09-30: Cilium
+# 1.20.2 and Tetragon 1.7.1. The EKS OCI mirror retains its separately reviewed
+# 1.18.8 contract and must not be conflated with the public chart.
 # Hubble Enterprise and standalone Timescape are private charts; their 1.18.8
 # family pin must still be resolved by `helm show chart --version` at apply time
 # because no distributable chart archive/checksum is available in this repo.
-OSS_CILIUM_CHART_VERSION = "1.18.10"
+OSS_CILIUM_CHART_VERSION = "1.20.2"
 ENTERPRISE_CILIUM_CHART_VERSION = "1.18.8"
 EKS_MIRROR_CILIUM_CHART_VERSION = "1.18.8"
-OSS_TETRAGON_CHART_VERSION = "1.7.0"
+OSS_TETRAGON_CHART_VERSION = "1.7.1"
 ENTERPRISE_TETRAGON_CHART_VERSION = "1.18.1"
 DNSPROXY_CHART_VERSION = "1.18.8"
 HUBBLE_ENTERPRISE_CHART_VERSION = "1.18.8"
@@ -286,7 +287,7 @@ def chart_contract(edition: str, eks_mirror: bool) -> dict[str, dict[str, Any]]:
                 if eks_mirror
                 else "isovalent-demo validated Enterprise Cilium 1.18.8"
                 if edition == "enterprise"
-                else "official upstream Cilium 1.18.10 maintenance release"
+                else "official upstream Cilium 1.20.2 stable release (confirmed 2026-09-30)"
             ),
             "archive_sha256": None,
         },
@@ -297,7 +298,7 @@ def chart_contract(edition: str, eks_mirror: bool) -> dict[str, dict[str, Any]]:
             "provenance": (
                 "isovalent-demo validated Enterprise Tetragon 1.18.1"
                 if edition == "enterprise"
-                else "official upstream Tetragon 1.7.0 release"
+                else "official upstream Tetragon 1.7.1 stable release (confirmed 2026-09-30)"
             ),
             "archive_sha256": None,
         },
@@ -1347,7 +1348,7 @@ def preflight_body(spec: dict[str, Any], edition: str, distribution: str, catalo
     if kernel.get("enable", True):
         body.append(f"MINIMUM_KERNEL={shell_literal(minimum_kernel)}")
         body.append(
-            'echo "Kernel check: minimum ${MINIMUM_KERNEL} required for Cilium v1.18.x."'
+            'echo "Kernel check: minimum ${MINIMUM_KERNEL} or distro-equivalent required for the selected Cilium chart; review feature and provider-specific requirements."'
         )
         body.append(
             '"${KUBECTL[@]}" get nodes -o jsonpath=\'{range .items[*]}{.metadata.name}{"\\t"}{.status.nodeInfo.kernelVersion}{"\\n"}{end}\' \\\n'

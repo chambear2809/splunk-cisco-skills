@@ -8,13 +8,21 @@ description: "Use when the user asks to manage Splunk Cloud ACS, acs admin, ACS 
   permissions, private connectivity, outbound ports, DDSS self-storage, limits.conf settings, maintenance
   windows, restarts, apps, authentication tokens, deployment task status, license state, and Observability
   pairing handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain the verified public 10.4 baseline where applicable."
+compatibility: "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain separate Enterprise version and package evidence; see the Enterprise 10.6 matrix."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-08"
   splunk_cloud_10_5: "supported"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Cloud ACS Admin Setup
+
+## Enterprise applicability
+
+ACS administers the Splunk Cloud control plane. The default workflow does not configure a self-managed Enterprise
+10.6 feature. Keep its Splunk Cloud validation separate. See the
+[documented service scope](https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/welcome-to-the-admin-config-service-acs/about-the-admin-config-service-acs-api).
 
 ## Prerequisites
 

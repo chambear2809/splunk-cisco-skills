@@ -15,10 +15,18 @@ and newer Data Management app connection/dataset handoffs:
 - Federated index stanza: `federated:<index_name>` with `federated.provider`,
   `federated.dataset` (`<type>:<dataset_name>`), `disabled`.
 - REST endpoints:
-  - `/services/data/federated/settings/general` — global enable/disable.
+  - `/services/data/federated/settings/general` — global settings. REST
+    global toggles are conditional: generated toggle scripts first require a
+    GET response advertising a recognized `disabled` field and refuse to POST
+    otherwise. The Enterprise 10.6 handler may omit that field and expose no
+    verified enable/disable action, so the toggle remains a manual/API-contract
+    review item in that case.
   - `/services/data/federated/provider` — FSS2S provider CRUD in this skill;
     legacy FSS3 definitions are read-only migration evidence here.
-  - `/services/data/federated/index` — FSS2S federated index CRUD in this skill.
+  - `/services/data/federated/index` — FSS2S federated index CRUD in this skill;
+    REST index lifecycle enable/disable is not assumed. REST plans with
+    `disabled=true` indexes fail closed; file-based `indexes.conf` retains the
+    setting.
   - Each provider entity supports `/_reload`, `/enable`, and `/disable`.
 
 ## Provider Types And Handoffs

@@ -10,8 +10,10 @@ description: "Use when configuring an already-running Galileo instance for Splun
   Annotation Queues GA, AI-assisted custom metrics, cost/billing review, Trace Count alerts,
   multimodal out-of-the-box metric variants, and the Splunk Agent Observability documentation epoch,
   HEC/OTLP/OTel handoffs, dashboards, and detectors; delegate On-Prem Kubernetes deployment and packaged services."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

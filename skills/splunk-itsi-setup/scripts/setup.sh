@@ -8,8 +8,8 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 INSTALL_APP_SCRIPT="${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 ITSI_APP_ID="1841"
-VERIFIED_ITSI_VERSION="4.21.2"
-CURRENT_PUBLIC_ITSI_VERSION="5.0.0"
+VERIFIED_ITSI_VERSION="5.0.2"
+CURRENT_PUBLIC_ITSI_VERSION="5.0.2"
 
 SOURCE="splunkbase"
 APP_VERSION=""
@@ -126,8 +126,7 @@ payload = {
     "latest_verified_version": os.environ["VERIFIED_ITSI_VERSION"],
     "current_public_version": os.environ["CURRENT_PUBLIC_ITSI_VERSION"],
     "package_verification_warning": (
-        "The current public ITSI release is not package-verified by this repository; "
-        "the shared installer defaults to the verified baseline."
+        "ITSI 5.0.2 package is checksum-verified; native-object contract changes still require review."
     ),
     "phases": os.environ.get("JSON_PHASES", "").split(sep)
     if os.environ.get("JSON_PHASES")
@@ -149,7 +148,7 @@ PY
         echo "Planned phases:"
         printf '  - %s\n' "${phases[@]}"
         if [[ "${SOURCE}" == "splunkbase" && -z "${APP_VERSION}" ]]; then
-            echo "Package boundary: the shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; public ${CURRENT_PUBLIC_ITSI_VERSION} requires its explicit unverified-release override."
+            echo "Package boundary: the shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; review ITSI 5.0 native-object changes before config management."
         fi
         if [[ "${INSTALL}" == "true" ]]; then
             echo "Install command:"
@@ -196,7 +195,7 @@ if [[ "${INSTALL}" == "true" ]]; then
     build_install_command
     build_fallback_command
     if [[ "${SOURCE}" == "splunkbase" && -z "${APP_VERSION}" ]]; then
-        echo "INFO: shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; public ${CURRENT_PUBLIC_ITSI_VERSION} requires its explicit unverified-release override." >&2
+        echo "INFO: shared installer pins verified ITSI ${VERIFIED_ITSI_VERSION}; review ITSI 5.0 native-object changes before config management." >&2
     fi
     if ! "${INSTALL_CMD[@]}"; then
         if [[ -n "${FALLBACK_CMD[0]+set}" ]]; then

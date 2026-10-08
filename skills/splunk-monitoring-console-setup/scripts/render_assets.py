@@ -45,6 +45,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=("standalone", "distributed"), default="distributed")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--splunk-home", default="/opt/splunk")
+    parser.add_argument(
+        "--enterprise-version",
+        default=None,
+        help="Expected installed Enterprise version (defaults to shared platform version).",
+    )
     parser.add_argument("--enable-auto-config", choices=("true", "false"), default="true")
     parser.add_argument("--enable-forwarder-monitoring", choices=("true", "false"), default="false")
     parser.add_argument("--forwarder-cron", default="*/15 * * * *")
@@ -76,6 +81,24 @@ def bool_value(value: str) -> bool:
 def no_newline(value: str, option: str) -> None:
     if "\n" in value or "\r" in value:
         die(f"{option} must not contain newlines.")
+
+
+def resolve_enterprise_version(value: str | None) -> str:
+    if value:
+        version = value.strip()
+    else:
+        try:
+            version = json.loads(_SPV_VERSIONS_JSON.read_text(encoding="utf-8"))["defaults"]["enterprise_version"]
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            die(f"Unable to resolve the shared default Enterprise version: {exc}")
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:\.\d+)?", version):
+        die("--enterprise-version must be a three- or four-part numeric version.")
+    return version
+
+
+def is_enterprise_106_or_newer(version: str) -> bool:
+    parts = tuple(int(part) for part in version.split("."))
+    return parts[:2] >= (10, 6)
 
 
 def csv_list(value: str) -> list[str]:
@@ -114,7 +137,7 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def make_script(body: str) -> str:
+def make_script(body: str, expected_version: str) -> str:
     first, separator, remainder = body.lstrip().partition("\n")
     if not separator:
         die("internal renderer error: local script body has no runtime assignment")
@@ -129,6 +152,12 @@ runtime_home="${{splunk_home:-}}"
 [[ -n "${{runtime_home}}" ]] || {{ echo "ERROR: rendered script did not set splunk_home." >&2; exit 1; }}
 installed_version="$(spv_require_supported_splunk_home "${{runtime_home}}")"
 echo "PASS: supported Splunk Enterprise runtime ${{installed_version}}."
+expected_version={shell_quote(expected_version)}
+if [[ "${{installed_version}}" != "${{expected_version}}" ]]; then
+  echo "ERROR: rendered assets expect Splunk Enterprise ${{expected_version}}, found ${{installed_version}}." >&2
+  exit 1
+fi
+echo "PASS: rendered Enterprise version matches ${{expected_version}}."
 """
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + first + "\n" + gate + remainder
 
@@ -141,6 +170,7 @@ def clean_render_dir(render_dir: Path) -> None:
 
 
 def validate(args: argparse.Namespace) -> None:
+    args.enterprise_version = resolve_enterprise_version(args.enterprise_version)
     peers = csv_list(args.search_peers)
     peer_set = set(peers)
     for peer in peers:
@@ -186,11 +216,14 @@ label = Monitoring Console
 
 
 def render_assets_conf(args: argparse.Namespace) -> str:
-    lines = ["# Rendered by splunk-monitoring-console-setup. Review before applying.", "[settings]"]
-    if args.mode == "distributed" and bool_value(args.enable_auto_config):
-        lines.append("mc_auto_config = enabled")
+    lines = [
+        "# Rendered by splunk-monitoring-console-setup. Review before applying.",
+        "[settings]",
+    ]
+    if is_enterprise_106_or_newer(args.enterprise_version):
+        lines.append("# mc_auto_config is managed by the Splunk Monitoring Console UI/feature flag in 10.6.")
     else:
-        lines.append("mc_auto_config = disabled")
+        lines.append(f"mc_auto_config = {'enabled' if args.mode == 'distributed' and bool_value(args.enable_auto_config) else 'disabled'}")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -249,6 +282,7 @@ def render_readme(args: argparse.Namespace) -> str:
     return f"""# Splunk Monitoring Console Rendered Assets
 
 Mode: `{args.mode}`
+Enterprise version: `{args.enterprise_version}`
 Auto-config: `{args.enable_auto_config}`
 Forwarder monitoring: `{args.enable_forwarder_monitoring}`
 Platform alerts: `{args.enable_platform_alerts}`
@@ -270,6 +304,9 @@ to enable Monitoring Console local settings.
 
 Distributed mode still requires correct search peers, unique server names and
 host values, internal log forwarding, and role review in the Monitoring Console.
+For Enterprise 10.6, the auto-config request is retained as intent metadata;
+the removed `mc_auto_config` key is not rendered and the UI/feature flag owns
+that behavior. Enterprise 10.4 renders the legacy key.
 """
 
 
@@ -281,7 +318,8 @@ test -x "${{splunk_home}}/bin/splunk"
 test -d "${{splunk_home}}/etc/apps/splunk_monitoring_console"
 "${{splunk_home}}/bin/splunk" btool app list --app=splunk_monitoring_console --debug >/dev/null
 "${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug >/dev/null
-"""
+""",
+        args.enterprise_version,
     )
 
 
@@ -302,7 +340,8 @@ for name in app.conf splunk_monitoring_console_assets.conf savedsearches.conf; d
 done
 cp app.conf splunk_monitoring_console_assets.conf savedsearches.conf "${{target_dir}}/"
 echo "distsearch.conf is rendered for review. Add peers through Splunk Web or copy it with trusted.pem key handling."
-{restart_block}"""
+{restart_block}""",
+        args.enterprise_version,
     )
 
 
@@ -341,7 +380,8 @@ for peer in "${{peers[@]}}"; do
   fi
 done
 "${{splunk_home}}/bin/splunk" list search-server
-"""
+""",
+        args.enterprise_version,
     )
 
 
@@ -353,7 +393,8 @@ def render_status(args: argparse.Namespace) -> str:
 "${{splunk_home}}/bin/splunk" btool splunk_monitoring_console_assets list --debug
 "${{splunk_home}}/bin/splunk" btool distsearch list --debug
 "${{splunk_home}}/bin/splunk" btool savedsearches list "DMC Forwarder - Build Asset Table" --debug
-"""
+""",
+        args.enterprise_version,
     )
 
 
@@ -368,6 +409,7 @@ def render(args: argparse.Namespace) -> dict:
             "metadata.json": json.dumps(
                 {
                     "mode": args.mode,
+                    "enterprise_version": args.enterprise_version,
                     "enable_auto_config": bool_value(args.enable_auto_config),
                     "enable_forwarder_monitoring": bool_value(args.enable_forwarder_monitoring),
                     "enable_platform_alerts": bool_value(args.enable_platform_alerts),

@@ -1,0 +1,42 @@
+{
+  "assessment_date": "2026-10-07",
+  "enterprise_version": "10.6.0.5",
+  "result": "pass",
+  "target": "Disposable Ubuntu 24.04 x86_64 standalone",
+  "selected_workflow": "S3 SmartStore configuration, activation, upload, cache eviction and remote search recovery",
+  "defects_corrected": [
+    "Explicit IMDS version missing from SmartStore rendering and wrapper",
+    "Explicit S3 CA bundle missing from SmartStore rendering and wrapper"
+  ],
+  "configuration": {
+    "imds_version": "v2",
+    "s3_authentication": "Scoped EC2 instance role; no static AWS keys",
+    "s3_tls_verify": true,
+    "s3_ca_bundle": "Operating system CA bundle",
+    "encryption": "SSE-S3",
+    "bucket_versioning": true,
+    "public_access_blocked": true,
+    "cache_size_mb": 1024,
+    "max_global_data_size_mb": 1024
+  },
+  "live_result": {
+    "initial_imds_v1_apply": "failed credential discovery without starting splunkd",
+    "corrected_skill_apply": "pass",
+    "post_activation_btool": "all requested settings matched",
+    "hec_accepted": true,
+    "exact_canary_count_before_roll": 1,
+    "controlled_warm_buckets": 1,
+    "uploaded_s3_objects": 12,
+    "cache_after_eviction": "remote; cached file flags false",
+    "exact_canary_count_after_eviction": 1,
+    "cache_after_search": "local; journal and tsidx available; failure_code=0"
+  },
+  "qualification": "Standalone S3 workflow only. Clustered SmartStore, other providers and archive/destructive lifecycle operations remain separate. REST and HEC CA verification used loopback with hostname matching disabled; S3 server CA verification remained enabled. Small canary proves functionality, not production sizing.",
+  "cleanup": "2026-10-08: owned HEC stanza, SmartStore app/configuration and canary index data removed while the retained lab was stopped. Restart succeeded with current/cohosted KV ready and working search. Temporary instance profile detached; all 12 owned bucket versions removed; bucket, profile and scoped role deletion verified. Historical October 7 functional evidence remains unchanged.",
+  "sources": [
+    "https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.4/deploy-smartstore/deploy-smartstore-on-a-new-standalone-indexer",
+    "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.6/configuration-file-reference/10.6.0-configuration-file-reference/server.conf",
+    "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.6/configuration-file-reference/10.6.0-configuration-file-reference/indexes.conf"
+  ],
+  "sanitization": "No credentials, resource IDs, bucket identifiers, raw events or host identifiers included"
+}

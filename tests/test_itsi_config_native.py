@@ -519,6 +519,7 @@ class NativeWorkflowTests(unittest.TestCase):
                         "title": "edge-sw-01",
                         "description": "Edge switch",
                         "sec_grp": "default_itsi_security_group",
+                        "host": ["edge-sw-01"],
                         "identifier": {"fields": ["host"], "values": ["edge-sw-01"]},
                     }
                 },
@@ -1016,6 +1017,7 @@ class NativeWorkflowTests(unittest.TestCase):
                 {
                     "title": "edge-sw-01",
                     "identifier_fields": [{"field": "host", "value": "edge-sw-01"}],
+                    "informational_fields": [{"field": "location", "value": "dc-1"}],
                     "sai_entity_key": "sai:edge-sw-01",
                     "payload": {"entity_class": "network"},
                 }
@@ -1046,6 +1048,8 @@ class NativeWorkflowTests(unittest.TestCase):
         service = client.find_object_by_title("service", "API")
         kpi = service["kpis"][0]
         self.assertEqual(entity["sai_entity_key"], "sai:edge-sw-01")
+        self.assertEqual(entity["host"], ["edge-sw-01"])
+        self.assertEqual(entity["location"], ["dc-1"])
         self.assertEqual(entity["entity_class"], "network")
         self.assertEqual(service["base_service_template_id"], "template:direct")
         self.assertEqual(kpi["alert_period"], "5")
@@ -1055,6 +1059,45 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertEqual(kpi["search_type"], "ad hoc")
         self.assertIn({"status": "pass", "object_type": "entity", "title": "edge-sw-01"}, result.validations)
         self.assertIn({"status": "pass", "object_type": "service", "title": "API"}, result.validations)
+
+    def test_entity_field_mappings_reject_reserved_top_level_names(self) -> None:
+        client = FakeNativeClient()
+        with self.assertRaisesRegex(ValidationError, "reserved field 'title'"):
+            NativeWorkflow(client).run(
+                {"entities": [{"title": "edge-sw-01", "identifier_fields": [{"field": "title", "value": "bad"}]}]},
+                "apply",
+            )
+        self.assertEqual(client.operations, [])
+
+    def test_entity_field_mapping_blobs_flatten_lowercase_unique_values(self) -> None:
+        client = FakeNativeClient()
+        NativeWorkflow(client).run(
+            {
+                "entities": [
+                    {
+                        "title": "edge-sw-01",
+                        "identifier_fields": [{"field": "host", "value": ["Edge-A", "edge-a", "Other"]}],
+                        "informational_fields": [{"field": "location", "value": "DC-1"}],
+                    }
+                ]
+            },
+            "apply",
+        )
+        entity = client.find_object_by_title("entity", "edge-sw-01")
+        self.assertEqual(entity["identifier"], {"fields": ["host"], "values": ["edge-a", "other"]})
+        self.assertEqual(entity["informational"], {"fields": ["location"], "values": ["dc-1"]})
+        self.assertEqual(entity["host"], ["Edge-A", "edge-a", "Other"])
+        self.assertEqual(entity["location"], ["DC-1"])
+
+    def test_entity_field_mapping_blob_preserves_value_whitespace(self) -> None:
+        client = FakeNativeClient()
+        NativeWorkflow(client).run(
+            {"entities": [{"title": "edge-sw-01", "identifier_fields": [{"field": "host", "value": " Edge-A "}]}]},
+            "apply",
+        )
+        entity = client.find_object_by_title("entity", "edge-sw-01")
+        self.assertEqual(entity["identifier"]["values"], [" edge-a "])
+        self.assertEqual(entity["host"], [" Edge-A "])
 
     def test_extended_config_sections_preview_without_mutating(self) -> None:
         client = FakeNativeClient()
@@ -1741,6 +1784,37 @@ class NativeWorkflowTests(unittest.TestCase):
         entity_type = client.find_object_by_title("entity_type", "Network Device")
         self.assertEqual(entity["entity_type_ids"], [entity_type["_key"]])
 
+    def test_entity_type_create_omits_security_group_field(self) -> None:
+        client = FakeNativeClient()
+
+        NativeWorkflow(client).run(
+            {
+                "entity_types": [
+                    {
+                        "title": "Network Device",
+                        "description": "Synthetic entity type",
+                        "data_drilldowns": [{"title": "Events", "type": "events"}],
+                    }
+                ]
+            },
+            "apply",
+        )
+
+        entity_type = client.find_object_by_title("entity_type", "Network Device")
+        self.assertIsNotNone(entity_type)
+        self.assertNotIn("sec_grp", entity_type)
+        self.assertEqual(entity_type["data_drilldowns"], [{"title": "Events", "type": "events"}])
+        self.assertEqual(entity_type["dashboard_drilldowns"], [])
+
+    def test_entity_type_create_defaults_required_drilldown_lists(self) -> None:
+        client = FakeNativeClient()
+
+        NativeWorkflow(client).run({"entity_types": [{"title": "Bare Device"}]}, "apply")
+
+        entity_type = client.find_object_by_title("entity_type", "Bare Device")
+        self.assertEqual(entity_type["data_drilldowns"], [])
+        self.assertEqual(entity_type["dashboard_drilldowns"], [])
+
     def test_validate_extended_config_and_service_template_link(self) -> None:
         client = FakeNativeClient(
             {
@@ -2400,6 +2474,18 @@ printf '{"mode":"preview"}\n'
             ruby_stub.chmod(0o755)
             python_stub.chmod(0o755)
             env = os.environ.copy()
+            # The native preview test is intentionally offline and must not inherit
+            # a developer's selected live Splunk profile.
+            for profile_selector in (
+                "SPLUNK_PROFILE",
+                "SPLUNK_SEARCH_PROFILE",
+                "SPLUNK_INGEST_PROFILE",
+                "SPLUNK_DEPLOYER_PROFILE",
+                "SPLUNK_CLUSTER_MANAGER_PROFILE",
+            ):
+                env.pop(profile_selector, None)
+            isolated_credentials = Path(tempdir) / "credentials-not-configured"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(isolated_credentials)
             env["PATH"] = f"{bin_dir}:{env['PATH']}"
             env["RUN_NATIVE_ARGS_FILE"] = str(args_file)
 

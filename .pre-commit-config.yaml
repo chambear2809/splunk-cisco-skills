@@ -188,6 +188,21 @@ repos:
             skills/shared/scripts/(audit_skill_compatibility|generate_splunk_10_5_compatibility)\.py
           )$
 
+      - id: enterprise-compatibility-fresh
+        name: Splunk Enterprise 10.6 compatibility matrix freshness
+        entry: python3 skills/shared/scripts/audit_splunk_enterprise_10_6_compatibility.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            SPLUNK_ENTERPRISE_10_6_COMPATIBILITY\.md|
+            skills/catalog\.yaml|
+            skills/[^/]+/SKILL\.md|
+            skills/shared/app_registry\.json|
+            skills/shared/references/splunk_platform_versions\.json|
+            skills/shared/scripts/audit_splunk_enterprise_10_6_compatibility\.py
+          )$
+
       - id: ruff-lint
         name: ruff (Python lint)
         entry: ruff check

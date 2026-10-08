@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T13:49:51.047136+00:00",
+  "status": "pass",
+  "scope": "Session-owned local and reusable-lab staging folders; protected demos received no changes",
+  "bytes_removed_before_small_evidence_archives": 11201158826,
+  "gib_removed": 10.43,
+  "local_cleanup": {
+    "reconstructible_directories_and_python_caches": 21,
+    "duplicate_package_archives": 1,
+    "legacy_temporary_folder": 1,
+    "obsolete_secrets": "Legacy credentials, tokens, session key and temporary private keys discarded after sanitized evidence retention"
+  },
+  "remote_cleanup": {
+    "test_workspaces_runtimes_staging_directories": 27,
+    "checksum_verified_duplicate_archives": 5,
+    "temporary_dashboard_bridge": "Stopped; owning staging folder removed; evidence retained off-host"
+  },
+  "preserved": [
+    "Primary and recovery installation/data archives",
+    "Frozen source snapshots and historical test evidence",
+    "Original selected package archives and pending workflow preparations",
+    "Installed reusable Splunk lab apps/data and runtime port reservation receipt",
+    "Persistent product credentials and reusable lab SSH key",
+    "Unrelated presentation build/output folders",
+    "Active test temporary files from other work"
+  ],
+  "aws_recheck": {
+    "unattached_ebs_volumes": 0,
+    "clusters": [
+      "isovalent-demo",
+      "genailens",
+      "streaming-eks-delay-demo"
+    ],
+    "remaining_validation_key_and_security_group": "Reusable lab only; preserved"
+  },
+  "retained_lab_health": {
+    "at": "2026-10-08T13:48:03.584731+00:00",
+    "current_kv": "ready",
+    "cohosted_kv": "ready",
+    "search": [
+      {
+        "count": "1"
+      }
+    ],
+    "enterprise_version": "10.6.0.5"
+  },
+  "external_remaining": "Galileo exact owned project/stream cleanup remains blocked by previously unavailable MinIO; no new tenant mutation attempted",
+  "qualification": "Historical evidence dates unchanged. Reconstructible caches can be downloaded/extracted again for future validation. Source and recovery archives intentionally retained.",
+  "sanitization": "No credentials, account IDs, raw data or exact AWS resource IDs"
+}

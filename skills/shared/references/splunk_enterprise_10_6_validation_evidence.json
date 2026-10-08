@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "enterprise_version": "10.6.0.5",
+  "assessment_date": "2026-10-07",
+  "sanitization": "Evidence records contain behavior, versions, counts, and source references; no passwords, tokens, raw REST responses, account IDs, or resource identifiers.",
+  "workflows": {
+    "splunk-knowledge-objects-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-core-objects-evidence.json"
+      ],
+      "notes": "Corrected skill apply/status passed for selected macro, disabled saved search and CSV lookup; content and ACL readback passed. Following restart, objects were retained, macro search returned two retained events and inputlookup returned one row. Optional object kinds remain outside this selected workflow qualification."
+    },
+    "splunk-dashboard-studio-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-core-objects-evidence.json",
+        "skills/shared/references/enterprise-10.6-dashboard-browser.png"
+      ],
+      "notes": "Corrected skill apply/status and ACL readback passed. View and data-source SPL persisted after restart; browser-rendered single-value visualization displayed two retained synthetic events with Last 30 days selected."
+    },
+    "splunk-enterprise-host-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-ubuntu-fresh-evidence.json",
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Corrected host setup installed Enterprise 10.6.0.5 on Ubuntu 24.04 x86_64. Selected ports were free and the package checksum was verified. Standalone search tier installation without boot start and authenticated host validation passed, including cohosted KV readiness."
+    },
+    "splunk-app-install": {
+      "status": "pass",
+      "last_verified": "2026-10-05",
+      "evidence": [
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Historical synthetic app installation 1.0.0 and update 1.1.0 passed authenticated version readback on isolated Enterprise 10.6.0.5. This qualifies native install/update workflow, not any vendor app integration."
+    },
+    "splunk-hec-service-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-ubuntu-fresh-evidence.json",
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Corrected HEC skill apply and status passed on Ubuntu 24.04 with Enterprise 10.6.0.5. Configuration was owned by splunk with mode 0640 and the token file with mode 0600. After restart, TLS HEC returned Success and search found the new canary. The initial ownership failure was reproduced and corrected in the repository."
+    },
+    "splunk-universal-forwarder-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-05",
+      "evidence": [
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Historical Universal Forwarder 10.6.0.5 management/forwarding validation and monitored-file canary passed indexed readback on isolated Enterprise 10.6.0.5."
+    },
+    "splunk-admin-doctor": {
+      "status": "pass",
+      "last_verified": "2026-10-05",
+      "evidence": [
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Historical authenticated doctor run completed 340 checks; operational collection and evaluation passed on isolated Enterprise 10.6.0.5. Individual findings are health outputs, not vendor-app compatibility."
+    },
+    "splunk-data-source-readiness-doctor": {
+      "status": "pass",
+      "last_verified": "2026-10-05",
+      "evidence": [
+        "SPLUNK_ENTERPRISE_10_6_LAB_VALIDATION.md"
+      ],
+      "notes": "Historical readiness doctor passed 8/8 checks for the synthetic HEC/UF source; this does not qualify unconfigured third-party sources."
+    },
+    "splunk-kvstore-admin-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-kv-evidence.json",
+        "skills/shared/references/enterprise-10.6-migration-evidence.json",
+        "skills/shared/references/enterprise-10.6-primary-recovery-evidence.json",
+        "skills/shared/references/enterprise-10.6-shc-kv-restore-evidence.json"
+      ],
+      "notes": "Parallel backup/restore passed on legacy 10.4.3 and cohosted 10.6.0.5 with collection/lookup definitions present and quiescent fixture readback. Cold 10.4.3 restore and upgrade without ITSI preserved the fixture and reported Migration_Succeeded with cohosted readiness; subsequent restart reported NotStarted while retaining data. The ITSI 5.0.2 deferred upgrade rehearsal passed on 10.6.0.5 with effective postgresMigrateOnStartup=false, KV ready/wiredTiger/NotStarted, retained original records and a second restart. These status observations are recorded separately rather than treated as equivalent migration states. Three-member legacy WiredTiger SHC parallel backup and controlled restore passed on Operator 3.2.0 / Enterprise 10.6.0.5, with exact definition and one-record hashes matching on every member after perturbation. The live check exposed and corrected unconditional point-in-time maintenance in the parallel restore route.",
+      "next_action": "Complete selected destructive reset/maintenance variants on disposable targets, then verify cleanup; preserve parallel consistency and development PKI qualifications."
+    },
+    "splunk-monitoring-console-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-monitoring-console-evidence.json"
+      ],
+      "notes": "Corrected standalone 10.6 render/apply/status passed. Unsupported mc_auto_config omitted; configuration validation passed. After restart health was green, KV ready, two indexed canaries retained; 111 shipped views were visible and representative shipped indexer/process/license searches returned data. This qualifies standalone MC; distributed MC remains a separate topology qualification."
+    },
+    "splunk-enterprise-kubernetes-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-sok-s1-evidence.json",
+        "skills/shared/references/enterprise-10.6-sok-c3-evidence.json",
+        "skills/shared/references/enterprise-10.6-sok-m4-evidence.json",
+        "skills/shared/references/enterprise-10.6-sok-appframework-evidence.json",
+        "skills/shared/references/enterprise-10.6-sok-c3-appframework-evidence.json"
+      ],
+      "notes": "SOK 3.2.0 S1,C3 and M4 on EKS 1.34.11 with Enterprise 10.6.0.5 passed qualified core live checks. M4 has four indexers across two sites and three SHC members; factors met, indexed/KV data survived sequential pod replacements. Static fixture lookup delivery/persistence passed with reviewed per-app always_overwrite configuration. C3 cleanup passed; M4 cleanup passed with all 23 recorded EBS volumes absent. S1 remote App Framework initial install, same-object update to 1.1.0 and persistence after pod replacement passed authenticated app/lookup readback and corrected skill status; all three owned EBS volumes, namespace, two object versions, temporary IAM user/key and local secrets were removed. C3 cluster-scope remote App Framework also passed install, manual update with polling disabled, exact lookup readback on all three members, persistence after one SH pod replacement, replication/search health, and final corrected skill status. Its temporary resources remain active for the SHC KV follow-up and must be removed before cleanup sign-off. POD remains independently gated. C3 AppFramework and SHC KV follow-up cleanup verified on October 8: namespace and both releases absent, all 21 EBS IDs absent, fixture IAM identity/key and all S3 object versions removed.",
+      "next_action": "Verify temporary EKS cluster teardown. SOK live functional gates are complete; qualify the coupled POD bundle separately when supported UCS hardware, entitlement and vendor-approved artifacts are available."
+    },
+    "splunk-itsi-setup": {
+      "status": "partial",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-itsi-access-blocker.md",
+        "skills/shared/references/enterprise-10.6-primary-recovery-evidence.json"
+      ],
+      "notes": "Isolated10.4.3 clone upgraded to ITSI 5.0.2 with all six migration prechecks passing, then Enterprise 10.6.0.5 with explicit KV migration deferral. Original106 typed records, native fixture validation, ingestion/search, Entity Overview readback and repeated restart passed. Premium Service Analyzer remains blocked by ITSI license entitlement; primary upgrade remains pending.",
+      "impact": "Premium service monitoring cannot qualify without an existing ITSI license. Available isolated upgrade/recovery checks passed; primary rollout and final checks remain pending.",
+      "owner": "Validation operator",
+      "next_action": "Resolve or explicitly hand off premium license gap, complete remaining primary preflight/storage checks, then perform rehearsed primary sequence.",
+      "last_verified": "2026-10-07"
+    },
+    "splunk-platform-pki-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-web-pki-evidence.json",
+        "skills/shared/references/enterprise-10.6-rest-hec-pki-evidence.json"
+      ],
+      "notes": "Private CA and leaf creation, strict chain verification, Web TLS on the reusable lab and REST/HEC TLS on the disposable Ubuntu 24.04 target passed. REST/HEC authentication verifies CA and hostname, TLS 1.2/1.3 work, certificate passphrases use encrypted $8$ configuration, KV and cohosted service are ready after restart, and the SmartStore canary remains searchable. Forwarding/S2S, mutual TLS and distributed certificate workflows remain pending."
+    },
+    "splunk-license-manager-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-license-evidence.json"
+      ],
+      "notes": "Corrected shared transport installed the verified Enterprise artifact after a controlled Free-group transition and removal on the disposable lab. Enterprise activation, peer registration, two 25 GiB pools, restart persistence, usage readback and HEC/search canary passed on manager and peer version 10.6.0.5. Version-skew and alternative license types remain outside this selected workflow."
+    },
+    "splunk-enterprise-security-install": {
+      "status": "blocked",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-package-access-evidence.json"
+      ],
+      "notes": "Authenticated package retrieval returned HTTP 403 for 263/8.5.1. This blocks the selected package path; compatibility metadata and other releases are separate results.",
+      "impact": "ES installation/configuration and dependent ES workflows cannot qualify from the 403 response.",
+      "owner": "ES entitlement/package owner",
+      "next_action": "Supply entitled exact package or approved local archive; validate premium license, SH placement, KV Store, essinstall and readback."
+    },
+    "splunk-pci-compliance-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-package-access-evidence.json"
+      ],
+      "notes": "Authenticated package retrieval returned HTTP 403 for 1143/8.6.1, 2897/8.6.1. This blocks the selected package path; compatibility metadata and other releases are separate results.",
+      "impact": "Standalone PCI installer path cannot qualify without the exact package. PCI Enterprise Security installer path cannot qualify without the exact package and ES dependency.",
+      "owner": "PCI package owner / PCI/ES package owners",
+      "next_action": "Supply entitled 8.6.1 archive; validate CDE indexes/macros, CIM/data models, reports and dashboards on 10.6. Supply exact archive plus ES entitlement; validate enterprise installer, ES/CIM dependencies and dashboard evidence."
+    },
+    "splunk-uba-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-package-access-evidence.json"
+      ],
+      "notes": "Authenticated package retrieval returned HTTP 403 for 4147/1.4.6. This blocks the selected package path; compatibility metadata and other releases are separate results.",
+      "impact": "The exact 1.4.6 package is access-blocked and its metadata lists no 10.6 support; UBA remains legacy/readiness-only.",
+      "owner": "UBA vendor/package owner",
+      "next_action": "Obtain a vendor-supported 10.6 release or explicit support statement; validate Kafka/ES ingestion only after compatibility and entitlement."
+    },
+    "splunk-asset-risk-intelligence-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-package-access-evidence.json"
+      ],
+      "notes": "Authenticated package retrieval returned HTTP 403 for 7180/1.2.2. This blocks the selected package path; compatibility metadata and other releases are separate results.",
+      "impact": "ARI package metadata lists 10.6, but restricted entitlement prevents package/workflow validation.",
+      "owner": "ARI entitlement/package owner",
+      "next_action": "Supply entitled archive; validate ARI plus required platform/TAs, KV Store, indexes, dashboards and ES handoff."
+    },
+    "splunk-platform-restart-orchestrator": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-restart-evidence.json"
+      ],
+      "notes": "Corrected skill selected the secondary standalone installation, verified the service owner and executed the accepted SSH CLI restart. All three expected listeners returned, KV Pdl was ready, and one collection row, one lookup row and three indexed events were retained. Primary daemon PID was unchanged. Distributed restart and reload variants remain separately qualified."
+    },
+    "splunk-index-lifecycle-smartstore-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-smartstore-evidence.json"
+      ],
+      "notes": "Corrected standalone S3 SmartStore skill activated with IMDSv2 role authentication and verified S3 CA bundle. Exact btool settings matched; one ingested event uploaded in a warm bucket, cache eviction changed it to remote, and search fetched journal/tsidx and returned exactly one event. Clustered/provider/lifecycle variants remain separately qualified."
+    },
+    "splunk-connect-for-syslog-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-sc4x-evidence.json"
+      ],
+      "notes": "Selected digest-pinned Docker Compose workflow passed repository validators and configured live ingestion with authenticated CA/hostname-verified HEC. Exact collector image contains no shipped Splunk views. Owned collectors, volumes, fixtures, HEC inputs and generated secret/runtime directories removed; synthetic indexed data remains only on the disposable target pending final target cleanup. Optional self-monitoring and other deployment modes are outside this qualification."
+    },
+    "splunk-connect-for-snmp-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-sc4x-evidence.json"
+      ],
+      "notes": "Selected digest-pinned Docker Compose workflow passed repository validators and configured live ingestion with authenticated CA/hostname-verified HEC. Exact collector image contains no shipped Splunk views. Owned collectors, volumes, fixtures, HEC inputs and generated secret/runtime directories removed; synthetic indexed data remains only on the disposable target pending final target cleanup. Optional self-monitoring and other deployment modes are outside this qualification."
+    },
+    "splunk-itsi-config": {
+      "status": "partial",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-primary-recovery-evidence.json"
+      ],
+      "notes": "Live native fixture entity type, entity and disabled service/KPI created on isolated ITSI 5.0.2; validation passed again after Enterprise 10.6.0.5 upgrade and restart. Entity Overview displays entity dimensions. Premium scheduled KPI/service health, Event Analytics and remaining default configuration gates are not qualified.",
+      "owner": "Validation operator / lab owner",
+      "next_action": "Use available ITSI license or licensed target to validate premium service/KPI workflow and remaining configuration gates."
+    },
+    "splunk-lookup-file-editing-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-core-apps-evidence.json"
+      ],
+      "notes": "Selected standalone workflow passed: version 4.0.8, CSV/KV inventory, two-row CSV readback, populated shipped health dashboard, both handlers Online after restart and 13/0/0 completion checks. Intermediate backup Offline was retained as a qualification; subsequent REST and restart checks were healthy. SHC backup replication is separate."
+    },
+    "splunk-security-essentials-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-core-apps-evidence.json",
+        "skills/shared/references/enterprise-10.6-ai-ml-evidence.json"
+      ],
+      "notes": "Version 3.8.3 introspection and populated inventory dashboard read actual Cisco ASA fixture data with demo mode off. One operational search classification persisted through restart. Optional PSC/MLTK DensityFunction baseline trained for 14 product rows and populated the Data Availability view; short lab history produces fewer-than-thirty-sample warnings. External signed content feed reported signature verification failure; bundled content remains accessible.",
+      "next_action": "Finish default content mapping and record external signed feed compatibility evidence. Optional baseline and classification fixtures were removed after successful restart/view readback."
+    },
+    "splunk-ai-ml-toolkit-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-ai-ml-evidence.json"
+      ],
+      "notes": "Default owning-wrapper install/update selected AI Toolkit 6.0.2 and PSC 4.3.4, completed both restarts and returned 3 PASS, 0 WARN, 0 FAIL. The exact pair also passed fit/apply, populated model dashboard and restart persistence on Ubuntu 24.04 x86_64. Post-install readback confirmed versions, healthy KV Store and completed model/temporary-role cleanup. Vendor session metadata finding remains separately documented; later 6.1.0 is research only. External model and Agent Launchpad workflows are not qualified by this result.",
+      "next_action": "Track vendor model-session metadata handling; qualify optional external runtimes only when their access is available."
+    },
+    "splunk-indexer-cluster-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-native-cluster-evidence.json"
+      ],
+      "notes": "Native Ubuntu24.04 cluster bootstrap/bundle delivery, configured20record ingest/distributed search, actual searchable rolling restart of all3peers and retained20records passed with RF3/SF2 and all6 health gates recovered. Initial native REST uses explicitly qualified self-signed TLS; PKI not qualified.",
+      "next_action": "Complete remaining selected distributed integrations and cleanup; preserve scoped native restart and health evidence."
+    },
+    "cisco-appdynamics-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-07",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-appdynamics-evidence.json"
+      ],
+      "notes": "TA 3.2.1 installed and owning recommended configuration/completion passed (12 pass, optional analytics warning). Status, security, audit and license ingest, shipped dashboard UI and restart retention passed. All five temporary inputs/account/stored credential removed. Controller events unavailable in direct 24h/7d checks; tier/node and ABL panels empty in this tenant. Exact version, Linux OS and source qualifications retained."
+    },
+    "splunk-db-connect-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-db-connect-evidence.json"
+      ],
+      "notes": "Owning DBX4.3/JDBC1.2.2 install, explicit Java17/local HEC and SELECT-only PostgreSQL identity/connection, initial3+incremental1 ingestion, duplicate-free later runs and restart retention passed on CA-verified Enterprise10.6.0.5 Ubuntu24.04. Input Health and six Input Performance panels populated. Two vendor stock diagnostic panels use obsolete metric names; final Connection Health UI and fixture cleanup pending. Connection Health browser verification showed37 successful operations and0 errors. Owned DBX entities, HEC token/settings, PostgreSQL container/volume and local/remote fixture credentials were cleaned; four index rows retained for the next federated validation.",
+      "next_action": "Complete available UI checks and cleanup, record vendor metric-name defect as an explicit external blocker or qualify reviewed dashboard override."
+    },
+    "splunk-search-head-cluster-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-native-cluster-evidence.json"
+      ],
+      "notes": "Native three-member SHC/cohosted readiness recovered after bundle replaced removable app-based member role configuration. Role settings persisted in system/local preserving bootstrap id. All three KV stores and members ready before successful reviewed bundle retry. Collection replication, durable status after delivery, rolling restart and cleanup remain open. All3 main processes were replaced by searchable rolling restart; app/collection definitions and5KVrecords retained on everymember; distributed20eventcanary retained. Cohosted KV readiness converged after877seconds; this does not qualify zero-downtime availability.",
+      "next_action": "Verify delivered app/collection/dashboard and member role persistence; create/read shared collection fixture, rolling restart and cleanup."
+    },
+    "splunk-cim-data-model-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cim-evidence.json"
+      ],
+      "notes": "Selected CIM 8.5.0 Authentication workflow passed on Ubuntu 24.04 Enterprise 10.6.0.5 with CA-verified REST: owning install and governance apply, normalized search and accelerated summaries, setup/audit browser views, controlled restart retaining three distinct events and model settings, and verified cleanup. Deprecated/configuration-only shipped views qualified separately. Initial multiline fixture observed one event; separate retention fixture observed three."
+    },
+    "splunk-ingest-actions-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-ingest-actions-evidence.json"
+      ],
+      "notes": "Selected Enterprise mask/eval/drop workflow passed on isolated Ubuntu 24.04 Enterprise 10.6.0.5 through owning conf-REST apply, real indexed fixture transformations, controlled restart retaining data/rules, and verified app/index/config cleanup. S3 routing remains a separate handoff; compatibility stays conditional."
+    },
+    "splunk-ddaa-archive-setup": {
+      "status": "not-applicable",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cloud-applicability-evidence.json"
+      ],
+      "notes": "DDAA archives Splunk Cloud indexes in a Splunk-managed archive. Scope correction; no Enterprise live result claimed."
+    },
+    "splunk-cloud-acs-admin-setup": {
+      "status": "not-applicable",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cloud-applicability-evidence.json"
+      ],
+      "notes": "ACS administers the Splunk Cloud control plane. Scope correction; no Enterprise live result claimed."
+    },
+    "splunk-cloud-acs-allowlist-setup": {
+      "status": "not-applicable",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cloud-applicability-evidence.json"
+      ],
+      "notes": "This alias delegates to the Splunk Cloud ACS allowlist workflow. Scope correction; no Enterprise live result claimed."
+    },
+    "splunk-cloud-data-manager-setup": {
+      "status": "not-applicable",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cloud-applicability-evidence.json"
+      ],
+      "notes": "Data Manager is a built-in Splunk Cloud app; generated customer-cloud resources support that Cloud control plane. Scope correction; no Enterprise live result claimed."
+    },
+    "splunk-ingest-processor-setup": {
+      "status": "not-applicable",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-cloud-applicability-evidence.json"
+      ],
+      "notes": "Ingest Processor operates within Splunk Cloud Platform on Victoria Experience. Enterprise Ingest Actions is a separate workflow. Scope correction; no Enterprise live result claimed."
+    },
+    "cisco-secure-access-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-conditional-package-review-evidence.json"
+      ],
+      "blocker_type": "external_vendor_qualification",
+      "owner": "Cisco Secure Access add-on maintainer",
+      "impact": "Paired 5558 app cannot qualify the selected companion add-on.",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 1.0.53, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "notes": "Exact selected package 7569 release 1.0.53 lacks explicit Enterprise10.6 vendor qualification in reviewed evidence. Current release 1.0.55 also omits10.6. No replacement pin or functional live pass is claimed."
+    },
+    "splunk-github-ta-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-conditional-package-review-evidence.json"
+      ],
+      "blocker_type": "external_vendor_qualification",
+      "owner": "Splunk GitHub add-on maintainer",
+      "impact": "Available source access does not supply exact release compatibility evidence.",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 4.0.0, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "notes": "Exact selected package 6254 release 4.0.0 lacks explicit Enterprise10.6 vendor qualification in reviewed evidence. Current release 4.0.1 also omits10.6. No replacement pin or functional live pass is claimed."
+    },
+    "splunk-cyberark-ta-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-conditional-package-review-evidence.json"
+      ],
+      "blocker_type": "external_vendor_qualification",
+      "owner": "Splunk CyberArk EPM add-on maintainer",
+      "impact": "Supported secondary package 2891 cannot qualify the selected EPM API add-on.",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 5.0.0, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "notes": "Exact selected package 5160 release 5.0.0 lacks explicit Enterprise10.6 vendor qualification in reviewed evidence. Current release 5.0.1 also omits10.6. No replacement pin or functional live pass is claimed."
+    },
+    "splunk-connect-for-otlp-setup": {
+      "status": "blocked",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-conditional-package-review-evidence.json"
+      ],
+      "blocker_type": "external_vendor_qualification",
+      "owner": "Splunk Connect for OTLP maintainer",
+      "impact": "Self-managed deployment is applicable; managed Cloud installation is a separate unsupported path.",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 0.4.1, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "notes": "Exact selected package 8704 release 0.4.1 lacks explicit Enterprise10.6 vendor qualification in reviewed evidence. Current release 0.161.0 also omits10.6. No replacement pin or functional live pass is claimed."
+    },
+    "galileo-platform-setup": {
+      "status": "partial",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-galileo-export-evidence.json",
+        "skills/shared/references/enterprise-10.6-galileo-one-off-evidence.json"
+      ],
+      "notes": "Selected one-off Galileo Observe export sent one trace to CA/hostname-verified Enterprise HEC; exact correlation and one-event retention after restart passed. Owned Splunk input/index/token/data deleted. Tenant MinIO refuses connections and child/parent deletion return HTTP500; exact owned Galileo project/stream remain HTTP200. External infrastructure owner and exact-ID cleanup next action recorded; onboarding date remains unknown under existing run-scoped authorization."
+    },
+    "splunk-federated-search-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-federated-search-evidence.json"
+      ],
+      "notes": "Selected standard REST provider/index lifecycle, TLS negative controls, corrected restart listener and four unique retained records passed. Exact Splunk objects/reader identity/password and PKI staging copies removed; exact two temporary AWS rules revoked and verified absent. Disposable consumer and disk deleted on October 8. Standalone-only loopback hostname workaround remains qualified; global toggle unsupported and refused before mutation."
+    },
+    "splunk-observability-otel-collector-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-otel-collector-evidence.json"
+      ],
+      "notes": "Selected external Linux0.158.0 workflow passed official pinned installer, owning live validator, exact-host recent CPU/memory SignalFlow readback, correlated one-span APM exact segment, restart metrics recovery, owning uninstall and secret-copy cleanup. EnterpriseTA compatibility and Platform pairing are separate unqualified variants; persistent user token preserved."
+    },
+    "cisco-asa-ta-setup": {
+      "status": "pass",
+      "last_verified": "2026-10-08",
+      "evidence": [
+        "skills/shared/references/enterprise-10.6-asa-evidence.json",
+        "skills/shared/references/enterprise-10.6-asa-dashboard.png"
+      ],
+      "notes": "ASA6.1.2 install and controlled SC4S3.47.0 TCP/UDP ingest, canonical parsed fields, enabled shipped dashboard with populated main panels and successful optional CIM pivots, four-record restart persistence and owned asset/token cleanup passed. Existing internal diagnostics follow normal retention; real hardware variant unqualified. Reusable lab current/cohosted KV ready after reserving custom listener ports."
+    }
+  }
+}

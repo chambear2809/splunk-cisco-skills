@@ -24,7 +24,7 @@ from typing import Iterable
 from urllib.parse import parse_qsl, unquote_plus, urlsplit
 
 
-DEFAULT_OPERATOR_VERSION = "3.1.0"
+DEFAULT_OPERATOR_VERSION = "3.2.0"
 DEFAULT_POD_VERSION = "10.4.0_1.6.0"
 VERIFIED_POD_BUNDLES = {DEFAULT_POD_VERSION}
 
@@ -34,7 +34,7 @@ if str(_SHARED_LIB) not in sys.path:
 from platform_versions import platform_default  # noqa: E402
 from compatibility import check_sok_compatibility  # noqa: E402
 
-DEFAULT_SPLUNK_VERSION = platform_default("enterprise_version")
+DEFAULT_SPLUNK_VERSION = platform_default("enterprise_kubernetes_version")
 SGT_ACCEPTANCE = "--accept-sgt-current-at-splunk-com"
 VERIFIED_SOK_ARTIFACT_SHA256 = {
     "3.1.0": {
@@ -42,9 +42,19 @@ VERIFIED_SOK_ARTIFACT_SHA256 = {
         "enterprise_chart": "0d46b934f78a270b2c9bbacb9f442855f125069800d0a1373eb5f21c54e7fc71",
         "crds": "d974a6f2c768ad60d8eb56b2dc571354b4dfe48873cbff4e478ca6aa3e2fb3fe",
     }
+    ,"3.2.0": {
+        "operator_chart": "a20fcea5dabd9b832ba2ffcddce30cbfd90f3f5bccfa276feb7a13dafe9bb7d8",
+        "enterprise_chart": "31bdca248f2ad991e667906818be75f2b70a9e8c4df7fa2b5b44f5062e34339d",
+        "crds": "5f0923739a34b7698322eecacfa8ccfd2136f5d51f9e6d31403ff22dc480c8ec",
+    }
 }
 VERIFIED_SOK_PROBE_SHA256 = {
     "3.1.0": {
+        "livenessProbe.sh": "3668ef135e7c7eb4b60b30f95081bee3d33ec1f62f6a109b7ade782f5d3c240d",
+        "readinessProbe.sh": "97f88e6e6d0bf1d21f53666a35886a54eaf68c14c8f39844a13a2b8ceb71f4fe",
+        "startupProbe.sh": "b8497b1365e88d2321e2802154ecbbadf4305536e2179fac8b11f25067f0c216",
+    }
+    ,"3.2.0": {
         "livenessProbe.sh": "3668ef135e7c7eb4b60b30f95081bee3d33ec1f62f6a109b7ade782f5d3c240d",
         "readinessProbe.sh": "97f88e6e6d0bf1d21f53666a35886a54eaf68c14c8f39844a13a2b8ceb71f4fe",
         "startupProbe.sh": "b8497b1365e88d2321e2802154ecbbadf4305536e2179fac8b11f25067f0c216",
@@ -65,6 +75,20 @@ HELM_LIST_ALL_FUNCTION = r'''helm_list_all() {
 }
 '''
 SOK_ARCHITECTURES = {"s1", "c3", "m4"}
+
+
+def startup_probe_failure_threshold(args: argparse.Namespace) -> int:
+    """Return the reviewed SOK startup budget for the selected architecture."""
+    value = args.startup_probe_failure_threshold
+    if value is None:
+        return 12 if args.architecture == "s1" else 60
+    if not 12 <= value <= 120:
+        raise SystemExit(
+            "ERROR: --startup-probe-failure-threshold must be between 12 and 120"
+        )
+    return value
+
+
 POD_PROFILES = {
     "pod-small",
     "pod-medium",
@@ -139,6 +163,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target", choices=("sok", "pod"), required=True)
     parser.add_argument(
         "--architecture", choices=sorted(SOK_ARCHITECTURES), default="s1"
+    )
+    parser.add_argument(
+        "--startup-probe-failure-threshold",
+        type=int,
+        default=None,
+        help=(
+            "SOK startup probe failure threshold (12..120); defaults to 12 "
+            "for S1 and 60 for C3/M4"
+        ),
     )
     parser.add_argument("--pod-profile", choices=sorted(POD_PROFILES), default="")
     parser.add_argument("--output-dir", required=True)
@@ -384,7 +417,7 @@ def image_numeric_tag(image: str) -> str:
     if ":" not in name:
         return ""
     tag = name.rsplit(":", 1)[-1]
-    return tag if re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][A-Za-z0-9_.-]+)?", tag) else ""
+    return tag if re.fullmatch(r"\d+\.\d+\.\d+(?:\.\d+)?(?:[-+][A-Za-z0-9_.-]+)?", tag) else ""
 
 
 def version_major(version: str) -> int:
@@ -424,11 +457,13 @@ def validate_release_version(
     option: str,
     allow_v: bool = False,
     allow_suffix: bool = False,
+    allow_four_segments: bool = False,
 ) -> None:
-    core = r"v?\d+\.\d+(?:\.\d+)?" if allow_v else r"\d+\.\d+\.\d+"
+    core = r"v?\d+\.\d+(?:\.\d+)?" if allow_v else r"\d+\.\d+\.\d+(?:\.\d+)?" if allow_four_segments else r"\d+\.\d+\.\d+"
     suffix = r"(?:[-+][0-9A-Za-z][0-9A-Za-z._-]*)?" if allow_suffix else ""
     if not re.fullmatch(rf"{core}{suffix}", value or ""):
-        die(f"{option} must be a canonical three-part release version.")
+        expected = "a canonical three- or four-part release version" if allow_four_segments else "a canonical three-part release version"
+        die(f"{option} must be {expected}.")
 
 
 def validate_k8s_subdomain(value: str, option: str) -> None:
@@ -1814,6 +1849,7 @@ def validate_common(args: argparse.Namespace) -> None:
             args.splunk_version,
             "--splunk-version",
             allow_suffix=args.allow_unverified_versions,
+            allow_four_segments=True,
         )
         if args.kubernetes_version:
             validate_release_version(
@@ -2106,7 +2142,7 @@ def validate_common(args: argparse.Namespace) -> None:
             if not digest_pattern.search(splunk_image(args)):
                 die("Production SOK requires a digest-pinned --splunk-image.")
         target_version_match = re.match(
-            r"^(\d+)\.(\d+)\.(\d+)", effective_splunk_version(args)
+            r"^(\d+)\.(\d+)\.(\d+)(?:\.\d+)?", effective_splunk_version(args)
         )
         target_version = (
             tuple(int(item) for item in target_version_match.groups())
@@ -2248,7 +2284,7 @@ def validate_common(args: argparse.Namespace) -> None:
                 validate_k8s_subdomain(args.queue_secret_ref, "--queue-secret-ref")
             if args.ingestor_service_account or args.splunk_service_account:
                 die(
-                    "Verified SOK 3.1 indexing/ingestion separation requires Queue "
+                    "Verified SOK 3.2 indexing/ingestion separation requires Queue "
                     "Secret auth with empty workload serviceAccount; the upstream "
                     "3.1 EKS workload-identity path is not verified."
                 )
@@ -2741,6 +2777,19 @@ def resources_block(
     )
 
 
+def startup_probe_block(args: argparse.Namespace, indent: str = "  ") -> str:
+    threshold = startup_probe_failure_threshold(args)
+    return "\n".join(
+        [
+            f"{indent}startupProbe:",
+            f"{indent}  initialDelaySeconds: 40",
+            f"{indent}  timeoutSeconds: 30",
+            f"{indent}  periodSeconds: 30",
+            f"{indent}  failureThreshold: {threshold}",
+        ]
+    )
+
+
 def zone_affinity_block(field: str, zone: str, indent: str = "  ") -> str:
     if not zone:
         return ""
@@ -2794,6 +2843,7 @@ def license_manager_block(args: argparse.Namespace) -> str:
             ),
             storage_block(args),
             resources_block(args, "license_manager"),
+            startup_probe_block(args),
             "",
         ]
     )
@@ -2993,6 +3043,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                 smartstore_text,
                 storage_text,
                 resources_block(args, "standalone"),
+                startup_probe_block(args),
                 "",
             ]
         )
@@ -3007,6 +3058,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                 smartstore_text,
                 storage_text,
                 resources_block(args, "cluster_manager"),
+                startup_probe_block(args),
                 "",
                 "indexerCluster:",
                 "  enabled: true",
@@ -3020,6 +3072,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                 ),
                 storage_text,
                 resources_block(args, "indexer"),
+                startup_probe_block(args),
                 "",
                 "searchHeadCluster:",
                 "  enabled: true",
@@ -3034,6 +3087,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                     args, "search", field="deployerResourceSpec"
                 ),
                 resources_block(args, "search"),
+                startup_probe_block(args),
                 "",
             ]
         )
@@ -3049,6 +3103,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                     ),
                     storage_text,
                     resources_block(args, "monitoring_console"),
+                    startup_probe_block(args),
                     "",
                 ]
             )
@@ -3063,43 +3118,29 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
             args.object_storage_endpoint,
             "--object-storage-endpoint",
         )
+        lines.extend(
+            [
+                "queue:",
+                "  enabled: true",
+                '  name: "ingest-queue"',
+                f"  provider: {yaml_quote(args.queue_provider)}",
+                "  sqs:",
+                f"    name: {yaml_quote(args.queue_name)}",
+                f"    authRegion: {yaml_quote(args.queue_region)}",
+                f"    endpoint: {yaml_quote(queue_endpoint)}",
+                f"    dlq: {yaml_quote(args.queue_dlq)}",
+            ]
+        )
         if args.queue_secret_ref:
-            # splunk-enterprise chart 3.1.0 serializes queue.sqs.volumes
-            # incorrectly (it emits the complete SQS mapping beneath volumes).
-            # Render the documented Queue CR through extraManifests until the
-            # chart fixes that path; semantic Helm validation guards this CR.
             lines.extend(
                 [
-                    "extraManifests:",
-                    "  - apiVersion: enterprise.splunk.com/v4",
-                    "    kind: Queue",
-                    "    metadata:",
-                    "      name: ingest-queue",
-                    f"      namespace: {yaml_quote(args.namespace)}",
-                    "    spec:",
-                    f"      provider: {yaml_quote(args.queue_provider)}",
-                    "      sqs:",
-                    f"        name: {yaml_quote(args.queue_name)}",
-                    f"        authRegion: {yaml_quote(args.queue_region)}",
-                    f"        endpoint: {yaml_quote(queue_endpoint)}",
-                    f"        dlq: {yaml_quote(args.queue_dlq)}",
-                    "        volumes:",
-                    "          - name: queue-credentials",
-                    f"            secretRef: {yaml_quote(args.queue_secret_ref)}",
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    "queue:",
-                    "  enabled: true",
-                    '  name: "ingest-queue"',
-                    f"  provider: {yaml_quote(args.queue_provider)}",
-                    "  sqs:",
-                    f"    name: {yaml_quote(args.queue_name)}",
-                    f"    authRegion: {yaml_quote(args.queue_region)}",
-                    f"    endpoint: {yaml_quote(queue_endpoint)}",
-                    f"    dlq: {yaml_quote(args.queue_dlq)}",
+                    "    secretKeyRef:",
+                    "      awsAccessKey:",
+                    f"        name: {yaml_quote(args.queue_secret_ref)}",
+                    '        key: "s3_access_key"',
+                    "      awsSecretKey:",
+                    f"        name: {yaml_quote(args.queue_secret_ref)}",
+                    '        key: "s3_secret_key"',
                 ]
             )
         lines.extend(
@@ -3123,6 +3164,7 @@ def render_enterprise_values(args: argparse.Namespace) -> str:
                 '    name: "ingest-object-storage"',
                 storage_text,
                 resources_block(args, "ingestor"),
+                startup_probe_block(args),
                 "",
             ]
         )
@@ -3220,6 +3262,13 @@ def render_sok_preflight(args: argparse.Namespace) -> str:
             "kubectl apply --dry-run=client --server-side=false -f ./splunk-operator-crds.yaml >/dev/null",
         ]
     else:
+        helm_repo_update = (
+            "python3 -c "
+            + shell_quote(
+                "import subprocess; subprocess.run(['helm', 'repo', 'update', 'splunk'], "
+                "check=True, timeout=120)"
+            )
+        )
         staged_crd_probe_code = """import hashlib
 import sys
 from pathlib import Path
@@ -3252,7 +3301,7 @@ if hashlib.sha256(payload).hexdigest() != expected.lower():
         )
         artifact_checks = [
             "helm repo add splunk https://splunk.github.io/splunk-operator/ --force-update >/dev/null",
-            "helm repo update splunk --timeout 2m >/dev/null",
+            f"{helm_repo_update} >/dev/null",
             f"helm show chart splunk/splunk-operator --version {shell_quote(chart_version(args))} >/dev/null",
             f"helm show chart splunk/splunk-enterprise --version {shell_quote(chart_version(args))} >/dev/null",
             staged_or_remote_crd_probe,
@@ -4252,13 +4301,105 @@ import sys
 
 payload = json.loads(sys.stdin.read() or '{"items": []}')
 items = payload.get("items", [])
-target_release, target_architecture, target_version, target_image, target_i_and_i, target_sites, expected_json, storage_json, smartstore_json, m4_json, refs_json, runtime_json, external_lm, target_namespace = sys.argv[1:]
+target_release, target_architecture, target_version, target_image, target_i_and_i, target_sites, expected_json, storage_json, smartstore_json, m4_json, refs_json, runtime_json, external_lm, target_namespace, operator_version = sys.argv[1:]
 expected_names = json.loads(expected_json)
 expected_storage = json.loads(storage_json)
 expected_smartstore = json.loads(smartstore_json)
 expected_m4 = json.loads(m4_json)
 expected_refs = json.loads(refs_json)
 expected_runtime = json.loads(runtime_json)
+
+def normalized_app_context_repo(spec_repo, actual_repo):
+    # Accept only Operator 3.2.0's exact empty premium-app expansion.
+    expected_repo = json.loads(json.dumps(spec_repo))
+    expected_poll = expected_repo.get("appsRepoPollIntervalSeconds")
+    actual_has_poll = isinstance(actual_repo, dict) and "appsRepoPollIntervalSeconds" in actual_repo
+    actual_poll = actual_repo.get("appsRepoPollIntervalSeconds") if isinstance(actual_repo, dict) else None
+    if (
+        actual_has_poll
+        and "appsRepoPollIntervalSeconds" in expected_repo
+        and type(expected_poll) is not type(actual_poll)
+    ):
+        raise SystemExit("ERROR: live App Framework poll interval type differs")
+    if operator_version != "3.2.0" or not isinstance(actual_repo, dict):
+        return expected_repo
+    if (
+        type(expected_poll) is int
+        and expected_poll == 0
+        and "appsRepoPollIntervalSeconds" not in actual_repo
+    ):
+        # The 3.2.0 status type uses omitempty for an explicitly disabled poll.
+        expected_repo.pop("appsRepoPollIntervalSeconds")
+    elif (
+        actual_has_poll
+        and "appsRepoPollIntervalSeconds" in expected_repo
+        and type(expected_poll) is not type(actual_poll)
+    ):
+        raise SystemExit("ERROR: live App Framework poll interval type differs")
+    empty_premium = {"esDefaults": {}}
+    expected_defaults = expected_repo.get("defaults")
+    actual_defaults = actual_repo.get("defaults")
+    if (
+        isinstance(expected_defaults, dict)
+        and isinstance(actual_defaults, dict)
+        and "premiumAppsProps" not in expected_defaults
+        and actual_defaults.get("premiumAppsProps") == empty_premium
+    ):
+        expected_repo["defaults"]["premiumAppsProps"] = json.loads(
+            json.dumps(empty_premium)
+        )
+    expected_sources = expected_repo.get("appSources")
+    actual_sources = actual_repo.get("appSources")
+    if isinstance(expected_sources, list) and isinstance(actual_sources, list):
+        actual_by_name = {
+            source.get("name"): source
+            for source in actual_sources
+            if isinstance(source, dict)
+        }
+        for source in expected_sources:
+            if not isinstance(source, dict) or "premiumAppsProps" in source:
+                continue
+            actual_source = actual_by_name.get(source.get("name"))
+            if (
+                isinstance(actual_source, dict)
+                and actual_source.get("premiumAppsProps") == empty_premium
+            ):
+                source["premiumAppsProps"] = json.loads(json.dumps(empty_premium))
+    return expected_repo
+
+def cluster_scoped_terminal_status(item, source_name, deployment, phase_infos):
+    # Operator 3.2.0's cluster bundle path marks install/303 and bundle stage
+    # complete but leaves DeployStatus at InProgress (1); see upstream
+    # afwscheduler.go:setInstallStateForClusterScopedApps.
+    if operator_version != "3.2.0":
+        return False
+    if item.get("kind") not in {"ClusterManager", "SearchHeadCluster"}:
+        return False
+    if type(deployment.get("repoState")) is not int or deployment.get("repoState") != 1:
+        return False
+    if type(deployment.get("deployStatus")) is not int or deployment.get("deployStatus") != 1:
+        return False
+    spec_repo = item.get("spec", {}).get("appRepo", {})
+    defaults = spec_repo.get("defaults", {}) if isinstance(spec_repo, dict) else {}
+    sources = spec_repo.get("appSources", []) if isinstance(spec_repo, dict) else []
+    source = next((value for value in sources if isinstance(value, dict) and value.get("name") == source_name), {})
+    scope = source.get("scope") or defaults.get("scope")
+    if scope != "cluster":
+        return False
+    context = item.get("status", {}).get("appContext", {})
+    if context.get("isDeploymentInProgress") is not False:
+        return False
+    if (
+        type(context.get("bundlePushStatus", {}).get("bundlePushStage")) is not int
+        or context.get("bundlePushStatus", {}).get("bundlePushStage") != 3
+    ):
+        return False
+    return bool(phase_infos) and all(
+        type(info.get("status")) is int
+        and info.get("phase") == "install"
+        and info.get("status") == 303
+        for info in phase_infos
+    )
 
 def require_healthy(item):
     kind = item.get("kind", "unknown")
@@ -4289,12 +4430,29 @@ def require_healthy(item):
         if (
             context.get("version") != 1
             or context.get("isDeploymentInProgress") is not False
-            or context.get("appRepo") != app_repo
+            or json.dumps(
+                context.get("appRepo"), sort_keys=True, separators=(",", ":")
+            )
+            != json.dumps(
+                normalized_app_context_repo(app_repo, context.get("appRepo")),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
         ):
             raise SystemExit(f"ERROR: live {kind}/{name} App Framework is not converged")
-        for source in context.get("appSrcDeployStatus", {}).values():
+        for source_name, source in context.get("appSrcDeployStatus", {}).items():
             for deployment in source.get("appDeploymentInfo", []):
-                if deployment.get("repoState") not in {1, 2} or deployment.get("deployStatus") != 3:
+                phase_infos = [deployment.get("phaseInfo", {})]
+                phase_infos.extend(deployment.get("auxPhaseInfo", []))
+                if (
+                    not (
+                        type(deployment.get("repoState")) is int
+                        and deployment.get("repoState") in {1, 2}
+                        and type(deployment.get("deployStatus")) is int
+                        and deployment.get("deployStatus") == 3
+                    )
+                    and not cluster_scoped_terminal_status(item, source_name, deployment, phase_infos)
+                ):
                     raise SystemExit(f"ERROR: live {kind}/{name} has an unreconciled app")
 
 if external_lm:
@@ -4489,8 +4647,8 @@ if expected_m4:
 
 def numeric(value):
     reference = (value or "").split("@", 1)[0]
-    match = re.search(r":(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+]|$)", reference)
-    return tuple(map(int, match.groups())) if match else None
+    match = re.search(r":(\\d+)\\.(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:[-+]|$)", reference)
+    return tuple(int(part or 0) for part in match.groups()) if match else None
 
 target = numeric("image:" + target_version)
 if target is None:
@@ -4788,7 +4946,8 @@ print(json.dumps({"items": items}))
             f"{shell_quote(json.dumps(expected_upgrade_refs, sort_keys=True))} "
             f"{shell_quote(json.dumps(expected_upgrade_runtime, sort_keys=True))} "
             f"{shell_quote(args.existing_license_manager if args.existing_license_manager_namespace in {'', args.namespace} else '')} "
-            f"{shell_quote(args.namespace)}"
+            f"{shell_quote(args.namespace)} "
+            f"{shell_quote(args.operator_version)}"
         )
         operator_owner_guard = """import json
 import re
@@ -5446,6 +5605,7 @@ the setup command included `--accept-splunk-general-terms`.
 
 def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
     assets: list[str] = []
+    startup_probe_failure_threshold(args)
     # Copy each overlay once through a no-follow descriptor, then validate and
     # consume that exact private snapshot. This closes the source-path swap
     # window between validation and bundle publication.
@@ -5488,6 +5648,13 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
         write_file(render_dir / rel, content, executable=executable)
         assets.append(rel)
 
+    helm_repo_update = (
+        "python3 -c "
+        + shell_quote(
+            "import subprocess; subprocess.run(['helm', 'repo', 'update', 'splunk'], "
+            "check=True, timeout=120)"
+        )
+    )
     local_artifacts = bool(args.operator_chart_archive)
     if local_artifacts:
         actual_artifact_hashes = {
@@ -5533,7 +5700,7 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
             )
         helm_repo_setup = (
             "helm repo add splunk https://splunk.github.io/splunk-operator/ --force-update\n"
-            "helm repo update splunk --timeout 2m"
+            + helm_repo_update
         )
 
     emit("README.md", render_sok_readme(args))
@@ -5543,6 +5710,7 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
             {
                 "target": "sok",
                 "architecture": args.architecture,
+                "startup_probe_failure_threshold": startup_probe_failure_threshold(args),
                 "standalone_replicas": int(args.standalone_replicas),
                 "site_count": int(args.site_count),
                 "indexer_replicas": int(args.indexer_replicas),
@@ -5684,15 +5852,21 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
                     if args.indexing_ingestion_separation
                     else None
                 ),
-                "queue_secret_workaround": bool(
-                    args.indexing_ingestion_separation and args.queue_secret_ref
+                "queue_secret_workaround": False,
+                "queue_secret_key_ref": (
+                    {
+                        "awsAccessKey": {"name": args.queue_secret_ref, "key": "s3_access_key"},
+                        "awsSecretKey": {"name": args.queue_secret_ref, "key": "s3_secret_key"},
+                    }
+                    if args.indexing_ingestion_separation and args.queue_secret_ref
+                    else None
                 ),
                 "queue_secret_ref": args.queue_secret_ref or None,
                 "allow_upgrade": args.allow_upgrade,
                 "splunk_10_4_upgrade_readiness_confirmed": (
                     args.confirm_splunk_10_4_upgrade_readiness
                 ),
-                "support_matrix_source": "https://github.com/splunk/splunk-operator/releases/tag/3.1.0",
+                "support_matrix_source": "https://github.com/splunk/splunk-operator/releases/tag/3.2.0",
             },
             indent=2,
             sort_keys=True,
@@ -6158,6 +6332,17 @@ probe_hashes = json.loads(sys.argv[3])
 expected_namespace = sys.argv[4]
 expected_general_terms = sys.argv[5]
 license_contract = json.loads(sys.argv[6])
+operator_version = sys.argv[7] if len(sys.argv) > 7 else "3.1.0"
+target_architecture = sys.argv[8] if len(sys.argv) > 8 else "s1"
+startup_failure_threshold = (
+    int(sys.argv[9])
+    if len(sys.argv) > 9
+    else 12
+    if target_architecture == "s1"
+    else 60
+)
+if not 12 <= startup_failure_threshold <= 120:
+    raise SystemExit("ERROR: reviewed startup probe threshold is outside 12..120")
 items = json.loads(sys.stdin.readline()).get("items", [])
 custom_resources = json.loads(sys.stdin.readline()).get("items", [])
 config_maps = json.loads(sys.stdin.readline()).get("items", [])
@@ -6473,6 +6658,21 @@ def expected_monitoring_console_data(monitoring_name):
     return values
 
 
+def monitoring_console_config_hash(data):
+    # Reproduce Operator 3.2.0 configDataHash (Go string byte lengths).
+    digest = hashlib.sha256()
+    for key in sorted(data):
+        key_bytes = key.encode("utf-8")
+        value_bytes = data[key].encode("utf-8")
+        digest.update(
+            str(len(key_bytes)).encode("ascii")
+            + b":" + key_bytes
+            + str(len(value_bytes)).encode("ascii")
+            + b":" + value_bytes
+        )
+    return digest.hexdigest()
+
+
 if license_contract:
     license_map = require_config_map("splunk-licenses")
     license_name = license_contract.get("name")
@@ -6535,7 +6735,16 @@ for contract in expected:
         name,
     )
     role = role_match.group(1) if role_match else ""
-    smartstore = reviewed_spec.get("smartstore", {})
+    smartstore_config = reviewed_spec.get("smartstore", {})
+    # Operator 3.2 emits the inert default {cacheManager: {}, defaults: {}}
+    # even when SmartStore is disabled. Only non-empty reviewed settings make
+    # SmartStore active and require its init container/config volume.
+    smartstore = (
+        smartstore_config
+        if isinstance(smartstore_config, dict)
+        and any(bool(value) for value in smartstore_config.values())
+        else {}
+    )
     expects_smartstore_init = bool(smartstore) and role in {
         "standalone",
         "cluster-manager",
@@ -6835,6 +7044,13 @@ for contract in expected:
         **required_env,
         "SPLUNK_DEFAULTS_URL": ",".join(defaults_sources),
     }
+    if tuple(int(part) for part in operator_version.split(".")[:2]) >= (3, 2):
+        expected_env_values.update(
+            {
+                "SPLUNK_KVSTORE_DEFAULT_TYPE": "local",
+                "SPLUNK_NODE_SIDECAR_POSTGRES_DISABLED": "true",
+            }
+        )
 
     def referenced_service(ref, instance_role):
         service = f"splunk-{ref.get('name')}-{instance_role}-service"
@@ -6849,6 +7065,11 @@ for contract in expected:
     if role != "license-manager" and license_manager_ref.get("name"):
         expected_env_values["SPLUNK_LICENSE_MASTER_URL"] = referenced_service(
             license_manager_ref, "license-manager"
+        )
+    elif role == "license-manager" and operator_version == "3.2.0":
+        expected_env_values["SPLUNK_LICENSE_MASTER_URL"] = (
+            f"splunk-{contract['owner_name']}-license-manager-service."
+            f"{expected_namespace}.svc.cluster.local"
         )
     if role == "cluster-manager":
         expected_env_values["SPLUNK_CLUSTER_MASTER_URL"] = "localhost"
@@ -6885,11 +7106,25 @@ for contract in expected:
         expected_env_values["SPLUNK_MULTISITE_MASTER"] = (
             f"splunk-{contract['owner_name']}-cluster-manager-service"
         )
+    actual_env_values = {item.get("name"): item.get("value") for item in env}
+    expected_env_variants = [expected_env_values]
+    if (
+        role == "cluster-manager"
+        and operator_version == "3.2.0"
+        and target_architecture == "m4"
+        and "all_sites:" in defaults_text
+    ):
+        # Operator 3.2.0 derives these two legacy variables from the live CM
+        # multisite probe. A fresh M4 CM can therefore legitimately converge
+        # with both absent; a partial pair or altered values remain invalid.
+        m4_without_legacy = dict(expected_env_values)
+        m4_without_legacy.pop("SPLUNK_SITE", None)
+        m4_without_legacy.pop("SPLUNK_MULTISITE_MASTER", None)
+        expected_env_variants = [m4_without_legacy, expected_env_values]
     if (
         len({item.get("name") for item in env}) != len(env)
         or any(set(item) != {"name", "value"} for item in env)
-        or {item.get("name"): item.get("value") for item in env}
-        != expected_env_values
+        or actual_env_values not in expected_env_variants
     ):
         raise SystemExit(f"ERROR: StatefulSet/{name} environment contract differs")
     env_from = main_containers[0].get("envFrom", [])
@@ -6904,15 +7139,27 @@ for contract in expected:
         ):
             raise SystemExit(f"ERROR: StatefulSet/{name} envFrom contract differs")
         monitoring_map = require_config_map(name)
+        reviewed_monitoring_data = expected_monitoring_console_data(
+            contract["owner_name"]
+        )
+        monitoring_revision = spec.get("template", {}).get("metadata", {}).get(
+            "annotations", {}
+        ).get("monitoringConsoleConfigRev")
         if (
             monitoring_map.get("binaryData")
-            or monitoring_map.get("data", {})
-            != expected_monitoring_console_data(contract["owner_name"])
+            or monitoring_map.get("data", {}) != reviewed_monitoring_data
             or not monitoring_map.get("metadata", {}).get("resourceVersion")
-            or spec.get("template", {}).get("metadata", {}).get(
-                "annotations", {}
-            ).get("monitoringConsoleConfigRev")
-            != monitoring_map.get("metadata", {}).get("resourceVersion")
+            or (
+                operator_version == "3.2.0"
+                and monitoring_revision != monitoring_console_config_hash(
+                    reviewed_monitoring_data
+                )
+            )
+            or (
+                operator_version != "3.2.0"
+                and monitoring_revision
+                != monitoring_map.get("metadata", {}).get("resourceVersion")
+            )
         ):
             raise SystemExit(
                 f"ERROR: StatefulSet/{name} Monitoring Console content/adoption differs"
@@ -7038,6 +7285,13 @@ for contract in expected:
         defaults_map = require_config_map(
             defaults_source["name"], owner=reviewed_cr
         )
+        expected_defaults_revision = (
+            monitoring_console_config_hash(
+                {"default.yml": reviewed_spec["defaults"]}
+            )
+            if operator_version == "3.2.0"
+            else defaults_map.get("metadata", {}).get("resourceVersion")
+        )
         if (
             defaults_map.get("binaryData")
             or defaults_map.get("data")
@@ -7046,7 +7300,7 @@ for contract in expected:
             or spec.get("template", {}).get("metadata", {}).get(
                 "annotations", {}
             ).get("defaultConfigRev")
-            != defaults_map.get("metadata", {}).get("resourceVersion")
+            != expected_defaults_revision
         ):
             raise SystemExit(
                 f"ERROR: StatefulSet/{name} defaults content/adoption differs"
@@ -7139,7 +7393,7 @@ for contract in expected:
             "initialDelaySeconds": 40,
             "timeoutSeconds": 30,
             "periodSeconds": 30,
-            "failureThreshold": 12,
+            "failureThreshold": startup_failure_threshold,
         },
     }
     for probe_name, expected_probe in probe_defaults.items():
@@ -7170,15 +7424,24 @@ for contract in expected:
             )
         ):
             raise SystemExit(f"ERROR: StatefulSet/{name} {probe_name} differs")
+    update_strategy = spec.get("updateStrategy", {}).get("type", "RollingUpdate")
     if (
         spec.get("replicas") != count
         or status.get("observedGeneration") != item.get("metadata", {}).get("generation")
-        or status.get("currentReplicas", 0) != count
+        or (
+            update_strategy != "OnDelete"
+            and status.get("currentReplicas", 0) != count
+        )
         or status.get("updatedReplicas", 0) != count
         or status.get("readyReplicas", 0) != count
         or status.get("availableReplicas", 0) != count
         or not status.get("currentRevision")
-        or status.get("currentRevision") != status.get("updateRevision")
+        or not status.get("updateRevision")
+        or update_strategy not in ("RollingUpdate", "OnDelete")
+        or (
+            update_strategy == "RollingUpdate"
+            and status.get("currentRevision") != status.get("updateRevision")
+        )
     ):
         raise SystemExit(f"ERROR: StatefulSet/{name} rollout is incomplete or stale")
 """
@@ -7251,7 +7514,8 @@ for contract in expected:
         name = item.get("metadata", {}).get("name", "unknown")
         status = item.get("status", {})
         expected_owner = prefix.rstrip("-")
-        expected_owner_uid = stateful_by_name.get(expected_owner, {}).get(
+        stateful = stateful_by_name.get(expected_owner, {})
+        expected_owner_uid = stateful.get(
             "metadata", {}
         ).get("uid")
         owners = item.get("metadata", {}).get("ownerReferences", [])
@@ -7265,6 +7529,17 @@ for contract in expected:
             or controller_owners[0].get("uid") != expected_owner_uid
         ):
             raise SystemExit(f"ERROR: reviewed Splunk pod has an invalid owner: {name}")
+        stateful_strategy = stateful.get("spec", {}).get("updateStrategy", {}).get(
+            "type", "RollingUpdate"
+        )
+        if stateful_strategy == "OnDelete" and item.get("metadata", {}).get(
+            "labels", {}
+        ).get("controller-revision-hash") != stateful.get("status", {}).get(
+            "updateRevision"
+        ):
+            raise SystemExit(
+                f"ERROR: OnDelete StatefulSet pod has not adopted update revision: {name}"
+            )
         ready = any(
             condition.get("type") == "Ready" and condition.get("status") == "True"
             for condition in status.get("conditions", [])
@@ -8363,9 +8638,11 @@ trap - EXIT
 """
     operator_contract_code = """import copy
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+from decimal import Decimal, InvalidOperation
 
 import yaml
 
@@ -8514,6 +8791,38 @@ def require_same(path, raw_value, live_value):
             f"ERROR: live Operator {path} differs from raw Helm intent: "
             f"live={live_value!r}, raw={raw_value!r}"
         )
+
+def normalized_resources(value):
+    if not isinstance(value, dict) or set(value) - {"limits", "requests"}:
+        raise SystemExit("ERROR: Operator resource contract is malformed")
+    suffixes = {"n": -9, "u": -6, "m": -3, "": 0, "k": 3,
+                "M": 6, "G": 9, "T": 12, "P": 15, "E": 18}
+    binary_suffixes = {"Ki": 1, "Mi": 2, "Gi": 3, "Ti": 4, "Pi": 5, "Ei": 6}
+    normalized = {}
+    for section, resources in value.items():
+        if not isinstance(resources, dict):
+            raise SystemExit("ERROR: Operator resource contract is malformed")
+        normalized[section] = {}
+        for name, raw_quantity in resources.items():
+            text = str(raw_quantity)
+            match = re.fullmatch(r"([+-]?(?:[0-9]+(?:[.][0-9]*)?|[.][0-9]+))(Ki|Mi|Gi|Ti|Pi|Ei|n|u|m|k|M|G|T|P|E|[eE][+-]?[0-9]+)?", text)
+            if not match:
+                raise SystemExit(f"ERROR: Operator resource quantity is malformed: {text!r}")
+            try:
+                suffix = match.group(2) or ""
+                quantity = Decimal(match.group(1))
+                if suffix in binary_suffixes:
+                    quantity *= Decimal(1024) ** binary_suffixes[suffix]
+                elif suffix in suffixes:
+                    quantity *= Decimal(10) ** suffixes[suffix]
+                else:
+                    quantity *= Decimal(10) ** int(suffix[1:])
+            except (InvalidOperation, OverflowError, ValueError):
+                raise SystemExit(f"ERROR: Operator resource quantity is malformed: {text!r}") from None
+            if not quantity.is_finite() or quantity < 0:
+                raise SystemExit(f"ERROR: Operator resource quantity is invalid: {text!r}")
+            normalized[section][name] = quantity
+    return normalized
 
 def normalized_probe(value):
     if value is None:
@@ -8728,13 +9037,18 @@ def enforce_raw_intent(raw_item, live_item):
                     f"raw Helm intent: {sorted(unexpected_fields)}"
                 )
             for field in (
-                "image", "imagePullPolicy", "args", "command", "resources",
+                "image", "imagePullPolicy", "args", "command",
                 "securityContext",
             ):
                 require_same(
                     f"Deployment container {name}.{field}",
                     raw_container.get(field), live_container.get(field),
                 )
+            require_same(
+                f"Deployment container {name}.resources",
+                normalized_resources(raw_container.get("resources", {})),
+                normalized_resources(live_container.get("resources", {})),
+            )
             for field in ("livenessProbe", "readinessProbe", "startupProbe"):
                 require_same(
                     f"Deployment container {name}.{field}",
@@ -8799,6 +9113,10 @@ def canonical(item):
             spec.pop(field, None)
     if value.get("kind") == "Deployment":
         pod_spec = value.get("spec", {}).get("template", {}).get("spec", {})
+        for container in pod_spec.get("containers", []):
+            container["resources"] = normalized_resources(
+                container.get("resources", {})
+            )
         for field in (
             "hostNetwork",
             "hostPID",
@@ -9020,7 +9338,11 @@ if int(str(getattr(yaml, "__version__", "0")).split(".", 1)[0]) != 6:
     )
 
 expected_path, live_path, expected_crd_path = sys.argv[1:4]
-release, namespace, external_lm, queue_secret_version = sys.argv[4:]
+release, namespace, external_lm, queue_secret_version, operator_version = (
+    sys.argv[4:9]
+    if len(sys.argv) > 8
+    else (*sys.argv[4:], "3.1.0")
+)
 managed_kinds = {
     "Standalone", "ClusterManager", "IndexerCluster", "SearchHeadCluster",
     "LicenseManager", "MonitoringConsole", "IngestorCluster", "Queue",
@@ -9357,6 +9679,59 @@ def normalize_with_schema(value, schema):
     return value
 
 
+def normalize_operator_default_spec(kind, expected, actual):
+    # Account for the fixed Operator 3.2.0 CM default expansion. The Operator
+    # persists these fields even when Helm omitted them. Keep this narrowly
+    # scoped: only an omitted expected field may be filled, and only with the
+    # exact JSON shape emitted by the reviewed 3.2.0 Operator.
+    if operator_version != "3.2.0" or kind not in {
+        "ClusterManager", "MonitoringConsole"
+    }:
+        return expected, actual
+    operator_defaults = {
+        "Mock": False,
+        "affinity": {},
+        "appRepo": {
+            "appInstallPeriodSeconds": 90,
+            "defaults": {"premiumAppsProps": {"esDefaults": {}}},
+            "installMaxRetries": 2,
+        },
+        "clusterManagerRef": {},
+        "clusterMasterRef": {},
+        "defaults": "",
+        "defaultsUrl": "",
+        "defaultsUrlApps": "",
+        "licenseUrl": "",
+        "licenseMasterRef": {},
+        "serviceTemplate": {
+            "metadata": {},
+            "spec": {},
+            "status": {"loadBalancer": {}},
+        },
+        "smartstore": {"cacheManager": {}, "defaults": {}},
+    }
+    if kind == "MonitoringConsole":
+        operator_defaults.pop("smartstore")
+        operator_defaults["licenseUrl"] = ""
+        operator_defaults.pop("clusterManagerRef")
+        operator_defaults["monitoringConsoleRef"] = {}
+
+
+    def strict_equal(left, right):
+        return json.dumps(left, sort_keys=True, separators=(",", ":")) == json.dumps(
+            right, sort_keys=True, separators=(",", ":")
+        )
+
+    normalized_expected = json.loads(json.dumps(expected))
+    normalized_actual = json.loads(json.dumps(actual))
+    for key, default in operator_defaults.items():
+        if key not in normalized_expected and key in normalized_actual and strict_equal(
+            normalized_actual[key], default
+        ):
+            normalized_expected[key] = json.loads(json.dumps(default))
+    return normalized_expected, normalized_actual
+
+
 def compare_selected(expected, actual, path, exact_maps=True):
     if path.rsplit(".", 1)[-1] in object_reference_names:
         expected_ref = canonical_reference(expected)
@@ -9418,7 +9793,7 @@ def compare_selected(expected, actual, path, exact_maps=True):
         for index, value in enumerate(expected):
             compare_selected(value, actual[index], f"{path}[{index}]", exact_maps)
         return
-    if actual != expected:
+    if type(actual) is not type(expected) or actual != expected:
         raise SystemExit(
             f"ERROR: live selected spec differs at {path}: "
             f"live={actual!r}, reviewed={expected!r}"
@@ -9428,6 +9803,16 @@ def compare_selected(expected, actual, path, exact_maps=True):
 def validate_app_framework(item, label):
     spec_repo = item.get("spec", {}).get("appRepo")
     if not isinstance(spec_repo, dict) or not spec_repo:
+        return
+    if (
+        label.split("/", 1)[0] in {"ClusterManager", "MonitoringConsole"}
+        and operator_version == "3.2.0"
+        and spec_repo == {
+            "appInstallPeriodSeconds": 90,
+            "defaults": {"premiumAppsProps": {"esDefaults": {}}},
+            "installMaxRetries": 2,
+        }
+    ):
         return
     sources = spec_repo.get("appSources", [])
     if not isinstance(sources, list) or not sources:
@@ -9451,7 +9836,51 @@ def validate_app_framework(item, label):
     last_check = context.get("lastAppInfoCheckTime")
     if not isinstance(last_check, int) or isinstance(last_check, bool) or last_check <= 0:
         raise SystemExit(f"ERROR: live {label} App Framework has not completed a repo check")
-    if context.get("appRepo") != spec_repo:
+    # Operator 3.2.0 persists empty premium-app properties in status even
+    # when Helm omitted them from the reviewed spec.  Normalize only those
+    # exact, empty defaults and only for omitted expected fields; explicit or
+    # non-empty values still go through the strict equality check below.
+    expected_context_repo = json.loads(json.dumps(spec_repo))
+    actual_context_repo = context.get("appRepo")
+    if operator_version == "3.2.0" and isinstance(actual_context_repo, dict):
+        empty_premium = {"esDefaults": {}}
+        if (
+            type(expected_context_repo.get("appsRepoPollIntervalSeconds")) is int
+            and expected_context_repo.get("appsRepoPollIntervalSeconds") == 0
+            and "appsRepoPollIntervalSeconds" not in actual_context_repo
+        ):
+            expected_context_repo.pop("appsRepoPollIntervalSeconds")
+        expected_defaults = expected_context_repo.get("defaults")
+        actual_defaults = actual_context_repo.get("defaults")
+        if (
+            isinstance(expected_defaults, dict)
+            and isinstance(actual_defaults, dict)
+            and "premiumAppsProps" not in expected_defaults
+            and actual_defaults.get("premiumAppsProps") == empty_premium
+        ):
+            expected_context_repo["defaults"]["premiumAppsProps"] = json.loads(
+                json.dumps(empty_premium)
+            )
+        expected_sources = expected_context_repo.get("appSources")
+        actual_sources = actual_context_repo.get("appSources")
+        if isinstance(expected_sources, list) and isinstance(actual_sources, list):
+            actual_by_name = {
+                source.get("name"): source
+                for source in actual_sources
+                if isinstance(source, dict)
+            }
+            for source in expected_sources:
+                if not isinstance(source, dict) or "premiumAppsProps" in source:
+                    continue
+                actual_source = actual_by_name.get(source.get("name"))
+                if (
+                    isinstance(actual_source, dict)
+                    and actual_source.get("premiumAppsProps") == empty_premium
+                ):
+                    source["premiumAppsProps"] = json.loads(json.dumps(empty_premium))
+    if json.dumps(actual_context_repo, sort_keys=True, separators=(",", ":")) != json.dumps(
+        expected_context_repo, sort_keys=True, separators=(",", ":")
+    ):
         raise SystemExit(
             f"ERROR: live {label} App Framework status has not adopted spec.appRepo"
         )
@@ -9475,11 +9904,49 @@ def validate_app_framework(item, label):
         has_deployments = has_deployments or bool(deployments)
         for deployment in deployments:
             app_name = deployment.get("appName", "<unknown>")
+            phase_infos = [deployment.get("phaseInfo", {})]
+            phase_infos.extend(deployment.get("auxPhaseInfo", []))
+            source_spec = next(
+                (
+                    source
+                    for source in sources
+                    if isinstance(source, dict) and source.get("name") == source_name
+                ),
+                {},
+            )
+            default_scope = spec_repo.get("defaults", {}).get("scope", "")
+            cluster_terminal = (
+                operator_version == "3.2.0"
+                and item.get("kind") in {"ClusterManager", "SearchHeadCluster"}
+                and type(deployment.get("repoState")) is int
+                and deployment.get("repoState") == 1
+                and type(deployment.get("deployStatus")) is int
+                and deployment.get("deployStatus") == 1
+                and (source_spec.get("scope") or default_scope) == "cluster"
+                and context.get("isDeploymentInProgress") is False
+                and type(context.get("bundlePushStatus", {}).get("bundlePushStage")) is int
+                and context.get("bundlePushStatus", {}).get("bundlePushStage") == 3
+                and bool(phase_infos)
+                and all(
+                    type(phase_info.get("status")) is int
+                    and phase_info.get("phase") == "install"
+                    and phase_info.get("status") == 303
+                    for phase_info in phase_infos
+                )
+            )
             # RepoStateDeleted (2) with DeployStatusComplete is the stable
             # post-uninstall record retained by SOK. Both active (1) and
             # completely deleted (2) records are converged; passive/unknown
             # records and any non-complete deployment are not.
-            if deployment.get("repoState") not in {1, 2} or deployment.get("deployStatus") != 3:
+            if (
+                not (
+                    type(deployment.get("repoState")) is int
+                    and deployment.get("repoState") in {1, 2}
+                    and type(deployment.get("deployStatus")) is int
+                    and deployment.get("deployStatus") == 3
+                )
+                and not cluster_terminal
+            ):
                 raise SystemExit(
                     f"ERROR: live {label} app {app_name!r} is not fully reconciled"
                 )
@@ -9488,8 +9955,6 @@ def validate_app_framework(item, label):
                     f"ERROR: live {label} removed App Framework source "
                     f"{source_name!r} still has active app {app_name!r}"
                 )
-            phase_infos = [deployment.get("phaseInfo", {})]
-            phase_infos.extend(deployment.get("auxPhaseInfo", []))
             for phase_info in phase_infos:
                 if not isinstance(phase_info, dict):
                     raise SystemExit(
@@ -9502,7 +9967,7 @@ def validate_app_framework(item, label):
                     raise SystemExit(
                         f"ERROR: live {label} app {app_name!r} has failed App Framework status"
                     )
-            if deployment.get("repoState") == 1 and any(
+            if deployment.get("repoState") == 1 and not cluster_terminal and any(
                 phase_info.get("phase") != "install"
                 or phase_info.get("status") != 303
                 for phase_info in phase_infos
@@ -9522,7 +9987,8 @@ def validate_app_framework(item, label):
     if requires_bundle and has_deployments:
         bundle_status = context.get("bundlePushStatus", {})
         if (
-            bundle_status.get("bundlePushStage") != 3
+            type(bundle_status.get("bundlePushStage")) is not int
+            or bundle_status.get("bundlePushStage") != 3
             or bundle_status.get("retryCount", 0) != 0
         ):
             raise SystemExit(
@@ -9562,6 +10028,9 @@ for item_identity, expected in expected_by_identity.items():
         raise SystemExit(f"ERROR: installed v4 CRD schema is missing for {kind}")
     expected_spec = normalize_with_schema(expected_spec, spec_schema)
     live_spec = normalize_with_schema(live_spec, spec_schema)
+    expected_spec, live_spec = normalize_operator_default_spec(
+        kind, expected_spec, live_spec
+    )
     compare_selected(expected_spec, live_spec, f"{label}.spec")
     status = live.get("status", {})
     if kind in reconciled_kinds and status.get("phase") != "Ready":
@@ -9593,7 +10062,7 @@ if queue_secret_version:
         status = item.get("status", {})
         if spec.get("serviceAccount") not in (None, "") or status.get("serviceAccount") not in (None, ""):
             raise SystemExit(
-                f"ERROR: live {label} must use the reviewed Secret-only SOK 3.1 identity path"
+                f"ERROR: live {label} must use the reviewed Secret-only SOK 3.2 identity path"
             )
         if status.get("message") not in (None, ""):
             raise SystemExit(
@@ -9690,7 +10159,8 @@ python3 -c {shell_quote(cr_contract_code)} \\
   "${{cr_contract_dir}}/expected.yaml" "${{cr_contract_dir}}/live.json" \\
   {shell_quote(crd_ref if local_artifacts else '')} \\
   {shell_quote(args.release_name)} {shell_quote(args.namespace)} \\
-  {shell_quote(external_same_namespace_lm)} "${{queue_secret_version}}"
+  {shell_quote(external_same_namespace_lm)} "${{queue_secret_version}}" \\
+  {shell_quote(args.operator_version)}
 rm -rf "${{cr_contract_dir}}"
 trap - EXIT
 """
@@ -9728,7 +10198,7 @@ while (( SECONDS < controller_deadline )); do
   kubectl --request-timeout=30s get configmaps --namespace {shell_quote(args.namespace)} -o json | python3 -c {shell_quote(compact_json_code)} >>"${{controller_health_input}}"
   printf '\n' >>"${{controller_health_input}}"
   {smartstore_secret_status} >>"${{controller_health_input}}"
-  if python3 -c {shell_quote(controller_health_code)} {shell_quote(json.dumps(expected_controllers, sort_keys=True))} {shell_quote(splunk_image(args))} {shell_quote(json.dumps(VERIFIED_SOK_PROBE_SHA256.get(args.operator_version, {}), sort_keys=True))} {shell_quote(args.namespace)} {shell_quote(SGT_ACCEPTANCE if args.accept_splunk_general_terms else '')} {shell_quote(json.dumps(license_contract, sort_keys=True))} <"${{controller_health_input}}"; then
+  if python3 -c {shell_quote(controller_health_code)} {shell_quote(json.dumps(expected_controllers, sort_keys=True))} {shell_quote(splunk_image(args))} {shell_quote(json.dumps(VERIFIED_SOK_PROBE_SHA256.get(args.operator_version, {}), sort_keys=True))} {shell_quote(args.namespace)} {shell_quote(SGT_ACCEPTANCE if args.accept_splunk_general_terms else '')} {shell_quote(json.dumps(license_contract, sort_keys=True))} {shell_quote(args.operator_version)} {shell_quote(args.architecture)} {shell_quote(startup_probe_failure_threshold(args))} <"${{controller_health_input}}"; then
     controllers_ready=true
     rm -f "${{controller_health_input}}"
     controller_health_input=""

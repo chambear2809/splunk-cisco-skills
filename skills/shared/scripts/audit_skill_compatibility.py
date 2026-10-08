@@ -39,23 +39,23 @@ BLOCKING_PACKAGE_RELATIONSHIPS = {"primary", "private-primary"}
 COMPATIBILITY_TEXT = {
     "supported": (
         "Splunk Cloud Platform 10.5.2605: supported. Self-managed paths retain "
-        "the verified public 10.4 baseline where applicable."
+        "separate Enterprise version and package evidence; see the Enterprise 10.6 matrix."
     ),
     "conditional": (
         "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, "
         "entitlement, topology, and customer-managed runtime guardrails; "
-        "self-managed paths remain on the public 10.4 baseline."
+        "self-managed paths use the separate Enterprise 10.6 compatibility contract."
     ),
     "blocked": (
         "Splunk Cloud Platform 10.5.2605: blocked for the primary package because "
         "no repo-selected or otherwise approved release has 10.5 compatibility "
         "evidence; render or hand off only unless an explicit approved override "
-        "is recorded."
+        "is recorded. Enterprise 10.6 package evidence is tracked separately."
     ),
     "self-managed-10.4": (
         "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime "
-        "workflow remains on the public Splunk Enterprise or Universal Forwarder "
-        "10.4 baseline."
+        "workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix "
+        "for self-managed compatibility."
     ),
     "not-applicable": (
         "No direct Splunk Platform runtime dependency. This workflow can be used "

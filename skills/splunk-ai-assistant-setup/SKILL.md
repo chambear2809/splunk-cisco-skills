@@ -5,8 +5,10 @@ description: "Use when the user asks about splunk-ai-assistant, Splunk AI Assist
   AI Assistant (`Splunk_AI_Assistant_Cloud`) setup on Splunk Cloud or Splunk Enterprise. Handles
   Splunkbase installation with the shared app installer, checks post-install health, and supports
   Enterprise cloud-connected onboarding, activation, and proxy configuration."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

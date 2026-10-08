@@ -6,8 +6,10 @@ description: "Use when setting up or auditing the legacy Splunk AI Agent Monitor
   diagnose, and safely apply Splunk Observability Cloud AI Agent Monitoring setup plans, including GenAI Python
   instrumentation, instrumentation-side evaluations, Log Observer Connect handoffs, histogram collector
   readiness, and AI Infrastructure Monitoring coverage."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

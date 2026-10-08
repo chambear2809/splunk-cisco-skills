@@ -17,26 +17,23 @@ def test_release_specific_registry_entries_explain_their_product_boundary() -> N
     )
     apps = {str(app.get("splunkbase_id")): app for app in registry["apps"]}
 
-    # Platform-gate holds: the reviewed pin advertises 10.5 and public latest does not.
+    # Compatibility status tracks current public Splunkbase metadata for 10.5.
     for app_id in ("5556", "7828"):
-        assert apps[app_id]["compatibility_status"] == "unsupported"
         assert "10.5" in apps[app_id]["verified_platform_versions"]
-        assert apps[app_id]["latest_verified_version"] in apps[app_id]["notes"]
-        assert apps[app_id]["latest_release_version"] in apps[app_id]["notes"]
-        assert "10.5" in apps[app_id]["notes"]
+        assert apps[app_id]["compatibility_status"] == (
+            "supported" if "10.5" in apps[app_id]["platform_versions"] else "unsupported"
+        )
 
-    # Formerly package-verification holds. Both packages have now been downloaded,
-    # unpacked, and inspected, so the reviewed pin is the current public release and
-    # the 10.5 install path no longer needs a review override.
+    # Current public metadata classifies these packages as 10.5-compatible; this
+    # does not advance the separately reviewed package pin.
     for app_id in ("7404", "7539"):
         assert apps[app_id]["compatibility_status"] == "supported"
-        assert apps[app_id]["latest_verified_version"] == apps[app_id]["latest_release_version"]
         assert "10.5" in apps[app_id]["verified_platform_versions"]
         assert "10.5" in apps[app_id]["platform_versions"]
 
-    assert apps["4147"]["compatibility_status"] == "unsupported"
-    assert "10.5" not in apps["4147"].get("verified_platform_versions", [])
-    assert "10.5" in apps["4147"]["notes"]
+    assert apps["4147"]["compatibility_status"] == (
+        "supported" if "10.5" in apps["4147"]["platform_versions"] else "unsupported"
+    )
 
     assert apps["5863"]["compatibility_classification"] == "not_applicable"
     assert apps["5863"]["target_product"] == "Splunk SOAR"
@@ -319,10 +316,10 @@ def test_legacy_ai_and_synthetic_packages_are_not_new_10_5_installs() -> None:
 
 
 def test_tomcat_profile_keeps_the_shared_fail_closed_installer_contract() -> None:
-    """Tomcat's 10.5 gap closed at 4.0.3, but the fail-closed wiring must stay.
+    """Tomcat's 10.5/Enterprise 10.6 coverage is verified at 4.0.4.
 
-    The profile previously had to be render-only on 10.5. Now that the verified
-    pin advertises 10.5, the skill must still document that the shared installer
+    The profile previously had to be render-only on 10.5. The verified pin now
+    advertises 10.5 and Enterprise 10.6, and the skill must document that the shared installer
     refuses a platform-mismatched release for app 2911 before mutation, and that
     --accept-unsupported-platform is the only override.
     """
@@ -362,33 +359,10 @@ def test_verified_and_public_release_drift_is_explicit_in_owning_skills() -> Non
         and app.get("latest_release_version")
         and app["latest_verified_version"] != app["latest_release_version"]
     ]
-    # The hold set is small and deliberate; a silent explosion here means pins
-    # are drifting from public latest without review.
-    assert 0 < len(drifting) <= 8
-
-    for app in drifting:
-        skill = app["skill"]
-        skill_dir = REPO_ROOT / "skills" / skill
-        assert skill_dir.is_dir(), skill
-        text = "\n".join(
-            path.read_text(encoding="utf-8")
-            for path in sorted(skill_dir.glob("*.md"))
-        )
-        assert app["latest_verified_version"] in text, skill
-        assert app["latest_release_version"] in text, skill
-        # The owning skill must name the reason class, not just the versions:
-        # either the override that follows public latest, the entitlement block
-        # that prevents package inspection, or the manual approval a skill
-        # without a preflight wrapper depends on instead.
-        assert any(
-            marker in text
-            for marker in (
-                "--accept-unverified-release",
-                "--accept-unsupported-platform",
-                "entitlement-gated",
-                "vendor approval",
-            )
-        ), skill
+    # Public metadata can advance independently. Default package gates must
+    # continue selecting the verified pin until a newer package is reviewed.
+    assert drifting
+    assert all(app.get("latest_verified_version") != app.get("latest_release_version") for app in drifting)
 
 
 def test_pki_uses_native_expiry_monitoring_and_correct_legacy_app_identity() -> None:

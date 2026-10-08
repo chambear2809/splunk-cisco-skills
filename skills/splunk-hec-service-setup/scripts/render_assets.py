@@ -49,7 +49,10 @@ EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
         mode = stat.S_IMODE(before.st_mode)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
             raise SystemExit(f"ERROR: {label} must be a single-link regular file: {path}")
-        if before.st_uid != os.geteuid():
+        # Root may apply an operator-owned token file, but must not take
+        # ownership of that reusable source secret. Non-root callers still
+        # have to own the file themselves.
+        if before.st_uid != os.geteuid() and os.geteuid() != 0:
             raise SystemExit(f"ERROR: {label} must be owned by the current user: {path}")
         if mode & 0o077:
             raise SystemExit(
@@ -573,7 +576,52 @@ finally:
     if tmp_path.exists():
         tmp_path.unlink()
 PY
-chmod 600 "${{target_file}}"
+python3 - "${{splunk_home}}" "${{token_file}}" "${{target_file}}" <<'PY'
+import grp
+import os
+import pwd
+import sys
+from pathlib import Path
+
+splunk_home = Path(sys.argv[1])
+token_path = Path(sys.argv[2])
+target_path = Path(sys.argv[3])
+configured = os.environ.get("SPLUNK_SERVICE_USER", "").strip()
+if configured:
+    try:
+        account = pwd.getpwnam(configured)
+    except KeyError as exc:
+        raise SystemExit(f"ERROR: configured Splunk service user does not exist: {{configured}}") from exc
+else:
+    try:
+        home_owner = os.stat(splunk_home).st_uid
+        account = pwd.getpwuid(home_owner)
+    except (FileNotFoundError, KeyError) as exc:
+        raise SystemExit(f"ERROR: could not derive the Splunk service user from {{splunk_home}}") from exc
+    if account.pw_uid == 0:
+        try:
+            account = pwd.getpwnam("splunk")
+        except KeyError as exc:
+            raise SystemExit("ERROR: Splunk home is root-owned and no splunk service user exists") from exc
+if account.pw_uid == 0:
+    raise SystemExit("ERROR: refusing to assign HEC files to root")
+try:
+    group = grp.getgrgid(account.pw_gid)
+except KeyError as exc:
+    raise SystemExit(f"ERROR: service user group is unavailable: {{account.pw_gid}}") from exc
+
+def secure_owner(path, mode):
+    if not path.exists():
+        raise SystemExit(f"ERROR: expected HEC file is missing: {{path}}")
+    current = os.stat(path)
+    # Preserve an existing non-root service ownership when it is already valid.
+    if current.st_uid != account.pw_uid or current.st_gid != account.pw_gid:
+        os.chown(path, account.pw_uid, account.pw_gid)
+    os.chmod(path, mode)
+
+secure_owner(target_path, 0o640)
+print(f"HEC config owned by service user {{account.pw_name}}:{{group.gr_name}}; config mode 0640; source token ownership preserved")
+PY
 {restart_block}"""
     )
 
@@ -789,14 +837,14 @@ if parsed is not None and exact_http_404(parsed):
     raise SystemExit(0)
 
 plain = " ".join(raw.split())
-plain = re.sub(r"^error:\s*", "", plain, flags=re.IGNORECASE).rstrip(".")
+plain = re.sub(r"^error:\\s*", "", plain, flags=re.IGNORECASE).rstrip(".")
 for marker in (chr(34), chr(39), "[", "]"):
     plain = plain.replace(marker, "")
 escaped = re.escape(requested)
 patterns = (
-    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{{escaped}}\s+(?:is\s+|was\s+)?not[ -]?found$",
-    rf"^no such (?:hec[ -]?token|http event collector|token|resource)\s*:?\s*{{escaped}}$",
-    rf"^(?:hec[ -]?token|http event collector|token|resource)\s+{{escaped}}\s+does not exist$",
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\\s+{{escaped}}\\s+(?:is\\s+|was\\s+)?not[ -]?found$",
+    rf"^no such (?:hec[ -]?token|http event collector|token|resource)\\s*:?\\s*{{escaped}}$",
+    rf"^(?:hec[ -]?token|http event collector|token|resource)\\s+{{escaped}}\\s+does not exist$",
 )
 if any(re.fullmatch(pattern, plain, flags=re.IGNORECASE) for pattern in patterns):
     print("missing", end="")

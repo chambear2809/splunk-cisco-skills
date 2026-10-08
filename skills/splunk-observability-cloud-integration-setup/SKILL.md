@@ -8,8 +8,10 @@ description: "Use when a user asks to pair Splunk Platform with Splunk Observabi
   token-auth enablement, realm checks, Unified Identity or service-account pairing, multi-org defaults,
   Centralized RBAC, Discover Splunk Observability Cloud app configuration, Log Observer Connect, Related
   Content, Real Time Metrics, Dashboard Studio O11y metrics, and Splunk_TA_sim modular inputs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

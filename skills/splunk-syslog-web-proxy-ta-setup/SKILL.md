@@ -5,8 +5,10 @@ description: "Use when the user asks to onboard, configure, render, or validate 
   parser and web/proxy profiles: Apache, NGINX, IIS, Tomcat, HAProxy, Squid, Blue Coat ProxySG, Forcepoint
   Web Security, Check Point Log Exporter, F5 BIG-IP, Citrix NetScaler, and Infoblox. Renders product-
   specific local file/UF, Windows UF, or SC4S/syslog transport handoffs with package-backed source types."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -87,12 +89,10 @@ profiles default to local file/Universal Forwarder monitors, IIS defaults to a
 Windows UF handoff, and network/proxy/security appliances default to SC4S or
 syslog handoff.
 
-Tomcat is no longer a compatibility exception. As of August 20, 2026 Splunkbase
-app `2911` designates `4.0.3` as current and advertises Splunk `10.5`; that
-package was downloaded, unpacked, and inspected here, so `tomcat` installs on a
-`10.5` Cloud stack through the default path. Older `4.0.x` releases through
-`4.0.1` advertised versions only through `10.4`, so do not pin below `4.0.3` on
-`10.5`. The shared installer still refuses an app whose selected release does not
+Tomcat is no longer a compatibility exception. Splunkbase app `2911` release
+`4.0.4` advertises Enterprise `10.6` and Cloud `10.5`; its package was
+downloaded, unpacked, and inspected here, so it is selected by default. The
+shared installer still refuses an app whose selected release does not
 advertise the target platform before any mutation, and
 `--accept-unsupported-platform` remains the only override — usable only when
 vendor approval and the operator's exception record explicitly cover that package

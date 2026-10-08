@@ -1,15 +1,13 @@
 ---
 name: splunk-observability-claude-code-instrumentation-setup
 description: "Use when instrumenting Claude Code to emit metrics, log events, and distributed traces (beta) to Splunk
-  Observability Cloud via a local OTel Collector fan-out, with optional Galileo OTLP trace ingestion for
-  AI observability; covers all three destination modes (local-collector, splunk-direct, external-
-  collector), env-block and settings.json rendering, collector overlay with dual fan-out,
-  otelHeadersHelper for secret-safe direct-mode auth, Galileo project/log-stream handoffs, detailed beta
-  tracing for Galileo Luna span scorers, non-public Galileo tenant support, and content-capture gating.
+  Observability Cloud via a local OTel Collector fan-out, with optional Galileo OTLP trace ingestion for AI observability; covers all destination modes, env-block and settings.json rendering, collector dual fan-out, secret-safe direct auth, Galileo handoffs and tracing, non-public tenants, and content-capture gating.
   Render, validate, and safely apply Claude Code CLI OpenTelemetry instrumentation to Splunk Observability
   Cloud and Galileo."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"
 ---

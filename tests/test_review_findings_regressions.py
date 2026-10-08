@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 from pathlib import Path
 
@@ -13,6 +14,7 @@ ACS_ALLOWLIST_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-allowlist-setup/sc
 IDXC_SETUP = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/setup.sh"
 IDXC_RENDERER = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/render_assets.py"
 SOAR_SETUP = REPO_ROOT / "skills/splunk-soar-setup/scripts/setup.sh"
+SHC_RENDERER = REPO_ROOT / "skills/splunk-search-head-cluster-setup/scripts/render_assets.py"
 
 
 def load_module(path: Path):
@@ -21,6 +23,109 @@ def load_module(path: Path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _run_generated_profile_probe(tmp_path: Path, script: str, mode: str) -> tuple[int, str]:
+    """Run a generated script against a deliberately small transport mock."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_curl = bin_dir / "curl"
+    fake_curl.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s' \"$*\" > \"${TLS_MARKER}\"\n"
+    )
+    fake_curl.chmod(0o700)
+    (lib / "credential_helpers.sh").write_text(
+        "load_splunk_platform_settings() {\n"
+        "  case \"${PROFILE_MODE:-}\" in\n"
+        "    insecure) SPLUNK_VERIFY_SSL=false ;;\n"
+        "    ca) SPLUNK_VERIFY_SSL=true; SPLUNK_CA_CERT=/protected/profile-ca.pem ;;\n"
+        "    *) return 1 ;;\n"
+        "  esac\n"
+        "}\n"
+        "get_session_key_from_password_file() {\n"
+        "  local tls_args=()\n"
+        "  [[ \"${SPLUNK_VERIFY_SSL}\" == false ]] && tls_args+=(-k)\n"
+        "  [[ \"${SPLUNK_CA_CERT:-}\" == /protected/profile-ca.pem ]] && tls_args+=(--cacert \"${SPLUNK_CA_CERT}\")\n"
+        "  curl \"${tls_args[@]}\" >/dev/null\n"
+        "  printf '%s' session-key\n"
+        "}\n"
+        "splunk_curl() { printf '{\"entry\":[]}' ; }\n"
+        # The SHC rolling-restart renderer validates the JSON body even for
+        # HTTP-200 responses; keep this transport mock representative.
+        "splunk_curl_post() { printf '{\"content\":{\"success\":1}}'; }\n"
+    )
+    (lib / "cluster_helpers.sh").write_text(
+        "cluster_bundle_status() { :; }\n"
+    )
+    (lib / "platform_version_helpers.sh").write_text(
+        "spv_require_supported_enterprise_server_info() { printf '10.6.0'; }\n"
+    )
+    target = tmp_path / "probe.sh"
+    target.write_text(script)
+    target.chmod(0o700)
+    password = tmp_path / "password"
+    password.write_text("secret\n")
+    password.chmod(0o600)
+    marker = tmp_path / "tls-marker"
+    env = dict(os.environ, SKILLS_SHARED_LIB_DIR=str(lib), PROFILE_MODE=mode,
+               SPLUNK_ADMIN_PASSWORD_FILE=str(password), TLS_MARKER=str(marker),
+               SPLUNK_AUTH_USER="admin", PATH=f"{bin_dir}:{os.environ['PATH']}")
+    result = subprocess.run([str(target)], env=env, capture_output=True, text=True)
+    return result.returncode, marker.read_text() if marker.exists() else ""
+
+
+def test_generated_indexer_auth_profile_controls_tls_and_fails_before_auth(tmp_path: Path) -> None:
+    renderer = load_module(IDXC_RENDERER)
+    script = renderer.render_bundle_scripts("https://manager.example.com:8089")["status.sh"]
+    rc, marker = _run_generated_profile_probe(tmp_path / "insecure", script, "insecure")
+    assert rc == 0
+    assert marker == "-k"
+    rc, marker = _run_generated_profile_probe(tmp_path / "ca", script, "ca")
+    assert rc == 0
+    assert marker == "--cacert /protected/profile-ca.pem"
+    rc, marker = _run_generated_profile_probe(tmp_path / "invalid", script, "invalid")
+    assert rc != 0
+    assert marker == ""
+
+
+def test_generated_shc_auth_profile_controls_tls_and_fails_before_auth(tmp_path: Path) -> None:
+    renderer = load_module(SHC_RENDERER)
+    script = renderer._rolling_restart_script(
+        "/protected/admin-password", "https://captain.example.com:8089", "searchable", "probe"
+    )
+    rc, marker = _run_generated_profile_probe(tmp_path / "insecure", script, "insecure")
+    assert rc == 0
+    assert marker == "-k"
+    rc, marker = _run_generated_profile_probe(tmp_path / "ca", script, "ca")
+    assert rc == 0
+    assert marker == "--cacert /protected/profile-ca.pem"
+    rc, marker = _run_generated_profile_probe(tmp_path / "invalid", script, "invalid")
+    assert rc != 0
+    assert marker == ""
+
+
+def test_indexer_searchable_restart_uses_supported_mode_and_rejects_json_errors(tmp_path: Path) -> None:
+    renderer = load_module(IDXC_RENDERER)
+    scripts = renderer.render_restart_scripts("https://manager.example.com:8089")
+    assert 'cluster_rolling_restart "${MANAGER_URI}" "${SK}" searchable' in scripts["searchable-rolling-restart.sh"]
+    helper = REPO_ROOT / "skills/shared/lib/cluster_helpers.sh"
+    probe = tmp_path / "probe.sh"
+    probe.write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        "_CRED_HELPERS_LOADED=true; log(){ :; }\n"
+        "splunk_curl_post(){ printf '%s' \"$2\" > \"${BODY_MARKER}\"; printf '{\"messages\":[{\"type\":\"ERROR\",\"text\":\"simulated restart failure\"}]}'; }\n"
+        f"source {helper}\n"
+        "cluster_rolling_restart https://manager.example.com:8089 valid-session searchable\n"
+    )
+    probe.chmod(0o700)
+    marker = tmp_path / "body"
+    result = subprocess.run([str(probe)], env=dict(os.environ, BODY_MARKER=str(marker)), capture_output=True, text=True)
+    assert result.returncode != 0
+    assert marker.read_text() == "searchable=true"
 
 
 def test_acs_fedramp_preflight_parser_fails_closed_on_invalid_status() -> None:
@@ -456,6 +561,111 @@ def test_indexer_cluster_bootstrap_uses_shared_pinned_ssh_policy(tmp_path: Path)
     assert 'ssh "${HBS_SSH_TRUST_ARGS[@]}"' in bootstrap
     assert "hbs_cleanup_ssh_trust" in bootstrap
     assert "StrictHostKeyChecking=accept-new" not in bootstrap
+
+
+def test_indexer_cluster_bootstrap_remote_cleanup_survives_local_nounset(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3", str(IDXC_RENDERER), "--output-dir", str(tmp_path),
+            "--cluster-manager-uri", "https://cm.example.com:8089",
+            "--manager-hosts", "cm.example.com", "--peer-hosts", "idx01.example.com",
+            "--replication-factor", "1", "--search-factor", "1",
+        ], cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    bootstrap = (tmp_path / "cluster/bootstrap/sequenced-bootstrap.sh").read_text(encoding="utf-8")
+    assert 'staged_secret="/tmp/${secret_basename}"' in bootstrap
+    assert '\\${staged_secret}' in bootstrap
+    assert 'rm -f -- "${staged_secret}"' not in bootstrap
+
+
+def test_indexer_cluster_bootstrap_executes_generated_remote_cleanup_under_nounset(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3", str(IDXC_RENDERER), "--output-dir", str(tmp_path),
+            "--cluster-manager-uri", "https://cm.example.com:8089",
+            "--manager-hosts", "cm.example.com", "--peer-hosts", "idx01.example.com",
+            "--replication-factor", "1", "--search-factor", "1",
+        ], cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    bootstrap = (tmp_path / "cluster/bootstrap/sequenced-bootstrap.sh").read_text(encoding="utf-8")
+    remote = bootstrap.split("cleanup_secret() {", 1)[1].split("target_dir=", 1)[0]
+    staged_name = f"indexer-bootstrap-{tmp_path.name}"
+    staged = Path("/tmp") / staged_name
+    staged.write_text("placeholder\n", encoding="utf-8")
+    try:
+        # Exercise the actual outer unquoted heredoc: it expands the client
+        # basename but leaves the escaped remote variable for the remote shell.
+        remote_file = tmp_path / "remote-body.sh"
+        outer_script = tmp_path / "outer-heredoc.sh"
+        outer_script.write_text(
+            "set -euo pipefail\n"
+            f"secret_basename={staged_name}\n"
+            f"cat > {remote_file!s} <<REMOTE_EOF\n"
+            "cleanup_secret() {" + remote +
+            "REMOTE_EOF\n"
+            f"bash -u {remote_file!s}\n",
+            encoding="utf-8",
+        )
+        completed = subprocess.run(["bash", "-u", str(outer_script)], capture_output=True, text=True, check=False)
+        assert completed.returncode == 0, completed.stderr
+        assert not staged.exists()
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def test_indexer_cluster_bootstrap_secret_guard_is_rendered_and_executable(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3", str(IDXC_RENDERER), "--output-dir", str(tmp_path),
+            "--cluster-manager-uri", "https://cm.example.com:8089",
+            "--manager-hosts", "cm.example.com", "--peer-hosts", "idx01.example.com",
+            "--replication-factor", "1", "--search-factor", "1",
+        ], cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    bootstrap = (tmp_path / "cluster/bootstrap/sequenced-bootstrap.sh").read_bytes()
+    assert b"\x00" not in bootstrap
+    text = bootstrap.decode("utf-8")
+    remote_python = text.split("<<'PY_REMOTE'\n", 1)[1].split("\nPY_REMOTE", 1)[0]
+    remote_script = tmp_path / "remote-secret-check.py"
+    remote_script.write_text(remote_python, encoding="utf-8")
+    source = tmp_path / "server.conf"
+    source.write_text("pass4SymmKey = $IDXC_SECRET\n", encoding="utf-8")
+    secret = tmp_path / "secret"
+    target = tmp_path / "target.conf"
+    secret.write_text("one-line-secret\n", encoding="utf-8")
+    secret.chmod(0o600)
+    valid = subprocess.run(
+        ["python3", str(remote_script), str(source), str(secret), str(target), str(__import__("os").getuid())],
+        capture_output=True, text=True, check=False,
+    )
+    assert valid.returncode == 0, valid.stderr
+    assert "one-line-secret" in target.read_text(encoding="utf-8")
+    for bad in ("two\nlines\n", "bad\x00secret\n"):
+        secret.write_bytes(bad.encode("utf-8"))
+        rejected = subprocess.run(
+            ["python3", str(remote_script), str(source), str(secret), str(target), str(__import__("os").getuid())],
+            capture_output=True, text=True, check=False,
+        )
+        assert rejected.returncode != 0
+
+
+def test_indexer_cluster_bootstrap_owns_app_root_before_local_config_write(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3", str(IDXC_RENDERER), "--output-dir", str(tmp_path),
+            "--cluster-manager-uri", "https://cm.example.com:8089",
+            "--manager-hosts", "cm.example.com", "--peer-hosts", "idx01.example.com",
+            "--replication-factor", "1", "--search-factor", "1",
+        ], cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    bootstrap = (tmp_path / "cluster/bootstrap/sequenced-bootstrap.sh").read_text(encoding="utf-8")
+    assert "app_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster" in bootstrap
+    assert 'target_dir="\\${app_dir}/local"' in bootstrap
+    assert 'sudo install -d -o splunk -g splunk -m 750 "\\${app_dir}" "\\${target_dir}"' in bootstrap
 
 
 def test_soar_automation_broker_requires_file_based_token(tmp_path: Path) -> None:

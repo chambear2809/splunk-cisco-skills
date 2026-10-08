@@ -26,17 +26,18 @@ NAMESPACE="splunk-operator"
 OPERATOR_NAMESPACE="splunk-operator"
 RELEASE_NAME="splunk-enterprise"
 OPERATOR_RELEASE_NAME="splunk-operator"
-OPERATOR_VERSION="3.1.0"
+OPERATOR_VERSION="3.2.0"
 OPERATOR_IMAGE=""
 CHART_VERSION=""
 OPERATOR_CHART_ARCHIVE=""
 ENTERPRISE_CHART_ARCHIVE=""
 CRD_MANIFEST=""
-SPLUNK_VERSION="$(spv_enterprise_default)"
+SPLUNK_VERSION="$(spv_default enterprise_kubernetes_version)"
 SPLUNK_IMAGE=""
 STORAGE_CLASS=""
 ETC_STORAGE="10Gi"
 VAR_STORAGE="100Gi"
+STARTUP_PROBE_FAILURE_THRESHOLD=""
 STANDALONE_REPLICAS="1"
 INDEXER_REPLICAS="3"
 SEARCH_HEAD_REPLICAS="3"
@@ -143,17 +144,18 @@ SOK options:
   --operator-namespace NAME                Operator namespace (default: splunk-operator)
   --release-name NAME                      Enterprise Helm release (default: splunk-enterprise)
   --operator-release-name NAME             Operator Helm release (default: splunk-operator)
-  --operator-version VERSION               Splunk Operator version (default: 3.1.0)
+  --operator-version VERSION               Splunk Operator version (default: 3.2.0)
   --operator-image IMAGE                   Private-registry Operator image mirror
   --chart-version VERSION                  Helm chart version (default: follows --operator-version)
   --operator-chart-archive PATH            Reviewed local Operator chart archive
   --enterprise-chart-archive PATH          Reviewed local Enterprise chart archive
   --crd-manifest PATH                      Reviewed local SOK CRD manifest
-  --splunk-version VERSION                 Splunk Enterprise version (default: $(spv_enterprise_default))
+  --splunk-version VERSION                 Splunk Enterprise version (default: $(spv_default enterprise_kubernetes_version))
   --splunk-image IMAGE                     Override Splunk Enterprise image
   --storage-class NAME                     Kubernetes StorageClass override
   --etc-storage SIZE                       /opt/splunk/etc PVC size (default: 10Gi)
   --var-storage SIZE                       /opt/splunk/var PVC size (default: 100Gi)
+  --startup-probe-failure-threshold N      SOK startup probe failures, 12..120 (default: S1 12, C3/M4 60)
   --standalone-replicas N                  Verified S1 requires exactly 1 (default: 1)
   --indexer-replicas N                     C3 total indexers; M4 indexers per site (default: 3)
   --search-head-replicas N                 C3/M4 search head count (default: 3)
@@ -190,7 +192,7 @@ SOK options:
   --enterprise-values-overlay PATH         Reviewed non-secret Enterprise chart overlay
   --operator-values-overlay PATH           Reviewed non-secret operator chart overlay
   --confirm-splunk-10-4-upgrade-readiness Confirm required 10.4 backup/KV/app/TLS checks
-  --indexing-ingestion-separation          Enable SOK 3.1 Queue/ObjectStorage/IngestorCluster
+  --indexing-ingestion-separation          Enable SOK 3.2 Queue/ObjectStorage/IngestorCluster
   --ingestor-replicas N                    Ingestor count (default: 3)
   --ingestor-service-account NAME          Reserved handoff; rejected by verified SOK 3.1 I&I
   --queue-provider sqs|sqs_cp               Queue provider (default: sqs)
@@ -264,6 +266,7 @@ while [[ $# -gt 0 ]]; do
         --storage-class) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); STORAGE_CLASS="$2"; shift 2 ;;
         --etc-storage) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); ETC_STORAGE="$2"; shift 2 ;;
         --var-storage) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); VAR_STORAGE="$2"; shift 2 ;;
+        --startup-probe-failure-threshold) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); STARTUP_PROBE_FAILURE_THRESHOLD="$2"; shift 2 ;;
         --standalone-replicas) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); STANDALONE_REPLICAS="$2"; shift 2 ;;
         --indexer-replicas) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); INDEXER_REPLICAS="$2"; shift 2 ;;
         --search-head-replicas) require_arg "$1" $# || exit 1; SOK_ONLY_OPTIONS+=("$1"); SEARCH_HEAD_REPLICAS="$2"; shift 2 ;;
@@ -804,6 +807,9 @@ build_renderer_args() {
     )
     if [[ -n "${POD_PROFILE}" ]]; then
         RENDER_ARGS+=(--pod-profile "${POD_PROFILE}")
+    fi
+    if [[ -n "${STARTUP_PROBE_FAILURE_THRESHOLD}" ]]; then
+        RENDER_ARGS+=(--startup-probe-failure-threshold "${STARTUP_PROBE_FAILURE_THRESHOLD}")
     fi
     if [[ -n "${SPLUNK_IMAGE}" ]]; then
         RENDER_ARGS+=(--splunk-image "${SPLUNK_IMAGE}")

@@ -3143,8 +3143,7 @@ def augment_lifecycle_evidence(
             unsupported = True
             derived_issues.append(
                 f"Splunk Enterprise {minor} is not in the current public "
-                "Enterprise release contract; keep the verified 10.4 baseline "
-                "until public Enterprise packages and documentation are available."
+                "Enterprise release contract; use a supported public Enterprise train."
             )
         else:
             supported_parts = [version_tuple(item) for item in supported]

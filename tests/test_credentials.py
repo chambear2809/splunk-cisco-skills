@@ -31,6 +31,7 @@ ALLOWED_KEYS = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_SSH_AUTH_METHOD",
     "SPLUNK_SSH_KNOWN_HOSTS_FILE",
     "SPLUNK_SSH_HOST_KEY_FINGERPRINT",
     "SPLUNK_SSH_ALLOW_TOFU",
@@ -303,12 +304,14 @@ class TestCredentialParsing(unittest.TestCase):
     def test_remote_bootstrap_keys_allowed(self):
         text = textwrap.dedent("""\
             SPLUNK_SSH_KNOWN_HOSTS_FILE="/secure/splunk_known_hosts"
+            SPLUNK_SSH_AUTH_METHOD="key"
             SPLUNK_SSH_HOST_KEY_FINGERPRINT="SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
             SPLUNK_SSH_ALLOW_TOFU="false"
             SPLUNK_REMOTE_TMPDIR="/var/tmp"
             SPLUNK_REMOTE_SUDO="true"
         """)
         result = parse_credential_file(text)
+        self.assertEqual(result["SPLUNK_SSH_AUTH_METHOD"], "key")
         self.assertEqual(result["SPLUNK_SSH_KNOWN_HOSTS_FILE"], "/secure/splunk_known_hosts")
         self.assertEqual(
             result["SPLUNK_SSH_HOST_KEY_FINGERPRINT"],

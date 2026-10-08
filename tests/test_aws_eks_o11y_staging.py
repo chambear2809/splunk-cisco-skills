@@ -104,6 +104,15 @@ def _runner_env(tmp_path: Path, token: Path) -> dict[str, str]:
         encoding="utf-8",
     )
     env = os.environ.copy()
+    # The Ubuntu validation runner intentionally has no ambient AWS/kubectl
+    # binaries. Provide inert command shims so configuration and token-file
+    # regressions reach their intended checks before live toolchain checks.
+    toolchain = tmp_path / "toolchain"
+    toolchain.mkdir()
+    for command in ("aws", "kubectl", "curl"):
+        shim = toolchain / command
+        shim.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        shim.chmod(0o700)
     env.update(
         {
             "STAGING_EXPECTED_AWS_ACCOUNT_ID": "123456789012",
@@ -122,6 +131,7 @@ def _runner_env(tmp_path: Path, token: Path) -> dict[str, str]:
             "STAGING_OTEL_RENDERED_DIR": str(otel),
             "STAGING_AUTO_INSTRUMENTATION_RENDERED_DIR": str(auto),
             "STAGING_AWS_INTEGRATION_RENDERED_DIR": str(aws),
+            "PATH": f"{toolchain}{os.pathsep}{env.get('PATH', '')}",
         }
     )
     env.pop("STAGING_LAMBDA_APM_RENDERED_DIR", None)

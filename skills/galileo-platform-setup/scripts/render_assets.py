@@ -593,6 +593,8 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
 
 def validate_galileo_root_url(value: str, label: str) -> Any:
     raw = value.strip()
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in raw) or "\\" in raw:
+        raise SystemExit(f"ERROR: {label} contains unsafe control or backslash characters")
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
         raw = "https://" + raw
     parsed = urlparse(raw)
@@ -600,7 +602,11 @@ def validate_galileo_root_url(value: str, label: str) -> Any:
         raise SystemExit(f"ERROR: {label} must be an absolute HTTP(S) URL")
     if parsed.username or parsed.password:
         raise SystemExit(f"ERROR: {label} must not contain credentials")
-    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+    allowed_console_tenant = (
+        label == "Galileo console URL"
+        and re.fullmatch(r"/[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?", parsed.path)
+    )
+    if (parsed.path not in {"", "/"} and not allowed_console_tenant) or parsed.params or parsed.query or parsed.fragment:
         raise SystemExit(
             f"ERROR: {label} must not contain a path, parameters, query, or fragment"
         )

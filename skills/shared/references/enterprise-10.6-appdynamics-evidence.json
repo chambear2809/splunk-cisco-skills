@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "validation": "enterprise-10.6-appdynamics",
+  "status": "qualified_partial",
+  "qualification": "functional validation passed with documented gaps; package installation alone is not a pass",
+  "target": {
+    "product": "Splunk Enterprise",
+    "version_family": "10.6.x",
+    "workflow": "Cisco AppDynamics add-on installation, configuration, ingest, and dashboard validation",
+    "version": "10.6.0.5",
+    "os": "Ubuntu 24.04 x86_64",
+    "topology": "Fresh standalone isolated lab",
+    "REST_TLS": "CA-verified management connection through protected SSH loopback forward"
+  },
+  "package": {
+    "app_id": "3471",
+    "app_name": "Splunk_TA_AppDynamics",
+    "version": "3.2.1",
+    "bytes": 6624371,
+    "sha256": "10c0c7ec606fcbf0e03c24352e3e69935ff4ed76ba3f95b9fa4db4dd6b851c6c",
+    "archive_top_level_members": [
+      "Splunk_TA_AppDynamics"
+    ],
+    "archive_member_count": 1345,
+    "macro_stanzas": [],
+    "shipped_views": [
+      "audit_log",
+      "configuration",
+      "dashboard",
+      "events",
+      "home",
+      "ingestion_statistics",
+      "inputs",
+      "license_usage",
+      "status",
+      "troubleshooting"
+    ]
+  },
+  "execution": {
+    "owning_installer_exit_code": 0,
+    "configuration_steps": {
+      "indexes": 0,
+      "settings": 0,
+      "account_and_inputs": 0
+    },
+    "completion_validator_exit_code": 0,
+    "completion_summary": {
+      "pass": 12,
+      "warn": 1,
+      "fail": 0
+    },
+    "package_owned_views": {
+      "expected": 10,
+      "present": 10,
+      "navigable_visible": 9,
+      "navigable_expected": 9
+    },
+    "cleanup": {
+      "owned_inputs_deleted": 5,
+      "owned_account_absent": true,
+      "owned_stored_credential_names_remaining": [],
+      "installed_package_and_test_index_retained": true,
+      "user_credential_files_preserved": true
+    }
+  },
+  "ingest_readback": {
+    "index": "appdynamics",
+    "enabled_inputs": 5,
+    "disabled_inputs": 0,
+    "streams_with_events": {
+      "appdynamics_status": 448,
+      "appdynamics_security": 42,
+      "appdynamics_audit": 18,
+      "appdynamics_licenses": 5
+    },
+    "events_stream_count": 0,
+    "search_errors": 0,
+    "controller_probe": {
+      "oauth_http_status": 200,
+      "application_discovery_http_status": 200,
+      "application_count": 2,
+      "tier_count": 2,
+      "event_query_windows": {
+        "24h": {
+          "http_status": 200,
+          "result_count": 0
+        },
+        "7d": {
+          "http_status": 200,
+          "result_count": 0
+        }
+      }
+    }
+  },
+  "dashboard_readback": {
+    "screenshots_reviewed": 7,
+    "ui_observations": {
+      "audit_rows": 11,
+      "monitoring_streams": 4,
+      "status_populated": true,
+      "license_usage_populated": true,
+      "troubleshooting_rows_present": true,
+      "events_view_empty_rows": 4
+    },
+    "package_owned_view_gate": "10/10 present; 9/9 navigable visible; vendor home view may be hidden"
+  },
+  "limitations": [
+    "The controller event endpoint returned zero results for both 24-hour and 7-day windows, so the events stream cannot be marked populated from this run.",
+    "High Level Status showed application, business-transaction, and database rows; tier/node panels remained empty.",
+    "License Usage showed IBL package rows. ABL and agent-count panels remained empty. The owned license input interval was 3600 seconds.",
+    "Analytics is an optional branch and was not configured or validated.",
+    "231 internal error-level records were observed. Sanitized samples included BrokenPipeError and one rate-limit classification; the root-cause classification is an inference and was not proven as an authentication, TLS, DNS, permission, or schema failure."
+  ],
+  "evidence_scope": {
+    "secrets_exposed": false,
+    "primary_or_production_mutation": false,
+    "retained_reusable_lab_package_and_index": true,
+    "source_receipts": [
+      "package-receipt",
+      "package-inspection",
+      "install-receipt",
+      "configure-receipt",
+      "completion-final",
+      "live-readback",
+      "diagnosis-summary",
+      "cleanup-receipt",
+      "dashboard-screenshot-set"
+    ]
+  },
+  "restart_retention": {
+    "status": "pass",
+    "restart_completed_at_utc": "2026-10-08T03:25:44.691923+00:00",
+    "collected_at_utc": "2026-10-08T03:27:12.015980+00:00",
+    "trigger": "owning DBConnect app installer REST restart",
+    "counts": [
+      {
+        "sourcetype": "appdynamics_audit",
+        "count": "18",
+        "latest_event": "1791429685"
+      },
+      {
+        "sourcetype": "appdynamics_licenses",
+        "count": "5",
+        "latest_event": "1791428193"
+      },
+      {
+        "sourcetype": "appdynamics_security",
+        "count": "42",
+        "latest_event": "1791429685"
+      },
+      {
+        "sourcetype": "appdynamics_status",
+        "count": "448",
+        "latest_event": "1791429684"
+      }
+    ],
+    "search_errors": 0,
+    "temporary_inputs_and_account_absent": true
+  }
+}

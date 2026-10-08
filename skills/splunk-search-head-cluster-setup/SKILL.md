@@ -10,13 +10,21 @@ description: "Use when the user asks to bootstrap an SHC, push a deployer bundle
   reset, captain re-election), standalone-to-SHC migration, deployer replacement, ES-on-SHC deployer
   placement, and failure-mode runbooks (split-brain, quorum loss, deployer mismatch, captain crash loop).
   SHC pass4SymmKey is templated as `$SHC_SECRET` for operator-managed rotation (see Out of Scope)."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Search Head Cluster Setup
+
+Before upgrading a cluster to Enterprise 10.6, follow the coordinated SHC
+procedure and verify stable captain, healthy membership, parallel KV Store
+backup, and authenticated KV Store status. The PostgreSQL sidecar migration can
+make KV Store read-only for an extended period; coordinate the maintenance
+window across the full cluster.
 
 ## Prerequisites
 
@@ -219,6 +227,10 @@ Under `splunk-search-head-cluster-rendered/shc/`:
   member `init shcluster-config` (parallel, one per member) →
   `bootstrap-shcluster-captain` on designated first captain →
   quorum-wait loop.
+- `bootstrap/apply-system-local.sh` and its colocated
+  `merge_server_conf_sections.py` helper — apply a protected reviewed member
+  role fragment atomically to `etc/system/local/server.conf`; membership
+  sections must not live in an app a later deployer bundle can remove.
 - `bundle/{validate.sh, status.sh, apply.sh, apply-skip-validation.sh, rollback.sh}`.
 - `restart/{rolling-restart.sh, searchable-rolling-restart.sh,
   force-searchable.sh, transfer-captain.sh}`.
@@ -298,6 +310,9 @@ do. The deployer hosts `$SPLUNK_HOME/etc/shcluster/apps/` for the bundle.
 
 - Apps for distribution live under `$SPLUNK_HOME/etc/shcluster/apps/` on the
   deployer (NOT `etc/manager-apps/` — that is the indexer cluster pattern).
+- Member membership and KV Store role configuration lives in each member's
+  `etc/system/local/server.conf`; do not place it under an app managed by the
+  deployer bundle.
 - Deployer-only apps (local admin apps, ES) live under `etc/apps/` on the
   deployer and are NOT pushed to members via the bundle.
 - Bundle SHA tracking prevents re-applying unchanged bundles.

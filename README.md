@@ -16,28 +16,25 @@ Most workflows are render-first and validation-heavy. Mutating phases are
 explicit, secrets stay in local files, and generated plans or manifests are
 review artifacts rather than source files.
 
-Current compatibility baseline: Splunk Cloud Platform `10.5.2605`, with
-`10.4.2604` retained as the previous Cloud documentation train. Self-managed
-Splunk Enterprise, Universal Forwarder, Splunk Operator for Kubernetes, and
-Splunk POD remain on their verified 10.4 baselines. As of July 2, 2026, the
-public Enterprise and Universal Forwarder downloads and Enterprise release
-manual remain on 10.4, so this repository does not yet enable a self-managed
-10.5 runtime. Splunkbase package compatibility is evaluated per release
-against `10.5`: repo-verified pins and current public releases keep separate
-platform-version evidence. A selected release with no 10.5 evidence fails
-closed and must not inherit compatibility merely because Splunk Cloud Platform
-supports that train or a different package release advertises it.
+Current Cloud documentation train: Splunk Cloud Platform `10.5.2605`, with
+`10.4.2604` retained as the previous Cloud train. The self-managed Enterprise
+baseline is Splunk Enterprise `10.6.0.5` (train `10.6`). Cloud compatibility
+and self-managed Enterprise compatibility are separate contracts. Splunkbase
+package compatibility is evaluated per exact release; a selected release with
+no explicit Enterprise 10.6 evidence remains conditional or blocked and cannot
+inherit support from Cloud 10.5 or another package release.
 The numeric app registry is also bound to a tracked public-listing/release-API
 [metadata provenance snapshot](skills/shared/references/splunkbase_registry_evidence.md).
 That evidence covers release metadata, not downloadable package binaries or
 package checksums; older pins absent from the current API require an additional
 explicit installer acknowledgement.
 
-Every skill now declares a machine-readable 10.5 status in its `SKILL.md`
-frontmatter. See the generated
-[`SPLUNK_10_5_COMPATIBILITY.md`](SPLUNK_10_5_COMPATIBILITY.md) matrix for all
-skill classifications, package evidence, and the meaning of supported,
-conditional, blocked, self-managed, delegated, and not-applicable statuses.
+Every skill declares separate machine-readable Cloud 10.5 and Enterprise 10.6
+statuses in its `SKILL.md` frontmatter. See the generated
+[`SPLUNK_10_5_COMPATIBILITY.md`](SPLUNK_10_5_COMPATIBILITY.md) and
+[`SPLUNK_ENTERPRISE_10_6_COMPATIBILITY.md`](SPLUNK_ENTERPRISE_10_6_COMPATIBILITY.md)
+matrices for each platform's classifications and package evidence. Enterprise
+10.6 status remains conditional or blocked until explicit evidence is recorded.
 
 ## Start Here
 

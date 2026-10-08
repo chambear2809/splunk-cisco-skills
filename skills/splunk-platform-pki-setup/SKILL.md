@@ -8,13 +8,17 @@ description: "Use when the user asks to build Splunk PKI, mint certs, prepare th
   forwarders, Universal Forwarders, Edge Processor, SAML SP signing, LDAPS trust, and CLI CA trust. Covers
   CSR handoffs, internal CA rendering, FIPS mode, TLS policy presets, KV Store EKU enforcement, default-
   cert refusal, SAN-aware leaf certs, mTLS, replication-port TLS, and delegated rotation runbooks."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Platform PKI Setup
+
+For 10.6 `$8$` encryption and public CA Client Authentication EKU changes, see [Enterprise 10.6 certificate notes](references/enterprise-10.6.md).
 
 ## Prerequisites
 

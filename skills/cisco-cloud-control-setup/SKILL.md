@@ -6,8 +6,10 @@ description: "Use when the user asks to prepare Cisco Cloud Control, AgenticOps,
   Cloud Control Studio handoffs, official Cloud Control feature coverage, Cisco Workflows API readiness,
   delegated Cisco Data Fabric architecture coverage, MCP connectors, Agent Observability access handoffs,
   Observability content, and Cisco domain readiness."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

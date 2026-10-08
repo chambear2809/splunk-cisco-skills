@@ -18,10 +18,10 @@ DNSPROXY_NAMESPACE="kube-system"
 TIMESCAPE_NAMESPACE="hubble-timescape"
 CILIUM_NS_SET=false
 TETRAGON_NS_SET=false
-AUDITED_OSS_CILIUM_CHART_VERSION="1.18.10"
+AUDITED_OSS_CILIUM_CHART_VERSION="1.20.2"
 AUDITED_ENTERPRISE_CILIUM_CHART_VERSION="1.18.8"
 AUDITED_EKS_MIRROR_CILIUM_CHART_VERSION="1.18.8"
-AUDITED_OSS_TETRAGON_CHART_VERSION="1.7.0"
+AUDITED_OSS_TETRAGON_CHART_VERSION="1.7.1"
 AUDITED_ENTERPRISE_TETRAGON_CHART_VERSION="1.18.1"
 AUDITED_DNSPROXY_CHART_VERSION="1.18.8"
 AUDITED_HUBBLE_ENTERPRISE_CHART_VERSION="1.18.8"
@@ -726,6 +726,35 @@ print(f"samples={sample_count}")
         log "    ${label}: reachable (${summary})"
     }
 
+    probe_cilium_agent_metrics() {
+        local pod_names pod
+        if ! pod_names="$(printf '%s' "${CILIUM_PODS_JSON}" | python3 -c '
+import json
+import re
+import sys
+
+payload = json.load(sys.stdin)
+items = payload.get("items") if isinstance(payload, dict) else None
+if not isinstance(items, list) or not items:
+    raise SystemExit(1)
+name_pattern = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
+names = []
+for pod in items:
+    name = str((pod.get("metadata") or {}).get("name") or "")
+    if not name_pattern.fullmatch(name):
+        raise SystemExit(1)
+    names.append(name)
+print("\n".join(names))
+' 2>/dev/null)"; then
+            record_failure "unable to parse Cilium agent pod inventory for per-agent metrics"
+            return 0
+        fi
+        while IFS= read -r pod; do
+            [[ -n "${pod}" ]] || continue
+            probe_metrics "Cilium agent ${pod}:9962" "/api/v1/namespaces/${CILIUM_NAMESPACE}/pods/${pod}:9962/proxy/metrics" true true
+        done <<< "${pod_names}"
+    }
+
     check_tetragon_pod_logs() {
         local pod_targets pod container output path log_scan
         if [[ -z "${TETRAGON_PODS_JSON}" ]]; then
@@ -938,11 +967,12 @@ for item in payload.get("items") or []:
     fi
 
     log "  Required platform pod readiness:"
+    CILIUM_PODS_JSON=""
     TETRAGON_PODS_JSON=""
     if [[ "${PROVIDER_MANAGED_CILIUM}" == "true" ]]; then
         log "    cilium: skipped Helm-owned pod selector for provider-managed ${DISTRIBUTION}"
     else
-        fetch_and_check_pods "Cilium agent" "${CILIUM_NAMESPACE}" "k8s-app=cilium" ""
+        fetch_and_check_pods "Cilium agent" "${CILIUM_NAMESPACE}" "k8s-app=cilium" CILIUM_PODS_JSON
     fi
     fetch_and_check_pods "Tetragon agent" "${TETRAGON_NAMESPACE}" "app.kubernetes.io/name=tetragon" TETRAGON_PODS_JSON
     if [[ "${ENABLE_HUBBLE_ENTERPRISE}" == "true" ]]; then
@@ -957,6 +987,7 @@ for item in payload.get("items") or []:
         log "    cilium metrics: skipped Helm-owned service names for provider-managed ${DISTRIBUTION}"
     else
         probe_metrics "cilium-agent:9962" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-agent:9962/proxy/metrics" true true
+        probe_cilium_agent_metrics
         probe_metrics "hubble-metrics:9965" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/hubble-metrics:9965/proxy/metrics" true true
         probe_metrics "cilium-envoy:9964" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-envoy:9964/proxy/metrics" true true
         probe_metrics "cilium-operator:9963" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-operator:9963/proxy/metrics" true true

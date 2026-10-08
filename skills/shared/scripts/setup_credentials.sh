@@ -139,6 +139,7 @@ splunk_ssh_host=""
 splunk_ssh_port="22"
 splunk_ssh_user="splunk"
 splunk_ssh_pass=""
+splunk_ssh_auth_method="password"
 splunk_ssh_known_hosts_file=""
 splunk_ssh_host_key_fingerprint=""
 splunk_ssh_allow_tofu="false"
@@ -150,9 +151,25 @@ if [[ "${add_ssh}" =~ ^[yY] ]]; then
     splunk_ssh_port="${splunk_ssh_port_input:-22}"
     read -rp "SSH user (default: splunk): " splunk_ssh_user_input
     splunk_ssh_user="${splunk_ssh_user_input:-splunk}"
-    read -rsp "SSH password: " splunk_ssh_pass
-    echo ""
-    echo "SSH host-key verification (required before password authentication):"
+    echo "SSH authentication:"
+    echo "  1) Password"
+    echo "  2) Local OpenSSH key or agent"
+    read -rp "Choose [1/2, default 1]: " ssh_auth_choice
+    case "${ssh_auth_choice}" in
+        ""|1)
+            splunk_ssh_auth_method="password"
+            read -rsp "SSH password: " splunk_ssh_pass
+            echo ""
+            ;;
+        2)
+            splunk_ssh_auth_method="key"
+            ;;
+        *)
+            echo "ERROR: unknown SSH authentication choice '${ssh_auth_choice}'." >&2
+            exit 1
+            ;;
+    esac
+    echo "SSH host-key verification (required before SSH authentication):"
     echo "  1) Pinned known_hosts file (recommended)"
     echo "  2) Pinned OpenSSH SHA256 host-key fingerprint"
     echo "  3) LAB ONLY: trust the first key seen (TOFU; interception risk)"
@@ -267,6 +284,7 @@ splunk_ssh_host_q=$(quote_credential_value "${splunk_ssh_host}")
 splunk_ssh_port_q=$(quote_credential_value "${splunk_ssh_port}")
 splunk_ssh_user_q=$(quote_credential_value "${splunk_ssh_user}")
 splunk_ssh_pass_q=$(quote_credential_value "${splunk_ssh_pass}")
+splunk_ssh_auth_method_q=$(quote_credential_value "${splunk_ssh_auth_method}")
 splunk_ssh_known_hosts_file_q=$(quote_credential_value "${splunk_ssh_known_hosts_file}")
 splunk_ssh_host_key_fingerprint_q=$(quote_credential_value "${splunk_ssh_host_key_fingerprint}")
 splunk_ssh_allow_tofu_q=$(quote_credential_value "${splunk_ssh_allow_tofu}")
@@ -330,7 +348,9 @@ SPLUNK_SSH_HOST=${splunk_ssh_host_q}
 SPLUNK_SSH_PORT=${splunk_ssh_port_q}
 SPLUNK_SSH_USER=${splunk_ssh_user_q}
 SPLUNK_SSH_PASS=${splunk_ssh_pass_q}
-# Password SSH fails closed unless one production pin is configured. Set only
+# SSH authentication mode: password or key (local OpenSSH key/agent).
+SPLUNK_SSH_AUTH_METHOD=${splunk_ssh_auth_method_q}
+# SSH fails closed unless one production pin is configured. Set only
 # one of the known_hosts file or fingerprint fields. TOFU is lab-only.
 SPLUNK_SSH_KNOWN_HOSTS_FILE=${splunk_ssh_known_hosts_file_q}
 SPLUNK_SSH_HOST_KEY_FINGERPRINT=${splunk_ssh_host_key_fingerprint_q}

@@ -6,8 +6,10 @@ description: "Use when the user asks to set up Ingest Actions, evaluate or mask 
   transforms.conf INGEST_EVAL through target-app REST endpoints on Splunk Enterprise or a customer-managed
   heavy forwarder. For route-s3, apply stages only outputs.conf [rfs:] and exits 2 with an explicit Splunk
   Web or supported rulesets-API handoff for the route rule. Splunk Cloud is render/handoff-only."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

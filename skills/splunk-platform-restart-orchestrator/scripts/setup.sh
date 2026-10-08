@@ -203,10 +203,16 @@ validate_expected_ports_after_restart() {
         log "ERROR: Cannot validate expected listener ports without an executable target mode."
         return 1
     }
+    # Probe with the target's plain Python interpreter.  Invoking
+    # ``splunk cmd python3`` is not a socket test: on SSH-managed hosts it can
+    # hit Splunk's boot-start/FTR guard when the command is run by the SSH
+    # account, even while splunkd is listening and the service-user command
+    # would succeed.  The execution helper still selects local vs SSH target;
+    # this command only checks the target loopback listener.
     probe_code='import socket, sys; s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=5); s.close()'
     IFS=',' read -r -a expected_port_array <<< "${EXPECTED_PORTS}"
     for port in "${expected_port_array[@]}"; do
-        raw_cmd="$(hbs_shell_join "${splunk_home%/}/bin/splunk" cmd python3 -c "${probe_code}" "${port}")"
+        raw_cmd="$(hbs_shell_join python3 -c "${probe_code}" "${port}")"
         if ! _platform_restart_capture "${execution_mode}" "${raw_cmd}" >/dev/null 2>&1; then
             log "ERROR: Expected listener port ${port} is not reachable on target loopback after restart."
             return 1

@@ -4,8 +4,10 @@ description: "Use when the user asks about SC4SNMP, Splunk Connect for SNMP, SNM
   through HEC. Deploy and validate Splunk Connect for SNMP (SC4SNMP) for Splunk Enterprise or Splunk
   Cloud. Prepares Splunk indexes and HEC, renders Docker Compose or Kubernetes Helm configuration, and
   validates SC4SNMP polling or trap readiness."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

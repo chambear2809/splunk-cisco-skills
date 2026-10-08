@@ -56,6 +56,8 @@ S3_KMS_KEY_ID=""
 S3_KMS_AUTH_REGION=""
 S3_SSL_VERIFY_SERVER_CERT="unset"
 S3_SSL_VERSIONS=""
+S3_SSL_ROOT_CA_PATH=""
+IMDS_VERSION="unset"
 S3_ACCESS_KEY_FILE=""
 S3_SECRET_KEY_FILE=""
 GCS_CREDENTIAL_FILE=""
@@ -134,6 +136,8 @@ Options:
   --s3-kms-auth-region REGION
   --s3-ssl-verify-server-cert true|false|unset
   --s3-ssl-versions CSV
+  --s3-ssl-root-ca-path ABSOLUTE_PATH
+  --imds-version v1|v2|unset
   --s3-access-key-file PATH
   --s3-secret-key-file PATH
   --gcs-credential-file PATH
@@ -203,6 +207,8 @@ while [[ $# -gt 0 ]]; do
         --s3-kms-auth-region) require_arg "$1" $# || exit 1; S3_KMS_AUTH_REGION="$2"; shift 2 ;;
         --s3-ssl-verify-server-cert) require_arg "$1" $# || exit 1; S3_SSL_VERIFY_SERVER_CERT="$2"; shift 2 ;;
         --s3-ssl-versions) require_arg "$1" $# || exit 1; S3_SSL_VERSIONS="$2"; shift 2 ;;
+        --s3-ssl-root-ca-path) require_arg "$1" $# || exit 1; S3_SSL_ROOT_CA_PATH="$2"; shift 2 ;;
+        --imds-version) require_arg "$1" $# || exit 1; IMDS_VERSION="$2"; shift 2 ;;
         --s3-access-key-file) require_arg "$1" $# || exit 1; S3_ACCESS_KEY_FILE="$2"; shift 2 ;;
         --s3-secret-key-file) require_arg "$1" $# || exit 1; S3_SECRET_KEY_FILE="$2"; shift 2 ;;
         --gcs-credential-file) require_arg "$1" $# || exit 1; GCS_CREDENTIAL_FILE="$2"; shift 2 ;;
@@ -451,6 +457,8 @@ build_renderer_args() {
         --s3-kms-auth-region "${S3_KMS_AUTH_REGION}"
         --s3-ssl-verify-server-cert "${S3_SSL_VERIFY_SERVER_CERT}"
         --s3-ssl-versions "${S3_SSL_VERSIONS}"
+        --s3-ssl-root-ca-path "${S3_SSL_ROOT_CA_PATH}"
+        --imds-version "${IMDS_VERSION}"
         --s3-access-key-file "${S3_ACCESS_KEY_FILE}"
         --s3-secret-key-file "${S3_SECRET_KEY_FILE}"
         --gcs-credential-file "${GCS_CREDENTIAL_FILE}"

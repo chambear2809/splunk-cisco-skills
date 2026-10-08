@@ -4,8 +4,10 @@ description: "Use when the user asks to onboard, configure, or validate Microsof
   data in Splunk. Render, install, and validate the package-verified Splunk Add-on for Microsoft SCOM
   (Splunk_TA_microsoft-scom, Splunkbase 2729). Covers package-derived PowerShell inputs, microsoft:scom*
   source types, eventtypes, lookups, index readiness, and readiness-doctor handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

@@ -35,6 +35,8 @@ CLIENT_NAME=""
 PHONE_HOME_INTERVAL="60"
 TCPOUT_GROUP="default-autolb-group"
 USE_ACK="true"
+MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
+IPC_PORT="${SPLUNK_IPC_BROKER_PORT:-${SPLUNK_IPC_PORT:-8194}}"
 BOOT_START=true
 ACCEPT_FORWARDER_MUTATION=false
 SPLUNK_REMOTE_SUDO="${SPLUNK_REMOTE_SUDO:-true}"
@@ -75,6 +77,8 @@ Install options:
   --splunk-home PATH
   --service-user USER
   --no-boot-start
+  --mgmt-port PORT (default: 8089; env: SPLUNK_MGMT_PORT)
+  --ipc-broker-port PORT (alias: --ipc-port; default: 8194; env: SPLUNK_IPC_BROKER_PORT)
   --checksum sha256:<value>
   --accept-forwarder-mutation
                          Required for live install, upgrade, or enrollment
@@ -137,6 +141,14 @@ validate_positive_int() {
     local label="${2:-value}"
     if [[ ! "${value}" =~ ^[0-9]+$ || "${value}" -lt 1 ]]; then
         log "ERROR: ${label} must be a positive integer."
+        exit 1
+    fi
+}
+
+validate_port() {
+    local value="${1:-}" label="${2:-port}" minimum="${3:-1}"
+    if [[ ! "${value}" =~ ^[0-9]+$ ]] || (( 10#${value} < minimum || 10#${value} > 65535 )); then
+        log "ERROR: ${label} must be a numeric value from ${minimum} through 65535."
         exit 1
     fi
 }
@@ -520,6 +532,7 @@ build_apply_source_command() {
     [[ "${ALLOW_STALE_LATEST}" == "true" ]] && apply_cmd+=(--allow-stale-latest)
     [[ -n "${SERVICE_USER}" ]] && apply_cmd+=(--service-user "${SERVICE_USER}")
     [[ "${BOOT_START}" == "false" ]] && apply_cmd+=(--no-boot-start)
+    apply_cmd+=(--mgmt-port "${MGMT_PORT}" --ipc-broker-port "${IPC_PORT}")
     [[ -n "${ADMIN_USER}" ]] && apply_cmd+=(--admin-user "${ADMIN_USER}")
     [[ -n "${ADMIN_PASSWORD_FILE}" ]] && apply_cmd+=(--admin-password-file "${ADMIN_PASSWORD_FILE}")
     [[ -n "${DEPLOYMENT_SERVER}" ]] && apply_cmd+=(--deployment-server "${DEPLOYMENT_SERVER}")
@@ -554,6 +567,8 @@ build_renderer_args() {
         --phone-home-interval "${PHONE_HOME_INTERVAL}"
         --tcpout-group "${TCPOUT_GROUP}"
         --use-ack "${USE_ACK}"
+        --mgmt-port "${MGMT_PORT}"
+        --ipc-port "${IPC_PORT}"
     )
     [[ -n "${source_command}" ]] && RENDER_ARGS+=(--source-command "${source_command}")
     return 0
@@ -614,6 +629,18 @@ validate_inputs() {
     validate_target_package_type "${PACKAGE_TYPE}"
 
     validate_positive_int "${PHONE_HOME_INTERVAL}" "phone-home interval"
+    validate_port "${MGMT_PORT}" "management port"
+    validate_port "${IPC_PORT}" "IPC port" 1025
+    MGMT_PORT=$((10#${MGMT_PORT}))
+    IPC_PORT=$((10#${IPC_PORT}))
+    if [[ "${MGMT_PORT}" == "${IPC_PORT}" ]]; then
+        log "ERROR: Management and IPC ports must be different."
+        exit 1
+    fi
+    if [[ "${TARGET_OS}" == "windows" && ( "${MGMT_PORT}" != "8089" || "${IPC_PORT}" != "8194" ) ]]; then
+        log "ERROR: Custom management and IPC ports are supported only for Unix-like UF targets; Windows handoff keeps MSI defaults."
+        exit 1
+    fi
     validate_no_newline "${ADMIN_USER}" "admin user"
     validate_no_newline "${CLIENT_NAME}" "client name"
     validate_conf_stanza_token "${TCPOUT_GROUP}" "tcpout group"
@@ -1074,6 +1101,18 @@ def safe_relative_path(value):
     path = PurePosixPath(normalized)
     return bool(normalized) and not path.is_absolute() and ".." not in path.parts
 
+def safe_link_target(member, destination, member_target):
+    linkname = str(member.linkname or "").replace("\\\\", "/")
+    link_path = PurePosixPath(linkname)
+    if not linkname or link_path.is_absolute():
+        return False
+    base = os.path.dirname(member_target) if member.issym() else destination
+    link_target = os.path.abspath(os.path.join(base, linkname))
+    try:
+        return os.path.commonpath([destination, link_target]) == destination
+    except ValueError:
+        return False
+
 archive_path, destination = sys.argv[1], sys.argv[2]
 destination = os.path.abspath(destination)
 with tarfile.open(archive_path, "r:*") as archive:
@@ -1087,17 +1126,14 @@ with tarfile.open(archive_path, "r:*") as archive:
         if member.isdev() or member.isfifo():
             fail(f"{member.name} uses a special file type")
         if member.issym() or member.islnk():
-            if not safe_relative_path(member.linkname):
-                fail(f"{member.name} -> {member.linkname}")
-            link_target = os.path.abspath(os.path.join(os.path.dirname(target), member.linkname))
-            if os.path.commonpath([destination, link_target]) != destination:
+            if not safe_link_target(member, destination, target):
                 fail(f"{member.name} -> {member.linkname}")
     try:
         archive.extractall(destination, members=members, filter="data")
     except TypeError:
         archive.extractall(destination, members=members)
 PY
-if [[ ! -d "\${extract_dir}/splunkforwarder" ]]; then
+if ! run_privileged test -d "\${extract_dir}/splunkforwarder"; then
     echo "ERROR: Extracted package did not contain a splunkforwarder/ directory." >&2
     exit 1
 fi
@@ -1141,6 +1177,27 @@ write_user_seed() {
     content+="PASSWORD = ${ADMIN_PASSWORD}"$'\n'
     cleanup_user_seed_artifacts
     write_splunk_config "${user_seed_path}" "${content}" "false"
+}
+
+check_fresh_install_ports() {
+    local check_cmd
+    check_cmd="if command -v ss >/dev/null 2>&1; then if ss -H -ltn | awk -v m=${MGMT_PORT} -v i=${IPC_PORT} '\$4 ~ (\":\" m \"\$\") || \$4 ~ (\":\" i \"\$\") { found=1 } END { exit found ? 0 : 1 }'; then echo 'ERROR: Universal Forwarder management or IPC port is already listening.' >&2; exit 1; fi; else python3 -c 'import socket,sys; sockets=[socket.socket() for _ in sys.argv[1:]]; [s.bind((\"0.0.0.0\",int(p))) for s,p in zip(sockets,sys.argv[1:])]; [s.close() for s in sockets]' ${MGMT_PORT} ${IPC_PORT}; fi"
+    hbs_run_target_cmd "${EXECUTION_MODE}" "${check_cmd}" || exit 1
+}
+
+write_fresh_port_config() {
+    local content
+    content=$'[settings]\n'
+    content+="mgmtHostPort = localhost:${MGMT_PORT}"$'\n'
+    write_splunk_config "${SPLUNK_HOME}/etc/system/local/web.conf" "${content}" "false"
+    # UF 9.1+ defaults to management mode auto, which uses UDS on Linux and
+    # does not bind its configured management TCP port. Keep the localhost-only
+    # management endpoint usable at the selected port for SSH/REST workflows.
+    content=$'[httpServer]\n'
+    content+="mgmtMode = tcp"$'\n\n'
+    content+=$'[ipc_broker]\n'
+    content+="port = ${IPC_PORT}"$'\n'
+    write_splunk_config "${SPLUNK_HOME}/etc/system/local/server.conf" "${content}" "false"
 }
 
 start_splunk() {
@@ -1192,6 +1249,7 @@ register_install_cleanup() {
 finalize_fresh_install() {
     ensure_service_user_exists
     ensure_splunk_ownership
+    write_fresh_port_config
     write_user_seed
     start_splunk
     cleanup_user_seed_artifacts
@@ -1298,6 +1356,8 @@ while [[ $# -gt 0 ]]; do
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME="$2"; shift 2 ;;
         --service-user) require_arg "$1" $# || exit 1; SERVICE_USER="$2"; shift 2 ;;
         --no-boot-start) BOOT_START=false; shift ;;
+        --mgmt-port) require_arg "$1" $# || exit 1; MGMT_PORT="$2"; shift 2 ;;
+        --ipc-port|--ipc-broker-port) require_arg "$1" $# || exit 1; IPC_PORT="$2"; shift 2 ;;
         --admin-user) require_arg "$1" $# || exit 1; ADMIN_USER="$2"; shift 2 ;;
         --admin-password-file) require_arg "$1" $# || exit 1; ADMIN_PASSWORD_FILE="$2"; shift 2 ;;
         --enroll) require_arg "$1" $# || exit 1; ENROLL_MODE="$2"; shift 2 ;;
@@ -1365,6 +1425,9 @@ if phase_includes_install; then
         pick_package_path
     fi
     determine_install_action
+    if [[ "${INSTALL_ACTION}" == "fresh-install" ]]; then
+        check_fresh_install_ports
+    fi
 fi
 
 load_secret_values

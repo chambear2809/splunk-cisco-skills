@@ -7,8 +7,10 @@ description: "Use when the user asks about Splunk_TA_google-cloudplatform, the S
   rendering the real google_cloud_pubsub input (google:gcp:pubsub:message plus auto-classified audit
   subtypes), a service-account credential runbook, the gcp index, and ingestion validation; documents the
   monitor, billing, bucket, and resource-metadata inputs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

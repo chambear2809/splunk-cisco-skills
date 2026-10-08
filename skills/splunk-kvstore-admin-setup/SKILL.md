@@ -6,13 +6,37 @@ description: "Use when the user asks to back up or restore the KV Store, migrate
   backup and restore (point-in-time), clean/reset, storage-engine migration to WiredTiger, KV Store
   server-version upgrade (7.0/8.0), maintenance mode, collections.conf and KV Store lookup-definition
   governance, and standalone vs search head cluster paths."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk KV Store Admin Setup
+
+## Enterprise 10.6 migration gate
+
+Enterprise 10.6 automatically migrates the supported MongoDB-backed KV Store
+to a cohosted PostgreSQL storage sidecar after upgrade. Require KV Store server
+7.0 or higher, more than 50% free space on the KV Store data filesystem,
+authenticated healthy `splunk show kvstore-status`, a parallel backup with
+restore evidence, and a maintenance window that allows read-only operation.
+During migration, writes, backups/restores, resync, and KV Store restarts are
+unavailable. ITSI 5.0.x requires postponing the PostgreSQL migration even
+though ITSI 5.0.2 is listed as compatible with Enterprise 10.6. For the
+documented Enterprise 10.4-to-10.6 deferred path, explicitly render
+`server.conf` with `--defer-postgres-migration true`, review and distribute it
+before upgrading, then verify the effective setting and
+`migrationStatus : NotStarted` after upgrade. This flag differs from
+`kvstoreUpgradeOnStartupEnabled`, which controls the KV Store server-version
+upgrade. Keep the ordinary backup, restore-test, health, topology, and
+disk-readiness gates. Do not report cohosted PostgreSQL migration complete;
+schedule it after all installed apps support it. Completion of an actual migration requires
+`migrationStatus : Migration_Succeeded`, KV Store `status : ready`, and
+cohosted-store `status : ready`. Treat unauthenticated or inaccessible status
+as an unverified gate.
 
 ## Prerequisites
 
@@ -93,8 +117,12 @@ The only Cloud mutation supported here is collection and lookup definition
 governance through the standard Splunk REST configuration endpoints in an
 existing, writable app namespace supplied with `--app-name`.
 
-Read `reference.md` before any restore, migrate, or upgrade. Always take a
-point-in-time backup first.
+Read `reference.md` before any restore, migrate, or upgrade. The default
+`--backup-mode auto` selects parallel jobs for an authenticated ready cohosted
+PostgreSQL store (`type: Pdl`) and point-in-time backup for a legacy store.
+Explicit point-in-time mode refuses a cohosted store rather than weakening its
+consistency guarantee. Backup and restore poll `backupRestoreStatus` to a
+bounded `backupRestoreStatus : Ready` state before reporting success.
 
 ## Splunk Enterprise 10.4 guardrails
 
@@ -103,7 +131,7 @@ Store releases. Do **not** upgrade directly from Splunk **9.x** to **10.4**;
 route through **10.0** or **10.2** first so KV Store reaches MongoDB 7+.
 
 On **10.x → 10.4**, MongoDB **8** is applied automatically during the Splunk
-upgrade. After upgrade, run `status.sh` or `splunk show kvstore-status --verbose`
+upgrade. After upgrade, run `status.sh` or authenticated `splunk show kvstore-status`
 and confirm `serverVersion` reflects the expected MongoDB 8 train before
 collection governance or restore work.
 
@@ -124,7 +152,7 @@ Take a point-in-time backup live:
 
 ```bash
 bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --platform enterprise \
-  --phase apply --operation backup --point-in-time true
+  --phase apply --operation backup --backup-mode auto --backup-archive-name kvdump_2026
 ```
 
 Restore (destructive, captain on SHC):
@@ -152,8 +180,8 @@ bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --platform auto \
 
 ## Operations
 
-- `backup` - `splunk backup kvstore [-pointInTime true]`
-- `restore` - `splunk restore kvstore -archiveName <file>.tar.gz` (gated)
+- `backup` - authenticated status-selected `splunk backup kvstore` (`--backup-mode auto|parallel|point-in-time|legacy`)
+- `restore` - status-selected `splunk restore kvstore` (parallel restores use `-restoreParallelJobs true`; gated)
 - `clean` - `splunk clean kvstore --local|--cluster` (gated)
 - `migrate` - SHC `start-shcluster-migration kvstore -storageEngine wiredTiger`
 - `upgrade` - SHC `start-shcluster-upgrade kvstore -version <v>`

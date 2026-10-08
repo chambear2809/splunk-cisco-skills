@@ -1,6 +1,6 @@
 # Cloud Deployment Matrix
 
-_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `099028859a2a1de3bea64655e2a0dc0fcbe96a6a27c6b287024560c30fdf3967`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
+_Generated from the validated extension `skills/shared/app_registry.json` against `skills/catalog.yaml` (SHA-256 `c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426`) by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
 
 This document defines the normal Splunk Cloud deployment model for the
 repo's cloud-supported apps and workflows.

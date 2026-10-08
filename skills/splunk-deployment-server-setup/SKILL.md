@@ -7,8 +7,10 @@ description: "Use when the user asks to bootstrap a deployment server, tune Univ
   Enterprise Deployment Server runtime: enable-deploy-server bootstrap, deployment-app layout checks,
   phoneHome tuning, REST inspection, large-fleet HA pairing, client re-enrollment, staged rollout, Splunk
   9.4.3+ filterType handling, and failure-mode runbooks for 503 floods, app drift, and unenrolled clients."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

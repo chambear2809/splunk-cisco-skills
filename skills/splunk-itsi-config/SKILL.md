@@ -4,8 +4,10 @@ description: "Use when managing ITSI entities, services, KPIs, dependencies, ser
   operations, or ITSI content-pack imports; do not use it to install, upgrade, license, or restart ITSI or
   install prerequisite apps. Configure and validate an existing, licensed Splunk IT Service Intelligence
   deployment from repo-local YAML."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

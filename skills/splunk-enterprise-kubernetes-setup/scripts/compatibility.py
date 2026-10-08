@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate documented Splunk Operator 3.1.0 compatibility combinations."""
+"""Validate documented Splunk Operator compatibility combinations."""
 
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ class CompatibilityResult:
 
 
 def version_tuple(
-    value: str, parts: int = 3, *, allow_platform_suffix: bool = False
+    value: str, parts: int = 3, *, allow_platform_suffix: bool = False,
+    allow_four_segments: bool = False,
 ) -> tuple[int, ...]:
     """Return canonical numeric version components, padding with zeroes.
 
@@ -26,8 +27,9 @@ def version_tuple(
     so only that call site opts into suffix parsing.
     """
     suffix = r"(?:[-+][0-9A-Za-z][0-9A-Za-z._-]*)?" if allow_platform_suffix else ""
+    fourth_segment = r"(?:\.(\d+))?" if allow_four_segments else ""
     match = re.fullmatch(
-        rf"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?{suffix}",
+        rf"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?{fourth_segment}{suffix}",
         value or "",
     )
     if not match:
@@ -42,54 +44,53 @@ def check_sok_compatibility(
     kubernetes_version: str = "",
     indexing_ingestion_separation: bool = False,
 ) -> CompatibilityResult:
-    """Check the release-note matrix for Splunk Operator 3.1.0.
+    """Check the release-note matrix for the supported Operator release.
 
-    The 3.1.0 release notes list supported release lines rather than one broad
+    The 3.2.0 release notes list supported release ranges rather than one broad
     semantic-version range. Keep the branches explicit so an unlisted future
     release is never silently presented as certified.
     """
     try:
         operator = version_tuple(operator_version)
-        splunk = version_tuple(splunk_version)
+        splunk = version_tuple(splunk_version, parts=4, allow_four_segments=True)
     except ValueError as exc:
         return CompatibilityResult(False, False, str(exc))
 
-    if operator != (3, 1, 0):
+    if operator != (3, 2, 0):
         return CompatibilityResult(
             False,
             False,
             "This skill's embedded support matrix is verified only for "
-            "Splunk Operator 3.1.0; review that release's official notes.",
+            "Splunk Operator 3.2.0; review that release's official notes.",
         )
 
-    # The 3.1.0 release table names these Splunk release lines explicitly.
-    # Do not treat an unlisted future release (for example, 10.6 or 11.0) as
-    # verified merely because its semantic version is numerically greater.
-    pre_separation_line = (splunk[0:2] == (9, 4) and splunk >= (9, 4, 3)) or (
-        splunk[0:2] == (10, 0) and splunk <= (10, 0, 4)
+    # Keep each documented minor train as an explicit half-open tuple range.
+    # This excludes Cloud-only/gap trains (10.3 and 10.5) while allowing
+    # supported patches within each named train. 10.6 stays capped at the
+    # reviewed 10.6.0.5 image used by this skill.
+    supported_splunk = any(
+        lower <= splunk < upper
+        for lower, upper in (
+            ((9, 4, 15, 0), (9, 5, 0, 0)),
+            ((10, 0, 0, 0), (10, 1, 0, 0)),
+            ((10, 2, 0, 0), (10, 3, 0, 0)),
+            ((10, 4, 0, 0), (10, 5, 0, 0)),
+            ((10, 6, 0, 0), (10, 6, 0, 6)),
+        )
     )
-    separation_line = splunk[0:2] in {(10, 2), (10, 4)}
-
     if not kubernetes_version:
-        supported_lines = pre_separation_line or separation_line
+        supported_lines = supported_splunk
         if not supported_lines:
             return CompatibilityResult(
                 False,
                 True,
                 "Splunk Enterprise is outside the release lines documented "
-                "for Splunk Operator 3.1.0.",
-            )
-        if indexing_ingestion_separation and not separation_line:
-            return CompatibilityResult(
-                False,
-                True,
-                "Indexing and ingestion separation requires Splunk Enterprise "
-                "on the listed 10.2.x or 10.4.x release lines.",
+                "for Splunk Operator 3.2.0.",
             )
         return CompatibilityResult(
             True,
             True,
-            "The Splunk release line is documented for Operator 3.1.0; the "
+            "The Splunk release line is documented for Operator 3.2.0; the "
             "live Kubernetes server version still must be checked.",
         )
 
@@ -100,52 +101,18 @@ def check_sok_compatibility(
     except ValueError as exc:
         return CompatibilityResult(False, False, str(exc))
 
-    if kubernetes < (1, 25) or kubernetes > (1, 34):
+    if kubernetes < (1, 32) or kubernetes > (1, 36):
         return CompatibilityResult(
             False,
             True,
-            "Splunk Operator 3.1.0 supports Kubernetes 1.25 through 1.34.",
+            "Splunk Operator 3.2.0 supports Kubernetes 1.32 through 1.36.",
         )
 
-    if kubernetes == (1, 34):
-        supported = (
-            (splunk[0:2] == (9, 4) and splunk >= (9, 4, 9))
-            or (splunk[0:2] == (10, 0) and splunk >= (10, 0, 4))
-            or (splunk[0:2] == (10, 4) and splunk >= (10, 4, 0))
-        )
-        if not supported:
-            return CompatibilityResult(
-                False,
-                True,
-                "Kubernetes 1.34 requires Splunk Enterprise 9.4.9+, "
-                "10.0.4+, or 10.4+ on a release line listed by Splunk.",
-            )
-        if indexing_ingestion_separation and splunk[0:2] != (10, 4):
-            return CompatibilityResult(
-                False,
-                True,
-                "For Kubernetes 1.34, use Splunk Enterprise 10.4+ when "
-                "enabling indexing and ingestion separation.",
-            )
-        return CompatibilityResult(
-            True, True, "Supported Operator/Splunk/Kubernetes combination."
-        )
-
-    supported = pre_separation_line or separation_line
-    if not supported:
+    if not supported_splunk:
         return CompatibilityResult(
             False,
             True,
-            "Kubernetes 1.25-1.33 supports Splunk Enterprise 9.4.3 through "
-            "10.0.4, or the listed 10.2.x and 10.4.x release lines, with "
-            "Operator 3.1.0.",
-        )
-    if indexing_ingestion_separation and not separation_line:
-        return CompatibilityResult(
-            False,
-            True,
-            "Indexing and ingestion separation requires Splunk Enterprise "
-            "on the listed 10.2.x or 10.4.x release lines.",
+            "Splunk Operator 3.2.0 supports Splunk Enterprise 9.4.15 through 10.6.0.",
         )
     return CompatibilityResult(
         True, True, "Supported Operator/Splunk/Kubernetes combination."

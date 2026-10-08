@@ -4,8 +4,10 @@ description: "Use when the user asks to install a Splunk app, TA, add-on, downlo
   package, or manage installed apps. Install, update, and manage Splunk apps and add-ons (TAs). Supports
   installing locally from .tgz/.spl files, remotely from a URL, or from Splunkbase. Can also list
   installed apps and uninstall apps."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -112,9 +114,11 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
   any ACS/REST install call. The check follows the selected release: a
   repo-verified pin uses `verified_platform_versions`, while
   `--accept-unverified-release` evaluates the current public release against
-  `platform_versions`. Cloud defaults to `10.5`; missing evidence for the
-  selected release fails closed unless `--accept-unsupported-platform` is
-  explicitly supplied with documented vendor/operator approval.
+  `platform_versions`. Cloud defaults to `10.5`; self-managed Enterprise uses
+  the shared `10.6` baseline. A Cloud `10.5` listing does not establish
+  Enterprise `10.6` support. Missing evidence for the exact selected release
+  fails closed unless `--accept-unsupported-platform` is explicitly supplied
+  with documented vendor/operator approval.
 - `_unpacked` app directories are for review only and are not part of the
   normal install workflow.
 
