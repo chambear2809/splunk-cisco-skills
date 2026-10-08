@@ -67,6 +67,8 @@ When OpenShift SCC or PSP blocks hostPath mounts:
 
 The platform-setup skill writes Tetragon Helm values with `export.mode: stdout`. Tetragon prints events to container stdout; the Splunk OTel collector's container log collection picks them up via the chart's `splunkPlatform.logsEnabled: true` (no extraFileLogs needed).
 
+This stdout path applies when Hubble flow export is disabled. `hubble_flow_export.enabled: true` requires the file based path above, so the renderer rejects a Hubble flow export combined with stdout mode.
+
 Pros:
 
 - No hostPath mount, no SCC/PSP friction.

@@ -454,8 +454,9 @@ if hubble_contract["enabled"]:
     hubble_includes = hubble_receiver.get("include")
     if not isinstance(hubble_includes, list) or len(hubble_includes) != 1 or not isinstance(hubble_includes[0], str):
         raise SystemExit("ERROR: Hubble flow log receiver must contain one include glob.")
-    if not hubble_includes[0].startswith(hubble_host_path.rstrip("/") + "/"):
-        raise SystemExit("ERROR: Hubble flow log include glob is outside its hostPath.")
+    expected_hubble_include = f"{hubble_contract.get('host_path').rstrip('/')}/{hubble_contract.get('filename_pattern')}"
+    if hubble_includes[0] != expected_hubble_include:
+        raise SystemExit("ERROR: Hubble flow log include glob does not match metadata host_path and filename_pattern.")
 elif hubble_receiver is not None:
     raise SystemExit("ERROR: Overlay renders a Hubble flow log receiver that metadata does not record.")
 

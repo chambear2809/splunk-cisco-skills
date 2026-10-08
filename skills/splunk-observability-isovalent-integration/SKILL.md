@@ -85,9 +85,9 @@ This skill wires an installed Isovalent stack to Splunk Observability Cloud and 
 - Hubble flow logs (opt-in, `hubble_flow_export.enabled: true`):
   - A second hostPath mount, `hubble-flows`, of `/var/run/cilium/hubble`.
   - `logsCollection.extraFileLogs.file_log/hubble-flows` tailing `events*.log` from the end, with sourcetype `cilium:hubble:flow` and index `cilium_hubble`.
-  - Coordinates with `cisco-isovalent-platform-setup`'s `hubble_flow_export` block, which renders Cilium's `hubble.export.static` file exporter. Works with the file or stdout Tetragon modes, not the legacy fluentd path.
+  - Coordinates with `cisco-isovalent-platform-setup`'s `hubble_flow_export` block, which renders Cilium's `hubble.export.static` file exporter. Requires Tetragon `export.mode: file`; the renderer rejects Hubble flow export with `stdout` or legacy fluentd mode because the flow receiver needs the file based Splunk Platform path.
 - Alternative paths (behind explicit flags):
-  - `--export-mode stdout` — Tetragon stdout + container log collection (no hostPath mount; useful when SCC/PSP blocks).
+  - `--export-mode stdout` — Tetragon stdout + container log collection (no hostPath mount; useful when SCC/PSP blocks). Use only when Hubble flow export is disabled.
   - `--legacy-fluentd-hec` — fluentd `splunk_hec` block. **DEPRECATED** (`fluent-plugin-splunk-hec` archived 2025-06-24).
 - `dashboards/cilium-by-isovalent.json` and `dashboards/hubble-by-isovalent.json` — token-scrubbed re-exports (sourced from the Isovalent_Splunk_o11y reference repo's `examples/*.json` only after `scripts/scrub-tokens.py` confirms zero `accessToken` material).
 - `detectors/*.yaml` — starter detectors for `cilium_*`, `hubble_*`, `tetragon_*` series.

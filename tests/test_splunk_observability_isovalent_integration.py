@@ -2171,7 +2171,7 @@ def test_hubble_flow_export_renders_file_tail_beside_tetragon(tmp_path: Path) ->
     assert 'EXPECTED_HUBBLE_SOURCETYPE="cilium:hubble:flow"' in apply_script
 
 
-def test_hubble_flow_export_with_stdout_tetragon_keeps_container_logs(
+def test_hubble_flow_export_with_stdout_tetragon_is_rejected_at_render(
     tmp_path: Path,
 ) -> None:
     output = tmp_path / "rendered"
@@ -2179,17 +2179,11 @@ def test_hubble_flow_export_with_stdout_tetragon_keeps_container_logs(
     result = run_setup(
         "--render", "--validate", "--spec", str(spec), "--output-dir", str(output)
     )
-    assert result.returncode == 0, combined_output(result)
-    overlay = _overlay(output)
-    assert "containers" not in overlay["logsCollection"]
-    assert list(overlay["logsCollection"]["extraFileLogs"]) == ["file_log/hubble-flows"]
-    assert [item["name"] for item in overlay["agent"]["extraVolumes"]] == [
-        "hubble-flows"
-    ]
-    resource = overlay["logsCollection"]["extraFileLogs"]["file_log/hubble-flows"][
-        "resource"
-    ]
-    assert resource["com.splunk.index"] == "hubble_flows"
+    assert result.returncode != 0
+    assert "cannot be combined with tetragon export mode stdout" in combined_output(
+        result
+    )
+    assert not (output / "splunk-otel-overlay/values.overlay.yaml").exists()
 
 
 def test_hubble_flow_export_is_absent_by_default(tmp_path: Path) -> None:

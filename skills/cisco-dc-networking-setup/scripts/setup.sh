@@ -16,6 +16,7 @@ CLASSINFO_INPUT=""
 CLASSINFO_CLASSES=""
 CLASSINFO_PRESET=""
 CLASSINFO_INTERVAL="300"
+CLASSINFO_INTERVAL_SET=false
 DRY_RUN=false
 
 # Application Atlas preset: ACI fabric links, host LLDP neighbors, and the
@@ -74,7 +75,7 @@ while [[ $# -gt 0 ]]; do
         --classinfo-input) require_arg "$1" $# || exit 1; CLASSINFO_INPUT="$2"; shift 2 ;;
         --classinfo-classes) require_arg "$1" $# || exit 1; CLASSINFO_CLASSES="$2"; shift 2 ;;
         --classinfo-preset) require_arg "$1" $# || exit 1; CLASSINFO_PRESET="$2"; shift 2 ;;
-        --interval) require_arg "$1" $# || exit 1; CLASSINFO_INTERVAL="$2"; shift 2 ;;
+        --interval) require_arg "$1" $# || exit 1; CLASSINFO_INTERVAL="$2"; CLASSINFO_INTERVAL_SET=true; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
@@ -389,7 +390,7 @@ apply_classinfo_input() {
 main() {
     warn_if_current_skill_role_unsupported
 
-    if [[ -n "${CLASSINFO_INPUT}${CLASSINFO_CLASSES}${CLASSINFO_PRESET}" ]]; then
+    if [[ -n "${CLASSINFO_INPUT}${CLASSINFO_CLASSES}${CLASSINFO_PRESET}" || "${CLASSINFO_INTERVAL_SET}" == true ]]; then
         if $ENABLE_INPUTS || $INDEXES_ONLY || $MACROS_ONLY; then
             log "ERROR: A custom classInfo input cannot be combined with --enable-inputs, --indexes-only or --macros-only."
             exit 1

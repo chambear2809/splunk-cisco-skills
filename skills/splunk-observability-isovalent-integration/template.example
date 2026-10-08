@@ -51,6 +51,8 @@ tetragon_export:
 # hubble_flow_export.enabled: true (Cilium hubble.export.static file exporter).
 # The collector mounts host_path and tails filename_pattern into Splunk
 # Platform. Create the index and allow it on the collector's HEC token first.
+# Hubble flow export requires tetragon_export.mode: file; stdout mode is rejected
+# when this block is enabled.
 hubble_flow_export:
   enabled: false
   host_path: /var/run/cilium/hubble

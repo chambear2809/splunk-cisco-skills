@@ -553,6 +553,10 @@ def validated_hubble_flow_export(spec: dict[str, Any], edition: str) -> dict[str
     file_path = raw.get("file_path", DEFAULT_HUBBLE_EXPORT_FILE)
     if not isinstance(file_path, str) or ".." in file_path.split("/") or not HUBBLE_EXPORT_PATH.fullmatch(file_path):
         raise SpecError("hubble_flow_export.file_path must be an absolute file path without '..'.")
+    if not file_path.startswith("/var/run/cilium/"):
+        raise SpecError(
+            "hubble_flow_export.file_path must be under the Cilium host-mounted /var/run/cilium path."
+        )
     namespaces = _string_list(raw.get("namespaces"), "hubble_flow_export.namespaces")
     for namespace in namespaces:
         if not DNS1123_LABEL.fullmatch(namespace):

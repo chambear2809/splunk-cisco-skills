@@ -47,7 +47,7 @@ logsCollection:
     file_log/hubble-flows: { ... }     # only with hubble_flow_export.enabled
 ```
 
-With `hubble_flow_export.enabled: true`, `agent.extraVolumes`/`extraVolumeMounts` also gain a `hubble-flows` hostPath entry for `/var/run/cilium/hubble` (see [tetragon-hostpath-coordination.md](tetragon-hostpath-coordination.md#hubble-flow-export-coordination)).
+With `hubble_flow_export.enabled: true`, `agent.extraVolumes`/`extraVolumeMounts` also gain a `hubble-flows` hostPath entry for `/var/run/cilium/hubble` (see [tetragon-hostpath-coordination.md](tetragon-hostpath-coordination.md#hubble-flow-export-coordination)). This requires Tetragon file export mode; rendering rejects the combination with stdout or legacy fluentd mode.
 
 ## yq deep-merge
 

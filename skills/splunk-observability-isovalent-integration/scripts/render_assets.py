@@ -458,6 +458,11 @@ def normalize_hubble_flow_export(
             "hubble_flow_export uses the collector's Splunk Platform logs path and "
             "cannot be combined with the legacy fluentd export mode."
         )
+    if export_mode == "stdout":
+        raise SpecError(
+            "hubble_flow_export cannot be combined with tetragon export mode stdout; "
+            "the Hubble file receiver requires the file-based Splunk Platform apply path."
+        )
     host_path = block.get("host_path", DEFAULT_HUBBLE_HOST_PATH)
     if (
         not isinstance(host_path, str)
