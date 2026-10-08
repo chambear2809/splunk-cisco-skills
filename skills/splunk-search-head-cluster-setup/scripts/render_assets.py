@@ -7,6 +7,7 @@ Reads CLI args (from setup.sh) and emits the SHC rendered tree under
 - member-<host>/server.conf
 - bootstrap/sequenced-bootstrap.sh
 - bootstrap/apply-system-local.sh
+- bootstrap/merge_server_conf_sections.py
 - bundle/{validate,status,apply,apply-skip-validation,rollback}.sh
 - restart/{rolling-restart,searchable-rolling-restart,force-searchable,transfer-captain}.sh
 - members/{add-member,decommission-member,remove-member}.sh
@@ -24,6 +25,7 @@ import argparse
 import json
 import re
 import shlex
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -321,6 +323,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     )
     (shc / "bootstrap" / "apply-system-local.sh").write_text(
         "#!/usr/bin/env bash\nset -euo pipefail\n"
+        '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
         "# Run on one SHC member before init/bootstrap. The fragment must be a\n"
         "# protected reviewed server.conf fragment; secrets never appear on argv.\n"
         'FRAGMENT="${1:-}"\n'
@@ -332,7 +335,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         '  echo "ERROR: fragment must have mode 600." >&2\n'
         '  exit 1\n'
         'fi\n'
-        'HELPER="${MERGE_SERVER_CONF_HELPER:-merge_server_conf_sections.py}"\n'
+        'HELPER="${MERGE_SERVER_CONF_HELPER:-${_SCRIPT_DIR}/merge_server_conf_sections.py}"\n'
         'if [[ ! -f "${HELPER}" ]]; then\n'
         '  echo "ERROR: set MERGE_SERVER_CONF_HELPER to the reviewed helper path." >&2\n'
         '  exit 1\n'
@@ -342,6 +345,10 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         encoding="utf-8",
     )
     (shc / "bootstrap" / "apply-system-local.sh").chmod(0o750)
+    shutil.copy2(
+        PROJECT_ROOT / "skills/splunk-enterprise-host-setup/scripts/merge_server_conf_sections.py",
+        shc / "bootstrap" / "merge_server_conf_sections.py",
+    )
 
     # bundle scripts
     bundle_target_uri = target_captain_uri or (

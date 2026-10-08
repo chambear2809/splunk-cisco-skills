@@ -49,7 +49,10 @@ EMBEDDED_PRIVATE_SECRET_READER = r'''def read_private_secret(path_value, label):
         mode = stat.S_IMODE(before.st_mode)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
             raise SystemExit(f"ERROR: {label} must be a single-link regular file: {path}")
-        if before.st_uid != os.geteuid():
+        # Root may apply an operator-owned token file, but must not take
+        # ownership of that reusable source secret. Non-root callers still
+        # have to own the file themselves.
+        if before.st_uid != os.geteuid() and os.geteuid() != 0:
             raise SystemExit(f"ERROR: {label} must be owned by the current user: {path}")
         if mode & 0o077:
             raise SystemExit(
@@ -616,9 +619,8 @@ def secure_owner(path, mode):
         os.chown(path, account.pw_uid, account.pw_gid)
     os.chmod(path, mode)
 
-secure_owner(token_path, 0o600)
 secure_owner(target_path, 0o640)
-print(f"HEC files owned by service user {{account.pw_name}}:{{group.gr_name}}; config mode 0640, token mode 0600")
+print(f"HEC config owned by service user {{account.pw_name}}:{{group.gr_name}}; config mode 0640; source token ownership preserved")
 PY
 {restart_block}"""
     )

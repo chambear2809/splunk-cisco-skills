@@ -1170,7 +1170,22 @@ restart_splunk_or_exit() {
 # identity is configured.
 splunk_install_target_is_local() {
     local uri_host ssh_host
-    uri_host="$(printf '%s' "${SPLUNK_URI:-}" | sed -E 's|https?://([^:/]+).*|\1|')"
+    if ! uri_host="$(python3 - "${SPLUNK_URI:-}" <<'PY'
+from urllib.parse import urlsplit
+import sys
+
+try:
+    parsed = urlsplit(sys.argv[1])
+    hostname = parsed.hostname
+except ValueError:
+    raise SystemExit(1)
+if not hostname:
+    raise SystemExit(1)
+print(hostname, end="")
+PY
+)"; then
+        return 1
+    fi
     ssh_host="${SPLUNK_SSH_HOST:-}"
     if [[ "${uri_host}" == "localhost" || "${uri_host}" == "127.0.0.1" || "${uri_host}" == "::1" ]]; then
         if [[ -n "${ssh_host}" && "${ssh_host}" != "localhost" && "${ssh_host}" != "127.0.0.1" && "${ssh_host}" != "::1" ]]; then
@@ -1887,6 +1902,16 @@ install_app() {
         exit 1
     fi
 
+    # The verified ITSI package is a multi-app archive. Generic bundle
+    # delivery stages only the inferred SA-ITOA directory, which would omit
+    # the other 18 required apps, so reject it before entering that path.
+    if is_verified_itsi_bundle_contract; then
+        log "ERROR: The verified ITSI multi-app bundle is not accepted by generic bundle or REST upload."
+        log "HANDOFF: Stop Splunk, back up the existing app directories, and extract the reviewed package into SPLUNK_HOME/etc/apps using the official ITSI procedure."
+        log "HANDOFF: Restore reviewed local configuration, start Splunk as its service owner, and verify all 19 app versions before declaring success."
+        exit 1
+    fi
+
     local bundle_check_status=0
     if deployment_should_use_bundle_for_current_target; then
         local bundle_kind
@@ -1949,12 +1974,7 @@ install_app() {
         log "Loopback REST forward has explicit SSH target ${SPLUNK_SSH_HOST}; staging package on remote Splunk host."
     fi
 
-    if is_verified_itsi_bundle_contract; then
-        log "ERROR: The verified ITSI multi-app bundle is not accepted by REST upload."
-        log "HANDOFF: Stop Splunk, back up the existing app directories, and extract the reviewed package into SPLUNK_HOME/etc/apps using the official ITSI procedure."
-        log "HANDOFF: Restore reviewed local configuration, start Splunk as its service owner, and verify all 19 app versions before declaring success."
-        exit 1
-    elif $is_local; then
+    if $is_local; then
         # Splunk is local — install directly from the filesystem path.
         log "Installing from local path: ${abs_file_path}"
         install_via_server_path_with_verification "${abs_file_path}" "${update_flag}" "${expected_app_name}"

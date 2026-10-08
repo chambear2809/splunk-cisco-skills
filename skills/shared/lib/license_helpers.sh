@@ -175,7 +175,9 @@ else:
         200)
             # The target name identifies an existing pool; Splunk rejects a
             # duplicate `name` form field on update as a create request.
-            local -a update_args=("${body_args[4]}" "${body_args[5]}" "${body_args[6]}" "${body_args[7]}")
+            # Exclude only the name pair; stack_id, quota, slaves, and any
+            # supplied description are mutable pool fields on update.
+            local -a update_args=("${body_args[@]:2}")
             if ! splunk_curl "${sk}" --fail-with-body --show-error -X POST "${update_args[@]}" \
                 "${manager_uri}/services/licenser/pools/${name}?output_mode=json" \
                 >/dev/null 2>/dev/null; then

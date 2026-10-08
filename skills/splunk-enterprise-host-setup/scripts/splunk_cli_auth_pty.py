@@ -61,6 +61,15 @@ def _uri_cache_match(uri: str, token_path: str) -> bool:
     return Path(token_path).name == f"authToken_{parsed[0]}_{parsed[1]}"
 
 
+def _default_target_cache_match(token_path: str) -> bool:
+    """Return whether a token belongs to the CLI's implicit target."""
+    default_uri = os.environ.get("SPLUNK_URI", "https://localhost:8089")
+    try:
+        return _uri_cache_match(default_uri, token_path)
+    except RuntimeError:
+        return False
+
+
 def _validated_uri(uri: str) -> tuple[str, int]:
     parsed = urlparse(uri)
     if (parsed.scheme != "https" or not parsed.hostname or parsed.username or
@@ -166,7 +175,10 @@ def main() -> int:
         auth_complete = False
         try:
             password = _regular_secret(password_path)
-            login_uris = ([""] if not before else []) + list(args.login_uri)
+            default_authenticated = any(
+                _default_target_cache_match(path) for path in before
+            )
+            login_uris = ([] if default_authenticated else [""]) + list(args.login_uri)
             for uri in login_uris:
                 if uri:
                     _validated_uri(uri)

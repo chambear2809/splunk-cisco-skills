@@ -64,10 +64,21 @@ def check_sok_compatibility(
             "Splunk Operator 3.2.0; review that release's official notes.",
         )
 
-    # The 3.2.0 release table names exact supported ranges. Do not infer
-    # support for future releases merely from a numerically greater version.
-    supported_splunk = (9, 4, 15) <= splunk <= (10, 6, 0, 5)
-    separation_line = supported_splunk
+    # Keep each documented minor train as an explicit half-open tuple range.
+    # This excludes Cloud-only/gap trains (10.3 and 10.5) while allowing
+    # supported patches within each named train. 10.6 stays capped at the
+    # reviewed 10.6.0.5 image used by this skill.
+    supported_splunk = any(
+        lower <= splunk < upper
+        for lower, upper in (
+            ((9, 4, 15, 0), (9, 5, 0, 0)),
+            ((10, 0, 0, 0), (10, 1, 0, 0)),
+            ((10, 2, 0, 0), (10, 3, 0, 0)),
+            ((10, 4, 0, 0), (10, 5, 0, 0)),
+            ((10, 6, 0, 0), (10, 6, 0, 6)),
+        )
+    )
+    separation_line = supported_splunk and splunk[:2] in {(10, 2), (10, 4)}
 
     if not kubernetes_version:
         supported_lines = supported_splunk

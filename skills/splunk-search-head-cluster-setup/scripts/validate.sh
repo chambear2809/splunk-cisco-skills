@@ -71,6 +71,7 @@ check_file() {
 
 # Required rendered files
 for f in "shc/bootstrap/sequenced-bootstrap.sh" \
+          "shc/bootstrap/merge_server_conf_sections.py" \
           "shc/bundle/validate.sh" "shc/bundle/apply.sh" \
           "shc/restart/searchable-rolling-restart.sh" \
           "shc/restart/transfer-captain.sh" \

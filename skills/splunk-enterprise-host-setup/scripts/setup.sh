@@ -451,6 +451,41 @@ resolve_requested_package_version() {
     printf '%s' "${package_version}"
 }
 
+enterprise_106_sidecars_enabled() {
+    [[ "${PACKAGE_VERSION:-}" =~ ^10\.6(\.|$) ]]
+}
+
+validate_sidecar_port_values() {
+    enterprise_106_sidecars_enabled || return 0
+    local i j port_value
+    local -a sidecar_ports=(
+        "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
+        "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+        "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+        "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+    )
+    for port_value in "${sidecar_ports[@]}"; do
+        if [[ ! "${port_value}" =~ ^[1-9][0-9]{0,4}$ ]] || (( port_value > 65535 )); then
+            log "ERROR: Configured service ports must be numeric values from 1 through 65535."
+            return 1
+        fi
+    done
+    for port_value in "${sidecar_ports[@]:5}"; do
+        if (( port_value < 1024 )); then
+            log "ERROR: PostgreSQL and Nascent sidecar ports must be from 1024 through 65535."
+            return 1
+        fi
+    done
+    for ((i = 0; i < ${#sidecar_ports[@]}; i++)); do
+        for ((j = i + 1; j < ${#sidecar_ports[@]}; j++)); do
+            if [[ "${sidecar_ports[i]}" == "${sidecar_ports[j]}" ]]; then
+                log "ERROR: All selected Splunk service and sidecar ports must be distinct."
+                return 1
+            fi
+        done
+    done
+}
+
 capture_installed_splunk_version() {
     local version_output version
     version_output="$(capture_splunk_as_service_user "$(splunk_cli_cmd version)" 2>/dev/null || true)"
@@ -540,25 +575,18 @@ validate_inputs() {
 
     local -a configured_ports=(
         "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
-        "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
-        "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
-        "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
     )
+    if enterprise_106_sidecars_enabled; then
+        configured_ports+=(
+            "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+            "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+            "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+        )
+    fi
     local i j port_value
     for port_value in "${configured_ports[@]}"; do
         if [[ ! "${port_value}" =~ ^[1-9][0-9]{0,4}$ ]] || (( port_value > 65535 )); then
             log "ERROR: Configured service ports must be numeric values from 1 through 65535."
-            exit 1
-        fi
-    done
-    local -a sidecar_ports=(
-        "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
-        "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
-        "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
-    )
-    for port_value in "${sidecar_ports[@]}"; do
-        if (( port_value < 1024 )); then
-            log "ERROR: PostgreSQL and Nascent sidecar ports must be from 1024 through 65535."
             exit 1
         fi
     done
@@ -899,18 +927,20 @@ configure_fresh_install_ports() {
     system_local="${SPLUNK_HOME}/etc/system/local"
     server_conf=$'[kvstore]\nport = '"${KVSTORE_PORT}"$'\n\n[ipc_broker]\n'
     server_conf+=$'port = '"${IPC_BROKER_PORT}"$'\n'
-    server_conf+=$'postgres:postgres:address = '"${POSTGRES_PORT}"$'\n'
-    # Splunk 10.6's default file retains these deprecated aliases; keep their
-    # values aligned with the canonical primary/replica sidecar addresses.
-    server_conf+=$'postgres:traefik_primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
-    server_conf+=$'postgres:traefik_replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
-    server_conf+=$'postgres:postgres-primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
-    server_conf+=$'postgres:postgres-replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
-    server_conf+=$'postgres:patroni:address = '"${POSTGRES_PATRONI_PORT}"$'\n'
-    server_conf+=$'postgres:pgbouncer:address = '"${POSTGRES_PGBOUNCER_PORT}"$'\n'
-    server_conf+=$'postgres:postgres_nanny:address = '"${POSTGRES_NANNY_PORT}"$'\n'
-    server_conf+=$'nascent:etcd_peer:address = '"${NASCENT_ETCD_PEER_PORT}"$'\n'
-    server_conf+=$'nascent:etcd_client:address = '"${NASCENT_ETCD_CLIENT_PORT}"$'\n'
+    if enterprise_106_sidecars_enabled; then
+        server_conf+=$'postgres:postgres:address = '"${POSTGRES_PORT}"$'\n'
+        # Splunk 10.6's default file retains these deprecated aliases; keep their
+        # values aligned with the canonical primary/replica sidecar addresses.
+        server_conf+=$'postgres:traefik_primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
+        server_conf+=$'postgres:traefik_replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
+        server_conf+=$'postgres:postgres-primary:address = '"${POSTGRES_PRIMARY_PORT}"$'\n'
+        server_conf+=$'postgres:postgres-replica:address = '"${POSTGRES_REPLICA_PORT}"$'\n'
+        server_conf+=$'postgres:patroni:address = '"${POSTGRES_PATRONI_PORT}"$'\n'
+        server_conf+=$'postgres:pgbouncer:address = '"${POSTGRES_PGBOUNCER_PORT}"$'\n'
+        server_conf+=$'postgres:postgres_nanny:address = '"${POSTGRES_NANNY_PORT}"$'\n'
+        server_conf+=$'nascent:etcd_peer:address = '"${NASCENT_ETCD_PEER_PORT}"$'\n'
+        server_conf+=$'nascent:etcd_client:address = '"${NASCENT_ETCD_CLIENT_PORT}"$'\n'
+    fi
     start_web_server=0
     [[ "${ENABLE_WEB}" != "true" ]] || start_web_server=1
     web_conf=$'[settings]\nmgmtHostPort = 0.0.0.0:'"${MGMT_PORT}"$'\nhttpport = '"${WEB_PORT}"$'\n'
@@ -927,11 +957,17 @@ assert_fresh_install_ports_free() {
     local port output
     local -a configured_ports=(
         "${MGMT_PORT}" "${WEB_PORT}" "${APPSERVER_PORT}" "${KVSTORE_PORT}" "${IPC_BROKER_PORT}"
-        "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
-        "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
-        "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
     )
-    log "Checking selected ports: mgmt=${MGMT_PORT}, web=${WEB_PORT}, appserver=${APPSERVER_PORT}, kvstore=${KVSTORE_PORT}, ipc_broker=${IPC_BROKER_PORT}, postgres=${POSTGRES_PORT}/${POSTGRES_PRIMARY_PORT}/${POSTGRES_REPLICA_PORT}/${POSTGRES_PATRONI_PORT}/${POSTGRES_PGBOUNCER_PORT}/${POSTGRES_NANNY_PORT}, nascent=${NASCENT_ETCD_PEER_PORT}/${NASCENT_ETCD_CLIENT_PORT}"
+    local selected_port_log="mgmt=${MGMT_PORT}, web=${WEB_PORT}, appserver=${APPSERVER_PORT}, kvstore=${KVSTORE_PORT}, ipc_broker=${IPC_BROKER_PORT}"
+    if enterprise_106_sidecars_enabled; then
+        configured_ports+=(
+            "${POSTGRES_PORT}" "${POSTGRES_PRIMARY_PORT}" "${POSTGRES_REPLICA_PORT}"
+            "${POSTGRES_PATRONI_PORT}" "${POSTGRES_PGBOUNCER_PORT}" "${POSTGRES_NANNY_PORT}"
+            "${NASCENT_ETCD_PEER_PORT}" "${NASCENT_ETCD_CLIENT_PORT}"
+        )
+        selected_port_log+=", postgres=${POSTGRES_PORT}/${POSTGRES_PRIMARY_PORT}/${POSTGRES_REPLICA_PORT}/${POSTGRES_PATRONI_PORT}/${POSTGRES_PGBOUNCER_PORT}/${POSTGRES_NANNY_PORT}, nascent=${NASCENT_ETCD_PEER_PORT}/${NASCENT_ETCD_CLIENT_PORT}"
+    fi
+    log "Checking selected ports: ${selected_port_log}"
     for port in "${configured_ports[@]}"; do
         if ! output="$(hbs_capture_target_cmd "${EXECUTION_MODE}" \
             "if command -v ss >/dev/null 2>&1; then $(hbs_shell_join ss -H -ltn "sport = :${port}"); elif command -v lsof >/dev/null 2>&1; then $(hbs_shell_join lsof -nP "-iTCP:${port}" -sTCP:LISTEN -t) || [[ \$? -eq 1 ]]; else exit 127; fi")"; then
@@ -1381,6 +1417,7 @@ if phase_includes_install; then
     fi
     determine_install_action
     validate_install_constraints
+    validate_sidecar_port_values || exit 1
     assert_fresh_install_ports_free || exit 1
 fi
 

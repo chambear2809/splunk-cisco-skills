@@ -227,9 +227,10 @@ Under `splunk-search-head-cluster-rendered/shc/`:
   member `init shcluster-config` (parallel, one per member) →
   `bootstrap-shcluster-captain` on designated first captain →
   quorum-wait loop.
-- `bootstrap/apply-system-local.sh` — applies a protected reviewed member role
-  fragment atomically to `etc/system/local/server.conf`; membership sections
-  must not live in an app a later deployer bundle can remove.
+- `bootstrap/apply-system-local.sh` and its colocated
+  `merge_server_conf_sections.py` helper — apply a protected reviewed member
+  role fragment atomically to `etc/system/local/server.conf`; membership
+  sections must not live in an app a later deployer bundle can remove.
 - `bundle/{validate.sh, status.sh, apply.sh, apply-skip-validation.sh, rollback.sh}`.
 - `restart/{rolling-restart.sh, searchable-rolling-restart.sh,
   force-searchable.sh, transfer-captain.sh}`.
