@@ -69,6 +69,8 @@ Alternatives:
 - `--export-mode stdout` — Tetragon stdout + container log collection. Useful when SCC/PSP blocks hostPath mounts.
 - `--legacy-fluentd-hec` — fluentd `splunk_hec` block. **DEPRECATED** (`fluent-plugin-splunk-hec` archived 2025-06-24). Prominent warning in the rendered metadata.
 
+When `hubble_flow_export.enabled: true`, use the default file export mode. The renderer rejects that Hubble flow configuration with `--export-mode stdout` or the legacy fluentd mode because Hubble flows are collected from a host mounted file.
+
 ## Secret handling
 
 - `--o11y-token-file` — Splunk Observability Org access token (passed through to base collector at apply time; never written into the overlay).

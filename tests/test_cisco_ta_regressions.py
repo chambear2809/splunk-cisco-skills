@@ -1410,6 +1410,175 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             )
 
 
+    def test_dc_networking_classinfo_preset_creates_and_enables_custom_input(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env, curl_log = self._build_configure_account_env(Path(tmpdir))
+
+            result = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/setup.sh",
+                "--classinfo-preset", "application-atlas",
+                "--account", "MY_FABRIC",
+                "--index", "cisco_dc",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            log_lines = curl_log.read_text(encoding="utf-8").splitlines()
+            creates = [
+                line for line in log_lines
+                if "METHOD=POST" in line
+                and line.split()[0].endswith("/data/inputs/cisco_nexus_aci")
+            ]
+            self.assertEqual(len(creates), 1, msg="\n".join(log_lines))
+            self.assertIn("/servicesNS/nobody/cisco_dc_networking_app_for_splunk/", creates[0])
+            for field in (
+                "name=classInfo_adm",
+                "apic_account=MY_FABRIC",
+                "apic_input_type=classInfo",
+                "apic_arguments=fabricLink+lldpAdjEp+vzBrCP+vzSubj+vzRsSubjFiltAtt+vzEntry+l3extInstP+l3extSubnet",
+                "interval=300",
+                "index=cisco_dc",
+            ):
+                self.assertIn(field, creates[0])
+            self.assertTrue(
+                any(
+                    "METHOD=POST" in line and "/cisco_nexus_aci/classInfo_adm/enable" in line
+                    for line in log_lines
+                ),
+                msg="Expected the custom input to be enabled after creation",
+            )
+
+            validate = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/validate.sh",
+                "--classinfo-preset", "application-atlas",
+                "--index", "cisco_dc",
+                "--strict",
+                env=env,
+            )
+            output = validate.stdout + validate.stderr
+            self.assertNotEqual(validate.returncode, 0, msg=output)
+            self.assertIn("PASS: cisco_nexus_aci://classInfo_adm is a classInfo input", output)
+            self.assertIn(
+                "FAIL: No cisco:dc:aci:class events from cisco_nexus_aci://classInfo_adm in index 'cisco_dc'",
+                output,
+            )
+
+    def test_dc_networking_adm_policy_preset_renders_policy_classes(self):
+        result = self.run_script_no_env(
+            "skills/cisco-dc-networking-setup/scripts/setup.sh",
+            "--classinfo-preset", "adm-policy",
+            "--account", "MY_FABRIC", "--index", "cisco_dc", "--dry-run",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("[cisco_nexus_aci://classInfo_adm_policy]", result.stdout)
+        self.assertIn(
+            "apic_arguments = fvCtx fvAEPg fvEPg fvESg vzAny vzRsAnyToCons vzRsAnyToProv "
+            "vzRsAnyToConsIf vzInTerm vzOutTerm vzTaboo fvRsProtBy vzRsSubjGraphAtt\n",
+            result.stdout,
+        )
+        self.assertIn("interval = 300", result.stdout)
+        alias = self.run_script_no_env(
+            "skills/cisco-dc-networking-setup/scripts/setup.sh",
+            "--classinfo-preset", "adm",
+            "--account", "MY_FABRIC", "--index", "cisco_dc", "--dry-run",
+        )
+        self.assertEqual(alias.returncode, 0, msg=alias.stdout + alias.stderr)
+        self.assertIn("[cisco_nexus_aci://classInfo_adm]", alias.stdout)
+
+    def test_dc_networking_validate_adm_policy_preset_checks_policy_input(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env, _curl_log = self._build_configure_account_env(Path(tmpdir))
+            created = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/setup.sh",
+                "--classinfo-preset", "adm-policy",
+                "--account", "MY_FABRIC", "--index", "cisco_dc",
+                env=env,
+            )
+            self.assertEqual(created.returncode, 0, msg=created.stdout + created.stderr)
+            validate = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/validate.sh",
+                "--classinfo-preset", "adm-policy", "--index", "cisco_dc", "--strict",
+                env=env,
+            )
+            output = validate.stdout + validate.stderr
+            self.assertIn("PASS: cisco_nexus_aci://classInfo_adm_policy is a classInfo input", output)
+            self.assertIn("No cisco:dc:aci:class events from cisco_nexus_aci://classInfo_adm_policy", output)
+
+    def test_dc_networking_classinfo_dry_run_renders_without_contacting_splunk(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env, curl_log = self._build_configure_account_env(Path(tmpdir))
+
+            result = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/setup.sh",
+                "--classinfo-input", "classInfo_links",
+                "--classinfo-classes", " fabricLink  lldpAdjEp fabricLink ",
+                "--interval", "600",
+                "--account", "FABRIC_A,FABRIC_B",
+                "--index", "cisco_aci",
+                "--dry-run",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("[cisco_nexus_aci://classInfo_links]", result.stdout)
+            self.assertIn("apic_account = FABRIC_A,FABRIC_B", result.stdout)
+            self.assertIn("apic_input_type = classInfo", result.stdout)
+            self.assertIn("apic_arguments = fabricLink lldpAdjEp\n", result.stdout)
+            self.assertIn("interval = 600", result.stdout)
+            self.assertFalse(curl_log.exists() and curl_log.read_text(encoding="utf-8").strip())
+
+    def test_dc_networking_classinfo_rejects_unsafe_or_conflicting_requests(self):
+        base = ["--account", "MY_FABRIC", "--index", "cisco_aci", "--dry-run"]
+        cases = [
+            (["--classinfo-input", "classInfo_faultInst", "--classinfo-classes", "fvCEp"], "shipped default input"),
+            (["--classinfo-input", "1bad", "--classinfo-classes", "fvCEp"], "--classinfo-input must start with a letter"),
+            (["--classinfo-input", "ok", "--classinfo-classes", "fvCEp;rm"], "APIC class names may contain only"),
+            (["--classinfo-input", "ok", "--classinfo-classes", "*"], "APIC class names may contain only"),
+            (["--classinfo-input", "ok", "--classinfo-classes", "   "], "must list at least one APIC class"),
+            (["--classinfo-input", "ok", "--classinfo-classes", "fvCEp", "--interval", "0"], "--interval must be a positive integer"),
+            (["--classinfo-preset", "application-atlas", "--classinfo-input", "x"], "cannot be combined"),
+            (["--classinfo-preset", "unknown"], "Unknown --classinfo-preset"),
+        ]
+        for extra, expected in cases:
+            with self.subTest(extra=extra):
+                result = self.run_script_no_env(
+                    "skills/cisco-dc-networking-setup/scripts/setup.sh", *extra, *base
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stdout + result.stderr)
+        for account in ("bad account", "MY_FABRIC\n[evil]", "x" * 51):
+            with self.subTest(account=account):
+                result = self.run_script_no_env(
+                    "skills/cisco-dc-networking-setup/scripts/setup.sh",
+                    "--classinfo-preset", "application-atlas",
+                    "--account", account, "--index", "cisco_aci", "--dry-run",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("--account must be one or more comma-separated", result.stdout + result.stderr)
+        for index in ("bad index", "_internal", "a" * 81):
+            with self.subTest(index=index):
+                result = self.run_script_no_env(
+                    "skills/cisco-dc-networking-setup/scripts/setup.sh",
+                    "--classinfo-preset", "application-atlas",
+                    "--account", "MY_FABRIC", "--index", index, "--dry-run",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("--index must begin with a letter or digit", result.stdout + result.stderr)
+
+    def test_dc_networking_validate_rejects_unsafe_classinfo_search_values(self):
+        cases = [
+            (["--classinfo-input", 'x" | delete'], "--classinfo-input must start with a letter"),
+            (["--classinfo-input", "ok", "--index", "a b"], "--index contains unsupported characters"),
+            (["--classinfo-input", "ok", "--expect-classes", "a|b"], "--expect-classes may contain only"),
+            (["--expect-classes", "fvCEp"], "--expect-classes requires --classinfo-input"),
+        ]
+        for extra, expected in cases:
+            with self.subTest(extra=extra):
+                result = self.run_script_no_env(
+                    "skills/cisco-dc-networking-setup/scripts/validate.sh", *extra
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stdout + result.stderr)
+
     def test_catalyst_configure_account_defaults_to_per_account_ssl_verification(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

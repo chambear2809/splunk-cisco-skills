@@ -374,6 +374,47 @@ if [[ "${EXPORT_MODE}" == "fluentd" ]]; then
     log "  WARN: Tetragon export mode is 'fluentd' (DEPRECATED, fluent-plugin-splunk-hec archived 2025-06-24)."
 fi
 
+# The opt-in Hubble static flow exporter is a cross-skill file contract with
+# splunk-observability-isovalent-integration; metadata and values must agree.
+if ! PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib${PYTHONPATH:+:${PYTHONPATH}}" python3 - \
+    "${OUTPUT_DIR}/metadata.json" "${OUTPUT_DIR}/helm/cilium-values.yaml" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+from yaml_compat import load_yaml_or_json
+
+metadata = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+values_path = Path(sys.argv[2])
+values = load_yaml_or_json(values_path.read_text(encoding="utf-8"), source=str(values_path))
+contract = metadata.get("hubble_flow_export", {"enabled": False, "file_path": ""})
+if not isinstance(contract, dict) or not isinstance(contract.get("enabled"), bool):
+    raise SystemExit("ERROR: metadata.json has an invalid hubble_flow_export contract")
+static = (((values or {}).get("hubble") or {}).get("export") or {}).get("static")
+if contract["enabled"]:
+    if metadata.get("edition") != "oss":
+        raise SystemExit("ERROR: Hubble flow export is supported only for the OSS edition")
+    if not isinstance(static, dict) or static.get("enabled") is not True:
+        raise SystemExit("ERROR: Hubble flow export requires hubble.export.static.enabled: true")
+    file_path = static.get("filePath")
+    if not isinstance(file_path, str) or not file_path.startswith("/") or file_path != contract.get("file_path"):
+        raise SystemExit("ERROR: hubble.export.static.filePath does not match metadata.hubble_flow_export.file_path")
+    for key in ("fieldMask", "allowList", "denyList"):
+        if not isinstance(static.get(key), list):
+            raise SystemExit(f"ERROR: hubble.export.static.{key} must be a list")
+    for item in static["allowList"] + static["denyList"]:
+        if not isinstance(item, str) or not isinstance(json.loads(item), dict):
+            raise SystemExit("ERROR: Hubble export allow/deny lists must contain JSON flow filters")
+    if (values.get("hubble") or {}).get("enabled") is not True:
+        raise SystemExit("ERROR: Hubble flow export requires hubble.enabled: true")
+elif isinstance(static, dict) and static.get("enabled") is True:
+    raise SystemExit("ERROR: hubble.export.static is enabled but metadata does not record the flow export contract")
+PY
+then
+    log "ERROR: Invalid Hubble flow export configuration."
+    exit 1
+fi
+
 log "Cisco Isovalent Platform Setup rendered assets passed static validation."
 
 if [[ "${LIVE}" == "true" ]]; then

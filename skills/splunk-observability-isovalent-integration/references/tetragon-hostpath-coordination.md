@@ -59,6 +59,38 @@ The validate.sh in this skill confirms `extraFileLogs.filelog/tetragon.include[0
 ERROR: extraFileLogs include (/var/log/tetragon/*.log) is not under hostPath (/var/run/cilium/tetragon).
 ```
 
+## Hubble flow export coordination
+
+The opt-in Hubble flow log path follows the same contract with a separate directory:
+
+1. `cisco-isovalent-platform-setup` -> `helm/cilium-values.yaml`:
+   ```yaml
+   hubble:
+     export:
+       static:
+         enabled: true
+         filePath: /var/run/cilium/hubble/events.log   # Cilium agents write here
+   ```
+
+2. This skill -> `splunk-otel-overlay/values.overlay.yaml`:
+   ```yaml
+   agent:
+     extraVolumes:
+       - name: hubble-flows
+         hostPath:
+           path: /var/run/cilium/hubble
+     extraVolumeMounts:
+       - name: hubble-flows
+         mountPath: /var/run/cilium/hubble
+   logsCollection:
+     extraFileLogs:
+       file_log/hubble-flows:
+         include: ['/var/run/cilium/hubble/events*.log']
+         start_at: end
+   ```
+
+The exporter rotates `events.log` in the same directory (backups are named `events-<timestamp>.log`; compressed backups end in `.gz` and are not matched). `start_at: end` avoids reading a large pre-existing file on first deployment; the chart's file storage keeps offsets across collector restarts. The receiver uses the chart's `file_log` component name (chart 0.151.0 renamed `filelog`). `hubble_flow_export.host_path` must differ from `tetragon_export.host_path`, and validate.sh checks that the mount, include glob and `metadata.json` agree.
+
 ## Permissions
 
 The Splunk OTel collector ServiceAccount needs read permission on the hostPath. This is usually fine because:

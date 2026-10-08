@@ -225,6 +225,39 @@ bash skills/cisco-dc-networking-setup/scripts/setup.sh --enable-inputs --account
 | `nd` | 11 inputs (advisories, anomalies, congestion, endpoints, fabrics, switches, flows, protocols, MSO) | `cisco_nd` |
 | `nexus9k` | 10 inputs (hostname, version, module, inventory, temp, interfaces, neighbors, transceivers, power, resources) | `cisco_nexus_9k` |
 
+### Step 3b: Custom ACI classInfo Input (optional)
+
+Collect APIC classes that the shipped inputs do not cover with one named
+`classInfo` input. Render the stanza first, then apply:
+
+```bash
+bash skills/cisco-dc-networking-setup/scripts/setup.sh \
+  --classinfo-input classInfo_links --classinfo-classes "fabricLink lldpAdjEp" \
+  --account "MY_FABRIC" --index "cisco_aci" --dry-run
+```
+
+Remove `--dry-run` to create or update and enable the input over REST. The
+`application-atlas` preset creates `classInfo_adm` with
+`fabricLink lldpAdjEp vzBrCP vzSubj vzRsSubjFiltAtt vzEntry l3extInstP l3extSubnet`
+(fabric links, host LLDP neighbors and ACI contract objects) every 300 seconds
+(`adm` is an alias). The optional `adm-policy` preset adds `classInfo_adm_policy`
+with VRF, uSeg EPG, ESG, vzAny, contract-term, taboo and service-graph classes
+so Application Atlas can evaluate ACI policy completely; the Splunk admin then
+sets the app macro `adm_aci_policy_complete` to `1`:
+
+```bash
+bash skills/cisco-dc-networking-setup/scripts/setup.sh \
+  --classinfo-preset application-atlas --account "MY_FABRIC" --index "cisco_dc"
+bash skills/cisco-dc-networking-setup/scripts/setup.sh \
+  --classinfo-preset adm-policy --account "MY_FABRIC" --index "cisco_dc"
+```
+
+Names, classes, accounts, interval and index follow the TA's own validators;
+shipped default input names are refused so their class lists stay intact.
+Check arrival per class with
+`validate.sh --classinfo-preset application-atlas --index cisco_dc`.
+See [reference.md](reference.md#custom-classinfo-inputs).
+
 ### Step 4: Restart If Required
 
 On Splunk Enterprise, restart Splunk after new index creation.
@@ -304,4 +337,7 @@ Tools: `cisco_dc_check_health`, `cisco_dc_list_inputs`, `cisco_dc_aci_faults`,
 
 Run `scripts/validate.sh` for diagnostics. Use `--completion` (alias `--strict`)
 to require at least one DC account, an enabled input, recent data, dashboard
-macros, and visible shipped views.
+macros, and visible shipped views. Add `--classinfo-input NAME` (or
+`--classinfo-preset application-atlas`) with `--index INDEX` to check a custom
+classInfo input is enabled and that `cisco:dc:aci:class` events arrived from it
+in the last 24 hours for each expected class.

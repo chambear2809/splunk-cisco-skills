@@ -75,6 +75,29 @@ tetragon:
     filename: tetragon.log
     file_perm: "644"        # allow the OTel collector hostPath reader to read exported files
 
+# Optional Hubble static flow exporter (OSS chart only). When enabled, each
+# Cilium agent writes Hubble flows as JSON lines to file_path on the node;
+# splunk-observability-isovalent-integration tails that file into Splunk
+# Platform. Keys map to the Cilium chart's hubble.export.static and
+# hubble.redact values. Flow logs can be large: limit them with namespaces,
+# allow_list/deny_list (Hubble flow filters as JSON strings) and field_mask.
+hubble_flow_export:
+  enabled: false
+  file_path: /var/run/cilium/hubble/events.log
+  namespaces: []            # keep flows whose source or destination pod is in these namespaces
+  allow_list: []            # e.g. '{"verdict":["DROPPED","ERROR"]}'
+  deny_list: []             # e.g. '{"source_pod":["kube-system/"]}'
+  field_mask: []            # e.g. [time, source, destination, IP, l4, verdict, node_name]
+  file_max_size_mb: 10
+  file_max_backups: 5
+  file_compress: false
+  redact:
+    enabled: false
+    http_url_query: false
+    http_user_info: true
+    http_headers_deny: []   # e.g. [Authorization, Proxy-Authorization, Cookie]
+    http_headers_allow: []  # use either allow or deny, not both
+
 # Optional Tetragon TracingPolicy starter. The skill renders a basic
 # network-monitoring policy by default.
 tracing_policy:

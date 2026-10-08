@@ -49,3 +49,17 @@ device_ip = 10.0.0.50
 port = 443
 username =
 proxy_enabled = 0
+
+# Optional custom ACI classInfo input (setup.sh --classinfo-input or
+# --classinfo-preset). Set preset, or leave it empty and set input_name and classes.
+# The application-atlas preset creates classInfo_adm with
+# fabricLink lldpAdjEp vzBrCP vzSubj vzRsSubjFiltAtt vzEntry l3extInstP l3extSubnet.
+# The optional adm-policy preset creates classInfo_adm_policy for complete ACI
+# policy evaluation in Application Atlas.
+[aci_classinfo_input]
+preset =
+input_name =
+classes =
+account = ACI_PROD
+index = cisco_aci
+interval = 300

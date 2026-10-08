@@ -5,12 +5,18 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SHARED_LIB = REPO_ROOT / "skills/shared/lib"
+if str(SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB))
+
+from yaml_compat import load_yaml_or_json  # noqa: E402
 SETUP = REPO_ROOT / "skills/cisco-isovalent-platform-setup/scripts/setup.sh"
 VALIDATE = REPO_ROOT / "skills/cisco-isovalent-platform-setup/scripts/validate.sh"
 
@@ -2178,3 +2184,129 @@ def test_cluster_name_override_lands_in_values_and_metadata(tmp_path: Path) -> N
     assert "name: isovalent-demo" in cilium
     assert "clusterName: isovalent-demo" in tetragon
     assert metadata["cluster_name"] == "isovalent-demo"
+
+
+def _render_values(output: Path) -> dict:
+    path = output / "helm/cilium-values.yaml"
+    return load_yaml_or_json(path.read_text(encoding="utf-8"), source=str(path))
+
+
+def test_hubble_flow_export_renders_static_exporter_values(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        hubble_flow_export={
+            "enabled": True,
+            "namespaces": ["shop"],
+            "deny_list": ['{"source_pod": ["kube-system/"]}'],
+            "field_mask": ["time", "source.namespace", "IP", "l4", "node_name"],
+            "file_max_size_mb": 50,
+            "redact": {"enabled": True, "http_headers_deny": ["Authorization", "Cookie"]},
+        },
+    )
+    result = run_setup("--render", "--validate", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    values = _render_values(output)
+    static = values["hubble"]["export"]["static"]
+    assert static == {
+        "enabled": True,
+        "filePath": "/var/run/cilium/hubble/events.log",
+        "fieldMask": ["time", "source.namespace", "IP", "l4", "node_name"],
+        "allowList": ['{"source_pod":["shop/"]}', '{"destination_pod":["shop/"]}'],
+        "denyList": ['{"source_pod":["kube-system/"]}'],
+        "fileMaxSizeMb": 50,
+        "fileMaxBackups": 5,
+        "fileCompress": False,
+    }
+    assert values["hubble"]["redact"] == {
+        "enabled": True,
+        "http": {
+            "urlQuery": False,
+            "userInfo": True,
+            "headers": {"allow": [], "deny": ["Authorization", "Cookie"]},
+        },
+    }
+    assert values["hubble"]["enabled"] is True
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["hubble_flow_export"] == {
+        "enabled": True,
+        "file_path": "/var/run/cilium/hubble/events.log",
+    }
+    catalog = json.loads((output / "feature-catalog.json").read_text(encoding="utf-8"))
+    row = next(item for item in catalog["features"] if item["id"] == "cilium.hubble_flow_export")
+    assert row["status"] == "helm_apply"
+
+
+def test_hubble_flow_export_is_absent_by_default(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup("--render", "--validate", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    assert "export" not in _render_values(output)["hubble"]
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["hubble_flow_export"] == {"enabled": False, "file_path": ""}
+
+
+@pytest.mark.parametrize(
+    ("block", "expected"),
+    [
+        ({"enabled": True, "file_path": "relative/events.log"}, "absolute file path"),
+        ({"enabled": True, "file_path": "/var/run/../etc/passwd"}, "absolute file path"),
+        ({"enabled": True, "namespaces": ["Bad_NS"]}, "DNS-1123 labels"),
+        ({"enabled": True, "allow_list": ["not json"]}, "JSON objects"),
+        ({"enabled": True, "deny_list": ["[1, 2]"]}, "non-empty JSON objects"),
+        ({"enabled": True, "field_mask": ["source;rm"]}, "flow field paths"),
+        ({"enabled": True, "file_max_backups": 0}, "positive integer"),
+        ({"enabled": True, "file_compress": "yes"}, "true or false"),
+        (
+            {"enabled": True, "redact": {"enabled": True, "http_headers_allow": ["a"], "http_headers_deny": ["b"]}},
+            "cannot set both",
+        ),
+        ({"enabled": "true"}, "true or false"),
+    ],
+)
+def test_hubble_flow_export_rejects_invalid_spec_before_write(
+    tmp_path: Path, block: dict, expected: str
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json", hubble_flow_export=block)
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode != 0
+    assert expected in combined_output(result)
+    assert not (output / "helm/cilium-values.yaml").exists()
+
+
+def test_hubble_flow_export_fails_closed_for_enterprise_edition(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        edition="enterprise",
+        hubble_flow_export={"enabled": True},
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode != 0
+    assert "OSS cilium/cilium chart only" in combined_output(result)
+
+
+def test_static_validation_rejects_hubble_flow_export_drift(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json", hubble_flow_export={"enabled": True})
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    values_path = output / "helm/cilium-values.yaml"
+    text = values_path.read_text(encoding="utf-8")
+    assert "filePath: /var/run/cilium/hubble/events.log" in text
+    values_path.write_text(
+        text.replace("filePath: /var/run/cilium/hubble/events.log", "filePath: /tmp/other.log"),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", str(VALIDATE), "--output-dir", str(output)],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "filePath does not match metadata" in combined_output(result)
