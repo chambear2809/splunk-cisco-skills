@@ -158,6 +158,34 @@ export:
 
 This is the **production-validated path** that coordinates with `splunk-observability-isovalent-integration`'s `agent.extraVolumes` hostPath mount and `logsCollection.extraFileLogs.filelog/tetragon` block. Override with `--export-mode stdout|fluentd` for users whose SCC/PSP policies block hostPath mounts (`stdout`) or who insist on the legacy fluentd `splunk_hec` output (`fluentd` — flagged DEPRECATED, the upstream `fluent-plugin-splunk-hec` was archived 2025-06-24).
 
+## Hubble flow export (opt-in, OSS)
+
+Set `hubble_flow_export.enabled: true` in the spec to render the Cilium chart's
+static Hubble exporter into `helm/cilium-values.yaml`:
+
+```yaml
+hubble:
+  export:
+    static:
+      enabled: true
+      filePath: /var/run/cilium/hubble/events.log
+      allowList: ['{"source_pod":["shop/"]}', '{"destination_pod":["shop/"]}']
+      denyList: []
+      fieldMask: []
+      fileMaxSizeMb: 10
+      fileMaxBackups: 5
+      fileCompress: false
+```
+
+`namespaces` expands into one source and one destination allow filter per
+namespace; `allow_list`/`deny_list` take Hubble flow filters as JSON strings,
+and `redact` renders `hubble.redact`. `metadata.json` records the file path so
+`splunk-observability-isovalent-integration` can tail the same file. The
+Isovalent Enterprise chart's flow-export values are not yet verified, so
+Enterprise renders fail closed with this block enabled. Hubble's default
+`bpf.monitorAggregation: medium` suppresses some datapath trace events; the
+skill does not change it. See [reference.md](reference.md#hubble-flow-export).
+
 ## Safety Rules
 
 - Never ask for the Isovalent license key in conversation; never inline it.

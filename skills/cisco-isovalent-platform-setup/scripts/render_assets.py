@@ -494,7 +494,123 @@ def write_json(path: Path, payload: Any) -> None:
     write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def cilium_values(spec: dict[str, Any], edition: str) -> dict[str, Any]:
+DEFAULT_HUBBLE_EXPORT_FILE = "/var/run/cilium/hubble/events.log"
+HUBBLE_EXPORT_PATH = re.compile(r"^/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+$")
+HUBBLE_FIELD_MASK = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
+HTTP_HEADER_NAME = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,128}$")
+
+
+def _positive_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise SpecError(f"{name} must be a positive integer.")
+    return value
+
+
+def _bool_value(value: Any, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise SpecError(f"{name} must be true or false.")
+    return value
+
+
+def _string_list(value: Any, name: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise SpecError(f"{name} must be a list of strings.")
+    return list(value)
+
+
+def _flow_filter(value: str, name: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise SpecError(f"{name} entries must be Hubble flow filters encoded as JSON objects.") from exc
+    if not isinstance(parsed, dict) or not parsed:
+        raise SpecError(f"{name} entries must be non-empty JSON objects.")
+    return json.dumps(parsed, separators=(",", ":"), sort_keys=True)
+
+
+def validated_hubble_flow_export(spec: dict[str, Any], edition: str) -> dict[str, Any]:
+    """Validate the opt-in Hubble static flow exporter block.
+
+    Keys and defaults follow the Cilium chart `hubble.export.static` and
+    `hubble.redact` values (cilium/cilium 1.18.10 values.yaml lines 1364-1422 and
+    1951-1972; unchanged for these keys in 1.20.2).
+    """
+    raw = spec.get("hubble_flow_export")
+    if raw is None:
+        return {"enabled": False}
+    if not isinstance(raw, dict):
+        raise SpecError("hubble_flow_export must be a mapping.")
+    enabled = _bool_value(raw.get("enabled", False), "hubble_flow_export.enabled")
+    if not enabled:
+        return {"enabled": False}
+    if edition != "oss":
+        raise SpecError(
+            "hubble_flow_export currently supports the OSS cilium/cilium chart only; "
+            "the Isovalent Enterprise chart's flow-export values are not yet verified by this skill."
+        )
+    file_path = raw.get("file_path", DEFAULT_HUBBLE_EXPORT_FILE)
+    if not isinstance(file_path, str) or ".." in file_path.split("/") or not HUBBLE_EXPORT_PATH.fullmatch(file_path):
+        raise SpecError("hubble_flow_export.file_path must be an absolute file path without '..'.")
+    namespaces = _string_list(raw.get("namespaces"), "hubble_flow_export.namespaces")
+    for namespace in namespaces:
+        if not DNS1123_LABEL.fullmatch(namespace):
+            raise SpecError("hubble_flow_export.namespaces must contain Kubernetes DNS-1123 labels.")
+    allow_list: list[str] = []
+    for namespace in namespaces:
+        # One filter per direction; Hubble ORs allowList entries.
+        allow_list.append(json.dumps({"source_pod": [f"{namespace}/"]}, separators=(",", ":")))
+        allow_list.append(json.dumps({"destination_pod": [f"{namespace}/"]}, separators=(",", ":")))
+    allow_list.extend(
+        _flow_filter(item, "hubble_flow_export.allow_list")
+        for item in _string_list(raw.get("allow_list"), "hubble_flow_export.allow_list")
+    )
+    deny_list = [
+        _flow_filter(item, "hubble_flow_export.deny_list")
+        for item in _string_list(raw.get("deny_list"), "hubble_flow_export.deny_list")
+    ]
+    field_mask = _string_list(raw.get("field_mask"), "hubble_flow_export.field_mask")
+    for field in field_mask:
+        if not HUBBLE_FIELD_MASK.fullmatch(field):
+            raise SpecError("hubble_flow_export.field_mask entries must be flow field paths such as source.namespace.")
+    static: dict[str, Any] = {
+        "enabled": True,
+        "filePath": file_path,
+        "fieldMask": field_mask,
+        "allowList": allow_list,
+        "denyList": deny_list,
+        "fileMaxSizeMb": _positive_int(raw.get("file_max_size_mb", 10), "hubble_flow_export.file_max_size_mb"),
+        "fileMaxBackups": _positive_int(raw.get("file_max_backups", 5), "hubble_flow_export.file_max_backups"),
+        "fileCompress": _bool_value(raw.get("file_compress", False), "hubble_flow_export.file_compress"),
+    }
+    result: dict[str, Any] = {"enabled": True, "file_path": file_path, "static": static}
+    redact = raw.get("redact")
+    if redact is not None:
+        if not isinstance(redact, dict):
+            raise SpecError("hubble_flow_export.redact must be a mapping.")
+        if _bool_value(redact.get("enabled", False), "hubble_flow_export.redact.enabled"):
+            allow = _string_list(redact.get("http_headers_allow"), "hubble_flow_export.redact.http_headers_allow")
+            deny = _string_list(redact.get("http_headers_deny"), "hubble_flow_export.redact.http_headers_deny")
+            if allow and deny:
+                raise SpecError("hubble_flow_export.redact cannot set both http_headers_allow and http_headers_deny.")
+            for header in allow + deny:
+                if not HTTP_HEADER_NAME.fullmatch(header):
+                    raise SpecError("hubble_flow_export.redact header lists must contain HTTP header names.")
+            result["redact"] = {
+                "enabled": True,
+                "http": {
+                    "urlQuery": _bool_value(redact.get("http_url_query", False), "hubble_flow_export.redact.http_url_query"),
+                    "userInfo": _bool_value(redact.get("http_user_info", True), "hubble_flow_export.redact.http_user_info"),
+                    "headers": {"allow": allow, "deny": deny},
+                },
+            }
+    return result
+
+
+def cilium_values(
+    spec: dict[str, Any], edition: str, flow_export: dict[str, Any] | None = None
+) -> dict[str, Any]:
     overrides = (spec.get("cilium") or {})
     base: dict[str, Any] = {
         "cluster": {
@@ -528,6 +644,10 @@ def cilium_values(spec: dict[str, Any], edition: str) -> dict[str, Any]:
     # Enterprise-only features. Set explicitly for clarity.
     if edition == "enterprise":
         base["enterprise"] = {"featureGate": "v1.18"}
+    if flow_export and flow_export.get("enabled"):
+        base["hubble"]["export"] = {"static": copy.deepcopy(flow_export["static"])}
+        if "redact" in flow_export:
+            base["hubble"]["redact"] = copy.deepcopy(flow_export["redact"])
     return _deep_merge(base, overrides)
 
 
@@ -1540,6 +1660,7 @@ def render_metadata(
     enable_dnsproxy: bool,
     enable_hubble_enterprise: bool,
     enable_timescape: bool,
+    hubble_flow_export: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     export_mode = args.export_mode or (spec.get("tetragon") or {}).get("export", {}).get("mode", "file")
     return {
@@ -1559,6 +1680,7 @@ def render_metadata(
         "enable_hubble_enterprise": enable_hubble_enterprise,
         "enable_timescape": enable_timescape,
         "tetragon_export_mode": export_mode,
+        "hubble_flow_export": hubble_flow_export or {"enabled": False, "file_path": ""},
         "apply_sections": sections,
         "outputs": {
             "feature_catalog": "feature-catalog.json",
@@ -1683,6 +1805,15 @@ def main() -> int:
         enable_dnsproxy = enable_dnsproxy or "dnsproxy" in sections
         enable_hubble_enterprise = enable_hubble_enterprise or "hubble" in sections
         enable_timescape = enable_timescape or "timescape" in sections
+    try:
+        flow_export = validated_hubble_flow_export(spec, edition)
+    except SpecError as exc:
+        print(f"ERROR: {exc}", file=__import__("sys").stderr)
+        return 1
+    flow_export_summary = {
+        "enabled": flow_export["enabled"],
+        "file_path": flow_export.get("file_path", ""),
+    }
     cilium_ns = namespaces["cilium"]
     tetragon_ns = namespaces["tetragon"]
     hubble_ent_ns = namespaces["hubble_enterprise"]
@@ -1700,6 +1831,7 @@ def main() -> int:
         "enable_hubble_enterprise": enable_hubble_enterprise,
         "enable_timescape": enable_timescape,
         "export_mode": export_mode,
+        "hubble_flow_export": flow_export_summary,
         "apply_sections": sections,
         "namespaces": namespaces,
         "helm_charts": chart_contract(edition, eks_mirror),
@@ -1729,7 +1861,7 @@ def main() -> int:
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    write_yaml(out / "helm/cilium-values.yaml", cilium_values(spec, edition))
+    write_yaml(out / "helm/cilium-values.yaml", cilium_values(spec, edition, flow_export))
     for section in sorted(CILIUM_SECTION_VALUE_OVERRIDES):
         write_yaml(out / f"helm/cilium-section-{section}-values.yaml", cilium_section_values(spec, section))
     write_yaml(out / "helm/tetragon-values.yaml", tetragon_values(spec, edition, args.export_mode))
@@ -1903,6 +2035,7 @@ def main() -> int:
                 enable_dnsproxy=enable_dnsproxy,
                 enable_hubble_enterprise=enable_hubble_enterprise,
                 enable_timescape=enable_timescape,
+                hubble_flow_export=flow_export_summary,
             ),
             indent=2,
             sort_keys=True,

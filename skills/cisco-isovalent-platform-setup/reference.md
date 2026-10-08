@@ -137,6 +137,50 @@ sample evidence and is not treated as unhealthy without documented semantics.
 - `stdout`: Tetragon prints events to container stdout. Picked up by the OTel collector's container log collection. Use when SCC/PSP policies block hostPath mounts.
 - `fluentd`: **DEPRECATED.** Renders the legacy `fluent-plugin-splunk-hec` block. The plugin was archived 2025-06-24; plan to migrate to `file` mode.
 
+## Hubble flow export
+
+`hubble_flow_export` in the spec renders `hubble.export.static` (and optionally
+`hubble.redact`) into `helm/cilium-values.yaml`. Keys and defaults are taken
+from the audited `cilium/cilium` 1.18.10 chart `values.yaml`
+(`hubble.export.static` at lines 1951–1972, `hubble.redact` at 1364–1422) and
+are unchanged for these keys in 1.20.2 (lines 2209–2238 and 1606–1664; 1.20
+adds optional `fieldAggregate`/`aggregationInterval`, which the skill does not
+render). Upstream reference:
+[Configuring Hubble exporter](https://docs.cilium.io/en/v1.18/observability/hubble/configuration/export/).
+
+| Spec key | Chart value | Default |
+|---|---|---|
+| `enabled` | `hubble.export.static.enabled` | `false` |
+| `file_path` | `hubble.export.static.filePath` | `/var/run/cilium/hubble/events.log` |
+| `namespaces` | `allowList` entries `{"source_pod":["<ns>/"]}` and `{"destination_pod":["<ns>/"]}` | none |
+| `allow_list`, `deny_list` | `allowList`, `denyList` (JSON flow filters, ORed) | none |
+| `field_mask` | `fieldMask` (flow field paths, e.g. `source.namespace`, `IP`, `l4`) | all fields |
+| `file_max_size_mb`, `file_max_backups`, `file_compress` | `fileMaxSizeMb`, `fileMaxBackups`, `fileCompress` | `10`, `5`, `false` |
+| `redact.*` | `hubble.redact.enabled`, `http.urlQuery`, `http.userInfo`, `http.headers.allow`/`deny` | off |
+
+The exporter writes JSON lines (`{"flow":{...},"node_name":...,"time":...}`)
+on each node and rotates them in the same directory. Collection into Splunk
+Platform is delegated to `splunk-observability-isovalent-integration`
+(`hubble_flow_export` block), which mounts the directory and tails
+`events*.log`. Static validation checks that `metadata.json` and the rendered
+values agree on the file path and that filters are JSON objects.
+
+Limits:
+
+- OSS edition only. The `isovalent/cilium-enterprise` chart's export values are
+  not verified here; Enterprise renders with `hubble_flow_export.enabled: true`
+  fail closed. Isovalent Enterprise flow export (including Hubble Timescape)
+  is a separate product path.
+- Cilium's `bpf.monitorAggregation` defaults to `medium` (1.18.10 values.yaml
+  line 645). At that level some datapath trace notifications (for example
+  pre-translation and forwarding traces) can be aggregated away, so the
+  exported file mainly reflects the post-translation flow delivered to the
+  endpoint.
+  Lowering aggregation increases event volume; the skill leaves the default
+  unchanged.
+- Flow logs contain workload names, IPs and, with L7 visibility, HTTP paths
+  and headers. Use `field_mask`, filters and `redact` to limit what is written.
+
 ## Preflights
 
 - **Kernel >= 5.10**: required for Cilium v1.18.x. Renderer emits a per-node check.

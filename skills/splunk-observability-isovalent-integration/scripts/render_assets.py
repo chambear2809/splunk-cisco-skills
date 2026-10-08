@@ -51,6 +51,14 @@ CHART_DISTRIBUTION = {"kubernetes": "", "vanilla": "", "": ""}
 SKILL_NAME = "splunk-observability-isovalent-integration"
 DEFAULT_TETRAGON_HOST_PATH = "/var/run/cilium/tetragon"
 DEFAULT_TETRAGON_FILENAME_PATTERN = "*.log"
+# Hubble static flow exporter (cilium/cilium hubble.export.static.filePath
+# default /var/run/cilium/hubble/events.log). Rotated backups are written in
+# the same directory as events-<timestamp>.log, which the glob also follows.
+DEFAULT_HUBBLE_HOST_PATH = "/var/run/cilium/hubble"
+DEFAULT_HUBBLE_FILENAME_PATTERN = "events*.log"
+DEFAULT_HUBBLE_INDEX = "cilium_hubble"
+DEFAULT_HUBBLE_SOURCETYPE = "cilium:hubble:flow"
+HUBBLE_RECEIVER = "file_log/hubble-flows"
 ALLOWED_REALMS = {"us0", "us1", "eu0", "eu1", "eu2", "au0", "jp0", "sg0"}
 ALLOWED_DISTRIBUTIONS = {"openshift", "kubernetes", "eks", "gke"}
 ALLOWED_EXPORT_MODES = {"file", "stdout", "fluentd"}
@@ -404,6 +412,14 @@ def normalize_configuration(
                 "tetragon_export.filename_pattern must be a nonempty basename glob."
             )
 
+    hubble_flow_export = normalize_hubble_flow_export(
+        spec,
+        platform_enabled=platform_enabled,
+        legacy_fluentd=legacy_fluentd,
+        export_mode=export_mode,
+        tetragon_host_path=tetragon_export.get("host_path", DEFAULT_TETRAGON_HOST_PATH),
+    )
+
     effective_scrape_jobs(spec)
     representative_signalflow_metrics(spec)
     return {
@@ -416,6 +432,61 @@ def normalize_configuration(
         "o11y_token_file": o11y_token_file,
         "platform_hec_token_file": platform_hec_token_file,
         "render_hec_helper": render_hec_helper,
+        "hubble_flow_export": hubble_flow_export,
+    }
+
+
+def normalize_hubble_flow_export(
+    spec: dict[str, Any],
+    *,
+    platform_enabled: bool,
+    legacy_fluentd: bool,
+    export_mode: str,
+    tetragon_host_path: Any,
+) -> dict[str, Any]:
+    """Validate the opt-in Hubble flow log file tail."""
+    block = _mapping(spec.get("hubble_flow_export"), name="hubble_flow_export")
+    enabled = block.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise SpecError("hubble_flow_export.enabled must be true or false.")
+    if not enabled:
+        return {"enabled": False}
+    if not platform_enabled:
+        raise SpecError("hubble_flow_export requires splunk_platform.enabled: true.")
+    if legacy_fluentd:
+        raise SpecError(
+            "hubble_flow_export uses the collector's Splunk Platform logs path and "
+            "cannot be combined with the legacy fluentd export mode."
+        )
+    host_path = block.get("host_path", DEFAULT_HUBBLE_HOST_PATH)
+    if (
+        not isinstance(host_path, str)
+        or not re.fullmatch(r"/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+", host_path)
+        or ".." in host_path.split("/")
+    ):
+        raise SpecError("hubble_flow_export.host_path must be an absolute directory path.")
+    if export_mode == "file" and host_path.rstrip("/") == str(tetragon_host_path).rstrip("/"):
+        raise SpecError(
+            "hubble_flow_export.host_path must differ from tetragon_export.host_path."
+        )
+    pattern = block.get("filename_pattern", DEFAULT_HUBBLE_FILENAME_PATTERN)
+    if not isinstance(pattern, str) or not pattern or "/" in pattern or ".." in pattern:
+        raise SpecError(
+            "hubble_flow_export.filename_pattern must be a nonempty basename glob."
+        )
+    index = block.get("index", DEFAULT_HUBBLE_INDEX)
+    sourcetype = block.get("sourcetype", DEFAULT_HUBBLE_SOURCETYPE)
+    if not isinstance(index, str) or not INDEX_RE.fullmatch(index):
+        raise SpecError("hubble_flow_export.index contains an invalid Splunk index name.")
+    if not isinstance(sourcetype, str) or not SOURCETYPE_RE.fullmatch(sourcetype):
+        raise SpecError("hubble_flow_export.sourcetype contains an invalid sourcetype.")
+    return {
+        "enabled": True,
+        "host_path": host_path.rstrip("/"),
+        "filename_pattern": pattern,
+        "index": index,
+        "sourcetype": sourcetype,
+        "receiver": HUBBLE_RECEIVER,
     }
 
 
@@ -442,6 +513,7 @@ def overlay_values(
     export_mode: str,
     legacy_fluentd: bool,
     platform_hec_url: str,
+    hubble_flow_export: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     collector = spec.get("collector") or {}
     scrape = spec.get("scrape") or {}
@@ -629,6 +701,45 @@ def overlay_values(
         # leave splunkPlatform.logsEnabled false because the legacy path
         # doesn't use the OTel splunkhec exporter.
         pass
+
+    if hubble_flow_export and hubble_flow_export.get("enabled"):
+        # Hubble's static exporter writes JSON flow lines on every node
+        # (cisco-isovalent-platform-setup hubble_flow_export). Mount the export
+        # directory and tail it through the chart's extraFileLogs, using the
+        # chart >= 0.151 receiver name file_log.
+        hubble_path = hubble_flow_export["host_path"]
+        overlay["agent"].setdefault("extraVolumes", []).append(
+            {"name": "hubble-flows", "hostPath": {"path": hubble_path}}
+        )
+        overlay["agent"].setdefault("extraVolumeMounts", []).append(
+            {"name": "hubble-flows", "mountPath": hubble_path}
+        )
+        platform = overlay.setdefault("splunkPlatform", {})
+        platform["logsEnabled"] = True
+        if platform_hec_url:
+            platform["endpoint"] = platform_hec_url
+        if splunk_block.get("insecure_skip_verify"):
+            platform["insecureSkipVerify"] = True
+        logs_collection = overlay.setdefault("logsCollection", {})
+        if export_mode != "stdout":
+            # Stdout mode relies on container log collection for Tetragon, so
+            # only restrict container logs when they are not the Tetragon path.
+            logs_collection.setdefault(
+                "containers", {"useSplunkIncludeAnnotation": True}
+            )
+        logs_collection.setdefault("extraFileLogs", {})[HUBBLE_RECEIVER] = {
+            "include": [f"{hubble_path}/{hubble_flow_export['filename_pattern']}"],
+            "start_at": "end",
+            "include_file_path": True,
+            "include_file_name": False,
+            "resource": {
+                "com.splunk.index": hubble_flow_export["index"],
+                "com.splunk.source": f"{hubble_path}/",
+                "host.name": 'EXPR(env("K8S_NODE_NAME"))',
+                "k8s.cluster.name": cluster_name,
+                "com.splunk.sourcetype": hubble_flow_export["sourcetype"],
+            },
+        }
 
     return overlay
 
@@ -841,6 +952,7 @@ def render_apply_overlay_script(
     platform_hec_token_file: str,
     platform_hec_url: str,
     export_mode: str,
+    hubble_flow_export: dict[str, Any] | None = None,
 ) -> str:
     collector = spec.get("collector") or {}
     release = collector.get("release", "splunk-otel-collector")
@@ -859,6 +971,10 @@ def render_apply_overlay_script(
     platform_enabled = splunk_platform.get("enabled", True)
     platform_index = splunk_platform.get("index", "cisco_isovalent")
     platform_sourcetype = splunk_platform.get("sourcetype", "cisco:isovalent")
+    hubble = hubble_flow_export or {"enabled": False}
+    hubble_enabled = str(bool(hubble.get("enabled"))).lower()
+    hubble_index = hubble.get("index", "")
+    hubble_sourcetype = hubble.get("sourcetype", "")
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 umask 077
@@ -960,6 +1076,9 @@ PLATFORM_ENABLED="{str(platform_enabled).lower()}"
 EXPORT_MODE="{export_mode}"
 EXPECTED_PLATFORM_INDEX="{platform_index}"
 EXPECTED_PLATFORM_SOURCETYPE="{platform_sourcetype}"
+HUBBLE_FLOW_EXPORT="{hubble_enabled}"
+EXPECTED_HUBBLE_INDEX="{hubble_index}"
+EXPECTED_HUBBLE_SOURCETYPE="{hubble_sourcetype}"
 CHART_NAME="${{CHART_REF##*/}}"
 RELEASE_ROWS="$("${{HELM[@]}}" list --all-namespaces --filter "^${{RELEASE}}$" -o json 2>/dev/null)" || {{
     echo 'ERROR: Could not list the expected collector Helm release.' >&2
@@ -1122,6 +1241,14 @@ if [[ "${{PLATFORM_ENABLED}}" == "true" && "${{EXPORT_MODE}}" == "file" ]]; then
     if [[ "${{OVERLAY_INDEX}}" != "${{EXPECTED_PLATFORM_INDEX}}" || "${{OVERLAY_SOURCETYPE}}" != "${{EXPECTED_PLATFORM_SOURCETYPE}}" ]]; then
         echo 'ERROR: The rendered Splunk Platform index/sourcetype path is incomplete or drifted.' >&2
         exit 1
+    fi
+    if [[ "${{HUBBLE_FLOW_EXPORT}}" == "true" ]]; then
+        HUBBLE_OVERLAY_INDEX="$(yq eval -r '.logsCollection.extraFileLogs."file_log/hubble-flows".resource."com.splunk.index" // ""' "${{OVERLAY}}")"
+        HUBBLE_OVERLAY_SOURCETYPE="$(yq eval -r '.logsCollection.extraFileLogs."file_log/hubble-flows".resource."com.splunk.sourcetype" // ""' "${{OVERLAY}}")"
+        if [[ "${{HUBBLE_OVERLAY_INDEX}}" != "${{EXPECTED_HUBBLE_INDEX}}" || "${{HUBBLE_OVERLAY_SOURCETYPE}}" != "${{EXPECTED_HUBBLE_SOURCETYPE}}" ]]; then
+            echo 'ERROR: The rendered Hubble flow log index/sourcetype path is incomplete or drifted.' >&2
+            exit 1
+        fi
     fi
 
     RENDERED_HEC_URL="$(yq eval -r '.splunkPlatform.endpoint // ""' "${{OVERLAY}}")"
@@ -1430,6 +1557,7 @@ def render_metadata(
         "splunk_platform_hec_url": config["hec_url"],
         "platform_hec_token_configured": bool(config["platform_hec_token_file"]),
         "render_platform_hec_helper": config["render_hec_helper"],
+        "hubble_flow_export": config["hubble_flow_export"],
         "collector": {
             "release": collector.get("release", "splunk-otel-collector"),
             "namespace": collector.get("namespace", ""),
@@ -1494,6 +1622,7 @@ def main() -> int:
         "distribution": distribution,
         "export_mode": export_mode,
         "legacy_fluentd_hec": legacy_fluentd,
+        "hubble_flow_export": config["hubble_flow_export"],
         "warnings": warnings(args, spec),
     }
 
@@ -1542,6 +1671,7 @@ def main() -> int:
         export_mode=export_mode,
         legacy_fluentd=legacy_fluentd,
         platform_hec_url=config["hec_url"],
+        hubble_flow_export=config["hubble_flow_export"],
     )
     write_yaml(out / "splunk-otel-overlay/values.overlay.yaml", overlay)
 
@@ -1607,6 +1737,7 @@ def main() -> int:
             platform_hec_token_file=config["platform_hec_token_file"],
             platform_hec_url=config["hec_url"],
             export_mode=config["export_mode"],
+            hubble_flow_export=config["hubble_flow_export"],
         ),
         executable=True,
     )

@@ -82,6 +82,10 @@ This skill wires an installed Isovalent stack to Splunk Observability Cloud and 
   - `logsCollection.extraFileLogs.filelog/tetragon` block with sourcetype `cisco:isovalent`, index `cisco_isovalent`.
   - `splunkPlatform.logsEnabled: true`.
   - Coordinates with `cisco-isovalent-platform-setup`'s default Tetragon `export.mode: file` + `exportDirectory: /var/run/cilium/tetragon`.
+- Hubble flow logs (opt-in, `hubble_flow_export.enabled: true`):
+  - A second hostPath mount, `hubble-flows`, of `/var/run/cilium/hubble`.
+  - `logsCollection.extraFileLogs.file_log/hubble-flows` tailing `events*.log` from the end, with sourcetype `cilium:hubble:flow` and index `cilium_hubble`.
+  - Coordinates with `cisco-isovalent-platform-setup`'s `hubble_flow_export` block, which renders Cilium's `hubble.export.static` file exporter. Works with the file or stdout Tetragon modes, not the legacy fluentd path.
 - Alternative paths (behind explicit flags):
   - `--export-mode stdout` — Tetragon stdout + container log collection (no hostPath mount; useful when SCC/PSP blocks).
   - `--legacy-fluentd-hec` — fluentd `splunk_hec` block. **DEPRECATED** (`fluent-plugin-splunk-hec` archived 2025-06-24).
@@ -176,6 +180,6 @@ Static checks: overlay shape, token-scrub assertion, dashboard JSON validity, so
 - `helm status` for the OTel collector release.
 - Pod-IP scrape probes for the seven Prometheus ports (uses `kubectl get --raw` for Tetragon, NOT `kubectl exec`).
 - Optional SignalFlow probe for `cilium_*`, `hubble_*`, `tetragon_*` series presence.
-- Optional Splunk Platform search check: `index=cisco_isovalent sourcetype=cisco:isovalent` returns events.
+- Optional Splunk Platform search check: `index=cisco_isovalent sourcetype=cisco:isovalent` returns events. With Hubble flow export enabled, it also requires a `sourcetype=cilium:hubble:flow` event in its index whose JSON contains a `flow` object.
 
 See `reference.md` and the `references/` annexes for collector-overlay details, Splunk Platform paths, Tetragon hostPath coordination, sourcetype reference, dashboards catalog, and troubleshooting.

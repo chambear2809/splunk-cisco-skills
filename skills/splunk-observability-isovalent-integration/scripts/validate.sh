@@ -406,7 +406,12 @@ if platform_enabled and export_mode == "file":
 elif platform_enabled and export_mode == "stdout":
     if not isinstance(splunk_platform, dict) or splunk_platform.get("logsEnabled") is not True:
         raise SystemExit("ERROR: Stdout export requires splunkPlatform.logsEnabled: true.")
-    if logs_collection is not None or agent.get("extraVolumes") or agent.get("extraVolumeMounts"):
+    # Only the separate Hubble flow log tail may add file-based collection.
+    other_logs = {key: value for key, value in (logs_collection or {}).items() if key != "extraFileLogs"}
+    other_file_logs = [key for key in ((logs_collection or {}).get("extraFileLogs") or {}) if key != "file_log/hubble-flows"]
+    other_volumes = [item for item in (agent.get("extraVolumes") or []) if not (isinstance(item, dict) and item.get("name") == "hubble-flows")]
+    other_mounts = [item for item in (agent.get("extraVolumeMounts") or []) if not (isinstance(item, dict) and item.get("name") == "hubble-flows")]
+    if other_logs or other_file_logs or other_volumes or other_mounts:
         raise SystemExit("ERROR: Stdout export must not render the file-based hostPath path.")
 elif platform_enabled and export_mode == "fluentd":
     if metadata.get("legacy_fluentd_hec") is not True:
@@ -416,6 +421,43 @@ elif platform_enabled and export_mode == "fluentd":
 elif not platform_enabled:
     if splunk_platform is not None or logs_collection is not None:
         raise SystemExit("ERROR: Disabled Splunk Platform output rendered active log configuration.")
+
+hubble_contract = metadata.get("hubble_flow_export", {"enabled": False})
+if not isinstance(hubble_contract, dict) or not isinstance(hubble_contract.get("enabled"), bool):
+    raise SystemExit("ERROR: metadata.json has an invalid hubble_flow_export contract.")
+hubble_receiver = ((logs_collection or {}).get("extraFileLogs") or {}).get("file_log/hubble-flows")
+if hubble_contract["enabled"]:
+    if not platform_enabled or export_mode == "fluentd":
+        raise SystemExit("ERROR: Hubble flow export requires the OTel Splunk Platform logs path.")
+    if not isinstance(splunk_platform, dict) or splunk_platform.get("logsEnabled") is not True:
+        raise SystemExit("ERROR: Hubble flow export requires splunkPlatform.logsEnabled: true.")
+    if not isinstance(hubble_receiver, dict):
+        raise SystemExit("ERROR: Hubble flow export is missing logsCollection.extraFileLogs.file_log/hubble-flows.")
+    hubble_resource = hubble_receiver.get("resource")
+    if not isinstance(hubble_resource, dict):
+        raise SystemExit("ERROR: Hubble flow log receiver is missing resource attributes.")
+    if hubble_resource.get("com.splunk.index") != hubble_contract.get("index"):
+        raise SystemExit("ERROR: Hubble flow log index does not match metadata.")
+    if hubble_resource.get("com.splunk.sourcetype") != hubble_contract.get("sourcetype"):
+        raise SystemExit("ERROR: Hubble flow log sourcetype does not match metadata.")
+    if hubble_resource.get("k8s.cluster.name") != cluster_name:
+        raise SystemExit("ERROR: Hubble flow log resource is not scoped to metadata.cluster_name.")
+    if hubble_receiver.get("start_at") != "end":
+        raise SystemExit("ERROR: Hubble flow log receiver must start at the end of existing files.")
+    hubble_volumes = [item for item in (agent.get("extraVolumes") or []) if isinstance(item, dict) and item.get("name") == "hubble-flows"]
+    hubble_mounts = [item for item in (agent.get("extraVolumeMounts") or []) if isinstance(item, dict) and item.get("name") == "hubble-flows"]
+    if len(hubble_volumes) != 1 or len(hubble_mounts) != 1:
+        raise SystemExit("ERROR: Hubble flow export must render exactly one hubble-flows volume and mount.")
+    hubble_host_path = (hubble_volumes[0].get("hostPath") or {}).get("path")
+    if hubble_host_path != hubble_contract.get("host_path") or hubble_mounts[0].get("mountPath") != hubble_host_path:
+        raise SystemExit("ERROR: Hubble hostPath, mountPath and metadata are not aligned.")
+    hubble_includes = hubble_receiver.get("include")
+    if not isinstance(hubble_includes, list) or len(hubble_includes) != 1 or not isinstance(hubble_includes[0], str):
+        raise SystemExit("ERROR: Hubble flow log receiver must contain one include glob.")
+    if not hubble_includes[0].startswith(hubble_host_path.rstrip("/") + "/"):
+        raise SystemExit("ERROR: Hubble flow log include glob is outside its hostPath.")
+elif hubble_receiver is not None:
+    raise SystemExit("ERROR: Overlay renders a Hubble flow log receiver that metadata does not record.")
 
 secret_patterns = (
     re.compile(
@@ -651,6 +693,11 @@ if expected_filelog is not None:
     live_filelog = live_receivers.get("filelog/tetragon")
     if live_filelog is None or not mapping_subset(expected_filelog, live_filelog):
         raise SystemExit("ERROR: Live Tetragon filelog index/sourcetype/resource configuration drifted.")
+expected_hubble_log = (((overlay.get("logsCollection") or {}).get("extraFileLogs") or {}).get("file_log/hubble-flows"))
+if expected_hubble_log is not None:
+    live_hubble_log = live_receivers.get("file_log/hubble-flows")
+    if live_hubble_log is None or not mapping_subset(expected_hubble_log, live_hubble_log):
+        raise SystemExit("ERROR: Live Hubble flow log index/sourcetype/resource configuration drifted.")
 PY
 
     selected_ready_pods() {
@@ -897,6 +944,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import sys
 import urllib.error
@@ -979,6 +1027,42 @@ try:
             break
     if not found:
         raise RuntimeError("Splunk search returned no Isovalent events")
+
+    hubble = metadata.get("hubble_flow_export") or {}
+    if hubble.get("enabled"):
+        hubble_index = str(hubble.get("index", ""))
+        hubble_sourcetype = str(hubble.get("sourcetype", ""))
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,127}", hubble_index) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,255}", hubble_sourcetype):
+            raise RuntimeError("metadata.json has an invalid Hubble flow log index or sourcetype")
+        hubble_search = (
+            f'search index={hubble_index} sourcetype="{hubble_sourcetype}" k8s.cluster.name="{cluster}" '
+            f'earliest=-{int(sys.argv[4])}s | head 1 | spath path=flow output=adm_flow '
+            '| eval adm_flow_fields=if(isnotnull(adm_flow), "true", "false") | fields "k8s.cluster.name" adm_flow_fields'
+        )
+        body = urllib.parse.urlencode({"search": hubble_search, "output_mode": "json"}).encode()
+        request = urllib.request.Request(base_url + "/services/search/jobs/export", data=body, method="POST", headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded", "Authorization": "Bearer " + token})
+        try:
+            with urllib.request.urlopen(request, timeout=int(sys.argv[5])) as response:
+                raw = response.read(1024 * 1024 + 1)
+        except urllib.error.HTTPError as exc:
+            exc.close()
+            raise RuntimeError(f"Splunk Hubble search returned HTTP {exc.code}; response body suppressed") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise RuntimeError("Splunk Hubble search request failed; details suppressed") from exc
+        if len(raw) > 1024 * 1024:
+            raise RuntimeError("Splunk Hubble search response exceeded the validation limit")
+        hubble_found = False
+        for line in raw.decode("utf-8", "replace").splitlines():
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            result = item.get("result") if isinstance(item, dict) else None
+            if isinstance(result, dict) and result.get("k8s.cluster.name") == cluster and result.get("adm_flow_fields") == "true":
+                hubble_found = True
+                break
+        if not hubble_found:
+            raise RuntimeError("Splunk search returned no Hubble flow events with JSON flow fields")
 except Exception as exc:
     print(f"ERROR: {exc}", file=sys.stderr)
     raise SystemExit(1)

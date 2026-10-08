@@ -47,6 +47,17 @@ tetragon_export:
   host_path: /var/run/cilium/tetragon
   filename_pattern: "*.log"
 
+# Optional Hubble flow logs. Requires cisco-isovalent-platform-setup with
+# hubble_flow_export.enabled: true (Cilium hubble.export.static file exporter).
+# The collector mounts host_path and tails filename_pattern into Splunk
+# Platform. Create the index and allow it on the collector's HEC token first.
+hubble_flow_export:
+  enabled: false
+  host_path: /var/run/cilium/hubble
+  filename_pattern: "events*.log"
+  index: cilium_hubble
+  sourcetype: cilium:hubble:flow
+
 # Optional Hubble Enterprise routing. When the operator deployed
 # isovalent/hubble-enterprise (private chart), the events also write to
 # /var/run/cilium/tetragon (default Hubble Enterprise behavior). The

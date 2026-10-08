@@ -44,7 +44,10 @@ logsCollection:
     useSplunkIncludeAnnotation: true
   extraFileLogs:
     filelog/tetragon: { ... }          # only in file mode
+    file_log/hubble-flows: { ... }     # only with hubble_flow_export.enabled
 ```
+
+With `hubble_flow_export.enabled: true`, `agent.extraVolumes`/`extraVolumeMounts` also gain a `hubble-flows` hostPath entry for `/var/run/cilium/hubble` (see [tetragon-hostpath-coordination.md](tetragon-hostpath-coordination.md#hubble-flow-export-coordination)).
 
 ## yq deep-merge
 
