@@ -9,6 +9,24 @@ release section when cutting a release.
 
 ### Added
 
+- `cisco-dc-networking-setup`: render-first custom ACI `classInfo` inputs.
+  `setup.sh --classinfo-input NAME --classinfo-classes "..."` (or
+  `--classinfo-preset application-atlas` for `classInfo_adm`: fabric links,
+  host LLDP neighbors and contract objects; optional `adm-policy` for
+  `classInfo_adm_policy` VRF, ESG, vzAny, contract-term, taboo and
+  service-graph classes) validates names, classes, accounts,
+  interval and index against the TA's own validators, refuses shipped input
+  names, previews with `--dry-run`, and creates and enables the stanza over
+  REST. `validate.sh --classinfo-input`/`--classinfo-preset` checks the stanza
+  and per-class `cisco:dc:aci:class` arrival.
+- Hubble flow export: `cisco-isovalent-platform-setup` renders the Cilium
+  chart's `hubble.export.static` file exporter (namespace allow-lists, flow
+  filters, field mask, rotation, `hubble.redact`) from an opt-in
+  `hubble_flow_export` spec block (OSS chart; Enterprise fails closed), and
+  `splunk-observability-isovalent-integration` mounts the export directory and
+  tails it with `file_log/hubble-flows` into `cilium_hubble` /
+  `cilium:hubble:flow`, with static, live and Splunk search validation.
+
 - Generated `SKILL_VALIDATION_MATRIX.md` and its checked-in evidence registry,
   separating interface contracts, direct test references, offline smoke scripts,
   advertised live/strict modes, TA completion requirements, and sanitized
