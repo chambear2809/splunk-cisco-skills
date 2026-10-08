@@ -3,22 +3,89 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STRICT=false
+CLASSINFO_INPUT=""
+CLASSINFO_PRESET=""
+EXPECT_CLASSES=""
+CLASSINFO_INDEX="cisco_aci"
+ADM_CLASSINFO_INPUT="classInfo_adm"
+ADM_CLASSINFO_CLASSES="fabricLink lldpAdjEp vzBrCP vzSubj vzRsSubjFiltAtt vzEntry l3extInstP l3extSubnet"
+ADM_POLICY_CLASSINFO_INPUT="classInfo_adm_policy"
+ADM_POLICY_CLASSINFO_CLASSES="fvCtx fvAEPg fvEPg fvESg vzAny vzRsAnyToCons vzRsAnyToProv vzRsAnyToConsIf vzInTerm vzOutTerm vzTaboo fvRsProtBy vzRsSubjGraphAtt"
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-dc-networking-setup/scripts/validate.sh [--strict|--completion] [--help]
+Usage: bash skills/cisco-dc-networking-setup/scripts/validate.sh [--strict|--completion]
+           [--classinfo-input NAME [--expect-classes "C1 C2"] | --classinfo-preset NAME]
+           [--index INDEX] [--help]
 
 Validates the deployed Cisco DC Networking app using configured Splunk credentials.
 Diagnostic mode reports incomplete onboarding as warnings. --strict and its
 alias --completion make completion-critical findings exit nonzero.
+
+Custom classInfo input checks (read-only):
+  --classinfo-input NAME   Check cisco_nexus_aci://NAME is enabled as a classInfo
+                           input and that cisco:dc:aci:class events from it
+                           arrived in the last 24 hours, per APIC class.
+  --expect-classes "C1 C2" Classes to expect (default: the input's apic_arguments)
+  --classinfo-preset NAME  application-atlas (alias adm) = classInfo_adm;
+                           adm-policy = classInfo_adm_policy; each with its class list
+  --index INDEX            Index holding the custom input's events (default: cisco_aci)
 EOF
     exit 0
 fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --strict|--completion) STRICT=true; shift ;;
+        --classinfo-input|--classinfo-preset|--expect-classes|--index)
+            if [[ $# -lt 2 || -z "${2:-}" ]]; then
+                echo "ERROR: $1 requires a value." >&2
+                exit 1
+            fi
+            case "$1" in
+                --classinfo-input) CLASSINFO_INPUT="$2" ;;
+                --classinfo-preset) CLASSINFO_PRESET="$2" ;;
+                --expect-classes) EXPECT_CLASSES="$2" ;;
+                --index) CLASSINFO_INDEX="$2" ;;
+            esac
+            shift 2
+            ;;
         *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+if [[ -n "${CLASSINFO_PRESET}" ]]; then
+    if [[ -n "${CLASSINFO_INPUT}" ]]; then
+        echo "ERROR: --classinfo-preset cannot be combined with --classinfo-input." >&2
+        exit 1
+    fi
+    case "${CLASSINFO_PRESET}" in
+        application-atlas|adm)
+            CLASSINFO_INPUT="${ADM_CLASSINFO_INPUT}"
+            EXPECT_CLASSES="${EXPECT_CLASSES:-${ADM_CLASSINFO_CLASSES}}"
+            ;;
+        adm-policy)
+            CLASSINFO_INPUT="${ADM_POLICY_CLASSINFO_INPUT}"
+            EXPECT_CLASSES="${EXPECT_CLASSES:-${ADM_POLICY_CLASSINFO_CLASSES}}"
+            ;;
+        *) echo "ERROR: Unknown --classinfo-preset '${CLASSINFO_PRESET}'. Use: application-atlas (alias adm), adm-policy" >&2; exit 1 ;;
+    esac
+fi
+if [[ -n "${EXPECT_CLASSES}" && -z "${CLASSINFO_INPUT}" ]]; then
+    echo "ERROR: --expect-classes requires --classinfo-input or --classinfo-preset." >&2
+    exit 1
+fi
+# These values are interpolated into a search; accept only the TA's own name,
+# index and class-name character sets.
+if [[ -n "${CLASSINFO_INPUT}" && ! "${CLASSINFO_INPUT}" =~ ^[A-Za-z][A-Za-z0-9_]{0,99}$ ]]; then
+    echo "ERROR: --classinfo-input must start with a letter and contain only letters, digits or underscores." >&2
+    exit 1
+fi
+if [[ ! "${CLASSINFO_INDEX}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]]; then
+    echo "ERROR: --index contains unsupported characters." >&2
+    exit 1
+fi
+if [[ -n "${EXPECT_CLASSES}" && ! "${EXPECT_CLASSES}" =~ ^[A-Za-z0-9_\ -]+$ ]]; then
+    echo "ERROR: --expect-classes may contain only APIC class names separated by spaces." >&2
+    exit 1
+fi
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco_dc_networking_app_for_splunk"
@@ -138,6 +205,50 @@ for idx in "cisco_aci" "cisco_nd" "cisco_nexus_9k"; do
     fi
 done
 [[ "${event_total}" -gt 0 ]] || completion_issue "No DC Networking events were found in the last hour"
+
+if [[ -n "${CLASSINFO_INPUT}" ]]; then
+    log ""
+    log "--- Custom classInfo Input (${CLASSINFO_INPUT}) ---"
+    ci_stanza="cisco_nexus_aci://${CLASSINFO_INPUT}"
+    ci_type=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "inputs" "$ci_stanza" "apic_input_type" 2>/dev/null || true)
+    ci_args=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "inputs" "$ci_stanza" "apic_arguments" 2>/dev/null || true)
+    ci_disabled=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "inputs" "$ci_stanza" "disabled" 2>/dev/null || true)
+    if [[ -z "${ci_type}" ]]; then
+        completion_issue "Input ${ci_stanza} not found"
+    else
+        if [[ "${ci_type}" == "classInfo" ]]; then
+            pass "${ci_stanza} is a classInfo input"
+        else
+            completion_issue "${ci_stanza} has apic_input_type '${ci_type}', expected classInfo"
+        fi
+        case "${ci_disabled}" in
+            0|false|False|"") pass "${ci_stanza} is enabled" ;;
+            *) completion_issue "${ci_stanza} is disabled" ;;
+        esac
+        ci_expected=()
+        read -r -a ci_expected <<< "${EXPECT_CLASSES:-${ci_args}}"
+        ci_seen=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
+            "search index=${CLASSINFO_INDEX} sourcetype=\"cisco:dc:aci:class\" source=\"${ci_stanza}\" earliest=-24h | stats values(component) AS components | eval components=mvjoin(components, \" \")" \
+            "components" 2>/dev/null || echo "0")
+        [[ "${ci_seen}" == "0" ]] && ci_seen=""
+        ci_missing=""
+        for ci_class in "${ci_expected[@]+"${ci_expected[@]}"}"; do
+            if [[ " ${ci_args} " != *" ${ci_class} "* ]]; then
+                completion_issue "Class '${ci_class}' is not configured in ${ci_stanza} apic_arguments"
+            fi
+            if [[ " ${ci_seen} " == *" ${ci_class} "* ]]; then
+                pass "Class '${ci_class}' has cisco:dc:aci:class events in index '${CLASSINFO_INDEX}' (last 24h)"
+            else
+                ci_missing="${ci_missing:+${ci_missing} }${ci_class}"
+            fi
+        done
+        if [[ -z "${ci_seen}" ]]; then
+            completion_issue "No cisco:dc:aci:class events from ${ci_stanza} in index '${CLASSINFO_INDEX}' in the last 24 hours"
+        elif [[ -n "${ci_missing}" ]]; then
+            warn "No events in the last 24 hours for: ${ci_missing} (a class with no objects in the fabric produces no events)"
+        fi
+    fi
+fi
 
 log ""
 log "--- Settings ---"
