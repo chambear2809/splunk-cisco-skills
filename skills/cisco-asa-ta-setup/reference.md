@@ -25,8 +25,10 @@ version `6.1.2`).
 
 ## Completion Validation
 
-The package ships parsing and CIM knowledge rather than standalone dashboards;
-dashboard completion is an ES/firewall-content handoff after ingest is proven.
-`validate.sh --completion --live` (alias `--strict`) exits nonzero unless the
-TA, target index, and matching ASA events are present. The ordinary live form
-remains diagnostic for staged receiver onboarding.
+The verified 6.1.2 package ships the user-facing `cisco_asa_dashboard` view
+(`default/data/ui/views/cisco_asa_dashboard.xml`). Dashboard completion is
+therefore part of the ASA gate: `validate.sh --completion --live` (alias
+`--strict`) exits nonzero unless the TA, target index, matching ASA events, and
+an enabled, visible dashboard with index-bound queries returning data are
+present. The ordinary live form remains diagnostic for staged receiver
+onboarding.

@@ -142,7 +142,7 @@ def validate(args: argparse.Namespace) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_]+", tag):
             die(f"Tag {tag!r} must contain only letters, numbers, and underscores.")
     for role in csv_list(args.read_roles) + csv_list(args.write_roles):
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", role):
+        if role != "*" and not re.fullmatch(r"[A-Za-z0-9_-]+", role):
             die(f"Role {role!r} must contain only letters, numbers, underscore, and hyphen.")
 
 

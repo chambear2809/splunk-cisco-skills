@@ -1,0 +1,42 @@
+{
+  "assessment_date": "2026-10-07",
+  "enterprise_version": "10.6.0.5",
+  "target": "Existing isolated secondary standalone lab",
+  "selected_workflow": "Reviewed SSH CLI restart under verified Splunk service owner, then listener and retained-data readback",
+  "result": "pass",
+  "defects_corrected": [
+    "Systemd unit selection was not bound to the selected installation",
+    "Non-systemd service ownership was not verified",
+    "Multiline Splunk PID file required first-line main-PID parsing"
+  ],
+  "live_result": {
+    "reviewed_plan": "cli; selected secondary home; no matching systemd unit",
+    "accepted_restart": "passed corrected skill",
+    "expected_listeners": [
+      28089,
+      28000,
+      28088
+    ],
+    "kv_status": "ready",
+    "kv_type": "Pdl",
+    "migrationStatus": "NotStarted",
+    "retained_collection_rows": 1,
+    "retained_lookup_rows": 1,
+    "retained_indexed_events": 3,
+    "primary_daemon_unchanged": true
+  },
+  "qualification": "Standalone secondary workflow only; indexer-cluster, SHC, Cloud and reload variants require separate qualification. CA verification passed through a loopback SSH tunnel; hostname matching was disabled for that tunnel.",
+  "sanitization": "No credentials, process IDs or host identifiers included",
+  "follow_up_2026_10_08": {
+    "target": "Disposable Ubuntu24.04 x86_64 standalone running Enterprise10.6.0.5",
+    "corrected_defect": "SSH account hit Splunk first-time-run guard while the bundled interpreter was used only for a socket probe",
+    "correction": "Use system Python on selected target through existing execution helper",
+    "owning_restart_exit": 0,
+    "expected_target_port": 8089,
+    "current_and_cohosted_kv": "ready",
+    "retained_federated_records": 4,
+    "rest_ca_and_hostname_verified": true,
+    "focused_fss_and_restart_tests_passed": 70,
+    "qualification": "Standalone CLI/listener follow-up only; OS hostname loopback workaround for cohosted KV is documented in federation evidence"
+  }
+}

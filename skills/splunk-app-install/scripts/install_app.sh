@@ -5,7 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
-SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
+# Leave this empty until the selected credential profile has been loaded.  A
+# profile may provide SPLUNK_HOME; an explicitly exported operator value still
+# wins because the credential loader only fills empty variables.
+SPLUNK_HOME="${SPLUNK_HOME:-}"
 PROJECT_TA_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 TA_CACHE="${TA_CACHE:-${PROJECT_TA_DIR}}"
 
@@ -244,7 +247,7 @@ import re
 import sys
 
 value = sys.argv[1].strip()
-match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+)?", value)
+match = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+){0,2}", value)
 if not match:
     raise SystemExit(1)
 print(f"{match.group(1)}.{match.group(2)}", end="")
@@ -261,7 +264,7 @@ resolve_target_splunk_version() {
         fi
     fi
     if ! TARGET_SPLUNK_VERSION="$(normalize_splunk_minor_version "${raw}")"; then
-        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+        log "ERROR: Target Splunk version '${raw}' must use two, three, or four numeric segments."
         return 1
     fi
     export SPLUNK_TARGET_VERSION="${TARGET_SPLUNK_VERSION}"
@@ -495,15 +498,16 @@ PACKAGE_INSPECTED_VERSION=""
 
 inspect_package_contract() {
     local package_path="$1" expected_name="${2:-}" expected_version="${3:-}" result
-    if ! result="$(python3 - "${package_path}" "${expected_name}" "${expected_version}" <<'PY'
+    if ! result="$(python3 - "${package_path}" "${expected_name}" "${expected_version}" "${EXPECTED_SHA256}" <<'PY'
 import configparser
+import hashlib
 import io
 import re
 import sys
 import tarfile
 from pathlib import PurePosixPath
 
-archive_path, expected_name, expected_version = sys.argv[1:]
+archive_path, expected_name, expected_version, expected_sha = sys.argv[1:]
 safe_name = re.compile(r"^[A-Za-z0-9_.-]+$")
 safe_version = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
 
@@ -547,26 +551,66 @@ with archive:
             if extracted is None:
                 print("ERROR: Package app.conf could not be read.", file=sys.stderr)
                 raise SystemExit(1)
-            app_conf_members[path.parts[1]] = extracted.read().decode("utf-8", errors="strict")
+            app_conf_members.setdefault(top, {})[path.parts[1]] = extracted.read().decode("utf-8", errors="strict")
 
-if len(top_levels) != 1:
+verified_itsi_members = {
+    "DA-ITSI-APPSERVER", "DA-ITSI-DATABASE", "DA-ITSI-EUEM", "DA-ITSI-LB",
+    "DA-ITSI-OS", "DA-ITSI-STORAGE", "DA-ITSI-VIRTUALIZATION", "DA-ITSI-WEBSERVER",
+    "SA-ITOA", "SA-ITSI-AI-Summarization", "SA-ITSI-AT-Recommendations", "SA-ITSI-ATAD",
+    "SA-ITSI-AlertCorrelation", "SA-ITSI-CustomModuleViz", "SA-ITSI-DriftDetection",
+    "SA-ITSI-Licensechecker", "SA-IndexCreation", "SA-UserAccess", "itsi",
+}
+sha256 = hashlib.sha256()
+with open(archive_path, "rb") as package_stream:
+    for chunk in iter(lambda: package_stream.read(1024 * 1024), b""):
+        sha256.update(chunk)
+actual_sha = sha256.hexdigest()
+is_verified_itsi_bundle = (
+    expected_name == "SA-ITOA"
+    and expected_version == "5.0.2"
+    and expected_sha.lower() == "88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b"
+    and actual_sha == "88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b"
+)
+if len(top_levels) != 1 and not is_verified_itsi_bundle:
     print(f"ERROR: Package must contain exactly one top-level Splunk app directory; found {sorted(top_levels)!r}.", file=sys.stderr)
     raise SystemExit(1)
+if is_verified_itsi_bundle and top_levels != verified_itsi_members:
+    print("ERROR: Verified ITSI bundle members do not match the registered 19-app identity set.", file=sys.stderr)
+    raise SystemExit(1)
+for bundle_top in sorted(top_levels):
+    if not safe_name.fullmatch(bundle_top):
+        print(f"ERROR: Package top-level app directory is unsafe: {bundle_top!r}.", file=sys.stderr)
+        raise SystemExit(1)
+    if is_verified_itsi_bundle and "default" not in app_conf_members.get(bundle_top, {}):
+        print(f"ERROR: Verified ITSI bundle member {bundle_top!r} is missing default/app.conf.", file=sys.stderr)
+        raise SystemExit(1)
+    if is_verified_itsi_bundle:
+        member_parser = configparser.RawConfigParser(strict=False, interpolation=None)
+        member_parser.optionxform = str.lower
+        try:
+            member_parser.read_file(io.StringIO(app_conf_members[bundle_top]["default"]))
+        except Exception as exc:
+            print(f"ERROR: Verified ITSI bundle member {bundle_top!r} app.conf is invalid: {exc}.", file=sys.stderr)
+            raise SystemExit(1)
+        member_id = member_parser.get("package", "id", fallback="").strip()
+        if member_id != bundle_top:
+            print(f"ERROR: Verified ITSI bundle member {bundle_top!r} has mismatched package id {member_id!r}.", file=sys.stderr)
+            raise SystemExit(1)
 
-top_level = next(iter(top_levels))
+top_level = "SA-ITOA" if is_verified_itsi_bundle else next(iter(top_levels))
 if not safe_name.fullmatch(top_level):
     print(f"ERROR: Package top-level app directory is unsafe: {top_level!r}.", file=sys.stderr)
     raise SystemExit(1)
 if expected_name and top_level != expected_name:
     print(f"ERROR: Package app identity {top_level!r} does not match expected {expected_name!r}.", file=sys.stderr)
     raise SystemExit(1)
-if "default" not in app_conf_members:
+if "default" not in app_conf_members.get(top_level, {}):
     print("ERROR: Package is missing default/app.conf.", file=sys.stderr)
     raise SystemExit(1)
 
 parsed = {}
 for layer in ("default", "local"):
-    text = app_conf_members.get(layer)
+    text = app_conf_members.get(top_level, {}).get(layer)
     if text is None:
         continue
     parser = configparser.RawConfigParser(strict=False, interpolation=None)
@@ -1078,6 +1122,10 @@ prompt_splunk_creds() {
     fi
 }
 
+ensure_splunk_home_default() {
+    SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
+}
+
 prompt_splunkbase_creds() {
     if ! load_splunkbase_credentials; then
         log "ERROR: Could not load Splunkbase credentials."
@@ -1113,6 +1161,24 @@ restart_splunk_or_exit() {
     : "${RESTART_SPLUNK}"  # Consumed by app_restart_splunk_or_exit.
     app_restart_splunk_or_exit "${SK}" "${SPLUNK_URI}" "$1" \
         "Restart manually before using the updated app." || exit 1
+}
+
+# A loopback REST URI can still address a remote Splunk home through an SSH
+# forward.  An explicit non-loopback SSH host is the operator's execution
+# identity and must take precedence over the URI hostname when staging a
+# package.  Keep plain loopback installs filesystem-local when no remote SSH
+# identity is configured.
+splunk_install_target_is_local() {
+    local uri_host ssh_host
+    uri_host="$(printf '%s' "${SPLUNK_URI:-}" | sed -E 's|https?://([^:/]+).*|\1|')"
+    ssh_host="${SPLUNK_SSH_HOST:-}"
+    if [[ "${uri_host}" == "localhost" || "${uri_host}" == "127.0.0.1" || "${uri_host}" == "::1" ]]; then
+        if [[ -n "${ssh_host}" && "${ssh_host}" != "localhost" && "${ssh_host}" != "127.0.0.1" && "${ssh_host}" != "::1" ]]; then
+            return 1
+        fi
+        return 0
+    fi
+    return 1
 }
 
 cloud_restart_or_exit() {
@@ -1531,7 +1597,7 @@ download_from_splunkbase() {
 
     [[ -n "${SB_DOWNLOAD_SOURCE_URL:-}" ]] && log "Source URL: ${SB_DOWNLOAD_SOURCE_URL}"
     if [[ -n "${SB_DOWNLOAD_EFFECTIVE_URL:-}" && "${SB_DOWNLOAD_EFFECTIVE_URL}" != "${SB_DOWNLOAD_SOURCE_URL:-}" ]]; then
-        log "Resolved URL: ${SB_DOWNLOAD_EFFECTIVE_URL}"
+        log "Resolved URL: $(redact_url_for_log "${SB_DOWNLOAD_EFFECTIVE_URL}")"
     fi
 
     APP_VERSION="${resolved_version}"
@@ -1621,6 +1687,35 @@ PY
     APP_FILE="${output_path}"
 }
 
+redact_url_for_log() {
+    printf '%s' "${1:-}" | python3 -c '
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+value = sys.stdin.read()
+try:
+    parsed = urlsplit(value)
+    hostname = parsed.hostname
+except ValueError:
+    print("[REDACTED_URL]", end="")
+    raise SystemExit(0)
+if parsed.scheme not in {"http", "https"} or not parsed.netloc or not hostname:
+    print("[REDACTED_URL]", end="")
+else:
+    try:
+        port = parsed.port
+    except ValueError:
+        print("[REDACTED_URL]", end="")
+        raise SystemExit(0)
+    # Userinfo, query strings, and fragments may contain credentials.
+    host = hostname
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    netloc = host if port is None else f"{host}:{port}"
+    print(urlunsplit((parsed.scheme, netloc, parsed.path, "", "")), end="")
+'
+}
+
 install_via_server_path() {
     local source_path="$1"
     local update_flag="$2"
@@ -1701,46 +1796,17 @@ install_via_server_path_with_verification() {
     INSTALL_BODY="${body}"
 }
 
+
 stage_file_via_ssh() {
     local local_path="$1"
     local remote_path="$2"
-    local ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
-    local remote_dir remote_name scp_target rc
+    local remote_name
 
-    if ! command -v sshpass >/dev/null 2>&1; then
-        log "ERROR: sshpass is required for SSH password-based staging."
-        log "Install sshpass or stage the package on the Splunk host before installing it."
-        return 1
-    fi
-
-    remote_dir="$(dirname "${remote_path}")"
+    load_splunk_ssh_credentials || return 1
     remote_name="$(basename "${remote_path}")"
-    if [[ "${remote_path}" != "${remote_dir%/}/${remote_name}" ]]; then
-        log "ERROR: SSH staging path is not a normalized absolute remote path: ${remote_path}"
-        return 1
-    fi
-    hbs_validate_remote_stage_path "${remote_dir}" "${remote_name}" || return 1
-    hbs_prepare_ssh_trust || return 1
-    scp_target="${ssh_target}:${remote_path}"
-    if [[ "${SPLUNK_SSH_HOST}" == *:* ]]; then
-        scp_target="${SPLUNK_SSH_USER}@[${SPLUNK_SSH_HOST}]:${remote_path}"
-    fi
-
-    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 scp \
-        -P "${SPLUNK_SSH_PORT}" \
-        -o ConnectTimeout=15 \
-        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -o NumberOfPasswordPrompts=1 \
-        -q \
-        "${local_path}" "${scp_target}" 3<<<"${SPLUNK_SSH_PASS}"; then
-        rc=0
-    else
-        rc=$?
-    fi
-    hbs_cleanup_ssh_trust
-    return "${rc}"
+    # The shared helper handles password and key auth, pinned known-hosts, and
+    # secure temporary staging.  It returns the normalized remote path.
+    hbs_stage_file_for_execution ssh "${local_path}" "${remote_name}"
 }
 
 prepare_remote_app_package_for_splunkd() {
@@ -1748,11 +1814,6 @@ prepare_remote_app_package_for_splunkd() {
     local quoted_path prepare_cmd verify_cmd
 
     [[ -n "${remote_path}" ]] || return 1
-
-    if ! command -v sshpass >/dev/null 2>&1; then
-        log "ERROR: sshpass is required to harden remote app package permissions."
-        return 1
-    fi
 
     if ! load_splunk_ssh_credentials; then
         return 1
@@ -1786,11 +1847,13 @@ cleanup_remote_stage_file() {
 
     [[ -z "${remote_path}" ]] && return 0
 
-    if ! command -v sshpass >/dev/null 2>&1; then
-        return 0
-    fi
-
     hbs_run_target_cmd ssh "$(hbs_prefix_with_sudo ssh "$(hbs_shell_join rm -f "${remote_path}")")" >/dev/null 2>&1 || true
+}
+
+is_verified_itsi_bundle_contract() {
+    [[ "${PACKAGE_INSPECTED_NAME:-}" == "SA-ITOA" \
+        && "${PACKAGE_INSPECTED_VERSION:-}" == "5.0.2" \
+        && "${EXPECTED_SHA256,,}" == "88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b" ]]
 }
 
 install_app() {
@@ -1879,19 +1942,25 @@ install_app() {
         log "Installing to ${SPLUNK_URI} ..."
 
     # Detect whether Splunk is local or remote.
-    local splunk_host
-    splunk_host=$(echo "${SPLUNK_URI}" | sed -E 's|https?://([^:/]+).*|\1|')
     local is_local=false
-    if [[ "${splunk_host}" == "localhost" || "${splunk_host}" == "127.0.0.1" ]]; then
+    if splunk_install_target_is_local; then
         is_local=true
+    elif [[ "${SPLUNK_URI}" =~ ^https?://(localhost|127\.0\.0\.1|::1)(:|/|$) && -n "${SPLUNK_SSH_HOST:-}" ]]; then
+        log "Loopback REST forward has explicit SSH target ${SPLUNK_SSH_HOST}; staging package on remote Splunk host."
     fi
 
-    if $is_local; then
+    if is_verified_itsi_bundle_contract; then
+        log "ERROR: The verified ITSI multi-app bundle is not accepted by REST upload."
+        log "HANDOFF: Stop Splunk, back up the existing app directories, and extract the reviewed package into SPLUNK_HOME/etc/apps using the official ITSI procedure."
+        log "HANDOFF: Restore reviewed local configuration, start Splunk as its service owner, and verify all 19 app versions before declaring success."
+        exit 1
+    elif $is_local; then
         # Splunk is local — install directly from the filesystem path.
         log "Installing from local path: ${abs_file_path}"
         install_via_server_path_with_verification "${abs_file_path}" "${update_flag}" "${expected_app_name}"
     else
         local remote_tmp
+        local staged_remote_path
         remote_tmp="/tmp/${file_name%.*}.$$.${RANDOM}.$(basename "${file_name}")"
 
         log "Remote package installs require staging on the Splunk host."
@@ -1901,10 +1970,11 @@ install_app() {
         fi
 
         log "Copying package to ${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}:${remote_tmp} ..."
-        if ! stage_file_via_ssh "${abs_file_path}" "${remote_tmp}"; then
+        if ! staged_remote_path="$(stage_file_via_ssh "${abs_file_path}" "${remote_tmp}")"; then
             log "ERROR: SSH copy failed."
             exit 1
         fi
+        remote_tmp="${staged_remote_path}"
 
         if ! prepare_remote_app_package_for_splunkd "${remote_tmp}"; then
             cleanup_remote_stage_file "${remote_tmp}"
@@ -2015,10 +2085,17 @@ main() {
 
     require_registry_provenance || exit 1
 
+    # Resolve settings once in the parent shell so profile-provided values
+    # such as SPLUNK_HOME are not lost to command-substitution subshells.
+    if ! load_splunk_platform_settings; then
+        log "ERROR: Could not load the selected Splunk target settings."
+        exit 1
+    fi
     if ! platform="$(resolve_splunk_platform)"; then
         log "ERROR: Could not resolve the selected Splunk platform; refusing installation routing."
         exit 1
     fi
+    ensure_splunk_home_default
 
     mkdir -p "${PROJECT_TA_DIR}"
     mkdir -p "${TA_CACHE}"

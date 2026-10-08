@@ -617,6 +617,26 @@ def ordered_subset(expected, actual) -> bool:
     return all(any(candidate == item for candidate in iterator) for item in expected)
 
 
+# Splunk OTel Collector Helm chart versions use upstream component names while
+# older overlay examples used the underscore aliases accepted by the chart.
+# Treat those names as equivalent when checking whether the rendered config is
+# present; keep comparing the actual component configuration below.
+COMPONENT_ALIASES = {
+    "host_metrics": "hostmetrics",
+    "kubelet_stats": "kubeletstats",
+    "resource_detection": "resourcedetection",
+}
+
+
+def live_component_name(name, components):
+    alias = COMPONENT_ALIASES.get(name)
+    return alias if alias in components else name
+
+
+def canonical_component_name(name):
+    return next((old for old, new in COMPONENT_ALIASES.items() if name == new), name)
+
+
 try:
     overlay = load(sys.argv[1])
     relay = load(sys.argv[2])
@@ -628,29 +648,63 @@ for name, receiver in (expected_config.get("receivers") or {}).items():
     if name.startswith("prometheus/isovalent_"):
         if live_receivers.get(name) != receiver:
             raise SystemExit("ERROR: Live Isovalent receiver/relabel/port configuration drifted.")
-    elif name not in live_receivers or not mapping_subset(receiver, live_receivers[name]):
-        raise SystemExit("ERROR: Live collector receiver configuration does not contain the rendered overlay.")
+    else:
+        actual_name = live_component_name(name, live_receivers)
+        if actual_name not in live_receivers or not mapping_subset(receiver, live_receivers[actual_name]):
+            raise SystemExit(f"ERROR: Live collector receiver configuration drifted for {name}.")
 
 expected_processors = expected_config.get("processors") or {}
 live_processors = relay.get("processors") or {}
 for name, processor in expected_processors.items():
+    actual_name = live_component_name(name, live_processors)
     if name == "filter/includemetrics":
-        if live_processors.get(name) != processor:
+        if live_processors.get(actual_name) != processor:
             raise SystemExit("ERROR: Live metric allow-list processor drifted.")
-    elif name not in live_processors or not mapping_subset(processor, live_processors[name]):
-        raise SystemExit("ERROR: Live collector processors do not contain the rendered overlay.")
+    elif actual_name not in live_processors or not mapping_subset(processor, live_processors[actual_name]):
+        raise SystemExit(f"ERROR: Live collector processor configuration drifted for {name}.")
 
 expected_pipeline = (((expected_config.get("service") or {}).get("pipelines") or {}).get("metrics") or {})
 live_pipeline = (((relay.get("service") or {}).get("pipelines") or {}).get("metrics") or {})
 for field in ("receivers", "processors", "exporters"):
-    if not ordered_subset(expected_pipeline.get(field), live_pipeline.get(field)):
+    expected_names = [canonical_component_name(name) for name in (expected_pipeline.get(field) or [])]
+    live_names = [canonical_component_name(name) for name in (live_pipeline.get(field) or [])]
+    if not ordered_subset(expected_names, live_names):
         raise SystemExit("ERROR: Live metrics pipeline does not contain the rendered ordered pipeline.")
 
 expected_filelog = (((overlay.get("logsCollection") or {}).get("extraFileLogs") or {}).get("filelog/tetragon"))
 if expected_filelog is not None:
     live_filelog = live_receivers.get("filelog/tetragon")
-    if live_filelog is None or not mapping_subset(expected_filelog, live_filelog):
+    expected_filelog_for_receiver = dict(expected_filelog)
+    expected_resource = dict(expected_filelog_for_receiver.pop("resource", {}) or {})
+    expected_cluster = expected_resource.pop("k8s.cluster.name", None)
+    if live_filelog is None or not mapping_subset(expected_filelog_for_receiver, live_filelog):
         raise SystemExit("ERROR: Live Tetragon filelog index/sourcetype/resource configuration drifted.")
+    if not mapping_subset(expected_resource, live_filelog.get("resource") or {}):
+        raise SystemExit("ERROR: Live Tetragon filelog index/sourcetype/resource configuration drifted.")
+    if expected_cluster is not None:
+        # The Helm chart promotes filelog attributes into the shared `resource`
+        # processor rather than retaining them on the receiver. Verify the
+        # downstream logs pipeline performs the same cluster enrichment when
+        # the receiver itself does not carry the configured cluster attribute.
+        live_cluster = (live_filelog.get("resource") or {}).get("k8s.cluster.name")
+        if live_cluster is not None and live_cluster != expected_cluster:
+            raise SystemExit("ERROR: Live Tetragon filelog index/sourcetype/resource configuration drifted.")
+        receiver_has_cluster = live_cluster == expected_cluster
+        resource_processor = live_processors.get("resource") or {}
+        actions = resource_processor.get("attributes") or []
+        cluster_action = next(
+            (action for action in actions if action.get("key") == "k8s.cluster.name"),
+            None,
+        )
+        logs_pipeline = (((relay.get("service") or {}).get("pipelines") or {}).get("logs/host") or {})
+        downstream_has_cluster = not (
+            not isinstance(cluster_action, dict)
+            or cluster_action.get("value") != expected_cluster
+            or cluster_action.get("action") not in {"insert", "upsert", "update"}
+            or "resource" not in (logs_pipeline.get("processors") or [])
+        )
+        if not receiver_has_cluster and not downstream_has_cluster:
+            raise SystemExit("ERROR: Live Tetragon filelog cluster enrichment drifted.")
 PY
 
     selected_ready_pods() {

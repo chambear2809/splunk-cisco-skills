@@ -312,14 +312,15 @@ set -euo pipefail
 cleanup_secret() {{
   staged_secret="/tmp/${{secret_basename}}"
   if command -v shred >/dev/null 2>&1; then
-    shred --remove -- "${{staged_secret}}" 2>/dev/null || rm -f -- "${{staged_secret}}"
+    shred --remove -- "\\${{staged_secret}}" 2>/dev/null || rm -f -- "\\${{staged_secret}}"
   else
-    rm -f -- "${{staged_secret}}"
+    rm -f -- "\\${{staged_secret}}"
   fi
 }}
 trap cleanup_secret EXIT
-target_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster/local
-sudo install -d -o splunk -g splunk -m 750 "\\${{target_dir}}"
+app_dir=/opt/splunk/etc/apps/ZZZ_cisco_skills_indexer_cluster
+target_dir="\\${{app_dir}}/local"
+sudo install -d -o splunk -g splunk -m 750 "\\${{app_dir}}" "\\${{target_dir}}"
 expected_secret_uid="\\$(id -u)"
 sudo python3 - /tmp/${{conf_basename}} /tmp/${{secret_basename}} "\\${{target_dir}}/server.conf" "\\${{expected_secret_uid}}" <<'PY_REMOTE'
 import os
@@ -363,7 +364,7 @@ try:
     lines = data.decode("utf-8").splitlines()
 except UnicodeDecodeError as exc:
     raise SystemExit(f"ERROR: indexer-cluster secret must be UTF-8 text: {{exc}}")
-if len(lines) != 1 or "\x00" in lines[0] or not lines[0].strip():
+if len(lines) != 1 or chr(0) in lines[0] or not lines[0].strip():
     raise SystemExit("ERROR: indexer-cluster secret file must contain exactly one non-empty line")
 secret = lines[0].strip()
 text = source.read_text(encoding="utf-8").replace("$" + "IDXC_SECRET", secret)
@@ -403,6 +404,10 @@ ATTEMPTS=60
 # key fed via -K <(...).
 # shellcheck disable=SC1091
 source "${{LIB_DIR_FOR_BOOTSTRAP}}/credential_helpers.sh"
+if ! load_splunk_platform_settings; then
+  echo "ERROR: Failed to load Splunk platform settings/profile before REST authentication." >&2
+  exit 1
+fi
 SK="$(get_session_key_from_password_file "${{MANAGER_URI}}" "${{ADMIN_PW_FILE}}" "${{SPLUNK_AUTH_USER:-admin}}")"
 splunk_curl "${{SK}}" --fail-with-body --show-error -o /dev/null \
   "${{MANAGER_URI}}/services/cluster/manager/peers?output_mode=json&count=0"
@@ -473,6 +478,10 @@ _CLUSTER_MGR_SK_BLOCK = (
     'source "${LIB_DIR}/cluster_helpers.sh"\n'
     "# shellcheck disable=SC1091\n"
     'source "${LIB_DIR}/platform_version_helpers.sh"\n'
+    'if ! load_splunk_platform_settings; then\n'
+    '  echo "ERROR: Failed to load Splunk platform settings/profile before REST authentication." >&2\n'
+    '  exit 1\n'
+    'fi\n'
     "\n"
     'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
     'ADMIN_PW_FILE="${SPLUNK_ADMIN_PASSWORD_FILE:-/tmp/splunk_admin_password}"\n'
@@ -568,6 +577,10 @@ def render_peer_ops(cluster_manager_uri: str) -> dict[str, str]:
         + 'source "${LIB_DIR}/credential_helpers.sh"\n'
         + "# shellcheck disable=SC1091\n"
         + 'source "${LIB_DIR}/cluster_helpers.sh"\n'
+        + 'if ! load_splunk_platform_settings; then\n'
+        + '  echo "ERROR: Failed to load Splunk platform settings/profile before REST authentication." >&2\n'
+        + '  exit 1\n'
+        + 'fi\n'
         + "\n"
         + 'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
         + 'ADMIN_PW_FILE="${SPLUNK_ADMIN_PASSWORD_FILE:-/tmp/splunk_admin_password}"\n'

@@ -1,0 +1,58 @@
+{
+  "assessment_date": "2026-10-07",
+  "qualification": "SOK S1 local-scope remote App Framework on EKS; this does not qualify cluster-scope App Framework or coupled POD",
+  "platform": {
+    "enterprise": "10.6.0.5",
+    "operator": "3.2.0",
+    "kubernetes": "1.34.11",
+    "profile": "development",
+    "storage": "encrypted gp3",
+    "enterprise_runtime_digest": "sha256:9280f9ce267b212e5596aa1832cdfd3f9be886c378da35ebc87499323ee447a4"
+  },
+  "auth": {
+    "mode": "temporary static Kubernetes Secret",
+    "keys": [
+      "s3_access_key",
+      "s3_secret_key"
+    ],
+    "scope": "read-only fixture object prefix; no S3 write permissions",
+    "session_token": "not used; upstream does not read this field"
+  },
+  "fixture": {
+    "app": "splunk106_appframework_fixture",
+    "initial_version": "1.0.0",
+    "updated_version": "1.1.0",
+    "shipped_dashboards": 0,
+    "package_qualification": "owned disposable static lookup fixture; no vendor app integration claimed"
+  },
+  "live_checks": {
+    "initial_install": "passed authenticated app enabled/version readback and exact one-row inputlookup",
+    "same_object_update": "passed version 1.1.0 and updated lookup row; S3 object hash changed",
+    "pod_replacement": "passed different pod UID, Ready and retained updated app/lookup",
+    "final_skill_status": "passed latest corrected status checks",
+    "tls": "CA verified over owned loopback forward; loopback hostname verification disabled"
+  },
+  "repository_corrections": {
+    "operator_defaults": "Only exact 3.2.0 injected empty premiumAppsProps.esDefaults accepted when omitted in reviewed spec; altered/nonempty/other-version values still rejected",
+    "upgrade_guard": "Reviewed Operator version explicitly bound to allow-upgrade preflight",
+    "focused_regressions": {
+      "passed": 77,
+      "subtests_passed": 104
+    }
+  },
+  "cleanup": {
+    "helm_releases_deleted": 2,
+    "iam_user_and_key_absent": true,
+    "fixture_object_versions_deleted": 2,
+    "fixture_prefix_empty": true,
+    "protected_files_remaining": 0,
+    "recorded_volume_count": 3,
+    "volume_absence_check": "passed: all 3 absent",
+    "namespace_absent": true
+  },
+  "remaining_qualifications": [
+    "Cluster-scope remote App Framework remains a separate optional variant",
+    "POD remains independently blocked; SOK results cannot qualify it"
+  ],
+  "sanitization": "No credentials, cloud account/resource identifiers, host addresses, raw REST objects or tenant data included"
+}

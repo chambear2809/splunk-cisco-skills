@@ -1,0 +1,103 @@
+{
+  "assessment_date": "2026-10-08",
+  "qualification": "SOK C3 cluster-scope remote App Framework on EKS 1.34.11 development profile; separate from POD and performance qualification",
+  "platform": {
+    "enterprise": "10.6.0.5",
+    "operator": "3.2.0",
+    "kubernetes": "1.34.11",
+    "profile": "development",
+    "storage": "encrypted gp3",
+    "enterprise_runtime_digest": "sha256:9280f9ce267b212e5596aa1832cdfd3f9be886c378da35ebc87499323ee447a4"
+  },
+  "fixture": {
+    "app": "splunk106_appframework_c3_fixture",
+    "initial_version": "1.0.0",
+    "updated_version": "1.1.0",
+    "shipped_dashboards": 0,
+    "qualification": "owned static lookup fixture; no vendor app integration or runtime-edited lookup preservation claimed"
+  },
+  "auth": {
+    "mode": "temporary prefix-scoped read-only static S3 access via protected Kubernetes Secret",
+    "tls": "CA verified over owned loopback forwards; loopback hostname verification disabled"
+  },
+  "live_checks": {
+    "install": {
+      "collected_at_utc": "2026-10-08T00:16:10.577811+00:00",
+      "members_verified": 3,
+      "app_version": "1.0.0",
+      "exact_lookup_row_verified_on_every_member": true,
+      "kv_ready_on_every_member": true,
+      "receipt_sha256": "802c663819dd0d2d9b771de01721b81f0adc0944822d4f359c38d45f6a389584"
+    },
+    "update": {
+      "collected_at_utc": "2026-10-08T00:17:15.617070+00:00",
+      "members_verified": 3,
+      "app_version": "1.1.0",
+      "exact_lookup_row_verified_on_every_member": true,
+      "kv_ready_on_every_member": true,
+      "receipt_sha256": "5a12946ec7a15e67b779c32be2222d96d7629fab6689909c677fe470746e0b87"
+    },
+    "persistence": {
+      "collected_at_utc": "2026-10-08T00:20:58.428571+00:00",
+      "members_verified": 3,
+      "app_version": "1.1.0",
+      "exact_lookup_row_verified_on_every_member": true,
+      "kv_ready_on_every_member": true,
+      "receipt_sha256": "b6a17c8faced1c27f46f8015818bd8cb9cbed5a747af811178411cd078b85b2b",
+      "replaced_member_count": 1
+    }
+  },
+  "cluster_health": {
+    "install": {
+      "receipt_sha256": "54f8891cf6c1e65163e2fa4666ba1c16466a73ff8a60e7ba89c95fbecb4c54f7",
+      "outcome": "passed manager replication/search factors with three peers up and SHC with three members up/service_ready"
+    },
+    "persistence": {
+      "receipt_sha256": "bb4103297208060fc7f2e4d0350db50d9672248e90b0266c5fc904e375d4e306",
+      "outcome": "passed manager replication/search factors with three peers up and SHC with three members up/service_ready"
+    }
+  },
+  "manual_update": {
+    "poll_interval_seconds": 0,
+    "trigger": "version-checked off-to-on ConfigMap transition",
+    "returned_to_off": true
+  },
+  "final_skill_status": {
+    "outcome": "passed",
+    "log_sha256": "9ffed19f0f4d8d3bf1fc848cb9ab8181650abe7496d92b7033c6e0daf7070cbf"
+  },
+  "repository_corrections": {
+    "operator_defaults": "exact 3.2.0 empty premium defaults and omitted integer-zero poll interval normalized; altered values rejected",
+    "cluster_terminal_status": "exact 3.2.0 CM/SHC cluster scope repoState 1 deployStatus 1 install/303 bundle 3 with isDeploymentInProgress false accepted; integer fields strictly typed",
+    "root_focused_regressions": {
+      "passed": 98,
+      "subtests_passed": 120,
+      "duration_seconds": 43.58
+    }
+  },
+  "cleanup": {
+    "status": "complete",
+    "collected_at_utc": "2026-10-08T01:03:53.002263+00:00",
+    "helm_releases_deleted": 2,
+    "namespace_absent": true,
+    "recorded_ebs_volumes_absent": 21,
+    "scoped_iam_user_and_access_key_absent": true,
+    "fixture_prefix_empty_including_versions": true,
+    "protected_local_access_files_deleted": 8,
+    "receipt_sha256": "d801431f7095303a40bba8d800ce6ab8a3e4999d0b5fe06fb40e8c36504f5dc9",
+    "qualification": "EKS deletion independently verified after C3 App Framework cleanup; private receipts and recovery archive retained. Separate manually provisioned/shared resources remain in the overall cleanup ledger.",
+    "eks_cluster_deletion": {
+      "verified_at_utc": "2026-10-08T01:24:48.731491+00:00",
+      "result": "pass",
+      "receipt_sha256": "e34daa96d88eece84beb5bd4f401f0dfa0bfb8119b6ec100175738138d098dae",
+      "cluster_absent": true,
+      "cloudformation_stacks_absent": 6,
+      "owned_instances_terminated": 7,
+      "owned_volumes_absent": 7,
+      "owned_roles_absent": 6,
+      "oidc_provider_absent": true,
+      "scope": "The EKS cluster and its enumerated stack-managed resources only. Separate manually provisioned roles, key pairs, shared bucket and native validation hosts require their own cleanup."
+    }
+  },
+  "sanitization": "No credentials, cloud resource identifiers, host addresses, raw REST responses or tenant records included"
+}

@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-10-08",
+  "enterprise_version": "10.6.0.5",
+  "environment": "Disposable Ubuntu 24.04 x86_64 standalone; protected owner-only profiles; REST TLS CA and hostname verified",
+  "packages": [
+    {
+      "app_id": "3435",
+      "app_directory": "Splunk_Security_Essentials",
+      "release": "3.8.3",
+      "file": "packages/sse-3.8.3.tgz",
+      "bytes": 68026657,
+      "sha256": "f1b8d2d304ad651708cf9ac3c0dedd84eb6600af15520aa2ef67789f919b38ae",
+      "archive_members": 1346,
+      "unsafe_paths": 0,
+      "dashboard_view_count": 33,
+      "app_conf_identity": {
+        "id": "Splunk_Security_Essentials",
+        "version": "3.8.3",
+        "build": "2194"
+      }
+    },
+    {
+      "app_id": "1724",
+      "app_directory": "lookup_editor",
+      "release": "4.0.8",
+      "file": "packages/lookup-editor-4.0.8.tgz",
+      "bytes": 5939920,
+      "sha256": "7d938a151f67be33d5d63c2e79faf195dfca71aa266580172e7dd8a81b476b76",
+      "archive_members": 64,
+      "unsafe_paths": 0,
+      "dashboard_view_count": 11,
+      "app_conf_identity": {
+        "id": "lookup_editor",
+        "version": "4.0.8",
+        "build": "1334"
+      }
+    }
+  ],
+  "lookup_editor": {
+    "status": "pass",
+    "default_workflow": "Standalone render/install, CSV and KV lookup inventory, app health and shipped-view validation",
+    "owned_views": 11,
+    "inventory_ui_rows": 238,
+    "csv_readback_rows": 2,
+    "health_handlers_after_restart": {
+      "editor": "Online",
+      "backup": "Online"
+    },
+    "health_dashboard_populated": true,
+    "readback_matches_after_restart": true,
+    "completion_checks": {
+      "pass": 13,
+      "warn": 0,
+      "fail": 0
+    },
+    "qualification": "An intermediate status view reported backup Offline with persistent-handler protocol errors. Direct pings and the same REST searches returned Online; both remained Online on a fresh restart. No package hotfix was applied. SHC backup replication remains a separate topology qualification."
+  },
+  "security_essentials": {
+    "status": "partial",
+    "owned_views": 33,
+    "content_catalog_entries": 2247,
+    "introspection_completed": true,
+    "default_products_analyzed": 290,
+    "default_products_total": 305,
+    "custom_products_to_review": 15,
+    "complete_inventory_records_after_restart": 5,
+    "populated_inventory_view": {
+      "cisco_asa_detected": true,
+      "query": "(index=\"netfw\" sourcetype=\"cisco:asa\")",
+      "hosts": 1,
+      "estimated_events_per_day": 1140
+    },
+    "content_mapping_review": {
+      "enabled_searches_discovered": 52,
+      "classified": 0,
+      "remaining": 52
+    },
+    "configuration_review_completed": true,
+    "demo_mode_enabled": false,
+    "optional_ml_dashboard": "Data Availability requires MLTK and PSC; model not built. Dependency acquisition is in progress, not an external blocker."
+  },
+  "receipt_sha256": {
+    "read-evidence.json": "f98f7b8c6a480c8cf485c0e3c9ccdac6ae28f1f87a745d73631fca837fcb98f5",
+    "lookup-completion.log": "3b7b33083b5b5da85fbec75f82083dca47b9ce7d18b7b049eae926616b0e2cbb",
+    "post-restart-readback.json": "55a23d7c9a48958d8a374be2c7ee783a15c500ce5e1fc6d82710c723979652a9",
+    "sse-live-inventory-overview.txt": "ca53c41fc434e1efdbb4b385d85b1b45e8a12af6a8d6657f157118a87930f201",
+    "lookup-health-reprobe.txt": "29d2f4faa7ff0b6bd1795786bd257198ff9b54fa750afd35129534c49f9e6d72"
+  },
+  "cleanup": "Reusable standalone lab and installed applications retained; temporary browser bridge remains active for continuing checks.",
+  "new_observations": {
+    "collected_at_utc": "2026-10-08T02:32:07.219748+00:00",
+    "optional_SSE_ml_baseline": {
+      "trained_rows": 14,
+      "model": "DensityFunction",
+      "populated_data_availability_view": true,
+      "restart_persistence": true,
+      "sample_limit": "14 products have fewer than thirty data points; functional low-volume lab evidence."
+    },
+    "operational_search_classification": {
+      "classified_as": "NotADetection",
+      "persisted_after_restart": true,
+      "remaining_content_mapping_workflows": 56
+    },
+    "external_content_feed": {
+      "signed_feed_signature_validation_failed": true,
+      "bundled_catalog_available": true,
+      "signature_checks_bypassed": false
+    },
+    "cleanup": {
+      "owned_models_removed": 2,
+      "baseline_returned_to_original_empty_state": true,
+      "owned_mapping_removed": true,
+      "temporary_role_removed": true,
+      "original_admin_roles_restored": true
+    },
+    "lookup_editor_after_default_AI_install": {
+      "collected_at_utc": "2026-10-08T02:38:15.926872+00:00",
+      "result": "pass",
+      "visible_lookup_inventory": 299,
+      "overview_lookup_files": 302,
+      "csv_lookup_files": 173,
+      "kv_lookup_files": 127,
+      "csv_size_mb": 154.1,
+      "qualification": "List and health overview counts observed independently. Backup panels not refreshed; no populated backup-panel claim.",
+      "screenshot_sha256": "89e99536531e66aee0901aabd55300d0c73e2b037b8bab6df61d314146d4a650"
+    }
+  }
+}

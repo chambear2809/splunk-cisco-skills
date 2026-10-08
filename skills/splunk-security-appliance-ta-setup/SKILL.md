@@ -5,8 +5,10 @@ description: "Use when the user asks for Carbon Black or Symantec EP supported a
   appliance supported add-ons for Carbon Black and Symantec Endpoint Protection. Covers
   Splunk_TA_bit9-carbonblack and Splunk_TA_symantec-ep app IDs, versions, package-derived source types,
   file/syslog transport ownership, eventtypes, lookups, and readiness-doctor handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

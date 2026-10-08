@@ -1793,6 +1793,56 @@ def test_live_validation_uses_pod_proxies_and_requires_all_rendered_jobs(
     assert ":9967/proxy/metrics" not in calls
 
 
+def test_live_validation_accepts_chart_component_aliases_and_log_enrichment(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    bin_dir, call_log = fake_live_tools(tmp_path)
+    relay_file = write_live_agent_relay(output, tmp_path / "agent-relay.yaml")
+    relay = load_yaml_or_json(relay_file.read_text(encoding="utf-8"), source="relay")
+    aliases = {
+        "host_metrics": "hostmetrics",
+        "kubelet_stats": "kubeletstats",
+        "resource_detection": "resourcedetection",
+    }
+    for section in ("receivers", "processors"):
+        components = relay.get(section) or {}
+        for old, new in aliases.items():
+            if old in components:
+                components[new] = components.pop(old)
+    for pipeline in (relay.get("service") or {}).get("pipelines", {}).values():
+        for field in ("receivers", "processors", "exporters"):
+            pipeline[field] = [aliases.get(name, name) for name in pipeline.get(field, [])]
+
+    # The Helm chart places cluster identity in the shared resource processor
+    # instead of the filelog receiver's resource map.
+    receiver_resource = relay["receivers"]["filelog/tetragon"].setdefault("resource", {})
+    receiver_resource.pop("k8s.cluster.name", None)
+    relay.setdefault("processors", {})["resource"] = {
+        "attributes": [
+            {"key": "k8s.cluster.name", "value": "lab-cluster", "action": "upsert"}
+        ]
+    }
+    logs_host = relay["service"]["pipelines"].setdefault("logs/host", {"processors": []})
+    logs_host.setdefault("processors", []).append("resource")
+    relay_file.write_text(dump_yaml(relay, sort_keys=True), encoding="utf-8")
+
+    validated = run_validate(
+        output,
+        "--live",
+        "--allow-current-context",
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "KUBECTL_CALL_LOG": str(call_log),
+            "FAKE_AGENT_RELAY_FILE": str(relay_file),
+        },
+    )
+    assert validated.returncode == 0, combined_output(validated)
+
+
 @pytest.mark.parametrize(
     ("rows", "expected"),
     [

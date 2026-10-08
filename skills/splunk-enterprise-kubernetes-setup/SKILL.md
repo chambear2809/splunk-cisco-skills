@@ -1,16 +1,20 @@
 ---
 name: splunk-enterprise-kubernetes-setup
 description: "Use when planning, installing, upgrading, or validating either runtime. Render, preflight, apply, and
-  validate Splunk Enterprise on Kubernetes with Splunk Operator for Kubernetes 3.1.0 or Splunk POD
+  validate Splunk Enterprise on Kubernetes with Splunk Operator for Kubernetes 3.2.0 or Splunk POD
   10.4.0_1.6.0 on Cisco UCS. Covers SOK S1/C3/M4, guarded C3 indexing and ingestion separation, reviewed
   Helm overlays, and POD Small through X-Large with ES, ITSI, and TLS variants."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "blocked"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Enterprise Kubernetes Setup
+
+Enterprise 10.6 compatibility is supported for SOK 3.2.0 within the official 9.4.15-10.6.0 and Kubernetes 1.32-1.36 matrix; POD remains separately gated.
 
 ## Prerequisites
 
@@ -82,8 +86,8 @@ operations.
 
 ## Supported Baselines
 
-- SOK: Operator and charts `3.1.0`, Splunk Enterprise `10.4.1` by default.
-  The renderer enforces the current 3.1.0 release matrix. Kubernetes 1.25-1.34
+- SOK: Operator and charts `3.2.0`, Splunk Enterprise `10.6.0.5` by default.
+  The renderer enforces the current 3.2.0 release matrix. Kubernetes 1.32-1.36
   is supported subject to the Splunk version rules in the official release.
 - POD: coupled bundle `10.4.0_1.6.0`. Do not independently select its SOK,
   Kubernetes, or Splunk Enterprise versions. The implementation hard-rejects
@@ -96,7 +100,7 @@ operations.
 Version truth comes from the official release pages, not a generic latest
 Splunk default:
 
-- <https://github.com/splunk/splunk-operator/releases/tag/3.1.0>
+- <https://github.com/splunk/splunk-operator/releases/tag/3.2.0>
 - <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/splunk-pod-release-notes>
 
 ## Secret and Safety Rules
@@ -107,7 +111,7 @@ or license contents in chat, templates, overlays, or command arguments.
 - Pass license and private-key paths only. POD private keys must not be readable
   or writable by group or others; use mode `0600` or stricter.
 - Reference existing Kubernetes Secrets and, where the verified path permits
-  it, service accounts by name. The SOK 3.1 separated-ingestion path in this
+  it, service accounts by name. The SOK separated-ingestion path in this
   skill is a deliberate exception: it requires Queue Secret authentication and
   rejects workload-identity service accounts because that upstream path has not
   been verified.
@@ -173,7 +177,7 @@ for the exact already-managed Helm releases; its preflight proves release,
 Operator, CR, and namespace ownership before mutation. Fresh preflight also
 inventories `enterprise.splunk.com` CRDs cluster-wide. No CRDs is the normal
 creation path. If any exist, the complete live CRD set and normalized specs must
-exactly equal the SHA-verified reviewed 3.1.0 release manifest, every CRD must be
+exactly equal the SHA-verified reviewed 3.2.0 release manifest, every CRD must be
 established on reviewed stored versions, and no SOK CR may exist anywhere in
 the cluster, except an explicitly reviewed existing LicenseManager identity.
 Partial, drifted, extra, unreadable, terminating, or otherwise populated
@@ -195,7 +199,7 @@ CRDs can compose C1/C11, C13, M2/M12, M3/M13, and M14, but this skill does not
 claim those direct-CR topologies as rendered presets. D1/D11 is not recommended
 by the upstream Applied SVA guidance. Use the explicit handoff in
 [coverage.md](coverage.md) instead of relabeling one of the three presets.
-The verified chart 3.1.0 M4 preset is exactly two sites because it hardcodes
+The verified chart 3.2.0 M4 preset is exactly two sites because it hardcodes
 multisite RF/SF totals of two. Its SHC and deployer are site-affined and pinned
 to one selected Kubernetes zone, so this is not a stretched multi-zone search
 tier and does not establish search continuity through that zone's failure. M4
@@ -217,7 +221,7 @@ For separate namespaces, render cluster-scoped RBAC with
 Enterprise namespace in `--watch-namespaces`.
 
 `--deployment-profile production` is a guardrail, not sizing approval. It
-requires reviewed local 3.1 charts/CRDs, digest-pinned images, exact cluster
+requires reviewed local 3.2 charts/CRDs, digest-pinned images, exact cluster
 identity, Guaranteed-QoS role resources, storage, licensing, complete
 SmartStore inventory/migration and exclusive-path attestations, and Secret or
 reviewed AWS IRSA authentication. IRSA requires the service account, exact role

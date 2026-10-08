@@ -1,0 +1,2945 @@
+{
+  "authentication": "session_success",
+  "entries": [
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "1841",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-it-service-intelligence_502.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 577577273
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SA-ITOA",
+      "redirect_http": null,
+      "requested_release": "5.0.2"
+    },
+    {
+      "access": "available",
+      "app_id": "5391",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-content-packs_251.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 94270144
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "DA-ITSI-ContentLibrary",
+      "redirect_http": "206",
+      "requested_release": "2.5.1"
+    },
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "263",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-enterprise-security_851.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 777226714
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SplunkEnterpriseSecuritySuite",
+      "redirect_http": null,
+      "requested_release": "8.5.1"
+    },
+    {
+      "access": "available",
+      "app_id": "1620",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-cisco-asa_612.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 71033
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cisco-asa",
+      "redirect_http": "206",
+      "requested_release": "6.1.2"
+    },
+    {
+      "access": "available",
+      "app_id": "7538",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-enterprise-networking-add-on-for-splunk_3244.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 41292786
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "TA_cisco_catalyst",
+      "redirect_http": "206",
+      "requested_release": "3.2.44"
+    },
+    {
+      "access": "available",
+      "app_id": "742",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-windows_1102.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 242721
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_windows",
+      "redirect_http": "206",
+      "requested_release": "11.0.2"
+    },
+    {
+      "access": "available",
+      "app_id": "3435",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-security-essentials_383.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 68026657
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_Security_Essentials",
+      "redirect_http": "206",
+      "requested_release": "3.8.3"
+    },
+    {
+      "access": "available",
+      "app_id": "2890",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-ai-toolkit_602.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 23724769
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_ML_Toolkit",
+      "redirect_http": "206",
+      "requested_release": "6.0.2"
+    },
+    {
+      "access": "available",
+      "app_id": "2882",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "python-for-scientific-computing-for-linux-64-bit_434.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 449623463
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "redirect_http": "206",
+      "requested_release": "4.3.4"
+    },
+    {
+      "access": "available",
+      "app_id": "2883",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "python-for-scientific-computing-for-windows-64-bit_434.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 399060764
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_Scientific_Python_windows_x86_64",
+      "redirect_http": "206",
+      "requested_release": "4.3.4"
+    },
+    {
+      "access": "available",
+      "app_id": "2686",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-db-connect_430.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 137997789
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_app_db_connect",
+      "redirect_http": "206",
+      "requested_release": "4.3.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6149",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-redshift-jdbc_122.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 1047216
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "6150",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-microsoft-sql-server-jdbc_132.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 6001516
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.3.2"
+    },
+    {
+      "access": "available",
+      "app_id": "6151",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-oracle-jdbc_222.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 6827238
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "2.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "6152",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-postgres-jdbc_122.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 1224481
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "6153",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-snowflake-jdbc_124.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 76403487
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.2.4"
+    },
+    {
+      "access": "available",
+      "app_id": "6154",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-mysql-jdbc_113.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 4287769
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.1.3"
+    },
+    {
+      "access": "available",
+      "app_id": "6332",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-db2-jdbc_111.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 6297932
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "7095",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-mongodb-jdbc_130.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 2208726
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.3.0"
+    },
+    {
+      "access": "available",
+      "app_id": "8133",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-dbx-add-on-for-athena-jdbc_101.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 25498338
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "redirect_http": "206",
+      "requested_release": "1.0.1"
+    },
+    {
+      "access": "available",
+      "app_id": "1761",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-cisco-esa_171.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 64393
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cisco-esa",
+      "redirect_http": "206",
+      "requested_release": "1.7.1"
+    },
+    {
+      "access": "available",
+      "app_id": "1747",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-cisco-wsa_500.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 47988
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cisco-wsa",
+      "redirect_http": "206",
+      "requested_release": "5.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6872",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-enterprise-networking-netflow-add-on-for-splunk_210.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 20710
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_app_stream_ipfix_cisco_hsl",
+      "redirect_http": "206",
+      "requested_release": "2.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "833",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-unix-and-linux_1033.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 138177
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_nix",
+      "redirect_http": "206",
+      "requested_release": "10.3.3"
+    },
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "1143",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-app-for-pci-compliance-splunk-enterprise_861.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0"
+        ],
+        "size_bytes": 890867970
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SplunkPCIComplianceSuite",
+      "redirect_http": null,
+      "requested_release": "8.6.1"
+    },
+    {
+      "access": "available",
+      "app_id": "1621",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-common-information-model-cim_850.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 2230520
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_CIM",
+      "redirect_http": "206",
+      "requested_release": "8.5.0"
+    },
+    {
+      "access": "available",
+      "app_id": "1724",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-lookup-file-editing_408.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 5939920
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "lookup_editor",
+      "redirect_http": "206",
+      "requested_release": "4.0.8"
+    },
+    {
+      "access": "available",
+      "app_id": "1809",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-stream_816.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 52179186
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_app_stream",
+      "redirect_http": "206",
+      "requested_release": "8.1.6"
+    },
+    {
+      "access": "available",
+      "app_id": "1876",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-amazon-web-services-aws_822.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 71571129
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_aws",
+      "redirect_http": "206",
+      "requested_release": "8.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "1910",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-oracle-database_420.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 975854
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_oracle",
+      "redirect_http": "206",
+      "requested_release": "4.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "1928",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-servicenow_1102.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 5607819
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_snow",
+      "redirect_http": "206",
+      "requested_release": "11.0.2"
+    },
+    {
+      "access": "available",
+      "app_id": "2648",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-sql-server_310.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 44921
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_microsoft-sqlserver",
+      "redirect_http": "206",
+      "requested_release": "3.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2679",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-box_501.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 10913824
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_box",
+      "redirect_http": "206",
+      "requested_release": "5.0.1"
+    },
+    {
+      "access": "available",
+      "app_id": "2680",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-f5-big-ip_700.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 2120807
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_f5-bigip",
+      "redirect_http": "206",
+      "requested_release": "7.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2729",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-system-center-operations-manager_451.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 10039254
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_microsoft-scom",
+      "redirect_http": "206",
+      "requested_release": "4.5.1"
+    },
+    {
+      "access": "available",
+      "app_id": "2731",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-cisco-ucs_433.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 5167985
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cisco-ucs",
+      "redirect_http": "206",
+      "requested_release": "4.3.3"
+    },
+    {
+      "access": "available",
+      "app_id": "2758",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-symantec-blue-coat-proxysg_390.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 40958
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_bluecoat-proxysg",
+      "redirect_http": "206",
+      "requested_release": "3.9.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2770",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-citrix-netscaler_825.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 10312862
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_citrix-netscaler",
+      "redirect_http": "206",
+      "requested_release": "8.2.5"
+    },
+    {
+      "access": "available",
+      "app_id": "2772",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-symantec-endpoint-protection_401.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 59270
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_symantec-ep",
+      "redirect_http": "206",
+      "requested_release": "4.0.1"
+    },
+    {
+      "access": "available",
+      "app_id": "2790",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-carbon-black_300.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 42799
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_bit9-carbonblack",
+      "redirect_http": "206",
+      "requested_release": "3.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2848",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-mysql_320.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 104666
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_mysql",
+      "redirect_http": "206",
+      "requested_release": "3.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2881",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "python-for-scientific-computing-for-mac-intel_434.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 339933574
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_Scientific_Python_darwin_x86_64",
+      "redirect_http": "206",
+      "requested_release": "4.3.4"
+    },
+    {
+      "access": "available",
+      "app_id": "2884",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "python-for-scientific-computing-for-linux-32-bit_13.tgz",
+        "product_versions": [],
+        "size_bytes": 73136135
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_Scientific_Python_linux_x86",
+      "redirect_http": "206",
+      "requested_release": "1.3"
+    },
+    {
+      "access": "available",
+      "app_id": "2891",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-cyberark_120.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 52200
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cyberark",
+      "redirect_http": "206",
+      "requested_release": "1.2.0"
+    },
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "2897",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-app-for-pci-compliance-splunk-enterprise-security_861.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0"
+        ],
+        "size_bytes": 8209470
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SplunkPCIComplianceSuite_ES",
+      "redirect_http": null,
+      "requested_release": "8.6.1"
+    },
+    {
+      "access": "available",
+      "app_id": "2911",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-tomcat_404.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 15569156
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_tomcat",
+      "redirect_http": "206",
+      "requested_release": "4.0.4"
+    },
+    {
+      "access": "available",
+      "app_id": "2934",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-infoblox_220.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 42766
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_infoblox",
+      "redirect_http": "206",
+      "requested_release": "2.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2958",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-rsa-securid_150.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 889660
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_rsa-securid",
+      "redirect_http": "206",
+      "requested_release": "1.5.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2965",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-squid-proxy_210.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 37500
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_squid",
+      "redirect_http": "206",
+      "requested_release": "2.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "2966",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-forcepoint-web-security_110.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 54331
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_websense-cg",
+      "redirect_http": "206",
+      "requested_release": "1.1.0"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "3088",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 3,
+        "available_10_6_versions": [
+          "5.0.1"
+        ],
+        "available_release_versions": [
+          "5.2.0",
+          "5.0.1",
+          "4.8.0"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "Splunk_TA_google-cloudplatform",
+      "redirect_http": null,
+      "requested_release": "5.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3110",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-cloud-services_631.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 85104281
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_microsoft-cloudservices",
+      "redirect_http": "206",
+      "requested_release": "6.3.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3135",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-haproxy_200.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 40585
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_haproxy",
+      "redirect_http": "206",
+      "requested_release": "2.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3172",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "ssl-certificate-checker_420.tgz",
+        "product_versions": [
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 4081
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "ssl_certificate_checker",
+      "redirect_http": "206",
+      "requested_release": "4.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3185",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-iis_200.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 41199
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_microsoft-iis",
+      "redirect_http": "206",
+      "requested_release": "2.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3186",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-apache-web-server_300.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 224485
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_apache",
+      "redirect_http": "206",
+      "requested_release": "3.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3215",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-vmware_421.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 2399137
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_vmware",
+      "redirect_http": "206",
+      "requested_release": "4.2.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3225",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-exchange_411.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0"
+        ],
+        "size_bytes": 870845
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "TA-Exchange-ClientAccess",
+      "redirect_http": "206",
+      "requested_release": "4.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3258",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-nginx_332.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 9758849
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_nginx",
+      "redirect_http": "206",
+      "requested_release": "3.3.2"
+    },
+    {
+      "access": "available",
+      "app_id": "3411",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-soar-export_870.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 11013098
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "phantom",
+      "redirect_http": "206",
+      "requested_release": "8.7.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3412",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-linux_211.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 100214
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_Linux",
+      "redirect_http": "206",
+      "requested_release": "2.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3418",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-netapp-data-ontap_321.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 2563261
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_ontap",
+      "redirect_http": "206",
+      "requested_release": "3.2.1"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "3449",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 4,
+        "available_10_6_versions": [
+          "6.8.0",
+          "6.7.0",
+          "6.6.0",
+          "6.5.0"
+        ],
+        "available_release_versions": [
+          "6.8.0",
+          "6.7.0",
+          "6.6.0",
+          "6.5.0"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "DA-ESS-ContentUpdate",
+      "redirect_http": null,
+      "requested_release": "6.4.0"
+    },
+    {
+      "access": "available",
+      "app_id": "3471",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-splunk-add-on-for-appdynamics_321.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 6624371
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_AppDynamics",
+      "redirect_http": "206",
+      "requested_release": "3.2.1"
+    },
+    {
+      "access": "available",
+      "app_id": "3546",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-on-call-victorops_1043.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 1677382
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "victorops_app",
+      "redirect_http": "206",
+      "requested_release": "1.0.43"
+    },
+    {
+      "access": "available",
+      "app_id": "3549",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-salesforce_700.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 50619853
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_salesforce",
+      "redirect_http": "206",
+      "requested_release": "7.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "4055",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-office-365_610.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 86927701
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_ta_o365",
+      "redirect_http": "206",
+      "requested_release": "6.1.0"
+    },
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "4147",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-uba-kafka-ingestion-app_146.tgz",
+        "product_versions": [
+          "10.3",
+          "10.2",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 527738
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk-UBA-SA-Kafka",
+      "redirect_http": null,
+      "requested_release": "1.4.6"
+    },
+    {
+      "access": "available",
+      "app_id": "4240",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "infosec-app-for-splunk_172.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 231942
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "infosec_app_for_splunk",
+      "redirect_http": "206",
+      "requested_release": "1.7.2"
+    },
+    {
+      "access": "available",
+      "app_id": "4603",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-health-assistant-add-on_2026523.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 14850
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_health_assistant_addon",
+      "redirect_http": "206",
+      "requested_release": "2026.5.23"
+    },
+    {
+      "access": "available",
+      "app_id": "4607",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-data-science-and-deep-learning_524.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 29094471
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "mltk-container",
+      "redirect_http": "206",
+      "requested_release": "5.2.4"
+    },
+    {
+      "access": "available",
+      "app_id": "4882",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "microsoft-azure-app-for-splunk_211.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 7391786
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "microsoft_azure_app",
+      "redirect_http": "206",
+      "requested_release": "2.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "4886",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-on-call-victorops_210.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 6297194
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "TA-splunk-add-on-for-victorops",
+      "redirect_http": "206",
+      "requested_release": "2.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "4992",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "webex-app-for-splunk_200.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 27756
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "cisco_webex_meetings_app_for_splunk",
+      "redirect_http": "206",
+      "requested_release": "2.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5089",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-vmware-metrics_501.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 2789553
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_vmware_inframon",
+      "redirect_http": "206",
+      "requested_release": "5.0.1"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "5160",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 3,
+        "available_10_6_versions": [
+          "4.0.0",
+          "3.1.0"
+        ],
+        "available_release_versions": [
+          "5.0.1",
+          "4.0.0",
+          "3.1.0"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "Splunk_TA_cyberark_epm",
+      "redirect_http": null,
+      "requested_release": "5.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5210",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-rsa-securid-cas_123.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 24842236
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_rsa_securid_cas",
+      "redirect_http": "206",
+      "requested_release": "1.2.3"
+    },
+    {
+      "access": "available",
+      "app_id": "5234",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-stream-wire-data_816.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 30518
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_stream_wire_data",
+      "redirect_http": "206",
+      "requested_release": "8.1.6"
+    },
+    {
+      "access": "available",
+      "app_id": "5238",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-stream-forwarders_816.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 105644261
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_stream",
+      "redirect_http": "206",
+      "requested_release": "8.1.6"
+    },
+    {
+      "access": "available",
+      "app_id": "5247",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-infrastructure-monitoring-add-on_131.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 2936032
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_sim",
+      "redirect_http": "206",
+      "requested_release": "1.3.1"
+    },
+    {
+      "access": "available",
+      "app_id": "5478",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-check-point-log-exporter_120.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 47651
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_checkpoint_log_exporter",
+      "redirect_http": "206",
+      "requested_release": "1.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5556",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-google-workspace_400.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 33293475
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_Google_Workspace",
+      "redirect_http": "206",
+      "requested_release": "4.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5558",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-secure-access-app-for-splunk_1057.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 1973837
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "cisco-cloud-security",
+      "redirect_http": "206",
+      "requested_release": "1.0.57"
+    },
+    {
+      "access": "available",
+      "app_id": "5580",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-meraki-add-on-for-splunk_340.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 28877147
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_cisco_meraki",
+      "redirect_http": "206",
+      "requested_release": "3.4.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5608",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-synthetic-monitoring-add-on_110.tgz",
+        "product_versions": [
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 327358
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_synthetic_monitoring",
+      "redirect_http": "206",
+      "requested_release": "1.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "5615",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-netapp-data-ontap-extractions_303.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 173095
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "TA-ONTAP-FieldExtractions",
+      "redirect_http": "206",
+      "requested_release": "3.0.3"
+    },
+    {
+      "access": "available",
+      "app_id": "5616",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-netapp-data-ontap-indexes_303.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 167907
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SA-ONTAPIndex",
+      "redirect_http": "206",
+      "requested_release": "3.0.3"
+    },
+    {
+      "access": "available",
+      "app_id": "5663",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-exchange-indexes_404.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 167081
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SA-ExchangeIndex",
+      "redirect_http": "206",
+      "requested_release": "4.0.4"
+    },
+    {
+      "access": "available",
+      "app_id": "5709",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-sysmon_501.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 42063
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_microsoft_sysmon",
+      "redirect_http": "206",
+      "requested_release": "5.0.1"
+    },
+    {
+      "access": "available",
+      "app_id": "5863",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-on-call_300.tgz",
+        "product_versions": [
+          "8.7",
+          "8.6",
+          "8.5",
+          "8.4",
+          "8.0",
+          "7.2",
+          "7.1",
+          "7.0",
+          "6.4",
+          "6.3",
+          "6.2",
+          "6.1",
+          "6.0",
+          "5.5",
+          "5.4",
+          "5.3",
+          "5.2",
+          "5.1"
+        ],
+        "size_bytes": 21585
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunkoncall",
+      "redirect_http": "206",
+      "requested_release": "3.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6207",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-microsoft-security_400.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2"
+        ],
+        "size_bytes": 23165598
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_MS_Security",
+      "redirect_http": "206",
+      "requested_release": "4.0.0"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "6254",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 5,
+        "available_10_6_versions": [
+          "3.3.1",
+          "3.3.0",
+          "3.2.0"
+        ],
+        "available_release_versions": [
+          "4.0.1",
+          "3.3.1",
+          "3.3.0",
+          "3.2.0",
+          "3.1.0"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "Splunk_TA_github",
+      "redirect_http": null,
+      "requested_release": "4.0.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6361",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-soar_860.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 18744411
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk_app_soar",
+      "redirect_http": "206",
+      "requested_release": "8.6.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6415",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "smart-alerts-assistant-for-splunk-beta_0120.tgz",
+        "product_versions": [
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 79385
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Smart_Alerts_Assistant",
+      "redirect_http": "206",
+      "requested_release": "0.1.20"
+    },
+    {
+      "access": "available",
+      "app_id": "6553",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-okta-identity-cloud_510.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 13003137
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_okta_identity_cloud",
+      "redirect_http": "206",
+      "requested_release": "5.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6785",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "python-for-scientific-computing-for-mac-apple-silicon_434.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 293394452
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_SA_Scientific_Python_darwin_arm64",
+      "redirect_http": "206",
+      "requested_release": "4.3.4"
+    },
+    {
+      "access": "available",
+      "app_id": "6841",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "ocsf-cim-add-on-for-splunk_110.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 1453064
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "ocsf_cim_addon_for_splunk",
+      "redirect_http": "206",
+      "requested_release": "1.1.0"
+    },
+    {
+      "access": "available",
+      "app_id": "6843",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-anomaly-detection_112.tgz",
+        "product_versions": [
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 7886474
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_App_for_Anomaly_Detection",
+      "redirect_http": "206",
+      "requested_release": "1.1.2"
+    },
+    {
+      "access": "available",
+      "app_id": "6999",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-splunk-attack-analyzer_130.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 5643161
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_SAA",
+      "redirect_http": "206",
+      "requested_release": "1.3.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7000",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-app-for-splunk-attack-analyzer_130.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 21343
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_App_SAA",
+      "redirect_http": "206",
+      "requested_release": "1.3.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7125",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-opentelemetry-collector_01580.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 305245804
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_otel",
+      "redirect_http": "206",
+      "requested_release": "0.158.0"
+    },
+    {
+      "access": "blocked_or_unresolved",
+      "app_id": "7180",
+      "initial_http": "403",
+      "metadata": {
+        "filename": "splunk-asset-and-risk-intelligence_122.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 5060792
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "SplunkAssetRiskIntelligence",
+      "redirect_http": null,
+      "requested_release": "1.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "7214",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-asset-and-risk-intelligence-technical-add-on-for-windows_120.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 21260
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+      "redirect_http": "206",
+      "requested_release": "1.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7245",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-ai-assistant_220.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 8255412
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_AI_Assistant_Cloud",
+      "redirect_http": "206",
+      "requested_release": "2.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7404",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-security-cloud_3610.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 35605829
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "CiscoSecurityCloud",
+      "redirect_http": "206",
+      "requested_release": "3.6.10"
+    },
+    {
+      "access": "available",
+      "app_id": "7416",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-asset-and-risk-intelligence-technical-add-on-for-linux_120.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 16073
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+      "redirect_http": "206",
+      "requested_release": "1.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7417",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-asset-and-risk-intelligence-technical-add-on-for-macos_120.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 16757
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+      "redirect_http": "206",
+      "requested_release": "1.2.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7539",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-enterprise-networking-app-for-splunk_3220.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "size_bytes": 497807
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "cisco-catalyst-app",
+      "redirect_http": "206",
+      "requested_release": "3.2.20"
+    },
+    {
+      "access": "available",
+      "app_id": "7557",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-talos-intelligence-for-enterprise-security-cloud_103.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0"
+        ],
+        "size_bytes": 9863110
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_Talos_Intelligence",
+      "redirect_http": "206",
+      "requested_release": "1.0.3"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "7569",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 1,
+        "available_10_6_versions": [],
+        "available_release_versions": [
+          "1.0.55"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "TA-cisco-cloud-security-addon",
+      "redirect_http": null,
+      "requested_release": "1.0.53"
+    },
+    {
+      "access": "available",
+      "app_id": "7719",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-thousandeyes-app-for-splunk_080.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1"
+        ],
+        "size_bytes": 9385432
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "ta_cisco_thousandeyes",
+      "redirect_http": "206",
+      "requested_release": "0.8.0"
+    },
+    {
+      "access": "available",
+      "app_id": "7777",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-dc-networking_122.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 12108530
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "cisco_dc_networking_app_for_splunk",
+      "redirect_http": "206",
+      "requested_release": "1.2.2"
+    },
+    {
+      "access": "available",
+      "app_id": "7828",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "cisco-intersight-add-on-for-splunk_311.spl",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 7048893
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_Cisco_Intersight",
+      "redirect_http": "206",
+      "requested_release": "3.1.1"
+    },
+    {
+      "access": "available",
+      "app_id": "7931",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-mcp-server_131.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 4167485
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_MCP_Server",
+      "redirect_http": "206",
+      "requested_release": "1.3.1"
+    },
+    {
+      "access": "available",
+      "app_id": "8365",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "webex-add-on-for-splunk_143.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3"
+        ],
+        "size_bytes": 9533655
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "ta_cisco_webex_add_on_for_splunk",
+      "redirect_http": "206",
+      "requested_release": "1.4.3"
+    },
+    {
+      "access": "available",
+      "app_id": "8485",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "spaces-add-on-for-splunk_201.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 11494611
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "ta_cisco_spaces",
+      "redirect_http": "206",
+      "requested_release": "2.0.1"
+    },
+    {
+      "access": "available",
+      "app_id": "8566",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-cisco-app-navigator-scan_1030.tar.gz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "size_bytes": 8587742
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "splunk-cisco-app-navigator",
+      "redirect_http": "206",
+      "requested_release": "1.0.30"
+    },
+    {
+      "access": "available",
+      "app_id": "8698",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-opentelemetry-collector-for-linux-x86_64_01580.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 152852673
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_otel_linux_x86_64",
+      "redirect_http": "206",
+      "requested_release": "0.158.0"
+    },
+    {
+      "access": "available",
+      "app_id": "8699",
+      "initial_http": "302",
+      "metadata": {
+        "filename": "splunk-add-on-for-opentelemetry-collector-for-windows-x86_64_01580.tgz",
+        "product_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4",
+          "9.3",
+          "9.2",
+          "9.1",
+          "9.0"
+        ],
+        "size_bytes": 152400408
+      },
+      "metadata_status": "exact_release_listed",
+      "name": "Splunk_TA_otel_windows_x86_64",
+      "redirect_http": "206",
+      "requested_release": "0.158.0"
+    },
+    {
+      "access": "not-probed",
+      "app_id": "8704",
+      "initial_http": null,
+      "metadata": {
+        "api_release_count": 4,
+        "available_10_6_versions": [],
+        "available_release_versions": [
+          "0.162.0",
+          "0.161.0",
+          "0.160.1",
+          "0.160.0"
+        ]
+      },
+      "metadata_status": "requested_release_not_listed",
+      "name": "splunk-connect-for-otlp",
+      "redirect_http": null,
+      "requested_release": "0.4.1"
+    }
+  ],
+  "generated_date": "2026-10-07",
+  "missing_release_review": {
+    "ids": {
+      "3088": {
+        "current_10_6_candidate": "5.0.1",
+        "reason": "requested version absent; 5.0.1 lists 10.6, while latest 5.2.0 lists 10.5 and lacks 10.6",
+        "requested": "5.1.1"
+      },
+      "3449": {
+        "current_10_6_candidate": "6.8.0",
+        "reason": "requested version absent; 6.8.0 lists 10.6",
+        "requested": "6.4.0"
+      },
+      "5160": {
+        "current_10_6_candidate": "4.0.0",
+        "reason": "requested version absent; 4.0.0 lists 10.6",
+        "requested": "5.0.0"
+      },
+      "6254": {
+        "current_10_6_candidate": "3.3.1",
+        "reason": "requested version absent; 3.3.1 lists 10.6",
+        "requested": "4.0.0"
+      },
+      "7569": {
+        "current_10_6_candidate": null,
+        "reason": "requested version absent; only 1.0.55 is listed and it does not list 10.6",
+        "requested": "1.0.53"
+      },
+      "8704": {
+        "current_10_6_candidate": null,
+        "reason": "requested version absent; listed releases target 10.5 and earlier, none list 10.6",
+        "requested": "0.4.1"
+      }
+    },
+    "method": "The release endpoint returned a finite unpaginated JSON list for each reviewed app; exact requested names were matched across the complete returned list, not only the first/latest item.",
+    "owner_action": "Root must decide whether to refresh ledger pins. Do not promote candidates without exact identity, checksum/package verification, and workflow validation."
+  },
+  "privacy_contract": "No authentication artifacts, redirect query material, user identifiers, network identifiers, cache validators, or response bodies are recorded.",
+  "probe_contract": "Initial download endpoint used authenticated Range bytes=0-0; redirects were probed without Splunkbase auth forwarding. No package body was retained.",
+  "schema_version": 1,
+  "scope": "Exact package pins selected by the Enterprise 10.6 validation ledger.",
+  "source": "Authenticated Splunkbase release metadata and bounded Range GET probes."
+}

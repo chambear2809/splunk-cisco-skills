@@ -13,6 +13,26 @@ Changes to skills should preserve that contract: concise trigger metadata,
 progressive disclosure, script-backed repeatable workflows where appropriate,
 and tests or evals that show the skill still behaves as intended.
 
+## Skill Portability
+
+Distribute the library with its `skills/` layout intact. Many skills use
+`skills/shared/` and delegate to sibling skills; copying only one skill directory
+does not create a standalone distribution. Include those dependencies when
+packaging a subset, and document the required tools in `SKILL_REQUIREMENTS.md`.
+
+- Resolve bundled helpers and references from the script location. Quote paths
+  and test relocated checkouts, including paths with spaces. Document commands
+  that require the library root as their working directory.
+- Keep core render and validation scripts usable without an agent-specific CLI.
+  Codex, Cursor, and Claude registrations are optional client integration paths.
+- Accept deployment identities and endpoints through documented configuration;
+  keep developer home paths, lab accounts, and local SSO brokers out of defaults.
+- Preserve the declared Python minimum and each skill's target OS contract.
+  CI compiles first-party Python on 3.10 and 3.14; use BSD-compatible controller
+  commands or explicit capability detection for GNU-only tools.
+- Keep credentials and downloaded packages external to portable skill bundles.
+  Offline render and audit paths must not require a developer's live credentials.
+
 ## Before You Start
 
 - Do not commit credentials, tokens, package binaries, rendered deployment
@@ -171,6 +191,7 @@ python3 skills/shared/scripts/generate_skill_catalog.py --write
 python3 skills/shared/scripts/generate_skill_ux_catalog.py --write
 python3 skills/shared/scripts/generate_skill_validation_matrix.py --write
 python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --write
+python3 skills/shared/scripts/audit_splunk_enterprise_10_6_compatibility.py --write
 python3 skills/shared/scripts/generate_deployment_docs.py --write
 ```
 
@@ -181,6 +202,7 @@ python3 skills/shared/scripts/generate_skill_catalog.py --check
 python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
 python3 skills/shared/scripts/generate_skill_validation_matrix.py --check
 python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
+python3 skills/shared/scripts/audit_splunk_enterprise_10_6_compatibility.py --check
 python3 skills/shared/scripts/generate_deployment_docs.py --check
 ```
 

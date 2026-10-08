@@ -371,7 +371,7 @@ def _validate_args(args: argparse.Namespace, policy: dict) -> None:
             "ERROR: --cert-install-subdir must be one safe directory name "
             "(letters, digits, dot, underscore, and hyphen only)"
         )
-    if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", args.splunk_version):
+    if not re.fullmatch(r"\d+\.\d+(?:\.\d+){0,2}", args.splunk_version):
         sys.exit("ERROR: --splunk-version must be a numeric version such as 10.4.0")
     try:
         require_supported_enterprise_version(args.splunk_version)
@@ -625,6 +625,7 @@ def render_metadata(out: Path, args: argparse.Namespace, targets: set[str], mtls
 # ---------- Private CA scripts ----------
 
 def _openssl_root_cnf(args: argparse.Namespace) -> str:
+    dn = _ca_dn_lines(args, include_intermediate=False)
     return f"""# Rendered by splunk-platform-pki-setup. Do not edit; re-render instead.
 [ req ]
 default_bits        = {_key_bits_or_curve(args.key_algorithm).get('bits', 4096)}
@@ -634,12 +635,7 @@ distinguished_name  = req_distinguished_name
 x509_extensions     = v3_ca
 
 [ req_distinguished_name ]
-C  = {args.ca_country}
-ST = {args.ca_state}
-L  = {args.ca_locality}
-O  = {args.ca_organization}
-OU = {args.ca_organizational_unit}
-CN = {args.ca_common_name}
+{dn}CN = {args.ca_common_name}
 
 [ v3_ca ]
 basicConstraints       = critical, CA:TRUE
@@ -649,21 +645,22 @@ subjectKeyIdentifier   = hash
 
 
 def _openssl_intermediate_cnf(args: argparse.Namespace) -> str:
+    dn = _ca_dn_lines(args, include_intermediate=True)
     return f"""# Rendered by splunk-platform-pki-setup. Do not edit; re-render instead.
 [ req ]
 default_bits        = {_key_bits_or_curve(args.key_algorithm).get('bits', 4096)}
 default_md          = sha384
 prompt              = no
 distinguished_name  = req_distinguished_name
-req_extensions      = v3_intermediate_ca
+req_extensions      = v3_intermediate_req
 
 [ req_distinguished_name ]
-C  = {args.ca_country}
-ST = {args.ca_state}
-L  = {args.ca_locality}
-O  = {args.ca_organization}
-OU = {args.ca_organizational_unit}
-CN = {args.ca_common_name} Intermediate
+{dn}CN = {args.ca_common_name} Intermediate
+
+[ v3_intermediate_req ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
 
 [ v3_intermediate_ca ]
 basicConstraints       = critical, CA:TRUE, pathlen:0
@@ -671,6 +668,14 @@ keyUsage               = critical, keyCertSign, cRLSign
 subjectKeyIdentifier   = hash
 authorityKeyIdentifier = keyid:always, issuer
 """
+
+
+def _ca_dn_lines(args: argparse.Namespace, *, include_intermediate: bool) -> str:
+    """Render only populated optional DN attributes for OpenSSL strictness."""
+    fields = (("C", args.ca_country), ("ST", args.ca_state),
+              ("L", args.ca_locality), ("O", args.ca_organization),
+              ("OU", args.ca_organizational_unit))
+    return "".join(f"{name} = {value}\n" for name, value in fields if value)
 
 
 def _openssl_leaf_server_cnf() -> str:
@@ -936,6 +941,14 @@ basicConstraints   = critical, CA:FALSE
 keyUsage           = critical, digitalSignature, keyEncipherment
 extendedKeyUsage   = serverAuth, clientAuth
 subjectAltName     = $SANS
+
+[ v3_srv ]
+basicConstraints   = critical, CA:FALSE
+keyUsage           = critical, digitalSignature, keyEncipherment
+extendedKeyUsage   = serverAuth, clientAuth
+subjectAltName     = $SANS
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer
 EOF
 
 {keygen}
@@ -954,7 +967,7 @@ $SPLUNK_HOME/bin/splunk cmd openssl x509 -req -days "$DAYS" \\
     -passin file:"$CA_PASS_FILE" \\
     -CAcreateserial \\
     -extfile "$CSR_TMP" \\
-    -extensions v3_req \\
+    -extensions v3_srv \\
     -sha384 \\
     -out "$OUT_DIR/$NAME.pem"
 chmod 0644 "$OUT_DIR/$NAME.pem"
@@ -1461,6 +1474,7 @@ if [[ "$TARGET" != "ldaps" ]]; then
 fi
 
 SPLUNK_UID="$(stat -c '%u' "$SPLUNK_HOME")"
+SPLUNK_GID="$(stat -c '%g' "$SPLUNK_HOME")"
 SPLUNK_OWNER="$(stat -c '%u:%g' "$SPLUNK_HOME")"
 if [[ "$EUID" -ne 0 && "$EUID" -ne "$SPLUNK_UID" ]]; then
     echo "ERROR: run as the Splunk service owner (uid $SPLUNK_UID) or root" >&2
@@ -1473,11 +1487,48 @@ set_splunk_owner() {{
     fi
 }}
 
-DEST="$SPLUNK_HOME/etc/auth/$INSTALL_SUBDIR/$HOST"
+service_can_traverse() {{
+    local target_uid target_gid target_mode mode_bits
+    read -r target_uid target_gid target_mode < <(stat -c '%u %g %a' "$INSTALL_ROOT")
+    mode_bits=$((8#$target_mode))
+    if [[ "$target_uid" == "$SPLUNK_UID" ]]; then
+        (( (mode_bits & 0100) != 0 ))
+    elif [[ "$target_gid" == "$SPLUNK_GID" ]]; then
+        (( (mode_bits & 0010) != 0 ))
+    else
+        (( (mode_bits & 0001) != 0 ))
+    fi
+}}
+
+INSTALL_ROOT="$SPLUNK_HOME/etc/auth/$INSTALL_SUBDIR"
+# Only repair permissions on the install subdirectory when this invocation
+# creates it.  Under a restrictive root umask, mkdir -p can otherwise leave
+# the new parent root-owned and inaccessible to the Splunk service.  Existing
+# targets are never chmod/chowned implicitly; fail closed if one is not
+# traversable so an operator can repair it deliberately.
+if [[ -e "$INSTALL_ROOT" && ! -d "$INSTALL_ROOT" ]]; then
+    echo "ERROR: install subdirectory exists but is not a directory: $INSTALL_ROOT" >&2
+    exit 1
+fi
+if [[ ! -e "$INSTALL_ROOT" ]]; then
+    if [[ ! -d "$SPLUNK_HOME/etc/auth" ]]; then
+        echo "ERROR: Splunk auth directory is missing: $SPLUNK_HOME/etc/auth" >&2
+        exit 1
+    fi
+    mkdir "$INSTALL_ROOT"
+    chmod 0750 "$INSTALL_ROOT"
+    set_splunk_owner "$INSTALL_ROOT"
+fi
+if ! service_can_traverse; then
+    echo "ERROR: existing install subdirectory is not traversable by the Splunk service owner: $INSTALL_ROOT" >&2
+    exit 1
+fi
+
+DEST="$INSTALL_ROOT/$HOST"
 mkdir -p "$DEST"
 chmod 0750 "$DEST"
 set_splunk_owner "$DEST"
-TRUST_BUNDLE="$SPLUNK_HOME/etc/auth/$INSTALL_SUBDIR/cabundle.pem"
+TRUST_BUNDLE="$INSTALL_ROOT/cabundle.pem"
 
 # Backup any existing PEMs
 if compgen -G "$DEST/*.pem" > /dev/null || compgen -G "$DEST/*.key" > /dev/null; then

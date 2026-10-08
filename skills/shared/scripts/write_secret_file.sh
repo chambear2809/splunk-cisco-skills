@@ -70,7 +70,9 @@ fi
 # Keep target validation, staging, and publication in one process with an open
 # parent-directory descriptor. A shell-level "does not exist" check followed by
 # redirection is vulnerable to symlink substitution and other TOCTOU races.
-python3 - "${OUTPUT_PATH}" "${PROMPT}" "${FORCE}" "${EDITOR_MODE}" <<'PY'
+# Python reads its program from stdin; preserve the caller's input separately
+# so the interactive check and hidden prompts inspect the actual terminal.
+python3 - "${OUTPUT_PATH}" "${PROMPT}" "${FORCE}" "${EDITOR_MODE}" 3<&0 <<'PY'
 import errno
 import getpass
 import os
@@ -293,12 +295,13 @@ def main():
             parent_path_still_matches(parent_fd, resolved_parent, parent_input)
             verify_staging_file(parent_fd, staging_name)
         else:
-            if not sys.stdin.isatty():
+            if not os.isatty(3):
                 fail(
                     "refusing to read a secret from non-interactive stdin\n"
                     "Run this script from a terminal so the secret is not captured "
                     "in shell history."
                 )
+            sys.stdin = os.fdopen(os.dup(3), "r")
             secret_value = getpass.getpass(f"{prompt}: ")
             secret_confirm = getpass.getpass(f"Confirm {prompt}: ")
             if secret_value != secret_confirm:

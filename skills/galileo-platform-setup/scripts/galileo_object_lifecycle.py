@@ -498,28 +498,33 @@ def get_project_compat(
         return _get_project_rest(project_id=project_id, name=name), "documented_rest_fallback"
 
 
-def delete_project_compat(delete_project: Callable[..., Any], *, project_id: str) -> str:
-    """Delete an exact project ID, narrowly bypassing the known SDK enum readback bug."""
+def delete_project_compat(*, project_id: str) -> str:
+    """Delete an exact project ID through the generated SDK API.
+
+    The high-level SDK delete path can fail while deserializing newer permission
+    enums. The generated project endpoint returns a raw status-bearing response,
+    so use it directly and verify exact absence through the existing readback.
+    """
 
     if _get_project_rest(project_id=project_id) is None:
         return "already_absent_verified"
-    source = "sdk"
     try:
-        deleted = delete_project(id=project_id)
-        if deleted is not True:
-            raise RuntimeError(f"Galileo did not confirm deletion of exact project ID {project_id}")
-    except Exception as exc:
-        if not _is_known_project_schema_error(exc):
-            raise
-        _project_rest_request(
-            "DELETE",
-            "/v2/projects/" + urllib.parse.quote(project_id, safe=""),
-            not_found_is_none=True,
+        from galileo.config import GalileoPythonConfig
+        from galileo.resources.api.projects import delete_project_projects_project_id_delete
+    except ImportError as exc:
+        raise RuntimeError("Galileo generated project-delete API is unavailable") from exc
+    response = delete_project_projects_project_id_delete.sync_detailed(
+        project_id=project_id,
+        client=GalileoPythonConfig.get().api_client,
+    )
+    status_code = int(getattr(response, "status_code", 0))
+    if status_code != 200:
+        raise RuntimeError(
+            f"Galileo generated project deletion returned HTTP {status_code} for exact project ID"
         )
-        source = "documented_rest_fallback"
     if _get_project_rest(project_id=project_id) is not None:
         raise RuntimeError(f"Exact project ID {project_id} still exists after deletion")
-    return source
+    return "generated_project_delete_api"
 
 
 def call_dataset_project_scoped(
@@ -1545,7 +1550,6 @@ def cleanup_created_objects(
         }
 
     from galileo.datasets import delete_dataset, get_dataset
-    from galileo.projects import delete_project
     from galileo.prompts import delete_prompt, get_prompt
 
     def get_dataset_for_cleanup(object_id: str, project_id: str) -> tuple[Any, str]:
@@ -1627,7 +1631,7 @@ def cleanup_created_objects(
         if entry["kind"] != "project":
             continue
         project_id = str(entry["id"])
-        deletion_source = delete_project_compat(delete_project, project_id=project_id)
+        deletion_source = delete_project_compat(project_id=project_id)
         project_cleanup_status = (
             "already_absent_verified"
             if deletion_source == "already_absent_verified"

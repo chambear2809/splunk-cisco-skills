@@ -4,8 +4,10 @@ description: "Use when the user asks to install, configure, prepare, or validate
   validate InfoSec App for Splunk readiness, including package delivery, prerequisite security data-source
   checklist, dashboard and macro checks, CIM/data-model prerequisites, Cloud IDM support-request notes,
   Lookup Editor dependency, and validation SPL."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

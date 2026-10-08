@@ -1,0 +1,34 @@
+{
+  "assessment_date": "2026-10-07",
+  "enterprise_version": "10.6.0.5",
+  "target": "Existing isolated standalone lab; custom Debian-derived host",
+  "qualification": "Web HTTPS only; REST, HEC, forwarding and mutual TLS policy are separate qualifications",
+  "certificate_workflow": {
+    "private_ca": "Generated root, intermediate and server leaf with corrected skill scripts",
+    "validation": "OpenSSL strict chain verification passed",
+    "web_readback": "New CA verified HTTPS response 303 after restart",
+    "private_material": "Protected files retained outside repository; root CA private key was not transferred"
+  },
+  "post_restart": {
+    "management_health": "green",
+    "kv_status": "ready",
+    "retained_index_canaries": 2
+  },
+  "hec_token_rotation": {
+    "old_token_status": 403,
+    "new_token_status": 200,
+    "new_ingest_and_search_count": 3,
+    "qualification": "Token replacement verified after a diagnostic exposure; no active token is included in published evidence"
+  },
+  "remaining": [
+    "REST and HEC certificate replacement",
+    "Forwarding TLS",
+    "Mutual TLS",
+    "Distributed certificate delivery"
+  ],
+  "tests": {
+    "pki_regressions_passed": 54,
+    "latest_combined_live_fix_tests_passed": 72,
+    "latest_combined_subtests_passed": 81
+  }
+}

@@ -266,15 +266,63 @@ if [[ -n "${sourcetype_breakdown}" ]]; then
     printf '%s\n' "${sourcetype_breakdown}"
 fi
 
+validate_package_owned_views() {
+    # The namespaced endpoint may include inherited/global views. Completion
+    # requires the exact package-owned views shipped by this TA, with a valid
+    # app ACL and view content record; a large total count is not evidence.
+    splunk_curl "${SK}" \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+        | python3 -c '
+import json
+import sys
+
+expected = {
+    "audit_log", "configuration", "dashboard", "events", "home",
+    "ingestion_statistics", "inputs", "license_usage", "status",
+    "troubleshooting",
+}
+try:
+    payload = json.load(sys.stdin)
+    entries = payload.get("entry", []) if isinstance(payload, dict) else []
+except Exception:
+    entries = []
+
+owned = set()
+invalid = 0
+visible_navigable = set()
+for entry in entries:
+    if not isinstance(entry, dict):
+        continue
+    name = entry.get("name")
+    acl = entry.get("acl")
+    content = entry.get("content")
+    if name not in expected or not isinstance(acl, dict) or acl.get("app") != "Splunk_TA_AppDynamics":
+        continue
+    if not isinstance(content, dict):
+        invalid += 1
+        continue
+    visible = content.get("is_visible", content.get("isVisible", True))
+    if str(visible).lower() in {"false", "0", "no"} and name != "home":
+        invalid += 1
+        continue
+    owned.add(name)
+    if name != "home":
+        visible_navigable.add(name)
+missing = sorted(expected - owned)
+missing_text = ",".join(missing)
+expected_visible_count = len(expected - {"home"})
+print(f"{len(owned)}|{len(expected)}|{len(visible_navigable)}|{expected_visible_count}|{missing_text}|{invalid}")
+' 2>/dev/null || echo "0|10|0|9|all|1"
+}
+
 log ""
 log "--- Built-in Views ---"
 if ${APP_INSTALLED}; then
-    view_count=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
-        | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("entry", [])))' 2>/dev/null || echo "0")
-    if [[ "${view_count}" -gt 0 ]]; then
-        pass "Built-in views are visible: ${view_count}"
+    IFS='|' read -r owned_view_count expected_view_count visible_view_count expected_visible_count missing_views invalid_views <<< "$(validate_package_owned_views)"
+    if [[ "${owned_view_count}" == "${expected_view_count}" && "${visible_view_count}" == "${expected_visible_count}" && -z "${missing_views}" && "${invalid_views}" == "0" ]]; then
+        pass "Package-owned shipped views present: ${owned_view_count}/${expected_view_count}; navigable visible=${visible_view_count}/${expected_visible_count}"
     else
-        completion_issue "No built-in dashboard views are visible for ${APP_NAME}"
+        completion_issue "Package-owned shipped views incomplete: ${owned_view_count:-0}/${expected_view_count:-10}; navigable visible=${visible_view_count:-0}/${expected_visible_count:-9}; missing=${missing_views:-unknown}; invalid=${invalid_views:-unknown}"
     fi
 else
     warn "Built-in views are unavailable until ${APP_NAME} is installed"

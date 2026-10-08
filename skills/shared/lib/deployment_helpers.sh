@@ -421,10 +421,10 @@ deployment_apply_profile_globals() {
     local explicit_endpoint=false explicit_status=0
     local ssh_policy=preserve ssh_port_policy=preserve resolve_policy=preserve
     local -a reset_keys=(
-        SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
+        SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP SPLUNK_SSH_AUTH_METHOD
     )
     local -a keys=(
-        SPLUNK_USER SPLUNK_PASS SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_REMOTE_TMPDIR SPLUNK_REMOTE_SUDO
+        SPLUNK_USER SPLUNK_PASS SPLUNK_SSH_USER SPLUNK_SSH_PASS SPLUNK_SSH_AUTH_METHOD SPLUNK_REMOTE_TMPDIR SPLUNK_REMOTE_SUDO
         SPLUNK_TARGET_ROLE SPLUNK_HEC_URL SPLUNK_ALLOW_INSECURE_HTTP
     )
     local -a values=()
@@ -478,12 +478,29 @@ deployment_apply_profile_globals() {
         ssh_host="${SPLUNK_SSH_HOST:-}"
     fi
 
-    for key in "${keys[@]}"; do
-        if ! value="$(deployment_profile_value "${profile_name}" "${key}")"; then
+    # Resolve this operation's profile once; do not persist parsed credentials
+    # across operations or bypass the reader's before/after snapshot checks.
+    local profile_output="" parsed_key parsed_value selected_value
+    if [[ -n "${profile_name}" ]]; then
+        profile_output="$(_credential_temp_file "${TMPDIR:-/tmp}/splunk-deployment-profile.XXXXXX")" || return 1
+        if ! _read_credential_file_entries "${_CRED_FILE}" "${profile_name}" >"${profile_output}"; then
+            rm -f "${profile_output}"
             return 1
         fi
-        values+=("${value}")
+    fi
+    for key in "${keys[@]}"; do
+        selected_value=""
+        if [[ -n "${profile_output}" ]]; then
+            while IFS= read -r -d '' parsed_key && IFS= read -r -d '' parsed_value; do
+                if [[ "${parsed_key}" == "${key}" ]]; then
+                    selected_value="${parsed_value}"
+                    break
+                fi
+            done <"${profile_output}"
+        fi
+        values+=("${selected_value:-${!key-}}")
     done
+    [[ -z "${profile_output}" ]] || rm -f "${profile_output}"
 
     if [[ -n "${profile_name}" ]]; then
         for key in "${reset_keys[@]}"; do

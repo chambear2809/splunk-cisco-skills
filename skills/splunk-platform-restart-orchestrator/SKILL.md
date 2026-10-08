@@ -5,8 +5,10 @@ description: "Use when the user asks to restart Splunk, avoid unnecessary restar
   or validate that a Splunk app/config change has been activated. Plan, validate, audit, and safely
   execute Splunk Platform restarts and reloads across Splunk Enterprise, Splunk Cloud, systemd-managed
   hosts, deployment servers, indexer clusters, and search head clusters."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

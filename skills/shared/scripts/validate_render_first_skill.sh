@@ -174,13 +174,36 @@ if [[ "${LIVE}" == "true" ]]; then
                 warn "App not found: ${APP_NAME}"
             fi
             if [[ "${REQUIRE_DASHBOARD}" == "true" ]]; then
-                dashboard_count="$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/-/${APP_NAME}/data/ui/views?count=0&output_mode=json" 2>/dev/null | python3 -c '
+                view_payload="$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/-/${APP_NAME}/data/ui/views?count=0&output_mode=json" 2>/dev/null || true)"
+                dashboard_count="$(printf '%s' "${view_payload}" | python3 -c '
 import json, sys
+app = sys.argv[1]
 try:
-    print(len(json.load(sys.stdin).get("entry") or []), end="")
+    payload = json.load(sys.stdin)
+    entries = payload.get("entry")
+    if not isinstance(entries, list):
+        print("INVALID", end="")
+        raise SystemExit
+    owned = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        content = entry.get("content")
+        if not isinstance(content, dict):
+            continue
+        acl_apps = []
+        if "eai:acl.app" in content:
+            acl_apps.append(content.get("eai:acl.app"))
+        if isinstance(content.get("eai:acl"), dict) and "app" in content["eai:acl"]:
+            acl_apps.append(content["eai:acl"].get("app"))
+        if isinstance(entry.get("acl"), dict) and "app" in entry["acl"]:
+            acl_apps.append(entry["acl"].get("app"))
+        if acl_apps and all(acl_app == app for acl_app in acl_apps):
+            owned += 1
+    print(owned, end="")
 except Exception:
-    print("0", end="")
-' || echo 0)"
+    print("INVALID", end="")
+' "${APP_NAME}")"
                 if [[ "${dashboard_count}" =~ ^[0-9]+$ && "${dashboard_count}" -gt 0 ]]; then
                     pass "App-owned views found: ${APP_NAME} (${dashboard_count})"
                 else

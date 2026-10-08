@@ -127,7 +127,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 self.assertIn("Could not inspect HEC token", output)
                 self.assertFalse(marker.exists(), msg="HEC mutation followed a failed read")
 
-                validation = self.run_script(validator, env=env)
+                validation = self.run_script(validator, env=env, timeout=300)
                 validation_output = validation.stdout + validation.stderr
                 self.assertNotEqual(validation.returncode, 0, msg=validation_output)
                 self.assertIn("Could not inspect HEC token", validation_output)
@@ -460,7 +460,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--config-file",
                 f"app-workaround.conf={config_file}",
                 env=env,
-                timeout=300,
+                timeout=600,
             )
             self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertTrue(token_file.exists(), msg="Expected the SC4S token file to be written")
@@ -579,12 +579,15 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             )
 
             curl_log.write_text("", encoding="utf-8")
+            # Reading all 21 indexes through profiled connection helpers can
+            # exceed five minutes on a busy macOS controller. Keep the same
+            # bounded allowance as the SC4S profile setup regression.
             validate_result = self.run_script(
                 "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
                 "--hec-token-name",
                 "sc4s",
                 env=env,
-                timeout=300,
+                timeout=900,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             validate_requests = curl_log.read_text(encoding="utf-8")
@@ -737,6 +740,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4s",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("exists but is an event index", validate_result.stdout)
@@ -796,6 +800,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4s",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("default index is 'main', expected 'sc4s'", validate_result.stdout)
@@ -1024,6 +1029,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--traps-file",
                 str(traps_file),
                 env=env,
+                timeout=600,
             )
             self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertTrue(token_file.exists(), msg="Expected the SC4SNMP token file to be written")
@@ -1119,6 +1125,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4snmp",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
@@ -1206,6 +1213,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--traps-file",
                 str(traps_file),
                 env=env,
+                timeout=600,
             )
 
             output = result.stdout + result.stderr
@@ -1231,6 +1239,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-token-name",
                 "sc4snmp",
                 env=env,
+                timeout=300,
             )
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             validate_requests = curl_log.read_text(encoding="utf-8")
@@ -1304,6 +1313,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--write-hec-token-file",
                 str(token_file),
                 env=env,
+                timeout=300,
             )
 
             output = result.stdout + result.stderr

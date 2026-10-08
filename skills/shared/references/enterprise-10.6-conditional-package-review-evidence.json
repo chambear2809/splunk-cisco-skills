@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-10-08",
+  "result": "Exact-pin Enterprise 10.6 vendor qualification remains unresolved; this is not a finding that the code cannot run.",
+  "workflows": {
+    "cisco-secure-access-setup": {
+      "selected_app_id": "7569",
+      "selected_release": "1.0.53",
+      "reviewed_current_release": "1.0.55",
+      "current_release_lists_10_6": false,
+      "exact_selected_release_supports_10_6_in_registry": false,
+      "selected_archive_identity_and_hash": "not established by this review",
+      "source": "https://splunkbase.splunk.com/app/7569",
+      "impact": "Paired 5558 app cannot qualify the selected companion add-on.",
+      "owner": "Cisco Secure Access add-on maintainer",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 1.0.53, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "access_qualification": "Runtime/API access and package download availability are independent prerequisites; this review does not label them unavailable."
+    },
+    "splunk-github-ta-setup": {
+      "selected_app_id": "6254",
+      "selected_release": "4.0.0",
+      "reviewed_current_release": "4.0.1",
+      "current_release_lists_10_6": false,
+      "exact_selected_release_supports_10_6_in_registry": false,
+      "selected_archive_identity_and_hash": "not established by this review",
+      "source": "https://splunkbase.splunk.com/app/6254",
+      "impact": "Available source access does not supply exact release compatibility evidence.",
+      "owner": "Splunk GitHub add-on maintainer",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 4.0.0, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "access_qualification": "Runtime/API access and package download availability are independent prerequisites; this review does not label them unavailable."
+    },
+    "splunk-cyberark-ta-setup": {
+      "selected_app_id": "5160",
+      "selected_release": "5.0.0",
+      "reviewed_current_release": "5.0.1",
+      "current_release_lists_10_6": false,
+      "exact_selected_release_supports_10_6_in_registry": false,
+      "selected_archive_identity_and_hash": "not established by this review",
+      "source": "https://splunkbase.splunk.com/app/5160",
+      "impact": "Supported secondary package 2891 cannot qualify the selected EPM API add-on.",
+      "owner": "Splunk CyberArk EPM add-on maintainer",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 5.0.0, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "access_qualification": "Runtime/API access and package download availability are independent prerequisites; this review does not label them unavailable."
+    },
+    "splunk-connect-for-otlp-setup": {
+      "selected_app_id": "8704",
+      "selected_release": "0.4.1",
+      "reviewed_current_release": "0.161.0",
+      "current_release_lists_10_6": false,
+      "exact_selected_release_supports_10_6_in_registry": false,
+      "selected_archive_identity_and_hash": "not established by this review",
+      "source": "https://splunkbase.splunk.com/app/8704",
+      "impact": "Self-managed deployment is applicable; managed Cloud installation is a separate unsupported path.",
+      "owner": "Splunk Connect for OTLP maintainer",
+      "next_action": "Obtain a primary vendor statement for Enterprise 10.6 on selected release 0.4.1, or review a separately qualified release and its archive identity/checksum before changing the pin. Then run configured ingest and shipped-dashboard/no-dashboard completion checks.",
+      "access_qualification": "Runtime/API access and package download availability are independent prerequisites; this review does not label them unavailable."
+    }
+  }
+}

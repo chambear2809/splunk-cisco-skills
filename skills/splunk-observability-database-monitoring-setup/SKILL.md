@@ -9,6 +9,8 @@ description: "Use when handling DBMon receiver setup, database query analysis, e
   DBMon query AI Assistant readiness."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   runtime_requirements: "Requires Bash and Python 3. For copied-skill use, install PyYAML; live and apply modes additionally require the documented kubectl, Helm, yq, Docker, or Podman tools."
   splunk_cloud_10_5: "not-applicable"
   collector_release: "0.158.0"

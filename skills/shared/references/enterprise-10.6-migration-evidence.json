@@ -1,0 +1,53 @@
+{
+  "after_upgrade": {
+    "cohosted_status": "ready",
+    "collection_count": 30,
+    "fixture_key": "legacy-row-1",
+    "fixture_marker": "legacy_parallel_fixture",
+    "fixture_value": "10.4.3",
+    "kv_status": "ready",
+    "migration_status": "Migration_Succeeded",
+    "row_count": 1,
+    "version": "10.6.0.5"
+  },
+  "before": {
+    "collection_count": 22,
+    "fixture_key": "legacy-row-1",
+    "fixture_marker": "legacy_parallel_fixture",
+    "fixture_value": "10.4.3",
+    "kv_status": "ready",
+    "migration_status": "NotStarted",
+    "row_count": 1,
+    "version": "10.4.3"
+  },
+  "captured_at_epoch": 1791390824,
+  "count_increase_explanation": "Aggregate collections increased22 to30. Controlled collection and lookup definitions were preserved. The additional8 definitions were not individually captured before upgrade, so their identity/origin is unverified.",
+  "definition_readback": {
+    "old_app_path": "/opt/splunk-before-restore/etc/apps/lab106_validation/local/collections.conf",
+    "old_collection_stanza": "legacy_parallel_validation",
+    "old_lookup_stanza": "legacy_parallel_lookup",
+    "post_restart_collection_present": true,
+    "post_restart_lookup_present": true
+  },
+  "hec_canary": {
+    "action": "Not tested in this follow-up; HEC inputs are unconfigured. Fresh supported-OS HEC workflow is in progress separately.",
+    "http_input_count": 0,
+    "supported": "not-tested"
+  },
+  "limitations": [
+    "Root separately restored the full cold10.4.3 archive before this upgrade and verified the fixture; this follow-up tests migration and restart only.",
+    "Raw KV rows were not stored; only the synthetic fixture identity/value and counts were recorded.",
+    "The eight added system collections were not individually attributed because the pre-upgrade snapshot supplied only its total count."
+  ],
+  "restart_reprobe": {
+    "cohosted_status": "ready",
+    "collection_count": 30,
+    "fixture_retained": true,
+    "kv_status": "ready",
+    "migration_status": "NotStarted",
+    "row_count": 1,
+    "service_restarted": true,
+    "version": "10.6.0.5"
+  },
+  "target": "disposable Ubuntu 10.4.3 -> 10.6.0.5 /opt/splunk"
+}

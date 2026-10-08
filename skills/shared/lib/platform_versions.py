@@ -115,10 +115,10 @@ def platform_minor_train(value: str) -> str:
     corresponding ``10.4`` train.
     """
 
-    match = re.fullmatch(r"\s*(\d+)\.(\d+)(?:\.\d+)?\s*", value or "")
+    match = re.fullmatch(r"\s*(\d+)\.(\d+)(?:\.\d+){0,2}\s*", value or "")
     if not match:
         raise ValueError(
-            f"invalid Splunk platform version {value!r}; expected MAJOR.MINOR or MAJOR.MINOR.PATCH"
+            f"invalid Splunk platform version {value!r}; expected MAJOR.MINOR, MAJOR.MINOR.PATCH, or MAJOR.MINOR.MAINTENANCE.PATCH"
         )
     return f"{int(match.group(1))}.{int(match.group(2))}"
 

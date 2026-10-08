@@ -1673,6 +1673,57 @@ if (
 PY
 }
 
+hbs_ssh_auth_mode() {
+    case "${SPLUNK_SSH_AUTH_METHOD:-password}" in
+        password|key) printf '%s' "${SPLUNK_SSH_AUTH_METHOD:-password}" ;;
+        *)
+            echo "ERROR: SPLUNK_SSH_AUTH_METHOD must be password or key." >&2
+            return 1
+            ;;
+    esac
+}
+
+hbs_ssh_prepare_trust() {
+    local auth_mode
+    auth_mode="$(hbs_ssh_auth_mode)" || return 1
+    if [[ "${auth_mode}" == "password" ]]; then
+        hbs_prepare_ssh_trust true
+    else
+        hbs_prepare_ssh_trust false
+    fi
+}
+
+hbs_ssh_check_client() {
+    local utility="${1:-ssh}" auth_mode
+    auth_mode="$(hbs_ssh_auth_mode)" || return 1
+    if [[ "${auth_mode}" == "password" ]] && ! command -v sshpass >/dev/null 2>&1; then
+        echo "ERROR: sshpass is required for password-based SSH bootstrap mode." >&2
+        return 1
+    fi
+    if ! command -v "${utility}" >/dev/null 2>&1; then
+        echo "ERROR: ${utility} is required for SSH bootstrap mode." >&2
+        return 1
+    fi
+}
+
+hbs_ssh_execute() {
+    local utility="${1:-ssh}" auth_mode
+    shift || true
+    auth_mode="$(hbs_ssh_auth_mode)" || return 1
+
+    if [[ "${auth_mode}" == "password" ]]; then
+        env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 "${utility}" \
+            -o PubkeyAuthentication=no \
+            -o PreferredAuthentications=password \
+            -o NumberOfPasswordPrompts=1 \
+            "$@" 3<<<"${SPLUNK_SSH_PASS}"
+    elif [[ "${utility}" == "ssh" ]]; then
+        ssh -o BatchMode=yes -o PreferredAuthentications=publickey "$@"
+    else
+        scp -o BatchMode=yes -o PreferredAuthentications=publickey "$@"
+    fi
+}
+
 hbs_run_target_cmd() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
@@ -1684,24 +1735,18 @@ hbs_run_target_cmd() {
     fi
 
     hbs_load_ssh_for_execution "${execution_mode}" || return 1
-    if ! command -v sshpass >/dev/null 2>&1; then
-        echo "ERROR: sshpass is required for SSH bootstrap mode." >&2
-        return 1
-    fi
+    hbs_ssh_check_client ssh || return 1
 
-    hbs_prepare_ssh_trust || return 1
+    hbs_ssh_prepare_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
+    if hbs_ssh_execute ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
         ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        "${ssh_target}" "bash -lc ${quoted}"; then
         rc=0
     else
         rc=$?
@@ -1727,24 +1772,50 @@ hbs_run_target_cmd_with_stdin() {
     fi
 
     hbs_load_ssh_for_execution "${execution_mode}" || return 1
-    if ! command -v sshpass >/dev/null 2>&1; then
-        echo "ERROR: sshpass is required for SSH bootstrap mode." >&2
-        return 1
-    fi
+    hbs_ssh_check_client ssh || return 1
 
-    hbs_prepare_ssh_trust || return 1
+    hbs_ssh_prepare_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
+    if hbs_ssh_execute ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
         ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}" <<<"${stdin_content}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        "${ssh_target}" "bash -lc ${quoted}" <<<"${stdin_content}"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    hbs_cleanup_ssh_trust
+    return "${rc}"
+}
+
+hbs_capture_target_cmd_with_stdin() {
+    local execution_mode="${1:-local}"
+    local raw_cmd="${2:-}"
+    local stdin_content="${3:-}"
+    local quoted ssh_target rc
+
+    if [[ "${execution_mode}" == "local" ]]; then
+        printf '%s' "${stdin_content}" | bash -lc "${raw_cmd}"
+        return $?
+    fi
+
+    hbs_load_ssh_for_execution "${execution_mode}" || return 1
+    hbs_ssh_check_client ssh || return 1
+
+    hbs_ssh_prepare_trust || return 1
+    printf -v quoted '%q' "${raw_cmd}"
+    ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
+
+    if printf '%s' "${stdin_content}" | hbs_ssh_execute ssh \
+        -p "${SPLUNK_SSH_PORT}" \
+        -o ConnectTimeout=15 \
+        ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
+        -q \
+        "${ssh_target}" "bash -lc ${quoted}"; then
         rc=0
     else
         rc=$?
@@ -1764,24 +1835,18 @@ hbs_capture_target_cmd() {
     fi
 
     hbs_load_ssh_for_execution "${execution_mode}" || return 1
-    if ! command -v sshpass >/dev/null 2>&1; then
-        echo "ERROR: sshpass is required for SSH bootstrap mode." >&2
-        return 1
-    fi
+    hbs_ssh_check_client ssh || return 1
 
-    hbs_prepare_ssh_trust || return 1
+    hbs_ssh_prepare_trust || return 1
     printf -v quoted '%q' "${raw_cmd}"
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
 
-    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 ssh \
+    if hbs_ssh_execute ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
         ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${ssh_target}" "bash -lc ${quoted}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        "${ssh_target}" "bash -lc ${quoted}"; then
         rc=0
     else
         rc=$?
@@ -1802,10 +1867,8 @@ hbs_stage_file_for_execution() {
     fi
 
     hbs_load_ssh_for_execution "${execution_mode}" || return 1
-    if ! command -v sshpass >/dev/null 2>&1; then
-        echo "ERROR: sshpass is required for SSH bootstrap mode." >&2
-        return 1
-    fi
+    hbs_ssh_check_client ssh || return 1
+    hbs_ssh_check_client scp || return 1
 
     remote_dir="${SPLUNK_REMOTE_TMPDIR:-/tmp}"
     resolved_remote_name="${remote_name:-$(basename "${local_path}")}"
@@ -1824,22 +1887,19 @@ hbs_stage_file_for_execution() {
         hbs_run_target_cmd "${execution_mode}" "$(hbs_prefix_with_sudo "${execution_mode}" "$(hbs_shell_join mkdir -p "${remote_dir}")")" >/dev/null
     fi
 
-    hbs_prepare_ssh_trust || return 1
+    hbs_ssh_prepare_trust || return 1
     ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
     scp_target="${ssh_target}:${upload_path}"
     if [[ "${SPLUNK_SSH_HOST}" == *:* ]]; then
         scp_target="${SPLUNK_SSH_USER}@[${SPLUNK_SSH_HOST}]:${upload_path}"
     fi
 
-    if env -u SPLUNK_SSH_PASS -u SSHPASS sshpass -d 3 scp \
+    if hbs_ssh_execute scp \
         -P "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
         ${HBS_SSH_TRUST_ARGS[@]+"${HBS_SSH_TRUST_ARGS[@]}"} \
-        -o PubkeyAuthentication=no \
-        -o PreferredAuthentications=password \
-        -o NumberOfPasswordPrompts=1 \
         -q \
-        "${local_path}" "${scp_target}" 3<<<"${SPLUNK_SSH_PASS}"; then
+        "${local_path}" "${scp_target}"; then
         rc=0
     else
         rc=$?

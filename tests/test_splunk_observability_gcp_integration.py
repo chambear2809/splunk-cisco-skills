@@ -2292,6 +2292,7 @@ with lock('us1', value):
     def test_plan_exact_name_parent_mode_and_fresh_plan_identity(self, tmp_path):
         parent = tmp_path / "review-parent"
         parent.mkdir(mode=0o755)
+        parent.chmod(0o755)
         before_mode = parent.stat().st_mode & 0o777
         first, first_hash = _gcp_plan(
             self.api, parent, integration_name="token=production"

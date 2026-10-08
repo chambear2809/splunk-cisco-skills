@@ -38,7 +38,7 @@ EVIDENCE_SCOPE = (
 )
 SOURCE_VERIFIED_STATUS = "source-verified-current-release-api"
 HISTORICAL_ONLY_STATUS = "historical-review-only-not-currently-reproducible"
-TARGET_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+)?$")
+TARGET_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+){0,2}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 NEXT_DATA_RE = re.compile(
     rb'<script[^>]*id="__NEXT_DATA__"[^>]*>(?P<payload>.*?)</script>',
@@ -91,7 +91,7 @@ def normalize_compatibility_target(value: str) -> str:
     match = TARGET_RE.fullmatch(str(value).strip())
     if not match:
         raise argparse.ArgumentTypeError(
-            "target Splunk version must use MAJOR.MINOR or MAJOR.MINOR.PATCH"
+            "target Splunk version must use two, three, or four numeric segments"
         )
     return f"{match.group(1)}.{match.group(2)}"
 

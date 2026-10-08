@@ -454,7 +454,9 @@ build_body() {
     case "${OBJECT_KIND}" in
         savedsearch)
             BODY=$(form_urlencode_pairs search "${SEARCH}")
-            [[ "${IS_SCHEDULED}" == "true" ]] && BODY="${BODY}&$(form_urlencode_pairs enableSched 1)"
+            # Splunk Enterprise 10.6's saved-search REST handler accepts
+            # is_scheduled; enableSched is a conf-file key and is rejected here.
+            [[ "${IS_SCHEDULED}" == "true" ]] && BODY="${BODY}&$(form_urlencode_pairs is_scheduled 1)"
             [[ -n "${CRON_SCHEDULE}" ]] && BODY="${BODY}&$(form_urlencode_pairs cron_schedule "${CRON_SCHEDULE}")"
             [[ -n "${DISPATCH_EARLIEST_TIME}" ]] && BODY="${BODY}&$(form_urlencode_pairs dispatch.earliest_time "${DISPATCH_EARLIEST_TIME}")"
             [[ -n "${DISPATCH_LATEST_TIME}" ]] && BODY="${BODY}&$(form_urlencode_pairs dispatch.latest_time "${DISPATCH_LATEST_TIME}")"

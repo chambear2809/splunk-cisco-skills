@@ -1,0 +1,134 @@
+{
+  "target": {
+    "host": "https://localhost:28089",
+    "secondary_runtime": "/opt/splunk-10.6-lab-core-20261005",
+    "app": "lab106_validation"
+  },
+  "render_checks": {
+    "knowledge_objects_validate": "passed",
+    "dashboard_studio_validate": "passed"
+  },
+  "objects": [
+    {
+      "kind": "macro",
+      "name": "lab106_validation_macro",
+      "definition": "index=lab106",
+      "sharing": "app",
+      "owner": "nobody",
+      "read_roles": [
+        "admin"
+      ],
+      "write_roles": []
+    },
+    {
+      "kind": "savedsearch",
+      "name": "lab106_validation_disabled_search",
+      "search": "index=lab106 | stats count",
+      "is_scheduled": false,
+      "sharing": "app",
+      "owner": "nobody",
+      "read_roles": [
+        "admin"
+      ],
+      "write_roles": []
+    },
+    {
+      "kind": "lookup",
+      "name": "lab106_validation_lookup",
+      "lookup_type": "csv",
+      "filename": "lab106_validation_lookup.csv",
+      "fields_list": "_key, host",
+      "sharing": "app",
+      "owner": "nobody",
+      "read_roles": [
+        "admin"
+      ],
+      "write_roles": []
+    },
+    {
+      "kind": "dashboard_studio",
+      "name": "lab106_validation_dashboard",
+      "query": "index=lab106 | stats count",
+      "sharing": "app",
+      "owner": "nobody",
+      "read_roles": [
+        "admin"
+      ],
+      "write_roles": []
+    }
+  ],
+  "live_readback": {
+    "macro": "passed",
+    "savedsearch": "passed",
+    "lookup": "passed",
+    "dashboard_studio": "passed",
+    "acl_readback": "passed"
+  },
+  "searches": {
+    "index_lab106_count": "2",
+    "dashboard_query": "2",
+    "macro_expansion": "2"
+  },
+  "read_only_inventory": {
+    "server_version": "10.6.0.5",
+    "license_pools": 3,
+    "lab106_validation_views": 36,
+    "dmc_views": "404/inaccessible",
+    "sample_app_views": "404/inaccessible"
+  },
+  "commands_redacted": [
+    "python3 lab_client.py GET /services/server/info?output_mode=json",
+    "python3 lab_client.py POST /servicesNS/nobody/lab106_validation/{configs/conf-macros,saved/searches,data/transforms/lookups,data/ui/views}",
+    "python3 lab_client.py POST .../{object}/acl",
+    "python3 lab_client.py POST /services/search/jobs/export (search=..., session authorization redacted)"
+  ],
+  "cleanup_identities": [
+    "lab106_validation_macro",
+    "lab106_validation_disabled_search",
+    "lab106_validation_lookup",
+    "lab106_validation_dashboard"
+  ],
+  "limitations": [
+    "Synthetic lab106 events qualify selected macro, disabled saved-search, CSV lookup and Dashboard Studio workflows; optional object kinds remain untested."
+  ],
+  "defects_fixed": [
+    "Wildcard read role accepted safely as literal *",
+    "Saved-search apply sends is_scheduled=1; no enableSched REST parameter"
+  ],
+  "script_owned_apply": {
+    "macro": "passed",
+    "savedsearch_disabled": "passed",
+    "lookup_definition": "passed",
+    "dashboard_studio": "passed",
+    "status_readback_all": "passed"
+  },
+  "lookup_validation": {
+    "method": "search export outputlookup/inputlookup in approved lab",
+    "sample_rows_written": 1,
+    "inputlookup_count": "1"
+  },
+  "macro_validation": {
+    "namespace": "/servicesNS/nobody/lab106_validation/search/jobs/export",
+    "query": "| search `lab106_validation_macro` | stats count",
+    "count": "2"
+  },
+  "dashboard_validation": {
+    "view_readback": "passed",
+    "query": "index=lab106 | stats count",
+    "count": "2",
+    "browser": {
+      "status": "pass",
+      "date": "2026-10-07",
+      "time_range": "Last30days",
+      "visualization": "singlevalue2",
+      "screenshot": "skills/shared/references/enterprise-10.6-dashboard-browser.png"
+    }
+  },
+  "captured_date": "2026-10-07",
+  "post_restart": {
+    "object_readback": "macro/savedsearch/lookup/dashboard present",
+    "macro_count": 2,
+    "lookup_count": 1,
+    "dashboard_count": 2
+  }
+}

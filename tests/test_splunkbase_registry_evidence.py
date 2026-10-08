@@ -66,9 +66,9 @@ def test_evidence_marks_only_non_reproducible_reviewed_pins_as_historical() -> N
         == module.HISTORICAL_ONLY_STATUS
     }
 
-    # Every reviewed pin now resolves to a currently downloadable release, so no
-    # entry may claim the historical-only status. Registry and evidence must agree.
-    assert historical_ids == evidence_historical_ids == set()
+    # A missing exact release record is historical-only; never substitute the
+    # current public release for the reviewed package pin.
+    assert historical_ids == evidence_historical_ids
     assert all(
         item["verified_release"]["source_status"]
         in {module.SOURCE_VERIFIED_STATUS, module.HISTORICAL_ONLY_STATUS}

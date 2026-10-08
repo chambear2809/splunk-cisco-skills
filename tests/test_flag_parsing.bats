@@ -198,12 +198,25 @@ teardown() {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/setup.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" =~ "Splunk Enterprise Host Setup" ]]
+    [[ "$output" =~ "--web-port PORT" ]]
+    [[ "$output" =~ "--appserver-port PORT" ]]
+    [[ "$output" =~ "--kvstore-port PORT" ]]
+    [[ "$output" =~ "--ipc-broker-port PORT" ]]
+    [[ "$output" =~ "--postgres-port PORT" ]]
+    [[ "$output" =~ "--postgres-primary-port PORT" ]]
+    [[ "$output" =~ "--postgres-replica-port PORT" ]]
+    [[ "$output" =~ "--postgres-patroni-port PORT" ]]
+    [[ "$output" =~ "--postgres-pgbouncer-port PORT" ]]
+    [[ "$output" =~ "--postgres-nanny-port PORT" ]]
+    [[ "$output" =~ "--nascent-etcd-peer-port PORT" ]]
+    [[ "$output" =~ "--nascent-etcd-client-port PORT" ]]
 }
 
 @test "enterprise host validate --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/validate.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" =~ "Splunk Enterprise Host Validation" ]]
+    [[ "$output" =~ "--mgmt-port PORT" ]]
 }
 
 @test "enterprise kubernetes setup --help exits 0" {

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T06:38:42.556813+00:00",
+  "status": "pass",
+  "selected_workflow": "External Linux agent: official installer, host metrics, OTLP synthetic trace, restart and uninstall",
+  "environment": {
+    "os": "Ubuntu 24.04 x86_64",
+    "enterprise_version_on_host": "10.6.0.5",
+    "collector_version": "0.158.0",
+    "realm": "us1",
+    "instrumentation": "disabled",
+    "discovery": "disabled",
+    "obi": "disabled",
+    "receivers": "loopback only",
+    "memory_mib": 512
+  },
+  "artifact": {
+    "installer_url": "https://raw.githubusercontent.com/signalfx/splunk-otel-collector/v0.158.0/packaging/installer/install.sh",
+    "installer_sha256": "cea51eefdf12a906e45db06ea0943931903df1328d9779a4dbfa7d17c0bb4b1b"
+  },
+  "functional": {
+    "owning_offline_validator": "pass",
+    "owning_installer": "pass",
+    "owning_live_validator": "pass",
+    "backend_host_metrics": [
+      "cpu.utilization",
+      "memory.utilization"
+    ],
+    "backend_metadata_and_recent_datapoints": "pass for exact owned host filter",
+    "local_otlp_accepted_spans": 1,
+    "exported_spans": 1,
+    "exported_metric_points_observed": 4756,
+    "export_queues_observed": 0,
+    "apm_segments_returned": 1,
+    "exact_segment_http": 200,
+    "correlated_spans": 1,
+    "service_name": "splunk106-otel-canary",
+    "operation_name": "splunk106.otel.canary",
+    "span_duration_microseconds": 10000,
+    "trace_id_sha256": "d2bf704f085a9ee0daa472fe7920b690b0aab72314889d035005a4afa05aaaf8",
+    "service_restart": "pass",
+    "metrics_after_restart": "recent CPU and memory datapoints with 30-second lookback"
+  },
+  "cleanup": {
+    "owning_uninstaller": "pass",
+    "service": "inactive",
+    "package": "absent",
+    "health_and_otlp_receivers": "closed",
+    "runtime_configuration": "absent",
+    "token_bearing_environment_files": "absent",
+    "owned_controller_token_copy": "deleted",
+    "persistent_user_token": "preserved",
+    "observability_telemetry": "synthetic metrics/trace remain under tenant retention; no dashboard/detector/token objects created",
+    "owned_package_repository_and_key": "deleted; birth timestamps match owned installer execution"
+  },
+  "qualifications": [
+    "External Collector workflow qualifies independently of Enterprise TA packaging or Platform pairing",
+    "APM latest initially returned404; documented segment inventory subsequently identified one segment and exact segment readback returned200",
+    "Original protected user token includes trailing line ending; untouched original preserved and owner-only temporary normalized copy used, then deleted",
+    "Splunkbase TA 0.158.0 lists versions through10.5; its Enterprise10.6 variant is not qualified by this Linux pass",
+    "No browser host/APM-view pass is claimed; product readback is authenticated backend API evidence"
+  ],
+  "sanitization": "No tokens, account/host identifiers, exact trace IDs or raw telemetry"
+}

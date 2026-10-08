@@ -3,6 +3,8 @@ name: galileo-on-prem-stack-setup
 description: "Inspect, render, connected-preflight, and observe a pinned Galileo On-Prem galileo-stack deployment on Kubernetes; produce secret-safe evidence and Galileo/CSE joint-session handoffs for every install, upgrade, rollback, uninstall, CRD, galileoctl, GPU, air-gap, and lab-bootstrap change. Use when planning reusable Galileo On-Prem Kubernetes deployment work without unattended mutation."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"
 ---

@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-08T01:54:59.584149+00:00",
+  "environment": {
+    "os": "Ubuntu 24.04 x86_64",
+    "enterprise_version": "10.6.0.5",
+    "topology": "One cluster manager and three native indexer peers",
+    "replication_factor": 3,
+    "search_factor": 2,
+    "tls_qualification": "Private isolated lab with self-signed REST certificates; certificate verification disabled for these initial native checks. This does not qualify PKI."
+  },
+  "bootstrap": {
+    "actual_owning_host_and_indexer_skills_executed": true,
+    "registered_peers": 3,
+    "source_defects_corrected": [
+      "Remote heredoc variable expansion",
+      "NUL check in generated Python secret guard",
+      "Splunk ownership of app parent directory"
+    ],
+    "health": {
+      "all_data_is_searchable": "1",
+      "all_peers_are_up": "1",
+      "cm_version_is_compatible": "1",
+      "no_fixup_tasks_in_progress": "1",
+      "ready_for_searchable_rolling_restart": "1",
+      "replication_factor_met": "1",
+      "search_factor_met": "1"
+    },
+    "manager": {
+      "indexing_ready_flag": true,
+      "initialized_flag": true,
+      "service_ready_flag": true,
+      "maintenance_mode": false
+    },
+    "peer_versions": [
+      "10.6.0.5",
+      "10.6.0.5",
+      "10.6.0.5"
+    ]
+  },
+  "bundle": {
+    "owned_test_index_delivered_to_all_three_peers": true,
+    "replication_mode": "auto",
+    "asynchronous_validation_initial_apply_rejected_by_server": true,
+    "apply_retry_after_validation_completed": true,
+    "structured_HTTP200_error_detection_corrected_in_repository": true
+  },
+  "remaining": [
+    "PKI qualification",
+    "Cleanup of temporary native topology"
+  ],
+  "status": "partial",
+  "search_head_cluster": {
+    "verified_at_utc": "2026-10-08T02:55:11.568587+00:00",
+    "members": 3,
+    "enterprise_version": "10.6.0.5",
+    "membership": "Up on all three members",
+    "cohosted_pdl_status": "ready on all three members",
+    "captain_service_ready": true,
+    "recovery": {
+      "initial_failure": "One PostgreSQL replica bootstrap stalled; other two members became ready.",
+      "manual_failed_member_stop_start_exit_code": 0,
+      "sole_postgresql_leader_restarted": false,
+      "captain_election_after_member_restart": true,
+      "qualification": "Original bootstrap recovery retained as historical evidence. Later app delivery, collection replication and searchable rolling restart passed with the separately recorded convergence delay."
+    },
+    "workflow_closure": {
+      "collected_at_utc": "2026-10-08T04:38:36Z",
+      "rolling_restart": {
+        "started": "04:23:15Z",
+        "closure_receipt": "04:37:52Z",
+        "observed_convergence_seconds": 877,
+        "member_pid_and_fixture_comparison": [
+          {
+            "role": "shc1",
+            "before_main_pid": "19925",
+            "after_main_pid": "22665",
+            "changed": true,
+            "kv_before": "ready",
+            "kv_after": "ready",
+            "records_before": 5,
+            "records_after": 5,
+            "definition_equal": true,
+            "view_equal": true
+          },
+          {
+            "role": "shc2",
+            "before_main_pid": "20546",
+            "after_main_pid": "23689",
+            "changed": true,
+            "kv_before": "ready",
+            "kv_after": "ready",
+            "records_before": 5,
+            "records_after": 5,
+            "definition_equal": true,
+            "view_equal": true
+          },
+          {
+            "role": "shc3",
+            "before_main_pid": "20090",
+            "after_main_pid": "22730",
+            "changed": true,
+            "kv_before": "ready",
+            "kv_after": "ready",
+            "records_before": 5,
+            "records_after": 5,
+            "definition_equal": true,
+            "view_equal": true
+          }
+        ]
+      },
+      "current_shc": {
+        "all_members_kv_current_ready": true,
+        "all_members_cohosted_pdl_ready": true,
+        "all_members_migrationStatus_NotStarted": true,
+        "captain_labels": [
+          "ip-172-31-30-232"
+        ],
+        "peer_statuses": "all Up",
+        "rolling_restart": "false",
+        "service_ready": "true"
+      },
+      "distributed_canary": {
+        "health": {
+          "all_data_is_searchable": "1",
+          "all_peers_are_up": "1",
+          "no_fixup_tasks_in_progress": "1",
+          "ready_for_searchable_rolling_restart": "1",
+          "replication_factor_met": "1",
+          "search_factor_met": "1"
+        },
+        "peer_versions": [
+          "10.6.0.5"
+        ],
+        "count": "20",
+        "min_sequence": "1",
+        "max_sequence": "20"
+      },
+      "qualification": "Post-restart closure is healthy and fixture/definitions match. The observed convergence delay and earlier transient PDL failures should remain documented; this is not evidence of zero-downtime availability during the restart."
+    },
+    "fixture_dashboard": {
+      "collected_at_utc": "2026-10-08T05:38:24.267506+00:00",
+      "browser_checked": true,
+      "search_completed": true,
+      "count": 20,
+      "min_sequence": 1,
+      "max_sequence": 20,
+      "target": "SHC2",
+      "tls_qualification": "Native default leaf chain verified by protected loopback bridge; hostname verification not qualified for native peers."
+    }
+  },
+  "searchable_rolling_restart": {
+    "status": "pass",
+    "verified_at_utc": "2026-10-08T03:32:30.227759+00:00",
+    "all_three_peer_processes_replaced": true,
+    "health": {
+      "all_data_is_searchable": "1",
+      "all_peers_are_up": "1",
+      "no_fixup_tasks_in_progress": "1",
+      "ready_for_searchable_rolling_restart": "1",
+      "replication_factor_met": "1",
+      "search_factor_met": "1"
+    },
+    "canary_count_before_during_after": 20,
+    "canary_min_sequence": 1,
+    "canary_max_sequence": 20,
+    "temporary_replication_factor_recovery_observed": true,
+    "repository_defects_corrected": [
+      "Generated operations load protected connection profile before authentication",
+      "Rolling restart uses documented restart handler with searchable=true",
+      "HTTP200 structured ERROR responses fail the operation"
+    ],
+    "official_source": "https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.6/manage-the-indexer-cluster/perform-a-rolling-restart-of-an-indexer-cluster"
+  },
+  "fixture_ingest_search": {
+    "owning_host_cli_auth_helper_executed": true,
+    "records": 20,
+    "distributed_search_head": "Native SHC member",
+    "distributed_peers_up": 3,
+    "search_errors": 0,
+    "temporary_auth_files_cleaned": true
+  },
+  "shc_bundle_configuration_incident": {
+    "observed_at_utc": "2026-10-08T03:40:59Z",
+    "qualification": "recovered_membership_and_bundle_delivery_remaining_workflow_gates",
+    "bundle_delivery_observed_on_all_three_members": true,
+    "removed_app_role_configuration": true,
+    "impact": "Member SHC configuration disappeared when deployer replaced member apps. Subsequent readiness and native CLI pre-deploy checks failed.",
+    "repository_defect": "SHC membership role settings were stored inside a removable local app.",
+    "correction": "Reviewed member role keys are durable in system/local/server.conf, preserving bootstrap id and unrelated settings. Targeted regressions and live app/collection/restart retention passed.",
+    "recovery_at_utc": "2026-10-08T04:10:02.801291+00:00",
+    "recovery_readback": {
+      "shc_members_up": 3,
+      "captain_service_ready": true,
+      "kvstore_current": "starting",
+      "cohosted_store": "failed"
+    },
+    "next_action": "Finish fixture dashboard browser check, PKI qualification and disposable topology cleanup.",
+    "owner": "Validation operator",
+    "cleanup_status": "Disposable native topology remains active for recovery and validation; primary and reusable standalone unchanged by this incident.",
+    "recovery_ready_at_utc": "2026-10-08T04:14:40Z",
+    "recovery_final_readback": {
+      "shc_members_up": 3,
+      "captain_service_ready": true,
+      "kvstore_current": "ready",
+      "cohosted_store": "ready"
+    },
+    "bundle_retry": {
+      "collected_at_utc": "2026-10-08T04:16:01.570592+00:00",
+      "exit_code": 0,
+      "local_and_target_authentication": "protected file with temporary CLI sessions cleaned after execution"
+    }
+  }
+}

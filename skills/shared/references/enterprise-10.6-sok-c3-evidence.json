@@ -1,0 +1,37 @@
+{
+  "last_verified": "2026-10-07",
+  "status": "partial",
+  "target": {
+    "kubernetes": "EKS 1.34.11",
+    "operator": "3.2.0",
+    "enterprise": "10.6.0.5",
+    "architecture": "C3",
+    "indexers": 3,
+    "search_heads": 3,
+    "license": "Existing NFR 50 GiB/day",
+    "storage": "encrypted gp3"
+  },
+  "workflow": {
+    "ready_conditions": "ClusterManager, IndexerCluster, SearchHeadCluster, MonitoringConsole Ready=True with matching observedGeneration",
+    "ingest_search": {
+      "before_replacement": 1,
+      "after_indexer_replacement": 1,
+      "after_search_head_replacement": 1
+    },
+    "kv_record_sha256": "ec52f980a462042094071001282a1928695eab65ee1952a36fd1c55fea2d601c",
+    "kv_persistence": "Same fixture hash before and after both sequential pod replacements",
+    "cluster_health": "All three indexers Up; replication and search factors met. All three SHC members Up; service ready.",
+    "app_delivery": "Reviewed private app delivered through deployer shcluster bundle; version 1.0, collection, lookup and saved search files present on all three SHC members. Authenticated search-head REST confirms app, collection, saved search, lookup and one lookup row.",
+    "monitoring_console": "Authenticated REST version 10.6.0.5; search returns one retained marker event",
+    "pod_replacement": "Indexer member 0 and SHC member 0 replaced sequentially; new pod UID, image and readiness verified",
+    "cleanup": "pass"
+  },
+  "transport": "CA verified over authenticated Kubernetes loopback port-forwards; default pod certificate hostname comparison disabled only for these forwards",
+  "limitations": [
+    "Remote AppFramework source delivery remains unvalidated.",
+    "POD coupled bundle requires separate qualification.",
+    "No performance, production scale or rolling upgrade claim."
+  ],
+  "cleanup": "Both Helm releases and owned namespace deleted; AWS query returned zero of the 21 recorded EBS volumes.",
+  "sanitization": "No secrets, license contents, endpoint identities or AWS resource IDs."
+}

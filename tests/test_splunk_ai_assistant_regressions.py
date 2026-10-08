@@ -25,10 +25,10 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
         reference_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/reference.md").read_text(encoding="utf-8")
 
         self.assertEqual(app["label"], "Splunk AI Assistant")
-        # 2.2.0 was downloaded, unpacked, and inspected, so the verified pin is the
-        # current public release and the skill must not advertise a review override.
+        # 2.2.0 was downloaded, unpacked, and inspected. The public release has since
+        # advanced, so retain the verified pin until the newer package is reviewed.
         self.assertEqual(app["latest_verified_version"], "2.2.0")
-        self.assertEqual(app["latest_release_version"], "2.2.0")
+        self.assertEqual(app["latest_release_version"], "2.3.3")
         self.assertEqual(app["min_splunk_version"], "9.3")
         self.assertIn("formerly", skill_text)
         self.assertIn("Splunk AI Assistant for SPL", skill_text)

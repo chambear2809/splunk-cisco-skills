@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-08T05:08:31.853254+00:00",
+  "status": "pass",
+  "environment": {
+    "enterprise_version": "10.6.0.5",
+    "os": "Ubuntu 24.04 x86_64",
+    "topology": "isolated standalone",
+    "rest_tls": "CA and hostname verified"
+  },
+  "package": {
+    "version": "8.5.0",
+    "sha256": "ed93ba614f12805ab428d71d45053ced12ce2ff1198b2f46b48537c0e0d6a412",
+    "bytes": 2230520,
+    "shipped_views": 4,
+    "view_paths": [
+      "Splunk_SA_CIM/default/data/ui/views/cim_setup.xml",
+      "Splunk_SA_CIM/default/data/ui/views/datamodel_audit.xml",
+      "Splunk_SA_CIM/default/data/ui/views/eventtype_tag_center.xml",
+      "Splunk_SA_CIM/default/data/ui/views/modaction_api_key.xml"
+    ]
+  },
+  "owning_workflow": {
+    "package_installer_exit_code": 0,
+    "cim_governance_apply_exit_code": 0,
+    "selected_model": "Authentication",
+    "index_constraint_applied": true,
+    "eventtype_and_authentication_tags_applied": true,
+    "acceleration": {
+      "earliest_time": "-1h",
+      "max_concurrent": 1,
+      "cron": "*/1 * * * *"
+    }
+  },
+  "live_data": {
+    "receiver_http_status": 200,
+    "indexed_events": 1,
+    "qualification": "Initial three JSON lines formed one multiline event. The observed indexed-event count, rather than submitted line count, is used for all results.",
+    "field_mapping": {
+      "user": "validation_user",
+      "action": "success"
+    },
+    "data_model_search_count": 1,
+    "tstats_count": 1,
+    "summaries_only_tstats_count": 1,
+    "search_errors": 0
+  },
+  "shipped_views": {
+    "cim_setup": "Browser shows configured Authentication model and fixture index restriction.",
+    "datamodel_audit": "Browser renders Authentication row, configured schedule and observed run duration. Tiny fixture size rounds to zero MB; complete range is not qualified from this view.",
+    "eventtype_tag_center": "Shipped page explicitly says deprecated.",
+    "modaction_api_key": "Adaptive Response API-key configuration surface; outside Authentication model fixture workflow."
+  },
+  "cleanup": {
+    "configuration_files_restored_exactly": 5,
+    "reload_http_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "owned_index_and_eventtype_absent": true,
+    "owned_index_data_directory_absent": true,
+    "final_verified_at_utc": "2026-10-08T05:08:31.853254+00:00"
+  },
+  "remaining": [],
+  "retention_fixture": {
+    "indexed_events": 3,
+    "separate_receiver_requests": 3,
+    "controlled_restart": true,
+    "kv_ready_after_restart": true,
+    "model_settings_retained": true,
+    "tstats_count_after_restart": 3,
+    "summaries_only_tstats_count_after_restart": 3,
+    "search_errors": 0
+  }
+}

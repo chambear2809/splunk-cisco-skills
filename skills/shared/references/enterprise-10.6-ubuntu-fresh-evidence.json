@@ -1,0 +1,45 @@
+{
+  "apply": "HEC skill apply passed after fix; no manual chown/chmod fallback",
+  "captured_at_epoch": 1791391741,
+  "ingest_search": {
+    "hec_code": 0,
+    "hec_text": "Success",
+    "marker": "lab106_fresh_hec_fixed_20261007",
+    "search_count": 1
+  },
+  "ownership_after_apply": {
+    "inputs_conf": "splunk:splunk 0640",
+    "token_file": "splunk:splunk 0600"
+  },
+  "restart": "Splunk restart completed; no inputs.conf permission warning after ownership fix",
+  "skill_change": "skills/splunk-hec-service-setup/scripts/render_assets.py",
+  "splunk_home": "/opt/splunk-fresh106",
+  "status_after_restart": "HEC skill status passed",
+  "target": "Disposable Ubuntu 24.04 x86_64; m6i.2xlarge, 8 vCPU, 32 GiB",
+  "tests": [
+    "pytest -q tests/test_splunk_hec_service_setup.py (2 passed)",
+    "python3 -m py_compile skills/splunk-hec-service-setup/scripts/render_assets.py",
+    "generated apply-enterprise-files.sh bash -n (passed)"
+  ],
+  "version": "10.6.0.5",
+  "prior_failure": "Initial HEC apply wrote root-owned mode 0600 configuration, which was unreadable to the service user after restart. Corrected repository apply passed without manual remediation.",
+  "host_setup": "completed standalone-search-tier, no-boot-start",
+  "host_validate": "passed via SSH; REST auth, server 10.6.0.5, KV member/cohosted ready",
+  "package_sha512": "c5f26fedc65b3959d63283106560f4318131357d3239404d8f12f18415a31901a6dc7357e04167eb840de73995b0100435ad09a1ded08674a6ec2a4f05337643",
+  "ports_free_preflight": [
+    18089,
+    18000,
+    18065,
+    18191,
+    18194,
+    45432,
+    45433,
+    45434,
+    48008,
+    46432,
+    45435,
+    42380,
+    42379
+  ],
+  "capacity_qualification": "Functional low-volume lab validation; no production SVA performance certification."
+}

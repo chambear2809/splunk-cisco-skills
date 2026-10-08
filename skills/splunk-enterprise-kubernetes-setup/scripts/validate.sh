@@ -140,7 +140,7 @@ run_sok_helm_template_checks() {
             operator_chart="${chart_dir}/splunk-operator"
             enterprise_chart="${chart_dir}/splunk-enterprise"
         fi
-        # Chart 3.1.0's List templates produce empty-name lint warnings before
+        # Chart 3.2.0's List templates produce empty-name lint warnings before
         # range expansion for C3/M4. A normal lint still fails template errors;
         # the fully rendered CR checks below validate names and semantics.
         helm lint "${operator_chart}" "${operator_values[@]}" >/dev/null && \
@@ -753,16 +753,22 @@ if metadata.get("indexing_ingestion_separation"):
                 identity or None
             ):
                 errors.append(f"{kind} is missing the separated-tier service account")
-    if metadata.get("queue_secret_workaround"):
-        if not queue_blocks or path_values(
-            queue_blocks[0], ("spec", "sqs", "volumes", "secretRef")
-        ) != [metadata.get("queue_secret_ref")]:
-            errors.append("Queue credential volume was not rendered")
-        if re.search(r"volumes:\s*\n\s+authRegion:", enterprise):
-            errors.append("Queue credential volume triggered the chart 3.1 serialization defect")
+    if metadata.get("queue_secret_ref"):
+        secret_key_ref = (queue_blocks[0].get("spec", {}).get("sqs", {})
+                          .get("secretKeyRef", {})) if queue_blocks else {}
+        expected_secret = {
+            "awsAccessKey": {"name": metadata.get("queue_secret_ref"), "key": "s3_access_key"},
+            "awsSecretKey": {"name": metadata.get("queue_secret_ref"), "key": "s3_secret_key"},
+        }
+        if secret_key_ref != expected_secret:
+            errors.append("Queue secretKeyRef was not rendered")
+        if re.search(r"(?:volumes:|secretRef:).*queue", enterprise):
+            errors.append("Queue credential volume/secretRef is unsupported in SOK 3.2")
 
 if "kind: ClusterMaster" in enterprise or "kind: LicenseMaster" in enterprise:
     errors.append("legacy v3 Manager terminology was rendered")
+if re.search(r"^kind: Postgres(?:Cluster|Database|ClusterClass)\\s*$", enterprise, re.MULTILINE):
+    errors.append("preview Postgres resources are disabled in the SOK 3.2 workflow")
 if "kind: Deployment" not in operator:
     errors.append("operator chart did not render its Deployment")
 if metadata.get("deployment_profile") == "production":

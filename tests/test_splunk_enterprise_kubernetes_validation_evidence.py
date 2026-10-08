@@ -104,10 +104,24 @@ class SplunkEnterpriseKubernetesValidationEvidenceTests(unittest.TestCase):
     def test_registry_matches_evidence(self) -> None:
         entry = self.registry["evidence"][SKILL]["live_apply_e2e"]
         self.assertEqual(entry["status"], "partial")
-        self.assertEqual(entry["last_verified"], self.evidence_run["date"])
-        self.assertEqual(entry["evidence"], [EVIDENCE_RELATIVE])
-        self.assertIn("SOK 3.1.0", entry["notes"])
-        self.assertIn("zero-residue cleanup", entry["notes"])
+        # The consolidated 3.1 evidence keeps its historical date. The registry
+        # may point at a newer qualified run, so select and validate that ref
+        # instead of rewriting the historical run in place.
+        self.assertGreaterEqual(entry["last_verified"], self.evidence_run["date"])
+        latest_refs = [ref for ref in entry["evidence"] if ref != EVIDENCE_RELATIVE]
+        if entry["last_verified"] > self.evidence_run["date"]:
+            self.assertTrue(latest_refs, "newer registry dates require a selected evidence reference")
+        for ref in latest_refs:
+            latest = json.loads((REPO_ROOT / ref).read_text(encoding="utf-8"))
+            self.assertEqual(latest.get("last_verified"), entry["last_verified"])
+            self.assertEqual(latest.get("target", {}).get("operator"), "3.2.0")
+            self.assertEqual(latest.get("target", {}).get("enterprise"), "10.6.0.5")
+            self.assertIn("render_preflight_apply_status", latest.get("workflow", {}))
+        if EVIDENCE_RELATIVE in entry["evidence"]:
+            self.assertIn("SOK 3.1.0", entry["notes"])
+            self.assertIn("zero-residue cleanup", entry["notes"])
+        else:
+            self.assertTrue(any("S1" in token for token in entry["notes"].split()))
         self.assertGreaterEqual(len(self.evidence_run["limitations"]), 2)
         self.assertTrue(
             any(

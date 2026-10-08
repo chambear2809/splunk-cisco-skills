@@ -1,15 +1,18 @@
 {
   "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-08-20. Enterprise entries are recognized release trains and remain listed when an end date is needed for lifecycle classification; Cloud entries identify current documentation trains.",
   "compatibility_verified_date": "2026-08-20",
+  "enterprise_compatibility_verified_date": "2026-10-05",
   "defaults": {
-    "enterprise_version": "10.4.1",
-    "enterprise_image": "splunk/splunk:10.4.1",
-    "enterprise_doc_train": "10.4",
+    "enterprise_version": "10.6.0.5",
+    "enterprise_image": "splunk/splunk:10.6.0.5",
+    "enterprise_kubernetes_version": "10.6.0.5",
+    "enterprise_doc_train": "10.6",
     "cloud_doc_train": "10.5.2605",
     "cloud_doc_train_previous": "10.4.2604",
     "splunkbase_compatibility_target": "10.5"
   },
   "enterprise_platform_versions": [
+    "10.6",
     "10.4",
     "10.2",
     "10.0",
@@ -25,8 +28,28 @@
     "9.x",
     "10.0",
     "10.2",
-    "10.4"
+    "10.4",
+    "10.6"
   ],
+  "enterprise_upgrade_paths_10_6": {
+    "9.4": [
+      "10.0",
+      "10.2"
+    ],
+    "10.0": [
+      "10.2",
+      "10.4",
+      "10.6"
+    ],
+    "10.2": [
+      "10.4",
+      "10.6"
+    ],
+    "10.4": [
+      "10.6"
+    ],
+    "source": "https://help.splunk.com/en/splunk-enterprise/get-started/install-and-upgrade/10.6/upgrade-or-migrate-splunk-enterprise/how-to-upgrade-splunk-enterprise"
+  },
   "enterprise_cloud_only_trains": [
     "10.1",
     "10.3"
@@ -37,7 +60,13 @@
   "enterprise_support_end_dates": {
     "9.3": "2026-07-24"
   },
+  "enterprise_version_format": {
+    "segments": 4,
+    "example": "10.6.0.5",
+    "source": "https://help.splunk.com/en/splunk-enterprise/release-notes-and-updates/release-notes/10.6/whats-new/welcome-to-splunk-enterprise-10.6"
+  },
   "svd_enterprise_floors": {
+    "10.6": "10.6.0",
     "10.4": "10.4.0",
     "10.2": "10.2.2",
     "10.0": "10.0.5",
@@ -87,5 +116,14 @@
     "tls": "Enterprise 10.4 removes TLS 1.0 and 1.1 negotiation between Splunk components. Use TLS 1.2 or higher.",
     "config_validation": "Enterprise 10.4 introduces Config Validation for .conf changes before production impact.",
     "enterprise_no_10_3_train": "There is no Splunk Enterprise 10.3 release train; Cloud 10.3.x stacks are Cloud-only."
+  },
+  "upgrade_notes_10_6": {
+    "kvstore_migration": "Upgrade to Enterprise 10.6 automatically migrates supported KV Store deployments to cohosted KV Store backed by a PostgreSQL Storage sidecar. Require KV Store server 7.0+, more than 50% free space on the data filesystem, healthy authenticated status, parallel backup and restore evidence, and a read-only maintenance window. ITSI 5.0.x and lower must postpone migration.",
+    "federated_search_remote_floor": "All remote search heads and provider deployments must run Enterprise 10.4 or higher before upgrading the local deployment to 10.6.",
+    "cluster_ports": "PostgreSQL network ports must be available between all cluster members for SPL2 availability.",
+    "encryption": "Enterprise 10.6 supports the $8$ secret encryption format; legacy $7$ values remain readable. Re-encryption occurs only when an administrator invokes the migration CLI.",
+    "public_certificate_eku": "Public TLS certificates used for inter-Splunk connections should no longer include Client Authentication EKU; obtain updated certificates before March 1, 2027.",
+    "source_upgrade": "https://help.splunk.com/en/splunk-enterprise/get-started/install-and-upgrade/10.6/upgrade-or-migrate-splunk-enterprise/about-upgrading-to-10.6-read-this-first",
+    "source_kvstore": "https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.6/administer-the-app-key-value-store/upgrade-to-a-cohosted-kv-store"
   }
 }

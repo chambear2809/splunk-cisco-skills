@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T07:27:51.147834+00:00",
+  "status": "pass",
+  "selected_workflow": "ASA6.1.2 render/install; controlled Cisco ASA syslog via pinned SC4S3.47.0; shipped dashboard; Enterprise restart; cleanup",
+  "environment": {
+    "enterprise_version": "10.6.0.5",
+    "os": "Ubuntu24.04 x86_64",
+    "topology": "isolated standalone",
+    "rest_and_hec_tls": "CA and hostname verified"
+  },
+  "package": {
+    "file": "splunk-add-on-for-cisco-asa_612.spl",
+    "sha256": "dbe93977b84b05c609665d3ec5db3297aae80f3b2d67b6645c3a763a7257d7fa",
+    "bytes": 71033,
+    "app_id": 1620,
+    "app_directory": "Splunk_TA_cisco-asa",
+    "version": "6.1.2",
+    "shipped_views": [
+      "Splunk_TA_cisco-asa/default/data/ui/views/cisco_asa_dashboard.xml"
+    ],
+    "archive_members": 39,
+    "provenance": "Authenticated HTTPS Splunkbase; runtime hash captured, not publisher signature"
+  },
+  "owning_workflow": {
+    "render_exit": 0,
+    "install_exit": 0,
+    "live_completion_exit": 0,
+    "restart_exit": 0,
+    "uninstall_exit": 0,
+    "mock_regression_tests_passed": 11
+  },
+  "ingestion": {
+    "post_correction_transport": [
+      "TCP",
+      "UDP"
+    ],
+    "canonical_sourcetype": "cisco:asa",
+    "parsed_fields": [
+      "message_id",
+      "action",
+      "src",
+      "dest",
+      "transport",
+      "src_port",
+      "dest_port"
+    ],
+    "retained_records_after_restart": 4,
+    "distinct_post_correction_records": 2,
+    "qualification": "Synthetic ASA302013 connection records; no device hardware or lossless-delivery qualification. Initial token allowlist rejected internal SC4S batches; corrected allowlist proved two fresh records over TCP and UDP."
+  },
+  "dashboard": {
+    "shipped_views": 1,
+    "view": "cisco_asa_dashboard",
+    "app_visible": true,
+    "enabled_visible_acl_verified": true,
+    "queries_executed": 16,
+    "version_readback": "6.1.2",
+    "primary_panels_populated": true,
+    "browser_visible_count": 2,
+    "browser_capture": "Before later TCP/UDP delivery and final restart; main panels show two parsed records. Post-restart four-record and panel validation verified through API. Subsequent browser automation blocked by extension panel.",
+    "cim_pivot_qualification": "All seven shipped pivot searches executed without errors. Categories not represented by connection fixtures legitimately return zero. Vendor pivots filter ASA/FTD sourcetypes across indexes; they do not bind the dashboard-selected index."
+  },
+  "cleanup": {
+    "app_http": 404,
+    "index_http": 404,
+    "hec_input_http": 404,
+    "owned_app_directory_absent": true,
+    "owned_index_data_directory_absent": true,
+    "container_absent": true,
+    "volume_absent": true,
+    "remote_stage_and_token_env_absent": true,
+    "local_token_and_environment_absent": true,
+    "reusable_lab_preserved": true,
+    "persistent_user_credentials_preserved": true,
+    "existing_sc4s_index_preserved": "Existing shared internal diagnostic index; synthetic SC4S diagnostics remain subject to normal index retention."
+  },
+  "final_health": {
+    "search_pass": true,
+    "current_kv_ready": true,
+    "cohosted_pdl_ready": true,
+    "lab_port_reservation": "Eight custom listeners overlap Linux ephemeral range. Runtime reservations added while retaining prior reserved-port set; protected restoration receipt retained. Prevented supervisor outgoing source port collision with PgBouncer; no KV configuration/data reset."
+  },
+  "remaining": [
+    "Real ASA hardware source variant unqualified; controlled syslog workflow passed."
+  ],
+  "sanitization": "No secret values, raw API responses or private resource identifiers.",
+  "source_references": [
+    "https://splunk.github.io/splunk-connect-for-syslog/develop/gettingstarted/getting-started-splunk-setup/"
+  ]
+}

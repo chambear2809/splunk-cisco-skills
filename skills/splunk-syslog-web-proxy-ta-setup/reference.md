@@ -7,7 +7,7 @@
 | `apache` | `Splunk_TA_apache` | `3186` | `3.0.0` | Local file / UF monitor |
 | `nginx` | `Splunk_TA_nginx` | `3258` | `3.3.1` | Local file / UF monitor |
 | `iis` | `Splunk_TA_microsoft-iis` | `3185` | `2.0.0` | Windows UF / IIS log files |
-| `tomcat` | `Splunk_TA_tomcat` | `2911` | `4.0.3` | Local file / UF monitor; optional JMX input |
+| `tomcat` | `Splunk_TA_tomcat` | `2911` | `4.0.4` | Local file / UF monitor; optional JMX input |
 | `haproxy` | `Splunk_TA_haproxy` | `3135` | `2.0.0` | Local file / UF monitor |
 | `squid` | `Splunk_TA_squid` | `2965` | `2.1.0` | SC4S/syslog handoff |
 | `bluecoat` | `Splunk_TA_bluecoat-proxysg` | `2758` | `3.9.0` | SC4S/syslog handoff |
@@ -17,13 +17,11 @@
 | `citrix` | `Splunk_TA_citrix-netscaler` | `2770` | `8.2.4` | SC4S/syslog or NITRO/IPFIX inputs |
 | `infoblox` | `Splunk_TA_infoblox` | `2934` | `2.2.0` | SC4S/syslog handoff |
 
-### Tomcat `10.5` compatibility note
+### Tomcat `10.5` and Enterprise `10.6` compatibility note
 
-The repo-verified Tomcat package is `4.0.3`, the release the listing designates
-as current as of August 20, 2026, and it advertises Splunk `10.5`. The earlier
-`4.0.0` pin and the `4.0.1` release advertised platform versions `9.1` through
-`10.4` only, which is why this profile used to be render-only on a `10.5` target.
-That restriction no longer applies at `4.0.3`. The shared installer still refuses
+The repo-verified Tomcat package is `4.0.4`. Its Splunkbase release metadata
+lists Enterprise `10.6` and Cloud `10.5`; its downloaded archive was inspected
+to verify package identity and version. The shared installer still refuses
 app `2911` before mutation when the selected release does not advertise the
 target platform, and `--accept-unsupported-platform` remains the only override —
 usable only when separately reviewed vendor evidence and the operator's exception

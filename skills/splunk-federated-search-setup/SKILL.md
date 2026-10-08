@@ -7,13 +7,23 @@ description: "Use when configuring Cisco Data Fabric federated search or standal
   Snowflake, and DDSS; distinguish Glue, Iceberg REST, and Splunk-native catalogs; preserve handoff-only
   Amazon Security Lake (`aws_lake`) and Cisco SAL (`aws_s3_sal`) identities; and manage supported global-
   switch, status, file, SHC, and REST workflows."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Federated Search Setup
+
+## Enterprise 10.6 provider requirement
+
+Before upgrading a deployment to Enterprise 10.6, upgrade every remote search
+head and federated provider deployment to Enterprise 10.4 or higher. Enterprise
+10.6 rejects federated searches when any remote provider is below 10.4. Keep
+this runtime prerequisite separate from the Cloud 10.5 provider compatibility
+notes below.
 
 ## Prerequisites
 
@@ -251,8 +261,8 @@ bash skills/splunk-federated-search-setup/scripts/validate.sh --live
 | `apply-search-head.sh` | File-based apply on a standalone Enterprise SH |
 | `apply-shc-deployer.sh` | Fail-closed handoff to `splunk-search-head-cluster-setup`; staging files alone is not reported as a completed SHC bundle apply |
 | `apply-rest.sh` | REST apply for supported FSS2S on Splunk Enterprise or Splunk Cloud; refuses legacy-only plans |
-| `global-enable.sh` / `global-disable.sh` | Toggle the global federated-search switch |
-| `status.sh` | REST GET per provider, prints `connectivityStatus` |
+| `global-enable.sh` / `global-disable.sh` | Conditionally toggle the global federated-search switch; scripts require a recognized `disabled` field from a read-only GET and fail closed when Enterprise 10.6 does not advertise that contract |
+| `status.sh` | REST GET per provider, prints `connectivityStatus`; omits absent general-setting fields |
 | `preflight.sh` | Local btool sanity checks |
 | `metadata.json` | Machine-readable plan summary, including warnings |
 

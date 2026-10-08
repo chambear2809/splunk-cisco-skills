@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-07T20:45:39.362417+00:00",
+  "product": "Galileo (user-confirmed)",
+  "sdk_version": "2.4.0",
+  "scope": "one-off isolated synthetic project and log stream; no external LLM or evaluators",
+  "onboarding_date": null,
+  "onboarding_gate_exception": "User authorized a run-scoped exception; repository default gate unchanged",
+  "readiness": {
+    "health_http": 200,
+    "authenticated_project_list_http": 200
+  },
+  "functional": {
+    "project_create_and_readback": "pass",
+    "log_stream_create_and_readback": "pass",
+    "synthetic_trace_backend_readback": "pass",
+    "synthetic_tool_span_backend_readback": "pass",
+    "ui_sessions": 1,
+    "ui_traces": 1,
+    "ui_spans": 1,
+    "splunk_enterprise_export": "pending",
+    "evaluators_controls_and_other_variants": "pending"
+  },
+  "cleanup": {
+    "initial_helper_delete_http": 500,
+    "authenticated_sdk_exact_project_delete_http": 200,
+    "exact_project_absence_http": 404,
+    "exact_stream_absence_http": 404,
+    "ui_project_inventory_restored": "pass",
+    "api_project_stream_absence": "Both isolated runs verified HTTP404",
+    "physical_storage_cleanup": "unverified: tenant MinIO connection refused during delete",
+    "status": "partial"
+  },
+  "qualification": "Partial integration evidence, not full default Enterprise workflow qualification",
+  "sanitization": "No credentials, user emails, raw trace content, host identifiers or project IDs included",
+  "external_blocker": {
+    "evidence": "Authenticated deletion HTTP500 reported MinIO connection refused; subsequent exact SDK project deletion HTTP200 and API GET404",
+    "impact": "Cannot prove removal of backing objects for the synthetic test projects or qualify storage-dependent export/cleanup",
+    "owner": "Galileo tenant infrastructure owner",
+    "next_action": "Restore MinIO connectivity, then verify and remove only the retained operation-ledger project prefixes; preserve unrelated data"
+  }
+}

@@ -3,6 +3,8 @@ name: splunk-agent-observability-setup
 description: "Use when onboarding, instrumenting, evaluating, securing, or operating Splunk Agent Observability for agentic and generative AI applications across SaaS and on-premises deployments. Work through the product's MCP server when available, otherwise use documented SDK/API/UI paths; cover traces, sessions, Agent Streams, evaluators, experiments, datasets, prompts, Agent Control, Signals, Tokenomics, access, integrations, and troubleshooting."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   runtime_requirements: "Offline helpers require Bash and Python 3. Live work requires an authorized Splunk Agent Observability interface and access to current product documentation."
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"

@@ -6,6 +6,7 @@ Reads CLI args (from setup.sh) and emits the SHC rendered tree under
 - deployer/server.conf
 - member-<host>/server.conf
 - bootstrap/sequenced-bootstrap.sh
+- bootstrap/apply-system-local.sh
 - bundle/{validate,status,apply,apply-skip-validation,rollback}.sh
 - restart/{rolling-restart,searchable-rolling-restart,force-searchable,transfer-captain}.sh
 - members/{add-member,decommission-member,remove-member}.sh
@@ -97,6 +98,10 @@ def _rest_script_head(pw_file: str) -> str:
         'source "${LIB_DIR}/credential_helpers.sh"\n'
         + "# shellcheck disable=SC1091\n"
         'source "${LIB_DIR}/platform_version_helpers.sh"\n'
+        'if ! load_splunk_platform_settings; then\n'
+        '  echo "ERROR: Failed to load Splunk platform settings/profile before REST authentication." >&2\n'
+        '  exit 1\n'
+        'fi\n'
         'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
         f'AUTH_PW_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-{pw_file}}}"\n'
         'if [[ ! -s "${AUTH_PW_FILE}" ]]; then\n'
@@ -113,7 +118,8 @@ def _rolling_restart_script(pw_file: str, captain_uri: str, mode: str,
     Sets the documented ``rolling_restart`` mode via ``shcluster/config/config``
     (restart | searchable | searchable_force), then POSTs the captain control
     ``restart`` endpoint — NOT ``restart_inactivity_timeout`` (which only sets a
-    timeout and never restarts). Success is reported only on HTTP 200.
+    timeout and never restarts). Success requires valid JSON without structured
+    error or nested failure indicators.
     """
     return (
         _rest_script_head(pw_file)
@@ -123,21 +129,53 @@ def _rolling_restart_script(pw_file: str, captain_uri: str, mode: str,
         + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
         + "# Set the documented rolling_restart mode, then trigger the real\n"
         + "# rolling restart via the captain control endpoint.\n"
-        + 'mode_code="$(splunk_curl_post "${SK}" "rolling_restart=' + mode + '" \\\n'
-        + "  -o /dev/null -w '%{http_code}' \\\n"
-        + '  "${CAPTAIN_URI}/services/shcluster/config/config")"\n'
-        + 'if [[ ! "${mode_code}" =~ ^2[0-9][0-9]$ ]]; then\n'
-        + '  echo "ERROR: failed to set rolling_restart=' + mode + ' (HTTP ${mode_code})." >&2\n'
-        + "  exit 1\n"
-        + "fi\n"
-        + 'rr_code="$(splunk_curl_post "${SK}" "" \\\n'
-        + "  -o /dev/null -w '%{http_code}' \\\n"
-        + '  "${CAPTAIN_URI}/services/shcluster/captain/control/control/restart")"\n'
-        + 'if [[ ! "${rr_code}" =~ ^2[0-9][0-9]$ ]]; then\n'
-        + '  echo "ERROR: ' + label + ' request failed (HTTP ${rr_code})." >&2\n'
-        + "  exit 1\n"
-        + "fi\n"
-        + 'echo "' + label + ' initiated (HTTP ${rr_code}). Monitor cluster status before further changes."\n'
+        + 'validate_control_response() {\n'
+        + '  local operation="$1" response="$2" result\n'
+        + '  result="$(printf \'%s\' "${response}" | python3 -c \'\n'
+        + 'import json, re, sys\n'
+        + 'operation = sys.argv[1]\n'
+        + 'try:\n'
+        + '    payload = json.load(sys.stdin)\n'
+        + 'except Exception:\n'
+        + '    print("INVALID: malformed or empty JSON response")\n'
+        + '    raise SystemExit(0)\n'
+        + 'if not isinstance(payload, dict):\n'
+        + '    print("INVALID: response must be a JSON object")\n'
+        + '    raise SystemExit(0)\n'
+        + 'def walk(value):\n'
+        + '    if isinstance(value, dict):\n'
+        + '        for key in ("type", "severity", "level"):\n'
+        + '            if str(value.get(key, "")).upper() == "ERROR":\n'
+        + '                text = value.get("text") or value.get("message") or value.get("msg") or "structured control error"\n'
+        + '                return "ERROR: " + " ".join(str(text).split())[:240]\n'
+        + '        for key, child in value.items():\n'
+        + '            if key == "success" and (child is False or child == 0 or str(child).lower() in {"false", "0"}):\n'
+        + '                return "ERROR: " + operation + " response reported success=false"\n'
+        + '            if key == "msg" and isinstance(child, str) and re.search(r"\\b(fail(?:ed|ure)?|error|unsuccess)\\b", child, re.I):\n'
+        + '                return "ERROR: " + " ".join(child.split())[:240]\n'
+        + '            found = walk(child)\n'
+        + '            if found:\n'
+        + '                return found\n'
+        + '    elif isinstance(value, list):\n'
+        + '        for child in value:\n'
+        + '            found = walk(child)\n'
+        + '            if found:\n'
+        + '                return found\n'
+        + '    return ""\n'
+        + 'print(walk(payload))\n\' "${operation}"\n'
+        + '  )"\n'
+        + '  if [[ "${result}" == INVALID:* || "${result}" == ERROR:* ]]; then\n'
+        + '    echo "${result}" >&2\n'
+        + '    return 1\n'
+        + '  fi\n'
+        + '}\n'
+        + 'mode_response="$(splunk_curl_post "${SK}" "rolling_restart=' + mode + '" \\\n'
+        + '  "${CAPTAIN_URI}/services/shcluster/config/config?output_mode=json")"\n'
+        + 'validate_control_response "rolling_restart=' + mode + ' configuration" "${mode_response}"\n'
+        + 'rr_response="$(splunk_curl_post "${SK}" "" \\\n'
+        + '  "${CAPTAIN_URI}/services/shcluster/captain/control/control/restart?output_mode=json")"\n'
+        + 'validate_control_response "' + label + '" "${rr_response}"\n'
+        + 'echo "' + label + ' initiated. Monitor cluster status before further changes."\n'
     )
 
 
@@ -240,7 +278,8 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     # deployer/server.conf
     (shc / "deployer" / "server.conf").write_text(
         "[shclustering]\n"
-        "disabled = false\n"
+        "# The deployer is not an SHC member; never let it elect a captain.\n"
+        "disabled = true\n"
         f"pass4SymmKey = $SHC_SECRET\n"
         f"shcluster_label = {shc_label}\n",
         encoding="utf-8",
@@ -280,13 +319,40 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "exit 2\n",
         encoding="utf-8",
     )
+    (shc / "bootstrap" / "apply-system-local.sh").write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        "# Run on one SHC member before init/bootstrap. The fragment must be a\n"
+        "# protected reviewed server.conf fragment; secrets never appear on argv.\n"
+        'FRAGMENT="${1:-}"\n'
+        'if [[ -z "${FRAGMENT}" || ! -f "${FRAGMENT}" ]]; then\n'
+        '  echo "ERROR: pass the protected reviewed member server.conf fragment path." >&2\n'
+        '  exit 1\n'
+        'fi\n'
+        'if [[ "$(stat -c %a "${FRAGMENT}" 2>/dev/null || stat -f %Lp "${FRAGMENT}")" != "600" ]]; then\n'
+        '  echo "ERROR: fragment must have mode 600." >&2\n'
+        '  exit 1\n'
+        'fi\n'
+        'HELPER="${MERGE_SERVER_CONF_HELPER:-merge_server_conf_sections.py}"\n'
+        'if [[ ! -f "${HELPER}" ]]; then\n'
+        '  echo "ERROR: set MERGE_SERVER_CONF_HELPER to the reviewed helper path." >&2\n'
+        '  exit 1\n'
+        'fi\n'
+        'sudo python3 "${HELPER}" /opt/splunk/etc/system/local/server.conf "${FRAGMENT}" --owner-user splunk\n'
+        'echo "Applied reviewed SHC member sections to system/local/server.conf."\n',
+        encoding="utf-8",
+    )
+    (shc / "bootstrap" / "apply-system-local.sh").chmod(0o750)
 
     # bundle scripts
+    bundle_target_uri = target_captain_uri or (
+        f"https://{members[0]}:8089" if members else ""
+    )
+    target_arg = f" -target {shlex.quote(bundle_target_uri)}" if bundle_target_uri else ""
     for script, cmd in [
-        ("validate.sh", "splunk validate shcluster-bundle"),
-        ("status.sh", "splunk show shcluster-bundle-status"),
-        ("apply.sh", "splunk apply shcluster-bundle --answer-yes"),
-        ("apply-skip-validation.sh", "splunk apply shcluster-bundle --answer-yes --skip-validation"),
+        ("validate.sh", f"splunk validate shcluster-bundle{target_arg}"),
+        ("status.sh", f"splunk show shcluster-bundle-status{target_arg}"),
+        ("apply.sh", f"splunk apply shcluster-bundle --answer-yes{target_arg}"),
+        ("apply-skip-validation.sh", f"splunk apply shcluster-bundle --answer-yes --skip-validation{target_arg}"),
     ]:
         (shc / "bundle" / script).write_text(
             f"#!/usr/bin/env bash\nset -euo pipefail\n# Run on deployer host\n"

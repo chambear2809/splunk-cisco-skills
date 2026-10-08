@@ -56,6 +56,12 @@ Plus `kubeletstats` (with `insecure_skip_verify: true` for OpenShift), `hostmetr
 
 The metrics pipeline applies the `filter/includemetrics` strict allow-list — only series in the list are forwarded to Splunk Observability Cloud. Extend the allow-list via `spec.metric_allowlist.extra`.
 
+### Live validation semantics
+
+`validate.sh --live` checks every selected Isovalent pod through its Prometheus endpoint and verifies that each endpoint returns samples. It compares receiver and pipeline configuration semantically across the chart's native `hostmetrics`, `kubeletstats`, and `resourcedetection` names and the overlay's underscore aliases. For Tetragon file logs, it accepts `k8s.cluster.name` on the receiver or verifies equivalent enrichment by the downstream logs `resource` processor.
+
+These Kubernetes checks establish collector configuration and target reachability. They do not prove backend delivery. Use the optional SignalFlow and Splunk Platform search checks with protected file-based credentials to verify that Observability metrics and Platform events arrived.
+
 ## Splunk Platform logs path
 
 Default: file-based via OTel filelog receiver. Renders three coordinated blocks (per `references/tetragon-hostpath-coordination.md`):

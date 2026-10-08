@@ -16,6 +16,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SETUP = REPO_ROOT / "skills/splunk-universal-forwarder-setup/scripts/setup.sh"
 RENDERER = REPO_ROOT / "skills/splunk-universal-forwarder-setup/scripts/render_assets.py"
+VALIDATOR = REPO_ROOT / "skills/splunk-universal-forwarder-setup/scripts/validate.sh"
 
 
 def sha512_hex(value: str) -> str:
@@ -110,6 +111,17 @@ def download_fixture_html(version: str = "10.2.3") -> str:
 
 
 class UniversalForwarderSetupTests(unittest.TestCase):
+    def test_tgz_extract_directory_is_checked_with_target_privilege(self) -> None:
+        setup = SETUP.read_text(encoding="utf-8")
+        self.assertIn(
+            'if ! run_privileged test -d "\\${extract_dir}/splunkforwarder"; then',
+            setup,
+        )
+        self.assertNotIn(
+            'if [[ ! -d "\\${extract_dir}/splunkforwarder" ]]; then',
+            setup,
+        )
+
     def run_script(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             list(args),
@@ -451,6 +463,32 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             outputs = (Path(tmpdir) / "rendered/universal-forwarder/outputs.conf").read_text(encoding="utf-8")
             self.assertIn("[2001:db8::10]:9997,idx01.example.com:9997", outputs)
+
+    def test_renderer_records_custom_unix_ports_and_rejects_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_script(
+                "python3", str(RENDERER), "--output-dir", str(Path(tmpdir) / "rendered"),
+                "--target-os", "linux", "--package-type", "tgz",
+                "--mgmt-port", "28089", "--ipc-port", "28194", "--json",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            metadata = json.loads(result.stdout)["metadata"]
+            self.assertEqual(metadata["mgmt_port"], 28089)
+            self.assertEqual(metadata["ipc_port"], 28194)
+            collision = self.run_script(
+                "python3", str(RENDERER), "--output-dir", str(Path(tmpdir) / "bad"),
+                "--target-os", "linux", "--package-type", "tgz",
+                "--mgmt-port", "28089", "--ipc-port", "28089",
+            )
+            self.assertNotEqual(collision.returncode, 0)
+            self.assertIn("must be different", collision.stderr + collision.stdout)
+
+    def test_fresh_install_configures_tcp_management_for_the_selected_port(self) -> None:
+        setup = SETUP.read_text(encoding="utf-8")
+        validator = VALIDATOR.read_text(encoding="utf-8")
+        self.assertIn('content+="mgmtMode = tcp"', setup)
+        self.assertIn("btool server list httpServer --debug", validator)
+        self.assertIn("TCP management listener on localhost", validator)
 
     def test_setup_rendered_apply_script_preserves_operator_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

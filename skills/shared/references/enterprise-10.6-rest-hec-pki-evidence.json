@@ -1,0 +1,33 @@
+{
+  "last_verified": "2026-10-07",
+  "status": "partial",
+  "target": "Disposable Ubuntu 24.04 x86_64 / Enterprise 10.6.0.5",
+  "selected_workflow": "Generated private CA/intermediate/leaf applied to management REST and HEC, then restart and retained-data health",
+  "result": {
+    "ca_and_hostname_verified_rest_authentication": "pass",
+    "ca_and_hostname_verified_hec_health": "pass",
+    "tls_protocols": {
+      "REST": [
+        "TLSv1.2",
+        "TLSv1.3"
+      ],
+      "HEC": [
+        "TLSv1.2",
+        "TLSv1.3"
+      ]
+    },
+    "ssl_password_format": "Splunk $8$ encrypted in server.conf and inputs.conf after restart",
+    "kv_current_ready": true,
+    "cohosted_Pdl_service_ready": true,
+    "fresh_store_migration_status": "NotStarted; not a legacy-to-cohosted migration claim",
+    "smartstore_retained_canary_count": 1
+  },
+  "defect_corrected": "New certificate installation parent initially root-only; installer now creates a missing parent for the service owner and verifies traversal of an existing parent. Live root-owned one-off parent ownership correction allowed restart.",
+  "limitations": [
+    "Separate reusable-lab Web workflow has its own evidence.",
+    "Forwarding/S2S, mutual TLS and distributed certificate workflows remain pending.",
+    "No production trust store modification or certificate rotation qualification."
+  ],
+  "cleanup": "Certificate material remains on disposable target for remaining health checks; final target teardown removes it.",
+  "sanitization": "No secret values, encrypted credential ciphertext, target identities or resource IDs."
+}

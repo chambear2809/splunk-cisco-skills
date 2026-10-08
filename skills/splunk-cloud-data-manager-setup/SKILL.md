@@ -8,13 +8,21 @@ description: "Use when the user asks to set up Splunk Cloud Data Manager, onboar
   CrowdStrike with Data Manager 1.16 source coverage, HEC ACK/token guardrails, Data Manager-generated
   CloudFormation/ARM/Terraform template handling, provider prerequisite checks, health searches, migration
   warnings, and secret-file-only handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-08"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Cloud Data Manager Setup
+
+## Enterprise applicability
+
+Data Manager is a built-in Splunk Cloud app; generated customer-cloud resources support that Cloud control plane. The default workflow does not configure a self-managed Enterprise
+10.6 feature. Keep its Splunk Cloud validation separate. See the
+[documented service scope](https://help.splunk.com/en/data-management/ingest-data-from-cloud-sources/use-data-manager/1.16/getting-data-in-gdi/set-up-data-manager).
 
 ## Prerequisites
 

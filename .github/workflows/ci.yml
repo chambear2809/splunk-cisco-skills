@@ -31,6 +31,21 @@ jobs:
           python -m pip install --upgrade pip==26.1.2
           python -m pip install -r requirements-dev.txt -r requirements-agent.txt
 
+      - name: Install pinned YAML processor for integration tests
+        shell: bash
+        env:
+          YQ_VERSION: "4.53.6"
+          YQ_LINUX_AMD64_SHA256: "c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385"
+        run: |
+          set -euo pipefail
+          binary="${RUNNER_TEMP}/yq"
+          curl --proto '=https' --tlsv1.2 --silent --show-error --fail --location \
+            "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" \
+            --output "${binary}"
+          echo "${YQ_LINUX_AMD64_SHA256}  ${binary}" | sha256sum -c -
+          chmod 0755 "${binary}"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
       - name: Audit Python dependencies
         shell: bash
         run: |
@@ -45,6 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
 
           # Security-sensitive runtime tests reject writable checkout ancestors
           # and interpreters. GitHub's hosted tool cache and work directory are
@@ -104,6 +120,16 @@ jobs:
 
       - name: Run MCP protocol tests
         run: pytest tests/test_agent_mcp_protocol.py -v
+
+      - name: Check first-party Python syntax on supported runtimes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          for root in ("skills", "tests", "agent", "scripts"):
+              for path in sorted(Path(root).rglob("*.py")):
+                  compile(path.read_bytes(), str(path), "exec")
+          PY
 
   # ── Bats tests ────────────────────────────────────────────────────────
   bats-tests:
@@ -258,12 +284,13 @@ jobs:
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check
 
-      - name: Check skill UX, validation, and Splunk 10.5 compatibility docs
+      - name: Check skill UX, validation, and Splunk compatibility docs
         run: |
           python3 skills/shared/scripts/generate_skill_ux_catalog.py --check
           python3 skills/shared/scripts/generate_skill_validation_matrix.py --check
           python3 skills/shared/scripts/audit_skill_compatibility.py
           python3 skills/shared/scripts/generate_splunk_10_5_compatibility.py --check
+          python3 skills/shared/scripts/audit_splunk_enterprise_10_6_compatibility.py --check
 
       - name: Check catalog freshness
         run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check

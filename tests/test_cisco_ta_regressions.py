@@ -2012,7 +2012,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if url.endswith("/services/auth/login"):
                     sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
                 elif "/services/server/info" in url:
-                    sys.stdout.write('{"entry":[{"name":"server-info"}]}')
+                    sys.stdout.write('{"entry":[{"name":"server-info","content":{"version":"10.6.0.5"}}]}')
+                elif "/services/kvstore/status" in url:
+                    sys.stdout.write('{"entry":[{"content":{"current":{"status":"ready","migrationStatus":"NotStarted"},"cohosted":{"status":"ready","type":"Pdl"}}}]}')
                 """,
             )
             write_executable(
@@ -2052,7 +2054,192 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             curl_requests = curl_log.read_text(encoding="utf-8")
             self.assertIn("https://localhost:8089/services/auth/login", curl_requests)
             self.assertIn("https://localhost:8089/services/server/info?output_mode=json", curl_requests)
+            self.assertIn("https://localhost:8089/services/kvstore/status?output_mode=json", curl_requests)
             self.assertNotIn("wrong.example.com", curl_requests)
+
+
+    def test_host_bootstrap_validate_fails_closed_when_cohosted_kvstore_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                url = next((arg for arg in reversed(sys.argv[1:]) if arg.startswith(("http://", "https://"))), "")
+                if url.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/services/server/info" in url:
+                    sys.stdout.write('{"entry":[{"name":"server-info","content":{"version":"10.6.0.5"}}]}')
+                elif "/services/kvstore/status" in url:
+                    sys.stdout.write('{"entry":[{"content":{"current":{"status":"ready","migrationStatus":"NotStarted"},"cohosted":{"status":"unknown","type":"Pdl"}}}]}')
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    status) echo "splunkd is running"; exit 0 ;;
+                    version) echo "Splunk Enterprise 10.6.0.5"; exit 0 ;;
+                    btool) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update({
+                "PATH": f"{bin_dir}:{env['PATH']}",
+                "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+            })
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/validate.sh",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                "--kvstore-ready-timeout-seconds", "1",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("KV Store did not become ready within 1s", result.stdout + result.stderr)
+            self.assertIn("member=ready, cohosted=unknown", result.stdout + result.stderr)
+
+    def test_host_bootstrap_validate_ssh_uses_target_loopback_for_rest(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            known_hosts = tmp_path / "known_hosts"
+            curl_log = tmp_path / "curl.log"
+            ssh_args_log = tmp_path / "ssh_args.log"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
+            known_hosts.write_text(
+                "labhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINSJyCDYXSJxp6bB9KeJSRtOlh4rPq8iaCWyiLC59I+b\n",
+                encoding="utf-8",
+            )
+            known_hosts.chmod(0o600)
+
+            write_executable(
+                bin_dir / "ssh",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import shlex
+                import subprocess
+                import sys
+                from pathlib import Path
+
+                with Path(os.environ["SSH_ARGS_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(" ".join(sys.argv[1:]) + "\\n")
+                remote_argv = shlex.split(sys.argv[-1])
+                if len(remote_argv) >= 3 and remote_argv[0:2] == ["bash", "-lc"]:
+                    remote_command = remote_argv[2]
+                else:
+                    raise SystemExit("unexpected mocked SSH command")
+                result = subprocess.run(
+                    remote_command,
+                    shell=True,
+                    input=sys.stdin.buffer.read(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                sys.stdout.buffer.write(result.stdout)
+                sys.stderr.buffer.write(result.stderr)
+                raise SystemExit(result.returncode)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                url = next((arg for arg in reversed(sys.argv[1:]) if arg.startswith(("http://", "https://"))), "")
+                request_input = sys.stdin.read()
+                with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
+                if url.endswith("/services/auth/login"):
+                    if "username=admin" not in request_input or "password=changeme" not in request_input:
+                        raise SystemExit("password form was not streamed over stdin")
+                    sys.stdout.write("<response><sessionKey>ssh-test-session</sessionKey></response>")
+                elif "/services/server/info" in url:
+                    if "Authorization: Splunk ssh-test-session" not in request_input:
+                        raise SystemExit("session key was not streamed over stdin")
+                    sys.stdout.write('{"entry":[{"name":"server-info","content":{"version":"10.6.0.5"}}]}')
+                elif "/services/kvstore/status" in url:
+                    if "Authorization: Splunk ssh-test-session" not in request_input:
+                        raise SystemExit("session key was not streamed over stdin")
+                    sys.stdout.write('{"entry":[{"content":{"current":{"status":"ready","migrationStatus":"NotStarted"},"cohosted":{"status":"ready","type":"Pdl"}}}]}')
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    status) echo "splunkd is running"; exit 0 ;;
+                    version) echo "Splunk Enterprise 10.6.0.5"; exit 0 ;;
+                    btool) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update({
+                "PATH": f"{bin_dir}:{env['PATH']}",
+                "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                "SPLUNK_SSH_HOST": "labhost",
+                "SPLUNK_SSH_USER": current_user,
+                "SPLUNK_SSH_AUTH_METHOD": "key",
+                "SPLUNK_SSH_KNOWN_HOSTS_FILE": str(known_hosts),
+                "SPLUNK_REMOTE_SUDO": "true",
+                "CURL_LOG": str(curl_log),
+                "SSH_ARGS_LOG": str(ssh_args_log),
+            })
+            for key in ("SPLUNK_HOST", "SPLUNK_URI", "SPLUNK_SEARCH_API_URI", "SPLUNK_SSH_PASS", "SPLUNK_USER", "SPLUNK_PASS"):
+                env.pop(key, None)
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/validate.sh",
+                "--execution", "ssh",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--mgmt-port", "28089",
+                "--admin-password-file", str(password_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("OK: REST authentication succeeded", result.stdout)
+            self.assertIn("OK: KV Store is ready", result.stdout)
+            self.assertIn("https://127.0.0.1:28089/services/server/info?output_mode=json", curl_log.read_text(encoding="utf-8"))
+            self.assertIn("https://127.0.0.1:28089/services/kvstore/status?output_mode=json", curl_log.read_text(encoding="utf-8"))
+            self.assertNotIn("changeme", ssh_args_log.read_text(encoding="utf-8"))
 
 
     def test_host_bootstrap_validate_heavy_forwarder_accepts_server_list_without_mode_flag(self):
@@ -2089,7 +2276,9 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 if url.endswith("/services/auth/login"):
                     sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
                 elif "/services/server/info" in url:
-                    sys.stdout.write('{"entry":[{"name":"server-info"}]}')
+                    sys.stdout.write('{"entry":[{"name":"server-info","content":{"version":"10.6.0.5"}}]}')
+                elif "/services/kvstore/status" in url:
+                    sys.stdout.write('{"entry":[{"content":{"current":{"status":"ready","migrationStatus":"NotStarted"},"cohosted":{"status":"ready","type":"Pdl"}}}]}')
                 """,
             )
             write_executable(
@@ -2191,7 +2380,26 @@ EOF
                 from pathlib import Path
 
                 args = sys.argv[1:]
-                stdin_data = sys.stdin.read()
+                if "version" in args:
+                    sys.stdout.write("Splunk 10.4.1\\n")
+                    sys.stdout.flush()
+                if args and args[0] == "login":
+                    sys.stdout.write("Username: ")
+                    sys.stdout.flush()
+                    entered_user = sys.stdin.readline()
+                    sys.stdout.write("Password: ")
+                    sys.stdout.flush()
+                    entered_password = sys.stdin.readline()
+                    cache = Path(sys.argv[0]).resolve().parents[1] / ".splunk"
+                    cache.mkdir(mode=0o700, exist_ok=True)
+                    token = cache / "authToken_local_8089"
+                    token.write_text("synthetic-token\\n", encoding="utf-8")
+                    token.chmod(0o600)
+                    stdin_data = entered_user + entered_password
+                else:
+                    # The real CLI command does not consume a pipe. Keep the
+                    # fixture non-blocking for version/status/authenticated calls.
+                    stdin_data = ""
                 with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
                     handle.write(json.dumps(args) + "\\n")
                 with Path(os.environ["SPLUNK_STDIN_LOG"]).open("a", encoding="utf-8") as handle:
@@ -2230,16 +2438,14 @@ EOF
                 "--advertise-host", "sh2.example.com",
                 env=env,
             )
-            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-
-            server_conf = (
-                splunk_home
-                / "etc"
-                / "apps"
-                / "ZZZ_cisco_skills_enterprise_role"
-                / "local"
-                / "server.conf"
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=result.stdout + result.stderr +
+                ("\nmock commands:\n" + cmd_log.read_text() if cmd_log.exists() else ""),
             )
+
+            server_conf = splunk_home / "etc" / "system" / "local" / "server.conf"
             self.assertTrue(server_conf.exists())
             server_conf_text = server_conf.read_text(encoding="utf-8")
             self.assertIn("mgmt_uri = https://sh2.example.com:8089", server_conf_text)
@@ -2260,7 +2466,7 @@ EOF
 
             stdin_lines = stdin_log.read_text(encoding="utf-8")
             self.assertIn("admin\\nchangeme", stdin_lines)
-            self.assertIn("current_member_uri", command_lines[-1] if command_lines else "")
+            self.assertTrue(any("current_member_uri" in line for line in command_lines))
 
 
     def test_host_bootstrap_setup_rejects_deb_auto_with_custom_home(self):
@@ -2394,6 +2600,106 @@ EOF
             self.assertIn("install -m 600 /tmp/pkg.tgz.stage.", cmd_text)
             self.assertIn("/var/tmp/splunk/pkg.tgz", cmd_text)
 
+    def test_host_bootstrap_remote_staging_supports_ssh_key_auth(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            local_file = tmp_path / "pkg.tgz"
+            local_file.write_text("package", encoding="utf-8")
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            ssh_log = tmp_path / "ssh.log"
+            scp_log = tmp_path / "scp.log"
+
+            write_executable(
+                bin_dir / "ssh",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${SSH_LOG}"
+                exit 0
+                """,
+            )
+            write_executable(
+                bin_dir / "scp",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${SCP_LOG}"
+                exit 0
+                """,
+            )
+
+            helper_script = textwrap.dedent(
+                f"""\
+                source "{REPO_ROOT / 'skills/shared/lib/host_bootstrap_helpers.sh'}"
+                load_splunk_ssh_credentials() {{ :; }}
+                hbs_run_target_cmd() {{ return 0; }}
+                export SPLUNK_SSH_USER="bootstrap"
+                export SPLUNK_SSH_HOST="hf.example.com"
+                export SPLUNK_SSH_PORT="22"
+                export SPLUNK_SSH_AUTH_METHOD="key"
+                export SPLUNK_SSH_ALLOW_TOFU="true"
+                export SPLUNK_REMOTE_TMPDIR="/var/tmp/splunk"
+                hbs_stage_file_for_execution ssh "{local_file}" "pkg.tgz"
+                """
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SSH_LOG": str(ssh_log),
+                    "SCP_LOG": str(scp_log),
+                }
+            )
+            result = subprocess.run(
+                ["bash", "-c", helper_script],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            scp_text = scp_log.read_text(encoding="utf-8")
+            self.assertIn("BatchMode=yes", scp_text)
+            self.assertIn("PreferredAuthentications=publickey", scp_text)
+            self.assertNotIn("PubkeyAuthentication=no", scp_text)
+            self.assertFalse(ssh_log.exists())
+
+    def test_splunk_ssh_credentials_accept_key_auth_without_password(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credentials_file = Path(tmpdir) / "credentials"
+            credentials_file.write_text(
+                "SPLUNK_HOST=hf.example.com\n"
+                "SPLUNK_SSH_HOST=hf.example.com\n"
+                "SPLUNK_SSH_PORT=22\n"
+                "SPLUNK_SSH_USER=bootstrap\n"
+                "SPLUNK_SSH_AUTH_METHOD=key\n",
+                encoding="utf-8",
+            )
+            helper_script = textwrap.dedent(
+                f"""\
+                source "{REPO_ROOT / 'skills/shared/lib/credential_helpers.sh'}"
+                load_splunk_ssh_credentials
+                printf '%s|%s|%s' "${{SPLUNK_SSH_AUTH_METHOD}}" "${{SPLUNK_SSH_USER}}" "${{SPLUNK_SSH_PASS:-}}"
+                """
+            )
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env.pop("SPLUNK_SSH_PASS", None)
+
+            result = subprocess.run(
+                ["bash", "-c", helper_script],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertEqual(result.stdout, "key|bootstrap|")
+
 
     def test_host_bootstrap_remote_staging_reports_noninteractive_sudo_requirement(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2468,6 +2774,13 @@ EOF
             splunk_home = tmp_path / "installed-splunk"
             package_root = tmp_path / "package-root" / "splunk"
             (package_root / "bin").mkdir(parents=True)
+            jemalloc_dir = package_root / "opt" / "jemalloc-4k-nostats" / "lib"
+            jemalloc_dir.mkdir(parents=True)
+            (package_root / "lib").mkdir()
+            (jemalloc_dir / "libjemalloc.so").write_text("jemalloc", encoding="utf-8")
+            (package_root / "lib" / "libjemalloc.so").symlink_to(
+                "../opt/jemalloc-4k-nostats/lib/libjemalloc.so"
+            )
 
             credentials_file.write_text("", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
@@ -2488,14 +2801,29 @@ EOF
                 """,
             )
             write_executable(
+                bin_dir / "ss",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+            write_executable(
                 package_root / "bin" / "splunk",
                 """\
                 #!/usr/bin/env bash
                 case "$1" in
-                    start|restart) echo "started"; exit 0 ;;
+                    start)
+                        splunk_home="$(cd "$(dirname "$0")/.." && pwd)"
+                        test -s "$splunk_home/etc/system/local/user-seed.conf" || exit 8
+                        mkdir -p "$splunk_home/etc"
+                        printf 'initial-admin-record\\n' > "$splunk_home/etc/passwd"
+                        echo "started"
+                        exit 0
+                        ;;
+                    restart) echo "started"; exit 0 ;;
                     status) echo "splunkd is running"; exit 0 ;;
                     version) echo "Splunk 10.0.0"; exit 0 ;;
-                    enable) exit 0 ;;
+                    enable) echo "Authentication needed, run splunk login" >&2; exit 9 ;;
                     *) exit 0 ;;
                 esac
                 """,
@@ -2521,19 +2849,48 @@ EOF
                 "--file", str(package_file),
                 "--splunk-home", str(splunk_home),
                 "--service-user", current_user,
+                "--mgmt-port", "28189",
+                "--web-port", "28000",
+                "--appserver-port", "28065",
+                "--kvstore-port", "28191",
+                "--ipc-broker-port", "28194",
                 "--admin-password-file", str(password_file),
                 "--no-boot-start",
             )
 
             first_result = self.run_script(
                 "skills/splunk-enterprise-host-setup/scripts/setup.sh",
-                *install_args,
+                "--phase", "all", *install_args[2:],
                 env=env,
             )
             self.assertEqual(first_result.returncode, 0, msg=first_result.stdout + first_result.stderr)
+            self.assertIn("Verified the initial admin seed is present", first_result.stdout)
+            self.assertIn("Verified Splunk created its initial local account database", first_result.stdout)
+            self.assertIn("Splunk Web was configured before the first start", first_result.stdout)
             self.assertTrue(package_file.exists(), msg="Local package should not be deleted after install")
+            self.assertTrue((splunk_home / "etc/passwd").is_file())
+            self.assertTrue((splunk_home / "lib/libjemalloc.so").is_symlink())
             self.assertFalse((splunk_home / "etc/system/local/user-seed.conf").exists())
             self.assertEqual(list((splunk_home / "etc/system/local").glob("user-seed.conf.bak.*")), [])
+            system_local = splunk_home / "etc/system/local"
+            server_conf = (system_local / "server.conf").read_text(encoding="utf-8")
+            web_conf = (system_local / "web.conf").read_text(encoding="utf-8")
+            self.assertIn("[kvstore]\nport = 28191", server_conf)
+            self.assertIn("[ipc_broker]\nport = 28194", server_conf)
+            self.assertIn("postgres:postgres:address = 5432", server_conf)
+            self.assertIn("postgres:traefik_primary:address = 5433", server_conf)
+            self.assertIn("postgres:traefik_replica:address = 5434", server_conf)
+            self.assertIn("postgres:postgres-primary:address = 5433", server_conf)
+            self.assertIn("postgres:postgres-replica:address = 5434", server_conf)
+            self.assertIn("postgres:patroni:address = 8008", server_conf)
+            self.assertIn("postgres:pgbouncer:address = 6432", server_conf)
+            self.assertIn("postgres:postgres_nanny:address = 5435", server_conf)
+            self.assertIn("nascent:etcd_peer:address = 2380", server_conf)
+            self.assertIn("nascent:etcd_client:address = 2379", server_conf)
+            self.assertIn("mgmtHostPort = 0.0.0.0:28189", web_conf)
+            self.assertIn("httpport = 28000", web_conf)
+            self.assertIn("appServerPorts = 28065", web_conf)
+            self.assertIn("startwebserver = 1", web_conf)
 
             stale_backup = splunk_home / "etc/system/local/user-seed.conf.bak.stale"
             stale_backup.parent.mkdir(parents=True, exist_ok=True)
@@ -2549,6 +2906,67 @@ EOF
             self.assertTrue(package_file.exists(), msg="Local package should remain after repeated install runs")
             self.assertIn("already matches the requested package", second_result.stdout)
             self.assertFalse(stale_backup.exists(), msg="Repeated same-version install should clean stale user-seed backups")
+
+    def test_host_bootstrap_rejects_duplicate_isolated_service_ports(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credentials_file = Path(tmpdir) / "credentials"
+            credentials_file.write_text("", encoding="utf-8")
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--mgmt-port", "28000",
+                "--web-port", "28000",
+                "--appserver-port", "28065",
+                "--kvstore-port", "28191",
+                "--ipc-broker-port", "28194",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must be distinct", result.stdout + result.stderr)
+
+    def test_host_bootstrap_rejects_duplicate_sidecar_ports(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credentials_file = Path(tmpdir) / "credentials"
+            credentials_file.write_text("", encoding="utf-8")
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--postgres-port", "8191",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must be distinct", result.stdout + result.stderr)
+
+    def test_host_bootstrap_rejects_privileged_sidecar_ports(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credentials_file = Path(tmpdir) / "credentials"
+            credentials_file.write_text("", encoding="utf-8")
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--postgres-port", "1023",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must be from 1024 through 65535", result.stdout + result.stderr)
 
     def test_host_bootstrap_install_rejects_unsafe_tgz_members(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2594,6 +3012,58 @@ EOF
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Unsafe package archive member", result.stdout + result.stderr)
             self.assertFalse(escape_path.exists())
+
+    def test_host_bootstrap_install_rejects_escaping_tgz_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            package_file = tmp_path / "splunk-10.0.0-linux-x86_64.tgz"
+            splunk_home = tmp_path / "installed-splunk"
+
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            password_file.chmod(0o600)
+            write_executable(bin_dir / "ss", "#!/usr/bin/env bash\nexit 0\n")
+            with tarfile.open(package_file, "w:gz") as archive:
+                link = tarfile.TarInfo("splunk/lib/libescape.so")
+                link.type = tarfile.SYMTYPE
+                link.linkname = "../../../../../../etc/passwd"
+                archive.addfile(link)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--mgmt-port", "28189",
+                "--web-port", "28000",
+                "--appserver-port", "28065",
+                "--kvstore-port", "28191",
+                "--ipc-broker-port", "28194",
+                "--admin-password-file", str(password_file),
+                "--no-boot-start",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsafe package archive member", result.stdout + result.stderr)
+            self.assertFalse(splunk_home.exists())
 
 
     def test_host_bootstrap_install_upgrades_tgz_without_admin_password_and_preserves_local_files(self):

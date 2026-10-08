@@ -42,6 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--phone-home-interval", default="60")
     parser.add_argument("--tcpout-group", default="default-autolb-group")
     parser.add_argument("--use-ack", choices=("true", "false"), default="true")
+    parser.add_argument("--mgmt-port", default="8089")
+    parser.add_argument("--ipc-port", "--ipc-broker-port", dest="ipc_port", default="8194")
     parser.add_argument("--source-command", default="")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -66,6 +68,12 @@ def conf_stanza_token(value: str, option: str) -> None:
 def positive_int(value: str, option: str) -> int:
     if not re.fullmatch(r"[0-9]+", value or "") or int(value) < 1:
         die(f"{option} must be a positive integer.")
+    return int(value)
+
+
+def port(value: str, option: str, minimum: int = 1) -> int:
+    if not re.fullmatch(r"[0-9]+", value or "") or not minimum <= int(value) <= 65535:
+        die(f"{option} must be a numeric value from {minimum} through 65535.")
     return int(value)
 
 
@@ -213,6 +221,12 @@ def windows_default_path(path: str) -> str:
 
 def validate(args: argparse.Namespace) -> None:
     positive_int(args.phone_home_interval, "--phone-home-interval")
+    mgmt_port = port(args.mgmt_port, "--mgmt-port")
+    ipc_port = port(args.ipc_port, "--ipc-port", 1025)
+    if mgmt_port == ipc_port:
+        die("--mgmt-port and --ipc-port must be different.")
+    if args.target_os == "windows" and (args.mgmt_port != "8089" or args.ipc_port != "8194"):
+        die("Custom management and IPC ports are supported only for Unix-like UF targets; Windows handoff keeps MSI defaults.")
     for value, option in (
         (args.target_arch, "--target-arch"),
         (args.package_type, "--package-type"),
@@ -570,6 +584,9 @@ def metadata(args: argparse.Namespace, files: list[str]) -> dict[str, object]:
         "server_list": server_list(args.server_list, "--server-list") if args.enroll == "enterprise-indexers" else [],
         "client_name": args.client_name,
         "phone_home_interval": positive_int(args.phone_home_interval, "--phone-home-interval"),
+        "mgmt_port": port(args.mgmt_port, "--mgmt-port"),
+        "ipc_port": port(args.ipc_port, "--ipc-port", 1025),
+        "ipc_broker_port": port(args.ipc_port, "--ipc-broker-port", 1025),
         "rendered_files": files,
         "v1_apply": v1_apply_state(args),
         "notes": "No secret values are stored in rendered metadata or scripts.",

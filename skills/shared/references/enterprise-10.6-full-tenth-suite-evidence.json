@@ -1,0 +1,27 @@
+{
+  "collected_at": "2026-10-08T07:02:56.760670+00:00",
+  "snapshot_sha256": "0a49d495862c274831a3e247cd9adcf675d5e97798c9490a9455fdd748a2734a",
+  "environment": "Ubuntu 24.04 x86_64; Python 3.11; owner-only workspace/interpreter/tmp; isolated network namespace; PYTHONDONTWRITEBYTECODE=1",
+  "result": "pass",
+  "pytest_passed": 4994,
+  "pytest_skipped": 31,
+  "subtests_passed": 3216,
+  "duration_seconds": 3853.06,
+  "exit_code": 0,
+  "junit": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "31",
+    "tests": "8241",
+    "time": "3852.936",
+    "timestamp": "2026-10-08T05:50:39.289652+00:00"
+  },
+  "artifacts_sha256": {
+    "pytest.log": "f0235fa9593b4cd58b07d6d4d5b3e838397d161654644db6aa4fc676613ae3f0",
+    "pytest.xml": "b591f47bc62718e37eeb8057b118ba5939adb3a649275cfaf9ae0542ed2aafcc",
+    "exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "qualification": "Frozen tenth snapshot only. Subsequent federation, restart and ASA corrections require another complete run before sign-off.",
+  "sanitization": "Private runtime host identifiers omitted; detailed reports retained in protected evidence directory."
+}

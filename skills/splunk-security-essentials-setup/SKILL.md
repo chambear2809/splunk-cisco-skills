@@ -4,8 +4,10 @@ description: "Use when a user asks to set up SSE, Security Essentials, MITRE/Kil
   Content recommendations, or starter security posture dashboards. Install, configure readiness, and
   validate Splunk Security Essentials (`Splunk_Security_Essentials`, Splunkbase app 3435) on Splunk Cloud
   or Splunk Enterprise."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-07"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -112,9 +114,15 @@ bash skills/splunk-security-essentials-setup/scripts/validate.sh
 - Keep SSE on the search tier or search head cluster deployer path.
 - Do not treat SSE as an Enterprise Security replacement. It can safely coexist
   with ES and includes content references from ES, ES Content Update, and UBA.
-- Splunkbase lists SSE through platform `10.5`. Treat that entry as the
-  repository's Splunk Cloud compatibility target; it does not change the
-  self-managed Enterprise default from `10.4.1` or certify Enterprise `10.5`.
+- The official Splunkbase listing currently identifies release `3.8.3` (January
+  21, 2026) as compatible with Splunk Enterprise platform `10.6`. The
+  self-managed Enterprise `10.6` qualification was checked against that
+  listing on October 7, 2026. Keep the Cloud route conditional under the
+  compatibility declaration above; Enterprise compatibility does not certify
+  a Cloud stack or its tenant-specific entitlements.
+- Source: https://splunkbase.splunk.com/app/3435/ and the release API
+  `https://splunkbase.splunk.com/api/v1/app/3435/release/` (checked October 7,
+  2026).
 - After install, guide operators through the setup checklist: Data Inventory
   Introspection, Content Mapping, app configuration review, and optional
   posture dashboards.

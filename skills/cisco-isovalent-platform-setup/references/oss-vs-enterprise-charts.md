@@ -6,8 +6,8 @@ Cisco completed the Isovalent acquisition on 2024-04-12. The chart story split i
 
 | Component | Helm repo | Chart name | Exact version | License |
 |-----------|-----------|------------|---:|---------|
-| Cilium (CNI) | `https://helm.cilium.io` (`helm repo add cilium https://helm.cilium.io`) | `cilium/cilium` | `1.18.10` | Apache 2.0 |
-| Tetragon (eBPF runtime security) | `https://helm.cilium.io` | `cilium/tetragon` | `1.7.0` | Apache 2.0 |
+| Cilium (CNI) | `https://helm.cilium.io` (`helm repo add cilium https://helm.cilium.io`) | `cilium/cilium` | `1.20.2` | Apache 2.0 |
+| Tetragon (eBPF runtime security) | `https://helm.cilium.io` | `cilium/tetragon` | `1.7.1` | Apache 2.0 |
 
 The OSS charts are publicly accessible; no license required. They cover the foundational CNI + runtime security functionality that pairs with `splunk-observability-isovalent-integration` for metrics scraping.
 
@@ -43,12 +43,13 @@ signatures, or independently audited SHA-256 values; private chart resolution
 also depends on customer entitlement. Treat that as an explicit provenance gap,
 not as checksum-backed supply-chain verification.
 
-The public and Enterprise version lines are not interchangeable. Cilium OSS
-uses the upstream `1.18.10` maintenance release and avoids the documented GKE
-regression in upstream `1.18.8`; Enterprise remains pinned to the exact
-`1.18.8` evidence validated on `isovalent-demo`. Tetragon likewise uses OSS
-`1.7.0` while the Enterprise chart retains the cluster-validated `1.18.1`
-product version.
+The public and Enterprise version lines are not interchangeable. The public
+chart pins (`1.20.2` Cilium, `1.7.1` Tetragon) were confirmed against the
+upstream chart index on 2026-09-30. Enterprise remains pinned to `1.18.8` and
+`1.18.1`, the exact chart versions validated on `isovalent-demo`; these are not
+asserted to be the newest Enterprise releases because the private chart index
+was not independently accessible. Reconfirm those pins with entitled access
+before planning an Enterprise upgrade.
 
 Enterprise unlocks:
 
@@ -69,9 +70,8 @@ This mirror is supported by AWS for the EKS Hybrid Nodes use case. The skill's `
 
 Caveats:
 
-- Available Cilium versions: v1.17.x and v1.18.x as of 2026 (per AWS docs).
-- v1.18.3+ requires Linux kernel >= 5.10 (preflight script checks this).
-- Not supported on Ubuntu 20.04 or RHEL 8 (per AWS).
+- This repository keeps the EKS OCI mirror at its separately reviewed `1.18.8` pin; confirm the current AWS-supported mirror versions before upgrades.
+- AWS EKS Hybrid Nodes requires kernel >= 5.10 for this Cilium path and excludes Ubuntu 20.04 and RHEL 8; these AWS exclusions do not define upstream OSS distro support.
 
 ## Switching editions
 

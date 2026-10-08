@@ -3,6 +3,8 @@ name: galileo-on-prem-kubernetes-setup
 description: "Use when planning, reviewing, doctoring, or checking full deployment coverage for Galileo On-Prem on Kubernetes. Render a non-mutating, immutable orchestration packet for the Galileo Stack, galileoctl, packaged Agent Control, Luna Studio, Wizard GPU/local inference, air-gapped supply chains, and production-readiness handoffs. Route implementation to the owning child skill; reject install, upgrade, rollback, uninstall, registry writes, and all other live mutations."
 compatibility: "No direct Splunk Platform runtime dependency. This workflow can be used alongside Splunk Cloud Platform 10.5.2605 through its documented external APIs or handoffs."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "not-applicable"
   compatibility_verified: "2026-08-20"
 ---

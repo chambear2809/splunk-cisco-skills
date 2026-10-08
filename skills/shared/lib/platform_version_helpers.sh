@@ -154,7 +154,7 @@ spv_splunk_home_version() {
 import re
 import sys
 
-match = re.search(r"\b(?:Splunk(?: Universal Forwarder)?|Universal Forwarder)\s+(\d+\.\d+(?:\.\d+)?)\b", sys.argv[1])
+match = re.search(r"\b(?:Splunk(?: Universal Forwarder)?|Universal Forwarder)\s+(\d+\.\d+(?:\.\d+){0,2})\b", sys.argv[1])
 if not match:
     raise SystemExit(1)
 print(match.group(1))

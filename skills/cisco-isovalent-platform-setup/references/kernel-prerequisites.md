@@ -1,16 +1,24 @@
 # Kernel prerequisites
 
-Cilium uses eBPF features that depend on Linux kernel version. The minimum kernel for Cilium v1.18.x is **5.10**. Older kernels work for older Cilium versions; the skill defaults to the v1.18.x line because that's what AWS EKS Hybrid Nodes ships.
+Cilium uses eBPF features that depend on Linux kernel version and configuration.
+For the OSS Cilium 1.20.2 chart pin, upstream documents Linux kernel **5.10 or
+equivalent**, including RHEL 8.10's 4.18 kernel with the required backports. The
+skill's simple numeric check remains conservative and can warn on equivalent
+distro kernels. The EKS Hybrid OCI mirror has separate AWS support constraints;
+AWS excludes Ubuntu 20.04 and RHEL 8 for that path. Do not apply those exclusions
+to every upstream Cilium installation.
 
 ## Per-version requirements
 
-| Cilium version | Minimum kernel | Notes |
-|----------------|----------------|-------|
-| 1.18.x | 5.10 | Not supported on Ubuntu 20.04 (kernel 5.4) or RHEL 8 (kernel 4.18) per AWS docs |
-| 1.17.x | 5.4 | Supported on Ubuntu 20.04, RHEL 8 |
-| 1.16.x and earlier | varies | See Cilium release notes |
+| Cilium version/path | Minimum kernel | Notes |
+|---------------------|----------------|-------|
+| Upstream 1.20.2 | 5.10 or distro-equivalent | RHEL 8.10's 4.18 kernel is listed as equivalent when required backports/configuration are present. |
+| AWS EKS Hybrid mirror | 5.10 | AWS-specific distribution restrictions include Ubuntu 20.04 and RHEL 8; verify its current support matrix. |
+| Other releases | varies | Review that exact release's upstream or provider system requirements. |
 
-If you need Cilium on Ubuntu 20.04 or RHEL 8 in 2026, pin to v1.17.x; otherwise upgrade the kernel or move to a distribution with kernel >= 5.10 (Ubuntu 22.04, RHEL 9, Amazon Linux 2023, etc.).
+Do not use an older Cilium version solely to bypass a warning. Confirm the
+kernel's distro-equivalent support and every feature-specific requirement for
+the chosen chart and provider.
 
 ## Preflight check
 
@@ -21,7 +29,10 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.n
     | awk -v min="5.10" '{split($2,a,/[.-]/); split(min,b,/[.-]/); ok=(a[1]>b[1] || (a[1]==b[1] && a[2]>=b[2])); printf "%s\t%s\t%s\n", $1, $2, ok?"OK":"WARN"}'
 ```
 
-It prints one line per node with kernel version and OK/WARN. Any WARN means that node will not run Cilium v1.18.x cleanly.
+It prints one line per node with kernel version and OK/WARN. A WARN identifies
+a numeric version below the configured threshold; it does not evaluate distro
+backports or prove that a kernel is unsupported. Review provider and feature
+requirements before accepting or rejecting that node.
 
 ## Per-feature kernel requirements
 
@@ -30,25 +41,25 @@ Some Cilium features require newer kernels even when the base requirement is met
 - `kubeProxyReplacement: true` — kernel >= 5.7 for full feature parity.
 - BPF-based load balancer with DSR (direct server return) — kernel >= 5.10.
 - BPF host routing (`bpf.hostRouting=true`) — kernel >= 5.10.
-- IPv6 BIG TCP — kernel >= 5.19 (mostly experimental in 1.18.x).
+- IPv6 BIG TCP — kernel >= 5.19.
 - Egress gateway with BPF mode — kernel >= 5.10.
 
-The skill's `helm/cilium-values.yaml` defaults to `kubeProxyReplacement: true`. If the operator is running on an older kernel, they should override to `false` in the spec's `cilium` block and explicitly plan the kube-proxy operating mode.
+The skill's `helm/cilium-values.yaml` defaults to `kubeProxyReplacement: true`. If an intended kernel lacks a required capability, use a supported kernel or explicitly plan a supported kube-proxy mode in the Cilium configuration.
 
 ## Tetragon kernel requirements
 
-Tetragon also requires eBPF support but is more flexible:
+Upstream Tetragon requires Linux **4.19 or newer**, BTF, and the necessary BPF
+kernel configuration. Older kernels can lack individual capabilities; arm64
+kernels 4.19 and 5.4 have documented limitations for some features such as
+reading exec arguments. Tetragon recommends kernel 5.10 or newer for full
+arm64 functionality and recommends the newest stable kernel practical for the
+deployment.
 
-| Tetragon feature | Minimum kernel |
-|------------------|----------------|
-| Process exec events | 4.18 |
-| Network connect / accept events | 4.18 |
-| File access events | 4.18 |
-| TracingPolicy with kprobes | 5.4 |
-| Layer 7 DNS / HTTP tracking | 5.10 |
-| Network observability with TLS | 5.10 |
-
-The skill's default TracingPolicy uses TCP connect/close kprobes which work on kernel >= 5.4.
+Do not use a feature-by-feature minimum table as a substitute for probing the
+actual kernel. Check the official Tetragon FAQ, then use `tetra probe config`
+and `tetra probe` with operator-approved access when a kernel's BTF or feature
+support is uncertain. The skill's bundled observe-only policies are not
+validated against every kernel/distribution combination.
 
 ## Upgrading the kernel
 

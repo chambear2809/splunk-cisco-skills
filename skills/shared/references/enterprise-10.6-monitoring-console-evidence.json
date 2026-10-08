@@ -1,0 +1,81 @@
+{
+  "captured_at": "2026-10-07T16:01:49.056368+00:00",
+  "target": "secondary standalone",
+  "version": "10.6.0.5",
+  "build": "86587d4e3b27",
+  "health_info": "green",
+  "kvStoreStatus": "ready",
+  "startup_time": 1791388798,
+  "app": {
+    "version": "10.6.0",
+    "configured": true,
+    "disabled": false,
+    "visible": true
+  },
+  "views_total": 111,
+  "representative_views": [
+    "indexing_performance_instance",
+    "license_usage_today",
+    "monitoringconsole_landing",
+    "monitoringconsole_overview",
+    "resource_usage_instance"
+  ],
+  "saved_searches_total": 13,
+  "enabled_saved_searches": [
+    "DMC Asset - Build Full",
+    "DMC Asset - Build Standalone Asset Table",
+    "DMC Asset - Build Standalone Computed Groups Only",
+    "DMC License Usage Data Cube"
+  ],
+  "queries": {
+    "lab106_30d": "{\"preview\":false,\"offset\":0,\"lastrow\":true,\"result\":{\"count\":\"2\"}}\n",
+    "internal_15m": "{\"preview\":false,\"offset\":0,\"lastrow\":true,\"result\":{\"count\":\"31876\"}}\n",
+    "mc_views": "{\"preview\":false,\"offset\":0,\"lastrow\":true,\"result\":{\"count\":\"111\"}}\n"
+  },
+  "restart": {
+    "before_startup_time": 1791250133,
+    "after_startup_time": 1791388798,
+    "changed": true,
+    "target": "secondary only"
+  },
+  "representative_searches": {
+    "source": "splunk_monitoring_console 10.6.0 shipped appserver/static/build/pages/enterprise/monitoringconsole_overview.js",
+    "results": {
+      "indexer_health": {
+        "query": "| rest splunk_server=local /services/server/introspection/indexer | fields average_KBps splunk_server | eval average_KBps=round(average_KBps,2).\" KB/s\"",
+        "rows": 1,
+        "first": [
+          {
+            "average_KBps": "19.07 KB/s"
+          }
+        ]
+      },
+      "process_health": {
+        "query": "| rest splunk_server=local /services/server/status/resource-usage/splunk-processes | fields process_class mem_used | eval process_class=if(process_class=\"Idle\",\"Free\",process_class)",
+        "rows": 38,
+        "first": [
+          {
+            "mem_used": "463.715"
+          },
+          {
+            "mem_used": "20.688"
+          }
+        ]
+      },
+      "license_pools": {
+        "query": "| rest splunk_server=local /services/licenser/pools | fields title stack_id quota | stats count",
+        "rows": 1,
+        "first": [
+          {
+            "count": "3"
+          }
+        ]
+      }
+    }
+  },
+  "config_validation": {
+    "spec": "/opt/splunk-10.6-lab-core-20261005/etc/apps/splunk_monitoring_console/README/splunk_monitoring_console_assets.conf.spec",
+    "mc_auto_config": "omitted; not a 10.6 [settings] key in shipped spec (global standalone/distributed boundary)",
+    "btool_check": "passed; applied app local/default files checked with no ERROR/WARN"
+  }
+}

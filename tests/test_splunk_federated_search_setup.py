@@ -9,8 +9,11 @@ import re
 import subprocess
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +71,12 @@ def write_supported_fake_splunk_home(path: Path) -> None:
     binary.chmod(0o755)
 
 
-def render_rest_apply_fixture(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+def render_rest_apply_fixture(
+    tmp_path: Path,
+    *,
+    provider_disabled: bool = False,
+    index_disabled: bool = False,
+) -> tuple[Path, dict[str, str]]:
     admin_password = tmp_path / "admin-password"
     provider_password = tmp_path / "provider-password"
     admin_password.write_text("admin-test-password", encoding="utf-8")
@@ -84,6 +92,7 @@ def render_rest_apply_fixture(tmp_path: Path) -> tuple[Path, dict[str, str]]:
                 "host_port": "remote.example.test:8089",
                 "service_account": "federated_svc",
                 "password_file": str(provider_password),
+                "disabled": provider_disabled,
             }
         ],
         "federated_indexes": [
@@ -92,6 +101,7 @@ def render_rest_apply_fixture(tmp_path: Path) -> tuple[Path, dict[str, str]]:
                 "provider": "alpha",
                 "dataset_type": "index",
                 "dataset_name": "main",
+                "disabled": index_disabled,
             }
         ],
     }
@@ -843,6 +853,65 @@ def test_global_toggle_scripts_post_correct_payload(tmp_path: Path) -> None:
     assert "/services/data/federated/provider" in status
     assert "/services/data/federated/index" in status
     assert "/services/data/federated/settings/general" in status
+    assert 'content.get("disabled")' not in status
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        {"transparent_mode": "0"},
+        {"disabled": "unexpected"},
+        {"disabled": "0", "messages": [{"type": "ERROR"}]},
+    ],
+)
+def test_global_toggle_refuses_unverified_disabled_contract(
+    tmp_path: Path, content: dict[str, str]
+) -> None:
+    post_paths: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            body = json.dumps({"entry": [{"content": content}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self) -> None:  # noqa: N802
+            post_paths.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = subprocess.run(
+            ["bash", str(render_dir / "global-enable.sh")],
+            cwd=render_dir,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        assert result.returncode != 0
+        assert "recognized federated global disabled field" in result.stderr
+        assert post_paths == []
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_apply_rest_payload_includes_password_substitution(tmp_path: Path) -> None:
@@ -915,6 +984,244 @@ def test_apply_rest_allows_explicit_lab_http_with_warning(tmp_path: Path) -> Non
         assert "LAB ONLY" in result.stderr
         assert len(authorization_headers) == 2
         assert all(value.startswith("Basic ") for value in authorization_headers)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_apply_rest_provider_disabled_uses_action_endpoint_after_create(
+    tmp_path: Path,
+) -> None:
+    requests: list[tuple[str, dict[str, list[str]]]] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length).decode()
+            requests.append((self.path, urllib.parse.parse_qs(body)))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path, provider_disabled=True)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert len(requests) == 3
+        assert requests[0][0].endswith("/services/data/federated/provider")
+        assert "disabled" not in requests[0][1]
+        assert requests[1][0].endswith("/services/data/federated/index")
+        assert requests[2][0].endswith("/services/data/federated/provider/alpha/disable")
+        assert requests[2][1] == {}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_apply_rest_existing_disabled_provider_refreshes_state_after_enable(
+    tmp_path: Path,
+) -> None:
+    requests: list[tuple[str, str]] = []
+    state_reads = 0
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            nonlocal state_reads
+            requests.append(("GET", self.path))
+            state_reads += 1
+            body = json.dumps(
+                {"entry": [{"name": "alpha", "content": {"disabled": "1" if state_reads == 1 else "0"}}]}
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self) -> None:  # noqa: N802
+            requests.append(("POST", self.path))
+            status = 409 if self.path.endswith("/federated/provider") else 200
+            self.send_response(status)
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert any(path.endswith("/provider/alpha/enable") for _, path in requests)
+        assert any(path.endswith("/federated/index") for _, path in requests)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    "error_body",
+    [
+        b'{"messages":[{"type":"ERROR","text":"rejected"}]}',
+        b'<response><messages><msg type="ERROR">rejected</msg></messages></response>',
+    ],
+)
+def test_apply_rest_rejects_structured_provider_error_without_index_post(
+    tmp_path: Path, error_body: bytes
+) -> None:
+    post_paths: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            post_paths.append(self.path)
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(error_body)))
+            self.end_headers()
+            self.wfile.write(error_body)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode != 0
+        assert "structured error response" in result.stderr
+        assert post_paths == ["/services/data/federated/provider"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    ("existing_status", "existing_disabled", "provider_disabled", "expected_rc"),
+    [(404, "0", False, 0), (409, "0", False, 0), (404, "1", False, 1), (404, "1", True, 0)],
+)
+def test_apply_rest_index_existing_verifies_exact_entity_before_keyed_update(
+    tmp_path: Path,
+    existing_status: int,
+    existing_disabled: str,
+    provider_disabled: bool,
+    expected_rc: int,
+) -> None:
+    requests: list[tuple[str, str]] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            requests.append(("GET", self.path))
+            body = json.dumps(
+                {
+                    "entry": [
+                        {
+                            "name": "federated:alpha_idx",
+                            "content": {
+                                "federated.provider": "alpha",
+                                "federated.dataset": "index:main",
+                                "disabled": existing_disabled,
+                            },
+                        }
+                    ]
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self) -> None:  # noqa: N802
+            requests.append(("POST", self.path))
+            if self.path.endswith("/federated/index"):
+                body = b"<response><messages><msg type=\"ERROR\">already exists</msg></messages></response>"
+                self.send_response(existing_status)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        render_dir, env = render_rest_apply_fixture(tmp_path, provider_disabled=provider_disabled)
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode == expected_rc, result.stdout + result.stderr
+        if expected_rc:
+            assert "cannot safely re-enable" in result.stderr
+            assert ("POST", "/services/data/federated/index/federated%3Aalpha_idx") not in requests
+        assert ("GET", "/services/data/federated/index/federated%3Aalpha_idx?output_mode=json") in requests
+        if not expected_rc and existing_disabled == "0":
+            assert ("POST", "/services/data/federated/index/federated%3Aalpha_idx") in requests
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_apply_rest_rejects_disabled_index_before_any_post(tmp_path: Path) -> None:
+    render_dir, env = render_rest_apply_fixture(tmp_path, index_disabled=True)
+    requests: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            requests.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        env.update(
+            {
+                "SPLUNK_REST_URI": f"http://127.0.0.1:{server.server_port}",
+                "SPLUNK_ALLOW_INSECURE_HTTP": "true",
+            }
+        )
+        result = run_rest_apply(render_dir, env)
+        assert result.returncode != 0
+        assert "disabled federated indexes" in result.stderr
+        assert requests == []
     finally:
         server.shutdown()
         server.server_close()

@@ -183,6 +183,22 @@ exit 9
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertTrue((Path(tmpdir) / expected_asset).exists())
 
+    def test_smartstore_setup_forwards_imds_and_s3_ca_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                [
+                    "bash", str(SMARTSTORE_SETUP), "--output-dir", tmpdir,
+                    "--remote-path", "s3://splunk-smartstore/wrapper",
+                    "--imds-version", "v2",
+                    "--s3-ssl-root-ca-path", "/etc/ssl/certs/ca-certificates.crt",
+                ],
+                cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "smartstore"
+            self.assertIn("imds_version = v2", (render_dir / "server.conf").read_text(encoding="utf-8"))
+            self.assertIn("remote.s3.sslRootCAPath = /etc/ssl/certs/ca-certificates.crt", (render_dir / "indexes.conf.template").read_text(encoding="utf-8"))
+
     def test_federated_standard_renders_provider_index_and_shc_replication(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             password_file = Path(tmpdir) / "federated.secret"
@@ -334,6 +350,10 @@ exit 9
                 "arn:aws:kms:us-east-1:111122223333:key/example",
                 "--s3-ssl-verify-server-cert",
                 "true",
+                "--s3-ssl-root-ca-path",
+                "/etc/ssl/certs/ca-certificates.crt",
+                "--imds-version",
+                "v2",
                 "--bucket-localize-max-timeout-sec",
                 "600",
                 "--s3-access-key-file",
@@ -361,6 +381,9 @@ exit 9
             self.assertIn("remote.s3.encryption = sse-kms", indexes_conf)
             self.assertIn("remote.s3.kms.key_id = arn:aws:kms:us-east-1:111122223333:key/example", indexes_conf)
             self.assertIn("remote.s3.sslVerifyServerCert = true", indexes_conf)
+            self.assertIn("remote.s3.sslRootCAPath = /etc/ssl/certs/ca-certificates.crt", indexes_conf)
+            self.assertIn("[imds]", server_conf)
+            self.assertIn("imds_version = v2", server_conf)
             self.assertIn("remote.s3.access_key = __SMARTSTORE_S3_ACCESS_KEY_FROM_FILE__", indexes_conf)
             self.assertIn("eviction_policy = lru", server_conf)
             self.assertIn("max_cache_size = 262144", server_conf)
@@ -370,6 +393,32 @@ exit 9
             self.assertIn("bucket_localize_max_timeout_sec = 600", limits_conf)
             self.assertNotIn("AKIA_TEST_SECRET", all_assets)
             self.assertNotIn("VERY_SECRET_S3_KEY", all_assets)
+
+    def test_smartstore_default_omits_imds_and_ca_overlays(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir", tmpdir,
+                "--remote-path", "s3://splunk-smartstore/defaults",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "smartstore"
+            self.assertNotIn("[imds]", (render_dir / "server.conf").read_text(encoding="utf-8"))
+            self.assertNotIn("sslRootCAPath", (render_dir / "indexes.conf.template").read_text(encoding="utf-8"))
+
+    def test_smartstore_rejects_invalid_imds_and_relative_ca_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            invalid_imds = self.run_renderer(
+                SMARTSTORE_RENDERER, "--output-dir", tmpdir,
+                "--remote-path", "s3://splunk-smartstore/invalid", "--imds-version", "v3",
+            )
+            self.assertNotEqual(invalid_imds.returncode, 0)
+            relative_ca = self.run_renderer(
+                SMARTSTORE_RENDERER, "--output-dir", tmpdir,
+                "--remote-path", "s3://splunk-smartstore/invalid", "--s3-ssl-root-ca-path", "ca.pem",
+            )
+            self.assertNotEqual(relative_ca.returncode, 0)
+            self.assertIn("absolute path", relative_ca.stderr)
 
     def test_smartstore_rejects_mismatched_remote_path_scheme(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1395,7 +1444,27 @@ sys.stdout.write("200")
             metadata = (render_dir / "metadata.json").read_text(encoding="utf-8")
             preflight = (render_dir / "preflight.sh").read_text(encoding="utf-8")
 
-            self.assertIn("mc_auto_config = enabled", assets_conf)
+            # Enterprise 10.6 removed this key; auto-config is managed by the
+            # Monitoring Console feature flag. Legacy 10.4 rendering is tested
+            # below and retains the explicit setting.
+            self.assertNotIn("mc_auto_config =", assets_conf)
+            legacy_dir = Path(tmpdir) / "legacy"
+            legacy_result = self.run_renderer(
+                MONITORING_RENDERER,
+                "--output-dir",
+                str(legacy_dir),
+                "--enterprise-version",
+                "10.4.1",
+                "--mode",
+                "distributed",
+                "--enable-auto-config",
+                "true",
+            )
+            self.assertEqual(legacy_result.returncode, 0, msg=legacy_result.stdout + legacy_result.stderr)
+            self.assertIn(
+                "mc_auto_config = enabled",
+                (legacy_dir / "monitoring-console" / "splunk_monitoring_console_assets.conf").read_text(encoding="utf-8"),
+            )
             self.assertIn("[distributedSearch]", distsearch)
             self.assertIn("servers = https://cm01.example.com:8089,https://idx01.example.com:8089", distsearch)
             self.assertIn("[distributedSearch:managers]\ndefault = false\nservers = cm01.example.com:8089", distsearch)

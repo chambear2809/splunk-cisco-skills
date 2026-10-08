@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-10-08",
+  "scope": "Default workflow applicability to self-managed Enterprise 10.6, independent of Splunk Cloud qualification",
+  "historical_baseline": {
+    "date": "2026-10-05",
+    "supported": 59,
+    "conditional": 42,
+    "blocked": 1,
+    "delegated": 6,
+    "not-applicable": 61
+  },
+  "workflows": {
+    "splunk-ddaa-archive-setup": {
+      "previous_status": "conditional",
+      "previous_verified": "2026-10-05",
+      "status": "not-applicable",
+      "verified": "2026-10-08",
+      "reason": "DDAA archives Splunk Cloud indexes in a Splunk-managed archive.",
+      "primary_source": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.4.2604/manage-your-indexes-and-data-in-splunk-cloud-platform/store-expired-splunk-cloud-platform-data-in-a-splunk-managed-archive"
+    },
+    "splunk-cloud-acs-admin-setup": {
+      "previous_status": "conditional",
+      "previous_verified": "2026-10-05",
+      "status": "not-applicable",
+      "verified": "2026-10-08",
+      "reason": "ACS administers the Splunk Cloud control plane.",
+      "primary_source": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/welcome-to-the-admin-config-service-acs/about-the-admin-config-service-acs-api"
+    },
+    "splunk-cloud-acs-allowlist-setup": {
+      "previous_status": "conditional",
+      "previous_verified": "2026-10-05",
+      "status": "not-applicable",
+      "verified": "2026-10-08",
+      "reason": "This alias delegates to the Splunk Cloud ACS allowlist workflow.",
+      "primary_source": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/welcome-to-the-admin-config-service-acs/about-the-admin-config-service-acs-api"
+    },
+    "splunk-cloud-data-manager-setup": {
+      "previous_status": "conditional",
+      "previous_verified": "2026-10-05",
+      "status": "not-applicable",
+      "verified": "2026-10-08",
+      "reason": "Data Manager is a built-in Splunk Cloud app; generated customer-cloud resources support that Cloud control plane.",
+      "primary_source": "https://help.splunk.com/en/data-management/ingest-data-from-cloud-sources/use-data-manager/1.16/getting-data-in-gdi/set-up-data-manager"
+    },
+    "splunk-ingest-processor-setup": {
+      "previous_status": "conditional",
+      "previous_verified": "2026-10-05",
+      "status": "not-applicable",
+      "verified": "2026-10-08",
+      "reason": "Ingest Processor operates within Splunk Cloud Platform on Victoria Experience. Enterprise Ingest Actions is a separate workflow.",
+      "primary_source": "https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/introduction/about-ingest-processor"
+    }
+  }
+}

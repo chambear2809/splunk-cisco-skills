@@ -4,8 +4,10 @@ description: "Use when the user asks to onboard or validate NetApp Data ONTAP, O
   Splunk. Render, install, and validate package-verified NetApp ONTAP supported add-ons: Splunk_TA_ontap,
   TA-ONTAP-FieldExtractions, and SA-ONTAPIndex. Covers scheduler/worker placement, ontap index creation,
   ontap:* and Hydra source type validation, troubleshooting checks, and ITSI storage handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---

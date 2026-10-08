@@ -322,6 +322,7 @@ allowed_keys = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_SSH_AUTH_METHOD",
     "SPLUNK_SSH_KNOWN_HOSTS_FILE",
     "SPLUNK_SSH_HOST_KEY_FINGERPRINT",
     "SPLUNK_SSH_ALLOW_TOFU",
@@ -585,7 +586,7 @@ flat_target_keys = {
     "SPLUNK_SEARCH_API_URI", "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
-    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_SSH_KNOWN_HOSTS_FILE",
+    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_SSH_AUTH_METHOD", "SPLUNK_SSH_KNOWN_HOSTS_FILE",
     "SPLUNK_SSH_HOST_KEY_FINGERPRINT", "SPLUNK_SSH_ALLOW_TOFU",
     "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER", "SPLUNK_PASS",
@@ -876,7 +877,7 @@ load_oncall_settings() {
 
 _search_profile_overrides_key() {
     case "${1:-}" in
-        SPLUNK_RESOLVE|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_SSH_KNOWN_HOSTS_FILE|SPLUNK_SSH_HOST_KEY_FINGERPRINT|SPLUNK_SSH_ALLOW_TOFU|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS|SPLUNK_ALLOW_INSECURE_HTTP)
+        SPLUNK_RESOLVE|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_SSH_AUTH_METHOD|SPLUNK_SSH_KNOWN_HOSTS_FILE|SPLUNK_SSH_HOST_KEY_FINGERPRINT|SPLUNK_SSH_ALLOW_TOFU|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS|SPLUNK_ALLOW_INSECURE_HTTP)
             return 0
             ;;
         *)
@@ -1285,9 +1286,7 @@ _credential_value_for_profile_key() {
         [[ -z "${profile_name}" ]] && return 0
         return 1
     fi
-    if [[ -n "${profile_name}" ]] && ! _credential_profile_exists_in_file "${file_path}" "${profile_name}"; then
-        return 1
-    fi
+    # The parser rejects unknown profiles in this same snapshot-checked read.
     output_file="$(_credential_temp_file "${TMPDIR:-/tmp}/splunk-credential-value.XXXXXX")" || return 1
     if ! _read_credential_file_entries "${file_path}" "${profile_name}" >"${output_file}"; then
         rm -f "${output_file}"
@@ -1312,9 +1311,7 @@ _credential_profile_value_for_profile_key() {
 
     [[ -n "${profile_name}" && -n "${target_key}" ]] || return 0
     [[ -f "${file_path}" ]] || return 1
-    if ! _credential_profile_exists_in_file "${file_path}" "${profile_name}"; then
-        return 1
-    fi
+    # Avoid a duplicate parse: the profile-only reader rejects unknown profiles.
     output_file="$(_credential_temp_file "${TMPDIR:-/tmp}/splunk-credential-profile-value.XXXXXX")" || return 1
     if ! _read_credential_file_entries "${file_path}" "${profile_name}" true >"${output_file}"; then
         rm -f "${output_file}"
@@ -1400,12 +1397,21 @@ _profile_endpoint_uri() {
     local fallback_search_api_uri="" fallback_uri="" fallback_host="" fallback_port=""
 
     if [[ -n "${profile_name}" ]]; then
-        if ! explicit_search_api_uri="$(_credential_profile_value_for_profile_key "${profile_name}" "SPLUNK_SEARCH_API_URI")" \
-            || ! explicit_uri="$(_credential_profile_value_for_profile_key "${profile_name}" "SPLUNK_URI")" \
-            || ! explicit_host="$(_credential_profile_value_for_profile_key "${profile_name}" "SPLUNK_HOST")" \
-            || ! explicit_port="$(_credential_profile_value_for_profile_key "${profile_name}" "SPLUNK_MGMT_PORT")"; then
+        local profile_output="" key value
+        profile_output="$(_credential_temp_file "${TMPDIR:-/tmp}/splunk-endpoint-profile.XXXXXX")" || return 1
+        if ! _read_credential_file_entries "${_CRED_FILE}" "${profile_name}" true >"${profile_output}"; then
+            rm -f "${profile_output}"
             return 1
         fi
+        while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+            case "${key}" in
+                SPLUNK_SEARCH_API_URI) explicit_search_api_uri="${value}" ;;
+                SPLUNK_URI) explicit_uri="${value}" ;;
+                SPLUNK_HOST) explicit_host="${value}" ;;
+                SPLUNK_MGMT_PORT) explicit_port="${value}" ;;
+            esac
+        done <"${profile_output}"
+        rm -f "${profile_output}"
     fi
 
     if [[ -n "${explicit_search_api_uri}" ]]; then
@@ -2164,18 +2170,33 @@ load_splunk_ssh_credentials() {
         return 1
     fi
     SPLUNK_SSH_USER="${SPLUNK_SSH_USER:-splunk}"
+    SPLUNK_SSH_AUTH_METHOD="${SPLUNK_SSH_AUTH_METHOD:-password}"
 
-    if [[ -z "${SPLUNK_SSH_PASS:-}" ]]; then
-        if [[ ! -t 0 ]]; then
-            echo "ERROR: Splunk SSH password is required for SSH staging." >&2
+    case "${SPLUNK_SSH_AUTH_METHOD}" in
+        password)
+            if [[ -z "${SPLUNK_SSH_PASS:-}" ]]; then
+                if [[ ! -t 0 ]]; then
+                    echo "ERROR: Splunk SSH password is required for password-based SSH staging." >&2
+                    return 1
+                fi
+                read -rsp "Splunk SSH password: " SPLUNK_SSH_PASS
+                echo ""
+            fi
+            ;;
+        key)
+            if [[ -n "${SPLUNK_SSH_PASS:-}" ]]; then
+                echo "ERROR: Remove SPLUNK_SSH_PASS when SPLUNK_SSH_AUTH_METHOD=key." >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "ERROR: SPLUNK_SSH_AUTH_METHOD must be password or key." >&2
             return 1
-        fi
-        read -rsp "Splunk SSH password: " SPLUNK_SSH_PASS
-        echo ""
-    fi
+            ;;
+    esac
 
-    if [[ -z "${SPLUNK_SSH_HOST:-}" || -z "${SPLUNK_SSH_USER:-}" || -z "${SPLUNK_SSH_PASS:-}" ]]; then
-        echo "ERROR: Splunk SSH host, user, and password are required." >&2
+    if [[ -z "${SPLUNK_SSH_HOST:-}" || -z "${SPLUNK_SSH_USER:-}" ]]; then
+        echo "ERROR: Splunk SSH host and user are required." >&2
         return 1
     fi
 }

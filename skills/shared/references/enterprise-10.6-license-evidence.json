@@ -1,0 +1,72 @@
+{
+  "artifact": {
+    "contents": "not recorded",
+    "quota_bytes": 53687091200,
+    "sha256": "57e886abbc4e1d75700b387d0afb4b157ed6542bc9ecb569863807a95ebbf24c",
+    "stack_id": "enterprise",
+    "status": "VALID",
+    "type": "enterprise"
+  },
+  "cleanup": {
+    "manager_stopped": true,
+    "peer_stopped": true,
+    "ports_free": [
+      "18089",
+      "8089",
+      "18088"
+    ]
+  },
+  "evidence_sources": [
+    "/tmp/license-replace-final-apply.log",
+    "/tmp/license-pool-final-restart2.log",
+    "/tmp/license-replace-start-manager.log",
+    "/tmp/license-replace-start-peer.log"
+  ],
+  "history": {
+    "old_false_positive": "trial artifact was initially mistaken for Enterprise; replacement used verified Enterprise artifact",
+    "old_trial_artifact_sha256": "dc578839a4a9e026567fe42e6003ba97b2c4d7b18c07aa86a48d3baded843677",
+    "tls": "SPLUNK_VERIFY_SSL=false used only on disposable self-signed lab"
+  },
+  "ingest_search": {
+    "hec_http_status": 200,
+    "search_count": 1
+  },
+  "readback_after_restart": {
+    "enterprise_stack_present": true,
+    "manager_version": "10.6.0.5",
+    "peer_count": 2,
+    "peer_version": "10.6.0.5",
+    "pool_count": 2,
+    "pool_sum_bytes": 53687091200,
+    "pools": [
+      {
+        "name": "auto_generated_pool_enterprise",
+        "peer_bound": false,
+        "quota_bytes": 26843545600,
+        "stack_id": "enterprise"
+      },
+      {
+        "name": "lab_enterprise_peer",
+        "peer_bound": true,
+        "quota_bytes": 26843545600,
+        "stack_id": "enterprise"
+      }
+    ],
+    "usage_endpoint_count": 1
+  },
+  "replacement": {
+    "corrected_skill_apply": "success; restart handoff only",
+    "duplicate_license_error": false,
+    "enterprise_active_after_restart": true,
+    "exact_known_nfr_delete_http_status": 200,
+    "free_active_after_restart": true
+  },
+  "scope": {
+    "manager_home": "/opt/splunk-fresh106",
+    "mutations": "disposable homes only",
+    "peer_home": "/opt/splunk",
+    "primary_secondary_eks": "untouched"
+  },
+  "secrets": "none recorded",
+  "workflow": "native Splunk license manager replacement on disposable Ubuntu"
+}

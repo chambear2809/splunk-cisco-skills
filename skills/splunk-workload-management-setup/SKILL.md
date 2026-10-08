@@ -4,8 +4,10 @@ description: "Use when the user asks to reserve search or ingest resources, conf
   workload_rules.conf, workload_policy.conf, cgroups prerequisites, long-running search guardrails, or
   admission control for expensive searches. Render, preflight, apply, and validate Splunk Enterprise
   Workload Management pools, workload rules, and admission rules."
-compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow remains on the public Splunk Enterprise or Universal Forwarder 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: not applicable. This self-managed runtime workflow is not a Cloud runtime; see the separate Enterprise 10.6 matrix for self-managed compatibility."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "self-managed-10.4"
   compatibility_verified: "2026-08-20"
 ---

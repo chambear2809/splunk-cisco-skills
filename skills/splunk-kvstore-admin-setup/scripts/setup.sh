@@ -18,12 +18,15 @@ EFFECTIVE_PLATFORM=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 TOPOLOGY="standalone"
 APP_NAME="ZZZ_cisco_skills_kvstore"
-POINT_IN_TIME="true"
+BACKUP_MODE="auto"
+POINT_IN_TIME=""
 BACKUP_ARCHIVE_NAME=""
 STORAGE_ENGINE="wiredTiger"
 MIGRATE_DRY_RUN="true"
 TARGET_KVSTORE_VERSION=""
+ENTERPRISE_VERSION=""
 DISABLE_STARTUP_UPGRADE="false"
+DEFER_POSTGRES_MIGRATION="false"
 COLLECTION_NAME=""
 COLLECTION_FIELDS=""
 COLLECTION_REPLICATE="false"
@@ -52,11 +55,14 @@ Options:
   --topology standalone|shc
   --app-name NAME
   --point-in-time true|false
+  --backup-mode auto|parallel|point-in-time|legacy (default auto; status-selected)
   --backup-archive-name NAME        (required for restore; include .tar.gz)
   --storage-engine wiredTiger|mmapv1
   --migrate-dry-run true|false
   --target-kvstore-version VERSION  (required for SHC upgrade, e.g. 7.0)
+  --enterprise-version VERSION      (expected live version; offline default is shared 10.6.0.5)
   --disable-startup-upgrade true|false
+  --defer-postgres-migration true|false
   --collection-name NAME
   --collection-fields name:type,... (type: number|string|bool|time|cidr)
   --collection-replicate true|false
@@ -90,11 +96,14 @@ while [[ $# -gt 0 ]]; do
         --topology) require_arg "$1" $# || exit 1; TOPOLOGY="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --point-in-time) require_arg "$1" $# || exit 1; POINT_IN_TIME="$2"; shift 2 ;;
+        --backup-mode) require_arg "$1" $# || exit 1; BACKUP_MODE="$2"; shift 2 ;;
         --backup-archive-name) require_arg "$1" $# || exit 1; BACKUP_ARCHIVE_NAME="$2"; shift 2 ;;
         --storage-engine) require_arg "$1" $# || exit 1; STORAGE_ENGINE="$2"; shift 2 ;;
         --migrate-dry-run) require_arg "$1" $# || exit 1; MIGRATE_DRY_RUN="$2"; shift 2 ;;
         --target-kvstore-version) require_arg "$1" $# || exit 1; TARGET_KVSTORE_VERSION="$2"; shift 2 ;;
+        --enterprise-version) require_arg "$1" $# || exit 1; ENTERPRISE_VERSION="$2"; shift 2 ;;
         --disable-startup-upgrade) require_arg "$1" $# || exit 1; DISABLE_STARTUP_UPGRADE="$2"; shift 2 ;;
+        --defer-postgres-migration) require_arg "$1" $# || exit 1; DEFER_POSTGRES_MIGRATION="$2"; shift 2 ;;
         --collection-name) require_arg "$1" $# || exit 1; COLLECTION_NAME="$2"; shift 2 ;;
         --collection-fields) require_arg "$1" $# || exit 1; COLLECTION_FIELDS="$2"; shift 2 ;;
         --collection-replicate) require_arg "$1" $# || exit 1; COLLECTION_REPLICATE="$2"; shift 2 ;;
@@ -131,10 +140,27 @@ validate_args() {
     validate_choice "${OPERATION}" none backup restore clean migrate upgrade collections
     validate_choice "${TARGET_PLATFORM}" auto cloud enterprise
     validate_choice "${TOPOLOGY}" standalone shc
-    validate_choice "${POINT_IN_TIME}" true false
+    if [[ -n "${POINT_IN_TIME}" ]]; then
+        validate_choice "${POINT_IN_TIME}" true false
+    fi
+    validate_choice "${BACKUP_MODE}" auto parallel point-in-time legacy
     validate_choice "${STORAGE_ENGINE}" wiredTiger mmapv1
     validate_choice "${MIGRATE_DRY_RUN}" true false
     validate_choice "${DISABLE_STARTUP_UPGRADE}" true false
+    validate_choice "${DEFER_POSTGRES_MIGRATION}" true false
+    if [[ -n "${ENTERPRISE_VERSION}" && ! "${ENTERPRISE_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+){0,2}$ ]]; then
+        log "ERROR: --enterprise-version must be a numeric Enterprise version (for example 10.6.0.5)."
+        exit 1
+    fi
+    if [[ "${DISABLE_STARTUP_UPGRADE}" == "true" && -n "${ENTERPRISE_VERSION}" ]]; then
+        local_version_major="${ENTERPRISE_VERSION%%.*}"
+        local_version_rest="${ENTERPRISE_VERSION#*.}"
+        local_version_minor="${local_version_rest%%.*}"
+        if (( local_version_major > 10 || (local_version_major == 10 && local_version_minor >= 3) )); then
+            log "ERROR: --disable-startup-upgrade true is removed and unsupported for Splunk Enterprise 10.3 and newer."
+            exit 1
+        fi
+    fi
     validate_choice "${COLLECTION_REPLICATE}" true false
     if [[ "${APPLY}" == "true" && "${PHASE}" != "render" && "${PHASE}" != "apply" && "${PHASE}" != "all" ]]; then
         log "ERROR: --apply is valid only with --phase render, apply, or all."
@@ -159,11 +185,14 @@ build_renderer_args() {
         --topology "${TOPOLOGY}"
         --app-name "${APP_NAME}"
         --point-in-time "${POINT_IN_TIME}"
+        --backup-mode "${BACKUP_MODE}"
         --backup-archive-name "${BACKUP_ARCHIVE_NAME}"
         --storage-engine "${STORAGE_ENGINE}"
         --migrate-dry-run "${MIGRATE_DRY_RUN}"
         --target-kvstore-version "${TARGET_KVSTORE_VERSION}"
+        --enterprise-version "${ENTERPRISE_VERSION}"
         --disable-startup-upgrade "${DISABLE_STARTUP_UPGRADE}"
+        --defer-postgres-migration "${DEFER_POSTGRES_MIGRATION}"
         --collection-name "${COLLECTION_NAME}"
         --collection-fields "${COLLECTION_FIELDS}"
         --collection-replicate "${COLLECTION_REPLICATE}"

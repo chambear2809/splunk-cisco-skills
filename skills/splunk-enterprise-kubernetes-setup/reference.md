@@ -7,27 +7,25 @@ This reference describes what the current renderer and entrypoints do. Use
 
 | Item | Default | Authority |
 |---|---|---|
-| Splunk Operator for Kubernetes | `3.1.0` | SOK 3.1.0 GitHub release |
+| Splunk Operator for Kubernetes | `3.2.0` | SOK 3.2.0 GitHub release |
 | Operator Helm chart | follows `--operator-version` | official Splunk Helm repository |
 | Enterprise Helm chart | follows `--operator-version` | official Splunk Helm repository |
-| SOK Splunk Enterprise image | `splunk/splunk:10.4.1` | shared platform default plus SOK matrix |
-| SOK Kubernetes range | `1.25` through `1.34`, conditional | SOK 3.1.0 release matrix |
+| SOK Splunk Enterprise image | `splunk/splunk:10.6.0.5` | shared platform default plus SOK matrix |
+| SOK Kubernetes range | `1.32` through `1.36` | SOK 3.2.0 release matrix |
 | Splunk POD bundle | `10.4.0_1.6.0` | POD 10.4 release notes |
 | Render root | `./splunk-enterprise-k8s-rendered/` | repository workflow |
 
 The SOK compatibility check is intentionally verified only for Operator
-`3.1.0`. The current release matrix enforced by the skill is:
+`3.2.0`. The current release matrix enforced by the skill is:
 
 | Kubernetes | Splunk Enterprise | Separated ingestion |
 |---|---|---|
-| 1.25-1.33 | 9.4.3 through 10.0.4 | not supported |
-| 1.25-1.33 | listed 10.2.x or 10.4.x release lines | supported |
-| 1.34 | 9.4.9+, 10.0.4+, or 10.4+ on listed release lines | only with 10.4+ |
+| 1.32-1.36 | 9.4.15 through 10.6.0 | supported |
 
 The release body is authoritative if another generated documentation page has
 not yet caught up:
 
-<https://github.com/splunk/splunk-operator/releases/tag/3.1.0>
+<https://github.com/splunk/splunk-operator/releases/tag/3.2.0>
 
 `--chart-version` must match `--operator-version` unless a development render
 uses `--allow-unverified-versions`. Production rejects that override and
@@ -36,19 +34,24 @@ hash-verified inputs. The renderer snapshots those bytes into the bundle so
 validation and mutation consume the reviewed artifacts rather than a later
 download.
 
-Verified SOK 3.1.0 artifact SHA-256 values:
+Verified SOK 3.2.0 artifact SHA-256 values:
 
 | Artifact | SHA-256 |
 |---|---|
-| Operator chart | `c71c1a7fe495c1122c1b0b1b689a366f759107950130c6fcf1f0c453e5d57efd` |
-| Enterprise chart | `0d46b934f78a270b2c9bbacb9f442855f125069800d0a1373eb5f21c54e7fc71` |
-| CRD release manifest | `d974a6f2c768ad60d8eb56b2dc571354b4dfe48873cbff4e478ca6aa3e2fb3fe` |
+| Operator chart | `a20fcea5dabd9b832ba2ffcddce30cbfd90f3f5bccfa276feb7a13dafe9bb7d8` |
+| Enterprise chart | `31bdca248f2ad991e667906818be75f2b70a9e8c4df7fa2b5b44f5062e34339d` |
+| CRD release manifest | `5f0923739a34b7698322eecacfa8ccfd2136f5d51f9e6d31403ff22dc480c8ec` |
 
 A custom image with an opaque tag or a digest-only reference cannot be matched
 to the release matrix. It requires the non-production unverified-version
 override; production fails closed. Preserve a numeric Splunk tag before the
 digest, for example `splunk:10.4.1@sha256:...`, when compatibility must be
 asserted.
+
+SOK 3.2's local KV Store type is allowed through product defaults and is
+reported as part of live status evidence. The new Postgres integration is
+preview-only and intentionally disabled in this workflow; Postgres resources
+are a separately reviewed handoff.
 
 POD versions have the form `<Splunk version>_<installer version>`, for example
 `10.4.0_1.6.0`. The POD installer bundles Splunk Enterprise, SOK, Kubernetes
@@ -876,3 +879,12 @@ cloud/Cisco readiness evidence.
 - SOK legacy CR terminology transition: <https://splunk.github.io/splunk-operator/BiasLanguageMigration.html>
 - POD deployment: <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/deploy-splunk-pod>
 - POD troubleshooting: <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/troubleshoot-splunk-pod>
+# SOK startup probe budget
+
+The renderer emits the official `startupProbe` CR field with the reviewed
+timing (`initialDelaySeconds: 40`, `timeoutSeconds: 30`, `periodSeconds: 30`).
+S1 retains threshold 12; C3 and M4 default to 60 to accommodate multi-role
+bootstrap. `--startup-probe-failure-threshold` permits a reviewed value from
+12 through 120. Generated status compares the live StatefulSet to that exact
+architecture/override contract while retaining probe script hash and handler
+guards.

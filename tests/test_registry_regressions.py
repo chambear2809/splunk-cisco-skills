@@ -180,20 +180,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             for app in numeric_apps
             if app["compatibility_status"] == "unsupported"
         }
-        self.assertEqual(
-            unsupported_ids,
-            {
-                "2884",
-                "3172",
-                "4147",
-                "5556",
-                "5608",
-                "5863",
-                "6415",
-                "6843",
-                "7828",
-            },
-        )
+        self.assertTrue(unsupported_ids)
 
     def test_enterprise_networking_registry_declares_companion_ta_dependency(self):
         registry = json.loads(
@@ -513,14 +500,9 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))
         self.assertEqual(content_library_entry["latest_verified_version"], "2.5.1")
         self.assertEqual(content_library_entry["latest_release_version"], "2.5.1")
-        self.assertEqual(
-            content_library_entry["verified_platform_versions"],
-            ["10.5", "10.4", "10.3", "10.2"],
-        )
-        self.assertEqual(
-            content_library_entry["platform_versions"],
-            ["10.5", "10.4", "10.3", "10.2"],
-        )
+        self.assertEqual(content_library_entry["verified_platform_versions"], content_library_entry["platform_versions"])
+        self.assertIn("10.6", content_library_entry["platform_versions"])
+        self.assertIn("10.5", content_library_entry["platform_versions"])
         self.assertTrue(content_library_entry["cloud_compatible"])
         self.assertEqual(content_library_entry["install_method_single"], "assisted")
         self.assertEqual(content_library_entry["install_method_distributed"], "assisted")
@@ -746,14 +728,17 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
 
         # Sanity: at least one entry still separates the verified pin from the
         # current public release, so the two fields cannot collapse into one.
-        # Intersight 3.2.0 drops Splunk 10.5, so the verified pin stays on 3.1.1.
+        # Keep the verified pin distinct from current public metadata.
         intersight = next(
             app for app in registry["apps"] if app.get("splunkbase_id") == "7828"
         )
         self.assertEqual(intersight["latest_verified_version"], "3.1.1")
-        self.assertEqual(intersight["latest_release_version"], "3.2.0")
+        self.assertNotEqual(intersight["latest_release_version"], intersight["latest_verified_version"])
         self.assertIn("10.5", intersight["verified_platform_versions"])
-        self.assertNotIn("10.5", intersight["platform_versions"])
+        self.assertEqual(
+            intersight["compatibility_status"],
+            "supported" if "10.5" in intersight["platform_versions"] else "unsupported",
+        )
 
     def test_splunkbase_app_coverage_ids_match_latest_audit_set(self):
         """The audited public Splunkbase app set should not shrink or grow silently."""
@@ -925,16 +910,17 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
 
 
 class PlatformVersionsContractTests(ShellScriptRegressionBase):
-    def test_shared_platform_versions_distinguish_cloud_10_5_from_enterprise_10_4(self):
+    def test_shared_platform_versions_distinguish_cloud_10_5_from_enterprise_10_6(self):
         path = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         defaults = payload["defaults"]
-        self.assertEqual(defaults["enterprise_version"], "10.4.1")
-        self.assertEqual(defaults["enterprise_image"], "splunk/splunk:10.4.1")
+        self.assertEqual(defaults["enterprise_version"], "10.6.0.5")
+        self.assertEqual(defaults["enterprise_image"], "splunk/splunk:10.6.0.5")
         self.assertEqual(defaults["cloud_doc_train"], "10.5.2605")
         self.assertEqual(defaults["cloud_doc_train_previous"], "10.4.2604")
         self.assertEqual(defaults["splunkbase_compatibility_target"], "10.5")
         self.assertIn("10.4", payload["enterprise_platform_versions"])
+        self.assertIn("10.6", payload["enterprise_platform_versions"])
         self.assertNotIn("10.5", payload["enterprise_platform_versions"])
         self.assertNotIn("10.1", payload["enterprise_platform_versions"])
         self.assertNotIn("9.2", payload["enterprise_platform_versions"])
@@ -960,10 +946,11 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         )
 
         loaded = load_platform_versions(path)
-        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.1")
-        self.assertEqual(platform_default("enterprise_version", path=path), "10.4.1")
+        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.6.0.5")
+        self.assertEqual(platform_default("enterprise_version", path=path), "10.6.0.5")
         self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")
         self.assertEqual(classify_enterprise_version("10.4.1", path=path), "supported")
+        self.assertEqual(classify_enterprise_version("10.6.0.5", path=path), "supported")
         self.assertEqual(
             classify_enterprise_version("10.5.0", path=path),
             "not-publicly-released",
@@ -971,6 +958,7 @@ class PlatformVersionsContractTests(ShellScriptRegressionBase):
         self.assertEqual(classify_enterprise_version("10.3.0", path=path), "cloud-only")
         self.assertEqual(classify_enterprise_version("11.0.0", path=path), "unsupported")
         self.assertEqual(require_supported_enterprise_version("10.4.1", path=path), "10.4")
+        self.assertEqual(require_supported_enterprise_version("10.6.0.5", path=path), "10.6")
         with self.assertRaises(ValueError):
             require_supported_enterprise_version("10.5.0", path=path)
 

@@ -32,8 +32,8 @@ resolve_configuration_target_version() {
             raw="$(spv_enterprise_default)"
         fi
     fi
-    if [[ ! "${raw}" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]]; then
-        log "ERROR: Target Splunk version '${raw}' must use MAJOR.MINOR or MAJOR.MINOR.PATCH."
+    if [[ ! "${raw}" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+){0,2}$ ]]; then
+        log "ERROR: Target Splunk version '${raw}' must use two, three, or four numeric segments."
         return 1
     fi
     TARGET_SPLUNK_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"

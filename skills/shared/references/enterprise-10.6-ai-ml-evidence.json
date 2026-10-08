@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-08T01:54:59.584149+00:00",
+  "environment": {
+    "os": "Ubuntu 24.04 x86_64",
+    "enterprise_version": "10.6.0.5",
+    "python_runtime": "3.13.13",
+    "tls": "CA and hostname verified"
+  },
+  "selected_packages": [
+    {
+      "app": "Splunk_ML_Toolkit",
+      "version": "6.0.2",
+      "sha256": "4a55ca290db7166cb37e50c6ee22c9f051bb776b8134eb2059941d694c0ac9c0"
+    },
+    {
+      "app": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "version": "4.3.4",
+      "sha256": "2d448b2ce293d4af538f3bcc6f098d8190c913c7673e61066a5bb9809bb6b855"
+    }
+  ],
+  "functional": {
+    "synthetic_fit_rows": 20,
+    "apply_rows": 5,
+    "maximum_prediction_error": 1.4e-14,
+    "coefficient": 2.0000000000000004,
+    "intercept": 2.9999999999999964,
+    "model_and_prediction_retained_after_restart": true,
+    "populated_owned_model_dashboard": true,
+    "completion_validator": {
+      "pass": 3,
+      "warn": 0,
+      "fail": 0
+    }
+  },
+  "vendor_package_finding": {
+    "behavior": "Model options persist a session credential; this value must be excluded from retained evidence.",
+    "versions_inspected": [
+      "6.0.2",
+      "6.1.0"
+    ],
+    "authenticated_endpoint_rejected_both_owned_model_credentials_after_restart": true,
+    "invalid_credential_control_http_status": 401,
+    "owned_credential_http_statuses": [
+      401,
+      401
+    ]
+  },
+  "cleanup": {
+    "owned_models_removed": 2,
+    "temporary_model_read_role_removed": true,
+    "original_admin_roles_restored": true,
+    "optional_SSE_baseline_restored_to_empty": true,
+    "owned_SSE_mapping_removed": true
+  },
+  "default_workflow_qualification": {
+    "status": "pass",
+    "selected_registry_verified_packages": {
+      "AI Toolkit": "6.0.2",
+      "PSC": "4.3.4"
+    },
+    "later_release_researched_separately": "6.1.0",
+    "reason": "The corrected owning wrapper installed its selected 6.0.2/4.3.4 pair through a CA-verified REST forward and pinned SSH key staging; both restarts completed and the live validator returned 3 PASS, 0 WARN, 0 FAIL.",
+    "next_action": "Track the vendor model-session metadata finding separately; optional external model and Agent Launchpad readiness require their own access qualifications.",
+    "install_verified_at_utc": "2026-10-08T02:31:15.457026+00:00",
+    "post_install_readback": {
+      "verified_at_utc": "2026-10-08T02:38:15.926872+00:00",
+      "versions_match": true,
+      "kvstore_ready": true,
+      "owned_models_absent": true,
+      "original_admin_roles_restored": true
+    },
+    "scope": "Linux search tier package install/update with fit/apply, model dashboard, restart persistence, and owned fixture cleanup; no external LLM or Agent Launchpad end-to-end claim."
+  }
+}

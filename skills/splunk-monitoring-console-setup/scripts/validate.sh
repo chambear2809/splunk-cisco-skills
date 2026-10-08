@@ -69,9 +69,31 @@ ok=true
 (( ${#missing[@]} == 0 )) || ok=false
 
 if [[ -f "${render_dir}/splunk_monitoring_console_assets.conf" ]]; then
-    if ! grep -q "mc_auto_config =" "${render_dir}/splunk_monitoring_console_assets.conf"; then
-        missing+=("splunk_monitoring_console_assets.conf mc_auto_config")
-        ok=false
+    expected_version="$(python3 - "${render_dir}/metadata.json" <<'PY'
+import json, sys
+try:
+    print(json.load(open(sys.argv[1], encoding="utf-8"))["enterprise_version"])
+except (OSError, KeyError, TypeError, json.JSONDecodeError):
+    raise SystemExit(1)
+PY
+    )" || { missing+=("metadata.json enterprise_version"); ok=false; expected_version=""; }
+    if [[ -n "${expected_version}" ]]; then
+        if python3 - "${expected_version}" <<'PY'
+import sys
+parts=tuple(int(p) for p in sys.argv[1].split('.'))
+raise SystemExit(0 if parts[:2] >= (10, 6) else 1)
+PY
+        then
+            if grep -q "^[[:space:]]*mc_auto_config[[:space:]]*=" "${render_dir}/splunk_monitoring_console_assets.conf"; then
+                missing+=("unsupported 10.6 splunk_monitoring_console_assets.conf mc_auto_config")
+                ok=false
+            fi
+        else
+            if ! grep -q "^[[:space:]]*mc_auto_config[[:space:]]*=" "${render_dir}/splunk_monitoring_console_assets.conf"; then
+                missing+=("missing legacy splunk_monitoring_console_assets.conf mc_auto_config")
+                ok=false
+            fi
+        fi
     fi
 fi
 

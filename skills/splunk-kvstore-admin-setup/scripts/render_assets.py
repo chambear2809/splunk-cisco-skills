@@ -48,12 +48,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--topology", choices=("standalone", "shc"), default="standalone")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_kvstore")
-    parser.add_argument("--point-in-time", choices=("true", "false"), default="true")
+    parser.add_argument("--point-in-time", choices=("", "true", "false"), default="")
+    parser.add_argument("--backup-mode", choices=("auto", "parallel", "point-in-time", "legacy"), default="auto")
     parser.add_argument("--backup-archive-name", default="")
     parser.add_argument("--storage-engine", choices=("wiredTiger", "mmapv1"), default="wiredTiger")
     parser.add_argument("--migrate-dry-run", choices=("true", "false"), default="true")
     parser.add_argument("--target-kvstore-version", default="")
+    parser.add_argument("--enterprise-version", default="", help="Expected installed Enterprise version for live checks (default: shared 10.6.0.5 for offline render metadata).")
     parser.add_argument("--disable-startup-upgrade", choices=("true", "false"), default="false")
+    parser.add_argument("--defer-postgres-migration", choices=("true", "false"), default="false")
     parser.add_argument("--collection-name", default="")
     parser.add_argument("--collection-fields", default="")
     parser.add_argument("--collection-replicate", choices=("true", "false"), default="false")
@@ -69,6 +72,17 @@ def die(message: str) -> None:
 
 def shell_quote(value: object) -> str:
     return shlex.quote(str(value))
+
+
+def shared_enterprise_version() -> str:
+    try:
+        payload = json.loads(_SPV_VERSIONS_JSON.read_text(encoding="utf-8"))
+        value = str((payload.get("defaults") or {}).get("enterprise_version") or "").strip()
+    except (OSError, ValueError, TypeError):
+        value = ""
+    if not value:
+        die("shared Enterprise version default is missing")
+    return value
 
 
 def no_newline(value: str, option: str) -> None:
@@ -87,7 +101,7 @@ def write_file(path: Path, content: str, executable: bool = False) -> None:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def make_script(body: str, *, platform: str) -> str:
+def make_script(body: str, *, platform: str, expected_enterprise_version: str = "", disable_startup_upgrade: bool = False) -> str:
     first, separator, remainder = body.lstrip().partition("\n")
     if not separator:
         die("internal renderer error: local script body has no runtime assignment")
@@ -111,6 +125,22 @@ runtime_home="${{splunk_home:-}}"
 [[ -n "${{runtime_home}}" ]] || {{ echo "ERROR: rendered script did not set splunk_home." >&2; exit 1; }}
 installed_version="$(spv_require_supported_splunk_home "${{runtime_home}}")"
 echo "PASS: supported Splunk Enterprise runtime ${{installed_version}}."
+expected_enterprise_version={shell_quote(expected_enterprise_version)}
+if [[ -n "${{expected_enterprise_version}}" && "${{installed_version}}" != "${{expected_enterprise_version}}" ]]; then
+  echo "ERROR: installed Splunk Enterprise version ${{installed_version}} does not match expected ${{expected_enterprise_version}}." >&2
+  exit 1
+fi
+if [[ "{str(disable_startup_upgrade).lower()}" == "true" ]]; then
+  if ! python3 - "${{installed_version}}" <<'PY'
+import sys
+parts = tuple(int(part) for part in sys.argv[1].split(".")[:2])
+raise SystemExit(0 if parts < (10, 3) else 1)
+PY
+  then
+    echo "ERROR: --disable-startup-upgrade true is removed and unsupported for Splunk Enterprise 10.3 and newer." >&2
+    exit 1
+  fi
+fi
 """
     return "#!/usr/bin/env bash\nset -euo pipefail\n\n" + first + "\n" + gate + remainder
 
@@ -140,10 +170,19 @@ def validate(args: argparse.Namespace) -> list[tuple[str, str]]:
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", args.app_name or ""):
         die("--app-name must contain only letters, numbers, underscore, dot, colon, or hyphen.")
     no_newline(args.backup_archive_name, "--backup-archive-name")
+    if args.point_in_time and args.backup_mode != "auto":
+        die("--point-in-time cannot be combined with an explicit --backup-mode.")
     if args.backup_archive_name and not re.fullmatch(r"[A-Za-z0-9._-]+", args.backup_archive_name):
         die("--backup-archive-name must contain only letters, numbers, dot, underscore, and hyphen.")
     if args.target_kvstore_version and not re.fullmatch(r"(?:7|8)\.0(?:\.[0-9]+)?", args.target_kvstore_version):
         die("--target-kvstore-version must be a supported 7.0 or 8.0.x KV Store server version.")
+    if args.enterprise_version and not re.fullmatch(r"\d+\.\d+(?:\.\d+){0,2}", args.enterprise_version):
+        die("--enterprise-version must be a numeric Enterprise version (for example 10.6.0.5).")
+    if args.disable_startup_upgrade == "true":
+        version_for_policy = args.enterprise_version or shared_enterprise_version()
+        major, minor = (int(part) for part in version_for_policy.split(".", 2)[:2])
+        if (major, minor) >= (10, 3):
+            die("--disable-startup-upgrade true is removed and unsupported for Splunk Enterprise 10.3 and newer.")
     fields = parse_fields(args.collection_fields)
     if args.collection_name and not re.fullmatch(r"[A-Za-z0-9_]+", args.collection_name):
         die("--collection-name must contain only letters, numbers, and underscores.")
@@ -159,17 +198,27 @@ def validate(args: argparse.Namespace) -> list[tuple[str, str]]:
 
 def render_server(args: argparse.Namespace) -> str:
     lines = ["# Rendered by splunk-kvstore-admin-setup. Review before applying."]
-    if bool_value(args.disable_startup_upgrade):
+    defer_postgres = bool_value(args.defer_postgres_migration)
+    disable_startup_upgrade = bool_value(args.disable_startup_upgrade)
+    if defer_postgres or disable_startup_upgrade:
+        lines.append("[kvstore]")
+    if defer_postgres:
         lines.extend(
             [
-                "[kvstore]",
+                "# Enterprise 10.4 pre-upgrade control: defer Enterprise 10.6's",
+                "# cohosted PostgreSQL migration. Review and distribute before upgrade.",
+                "postgresMigrateOnStartup = false",
+            ]
+        )
+    if disable_startup_upgrade:
+        lines.extend(
+            [
                 "# Prevent the automatic KV Store server-version upgrade on startup so you can",
                 "# upgrade manually after backing up. Set on every SHC member before the binary upgrade.",
                 "kvstoreUpgradeOnStartupEnabled = false",
-                "",
             ]
         )
-    else:
+    if not defer_postgres and not disable_startup_upgrade:
         lines.append("# No server.conf [kvstore] overrides requested.")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -216,38 +265,251 @@ df -h "${{splunk_home}}/var/lib/splunk" 2>/dev/null || true
 echo "Preflight complete. Take a backup before any restore, migrate, or upgrade."
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
+
+
+def kvstore_status_helpers() -> str:
+    return r'''status_file=""
+cleanup_status_file() { [[ -z "${status_file}" ]] || rm -f "${status_file}"; }
+trap cleanup_status_file EXIT
+read_kvstore_status() {
+  [[ -n "${status_file}" ]] || status_file="$(mktemp)"
+  : >"${status_file}"
+  if ! "${splunk_home}/bin/splunk" show kvstore-status >"${status_file}"; then
+    echo "ERROR: authenticated kvstore-status query failed; refusing to select a backup mode." >&2
+    return 1
+  fi
+}
+status_summary() {
+  # Handles the CLI's nested "Service Info" type:Pdl section as well as JSON.
+  python3 - "${status_file}" <<'PY'
+import json, sys
+from pathlib import Path
+raw = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+start = raw.find("{")
+try:
+    payload = json.loads(raw[start:]) if start >= 0 else {}
+except Exception:
+    payload = {}
+if not payload:
+    import re
+    lower = raw.lower()
+    marker = lower.find("cohosted kvstore information")
+    member_text = raw[:marker] if marker >= 0 else raw
+    cohosted_text = raw[marker:] if marker >= 0 else ""
+    def value(text, key):
+        match = re.search(r"(?im)^\s*" + re.escape(key) + r"\s*:\s*([^\s]+)", text)
+        return match.group(1).lower() if match else "unknown"
+    ctype = "pdl" if re.search(r"(?i)\btype\s*:\s*pdl\b", cohosted_text) else "unknown"
+    mode = "cohosted" if ctype == "pdl" else ("legacy" if marker < 0 else "unknown")
+    print("\t".join((mode, value(member_text, "status"), value(cohosted_text, "status"), value(raw, "backupRestoreStatus"), value(member_text, "storageEngine"), value(member_text, "version"))))
+    raise SystemExit(0)
+def find_content(value):
+    if isinstance(value, dict):
+        if isinstance(value.get("content"), dict): return value["content"]
+        for child in value.values():
+            found = find_content(child)
+            if found is not None: return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find_content(child)
+            if found is not None: return found
+    return None
+content = find_content(payload) or payload
+current = content.get("current", content) if isinstance(content, dict) else {}
+if not isinstance(current, dict): current = {}
+cohosted = {}
+if isinstance(content, dict):
+    for key in ("cohosted", "cohostedKVStore", "cohostedKVStoreInformation"):
+        if isinstance(content.get(key), dict): cohosted = content[key]; break
+if not cohosted and isinstance(current.get("cohosted"), dict): cohosted = current["cohosted"]
+def find_type(value):
+    if isinstance(value, dict):
+        if "type" in value: return value["type"]
+        for child in value.values():
+            found = find_type(child)
+            if found is not None: return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find_type(child)
+            if found is not None: return found
+    return None
+ctype = str(find_type(cohosted) or "unknown")
+cstatus = str(cohosted.get("status", "unknown")).lower()
+mstatus = str(current.get("status", "unknown")).lower()
+backup = "unknown"
+def walk(value):
+    global backup
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key).lower() == "backuprestorestatus":
+                if isinstance(child, dict): child = child.get("status", child.get("state", "unknown"))
+                backup = str(child).lower()
+            walk(child)
+    elif isinstance(value, list):
+        for child in value: walk(child)
+walk(payload)
+engine = str(current.get("storageEngine", "unknown")).lower()
+version = str(current.get("version", "unknown")).lower()
+mode = "cohosted" if ctype.lower() == "pdl" else ("legacy" if not cohosted else "unknown")
+print("\t".join((mode, mstatus, cstatus, backup, engine, version)))
+PY
+}
+select_backup_mode() {
+  local mode member_status cohosted_status backup_status
+  IFS=$'\t' read -r mode member_status cohosted_status backup_status storage_engine kv_version <<<"$(status_summary)"
+  [[ "${member_status}" == "ready" ]] || { echo "ERROR: KV Store member status is ${member_status}; refusing backup/restore." >&2; return 1; }
+  if [[ "${mode}" == "cohosted" && "${cohosted_status}" != "ready" ]]; then
+    echo "ERROR: cohosted KV Store type Pdl is ${cohosted_status}; refusing backup/restore." >&2
+    return 1
+  fi
+  case "${requested_backup_mode}" in
+    auto) case "${mode}" in cohosted) selected_backup_mode="parallel" ;; legacy) selected_backup_mode="point-in-time" ;; *) echo "ERROR: KV Store status did not identify a legacy or cohosted store." >&2; return 1 ;; esac ;;
+    parallel) [[ "${mode}" == "cohosted" || "${mode}" == "legacy" ]] || { echo "ERROR: parallel backup/restore requires a positively identified KV Store type." >&2; return 1; }; selected_backup_mode="parallel" ;;
+    point-in-time|legacy) [[ "${mode}" == "legacy" ]] || { echo "ERROR: explicit point-in-time/legacy mode is unsupported for cohosted or unidentified KV Store status; use --backup-mode parallel for type Pdl." >&2; return 1; }; selected_backup_mode="${requested_backup_mode}" ;;
+    *) echo "ERROR: invalid backup mode ${requested_backup_mode}." >&2; return 1 ;;
+  esac
+  echo "Selected KV Store backup mode: ${selected_backup_mode} (member=${member_status}, cohosted=${cohosted_status})."
+}
+require_legacy_migration_state() {
+  local requested_engine="$1"
+  local mode member_status cohosted_status backup_status storage_engine kv_version
+  IFS=$'\t' read -r mode member_status cohosted_status backup_status storage_engine kv_version <<<"$(status_summary)"
+  [[ "${member_status}" == "ready" ]] || { echo "ERROR: KV Store member status is ${member_status}; refusing migration." >&2; return 1; }
+  [[ "${mode}" == "legacy" && "${cohosted_status}" == "unknown" ]] || { echo "ERROR: storage-engine migration requires a positively identified legacy KV Store; cohosted Pdl is already migrated." >&2; return 1; }
+  [[ "${requested_engine}" == "wiredTiger" ]] || { echo "ERROR: only migration to wiredTiger is supported." >&2; return 1; }
+  case "${storage_engine}" in
+    mmapv1|mmap_v1) ;;
+    wiredtiger) echo "ERROR: KV Store is already using WiredTiger; refusing migration." >&2; return 1 ;;
+    *) echo "ERROR: KV Store storage engine is unknown; refusing migration." >&2; return 1 ;;
+  esac
+}
+require_legacy_upgrade_state() {
+  local requested_version="$1"
+  local mode member_status cohosted_status backup_status storage_engine kv_version
+  IFS=$'\t' read -r mode member_status cohosted_status backup_status storage_engine kv_version <<<"$(status_summary)"
+  [[ "${member_status}" == "ready" ]] || { echo "ERROR: KV Store member status is ${member_status}; refusing server-version upgrade." >&2; return 1; }
+  [[ "${mode}" == "legacy" && "${cohosted_status}" == "unknown" ]] || { echo "ERROR: server-version upgrade requires a positively identified legacy KV Store; cohosted Pdl is upgraded automatically by Enterprise 10.6." >&2; return 1; }
+  [[ "${storage_engine}" == "wiredtiger" ]] || { echo "ERROR: server-version upgrade requires a verified WiredTiger KV Store engine; storage engine is ${storage_engine}." >&2; return 1; }
+  local current_major
+  if [[ "${kv_version}" =~ ^4\.2([.][0-9]+)?$ ]]; then
+    current_major="4.2"
+  elif [[ "${kv_version}" =~ ^(7|8)\.0([.][0-9]+)?$ ]]; then
+    current_major="${BASH_REMATCH[1]}"
+  else
+    echo "ERROR: KV Store server version is unknown or unsupported; refusing upgrade." >&2
+    return 1
+  fi
+  [[ "${requested_version}" =~ ^(7|8)\.0([.][0-9]+)?$ ]] || { echo "ERROR: requested KV Store server version is unsupported." >&2; return 1; }
+  local requested_major="${BASH_REMATCH[1]}"
+  local enterprise_major="${installed_version%%.*}"
+  local enterprise_minor="${installed_version#*.}"
+  enterprise_minor="${enterprise_minor%%.*}"
+  if (( enterprise_major < 9 || (enterprise_major == 9 && enterprise_minor < 4) )); then
+    echo "ERROR: KV Store server-version upgrade is unsupported on Enterprise ${installed_version}." >&2
+    return 1
+  fi
+  if [[ "${requested_major}" == "8" ]] && (( enterprise_major < 10 || (enterprise_major == 10 && enterprise_minor < 2) )); then
+    echo "ERROR: KV Store server version 8.0 requires Enterprise 10.2 or newer." >&2
+    return 1
+  fi
+  # Splunk 10.2 documents both 4.2->8.0 directly and 7.0->8.0; 4.2->7.0
+  # remains the supported path for older Enterprise releases.
+  if [[ "${current_major}" == 4.2 && ( "${requested_major}" == 7 || "${requested_major}" == 8 ) ]] || [[ "${current_major}" == 7 && "${requested_major}" == 8 ]]; then
+    :
+  else
+    echo "ERROR: only the supported KV Store server-version transitions 4.2 to 7.0, 4.2 to 8.0, or 7.0 to 8.0 are allowed." >&2
+    return 1
+  fi
+}
+wait_for_backup_restore() {
+  validate_polling_env
+  local deadline=$((SECONDS + KVSTORE_BACKUP_STATUS_TIMEOUT_SECONDS))
+  local mode member_status cohosted_status backup_status
+  while (( SECONDS < deadline )); do
+    read_kvstore_status || return 1
+    IFS=$'\t' read -r mode member_status cohosted_status backup_status storage_engine kv_version <<<"$(status_summary)"
+    case "${backup_status}" in
+      ready) [[ "${member_status}" == "ready" && ( "${mode}" != "cohosted" || "${cohosted_status}" == "ready" ) ]] || { echo "ERROR: KV Store ${backup_restore_operation} reports Ready but readiness is incomplete (member=${member_status}, cohosted=${cohosted_status})." >&2; return 1; }; echo "PASS: KV Store ${backup_restore_operation} completed (backupRestoreStatus=Ready)."; return 0 ;;
+      failed|failure|error) echo "ERROR: KV Store ${backup_restore_operation} failed (backupRestoreStatus=${backup_status})." >&2; return 1 ;;
+    esac
+    sleep "${KVSTORE_BACKUP_STATUS_POLL_SECONDS}"
+  done
+  echo "ERROR: KV Store ${backup_restore_operation} did not reach a completed backupRestoreStatus within the bounded timeout." >&2
+  return 1
+}
+validate_polling_env() {
+  local timeout="${KVSTORE_BACKUP_STATUS_TIMEOUT_SECONDS:-60}"
+  local interval="${KVSTORE_BACKUP_STATUS_POLL_SECONDS:-2}"
+  [[ "${timeout}" =~ ^[0-9]+$ && "${timeout}" -ge 1 && "${timeout}" -le 3600 ]] || { echo "ERROR: KVSTORE_BACKUP_STATUS_TIMEOUT_SECONDS must be an integer from 1 to 3600." >&2; return 1; }
+  [[ "${interval}" =~ ^[0-9]+$ && "${interval}" -ge 1 && "${interval}" -le 60 ]] || { echo "ERROR: KVSTORE_BACKUP_STATUS_POLL_SECONDS must be an integer from 1 to 60." >&2; return 1; }
+  KVSTORE_BACKUP_STATUS_TIMEOUT_SECONDS="${timeout}"
+  KVSTORE_BACKUP_STATUS_POLL_SECONDS="${interval}"
+}
+'''
 
 
 def render_backup(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
-    pit = "-pointInTime true" if bool_value(args.point_in_time) else ""
+    requested_mode = args.backup_mode
+    if args.point_in_time:
+        requested_mode = "point-in-time" if bool_value(args.point_in_time) else "legacy"
+    archive = shell_quote(args.backup_archive_name) if args.backup_archive_name else "''"
     return make_script(
         f"""splunk_home={splunk_home}
 # Run as the splunk user after "${{splunk_home}}/bin/splunk" login.
-# Point-in-time backups (-pointInTime true) are consistent; archives land in
-# $SPLUNK_DB/kvstorebackup. Take one before every restore, migrate, or upgrade.
-"${{splunk_home}}/bin/splunk" backup kvstore {pit}
+requested_backup_mode={shell_quote(requested_mode)}
+backup_archive_name={archive}
+{kvstore_status_helpers()}
+read_kvstore_status
+select_backup_mode
+if [[ "${{selected_backup_mode}}" == "parallel" && -z "${{backup_archive_name}}" ]]; then
+  echo "ERROR: parallel backup requires --backup-archive-name NAME (without .tar.gz)." >&2
+  exit 1
+fi
+backup_archive_args=()
+if [[ -n "${{backup_archive_name}}" ]]; then
+  backup_archive_args=(-archiveName "${{backup_archive_name%.tar.gz}}")
+fi
+case "${{selected_backup_mode}}" in
+  parallel) "${{splunk_home}}/bin/splunk" backup kvstore -backupParallelJobs true "${{backup_archive_args[@]}}" ;;
+  point-in-time) "${{splunk_home}}/bin/splunk" backup kvstore -pointInTime true "${{backup_archive_args[@]}}" ;;
+  legacy) "${{splunk_home}}/bin/splunk" backup kvstore "${{backup_archive_args[@]}}" ;;
+esac
+backup_restore_operation=backup
+wait_for_backup_restore
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
 def render_restore(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     archive = shell_quote(args.backup_archive_name) if args.backup_archive_name else "''"
-    pit = "-pointInTime true" if bool_value(args.point_in_time) else ""
+    requested_mode = args.backup_mode
+    if args.point_in_time:
+        requested_mode = "point-in-time" if bool_value(args.point_in_time) else "legacy"
     maint = ""
     maint_after = ""
     if args.topology == "shc":
         maint = (
-            '"${splunk_home}/bin/splunk" enable kvstore-maintenance-mode\n'
-            'echo "Maintenance mode enabled on this SHC member."\n'
+            'maintenance_enabled=false\n'
+            'if [[ "${selected_backup_mode}" == "point-in-time" ]]; then\n'
+            '  "${splunk_home}/bin/splunk" enable kvstore-maintenance-mode\n'
+            '  echo "Maintenance mode enabled on this SHC member for point-in-time restore."\n'
+            '  maintenance_enabled=true\n'
+            'fi\n'
         )
         maint_after = (
-            '"${splunk_home}/bin/splunk" disable kvstore-maintenance-mode\n'
-            'echo "Maintenance mode disabled after successful restore."\n'
+            'if [[ "${maintenance_enabled}" == "true" ]]; then\n'
+            '  "${splunk_home}/bin/splunk" disable kvstore-maintenance-mode\n'
+            '  echo "Maintenance mode disabled after successful point-in-time restore."\n'
+            'fi\n'
         )
     return make_script(
         f"""splunk_home={splunk_home}
@@ -260,13 +522,31 @@ if [[ "${{KVSTORE_ACCEPT_RESTORE:-false}}" != "true" ]]; then
   echo "ERROR: restore requires KVSTORE_ACCEPT_RESTORE=true (normally set by --accept-kvstore-restore)." >&2
   exit 1
 fi
-# DESTRUCTIVE: overwrites current KV Store data. On a search head cluster, run
-# this from the captain; only one restore can run at a time across the cluster.
-{maint}"${{splunk_home}}/bin/splunk" restore kvstore {pit} -archiveName "${{archive_name}}"
+# DESTRUCTIVE: overwrites current KV Store data. Ensure collections.conf and
+# transforms.conf definitions are distributed and effective before restoring;
+# restore does not create missing collection definitions. On a search head
+# cluster, run this from the captain; only one restore can run at a time.
+requested_backup_mode={shell_quote(requested_mode)}
+{kvstore_status_helpers()}
+read_kvstore_status
+select_backup_mode
+restore_archive_name="${{archive_name}}"
+if [[ "${{restore_archive_name}}" != *.tar.gz ]]; then
+  restore_archive_name="${{restore_archive_name}}.tar.gz"
+fi
+{maint}case "${{selected_backup_mode}}" in
+  parallel) "${{splunk_home}}/bin/splunk" restore kvstore -restoreParallelJobs true -archiveName "${{restore_archive_name}}" ;;
+  point-in-time) "${{splunk_home}}/bin/splunk" restore kvstore -pointInTime true -archiveName "${{restore_archive_name}}" ;;
+  legacy) "${{splunk_home}}/bin/splunk" restore kvstore -archiveName "${{restore_archive_name}}" ;;
+esac
+backup_restore_operation=restore
+wait_for_backup_restore
 {maint_after}
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
@@ -284,6 +564,8 @@ fi
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
@@ -303,10 +585,15 @@ fi
 # Migrate the SHC KV Store storage engine. Run the dry run first, then re-run
 # without -isDryRun to perform the migration. Coordinate across all members.
 {acceptance_gate}
+{kvstore_status_helpers()}
+read_kvstore_status
+require_legacy_migration_state {shell_quote(args.storage_engine)}
 "${{splunk_home}}/bin/splunk" start-shcluster-migration kvstore -storageEngine {args.storage_engine} {dry}
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
             platform=args.platform,
+            expected_enterprise_version=args.enterprise_version,
+            disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
         )
     return make_script(
         f"""splunk_home={splunk_home}
@@ -316,6 +603,8 @@ fi
 echo "Storage engine: {args.storage_engine} (single-instance migration is automatic on upgrade)."
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
@@ -336,10 +625,15 @@ if [[ "${{KVSTORE_ACCEPT_UPGRADE:-false}}" != "true" ]]; then
 fi
 # Upgrade the SHC KV Store server version after all members run the same Splunk
 # Enterprise version. Take a backup first.
+{kvstore_status_helpers()}
+read_kvstore_status
+require_legacy_upgrade_state "${{target_version}}"
 "${{splunk_home}}/bin/splunk" start-shcluster-upgrade kvstore -version "${{target_version}}"
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
             platform=args.platform,
+            expected_enterprise_version=args.enterprise_version,
+            disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
         )
     return make_script(
         f"""splunk_home={splunk_home}
@@ -348,6 +642,8 @@ fi
 "${{splunk_home}}/bin/splunk" show kvstore-status
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
@@ -359,26 +655,36 @@ def render_status(args: argparse.Namespace) -> str:
 "${{splunk_home}}/bin/splunk" btool server list kvstore --debug 2>/dev/null || true
 """,
         platform=args.platform,
+        expected_enterprise_version=args.enterprise_version,
+        disable_startup_upgrade=bool_value(args.disable_startup_upgrade),
     )
 
 
 def render_readme(args: argparse.Namespace) -> str:
+    enterprise_version = args.enterprise_version or shared_enterprise_version()
     return f"""# Splunk KV Store Admin Rendered Assets
 
 Platform: `{args.platform}`
 Topology: `{args.topology}`
 Splunk home: `{args.splunk_home}`
+Enterprise version expectation: `{enterprise_version}` (offline default; live scripts always verify the installed supported train)
 Point-in-time backup: `{args.point_in_time}`
+Backup mode: `{args.backup_mode}` (`auto` selects parallel for a ready cohosted
+PostgreSQL/Pdl store and point-in-time for a legacy store)
 
 Lifecycle host scripts (run as the splunk user after `splunk login`):
 
 - `preflight.sh` - status + disk headroom; reminds you to back up first
-- `backup.sh` - `splunk backup kvstore` (point-in-time when enabled)
+- `backup.sh` - status-selected `splunk backup kvstore` (parallel cohosted or point-in-time legacy)
 - `restore.sh` - `splunk restore kvstore` (DESTRUCTIVE; captain on SHC)
 - `clean.sh` - `splunk clean kvstore` (DESTRUCTIVE)
 - `migrate.sh` - storage-engine migration (SHC `start-shcluster-migration`)
 - `upgrade.sh` - server-version upgrade (SHC `start-shcluster-upgrade`)
 - `status.sh` - `splunk show kvstore-status`
+
+Distribute `collections.conf` and `transforms.conf` definitions and verify they
+are effective before restoring data; restore does not create missing collection
+definitions. A restore on an SHC must run from the captain in maintenance mode.
 
 Governance config (apply with `--phase apply --operation collections`, written via REST):
 
@@ -386,7 +692,12 @@ Governance config (apply with `--phase apply --operation collections`, written v
 - `transforms.conf` - KV Store lookup definition
 - `server.conf` - optional `[kvstore] kvstoreUpgradeOnStartupEnabled = false`
 
-Always take a point-in-time backup before a restore, migrate, or upgrade.
+`auto` requires an authenticated ready status. Cohosted PostgreSQL/Pdl uses
+parallel jobs and has a bounded consistency window; legacy KV Store uses the
+consistent point-in-time path. Explicit point-in-time mode refuses a cohosted
+store rather than silently downgrading its guarantee. Set
+`KVSTORE_BACKUP_STATUS_TIMEOUT_SECONDS` and `KVSTORE_BACKUP_STATUS_POLL_SECONDS`
+to tune bounded completion polling.
 
 Managed Splunk Cloud owns every host lifecycle operation listed above. When
 rendered with `--platform cloud`, those scripts exit `2` before invoking the
@@ -416,8 +727,11 @@ def render(args: argparse.Namespace, fields: list[tuple[str, str]]) -> dict:
                     "splunk_home": args.splunk_home,
                     "app_name": args.app_name,
                     "point_in_time": args.point_in_time,
+                    "backup_mode": args.backup_mode,
                     "storage_engine": args.storage_engine,
                     "target_kvstore_version": args.target_kvstore_version,
+                    "enterprise_version": args.enterprise_version or shared_enterprise_version(),
+                    "defer_postgres_migration": args.defer_postgres_migration,
                     "collection_name": args.collection_name,
                     "lookup_definition_name": args.lookup_definition_name,
                 },

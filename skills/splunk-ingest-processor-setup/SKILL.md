@@ -8,13 +8,21 @@ description: "Use when the user asks to configure Ingest Processor, author Inges
   types, destinations, lifecycle handoffs, queue and monitoring searches, metrics, OCSF, decrypt, S3
   archive, custom pipeline templates, AI-powered data management readiness, Automated Field Extraction,
   Guided Onboarding with Auto-Schematization, and downstream readiness checks."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "not-applicable"
+  enterprise_compatibility_verified: "2026-10-08"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
 
 # Splunk Ingest Processor Setup
+
+## Enterprise applicability
+
+Ingest Processor operates within Splunk Cloud Platform on Victoria Experience. Enterprise Ingest Actions is a separate workflow. The default workflow does not configure a self-managed Enterprise
+10.6 feature. Keep its Splunk Cloud validation separate. See the
+[documented service scope](https://help.splunk.com/en/data-management/process-data-at-ingest-time/use-ingest-processor/introduction/about-ingest-processor).
 
 ## Prerequisites
 

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-08T04:16:13.620835+00:00",
+  "status": "qualified_partial",
+  "environment": {
+    "enterprise_version": "10.6.0.5",
+    "os": "Ubuntu 24.04 x86_64",
+    "topology": "Isolated standalone search head, loopback-only PostgreSQL fixture",
+    "rest_tls": "CA verified",
+    "hec_tls": "HTTPS with lab CA imported into dedicated DBX JVM trust store"
+  },
+  "packages": {
+    "db_connect": {
+      "version": "4.3.0",
+      "sha256": "3c047864cb243a1a79226440dbf798fb9eee2ccc6866e567ad3e95b363edb473",
+      "shipped_views": 6
+    },
+    "postgresql_jdbc_addon": {
+      "version": "1.2.2",
+      "sha256": "857682e2a1eb5e4ce2211931272bd13170fd1069ba6ed74d48b6ad81b3782139",
+      "shipped_views": 0
+    },
+    "java": {
+      "distribution": "Eclipse Temurin",
+      "version": "17.0.20.1+1",
+      "sha256": "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e"
+    },
+    "database": {
+      "image": "postgres:16.15-trixie",
+      "amd64_digest": "sha256:75adc2a65806c96bc0e59030230bfe3f1c1b0d6d8f8181a8913e2b8b53bdc166"
+    }
+  },
+  "owning_workflow": {
+    "package_install_helper_exit_code": 0,
+    "installed_using_owning_skill": true,
+    "manual_identity_connection_input_apply": "Completed within v1 documented operator handoff scope",
+    "database_role": "SELECT only, default read-only transactions, no superuser/createdb/createrole",
+    "input": "Rising timestamp query, 60 second interval, owned index and HEC token"
+  },
+  "live_ingest": {
+    "initial_run": {
+      "read_count": 3,
+      "write_count": 3,
+      "status": "COMPLETED"
+    },
+    "incremental_run": {
+      "read_count": 1,
+      "write_count": 1,
+      "status": "COMPLETED"
+    },
+    "indexed_records": 4,
+    "count_per_id": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "later_runs": {
+      "runs": 2,
+      "read_count": 0,
+      "write_count": 0,
+      "status": "COMPLETED"
+    },
+    "checkpoint": "2026-10-07 00:00:04+00"
+  },
+  "restart_retention": {
+    "restart_http_status": 200,
+    "all_four_records_retained_exactly_once": true,
+    "checkpoint_retained": true,
+    "java_taskserver_identity_connection_input_health_severity": 0
+  },
+  "contract_findings": [
+    "REST acceptance of ISO timestamp checkpoint did not qualify execution; JDBC type93 required connector timestamp text.",
+    "DBX HEC endpoint and token require explicit protected configuration; management port does not determine HEC port.",
+    "Fresh internal client mgmtHostPort must identify a certificate-valid local address."
+  ],
+  "dashboard_evidence": {
+    "input_health": "Populated successful job timeline, zero errors for successful run window.",
+    "input_performance": "Six populated job/HEC aggregate panels; two diagnostic metric panels empty.",
+    "connection_health": {
+      "verified_at_utc": "2026-10-08T04:38:58.306746+00:00",
+      "successful_connection_operations": 37,
+      "errors": 0,
+      "error_percent": 0,
+      "connection_and_operation_tables_populated": true,
+      "pool_wait_and_usage_tables_populated": true,
+      "median_duration_charts": "No results; tables have percentiles but no median. Not claimed populated."
+    }
+  },
+  "vendor_panel_gap": {
+    "owner": "Splunk DB Connect vendor",
+    "impact": "Shipped HEC Connection Status and HEC Upload Time panels return no data despite corresponding emitted metrics.",
+    "evidence": "Shipped input_performance.xml filters org.apache.http names; runtime emits org.apache.hc.client5 names. Source-adjusted read-only probes produced 72 connection rows and 61 upload rows without search errors.",
+    "next_action": "Report exact DBX4.3 metric-name mismatch; qualify an official corrected release or reviewed local dashboard override separately.",
+    "vendor_stock_dashboard_pass": false
+  },
+  "cleanup": {
+    "verified_at_utc": "2026-10-08T04:50:36.460767+00:00",
+    "status": "owned_integration_fixture_removed",
+    "dbx_input_connection_identity_absent": true,
+    "owned_hec_input_absent": true,
+    "owned_hec_settings_cleared": true,
+    "postgres_container_and_volume_absent": true,
+    "local_and_remote_fixture_secret_files_absent": true,
+    "retained": "Four dbx_orders canary events for pending federated validation; installed vendor packages and dedicated JDK retained in reusable lab. Protected pre-change configuration and JVM trust backups retained until final health checks.",
+    "follow_up_2026_10_08": "After federation readback and restart persistence, dbx_orders index returned404 and its canary data directory was absent. Installed packages and dedicated JDK remain in reusable lab; retain protected configuration and JVM trust backups until final health checks."
+  },
+  "completion_limits": [
+    "No qualification of outputs/lookups/HA/federated DBX variants.",
+    "Vendor stock diagnostic panel gap and final UI/cleanup gates remain open."
+  ]
+}

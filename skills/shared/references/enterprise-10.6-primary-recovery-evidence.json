@@ -1,0 +1,260 @@
+{
+  "assessment_date": "2026-10-07",
+  "primary_version": "10.4.3",
+  "itsi_version": "5.0.1",
+  "status": "partial",
+  "access": "Authenticated primary administration restored through the authorized password reset",
+  "backups": {
+    "cold_installation_data_archive": {
+      "bytes": 61443870720,
+      "sha256": "89cbd7f737d8a790ba9ec74d8a82ef900aacca7592cae8b22474a29b9927d5c9"
+    },
+    "offhost_compressed_copy": {
+      "bytes": 34701088687,
+      "decompressed_sha256_matches": true,
+      "retention_status": "Replacement copy verified and retained in durable owner-only controller storage outside temporary directories",
+      "decompressed_bytes": 61443870720,
+      "reverified_date": "2026-10-07"
+    },
+    "parallel_kv_archive": {
+      "bytes": 829196,
+      "sha256": "0589c1ef94d54e80a6b07193dd83ba47ceeac2372dfe768535fcf34a4550da53",
+      "consistency": "Parallel backup does not promise an atomic snapshot across collections"
+    },
+    "controller_artifact_incident": {
+      "date": "2026-10-07",
+      "cause": "Undetermined; no deletion action identified in reviewed agent command history",
+      "primary_archive_retained": true,
+      "durable_recovery_in_progress": false,
+      "cold_archive_offhost_copy_recovered": true
+    },
+    "clone_pre_itsi_upgrade_kv_archive": {
+      "collected_at_utc": "2026-10-07T21:01:26Z",
+      "bytes": 993181,
+      "sha256": "d4a88a1f326020dc5bd39cb6af423fe4f91250c07395b127a2fb4c8c4f49baa3",
+      "mode": "legacy point-in-time",
+      "server_version": "10.4.3",
+      "itsi_version": "5.0.1",
+      "completion": "KV Store ready and backupRestoreStatus Ready; gzip integrity check passed",
+      "tls": "CA verified; hostname check disabled only for isolated loopback endpoint",
+      "initial_failure": "Namespace lacked localhost mappings; fixed with namespace-only hosts mapping and clone restart, then backup repeated successfully"
+    },
+    "clone_502_pre_enterprise_cold": {
+      "bytes": 61953034240,
+      "sha256": "7b947164600aa1f8dbf8c14bc0585ea64a1c528038159226c748d6113bfb2868",
+      "scope": "Stopped isolated 10.4.3 installation with ITSI 5.0.2, fixture and explicit migration deferral",
+      "offhost_copy": "In progress; original primary pre-upgrade offhost archive remains verified and retained"
+    }
+  },
+  "restore": {
+    "version": "10.4.3",
+    "isolation": "Loopback-only Linux network namespace, empty route table; outbound inputs, forwarding and schedules disabled",
+    "kv_status": "ready",
+    "readable_collection_counts_match": 410,
+    "indexed_data": "Historical _internal searches returned retained data; main and itsi_summary were empty at the selected cutoff",
+    "qualification": "The cold-restored 10.4.3 clone returns retained indexed data and 106 records in the ITSI services collection with matching identities and stable fields. Follow-up comparison qualifies all 25 readable collection differences as runtime state or regenerated IDs. Upgrade rehearsal and representative post-upgrade views remain pending the isolated ITSI and Enterprise upgrade rehearsal.",
+    "canonical_collection_hashes_match": 397,
+    "canonical_collection_hashes_total": 410,
+    "canonical_hash_algorithm": "sha256(json.dumps(rows, sort_keys=True, separators=(\",\", \":\")).encode())",
+    "followup_collection_review": {
+      "assessment_date": "2026-10-07",
+      "all_app_collection_config_count_each": 442,
+      "differing_collection_values": 25,
+      "itsi_service_changed_fields": [
+        "mod_timestamp"
+      ],
+      "durable_review_pending": [],
+      "qualification": "All readable value differences are accounted for as runtime state, migration markers or regenerated IDs. ITSI collection records match by identity and stable fields. Historical exact hashes remain separately dated; no byte-identical live snapshot claim.",
+      "readable_collections_each": 410,
+      "nonreadable_collections_each": 32,
+      "qualified_runtime_collection_differences": 25,
+      "itsi_collection_matching_record_identities": 106
+    },
+    "data_readback_gate": "pass-with-qualified-runtime-variance",
+    "archive_baseline_qualification": "Cold archive SHA and restored installation were verified; embedded BSON/WiredTiger records were inventoried but not independently decoded.",
+    "itsi_services_collection_rows": 106,
+    "itsi_service_field_differences": [
+      "mod_timestamp"
+    ]
+  },
+  "storage_waiver": {
+    "measured_free_bytes": 502848638976,
+    "measured_used_percent": 76,
+    "estimated_additional_peak_reserve_bytes": 150323855360,
+    "qualification": "Capacity reserve is an estimate pending exact package staging and upgrade peak measurement",
+    "fresh_preflight": {
+      "collected_at_utc": "2026-10-07T23:13:24Z",
+      "installation_bytes": 62119307419,
+      "free_bytes": 432780902400,
+      "measured_backup_and_recovery_reserve_bytes": 145713451318,
+      "space_gate_pass": true,
+      "main_pid_unchanged": true,
+      "reserve_basis": "Twice the measured installation size plus 20 GiB staging margin; actual upgrade peak remains to be observed."
+    }
+  },
+  "upgrade_gate": {
+    "itsi_5_0_2_download": "Historical authenticated HTTP 403; resolved 2026-10-07 by verified local archive",
+    "primary_upgrade_performed": false,
+    "recovery_artifact_retention": "Protected backups and clone retained pending rehearsal and final observation; 24-hour post-upgrade period has not started",
+    "itsi_5_0_2_package": {
+      "version": "5.0.2",
+      "build": "117138",
+      "size_bytes": 577577273,
+      "sha256": "88cc12d00bcb114d626cc312db2eb5eb1aabcb51cfa44245e8abb6ec465b116b",
+      "verified": "2026-10-07"
+    },
+    "isolated_upgrade_rehearsal": "Enterprise 10.4.3 to10.6.0.5 with ITSI 5.0.2 and explicit postgresMigrateOnStartup=false passed available isolated functional gates. KV ready/wiredTiger/migration NotStarted; original 106 typed objects retained; fixture native validation, ingestion/search, populated Entity Overview object view and second restart passed. Premium Service Analyzer blocked by existing license entitlement.",
+    "itsi_clone_package_upgrade": {
+      "assessment_date": "2026-10-07",
+      "enterprise_version": "10.4.3",
+      "itsi_version": "5.0.2",
+      "kv_status": "ready before migration-worker restart",
+      "all_collection_configs_each": 442,
+      "readable_collections_each": 410,
+      "unchanged_readable_counts": 410,
+      "matching_full_collection_hashes": 405,
+      "changed_full_collection_hashes": 5,
+      "qualification": "Package identity, typed object counts and migration completion verified. Field-level differences and representative native views remain pending.",
+      "migration_skip_prechecks": [],
+      "isolation_adjustment": "Enabled only internal ITSI migration/configurator inputs; loopback-only network namespace and outbound isolation retained.",
+      "startup_failure": {
+        "date": "2026-10-07",
+        "enterprise_version": "10.4.3",
+        "signal": "SIGSEGV",
+        "thread": "CallbackRunnerThread",
+        "phase": "Restart after enabling internal ITSI migration/configurator workers",
+        "qualification": "Single startup SIGSEGV retained; controlled retry recovered. Root also corrected malformed internal-input edit before successful migration. Causation is unproven; repeat restart remains a required gate."
+      },
+      "collection_records": 106,
+      "collection_identifier_sha256": "4151360fe5195f4d3b285da5bb89f6523ea2caf3a7f441094a2b7dd27382af5e",
+      "pre_object_migration_full_rows_sha256": "dac0fd211729030cff2bc94d3d60dfef508216390207297ee5bc01bf6cfca06a",
+      "object_types": {
+        "kpi_template": 33,
+        "kpi_base_search": 40,
+        "kpi_threshold_template": 33
+      },
+      "configured_service_count": 0,
+      "configured_entity_count": 0,
+      "configured_glass_table_count": 0,
+      "object_count_correction": "2026-10-07: Earlier evidence called all 106 itsi_services collection rows services; typed readback identifies templates and base searches, with no configured service records.",
+      "object_migration": {
+        "has_succeeded": true,
+        "is_running": false,
+        "error": null,
+        "completed_prechecks": 6,
+        "skipped_prechecks": [],
+        "completed_at_utc": "2026-10-07T21:51:15Z",
+        "transformed_threshold_template_count_before": 33,
+        "transformed_threshold_template_count_after": 33
+      },
+      "admin_inheritance_repair": "Preserved ES role imports and added documented ITSI admin/analyst/user role imports on the isolated clone; internal service-account capability verification passed.",
+      "post_migration_object_comparison": {
+        "source": "Read-only current primary 10.4.3 / ITSI 5.0.1",
+        "matching_keys": 106,
+        "source_objects": 106,
+        "clone_objects": 106,
+        "only_changed_fields": [
+          "_version",
+          "mod_timestamp"
+        ],
+        "changed_objects_by_type": {
+          "kpi_template": 33,
+          "kpi_base_search": 40,
+          "kpi_threshold_template": 33
+        },
+        "qualification": "Stable content matches by key; version and modification timestamp changed after upgrade/configuration lifecycle. Comparison is to current read-only primary, not an atomic archive snapshot."
+      },
+      "native_fixture": {
+        "last_verified": "2026-10-07",
+        "platform": "Enterprise 10.4.3 / ITSI 5.0.2 isolated recovery clone",
+        "created": {
+          "entity_type": 1,
+          "entity": 1,
+          "disabled_service_with_embedded_kpi": 1
+        },
+        "apply": "pass",
+        "live_validate": "pass",
+        "second_preview": {
+          "created": 0,
+          "updated": 0,
+          "unchanged": 3,
+          "failed": 0
+        },
+        "contract_fixes": [
+          "New entity type requires list-valued data_drilldowns and dashboard_drilldowns, including empty lists.",
+          "Entity identifier/informational fields require top-level list values in addition to canonical field/value blobs."
+        ],
+        "qualification": "ITSI 5.0.2 native fixture apply, readback, idempotence, source search and available Entity Overview passed on isolated Enterprise 10.4.3. Premium service monitoring license access, restart persistence and Enterprise 10.6 upgrade remain pending.",
+        "kpi_search": {
+          "rows": 1,
+          "fixture_value": 1,
+          "warnings_or_errors": 0,
+          "qualification": "Direct bounded source search; premium scheduled KPI health is unqualified."
+        },
+        "browser_view": {
+          "available_view": "Entity Overview",
+          "fixture_entity_count": 1,
+          "fixture_dimensions_visible": [
+            "host",
+            "environment"
+          ],
+          "status": "N/A; manually created fixture with no discovery source",
+          "premium_access_blocker": "Service Analyzer reports premium ITSI licensing required; UI identifies product as IT Essentials Work.",
+          "owner": "Lab owner",
+          "next_action": "Provide an existing protected ITSI license file or licensed lab/profile; validate Service Analyzer and KPI health after applying the licensed entitlement.",
+          "validation_bridge_correction": "Session cookies now retained; timezone configuration is populated. Earlier blank page was a private validation bridge issue, not a Splunk timezone defect."
+        }
+      }
+    },
+    "enterprise_clone_rehearsal": {
+      "assessment_date": "2026-10-07",
+      "enterprise": "10.6.0.5",
+      "itsi": "5.0.2",
+      "postgresMigrateOnStartup": false,
+      "kv_status": "ready",
+      "kv_storage_engine": "wiredTiger",
+      "migrationStatus": "NotStarted",
+      "original_objects": {
+        "kpi_template": 33,
+        "kpi_base_search": 40,
+        "kpi_threshold_template": 33,
+        "stable_fields_preserved": true
+      },
+      "fixtures": {
+        "entity": 1,
+        "service": 1,
+        "entity_type": 1,
+        "native_validation": "pass before and after second restart",
+        "kpi_source_search": "Earlier legacy fixture source returned one row; premium scheduled service/KPI health not qualified"
+      },
+      "canary_search_count_before_after_restart": [
+        1,
+        1
+      ],
+      "view": "Entity Overview on 10.6.0.5 shows fixture name, host and environment; status N/A because no entity-metrics source configured",
+      "premium_license_blocker": {
+        "impact": "Service Analyzer and premium scheduled service-health workflow unavailable",
+        "owner": "Lab owner",
+        "next_action": "Provide an existing protected ITSI license-file path or licensed lab/profile"
+      },
+      "primary_version_unchanged": "10.4.3",
+      "primary_itsi_unchanged": "5.0.1",
+      "primary_upgrade_performed": false,
+      "environment_qualification": "Custom Debian13.4 AMD host; supported Ubuntu24.04 evidence is separate",
+      "startup_warnings": "Pre-existing app configuration keys warned during startup; all preliminary checks passed. Preserve these findings for primary app/config review."
+    },
+    "installed_premium_vendor_compatibility": {
+      "verified_date": "2026-10-07",
+      "enterprise": "10.6.x",
+      "installed_es": "8.7.0",
+      "planned_itsi": "5.0.2",
+      "vendor_matrix_families": {
+        "ES": "8.7",
+        "ITSI": "5.0"
+      },
+      "source": "https://help.splunk.com/en/splunk-enterprise/release-notes-and-updates/compatibility-matrix/splunk-products-version-compatibility/splunk-products-version-compatibility-matrix",
+      "qualification": "Vendor version families include these installed/planned releases; this does not establish functional validation or change catalog package pins."
+    }
+  },
+  "sanitization": "No passwords, tokens, license contents, raw collection rows, host identifiers or resource IDs included"
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-08T05:17:43.339526+00:00",
+  "status": "pass",
+  "environment": {
+    "enterprise_version": "10.6.0.5",
+    "os": "Ubuntu 24.04 x86_64",
+    "topology": "isolated standalone",
+    "rest_tls": "CA and hostname verified"
+  },
+  "selected_workflow": "Enterprise conf-REST mask, eval and drop with dedicated source types",
+  "owning_workflow": {
+    "render_reviewed": true,
+    "mask_apply_exit": 0,
+    "eval_apply_exit": 0,
+    "drop_apply_exit": 0,
+    "accept_irreversible_ingest": true,
+    "retention_restart_orchestrator_exit": 0,
+    "cleanup_restart_orchestrator_exit": 0
+  },
+  "live_results": [
+    {
+      "sourcetype": "splunk106:ingest:drop",
+      "_raw": "run=ingest20261008 level=INFO sequence=2"
+    },
+    {
+      "sourcetype": "splunk106:ingest:eval",
+      "_raw": "run=ingest20261008 keep=true evaluated=true"
+    },
+    {
+      "sourcetype": "splunk106:ingest:mask",
+      "_raw": "run=ingest20261008 REDACTED keep=true"
+    }
+  ],
+  "retention": {
+    "three_indexed_events_survived_controlled_restart": true,
+    "rule_configuration_retained": true,
+    "mask_secret_absent": true,
+    "eval_text_present": true,
+    "debug_event_dropped_info_retained": true,
+    "search_errors": 0
+  },
+  "cleanup": {
+    "collected_at_utc": "2026-10-08T05:17:43.339526+00:00",
+    "app_and_index_http_status": 404,
+    "app_directory_absent": true,
+    "index_data_directory_absent": true,
+    "effective_rule_configuration_absent": true,
+    "kv_status": "ready",
+    "DBX_four_rows_retained": true
+  },
+  "qualifications": [
+    "Synthetic disposable test data only.",
+    "RFS S3 route requires its separate UI/rulesets handoff; not qualified by this mask/eval/drop result."
+  ]
+}

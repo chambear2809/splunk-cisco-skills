@@ -4,8 +4,10 @@ description: Use when onboarding or validating Cisco ASA or FTD syslog with Splu
 compatibility: >-
   Splunk Cloud Platform 10.5.2605: conditional. Follow documented package,
   entitlement, topology, and customer-managed runtime guardrails; self-managed
-  paths remain on the public 10.4 baseline.
+  paths use the separate Enterprise 10.6 compatibility contract.
 metadata:
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -69,7 +71,7 @@ checks report `[PASS]`; missing evidence exits nonzero.
 |---|---|---|
 | No `cisco:asa` events | Receiver or route is incomplete | Verify the SC4S/listener handoff before changing the TA |
 | Wrong source type | Receiver metadata differs | Correct the receiver route |
-| No TA dashboards | The TA ships parsing | Validate consuming ES/firewall content |
+| ASA dashboard missing/hidden | Package view is absent, disabled, or not visible | Restore the shipped `cisco_asa_dashboard` view and rerun completion after index routing |
 | Live checks fail | Splunk is unreachable | Run offline checks and hand off live validation |
 
 ## TA Completion Gate
@@ -79,9 +81,11 @@ For every TA/add-on or dashboard companion run, satisfy the shared
 data ingest path owned by this skill or its required companion, validate events
 or metrics in the target indexes/source types, and verify any
 pre-built/package-shipped dashboards are visible, macro-aligned, and returning
-data. If the package ships no dashboards, record that evidence explicitly and
-hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
-doctor.
+data. For the verified 6.1.2 package, completion also requires the shipped
+`cisco_asa_dashboard` view to be present, enabled, visible, and backed by
+queries that resolve the selected index and return data. Do not replace this
+check with a generic no-dashboard claim; qualify a different package version
+only with package evidence.
 
 Render-first workflow for `Splunk_TA_cisco-asa` and Cisco ASA/FTD syslog data.
 The skill emits reviewed placement notes, syslog handoffs, validation SPL, and
@@ -126,7 +130,8 @@ bash skills/cisco-asa-ta-setup/scripts/validate.sh \
 The no-flag/live validator is diagnostic. Add `--completion` (alias `--strict`)
 to require the installed TA, target index, and `cisco:asa` event evidence; the
 completion flags require `--live`. `setup.sh --all --live` invokes this strict
-gate automatically. The TA supplies parsing/CIM knowledge rather than
-standalone dashboards, so dashboard use is handed off to ES/firewall content.
+gate automatically. The TA supplies parsing/CIM knowledge and the verified
+package ships the ASA monitoring dashboard; ES/firewall content remains an
+additional handoff.
 
 See `reference.md` for source type, CIM, and receiver guardrails.

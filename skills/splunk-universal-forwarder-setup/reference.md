@@ -58,6 +58,18 @@ must use the same explicit acknowledgement before deleting runtime state.
 
 ## Install Safety
 
+Unix-like fresh installs retain the standard management (`8089`) and IPC
+broker (`8194`) defaults unless overridden with `--mgmt-port` /
+`--ipc-broker-port` (alias `--ipc-port`) or `SPLUNK_MGMT_PORT` /
+`SPLUNK_IPC_BROKER_PORT` (legacy `SPLUNK_IPC_PORT`). The setup checks target
+port availability and writes `[settings]/mgmtHostPort` in `web.conf` plus
+`[ipc_broker]/port` in `server.conf` before first start. It also sets the
+UF-only `[httpServer]/mgmtMode = tcp` setting in `server.conf`; newer Universal
+Forwarders default to UDS management mode on Linux and otherwise would not bind
+the selected TCP management port. Validation checks the effective management
+mode and listener as well as both configured ports. Upgrade paths do not
+rewrite those settings. Windows MSI handoffs keep their standard ports.
+
 - Running `setup.sh` with no `--phase` is render-only. Live installs, upgrades,
   and enrollment changes fail closed without `--accept-forwarder-mutation`.
 - The skill rejects packages that are not named like official Universal

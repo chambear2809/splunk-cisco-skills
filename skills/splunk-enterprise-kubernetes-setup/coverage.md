@@ -21,7 +21,7 @@ Record the owning team, artifact, and readback separately.
 
 | Capability | Status | Current coverage and boundary |
 |---|---|---|
-| Operator/chart/Splunk compatibility | First-class | Verified Operator `3.1.0` matrix, exact GA version/tag checks, live/offline Kubernetes checks, matching chart/CRD checks, and fail-closed Helm 3/4 release inventory. Production requires hash-verified local official chart and CRD snapshots plus digest-pinned Operator/Splunk images and cannot bypass the matrix. |
+| Operator/chart/Splunk compatibility | First-class | Verified Operator `3.2.0` matrix (Splunk 9.4.15-10.6.0, Kubernetes 1.32-1.36), exact GA version/tag checks, live/offline Kubernetes checks, matching chart/CRD checks, and fail-closed Helm 3/4 release inventory. Production requires hash-verified local official chart and CRD snapshots plus digest-pinned Operator/Splunk images and cannot bypass the matrix. |
 | CRD OpenAPI/CEL admission | First-class artifact + product-managed enforcement | The exact official 3.1 CRD snapshot, including OpenAPI and `x-kubernetes-validations` rules, is hash-locked, checked, applied before CR dry-run, and enforced by the API server. This is independent of the optional incompatible validation webhook below. |
 | Direct manifest/Kustomize installation | Upstream-supported, incompatible handoff | Upstream supports non-Helm installation, but this skill's ownership, upgrade, inventory, and exact object contracts are Helm-only. Do not adopt a direct/Kustomize install into this bundle without a separate migration/ownership design. |
 | Splunk General Terms | First-class | Explicit acceptance is required for every SOK render because Operator 3.1 validates the value before reconciling a Splunk CR, including supported 9.4.x images. The flag renders the required Operator value. |
@@ -63,12 +63,12 @@ Record the owning team, artifact, and readback separately.
 | SmartStore cache/per-index tuning | Handoff | The strict renderer locks its single-volume/index contract. Additional cache/index tuning requires a separately reviewed design plus sizing, retention, encryption, and recovery evidence. |
 | Azure/GCP SmartStore | App Framework + handoff | Official guidance requires Splunk app configuration deployed through App Framework; Azure/GCP are not first-class SmartStore CR provider modes here. |
 | Existing-index SmartStore migration | Handoff | Existing local index data must be migrated before CR enablement. Prove migration, `repFactor`, cache, encryption, retention, and restore behavior. |
-| Indexing and ingestion separation | First-class, constrained | C3 only; upstream `sqs` or `sqs_cp` queue mode, AWS SQS/DLQ, S3 oversized-message storage, IngestorCluster, Queue/ObjectStorage references, and required Queue Secret authentication. Workload service accounts are rejected in the verified 3.1 path. |
+| Indexing and ingestion separation | First-class, constrained | C3 only; upstream `sqs` or `sqs_cp` queue mode, AWS SQS/DLQ, S3 oversized-message storage, IngestorCluster, Queue/ObjectStorage references, and required Queue `secretKeyRef` authentication. Workload service accounts are rejected in the verified 3.2 path. |
 | I&I cloud resource creation | Handoff | Queue, DLQ, bucket, IAM/KMS, endpoints, and the `s3_access_key`/`s3_secret_key` Secret are external. |
 | I&I Queue region grammar | First-class | `--queue-region` is checked against the narrower SOK 3.1 Queue CRD OpenAPI grammar, not merely a general AWS-region parser. |
 | I&I on M4 or non-AWS providers | Unsupported by this renderer | Do not force through an overlay without a separate supported design and validation workflow. |
 | I&I queue/object-store updates | First-class rejection + handoff | Upgrade preflight rejects immutable Queue/ObjectStorage/ref changes. Queue credential volumes are the upstream mutable exception; replacement requires a migration and recovery design. |
-| I&I Queue credential volume | First-class workaround | Chart 3.1.0 mis-serializes `queue.sqs.volumes`; the skill renders the documented Queue CR through `extraManifests` and checks the resulting Secret reference. |
+| I&I Queue credential reference | First-class | SOK 3.2.0 requires `queue.sqs.secretKeyRef` with `awsAccessKey`/`awsSecretKey` selectors; the former volume-based `secretRef` path is rejected. |
 | I&I horizontal autoscaling | Handoff | Upstream documents HPA for IngestorCluster, but customer HPA manifests are outside the strict Helm kind allowlist. Metrics and capacity evidence are required. |
 | I&I Grafana dashboards | Handoff | Upstream provides an example only. Metrics stack, dashboard lifecycle, and alert ownership remain external. |
 | App Framework | Constrained Overlay | `appRepo` can be supplied for supported CRs. The skill copies/hashes it and validates structure, roles/scopes, providers, endpoints, paths, references, polling bounds, and premium settings, but does not inspect packages or app compatibility. |
@@ -303,3 +303,11 @@ Regardless of target, a production handoff should include:
 - Upgrade: <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/upgrade-splunk-pod>
 - Troubleshoot: <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/troubleshoot-splunk-pod>
 - Cisco CVD: <https://www.cisco.com/c/en/us/td/docs/unified_computing/ucs/UCS_CVDs/cisco_ucs_splunk_pod.html>
+
+## Enterprise 10.6 compatibility gate
+
+SOK Operator 3.2.0 explicitly supports Splunk Enterprise 9.4.15 through 10.6.0
+and Kubernetes 1.32 through 1.36. The renderer accepts only that exact tuple,
+with four-part `10.6.0.5` tags supported for image compatibility checks.
+POD `10.4.0_1.6.0` remains a separate coupled runtime and does not inherit this
+SOK release evidence.

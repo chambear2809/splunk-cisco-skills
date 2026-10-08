@@ -37,7 +37,9 @@ class ConfigObjectSection:
 
 PRE_SERVICE_CONFIG_SECTIONS = (
     ConfigObjectSection("teams", "team", default_sec_grp=False),
-    ConfigObjectSection("entity_types", "entity_type"),
+    # ITSI entity types are global objects but their REST schema does not
+    # accept the security-group field used by services and other objects.
+    ConfigObjectSection("entity_types", "entity_type", default_sec_grp=False),
     ConfigObjectSection("entity_filter_rules", "entity_filter_rule"),
     ConfigObjectSection("entity_management_policies", "entity_management_policies", label="entity_management_policy"),
     ConfigObjectSection("entity_management_rules", "entity_management_rules", label="entity_management_rule"),
@@ -191,6 +193,7 @@ ENTITY_RESERVED_KEYS = {
     "entity_type_ids",
     "entity_type_titles",
 }
+ENTITY_FIELD_RESERVED_NAMES = ENTITY_RESERVED_KEYS | {"_key", "identifier", "informational", "sai_entity_key"}
 SERVICE_RESERVED_KEYS = {
     "payload",
     "title",
@@ -260,10 +263,42 @@ class NativeResult:
 
 
 def _field_map(entries: list[dict[str, Any]]) -> dict[str, list[Any]]:
+    values: list[str] = []
+    seen_values: set[str] = set()
+    for entry in entries:
+        raw_values = entry.get("value") if isinstance(entry.get("value"), list) else [entry.get("value")]
+        for raw_value in raw_values:
+            if not isinstance(raw_value, str):
+                raise ValidationError("Entity identifier and informational values must be strings.")
+            normalized_value = raw_value.lower()
+            if normalized_value and normalized_value not in seen_values:
+                seen_values.add(normalized_value)
+                values.append(normalized_value)
     return {
         "fields": [entry["field"] for entry in entries],
-        "values": [entry["value"] for entry in entries],
+        "values": values,
     }
+
+
+def _normalize_entity_fields(entries: list[dict[str, Any]], entity_title: str) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in entries:
+        field_name = _validate_entity_field_name(entry.get("field"), entity_title)
+        if field_name in seen:
+            raise ValidationError(f"Entity '{entity_title}' field mappings cannot repeat field '{field_name}'.")
+        seen.add(field_name)
+        normalized.append({"field": field_name, "value": deepcopy(entry.get("value"))})
+    return normalized
+
+
+def _validate_entity_field_name(field_name: Any, entity_title: str) -> str:
+    normalized = str(field_name or "").strip()
+    if not normalized:
+        raise ValidationError(f"Entity '{entity_title}' field mappings require a non-empty field name.")
+    if normalized in ENTITY_FIELD_RESERVED_NAMES:
+        raise ValidationError(f"Entity '{entity_title}' field mapping cannot overwrite reserved field '{normalized}'.")
+    return normalized
 
 
 def _schema_overlay(object_spec: dict[str, Any], reserved_keys: set[str], label: str = "payload") -> dict[str, Any]:
@@ -299,9 +334,21 @@ def _normalize_entity(
     identifiers = listify(entity_spec.get("identifier_fields"))
     informational = listify(entity_spec.get("informational_fields"))
     if identifiers:
+        identifiers = _normalize_entity_fields(identifiers, entity_spec["title"])
         payload["identifier"] = _field_map(identifiers)
+        # ITSI rebuilds the identifier blob from the entity's top-level field
+        # values. Keep both representations in sync for create and updates.
+        for entry in identifiers:
+            field_name = _validate_entity_field_name(entry.get("field"), entity_spec["title"])
+            value = deepcopy(entry["value"])
+            payload[field_name] = value if isinstance(value, list) else [value]
     if informational:
+        informational = _normalize_entity_fields(informational, entity_spec["title"])
         payload["informational"] = _field_map(informational)
+        for entry in informational:
+            field_name = _validate_entity_field_name(entry.get("field"), entity_spec["title"])
+            value = deepcopy(entry["value"])
+            payload[field_name] = value if isinstance(value, list) else [value]
     if "entity_type_ids" in entity_spec:
         payload["entity_type_ids"] = list(entity_spec.get("entity_type_ids") or [])
     if "entity_type_titles" in entity_spec:
@@ -528,6 +575,11 @@ def _normalize_config_object(
         payload["description"] = object_spec.get("description", "")
     if section.default_sec_grp and (existing is None or "sec_grp" in object_spec):
         payload["sec_grp"] = object_spec.get("sec_grp", default_team)
+    if section.section == "entity_types" and existing is None:
+        # ITSI 5.x requires both drilldown collections on entity-type create,
+        # including when the desired type intentionally has none.
+        payload.setdefault("data_drilldowns", [])
+        payload.setdefault("dashboard_drilldowns", [])
     if section.section == "service_templates":
         requested_team = object_spec.get("sec_grp", DEFAULT_TEAM)
         if requested_team != DEFAULT_TEAM:

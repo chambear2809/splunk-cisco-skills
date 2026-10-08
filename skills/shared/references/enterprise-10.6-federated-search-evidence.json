@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T06:35:39.480791+00:00",
+  "status": "partial",
+  "selected_workflow": "Standard Splunk-to-Splunk REST provider and index lifecycle",
+  "environment": {
+    "consumer": "Disposable unclustered Ubuntu 24.04 x86_64, 8 vCPU, 32 GiB RAM",
+    "provider": "Existing isolated Ubuntu 24.04 standalone",
+    "enterprise_version_both": "10.6.0.5",
+    "tls": "CA and endpoint hostname verified"
+  },
+  "functional": {
+    "owning_rest_apply": "pass",
+    "owning_live_validator": "pass",
+    "unique_federated_records": 4,
+    "count_per_record": 1,
+    "owning_provider_disable": "pass",
+    "disabled_query_records": 0,
+    "owning_provider_enable": "pass",
+    "enabled_query_records": 4,
+    "owning_cli_restart": "pass",
+    "corrected_target_listener_probe": 8089,
+    "records_retained_after_restart": 4,
+    "current_and_cohosted_kv_status": "ready",
+    "untrusted_ca_negative": "zero records with SSL certificate verification error",
+    "unmatched_hostname_negative": "zero records with SSL certificate verification error",
+    "trusted_endpoint_restoration": "four records recovered after both negative fixtures",
+    "unsupported_global_toggle": "refused before POST; general settings unchanged"
+  },
+  "repository_corrections": [
+    "Provider state uses supported enable/disable actions rather than unsupported disabled form field",
+    "Index state is derived from provider state; exact existing index identity and known state required",
+    "Duplicate index HTTP404 is accepted only after exact keyed entity verification",
+    "Index mutation precedes desired provider disable; current and desired states are separate",
+    "Provider enable is verified by fresh keyed readback before index updates",
+    "Structured HTTP-success error messages reject apply",
+    "Unsupported global state contract fails closed",
+    "Restart listener uses target system Python rather than the Splunk first-time-run wrapper"
+  ],
+  "runtime_qualification": {
+    "standalone_hostname_loopback_workaround": true,
+    "reason": "Cohosted KV private-IP PgBouncer authorization rejected the generated service identity after verified TLS succeeded",
+    "scope": "Owned standalone only; reversible exact /etc/hosts addition maps its two local hostnames to loopback",
+    "tls_verification_weakened": false,
+    "pg_hba_or_database_modified": false,
+    "risk": "Local hostname resolution differs from the private interface; do not transfer this workaround to clustered roles",
+    "next_action": "Investigate vendor service-group bootstrap behavior before reusing outside this disposable standalone"
+  },
+  "cleanup": {
+    "consumer_provider_http": 404,
+    "consumer_index_http": 404,
+    "provider_reader_user_http": 404,
+    "provider_reader_role_http": 404,
+    "provider_index_http": 404,
+    "reader_password_file": "deleted",
+    "temporary_aws_rules": "pending expired AWS session refresh",
+    "consumer_host": "retained for sequential Deployment Server workflow",
+    "active_consumer_pki": "Retained on disposable host for sequential validation. Unused remote/controller staging private keys, password and remote staging input directory deleted; public CA artifacts retained."
+  },
+  "remaining": [
+    "Remove exact two owned AWS private-federation network rules after Duo refresh and verify absence",
+    "Remove unused PKI staging secret copies",
+    "Transparent providers, alternative dataset types and global switch are separately unqualified"
+  ],
+  "sanitization": "No host addresses, account identifiers, credentials, exact resource IDs or raw data"
+}

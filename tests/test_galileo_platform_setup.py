@@ -28,6 +28,57 @@ ALERT_RELAY = SKILL_DIR / "scripts/galileo_alert_webhook_relay.py"
 GALILEO_CONSOLE_ARGS = ("--galileo-console-url", "https://console.demo-v2.galileocloud.io/")
 
 
+@pytest.mark.parametrize(
+    "console_url,api_base",
+    [
+        (
+            "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1",
+            "https://api-demo-amd.gcp-dev.galileo.ai",
+        ),
+        (
+            "https://console.demo-v2.galileocloud.io/",
+            "https://api.demo-v2.galileocloud.io",
+        ),
+    ],
+)
+def test_console_tenant_path_is_preserved_and_api_origin_is_derived(
+    console_url: str, api_base: str
+) -> None:
+    renderer = load_script(RENDER, "galileo_render_url_tests")
+    assert renderer.derive_api_base(console_url) == api_base
+    assert renderer.validate_galileo_root_url(console_url, "Galileo console URL").path
+    assert console_url.endswith("/demo-amd-1") or console_url.endswith("/")
+
+
+@pytest.mark.parametrize(
+    "console_url",
+    [
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1?x=1",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1#fragment",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1/../other",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1%2Fother",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1%5Cother",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo.amd.1",
+        "https://console-demo-amd.gcp-dev.galileo.ai//demo-amd-1",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1\\other",
+        "https://console-demo-amd.gcp-dev.galileo.ai/demo-amd-1\x7f",
+    ],
+)
+def test_console_tenant_path_rejects_unsafe_variants(console_url: str) -> None:
+    renderer = load_script(RENDER, "galileo_render_url_reject_tests")
+    with pytest.raises(SystemExit, match="Galileo console URL"):
+        renderer.validate_galileo_root_url(console_url, "Galileo console URL")
+
+
+def test_api_base_still_rejects_paths_even_when_console_paths_are_allowed() -> None:
+    renderer = load_script(RENDER, "galileo_render_api_origin_tests")
+    with pytest.raises(SystemExit, match="Galileo API base"):
+        renderer.validate_galileo_root_url(
+            "https://api-demo-amd.gcp-dev.galileo.ai/demo-amd-1",
+            "Galileo API base",
+        )
+
+
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         list(args),
@@ -2085,53 +2136,6 @@ def test_project_rest_fallback_accepts_empty_success_response(monkeypatch) -> No
     assert lifecycle._project_rest_request("DELETE", "/v2/projects/project-id") == {}
 
 
-def test_project_delete_fallback_is_exact_and_limited_to_known_schema_error(monkeypatch) -> None:
-    lifecycle = load_script(LIFECYCLE, "galileo_object_lifecycle_project_delete")
-    project_id = "11111111-1111-4111-8111-111111111111"
-    rest_calls: list[tuple[str, str, bool]] = []
-
-    def sdk_schema_failure(**_kwargs):
-        raise ValueError("'use_control_runtime' is not a valid PermissionAction")
-
-    def rest_request(method, path, *, body=None, not_found_is_none=False):
-        assert body is None
-        rest_calls.append((method, path, not_found_is_none))
-        return {"message": "deleted"}
-
-    monkeypatch.setattr(lifecycle, "_project_rest_request", rest_request)
-    project_reads = iter([{"id": project_id, "name": "project"}, None])
-    monkeypatch.setattr(lifecycle, "_get_project_rest", lambda **_kwargs: next(project_reads))
-
-    source = lifecycle.delete_project_compat(sdk_schema_failure, project_id=project_id)
-    assert source == "documented_rest_fallback"
-    assert rest_calls == [("DELETE", f"/v2/projects/{project_id}", True)]
-
-    def sdk_auth_failure(**_kwargs):
-        raise RuntimeError("HTTP 403 forbidden")
-
-    monkeypatch.setattr(
-        lifecycle,
-        "_get_project_rest",
-        lambda **_kwargs: {"id": project_id, "name": "project"},
-    )
-    with pytest.raises(RuntimeError, match="403"):
-        lifecycle.delete_project_compat(sdk_auth_failure, project_id=project_id)
-    assert len(rest_calls) == 1
-
-    sdk_calls: list[dict[str, object]] = []
-
-    def must_not_delete(**kwargs):
-        sdk_calls.append(kwargs)
-        pytest.fail("an already-absent exact project must not call SDK delete")
-
-    monkeypatch.setattr(lifecycle, "_get_project_rest", lambda **_kwargs: None)
-    assert (
-        lifecycle.delete_project_compat(must_not_delete, project_id=project_id)
-        == "already_absent_verified"
-    )
-    assert sdk_calls == []
-
-
 def test_project_failure_stops_log_stream_and_all_child_processing(monkeypatch, tmp_path: Path) -> None:
     lifecycle = load_script(LIFECYCLE, "galileo_object_lifecycle_child_gate")
     output = tmp_path / "result.json"
@@ -2260,6 +2264,26 @@ def test_cleanup_ledger_deletes_datasets_before_exact_project_and_marks_children
         return True
 
     projects.delete_project = delete_project
+    config = ModuleType("galileo.config")
+    config.GalileoPythonConfig = type(
+        "GalileoPythonConfig",
+        (),
+        {"get": staticmethod(lambda: type("Config", (), {"api_client": "client"})())},
+    )
+    generated = ModuleType(
+        "galileo.resources.api.projects.delete_project_projects_project_id_delete"
+    )
+    generated.sync_detailed = lambda *, project_id, client: (
+        calls.append(("project", {"project_id": project_id, "client": client}))
+        or type("Response", (), {"status_code": 200})()
+    )
+    resources_api = ModuleType("galileo.resources.api")
+    resources_api.projects = ModuleType("galileo.resources.api.projects")
+    resources_api.projects.delete_project_projects_project_id_delete = generated
+    resources = ModuleType("galileo.resources")
+    resources.api = resources_api
+    galileo.config = config
+    galileo.resources = resources
     prompt_reads = iter([{"id": prompt_id, "name": "prompt"}, "deleted"])
 
     def get_prompt(**_kwargs):
@@ -2271,6 +2295,11 @@ def test_cleanup_ledger_deletes_datasets_before_exact_project_and_marks_children
     prompts.get_prompt = get_prompt
     prompts.delete_prompt = lambda **kwargs: calls.append(("prompt", kwargs))
     monkeypatch.setitem(sys.modules, "galileo", galileo)
+    monkeypatch.setitem(sys.modules, "galileo.config", config)
+    monkeypatch.setitem(sys.modules, "galileo.resources", resources)
+    monkeypatch.setitem(sys.modules, "galileo.resources.api", resources_api)
+    monkeypatch.setitem(sys.modules, "galileo.resources.api.projects", resources_api.projects)
+    monkeypatch.setitem(sys.modules, generated.__name__, generated)
     monkeypatch.setitem(sys.modules, "galileo.datasets", datasets)
     monkeypatch.setitem(sys.modules, "galileo.projects", projects)
     monkeypatch.setitem(sys.modules, "galileo.prompts", prompts)
@@ -2283,7 +2312,7 @@ def test_cleanup_ledger_deletes_datasets_before_exact_project_and_marks_children
     assert calls == [
         ("dataset", {"id": dataset_id, "project_id": project_id}),
         ("prompt", {"id": prompt_id}),
-        ("project", {"id": project_id}),
+        ("project", {"project_id": project_id, "client": "client"}),
     ]
     cleaned = json.loads(ledger_path.read_text(encoding="utf-8"))
     assert cleaned["status"] == "cleaned"

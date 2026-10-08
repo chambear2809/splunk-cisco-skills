@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-08T06:14:21.266746+00:00",
+  "status": "partial",
+  "product": "User-confirmed Galileo demo tenant",
+  "selected_workflow": "Galileo Observe JSONL trace export to Splunk Enterprise HEC",
+  "environment": {
+    "enterprise_version": "10.6.0.5",
+    "os": "Ubuntu 24.04 x86_64",
+    "galileo_sdk_version": "2.4.0",
+    "onboarding_date": null,
+    "exception": "Existing user-approved one-off; tracked onboarding gate unchanged; no fabricated date"
+  },
+  "functional": {
+    "owned_project_and_stream_creation": "pass",
+    "synthetic_trace_and_tool_readback": "pass",
+    "galileo_exported_trace_count": 1,
+    "hec_event_count": 1,
+    "hec_ca_and_hostname_verification": true,
+    "enterprise_indexed_trace_count": 1,
+    "exact_project_stream_trace_correlation": true,
+    "retained_after_restart_count": 1,
+    "retention_collected_at": "2026-10-08T06:04:05.908678+00:00",
+    "current_and_cohosted_kv_ready": true,
+    "trace_id_sha256": "5f5d01cc463098d30ae68c7f1244a7ec8c17e17589d31a2033474c94cbd576d3"
+  },
+  "cleanup": {
+    "splunk_hec_http": 404,
+    "splunk_index_http": 404,
+    "index_data_directory": "absent",
+    "owned_hec_token_file": "deleted",
+    "galileo_project_http": 200,
+    "galileo_log_stream_http": 200,
+    "galileo_object_deletion": "blocked",
+    "backing_storage_deletion": "unverified",
+    "attempts": {
+      "child_delete": 500,
+      "child_retry": 500,
+      "exact_parent_sdk_delete": 500
+    }
+  },
+  "external_blocker": {
+    "type": "tenant_storage_unavailable",
+    "evidence": "Authenticated child and exact parent deletion returned HTTP500 with MinIO connection refused; exact project and stream GET still return HTTP200",
+    "impact": "Owned synthetic Galileo objects and backing storage cannot be removed; workflow cannot receive completion sign-off despite successful export and retention",
+    "owner": "Galileo tenant infrastructure owner",
+    "next_action": "Restore MinIO connectivity, then rerun exact-ID cleanup using the protected ownership ledger and verify API absence and backing-object removal",
+    "ownership_ledger_retained": true,
+    "project_id_sha256": "d9d34a837416741a416e5d2f03646ca616d26b8a5ac33058443c2c3408bfbe7c",
+    "log_stream_id_sha256": "f3539167ebd0ead0287bd6c2324c9238ced59351c8b07dce0677e943d8baf7b0"
+  },
+  "qualification": "Selected trace-export and Enterprise retention passed; cleanup is externally blocked. Evaluators, controls, multimedia and other variants are unqualified. Original 2026-10-07 evidence remains separately dated.",
+  "sanitization": "No API keys, tokens, passwords, raw trace input/output or exact Galileo object IDs"
+}

@@ -7,8 +7,10 @@ description: "Use when installing Edge Processor, managing EP pipelines, routing
   Covers EP objects, TLS / mTLS, Linux or Docker instances, multi-instance scale-out, source types,
   destinations, SPL2 pipelines with splunk-spl2-pipeline-kit linting, apply handoffs, default destination
   guardrails, ACS allowlist stubs, and AI-powered data management readiness handoffs."
-compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths remain on the public 10.4 baseline."
+compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-10-05"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
