@@ -49,6 +49,26 @@ parent_process_name!="*kubelet*"
 | stats count by pod_namespace, pod_name, parent_process, process
 ```
 
+## `cilium:hubble:flow` (Hubble flow logs, opt-in)
+
+Rendered only when `hubble_flow_export.enabled: true`. Each line written by Cilium's static Hubble exporter (`hubble.export.static`, rendered by `cisco-isovalent-platform-setup`) becomes one event. The line is a JSON object with a `flow` member (fields from Cilium's `flow.proto`, such as `flow.IP.source`, `flow.IP.destination`, `flow.l4`, `flow.source`, `flow.destination`, `flow.traffic_direction`, `flow.verdict`) plus `node_name` and `time`, limited by any `fieldMask` set on the exporter.
+
+| Setting | Default |
+|---------|---------|
+| Index | `cilium_hubble` (`hubble_flow_export.index`) |
+| Sourcetype | `cilium:hubble:flow` (`hubble_flow_export.sourcetype`) |
+| Source | `/var/run/cilium/hubble/` |
+| Resource fields | `k8s.cluster.name`, `host.name` (node) |
+
+```spl
+index=cilium_hubble sourcetype="cilium:hubble:flow"
+| spath path=flow.IP.source output=src_ip
+| spath path=flow.IP.destination output=dest_ip
+| stats count by src_ip, dest_ip
+```
+
+No Splunkbase add-on ships search-time parsing for this sourcetype; configure `KV_MODE = json` (or use `spath`) in the consuming app. Create the index and allow it on the collector's HEC token first.
+
 ## How the routing works
 
 When `splunk_platform.also_render_processexec_routing: true` (default), the rendered overlay includes routing logic to tag specific events with the more specific sourcetype:

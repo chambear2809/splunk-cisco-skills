@@ -22,6 +22,7 @@
     "cilium.hubble",
     "cilium.hubble_relay",
     "cilium.hubble_ui",
+    "cilium.hubble_flow_export",
     "cilium.metrics",
     "cilium.network_policy",
     "cilium.cilium_network_policy",
@@ -196,6 +197,16 @@
       "disruptive": false,
       "source_url": "https://docs.cilium.io/en/stable/observability/hubble/",
       "reason": "Rendered values accept Hubble UI overrides; the feature is applied through the Cilium chart."
+    },
+    {
+      "id": "cilium.hubble_flow_export",
+      "product": "Cilium",
+      "feature": "Hubble static flow exporter",
+      "status": "helm_apply",
+      "apply_section": "cilium",
+      "disruptive": false,
+      "source_url": "https://docs.cilium.io/en/v1.18/observability/hubble/configuration/export/",
+      "reason": "Opt-in via spec.hubble_flow_export; renders hubble.export.static values (OSS chart) for file-based flow logs collected by splunk-observability-isovalent-integration."
     },
     {
       "id": "cilium.metrics",

@@ -18,6 +18,44 @@ Input type prefix: `cisco_nexus_aci://`
 | `microsegment` | microsegment | `fvRsDomAtt fvVmAttr fvIpAttr fvMacAttr` | 300s | `cisco_aci` |
 | `stats` | stats | `eqptEgrTotal15min eqptIngrTotal15min fvCEp l2IngrBytesAg15min l2EgrBytesAg15min procCPU15min procMem15min` | 300s | `cisco_aci` |
 
+### Custom classInfo inputs
+
+`setup.sh --classinfo-input NAME --classinfo-classes "..."` (or a preset)
+creates or updates one `cisco_nexus_aci://NAME` stanza through
+`servicesNS/nobody/cisco_dc_networking_app_for_splunk/data/inputs/cisco_nexus_aci`
+and enables it. `--dry-run` prints the stanza and makes no REST call:
+
+```ini
+[cisco_nexus_aci://classInfo_adm]
+apic_account = MY_FABRIC
+apic_input_type = classInfo
+apic_arguments = fabricLink lldpAdjEp vzBrCP vzSubj vzRsSubjFiltAtt vzEntry l3extInstP l3extSubnet
+interval = 300
+index = cisco_dc
+disabled = 0
+```
+
+Field names come from the TA's `README/inputs.conf.spec` `[cisco_nexus_aci://<name>]`
+stanza and the shipped `classInfo_*` defaults in `default/inputs.conf`. The
+script enforces the TA's UI validators from `globalConfig.json`: input name
+`^[a-zA-Z]\w*$` (1–100), `apic_arguments` `^[\w\s-]+$`, positive integer
+interval, index `^[a-zA-Z0-9][a-zA-Z0-9_-]*$` (1–80), and ACI account names
+`^[a-zA-Z]\w*$` (1–50; comma-separated for several accounts). It deduplicates
+classes and refuses the shipped input names so their defaults are not
+overwritten.
+
+The TA writes every class object as one tab-separated `k="v"` event with
+`sourcetype=cisco:dc:aci:class` and `component=<class>`; the source is the
+input stanza. `validate.sh --classinfo-input NAME --index INDEX` reads the
+stanza back (type, enabled state, class list) and searches the last 24 hours by
+`component`. A class with no objects in the fabric produces no events, so a
+missing class is a warning; no events at all is a completion failure.
+
+| Preset | Input | Classes | Use |
+|---|---|---|---|
+| `application-atlas` (alias `adm`) | `classInfo_adm` | `fabricLink lldpAdjEp vzBrCP vzSubj vzRsSubjFiltAtt vzEntry l3extInstP l3extSubnet` | Leaf–spine links, host LLDP attachment, and contract subjects, filters, entries and L3Out external EPGs for network-perspective dependency mapping. `vzBrCP` and `vzEntry` are repeated here because `health_fvTenant` merges them with health records. |
+| `adm-policy` (optional) | `classInfo_adm_policy` | `fvCtx fvAEPg fvEPg fvESg vzAny vzRsAnyToCons vzRsAnyToProv vzRsAnyToConsIf vzInTerm vzOutTerm vzTaboo fvRsProtBy vzRsSubjGraphAtt` | VRF enforcement, uSeg EPGs, ESGs, vzAny relations, contract direction terms, taboo contracts and service-graph attachment. With both presets collected, Application Atlas can evaluate ACI policy completely; the Splunk admin then sets the app macro `adm_aci_policy_complete` to `1`. |
+
 ### ACI Account Configuration Fields
 
 | Field | Description |

@@ -75,13 +75,10 @@ def write_live_agent_relay(output: Path, path: Path) -> Path:
         source="test overlay",
     )
     relay = deepcopy(overlay["agent"]["config"])
-    filelog = (
-        (overlay.get("logsCollection") or {})
-        .get("extraFileLogs", {})
-        .get("filelog/tetragon")
-    )
-    if filelog is not None:
-        relay.setdefault("receivers", {})["filelog/tetragon"] = deepcopy(filelog)
+    for name, filelog in (
+        (overlay.get("logsCollection") or {}).get("extraFileLogs", {}).items()
+    ):
+        relay.setdefault("receivers", {})[name] = deepcopy(filelog)
     path.write_text(dump_yaml(relay, sort_keys=True), encoding="utf-8")
     return path
 
@@ -2161,3 +2158,248 @@ def test_live_validation_rejects_any_unready_selected_pod(tmp_path: Path) -> Non
     assert "requires every selected pod to be Running and Ready" in combined_output(
         validated
     )
+
+
+def _hubble_spec(tmp_path: Path, mode: str = "file", **hubble: object) -> Path:
+    return write_spec(
+        tmp_path / "spec.json",
+        hubble_flow_export={"enabled": True, **hubble},
+        tetragon_export={
+            "mode": mode,
+            "host_path": "/var/run/cilium/tetragon",
+            "filename_pattern": "*.log",
+        },
+    )
+
+
+def _overlay(output: Path) -> dict:
+    return load_yaml_or_json(
+        (output / "splunk-otel-overlay/values.overlay.yaml").read_text(
+            encoding="utf-8"
+        ),
+        source="test overlay",
+    )
+
+
+def test_hubble_flow_export_renders_file_tail_beside_tetragon(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path)
+    result = run_setup(
+        "--render", "--validate", "--spec", str(spec), "--output-dir", str(output)
+    )
+    assert result.returncode == 0, combined_output(result)
+    overlay = _overlay(output)
+    receiver = overlay["logsCollection"]["extraFileLogs"]["file_log/hubble-flows"]
+    assert receiver["include"] == ["/var/run/cilium/hubble/events*.log"]
+    assert receiver["start_at"] == "end"
+    assert receiver["resource"]["com.splunk.index"] == "cilium_hubble"
+    assert receiver["resource"]["com.splunk.sourcetype"] == "cilium:hubble:flow"
+    assert receiver["resource"]["k8s.cluster.name"] == "lab-cluster"
+    assert receiver["resource"]["host.name"] == 'EXPR(env("K8S_NODE_NAME"))'
+    assert "filelog/tetragon" in overlay["logsCollection"]["extraFileLogs"]
+    assert {"name": "hubble-flows", "hostPath": {"path": "/var/run/cilium/hubble"}} in (
+        overlay["agent"]["extraVolumes"]
+    )
+    assert {"name": "hubble-flows", "mountPath": "/var/run/cilium/hubble"} in (
+        overlay["agent"]["extraVolumeMounts"]
+    )
+    assert overlay["splunkPlatform"]["logsEnabled"] is True
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["hubble_flow_export"] == {
+        "enabled": True,
+        "host_path": "/var/run/cilium/hubble",
+        "filename_pattern": "events*.log",
+        "index": "cilium_hubble",
+        "sourcetype": "cilium:hubble:flow",
+        "receiver": "file_log/hubble-flows",
+    }
+    apply_script = (output / "scripts/apply-isovalent-overlay.sh").read_text(
+        encoding="utf-8"
+    )
+    assert 'HUBBLE_FLOW_EXPORT="true"' in apply_script
+    assert 'EXPECTED_HUBBLE_INDEX="cilium_hubble"' in apply_script
+    assert 'EXPECTED_HUBBLE_SOURCETYPE="cilium:hubble:flow"' in apply_script
+
+
+def test_hubble_flow_export_with_stdout_tetragon_is_rejected_at_render(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path, mode="stdout", index="hubble_flows")
+    result = run_setup(
+        "--render", "--validate", "--spec", str(spec), "--output-dir", str(output)
+    )
+    assert result.returncode != 0
+    assert "cannot be combined with tetragon export mode stdout" in combined_output(
+        result
+    )
+    assert not (output / "splunk-otel-overlay/values.overlay.yaml").exists()
+
+
+def test_hubble_flow_export_is_absent_by_default(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    overlay = _overlay(output)
+    assert "file_log/hubble-flows" not in overlay["logsCollection"]["extraFileLogs"]
+    assert [item["name"] for item in overlay["agent"]["extraVolumes"]] == ["tetragon"]
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["hubble_flow_export"] == {"enabled": False}
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        (
+            {"tetragon_export": {"mode": "fluentd"}},
+            "cannot be combined with the legacy fluentd",
+        ),
+        ({"splunk_platform": {"enabled": False}}, "requires splunk_platform.enabled"),
+        (
+            {"hubble_flow_export": {"enabled": True, "host_path": "/var/run/cilium/tetragon"}},
+            "must differ from tetragon_export.host_path",
+        ),
+        (
+            {"hubble_flow_export": {"enabled": True, "host_path": "relative/dir"}},
+            "absolute directory path",
+        ),
+        (
+            {"hubble_flow_export": {"enabled": True, "filename_pattern": "../x.log"}},
+            "basename glob",
+        ),
+        (
+            {"hubble_flow_export": {"enabled": True, "index": "bad index"}},
+            "invalid Splunk index name",
+        ),
+        (
+            {"hubble_flow_export": {"enabled": True, "sourcetype": "bad sourcetype"}},
+            "invalid sourcetype",
+        ),
+        ({"hubble_flow_export": {"enabled": "yes"}}, "must be true or false"),
+    ],
+)
+def test_hubble_flow_export_rejects_invalid_configuration_before_write(
+    tmp_path: Path, overrides: dict, expected: str
+) -> None:
+    output = tmp_path / "rendered"
+    base: dict[str, object] = {"hubble_flow_export": {"enabled": True}}
+    base.update(overrides)
+    spec = write_spec(tmp_path / "spec.json", **base)
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode != 0
+    assert expected in combined_output(result)
+    assert not (output / "splunk-otel-overlay/values.overlay.yaml").exists()
+
+
+@pytest.mark.parametrize(
+    ("needle", "replacement", "message"),
+    [
+        ("com.splunk.sourcetype: cilium:hubble:flow", "com.splunk.sourcetype: drifted", "hubble flow log sourcetype"),
+        ("com.splunk.index: cilium_hubble", "com.splunk.index: drifted", "hubble flow log index"),
+        ("start_at: end", "start_at: beginning", "start at the end"),
+    ],
+)
+def test_static_validation_rejects_hubble_flow_log_drift(
+    tmp_path: Path, needle: str, replacement: str, message: str
+) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path)
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    overlay = output / "splunk-otel-overlay/values.overlay.yaml"
+    text = overlay.read_text(encoding="utf-8")
+    assert needle in text
+    overlay.write_text(text.replace(needle, replacement), encoding="utf-8")
+    validated = run_validate(output)
+    assert validated.returncode == 1
+    assert message in combined_output(validated).lower()
+
+
+def test_static_validation_rejects_hubble_receiver_not_in_metadata(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path)
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    metadata_path = output / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["hubble_flow_export"] = {"enabled": False}
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    validated = run_validate(output)
+    assert validated.returncode == 1
+    assert "metadata does not record" in combined_output(validated)
+
+
+def test_live_validation_rejects_hubble_flow_log_receiver_drift(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path)
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    bin_dir, call_log = fake_live_tools(tmp_path)
+    relay_file = write_live_agent_relay(output, tmp_path / "agent-relay.yaml")
+    relay = load_yaml_or_json(relay_file.read_text(encoding="utf-8"), source="relay")
+    del relay["receivers"]["file_log/hubble-flows"]
+    relay_file.write_text(dump_yaml(relay, sort_keys=True), encoding="utf-8")
+    validated = run_validate(
+        output,
+        "--live",
+        "--allow-current-context",
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "KUBECTL_CALL_LOG": str(call_log),
+            "FAKE_AGENT_RELAY_FILE": str(relay_file),
+        },
+    )
+    assert validated.returncode == 1
+    assert "Live Hubble flow log" in combined_output(validated)
+
+
+def test_splunk_search_requires_hubble_flow_events_with_flow_fields(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rendered"
+    spec = _hubble_spec(tmp_path)
+    rendered = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert rendered.returncode == 0, combined_output(rendered)
+    token = write_token(tmp_path / "splunk.token")
+    with mock_http_api(
+        200,
+        b'{"result":{"k8s.cluster.name":"lab-cluster","adm_flow_fields":"true"}}\n',
+        "application/json",
+    ) as (url, requests):
+        result = run_validate(
+            output,
+            "--splunk-search",
+            "--splunk-url",
+            url,
+            "--splunk-search-token-file",
+            str(token),
+            "--api-timeout-seconds",
+            "2",
+            env={"ISOVALENT_VALIDATION_TEST_MODE": "true"},
+        )
+    assert result.returncode == 0, combined_output(result)
+    assert len(requests) == 2
+    hubble_body = requests[1]["body"]
+    assert b"index%3Dcilium_hubble" in hubble_body
+    assert b"cilium%3Ahubble%3Aflow" in hubble_body
+    assert b"spath+path%3Dflow" in hubble_body
+
+    with mock_http_api(
+        200,
+        b'{"result":{"k8s.cluster.name":"lab-cluster","adm_flow_fields":"false"}}\n',
+        "application/json",
+    ) as (url, _requests):
+        failed = run_validate(
+            output,
+            "--splunk-search",
+            "--splunk-url",
+            url,
+            "--splunk-search-token-file",
+            str(token),
+            "--api-timeout-seconds",
+            "2",
+            env={"ISOVALENT_VALIDATION_TEST_MODE": "true"},
+        )
+    assert failed.returncode == 1
+    assert "no Hubble flow events with JSON flow fields" in combined_output(failed)
