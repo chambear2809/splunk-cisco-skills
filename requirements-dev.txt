@@ -2,9 +2,11 @@ pytest>=9.1.1,<10
 jsonschema>=4.26.0,<5
 pip-audit==2.10.1
 PyYAML>=6,<7
-# Ruff 0.16's rule selection is configured explicitly in ruff.toml.
-ruff>=0.16.10,<0.17
+# Ruff's rule selection is configured explicitly in ruff.toml.
+ruff>=0.17.0,<0.18
 yamllint>=1.38.0,<2
 defusedxml>=0.7.1,<1
 # Optional: enables `pre-commit install` per CONTRIBUTING.md.
-pre-commit>=4.6.2,<5
+# pre-commit 4.7+ requires Python 3.11; retain the supported 3.10 toolchain.
+pre-commit>=4.6.2,<4.7; python_version < "3.11"
+pre-commit>=4.7.0,<5; python_version >= "3.11"
