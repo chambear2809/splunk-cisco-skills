@@ -134,11 +134,41 @@ grep -q "CLI_GROUP='ip-allowlist'" "${render_dir}/apply-ipv4.sh" \
     || { echo "FAIL: apply-ipv4.sh must set CLI_GROUP='ip-allowlist'" >&2; exit 1; }
 grep -q "CLI_GROUP='ip-allowlist-v6'" "${render_dir}/apply-ipv6.sh" \
     || { echo "FAIL: apply-ipv6.sh must set CLI_GROUP='ip-allowlist-v6'" >&2; exit 1; }
-# shellcheck disable=SC2016
-grep -q '"\${CLI_GROUP}" describe' "${render_dir}/apply-ipv4.sh" \
-    || { echo "FAIL: apply-ipv4.sh must call CLI_GROUP describe (not list)" >&2; exit 1; }
-grep -q 'ip-allowlist-v6 describe' "${render_dir}/audit.sh" \
-    || { echo "FAIL: audit.sh must use 'ip-allowlist-v6 describe' for IPv6" >&2; exit 1; }
+# Exercise the shared read-before-write guard with a mocked ACS command log.
+ACS_TEST_LOG="${TMP_OUT}/acs-command.log"
+export ACS_TEST_LOG
+# shellcheck source=skills/shared/lib/acs_helpers.sh
+source "${SCRIPT_DIR}/../../shared/lib/acs_helpers.sh"
+log() { :; }
+load_splunk_platform_settings() { return 0; }
+acs_prepare_context() { return 0; }
+_detect_public_ip() { printf '198.51.100.10'; }
+acs_command() {
+    printf '%s\n' "$*" >> "${ACS_TEST_LOG}"
+    if [[ "$1 $2 $3" == "ip-allowlist describe search-api" ]]; then
+        printf '[{"type":"http","response":"{\\"subnets\\":[]}"}]'
+    elif [[ "$1 $2 $3" == "ip-allowlist create search-api" ]]; then
+        return 0
+    elif [[ "$1 $2 $3" == "ip-allowlist-v6 describe search-api" ]]; then
+        printf '[{"type":"http","response":"{\\"subnets\\":[\\"2001:db8::/64\\"]}"}]'
+    else
+        return 1
+    fi
+}
+export SPLUNK_SKIP_ALLOWLIST=false
+_SEARCH_API_ALLOWLIST_CHECKED=false
+acs_ensure_search_api_access
+grep -qx 'ip-allowlist describe search-api' "${ACS_TEST_LOG}" \
+    || { echo "FAIL: search-api guard must use ip-allowlist describe" >&2; exit 1; }
+grep -qx 'ip-allowlist create search-api --subnets 198.51.100.10/32' "${ACS_TEST_LOG}" \
+    || { echo "FAIL: search-api guard must create only after a valid describe" >&2; exit 1; }
+[[ "$(acs_ipallowlist_describe_v6 search-api)" == '2001:db8::/64' ]] \
+    || { echo "FAIL: IPv6 describe did not parse the mocked response" >&2; exit 1; }
+acs_command() { printf '[{"type":"http","response":"{\\"unexpected\\":true}"}]'; }
+if acs_ipallowlist_describe_v6 search-api >/dev/null 2>&1; then
+    echo "FAIL: malformed allowlist response was accepted" >&2
+    exit 1
+fi
 # Live state must NOT use the old (invented) `ip-allowlist list-v6/create-v6/delete-v6` subcommand names
 # (they were superseded by the documented `ip-allowlist-v6 describe/create/delete` group).
 if grep -E 'ip-allowlist (list-v6|create-v6|delete-v6)' "${render_dir}/"*.sh >/dev/null 2>&1; then
@@ -164,8 +194,8 @@ grep -q 'private-connectivity' "${render_dir}/private-connectivity-rest.sh" \
     || { echo "FAIL: private-connectivity-rest.sh must use ACS private-connectivity REST endpoint" >&2; exit 1; }
 grep -q '"feature": item\["features"\]' "${render_dir}/private-connectivity-rest.sh" \
     || { echo "FAIL: private-connectivity-rest.sh must send the documented feature array" >&2; exit 1; }
-grep -q 'acs_command license' "${render_dir}/inventory.sh" \
-    || { echo "FAIL: inventory.sh must include acs license inventory" >&2; exit 1; }
+grep -q 'tenant entitlement evidence is not available' "${render_dir}/inventory.sh" \
+    || { echo "FAIL: inventory.sh must mark ACS license state unassessed" >&2; exit 1; }
 grep -q 'observability-handoff.json' "${render_dir}/inventory.sh" \
     || { echo "FAIL: inventory.sh must include observability handoff coverage" >&2; exit 1; }
 grep -q 'hec-token create' "${render_dir}/admin-commands.sh" \

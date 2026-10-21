@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared Splunk Platform version defaults and compatibility metadata, verified 2026-08-20. Enterprise entries are recognized release trains and remain listed when an end date is needed for lifecycle classification; Cloud entries identify current documentation trains.",
+  "_comment": "Shared Splunk Platform compatibility baseline verified 2026-08-20. Enterprise entries are recognized release trains and remain listed when an end date is needed for lifecycle classification. Cloud documentation trains and runtime minor trains are tracked separately, with per-train provenance and verification dates below.",
   "compatibility_verified_date": "2026-08-20",
   "enterprise_compatibility_verified_date": "2026-10-05",
   "defaults": {
@@ -24,6 +24,35 @@
     "10.4.2604",
     "10.3.2512"
   ],
+  "cloud_runtime_minor_trains": [
+    "10.6"
+  ],
+  "cloud_version_format": "major.minor.maintenance.patch",
+  "cloud_version_provenance": {
+    "10.5.2605": {
+      "verified_date": "2026-10-21",
+      "verified_version_examples": ["10.5.2605.12"],
+      "sources": [
+        "https://help.splunk.com/en/splunk-cloud-platform/release-notes/10.6/splunk-cloud-platform-release-notes/splunk-cloud-platform-maintenance-patch-release-information"
+      ]
+    },
+    "10.4.2604": {
+      "verified_date": "2026-10-21",
+      "verified_version_examples": ["10.4.2604.15"],
+      "sources": [
+        "https://help.splunk.com/en/splunk-cloud-platform/release-notes/10.6/splunk-cloud-platform-release-notes/splunk-cloud-platform-maintenance-patch-release-information"
+      ]
+    },
+    "10.6": {
+      "verified_date": "2026-10-21",
+      "verified_version_examples": ["10.6.0.5"],
+      "verified_build_examples": ["86587d4e3b27"],
+      "sources": [
+        "https://help.splunk.com/en/splunk-cloud-platform/release-notes/10.6/splunk-cloud-platform-release-notes/whats-new",
+        "https://www.splunk.com/en_us/download/previous-releases.html"
+      ]
+    }
+  },
   "enterprise_upgrade_ladder": [
     "9.x",
     "10.0",

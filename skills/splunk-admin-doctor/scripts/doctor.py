@@ -2465,6 +2465,30 @@ def compare_version_gte(actual: Any, minimum: Any) -> bool:
     return actual_parts + (0,) * (width - len(actual_parts)) >= minimum_parts + (0,) * (width - len(minimum_parts))
 
 
+def cloud_version_matches_contract(version: str, contract: dict[str, Any]) -> bool:
+    """Match documented unified or calendar trains at numeric boundaries.
+
+    Calendar releases can have a fourth maintenance-patch segment, such as
+    ``10.5.2605.12``. Match their complete three-segment base, never a raw
+    prefix that would also accept ``10.5.26050``.
+    """
+    calendar_trains = {str(item) for item in contract.get("cloud_doc_trains", [])}
+    if version in calendar_trains:
+        return True
+    runtime_match = re.fullmatch(
+        r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)",
+        version,
+    )
+    if runtime_match:
+        minor = f"{runtime_match.group(1)}.{runtime_match.group(2)}"
+        runtime_trains = {
+            str(item) for item in contract.get("cloud_runtime_minor_trains", [])
+        }
+        calendar_base = ".".join(runtime_match.groups()[:3])
+        return minor in runtime_trains or calendar_base in calendar_trains
+    return False
+
+
 def normalize_bool(value: Any) -> Any:
     if isinstance(value, str):
         normalized = value.strip().lower()
@@ -3177,7 +3201,11 @@ def augment_lifecycle_evidence(
     else:
         cloud_trains = [str(item) for item in contract.get("cloud_doc_trains", [])]
         lifecycle["documented_cloud_trains"] = cloud_trains
-        known = any(version.startswith(train) for train in cloud_trains)
+        runtime_trains = [
+            str(item) for item in contract.get("cloud_runtime_minor_trains", [])
+        ]
+        lifecycle["documented_cloud_runtime_minor_trains"] = runtime_trains
+        known = cloud_version_matches_contract(version, contract)
         lifecycle["version_unsupported"] = False if known else lifecycle.get("version_unsupported", False)
         lifecycle["version_unrecognized"] = not known
 

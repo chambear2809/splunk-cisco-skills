@@ -2,6 +2,14 @@
 
 Validation date: `2026-10-05`
 
+## Related Splunk Cloud validation — 2026-10-21
+
+A separate read-only Splunk Cloud Platform assessment and local correction pass
+is documented in [SPLUNK_CLOUD_VALIDATION.md](SPLUNK_CLOUD_VALIDATION.md). It
+covers an unnamed existing Cloud tenant, source-input and dashboard blockers,
+and offline repository checks. It does not modify, recertify, or alter any
+Enterprise lab evidence or pass counts in this document.
+
 ## Isolated fresh install
 
 - Package: `splunk-10.6.0.5-86587d4e3b27-linux-amd64.tgz`

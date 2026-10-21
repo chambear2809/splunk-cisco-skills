@@ -46,7 +46,7 @@ Official references:
 | Apps | `acs apps` | Inventory/read-only here; installs remain in `splunk-app-install` |
 | Auth tokens | `acs token` | Inventory/read-only here; token creation remains operator-driven |
 | Deployment tasks | `acs deployment` | Status/retry visibility; retry remains operator-driven |
-| License | `acs license` | Inventory/read-only |
+| License | No tenant-entitlement endpoint is exposed by the supported ACS inventory surface | Records an explicit unassessed/support handoff; do not treat static `acs license` terms/help output as tenant license evidence |
 | Observability pairing | `acs observability` | Command-surface check and handoff to `splunk-observability-cloud-integration-setup` for Unified Identity / centralized RBAC guardrails |
 
 ## Admin Plan JSON

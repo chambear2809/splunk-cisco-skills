@@ -128,6 +128,8 @@ requirements by skill, use [`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md).
 For checked-in test surfaces, offline smoke coverage, advertised live/strict
 modes, TA completion gates, and sanitized target-backed results, use the
 generated [`SKILL_VALIDATION_MATRIX.md`](SKILL_VALIDATION_MATRIX.md).
+The dated [`Splunk Cloud validation run`](SPLUNK_CLOUD_VALIDATION.md) records
+Cloud assessment results, repository corrections, and input-dependent blockers.
 Before claiming full product or feature coverage, run the offline contract audit
 documented in
 [`product_feature_coverage_contract.md`](skills/shared/references/product_feature_coverage_contract.md).

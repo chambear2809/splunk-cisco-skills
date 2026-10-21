@@ -461,7 +461,8 @@ def test_acs_admin_renderer_scopes_preflight_and_operations_to_modules(tmp_path:
 
     assert "REQUIRED_COMMAND_GROUPS=(license limits observability)" in preflight
     assert "command_group in indexes hec-token" not in preflight
-    assert "acs_command license" in inventory
+    assert '"status":"unassessed"' in inventory
+    assert "tenant entitlement evidence is not available" in inventory
     assert "observability-handoff.json" in inventory
     assert "SKIP: allowlists module is disabled" in apply_ipv4
 

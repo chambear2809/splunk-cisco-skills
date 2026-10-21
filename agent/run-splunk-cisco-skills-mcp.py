@@ -123,7 +123,7 @@ sys.path.insert(0, str(AGENT_DIR))
 try:
     from splunk_cisco_skills_mcp.server import main
 except ModuleNotFoundError as exc:
-    if exc.name in {"mcp", "yaml"}:
+    if exc.name in {"anyio", "mcp", "mcp_types", "pydantic", "yaml"}:
         print(
             f"Missing Python dependency '{exc.name}' for the local agent server. "
             "Install with: pip install -r requirements-agent.txt",

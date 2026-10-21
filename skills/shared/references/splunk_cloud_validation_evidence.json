@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "document": "SPLUNK_CLOUD_VALIDATION.md",
+  "validation_date": "2026-10-21",
+  "context": {
+    "tenant": "unnamed existing Splunk Cloud tenant",
+    "mode": "read-only live snapshot plus offline local correction verification",
+    "live_mutations": false,
+    "source_inputs_present": false,
+    "rebased_base": "7291139",
+    "repository_ci": {
+      "status": "tracked by required pull-request checks for the integrated revision",
+      "workflow_url": "https://github.com/chambear2809/splunk-cisco-skills/actions/workflows/ci.yml",
+      "live_cloud_recertification": false
+    },
+    "post_rebase_cloud_recertification": false
+  },
+  "skill_scope": {
+    "catalog_entries": 169,
+    "applicable": 78,
+    "conditional": 40,
+    "not_applicable": 50,
+    "compatibility_aliases": 1
+  },
+  "recorded_cloud_runtime": {
+    "version": "10.6.0.5",
+    "build": "86587d4e3b27",
+    "evidence": "dated read-only Cloud snapshot"
+  },
+  "cloud_findings": {
+    "source_inputs": "absent; end-to-end ingestion and data-backed dashboard checks blocked",
+    "dashboard_data": "not established; installed views are not population proof",
+    "acs_restart_required": true,
+    "restart_applied": false,
+    "license_entitlement": "unassessed; static ACS terms/help are not tenant entitlement evidence",
+    "lifecycle_plans": "prepared but unapplied pending approval"
+  },
+  "corrections": [
+    {
+      "id": "cloud-version",
+      "result": "Cloud runtime version parsing corrected",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "dashboard-render",
+      "result": "render-only behavior and apply error propagation corrected",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "acs-observations",
+      "result": "describe binding and fail-closed IPv4/IPv6 checks corrected",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "license-evidence",
+      "result": "inventory reports unassessed with support handoff",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "mcp-dependencies",
+      "result": "missing dependency guidance corrected",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "cloud-index-metadata",
+      "result": "Cloud retention and deletion metadata corrected",
+      "verification_class": "offline/local"
+    },
+    {
+      "id": "sc4x-context",
+      "result": "selected REST context and verified HEC snapshot reuse corrected",
+      "verification_class": "offline/local"
+    }
+  ],
+  "verification": {
+    "baseline_before_corrections": {
+      "pytest": {
+        "total": 4841,
+        "passed": 4805,
+        "failed": 10,
+        "skipped": 26
+      },
+      "note": "not fully rerun after corrections"
+    },
+    "post_correction_groups": [
+      {
+        "name": "SC4X regression methods",
+        "passed": 32,
+        "status": "pass"
+      },
+      {
+        "name": "HEC snapshot regression",
+        "passed": 1,
+        "status": "pass"
+      },
+      {
+        "name": "Doctor/platform-version contract",
+        "passed": 46,
+        "status": "pass"
+      },
+      {
+        "name": "MCP core",
+        "passed": 109,
+        "status": "pass"
+      },
+      {
+        "name": "Metadata/catalog/docs",
+        "passed": 90,
+        "status": "pass"
+      },
+      {
+        "name": "ACS/review/transport/docs",
+        "passed": 27,
+        "status": "pass"
+      },
+      {
+        "name": "Selected shell regressions",
+        "passed": 161,
+        "status": "pass"
+      }
+    ],
+    "overlap_note": "Counts overlap; do not sum.",
+    "integration_targeted": {
+      "base": "7291139",
+      "passed": 224,
+      "subtests_passed": 1487,
+      "full_suite": false,
+      "live_cloud_changes": false,
+      "scope": [
+        "Doctor/platform versions",
+        "MCP core",
+        "ACS",
+        "Dashboard Studio",
+        "review-finding regressions",
+        "registry regressions"
+      ],
+      "note": "Separate combined-working-tree run; overlaps historical correction groups and must not be summed with them."
+    }
+  },
+  "limitations": [
+    "No source inputs were available for ingestion or populated-dashboard validation.",
+    "License entitlement remains unassessed and requires a support handoff.",
+    "Recorded checks are snapshots and local corrections, not post-rebase Cloud recertification.",
+    "Historical local test counts describe the correction snapshot; required pull-request checks report validation of the integrated revision separately."
+  ],
+  "artifacts": [
+    "splunk-live-validation-runs/cloud-assessment-20261021T165916Z-0d8f25bf/REPORT.md",
+    "splunk-live-validation-runs/cloud-fixes-20261021T183248Z/REPORT.md",
+    "splunk-live-validation-runs/cloud-fixes-20261021T183248Z/fixes.json"
+  ]
+}

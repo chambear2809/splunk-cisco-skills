@@ -1491,19 +1491,48 @@ class AgentMCPCoreTests(unittest.TestCase):
             self.assertNotEqual(result["returncode"], 0)
             self.assertIn("returncode", result)
 
-    def test_runner_reports_missing_mcp_dependency_without_traceback(self) -> None:
-        result = subprocess.run(
-            [sys.executable, "-I", "agent/run-splunk-cisco-skills-mcp.py"],
-            cwd=core.REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+    def run_runner_without_site_packages(self, dependency: str) -> subprocess.CompletedProcess:
+        # -S makes missing dependencies deterministic even on an installed host.
+        # Exercise the actual server's first external import as well as isolated
+        # later imports, so an early startup failure cannot bypass this guard.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            agent_dir = Path(tmpdir) / "agent"
+            package_dir = agent_dir / "splunk_cisco_skills_mcp"
+            package_dir.mkdir(parents=True)
+            (package_dir / "__init__.py").write_text("", encoding="utf-8")
+            if dependency == "anyio":
+                (package_dir / "server.py").write_bytes(
+                    (core.REPO_ROOT / "agent/splunk_cisco_skills_mcp/server.py").read_bytes()
+                )
+            else:
+                (package_dir / "server.py").write_text(
+                    f"import {dependency}\n", encoding="utf-8"
+                )
+            runner = agent_dir / "run-splunk-cisco-skills-mcp.py"
+            runner.write_bytes(
+                (core.REPO_ROOT / "agent/run-splunk-cisco-skills-mcp.py").read_bytes()
+            )
+            return subprocess.run(
+                [sys.executable, "-I", "-S", str(runner)],
+                cwd=tmpdir, capture_output=True, text=True, check=False, timeout=15,
+                env={**os.environ, "SPLUNK_CISCO_SKILLS_MCP_NO_VENV": "1"},
+            )
 
-        if result.returncode == 0:
-            self.skipTest("mcp dependency is installed in this environment")
-        self.assertIn("pip install -r requirements-agent.txt", result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
+    def test_runner_reports_missing_mcp_dependency_without_traceback(self) -> None:
+        for dependency in ("anyio", "mcp", "mcp_types", "pydantic", "yaml"):
+            with self.subTest(dependency=dependency):
+                result = self.run_runner_without_site_packages(dependency)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(f"Missing Python dependency '{dependency}'", result.stderr)
+                self.assertIn("pip install -r requirements-agent.txt", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+    def test_runner_does_not_hide_internal_import_errors(self) -> None:
+        result = self.run_runner_without_site_packages("missing_internal_skill_module")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Traceback", result.stderr)
+        self.assertIn("missing_internal_skill_module", result.stderr)
+        self.assertNotIn("pip install -r requirements-agent.txt", result.stderr)
 
     def test_mcp_configs_include_local_agent_server(self) -> None:
         for rel_path in [".mcp.json", ".cursor/mcp.json"]:

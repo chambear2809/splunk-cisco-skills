@@ -1,6 +1,6 @@
 # Splunk 10.5 Skill Compatibility
 
-_Generated from `skills/catalog.yaml` (SHA-256 `c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
+_Generated from `skills/catalog.yaml` (SHA-256 `ce0f7df652266915a6bf5394b1cf11ed9f99bf9c1d9e5bb85990b4965253bb27`), its SKILL.md paths, the validated `skills/shared/app_registry.json` extension, and `skills/shared/references/splunk_platform_versions.json`; do not edit manually._
 
 This matrix classifies every repository skill against Splunk Cloud Platform
 `10.5.2605`. Self-managed Enterprise 10.6 has a separate compatibility

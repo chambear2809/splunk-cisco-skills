@@ -1124,6 +1124,33 @@ def test_machine_visible_promises_match_supported_canonical_boundaries() -> None
     assert "topology-appropriate deploy step" in ingest_row
 
 
+def test_index_lifecycle_metadata_covers_cloud_and_enterprise_boundaries() -> None:
+    skill_name = "splunk-index-lifecycle-smartstore-setup"
+    record = load_catalog().by_name[skill_name]
+    assert record.product == "splunk-platform"
+    for phrase in ("Cloud retention", "guarded deletion", "ACS", "archive/restore", "Enterprise SmartStore"):
+        assert phrase in record.purpose
+
+    registry = json.loads(
+        (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+    )
+    topology = next(item for item in registry["skill_topologies"] if item["skill"] == skill_name)
+    assert topology["role_support"]["search-tier"] == "supported"
+    assert topology["role_support"]["indexer"] == "supported"
+    assert topology["cloud_pairing"] == ["search-tier"]
+    row = next(
+        item for item in registry["documentation"]["cloud_matrix_rows"]
+        if item.get("skill") == skill_name
+    )
+    for phrase in ("retention", "guarded index deletion", "ACS readback", "archive/DDAA", "restore"):
+        assert phrase in row["cloud_config_path"]
+    for text in (row["notes"], topology["notes"]):
+        assert "Cloud SmartStore remote volumes, cache settings, and indexer configuration remain Splunk-managed" in text
+    assert "exact requested-field readback" in row["notes"]
+    assert "confirmed absence (404)" in row["notes"]
+    assert "destructive-operation evidence and approval gates" in row["notes"]
+
+
 def test_requirements_rows_use_exact_manifest_lifecycle_suffix() -> None:
     catalog = load_catalog()
     text = (REPO_ROOT / "SKILL_REQUIREMENTS.md").read_text(encoding="utf-8")

@@ -178,18 +178,47 @@ inspect_hec_token_record() {
 }
 
 validate_indexes() {
-    local idx metrics_datatype
+    local idx metrics_datatype check_status index_sk="${SK}" index_uri="${SPLUNK_URI}" platform=""
+    if ! platform="$(resolve_splunk_platform)"; then
+        fail "Could not resolve the selected Splunk platform for index validation"
+        return
+    fi
+    if [[ "${platform}" != "cloud" ]] && type deployment_prepare_index_rest_context >/dev/null 2>&1; then
+        if ! deployment_prepare_index_rest_context "${SK}" "${SPLUNK_URI}"; then
+            fail "Could not resolve the configured ingest REST target for index validation"
+            return
+        fi
+        index_sk="${DEPLOYMENT_REST_SK}"
+        index_uri="${DEPLOYMENT_REST_URI}"
+    fi
     log "--- Indexes ---"
     for idx in "${DEFAULT_INDEXES[@]}"; do
-        if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
+        if [[ "${platform}" == "cloud" ]]; then
+            check_status=0
+            platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || check_status=$?
+        else
+            check_status=0
+            rest_observe_index "${index_sk}" "${index_uri}" "${idx}" 2>/dev/null || check_status=$?
+        fi
+        if (( check_status == 0 )); then
             pass "Index '${idx}' exists"
         else
             fail "Required SC4S index '${idx}' was not found or could not be queried"
         fi
     done
 
-    if platform_check_index "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null; then
-        metrics_datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || echo "")"
+    check_status=0
+    if [[ "${platform}" == "cloud" ]]; then
+        platform_check_index "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || check_status=$?
+    else
+        rest_observe_index "${index_sk}" "${index_uri}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || check_status=$?
+    fi
+    if (( check_status == 0 )); then
+        if [[ "${platform}" == "cloud" ]]; then
+            metrics_datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || echo "")"
+        else
+            metrics_datatype="$(rest_get_index_datatype "${index_sk}" "${index_uri}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || echo "")"
+        fi
         case "${metrics_datatype}" in
             metric)
                 pass "Optional metrics index '${OPTIONAL_METRICS_INDEX}' exists and is a metrics index"
