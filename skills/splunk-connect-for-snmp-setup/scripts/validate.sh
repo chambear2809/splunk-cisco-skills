@@ -162,11 +162,33 @@ inspect_hec_token_record() {
 }
 
 validate_indexes() {
-    local idx datatype
+    local idx datatype check_status index_sk="${SK}" index_uri="${SPLUNK_URI}" platform=""
+    if ! platform="$(resolve_splunk_platform)"; then
+        fail "Could not resolve the selected Splunk platform for index validation"
+        return
+    fi
+    if [[ "${platform}" != "cloud" ]] && type deployment_prepare_index_rest_context >/dev/null 2>&1; then
+        if ! deployment_prepare_index_rest_context "${SK}" "${SPLUNK_URI}"; then
+            fail "Could not resolve the configured ingest REST target for index validation"
+            return
+        fi
+        index_sk="${DEPLOYMENT_REST_SK}"
+        index_uri="${DEPLOYMENT_REST_URI}"
+    fi
     log "--- Indexes ---"
     for idx in "${EVENT_INDEXES[@]}"; do
-        if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
-            datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+        check_status=0
+        if [[ "${platform}" == "cloud" ]]; then
+            platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || check_status=$?
+        else
+            rest_observe_index "${index_sk}" "${index_uri}" "${idx}" 2>/dev/null || check_status=$?
+        fi
+        if (( check_status == 0 )); then
+            if [[ "${platform}" == "cloud" ]]; then
+                datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+            else
+                datatype="$(rest_get_index_datatype "${index_sk}" "${index_uri}" "${idx}" 2>/dev/null || echo "")"
+            fi
             case "${datatype}" in
                 ""|event) pass "Index '${idx}' exists as an event index" ;;
                 *) fail "Index '${idx}' exists but has datatype '${datatype}', expected 'event'" ;;
@@ -177,8 +199,18 @@ validate_indexes() {
     done
 
     for idx in "${METRIC_INDEXES[@]}"; do
-        if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
-            datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+        check_status=0
+        if [[ "${platform}" == "cloud" ]]; then
+            platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || check_status=$?
+        else
+            rest_observe_index "${index_sk}" "${index_uri}" "${idx}" 2>/dev/null || check_status=$?
+        fi
+        if (( check_status == 0 )); then
+            if [[ "${platform}" == "cloud" ]]; then
+                datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+            else
+                datatype="$(rest_get_index_datatype "${index_sk}" "${index_uri}" "${idx}" 2>/dev/null || echo "")"
+            fi
             case "${datatype}" in
                 metric) pass "Index '${idx}' exists as a metrics index" ;;
                 event) fail "Index '${idx}' exists but is an event index" ;;

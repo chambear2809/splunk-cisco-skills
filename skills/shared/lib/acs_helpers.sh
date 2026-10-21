@@ -1225,7 +1225,10 @@ acs_ensure_search_api_access() {
 
     local subnet="${public_ip}/32"
     local allowlist_json="" allowlist_raw="" already_listed
-    if ! allowlist_raw="$(acs_command ip-allowlist list search-api 2>/dev/null)"; then
+    # ACS CLI exposes allowlist observations through the `describe` action.
+    # Keep this read-before-write guard aligned with the rendered allowlist
+    # helpers; the former `list search-api` spelling is not a valid command.
+    if ! allowlist_raw="$(acs_command ip-allowlist describe search-api 2>/dev/null)"; then
         return 1
     fi
     if ! allowlist_json="$(printf '%s' "${allowlist_raw}" | acs_extract_http_response_json)"; then

@@ -3,7 +3,7 @@
   "generated_from": {
     "path": "skills/catalog.yaml",
     "schema_version": 1,
-    "sha256": "c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426"
+    "sha256": "ce0f7df652266915a6bf5394b1cf11ed9f99bf9c1d9e5bb85990b4965253bb27"
   },
   "skill_records": [
     {
@@ -896,6 +896,7 @@
             "splunk-db-connect-setup",
             "splunk-edge-processor-setup",
             "splunk-federated-search-setup",
+            "splunk-index-lifecycle-smartstore-setup",
             "splunk-ingest-actions-setup",
             "splunk-knowledge-objects-setup",
             "splunk-lookup-file-editing-setup",
@@ -999,7 +1000,6 @@
           "name": "Administration, Storage, and Security",
           "skills": [
             "splunk-enterprise-public-exposure-hardening",
-            "splunk-index-lifecycle-smartstore-setup",
             "splunk-kvstore-admin-setup",
             "splunk-license-manager-setup",
             "splunk-monitoring-console-setup",

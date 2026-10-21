@@ -666,7 +666,9 @@ main() {
     case "${PHASE}" in
         render)
             render_assets
-            [[ "${APPLY}" == "true" ]] && apply_live
+            if [[ "${APPLY}" == "true" ]]; then
+                apply_live
+            fi
             ;;
         preflight) render_assets; run_live_preflight ;;
         apply) render_assets; apply_live ;;

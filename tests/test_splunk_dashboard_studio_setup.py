@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from tests.regression_helpers import REPO_ROOT
@@ -267,6 +268,46 @@ class DashboardStudioTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             dashboard = json.loads((Path(tmpdir) / "dashboard-studio" / "dashboard.json").read_text(encoding="utf-8"))
             self.assertEqual(dashboard["title"], "Custom")
+
+    def test_render_succeeds_with_valid_assets_and_no_live_requests(self) -> None:
+        for phase_args in ((), ("--phase", "render")):
+            with self.subTest(args=phase_args), tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                result, _state_path, log_path = self.run_live_setup(
+                    root, {}, *phase_args,
+                    "--dashboard-name", "net_overview", "--search", "index=main",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                render_dir = root / "rendered" / "dashboard-studio"
+                view = ET.parse(render_dir / "view.xml").getroot()
+                self.assertEqual(view.tag, "dashboard")
+                self.assertEqual(view.get("version"), "2")
+                definition = json.loads((render_dir / "dashboard.json").read_text())
+                self.assertEqual(
+                    definition["dataSources"]["ds_primary"]["options"]["query"],
+                    "index=main",
+                )
+                self.assertFalse(log_path.exists(), "Rendering must not contact Splunk")
+
+    def test_render_with_apply_propagates_live_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            result, _state_path, log_path = self.run_live_setup(
+                root, {"fail_collection": True},
+                "--phase", "render", "--apply",
+                "--dashboard-name", "net_overview", "--search", "index=main",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            evidence = json.loads(
+                (root / "rendered/dashboard-studio/state/apply-evidence.json").read_text()
+            )
+            self.assertEqual(evidence["failure_step"], "preflight")
+            calls = [json.loads(line) for line in log_path.read_text().splitlines()]
+            self.assertFalse(any(
+                call["method"] in {"POST", "DELETE"}
+                and not call["url"].endswith("/services/auth/login")
+                for call in calls
+            ))
 
     def test_requires_search_or_definition(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

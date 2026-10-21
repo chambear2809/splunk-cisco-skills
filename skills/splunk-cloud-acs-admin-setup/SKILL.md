@@ -87,6 +87,11 @@ This skill is the broad Splunk Cloud Admin Config Service workflow. It replaces
 the older allowlist-only workflow while preserving the proven IPv4/IPv6
 allowlist convergence logic and lock-out protection.
 
+The `license` inventory module records an explicit `unassessed` result with a
+Splunk Support handoff. The supported ACS CLI license surface returns static
+terms/help rather than tenant entitlement evidence, so inventory output must
+not describe that command as a live license-state check.
+
 Cloud Platform planning defaults to **10.5.2605**, with **10.4.2604** as the
 previous train. Use the train-specific canonical sources in `reference.md`
 when reviewing an ACS operation.

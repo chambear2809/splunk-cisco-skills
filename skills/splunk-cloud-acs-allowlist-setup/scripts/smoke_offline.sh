@@ -49,11 +49,33 @@ grep -q "CLI_GROUP='ip-allowlist'" "${render_dir}/apply-ipv4.sh" \
     || { echo "FAIL: apply-ipv4.sh must set CLI_GROUP='ip-allowlist'" >&2; exit 1; }
 grep -q "CLI_GROUP='ip-allowlist-v6'" "${render_dir}/apply-ipv6.sh" \
     || { echo "FAIL: apply-ipv6.sh must set CLI_GROUP='ip-allowlist-v6'" >&2; exit 1; }
-# shellcheck disable=SC2016
-grep -q '"\${CLI_GROUP}" describe' "${render_dir}/apply-ipv4.sh" \
-    || { echo "FAIL: apply-ipv4.sh must call CLI_GROUP describe (not list)" >&2; exit 1; }
-grep -q 'ip-allowlist-v6 describe' "${render_dir}/audit.sh" \
-    || { echo "FAIL: audit.sh must use 'ip-allowlist-v6 describe' for IPv6" >&2; exit 1; }
+# Verify the executable helper command shape for IPv4 and IPv6 with a mocked
+# ACS response. Malformed observations must fail closed.
+ACS_TEST_LOG="${TMP_OUT}/acs-command.log"
+export ACS_TEST_LOG
+# shellcheck source=skills/shared/lib/acs_helpers.sh
+source "${SCRIPT_DIR}/../../shared/lib/acs_helpers.sh"
+acs_command() {
+    printf '%s\n' "$*" >> "${ACS_TEST_LOG}"
+    case "$1 $2 $3" in
+        'ip-allowlist describe search-api') printf '[{"type":"http","response":"{\\"subnets\\":[\\"198.51.100.0/24\\"]}"}]' ;;
+        'ip-allowlist-v6 describe search-api') printf '[{"type":"http","response":"{\\"subnets\\":[\\"2001:db8::/64\\"]}"}]' ;;
+        *) return 1 ;;
+    esac
+}
+[[ "$(acs_ipallowlist_describe search-api)" == '198.51.100.0/24' ]] \
+    || { echo "FAIL: IPv4 describe did not parse the mocked response" >&2; exit 1; }
+[[ "$(acs_ipallowlist_describe_v6 search-api)" == '2001:db8::/64' ]] \
+    || { echo "FAIL: IPv6 describe did not parse the mocked response" >&2; exit 1; }
+grep -qx 'ip-allowlist describe search-api' "${ACS_TEST_LOG}" \
+    || { echo "FAIL: IPv4 helper must use describe" >&2; exit 1; }
+grep -qx 'ip-allowlist-v6 describe search-api' "${ACS_TEST_LOG}" \
+    || { echo "FAIL: IPv6 helper must use the top-level v6 describe" >&2; exit 1; }
+acs_command() { printf '[{"type":"http","response":"{\\"unexpected\\":true}"}]'; }
+if acs_ipallowlist_describe search-api >/dev/null 2>&1; then
+    echo "FAIL: malformed allowlist response was accepted" >&2
+    exit 1
+fi
 # Live state must NOT use the old (invented) `ip-allowlist list-v6/create-v6/delete-v6` subcommand names
 # (they were superseded by the documented `ip-allowlist-v6 describe/create/delete` group).
 if grep -E 'ip-allowlist (list-v6|create-v6|delete-v6)' "${render_dir}/"*.sh >/dev/null 2>&1; then

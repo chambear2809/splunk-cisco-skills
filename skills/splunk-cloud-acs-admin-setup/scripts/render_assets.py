@@ -1657,7 +1657,12 @@ for module in "${{MODULES[@]}}"; do
       capture deployment-status acs_command deployment status
       ;;
     license)
-      capture license acs_command license
+      # `acs license` currently returns static legal/command-surface text and
+      # is not tenant entitlement evidence. Preserve that distinction in the
+      # inventory instead of presenting the output as live license state.
+      cat > "${{SNAPSHOT_DIR}}/license.json" <<'JSON'
+{{"status":"unassessed","reason":"The ACS CLI license command exposes static terms/help only; tenant entitlement evidence is not available through this inventory path.","handoff":"Confirm entitlement and licensing state through Splunk Support or the tenant's documented licensing workflow."}}
+JSON
       ;;
     observability)
       cat > "${{SNAPSHOT_DIR}}/observability-handoff.json" <<'JSON'

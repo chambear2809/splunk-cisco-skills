@@ -602,10 +602,14 @@ index_type_for_name() {
 
 warn_if_wrong_metrics_datatype() {
     local idx="$1"
-    local datatype
+    local datatype check_sk="${2:-}" check_uri="${3:-}"
 
     [[ "${idx}" == "${OPTIONAL_METRICS_INDEX}" ]] || return 0
-    datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+    if [[ -n "${check_sk}" && -n "${check_uri}" ]]; then
+        datatype="$(rest_get_index_datatype "${check_sk}" "${check_uri}" "${idx}" 2>/dev/null || echo "")"
+    else
+        datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+    fi
     case "${datatype}" in
         metric)
             ;;
@@ -1199,7 +1203,7 @@ cloud_update_hec_token_default_index_via_acs() {
 }
 
 ensure_expected_hec_default_index() {
-    local token_name="$1" expected_index="$2" token_record default_index
+    local token_name="$1" expected_index="$2" output_var="${3:-}" token_record default_index
 
     if is_splunk_cloud; then
         if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
@@ -1219,6 +1223,7 @@ ensure_expected_hec_default_index() {
     fi
 
     if [[ "${default_index}" == "${expected_index}" ]]; then
+        [[ -z "${output_var}" ]] || printf -v "${output_var}" '%s' "${token_record}"
         return 0
     fi
 
@@ -1237,6 +1242,7 @@ ensure_expected_hec_default_index() {
             log "ERROR: HEC token '${token_name}' default index remained '${default_index:-unknown}', expected '${expected_index}'."
             return 1
         fi
+        [[ -z "${output_var}" ]] || printf -v "${output_var}" '%s' "${token_record}"
         return 0
     fi
 
@@ -1277,13 +1283,16 @@ ensure_expected_hec_default_index() {
         log "ERROR: HEC token '${token_name}' default index remained '${default_index:-unknown}', expected '${expected_index}'."
         exit 1
     fi
+    [[ -z "${output_var}" ]] || printf -v "${output_var}" '%s' "${token_record}"
 }
 
 write_hec_token_file_if_requested() {
-    local token_name="$1" token_record token_value
+    local token_name="$1" supplied_record="${2:-}" token_record token_value
     [[ -n "${WRITE_HEC_TOKEN_FILE}" ]] || return 0
 
-    if is_splunk_cloud; then
+    if [[ -n "${supplied_record}" ]]; then
+        token_record="${supplied_record}"
+    elif is_splunk_cloud; then
         if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
             log "ERROR: Could not inspect the requested Cloud HEC token value over Splunk REST."
             log "HANDOFF: Rotate/create the token through the supported Cloud HEC surface and store the one-time value in ${WRITE_HEC_TOKEN_FILE}."
@@ -1309,9 +1318,11 @@ write_hec_token_file_if_requested() {
 }
 
 warn_about_hec_token_details() {
-    local token_name="$1" token_record ack_state indexes_value default_index missing_indexes
+    local token_name="$1" supplied_record="${2:-}" token_record ack_state indexes_value default_index missing_indexes
 
-    if is_splunk_cloud; then
+    if [[ -n "${supplied_record}" ]]; then
+        token_record="${supplied_record}"
+    elif is_splunk_cloud; then
         if ! token_record="$(cloud_rest_get_hec_token_record "${token_name}")"; then
             log "ERROR: Could not inspect detailed Cloud HEC token settings over Splunk REST."
             return 1
@@ -1490,32 +1501,71 @@ ensure_hec_token() {
         esac
     fi
 
-    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "${SC4S_INTERNAL_INDEX}" || return 1
-    warn_about_hec_token_details "${HEC_TOKEN_NAME}" || return 1
-    write_hec_token_file_if_requested "${HEC_TOKEN_NAME}" || return 1
+    local hec_token_record=""
+    # Reuse only the record verified after any default-index mutation/readback.
+    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "${SC4S_INTERNAL_INDEX}" hec_token_record || return 1
+    warn_about_hec_token_details "${HEC_TOKEN_NAME}" "${hec_token_record}" || return 1
+    write_hec_token_file_if_requested "${HEC_TOKEN_NAME}" "${hec_token_record}" || return 1
 }
 
 ensure_indexes() {
-    local idx index_type
+    local idx index_type platform="" rest_sk="" rest_uri=""
+    local cache_rest=false bundle_status=0
     ensure_splunk_context || return 1
     if ! is_splunk_cloud; then
         ensure_search_session || return 1
+    fi
+    platform="$(resolve_splunk_platform)" || return 1
+    if [[ "${platform}" != "cloud" && $(type -t deployment_index_bundle_profile 2>/dev/null) == function ]]; then
+        if deployment_index_bundle_profile >/dev/null; then
+            cache_rest=false
+        else
+            bundle_status=$?
+            (( bundle_status == 2 )) && return 1
+            cache_rest=true
+        fi
+    fi
+    if [[ "${cache_rest}" == true && $(type -t deployment_prepare_index_rest_context 2>/dev/null) == function ]]; then
+        deployment_prepare_index_rest_context "${SK}" "${SPLUNK_URI}" || return 1
+        rest_sk="${DEPLOYMENT_REST_SK}"
+        rest_uri="${DEPLOYMENT_REST_URI}"
+        [[ -n "${rest_sk}" && -n "${rest_uri}" ]] || return 1
+    else
+        rest_sk="${SK}"
+        rest_uri="${SPLUNK_URI}"
     fi
 
     while IFS= read -r idx; do
         [[ -n "${idx}" ]] || continue
         index_type="$(index_type_for_name "${idx}")"
-        if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
+        if [[ "${cache_rest}" == true ]]; then
+            if rest_check_index "${rest_sk}" "${rest_uri}" "${idx}"; then
+                log "Index '${idx}' already exists."
+                warn_if_wrong_metrics_datatype "${idx}" "${rest_sk}" "${rest_uri}"
+                continue
+            fi
+        elif platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
             log "Index '${idx}' already exists."
             warn_if_wrong_metrics_datatype "${idx}"
             continue
         fi
         log "Creating index '${idx}'..."
-        if ! platform_create_index "${SK}" "${SPLUNK_URI}" "${idx}" "512000" "${index_type}" 2>/dev/null; then
-            log "ERROR: Failed to create index '${idx}'."
-            exit 1
+        if [[ "${cache_rest}" == true ]]; then
+            if ! rest_create_index "${rest_sk}" "${rest_uri}" "${idx}" "512000" "${index_type}"; then
+                log "ERROR: Failed to create index '${idx}'."
+                exit 1
+            fi
+        else
+            if ! platform_create_index "${SK}" "${SPLUNK_URI}" "${idx}" "512000" "${index_type}" 2>/dev/null; then
+                log "ERROR: Failed to create index '${idx}'."
+                exit 1
+            fi
         fi
-        warn_if_wrong_metrics_datatype "${idx}"
+        if [[ "${cache_rest}" == true ]]; then
+            warn_if_wrong_metrics_datatype "${idx}" "${rest_sk}" "${rest_uri}"
+        else
+            warn_if_wrong_metrics_datatype "${idx}"
+        fi
         INDEXES_CREATED=$((INDEXES_CREATED + 1))
     done < <(build_index_list)
 

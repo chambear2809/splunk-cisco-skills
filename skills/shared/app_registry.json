@@ -668,9 +668,9 @@
         "skill": "splunk-index-lifecycle-smartstore-setup",
         "label": "`splunk-index-lifecycle-smartstore-setup`",
         "splunkbase_id": "N/A",
-        "cloud_install_path": "Not a Splunk Cloud install path; SmartStore is managed by Splunk Cloud",
-        "cloud_config_path": "Rendered self-managed Enterprise SmartStore indexes.conf, server.conf, and limits.conf assets for indexers or cluster managers",
-        "notes": "Self-managed index lifecycle workflow for remote volumes, retention limits, cache manager settings, remote-storage localization limits, and cluster bundle apply."
+        "cloud_install_path": "No Splunk Cloud app install; index lifecycle uses supported ACS operations and search-tier evidence",
+        "cloud_config_path": "Inventory index usage; render, apply, and poll ACS readback for retention changes or guarded index deletion; render archive/DDAA and restore handoffs",
+        "notes": "Cloud retention requires exact requested-field readback and deletion requires confirmed absence (404), with destructive-operation evidence and approval gates. Managed Cloud SmartStore remote volumes, cache settings, and indexer configuration remain Splunk-managed; self-managed Enterprise SmartStore assets and cluster bundle apply are separate paths."
       },
       {
         "kind": "workflow",
@@ -897,7 +897,7 @@
         "label": "`splunk-cloud-acs-admin-setup`",
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; manages Splunk Cloud ACS control-plane administration",
-        "cloud_config_path": "Renders desired-state plans and inventory for ACS IP allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, license state, and Observability pairing handoffs",
+        "cloud_config_path": "Renders desired-state plans and inventory for ACS IP allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, licensing Support handoffs, and Observability pairing handoffs",
         "notes": "Preserves allowlist lock-out protection and subnet-limit preflights while adding broader ACS admin inventory and guarded apply assets. FedRAMP High allowlists and FedRAMP Moderate private-connectivity enablement remain Splunk Support paths."
       },
       {
@@ -1930,14 +1930,16 @@
     {
       "skill": "splunk-index-lifecycle-smartstore-setup",
       "role_support": {
-        "search-tier": "none",
-        "indexer": "required",
+        "search-tier": "supported",
+        "indexer": "supported",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
-      "cloud_pairing": [],
-      "notes": "Self-managed indexer workflow for SmartStore remote volumes, retention policy, cache manager settings, and low-level remote-storage localization limits."
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Cloud uses search-tier inventory evidence and ACS retention/deletion with verified readback, plus archive/DDAA and restore handoffs. Enterprise SmartStore configuration requires indexers or a cluster manager. Roles depend on the selected platform and operation; managed Cloud SmartStore remote volumes, cache settings, and indexer configuration remain Splunk-managed."
     },
     {
       "skill": "splunk-monitoring-console-setup",
@@ -2215,7 +2217,7 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Splunk Cloud ACS control-plane workflow; inventories and renders guarded operations across allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, license state, and Observability pairing handoffs. No Splunk Enterprise role placement."
+      "notes": "Splunk Cloud ACS control-plane workflow; inventories and renders guarded operations across allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, licensing Support handoffs, and Observability pairing handoffs. No Splunk Enterprise role placement."
     },
     {
       "skill": "splunk-cloud-acs-allowlist-setup",

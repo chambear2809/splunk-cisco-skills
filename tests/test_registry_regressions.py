@@ -371,7 +371,9 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         federated_search = skill_topologies["splunk-federated-search-setup"]
         self.assertEqual(federated_search["role_support"]["search-tier"], "required")
         smartstore = skill_topologies["splunk-index-lifecycle-smartstore-setup"]
-        self.assertEqual(smartstore["role_support"]["indexer"], "required")
+        self.assertEqual(smartstore["role_support"]["indexer"], "supported")
+        self.assertEqual(smartstore["role_support"]["search-tier"], "supported")
+        self.assertEqual(smartstore["cloud_pairing"], ["search-tier"])
         monitoring_console = skill_topologies["splunk-monitoring-console-setup"]
         self.assertEqual(monitoring_console["role_support"]["search-tier"], "required")
 

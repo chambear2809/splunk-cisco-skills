@@ -33,7 +33,7 @@ verify shipped dashboards are visible, macro-aligned, and returning data, or
 record explicit evidence that the package ships no pre-built dashboards.
 
 <!-- BEGIN GENERATED SKILL CATALOG -->
-<!-- source: skills/catalog.yaml; schema: 1; sha256: c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426 -->
+<!-- source: skills/catalog.yaml; schema: 1; sha256: ce0f7df652266915a6bf5394b1cf11ed9f99bf9c1d9e5bb85990b4965253bb27 -->
 ## Skill Index
 
 The complete 169-entry catalog is maintained in `skills/catalog.yaml`. If a product term or alias does not clearly match a skill name below, search that catalog for the term before selecting a skill. Read only the selected skill's `SKILL.md` on demand.
@@ -220,7 +220,7 @@ after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
 <!-- BEGIN GENERATED LOCAL SKILL MCP SAFETY -->
-<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: c0d59308691b6edac8a3a24d5c0695e777e6ec338ebc1d362391794c22485426 -->
+<!-- source: skills/catalog.yaml#shared_sections.local_skill_mcp_server; schema: 1; sha256: ce0f7df652266915a6bf5394b1cf11ed9f99bf9c1d9e5bb85990b4965253bb27 -->
 ## Local Skill MCP Server
 
 The project also exposes a local `splunk-cisco-skills` MCP server through

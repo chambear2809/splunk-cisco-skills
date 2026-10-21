@@ -644,6 +644,41 @@ class SplunkAdminDoctorTests(unittest.TestCase):
         self.assertTrue(enterprise["lifecycle"]["version_unsupported"])
         self.assertIn("not in the current public Enterprise release contract", enterprise["lifecycle"]["upgrade_path_issues"][0])
 
+    def test_lifecycle_contract_recognizes_cloud_10_6_four_segment_runtime_version(self) -> None:
+        evidence = {"server": {"version": "10.6.0.5"}}
+        doctor.augment_lifecycle_evidence(evidence, "cloud")
+
+        self.assertFalse(evidence["lifecycle"]["version_unsupported"])
+        self.assertFalse(evidence["lifecycle"]["version_unrecognized"])
+        self.assertIn("10.6", evidence["lifecycle"]["documented_cloud_runtime_minor_trains"])
+
+    def test_cloud_version_contract_is_segment_aware(self) -> None:
+        cases = {
+            "10.5.2605": True,
+            "10.5.2605.12": True,
+            "10.4.2604.15": True,
+            "10.5.26050": False,
+            "10.5.26050.12": False,
+            "10.5.2605.012": False,
+            "10.5.2605.12-extra": False,
+            "10.6.0.5": True,
+            "10.5.0.5": False,
+            "10.7.0.1": False,
+            "10.6.0": False,
+            "10.6.0.5-extra": False,
+            "10.6.0.\u0661": False,
+            "010.6.0.5": False,
+            "10.06.0.5": False,
+        }
+        for version, expected in cases.items():
+            with self.subTest(version=version):
+                evidence = {"server": {"version": version}}
+                doctor.augment_lifecycle_evidence(evidence, "cloud")
+                self.assertEqual(
+                    evidence["lifecycle"]["version_unrecognized"],
+                    not expected,
+                )
+
     def test_support_end_date_remains_supported_for_the_full_published_day(self) -> None:
         from datetime import date
 

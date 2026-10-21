@@ -146,7 +146,7 @@ teardown() {
     acs_prepare_context() { return 0; }
     _detect_public_ip() { printf '%s' '198.51.100.10'; }
     acs_command() {
-        if [[ "$1 $2 $3" == "ip-allowlist list search-api" ]]; then
+        if [[ "$1 $2 $3" == "ip-allowlist describe search-api" ]]; then
             printf '%s' '{}'
             return 0
         fi

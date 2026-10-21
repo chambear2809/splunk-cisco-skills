@@ -258,7 +258,7 @@ class DeploymentDocRegressionTests(unittest.TestCase):
             self.role_matrix,
         )
         self.assertIn(
-            "| `splunk-index-lifecycle-smartstore-setup` | Canonical | None | Required | None | None | None |",
+            "| `splunk-index-lifecycle-smartstore-setup` | Canonical | Supported | Supported | None | None | None | Search tier |",
             self.role_matrix,
         )
         self.assertIn(
