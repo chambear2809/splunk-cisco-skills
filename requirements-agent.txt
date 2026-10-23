@@ -5,7 +5,8 @@ PyYAML==6.0.3
 # Security-reviewed MCP runtime transitive floor, pinned after pip-audit.
 cryptography==50.0.2
 idna==3.20
-pydantic-settings==2.15.0
+pydantic-settings==2.15.0; python_version < "3.11"
+pydantic-settings==2.16.0; python_version >= "3.11"
 PyJWT[crypto]==2.15.1
 python-multipart==0.0.32
 # Starlette 1.8+ requires Python 3.11; retain the supported 3.10 runtime.
