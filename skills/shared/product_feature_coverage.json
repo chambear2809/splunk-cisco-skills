@@ -270,7 +270,7 @@
         {
           "path": "skills/splunk-observability-deep-native-workflows/reference.md",
           "format": "text",
-          "date_pattern": "(?P<date>2026-05-01)",
+          "date_pattern": "(?P<date>2026-10-31)",
           "extract_https_urls": true
         }
       ],
