@@ -1,8 +1,8 @@
 # Splunk Observability Deep Native Workflow Reference
 
-This skill was researched against current Splunk Observability Cloud help and
-developer documentation in May 2026. The tracked freshness date is
-`2026-05-01`. Use it to distinguish native product workflows from collector
+This skill was reviewed against Splunk Observability Cloud help and developer
+documentation in October 2026. The tracked freshness date is
+`2026-10-31`. Use it to distinguish native product workflows from collector
 setup, classic dashboard API rendering, and basic detector creation.
 
 ## Product Coverage Matrix
@@ -65,6 +65,8 @@ infrastructure metrics, Tag Spotlight, endpoints, embedded logs, and pivots to
 dashboards, traces, code profiling, and memory profiling. It is also where
 database services expose Database Query Performance and where service dashboards
 can be customized or converted into durable dashboard-builder handoffs.
+For embedded logs, review entity-index mappings and ensure log and trace
+`service.name` and `deployment.environment` values match.
 
 Trace Analyzer is the native search UI for full-fidelity traces. The trace
 waterfall supports span filtering, collapsed repeated spans, RUM session links,
@@ -149,6 +151,9 @@ applications need Splunk RUM iOS agent 2.0.0 or later, or Splunk RUM Android
 agent 2.0.0 or later. DXA also depends on RUM data being linked to user
 tracking; for the documented defaults, check the current setup page before
 changing agent guidance.
+The setup documentation lists anonymous tracking as enabled by default for
+browser agent 2.0 or later, iOS agent 2.0.5 or later, and Android agent 2.1.3
+or later. Check the application's privacy requirements before enabling it.
 
 Do not claim a public DXA apply API for projects, event definitions, segments,
 conversion funnels, or analysis views unless Splunk publishes one. Render
@@ -195,7 +200,7 @@ Source anchors:
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring/browser-tests-for-webpages/set-up-a-browser-test
 - https://help.splunk.com/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring/browser-tests-for-webpages/interpret-browser-test-results
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring/browser-tests-for-webpages/browser-test-metrics
-- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/synthetic-monitoring/advanced-test-configurations/validate-your-test-configuration-with-try-now
+- https://help.splunk.com/en/splunk-observability-cloud/digital-experience-monitoring/synthetic-monitoring/advanced-test-configurations/validate-your-test-configuration
 - https://dev.splunk.com/observability/reference/api/synthetics_tests/latest
 - https://dev.splunk.com/observability/reference/api/synthetics_artifacts/latest
 
@@ -225,7 +230,8 @@ custom navigator dashboard settings, and Related Content pivots. Data freshness
 matters: stale infrastructure streams stop being counted after documented
 inactivity windows.
 
-The new Kubernetes entities experience supersedes the classic navigator path.
+The Kubernetes entities experience is the default; users can switch back to the
+classic navigator where available.
 It requires Kubernetes data collection, navigator/dashboard/SignalFlow
 permissions, and a feature-compatible Splunk OTel Collector for Kubernetes.
 Coverage must include cluster, node, workload, pod, container, K8s analyzer,
