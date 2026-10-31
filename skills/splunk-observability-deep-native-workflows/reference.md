@@ -153,7 +153,9 @@ tracking; for the documented defaults, check the current setup page before
 changing agent guidance.
 The setup documentation lists anonymous tracking as enabled by default for
 browser agent 2.0 or later, iOS agent 2.0.5 or later, and Android agent 2.1.3
-or later. Check the application's privacy requirements before enabling it.
+or later. Review the application's privacy requirements before deploying or
+upgrading these agents. Set `user.trackingMode` to `noTracking` when anonymous
+tracking is not approved.
 
 Do not claim a public DXA apply API for projects, event definitions, segments,
 conversion funnels, or analysis views unless Splunk publishes one. Render
