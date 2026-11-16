@@ -1743,6 +1743,56 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                     msg=f"Expected device input enablement for {input_type}",
                 )
 
+    def test_meraki_all_inputs_preserve_package_polling_intervals(self):
+        from urllib.parse import parse_qs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            helper = tmp_path / "helpers.sh"
+            helper.write_text(r'''
+log() { :; }
+warn_if_current_skill_role_unsupported() { :; }
+require_arg() { [ "$2" -ge 2 ]; }
+load_splunk_credentials() { SPLUNK_URI=https://example.invalid; }
+get_session_key() { echo mock-session; }
+rest_check_app() { return 0; }
+rest_get_live_input_counts() { echo "42 42 0"; }
+log_platform_restart_guidance() { :; }
+form_urlencode_pairs() {
+    while [ "$#" -gt 0 ]; do printf '%s=%s&' "$1" "$2"; shift 2; done
+}
+rest_create_input() { printf '%s\t%s\n' "$4" "$6" >> "$CURL_LOG"; }
+''')
+            source = (REPO_ROOT / "skills/cisco-meraki-ta-setup/scripts/setup.sh").read_text()
+            script = tmp_path / "setup.sh"
+            script.write_text(source.replace(
+                'source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"',
+                'source "${SCRIPT_DIR}/helpers.sh"',
+            ))
+            log = tmp_path / "requests.log"
+            result = subprocess.run(
+                ["bash", str(script), "--enable-inputs", "--account", "CVF",
+                 "--index", "meraki", "--input-type", "all"],
+                env={**os.environ, "CURL_LOG": str(log)},
+                text=True, capture_output=True, check=False, timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            inputs = dict(line.split("\t", 1) for line in log.read_text().splitlines())
+            self.assertEqual(len(inputs), 42)
+            hourly = {
+                "cisco_meraki_device_availabilities_change_history",
+                "cisco_meraki_power_modules_statuses_by_device",
+                "cisco_meraki_assurance_alerts",
+            }
+            security = {"cisco_meraki_organizationsecurity", "cisco_meraki_securityappliances"}
+            self.assertTrue(hourly | security <= inputs.keys())
+            for name, body in inputs.items():
+                fields = parse_qs(body)
+                expected = "3600" if name in hourly else "360" if name in security else "86400"
+                self.assertEqual(fields["interval"], [expected], msg=name)
+                if name in ("cisco_meraki_airmarshal", "cisco_meraki_audit"):
+                    self.assertEqual(fields["start_from_days_ago"], ["7"])
+
     def _build_configure_account_env(self, tmp_path: Path) -> tuple[dict, Path]:
         """Build a mock environment for configure_account.sh integration tests."""
         bin_dir = tmp_path / "bin"

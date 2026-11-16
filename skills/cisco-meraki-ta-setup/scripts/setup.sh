@@ -115,9 +115,10 @@ add_input() {
     local body
 
     # The Meraki modular-input handlers require an integer interval. Keep the
-    # core-input defaults aligned with the package's default/inputs.conf.
+    # input defaults aligned with the package's default/inputs.conf.
     case "${input_type}" in
         organizationsecurity|securityappliances) interval="360" ;;
+        device_availabilities_change_history|power_modules_statuses_by_device|assurance_alerts) interval="3600" ;;
     esac
 
     if [[ "${input_type}" == "airmarshal" || "${input_type}" == "audit" ]]; then

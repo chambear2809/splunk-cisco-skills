@@ -16,6 +16,18 @@ rest_check_app() { return 0; }
 rest_get_app_version() { echo 1.0.50; }
 rest_check_saved_search() { return 0; }
 rest_get_saved_search_value() { echo 1; }
+form_urlencode_pairs() { printf '%s\n' "$*"; }
+splunk_curl_post() {
+    if [[ "$3" == "https://example.invalid/servicesNS/nobody/splunk-cisco-app-navigator/search/jobs" && "$2" == *"inputlookup scan_splunkbase_apps"* ]]; then
+        if [[ "${SCAN_LOOKUP_ERROR:-0}" == 1 ]]; then
+            echo '{"messages":[{"type":"ERROR","text":"lookup unavailable"}],"results":[{"catalog_rows":"12"}]}'
+        else
+            printf '{"results":[{"catalog_rows":"%s"}]}\n' "${SCAN_LOOKUP_ROWS:-12}"
+        fi
+    else
+        echo '{"results":[]}'
+    fi
+}
 splunk_curl() {
     case "$*" in
         *apps/local*) printf '{"entry":[{"content":{"visible":%s}}]}\n' "${APP_VISIBLE:-true}" ;;
@@ -32,7 +44,8 @@ splunk_curl() {
 }
 rest_oneshot_search() {
     case "$*" in
-        *catalog_rows*) echo "${SCAN_LOOKUP_ROWS:-12}" ;;
+        # Model app-local lookup export: the default app cannot read it.
+        *catalog_rows*) echo 0 ;;
         *status*) echo 'Dry Run' ;;
         *) echo 1 ;;
     esac
@@ -83,6 +96,12 @@ def test_scan_diagnostic_mode_preserves_warnings(tmp_path):
     result = run_validator(tmp_path, SCAN_LOOKUP_ROWS="0")
     assert result.returncode == 0
     assert "OK with warnings" in result.stdout
+
+
+def test_scan_completion_rejects_lookup_search_errors(tmp_path):
+    result = run_validator(tmp_path, "--completion", SCAN_LOOKUP_ERROR="1")
+    assert result.returncode == 1
+    assert "Dashboard source lookup returns no rows" in result.stdout
 
 
 def test_scan_completion_succeeds_with_catalog_and_views(tmp_path):

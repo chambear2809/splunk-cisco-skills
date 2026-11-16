@@ -67,8 +67,13 @@ load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit
 SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 installed_version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null || true)
 if [[ "${installed_version}" != "${VERIFIED_APP_VERSION}" ]]; then
-    log "ERROR: Refusing account mutation for ${APP_NAME} ${installed_version:-unknown}; reviewed package is ${VERIFIED_APP_VERSION}."
-    exit 1
+    if [[ "${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}" == "true" ]]; then
+        log "WARNING: Explicit vendor-approved override accepted for ${APP_NAME} ${installed_version:-unknown}; reviewed package is ${VERIFIED_APP_VERSION}."
+    else
+        log "ERROR: Refusing account mutation for ${APP_NAME} ${installed_version:-unknown}; reviewed package is ${VERIFIED_APP_VERSION}."
+        log "Pass SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true only with documented vendor approval for this exact package and stack."
+        exit 1
+    fi
 fi
 
 log "Authenticated to Splunk REST API."

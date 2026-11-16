@@ -180,8 +180,19 @@ for view in ecosystem_intelligence cisco_glass_pane products user_guide; do
         warn "Shipped view is missing or inaccessible: ${view}"
     fi
 done
-lookup_rows=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
-    "| inputlookup scan_splunkbase_apps | stats count as catalog_rows" "catalog_rows" 2>/dev/null || echo "0")
+# The lookup is app-local (export = none), so dispatch in the same namespace
+# as the shipped dashboards instead of the user's default search app.
+lookup_body=$(form_urlencode_pairs \
+    search "| inputlookup scan_splunkbase_apps | stats count as catalog_rows" \
+    exec_mode oneshot output_mode json)
+lookup_rows=$(splunk_curl_post "${SK}" "${lookup_body}" \
+    "${SPLUNK_URI%/}/servicesNS/nobody/${APP_NAME}/search/jobs" 2>/dev/null \
+    | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+if any(str(m.get("type", "")).lower() == "error" for m in d.get("messages", [])):
+    raise SystemExit(1)
+r=d.get("results", [])
+print(r[0].get("catalog_rows", "0") if r else "0")' 2>/dev/null || echo "0")
 if [[ "${lookup_rows}" =~ ^[0-9]+$ && "${lookup_rows}" -gt 0 ]]; then
     pass "Dashboard source lookup returns ${lookup_rows} rows"
 else

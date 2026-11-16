@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import subprocess
 
 
@@ -100,6 +101,75 @@ def test_intersight_guards_all_supported_targets_and_direct_account_path():
     assert 'TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0' not in setup
     assert 'VERIFIED_APP_VERSION="3.1.1"' in account
     assert "rest_get_app_version" in account
+
+
+def _run_intersight_account_mock(tmp_path, *, override: bool):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    helper = scripts / "helpers.sh"
+    marker = tmp_path / "mutation"
+    helper.write_text(
+        r'''
+log() { echo "$*"; }
+require_arg() { [ "$2" -ge 2 ]; }
+reject_secret_arg() { return 0; }
+load_splunk_credentials() { SPLUNK_URI=https://example.invalid; }
+get_session_key() { echo mock-session; }
+read_secret_file() { tr -d '\\r\\n' < "$1"; }
+rest_get_app_version() { echo 3.2.2; }
+rest_set_verify_ssl() { return 0; }
+form_urlencode_pairs() { echo "$*"; }
+rest_create_or_update_account() { touch "$MUTATION_MARKER"; echo 201; }
+'''
+    )
+    source = (
+        ROOT / "skills/cisco-intersight-setup/scripts/configure_account.sh"
+    ).read_text(encoding="utf-8")
+    source = source.replace(
+        'source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"',
+        'source "${SCRIPT_DIR}/helpers.sh"',
+    )
+    script = scripts / "configure_account.sh"
+    script.write_text(source)
+    secret = tmp_path / "client-secret"
+    secret.write_text("test-secret\n")
+    env = {**os.environ, "MUTATION_MARKER": str(marker)}
+    if override:
+        env["SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM"] = "true"
+    else:
+        env.pop("SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM", None)
+    result = subprocess.run(
+        [
+            "bash",
+            str(script),
+            "--name",
+            "TEST_ACCOUNT",
+            "--client-id",
+            "test-client-id",
+            "--client-secret-file",
+            str(secret),
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result, marker
+
+
+def test_intersight_direct_account_rejects_unapproved_version_before_mutation(tmp_path):
+    result, marker = _run_intersight_account_mock(tmp_path, override=False)
+    assert result.returncode == 1
+    assert "Refusing account mutation" in result.stdout
+    assert not marker.exists()
+
+
+def test_intersight_direct_account_override_allows_intended_mutation(tmp_path):
+    result, marker = _run_intersight_account_mock(tmp_path, override=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Explicit vendor-approved override accepted" in result.stdout
+    assert "SUCCESS: Intersight account" in result.stdout
+    assert marker.exists()
 
 
 def test_enterprise_networking_rejects_unapproved_4x_on_enterprise_10_6():
