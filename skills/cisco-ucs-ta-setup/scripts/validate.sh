@@ -8,10 +8,12 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 Usage: bash skills/cisco-ucs-ta-setup/scripts/validate.sh [--strict|--completion] [--help]
 
 Validates Cisco UCS TA installation, index, templates, server records, inputs,
-and starter data using configured Splunk credentials.
+and starter data using configured Splunk credentials. The 5.0 package also
+ships Monitoring Dashboard, Inputs, and Configuration views; completion still
+requires live `cisco:ucs` data before dashboard searches can be considered
+ready.
 Diagnostic mode reports incomplete onboarding as warnings. --strict and its
-alias --completion make completion-critical findings exit nonzero. This TA
-ships no standalone dashboards.
+alias --completion make completion-critical findings exit nonzero.
 EOF
     exit 0
 fi
@@ -59,6 +61,29 @@ if [[ -n "${SK:-}" ]]; then
     fi
 
     if ${app_present}; then
+        app_visible=$(splunk_curl "${SK}" "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
+            | python3 -c 'import json,sys; v=json.load(sys.stdin)["entry"][0]["content"]["visible"]; print("1" if str(v).lower() in ("true", "1") else "0")' 2>/dev/null || echo "0")
+        if [[ "${app_visible}" == "1" ]]; then
+            pass "UCS app is visible in Splunk Web"
+        else
+            completion_issue "UCS app is hidden or its visibility cannot be verified"
+        fi
+        views=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+            | python3 -c 'import json,sys; print(" ".join(e.get("name", "") for e in json.load(sys.stdin).get("entry", [])))' 2>/dev/null || true)
+        for view in dashboard inputs configuration; do
+            if [[ " ${views} " == *" ${view} "* ]]; then
+                pass "UCS shipped view is accessible: ${view}"
+            else
+                completion_issue "UCS shipped view is missing or inaccessible: ${view}"
+            fi
+        done
+        health_events=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
+            'search index=_internal source=*splunk_ta_cisco-ucs* earliest=-24h | stats count as health_events' "health_events" 2>/dev/null || echo "0")
+        if [[ "${health_events}" =~ ^[0-9]+$ && "${health_events}" -gt 0 ]]; then
+            pass "Monitoring Dashboard log source returns data"
+        else
+            warn "Monitoring Dashboard log source has no readable events in the last 24 hours; inspect log forwarding, logging level, and internal-index permissions in the UI"
+        fi
         for template in UCS_Fault UCS_Inventory UCS_Performance; do
             content=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "splunk_ta_cisco_ucs_templates" "${template}" "content")
             if [[ -n "${content}" ]]; then

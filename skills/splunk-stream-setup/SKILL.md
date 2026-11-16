@@ -101,6 +101,17 @@ Automates installation and configuration of the **Splunk Stream** stack:
 
 ## Package Model
 
+The selected three-component baseline remains `8.1.6`. Listing defaults for
+1809/5238/5234 are `8.1.7` as of 2026-11-16; those exact archives were
+downloaded, safely extracted and statically inspected during the Cisco NetFlow
+dependency audit. The 8.1.7 forwarder specification requires management
+credential bootstrap and encrypted local credential state, while the app
+enables Python 3.13 startup/maintenance scripts. Do not advance the collector
+contract until management authentication, native-host permissions, hybrid
+placement and NetFlow decoding/dashboard results are qualified. No native
+collector binary was executed during this review. See the
+[package review](../../docs/cisco-package-review-network-dc-2026-11-16.md).
+
 On Splunk Enterprise, the install flow is:
 
 1. try Splunkbase first for the current app ID

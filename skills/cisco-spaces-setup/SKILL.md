@@ -91,6 +91,8 @@ Use `splunk-app-install` with `--source splunkbase --app-id 8485` to get the
 latest release. If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
+Splunkbase listed `2.0.20` as its default on November 16, 2026 ([listing](https://splunkbase.splunk.com/app/8485)). The exact archive was downloaded and inspected on that date (4 shipped views and `cisco_spaces_firehose` with 300-second polling, checkpoint, and health settings). Source-type guidance remains subject to the completion gate.
+
 After installation, use this skill to configure the meta stream, inputs, and
 validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
 review-only.

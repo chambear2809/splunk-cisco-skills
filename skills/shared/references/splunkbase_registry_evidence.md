@@ -14,20 +14,28 @@ source hash must never be described as a package checksum.
 
 ## Current snapshot
 
-The tracked snapshot is dated `2026-10-06` and covers 120 numeric apps. The
+The tracked snapshot is dated `2026-11-16` and covers 120 numeric apps. The
 registry and JSON snapshot are authoritative for current selected releases;
-the August snapshot notes below preserve the earlier review history.
+the notes below preserve earlier review history. See the
+[Cisco package audit](../../../docs/cisco-splunkbase-audit-2026-11-16/README.md)
+and [initial full-registry drift findings](../../../docs/cisco-splunkbase-registry-drift-2026-11-16.json).
+The shared snapshot requires a clean live comparison for every numeric entry;
+its refresh therefore updates public metadata for all 120 apps. This does not
+advance unrelated package pins or establish package/runtime inspection for them.
 
 - ITSI (`1841`) now selects checksum-verified `5.0.2`; the earlier `4.21.2`
   entitlement hold is resolved. Its Enterprise 10.6 workflow still requires
   postponing cohosted KV Store migration for ITSI 5.0.x.
-- Enterprise Security (`263`) retains reviewed `8.5.1` behind public `8.7.1`.
-- Google Workspace (`5556`) retains `4.0.0` behind public `5.0.1`, and
-  Intersight (`7828`) retains `3.1.1` behind public `3.2.2`.
-- Five selected pins now carry historical-only provenance: Cisco Cloud
-  Security (`7569`, `1.0.53`), Connect for OTLP (`8704`, `0.4.1`), GCP
+- Enterprise Security (`263`) retains reviewed `8.5.1`; public version facts
+  are refreshed separately from the selected pin.
+- Google Workspace (`5556`) retains `4.0.0`. Cisco package-specific adoption
+  decisions and outstanding holds are recorded in the dated audit.
+- Seven selected pins now carry historical-only provenance: Connect for OTLP
+  (`8704`, `0.4.1`), GCP
   (`3088`, `5.1.1`), GitHub (`6254`, `4.0.0`), and CyberArk EPM
-  (`5160`, `5.0.0`). They require the historical-pin acknowledgement and
+  (`5160`, `5.0.0`), Infoblox (`2934`, `2.2.0`), Security Content Update
+  (`3449`, `6.4.0`), and Asset and Risk Intelligence (`7180`, `1.2.2`).
+  They require the historical-pin acknowledgement and
   separate platform evidence gates described below.
 
 ## Audit and refresh

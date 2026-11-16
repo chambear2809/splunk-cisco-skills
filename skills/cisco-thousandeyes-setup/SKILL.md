@@ -104,7 +104,9 @@ DC Networking TAs in several ways:
 
 **Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
 Use `splunk-app-install` with `--source splunkbase --app-id 7719` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
+latest release. The listing-default `0.9.0` archive was downloaded and
+inspected on 2026-11-16 (10 views and path-vis, trace, event, activity, and
+refresh-token inputs). If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
 After installation, use this skill to authenticate via OAuth, configure HEC,

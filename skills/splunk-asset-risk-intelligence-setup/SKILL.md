@@ -7,8 +7,8 @@ description: "Use when a user asks to set up ARI, Splunk Asset and Risk Intellig
   Analytics, ARI Technical Add-ons, ARI Echo, upgrade, and uninstall prerequisite handoffs."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
-  splunk_enterprise_10_6: "supported"
-  enterprise_compatibility_verified: "2026-10-05"
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-11-16"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -188,3 +188,12 @@ bash skills/splunk-asset-risk-intelligence-setup/scripts/load_mcp_tools.sh
 The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
 `--allow-legacy-kv` only for older MCP Server app versions that lack that
 endpoint.
+
+## Historical package evidence boundary
+
+The 2026-11-16 shared Splunkbase metadata refresh found that a selected package
+for this workflow is no longer returned by the public release API. Its pin is
+retained with historical-only provenance; current Enterprise 10.6 compatibility
+is conditional on independent exact-package and platform approval. Public
+latest compatibility does not prove support for that selected historical pin.
+See the [registry evidence policy](../shared/references/splunkbase_registry_evidence.md).

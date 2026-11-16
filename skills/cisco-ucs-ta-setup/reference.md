@@ -1,6 +1,6 @@
 # Cisco UCS Package Reference
 
-Source: Splunk Add-on for Cisco UCS `4.3.2` package inspection and published
+Source: Splunk Add-on for Cisco UCS `5.0.0` package inspection and published
 Splunk documentation.
 
 ## Package
@@ -38,4 +38,20 @@ Splunk documentation.
 
 `validate.sh --completion`/`--strict` makes absent templates, server records,
 enabled task inputs, index, or event evidence fail. No-flag validation remains
-diagnostic. The package does not ship standalone dashboards.
+diagnostic. The inspected package ships Monitoring Dashboard, Inputs, and
+Configuration views; live `cisco:ucs` events remain required before those views
+are considered ready.
+
+The `dashboard.xml` view is the UCC **Monitoring Dashboard**, not a UCS
+inventory/performance business dashboard. Its implementation under
+`appserver/static/js/build/custom/` queries `_internal` license usage and
+`source=*splunk_ta_cisco-ucs*` logs plus `_introspection` resource data.
+Completion checks the exact three REST view IDs and real
+`index=cisco_ucs sourcetype=cisco:ucs` ingest. Health-log availability is
+diagnostic: a healthy collector with restrictive logging or separately forwarded
+internal logs may have no matching recent local log events.
+Open the Monitoring Dashboard with the intended operator role and validate
+its panels, including permissions to these internal indexes; REST view
+presence alone cannot prove browser rendering. No standalone UCS business
+dashboard is claimed. Use downstream CIM/ES/ITSI content or a separately
+reviewed UCS visualization app for that use case.

@@ -12,18 +12,20 @@ Reference for the Cisco Security Cloud package and its configurable input types.
 | Local package in repo | `splunk-ta/cisco-security-cloud_363.tar.gz` |
 | Packaged version inspected | `3.6.3` |
 | Repo-verified Splunkbase version | `3.6.10` |
-| Latest public listing observed August 20, 2026 | `3.6.10` |
+| Splunkbase default observed November 16, 2026 | [`4.1.3`](https://splunkbase.splunk.com/app/7404) |
 | Repo-verified `3.6.10` platforms | `9.1` through `10.5`; Cloud-compatible |
+| Current package inspected in this audit | `4.1.3`, downloaded through the repository helper on 2026-11-16; binary SHA-256 `54345d6220e288942ec245a0cfa2f1f9433b4b9f9e82c1426f9c4689505104a6`; extracted identity `CiscoSecurityCloud` |
+| Current package shipped views | 26 files under `default/data/ui/views`; FTD mappings include granular families and retained `cisco:ftd:syslog` compatibility views |
 | Superseded `3.6.6` platforms | `9.1` through `10.5`; Cloud-compatible |
 | Superseded `3.6.7` platforms | `9.1` through `10.4`; no advertised `10.5` support |
 
 The `10.5` platform gap that previously motivated a `3.6.6` pin was specific to
 `3.6.7`. The `3.6.x` line re-advertises `10.5` from `3.6.8` onward, and `3.6.10`
-was downloaded, unpacked, and inspected here, so the verified pin and the current
-public release are now the same version and no review override is needed.
-Splunkbase also publishes a parallel `4.0.x` line, most recently `4.0.2`, which
-the listing does not designate as the current release; do not install `4.0.x`
-without vendor approval and review.
+was downloaded, unpacked, and inspected here, so the verified pin needs no
+review override. Splunkbase now defaults to `4.1.3`; its 4.x line changes FTD
+sourcetype routing and may break custom content. Review the exact package,
+dashboards, searches, and data models before adopting it. Cisco recommends the
+maintained 3.x line for customers who need the existing FTD behavior.
 
 On Splunk Cloud `10.5`, pin repo-verified `3.6.10`. The setup wrapper delegates
 the default install to the shared installer without forcing the public-latest
@@ -32,6 +34,12 @@ release contract explicit. Before any post-install mutation it reads the actual
 installed version, then refuses an unverified package unless
 `--accept-unsupported-platform` is backed by documented vendor approval for
 that exact version and stack.
+
+The same package-contract check runs in `configure_input.sh`, which is called
+by `configure_product.sh`; direct product configuration therefore cannot bypass
+the 3.6.10 review boundary before index or input mutation. A vendor-approved
+override must be supplied explicitly through
+`SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true`.
 
 ## App-Level Configuration
 

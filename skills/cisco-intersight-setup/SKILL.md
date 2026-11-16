@@ -91,11 +91,14 @@ Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersigh
 installer defaults to the repository-verified package. If Splunkbase is
 unavailable, fall back to the local package in `splunk-ta/`.
 
-The repo-verified `3.1.1` release explicitly advertises `10.5` and is
-Cloud-compatible. The newer public `3.2.0` listing advertises versions only
-through `10.4`. On Splunk Cloud `10.5`, keep the shared installer's verified
-`3.1.1` pin. The setup wrapper reads the actual installed version before any
-REST mutation and refuses an unverified selection unless
+The selected pin remains `3.1.1`. The newer `3.2.2` release was downloaded
+and inspected on November 16, 2026; it advertises Splunk 10.5 and Cloud
+compatibility but does not advertise Enterprise 10.6. Package inspection cannot
+clear that platform gate, so the default pin is retained. The newer package
+contains OAuth account/configuration handlers, audit/alarm, inventory, metrics,
+and custom inputs plus 15 shipped views. The archive SHA-256 is recorded in
+the network/data-center package review. The setup wrapper reads the actual
+installed version before any REST mutation and refuses an unverified selection unless
 `--accept-unsupported-platform` is backed by documented vendor approval for
 the exact package and stack; the override is not compatibility certification.
 

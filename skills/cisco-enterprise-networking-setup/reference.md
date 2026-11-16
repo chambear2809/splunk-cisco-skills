@@ -4,8 +4,8 @@ Complete reference for macros, saved searches, dashboards, data model, and looku
 
 ## Platform Compatibility
 
-- Repo-verified package: `3.2.20`, which is also the current public listing as
-  observed August 20, 2026. It was downloaded, unpacked, and inspected here.
+- Repo-verified package: `3.2.20`, downloaded, unpacked, and inspected here.
+- Splunkbase default observed November 16, 2026: [`4.0.20`](https://splunkbase.splunk.com/app/7539). Its package and macro contracts have not yet been inspected here.
 - `3.2.20` advertises Splunk `10.5` and is Cloud-compatible, so the default
   install path works on a `10.5` stack with no review override.
 - History, because older stacks and older notes still reference it: the previous

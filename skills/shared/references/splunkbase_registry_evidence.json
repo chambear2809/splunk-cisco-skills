@@ -5,25 +5,26 @@
       "app_name": "SplunkEnterpriseSecuritySuite",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "October 1, 2026",
-        "version": "8.7.1"
+        "release_date": "November 4, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "f4c6a9abec6ce02e06e7e0973ee1d7f0e27df2692edcb4cf007e607a3c277c48",
+      "registry_package_facts_sha256": "4c414955164e81df72c92dec81f4fc7a1d11f1f08d32c97597cb60092b01a099",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "4e038c7e9edd703c8609793961ae376c924cba8b9dcd89defbc0a97088a32c2a",
+          "sha256": "ba7d8c1d1fc920d37c11536891dd81b487396fbd6e66d88d7d524b198c5cba93",
           "url": "https://splunkbase.splunk.com/app/263"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "cb7f1124446d48aba2130ed18aacd23125ee2d10d35c3ffac7b40647aee0f8ac",
+          "sha256": "3e3dfcb212ae0d27769ef937760d25cd2393296089cfd9398b2abbf0f02cd317",
           "url": "https://splunkbase.splunk.com/api/v1/app/263/release/"
         }
       },
@@ -49,6 +50,7 @@
       "app_name": "Splunk_TA_windows",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -59,25 +61,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "October 1, 2026",
-        "version": "11.0.3"
+        "release_date": "October 27, 2026",
+        "version": "12.0.0"
       },
-      "registry_package_facts_sha256": "fa67e4528468bbde244a47951a8dc81f1c22ce3a320470ef10067c716ff54bcf",
+      "registry_package_facts_sha256": "a5c33a960275af15a2bffbfecba05b788ebd8d674327326c21052e51bd3fcd67",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9bb90de168b6c7b017ccc88cb0a03db95a0d858e74012ff86f59b920c9c1cada",
+          "sha256": "497235a12f049c602001a47fd9df41bb13f5332ebd2c1fa4f3060d493150d25e",
           "url": "https://splunkbase.splunk.com/app/742"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "7519f6fa3f49708bd420a9f7bdddd01cde9e363af53fe483749530a0784e01b6",
+          "sha256": "23a1a88402ac4a204b0c78abc521849c2cccb920c6b53d970ca236956ac6c84d",
           "url": "https://splunkbase.splunk.com/api/v1/app/742/release/"
         }
       },
       "splunkbase_id": "742",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -97,6 +100,7 @@
       "app_name": "Splunk_TA_nix",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -109,22 +113,23 @@
         "release_date": "September 1, 2026",
         "version": "10.3.4"
       },
-      "registry_package_facts_sha256": "17ce210e32377909b336faffe2cff74c207d2cfcd6ef668427bfdb83d623f2e9",
+      "registry_package_facts_sha256": "988fea6e26d461644019022ce33ececa8130370980321cd1c544735c442fed2c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c7c16ccce75d50471ad999212d37243b95a6d6aad85db5e574a9fd49e2acdaa0",
+          "sha256": "a717905651220a2d982164e343558a54199aab77b9b299ddf7a538591efca9ec",
           "url": "https://splunkbase.splunk.com/app/833"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "82e4452fe5ed8387a80b3ed94469ff96641d8877029047fcfc3089290a84da0b",
+          "sha256": "5a0af1a8c61b6f6d8abddb1b4311626a5957018a43d1dfd80757b5f59dc72012",
           "url": "https://splunkbase.splunk.com/api/v1/app/833/release/"
         }
       },
       "splunkbase_id": "833",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -143,31 +148,33 @@
       "app_name": "SplunkPCIComplianceSuite",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "October 1, 2026",
-        "version": "8.7.1"
+        "release_date": "November 4, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "df091bbf1125d4641b24e098e521fd9926bc0eda1509dc48bd7f2f91cfc2cca1",
+      "registry_package_facts_sha256": "9c44fa68c2bf5852651e78e0aa30e649c83dbb590d0e9a033627a2f677396216",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d20a5e426bd677a4c3ba34dbdded605840c018589fb2deec046a19ea448f1da1",
+          "sha256": "6609df93810b16f4b16e6c4a322d676834568be02931e22914bcc6afdf16a8d0",
           "url": "https://splunkbase.splunk.com/app/1143"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "998be0a1316dd0e699dc433c15b81032abb2d6878f5a137fe7bb1996e58a77a7",
+          "sha256": "7c3b890241e31ad3c6472ffd642a95df9c270a1e9bde4e1df3e8078ff74ba813",
           "url": "https://splunkbase.splunk.com/api/v1/app/1143/release/"
         }
       },
       "splunkbase_id": "1143",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -185,6 +192,7 @@
       "app_name": "Splunk_TA_cisco-asa",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -198,22 +206,23 @@
         "release_date": "July 29, 2026",
         "version": "6.1.2"
       },
-      "registry_package_facts_sha256": "2186eceea419cf3e0d7e54270ec66c6a113c815a6bd18152e8d7cfa22b13bd46",
+      "registry_package_facts_sha256": "52ca47344e1d7c15e1a85f02278b177743f051d01dd4b04c52e35fcaeba67cbe",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "484be08deb7d90c3d527689bbca136a41486f34e7cbab3c7e6039772c1faffb8",
+          "sha256": "30402c4cd159a6ab450b71af01a8576200702fd9260a91f16b668d5f8ea1781f",
           "url": "https://splunkbase.splunk.com/app/1620"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ddadc3cd7573ef47b9a7b9c2061af3695f783dc480d139bb07a4c9dce22e7c6b",
+          "sha256": "b3e7f93a85be955332d06134fa635bd3e8929bd464aebfa61357440203aaa8f4",
           "url": "https://splunkbase.splunk.com/api/v1/app/1620/release/"
         }
       },
       "splunkbase_id": "1620",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -233,6 +242,7 @@
       "app_name": "Splunk_SA_CIM",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -242,25 +252,26 @@
           "10.0",
           "9.4"
         ],
-        "release_date": "September 2, 2026",
-        "version": "8.7.0"
+        "release_date": "October 21, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "73b09ffc9f87e16f5f1c1fa65872cbc0828093f60136539ab7799a658c52d600",
+      "registry_package_facts_sha256": "af0c5c11d23e4cf52900e824f689b1d3364c4da6eedc0b465ed02b93cadd20cd",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5d6df182856130226726d2ba017334010d7190f171b81c329fd3b94994fcb566",
+          "sha256": "ce4fb7d4812873c2d1abb83d63040795a17e4938691b6cf06a396c42215f1d40",
           "url": "https://splunkbase.splunk.com/app/1621"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "0a748944ea014a067dbe567abc85fbb1f09353a6a19b05e74f946b6a602c4a23",
+          "sha256": "8f5bfe73090d44474f27c4b864fed2fad081c015104c2b0d09cb682edf4eb189",
           "url": "https://splunkbase.splunk.com/api/v1/app/1621/release/"
         }
       },
       "splunkbase_id": "1621",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -280,6 +291,7 @@
       "app_name": "lookup_editor",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -294,22 +306,23 @@
         "release_date": "August 13, 2026",
         "version": "4.0.8"
       },
-      "registry_package_facts_sha256": "39bdb8d4cf6e6f1f415c9d0d08779b58e6c66243fcbd426ed235f83f86a71bcb",
+      "registry_package_facts_sha256": "9c83f402053dc61d6e17dddf3c2b3999362b13ee3b790a36b8f3968675781d0d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "af3085575044e8ff4f707c176c319d864f63f7d9cf2d1e3791bebc6edcc26692",
+          "sha256": "36255aa7cbac8a995d91dd1f0a242d2aaccdbea74764078dc161a206850662b3",
           "url": "https://splunkbase.splunk.com/app/1724"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ccbebf5b0b70077d5e37743327e52b5e8e59d74192183de994f0deff308dfc4c",
+          "sha256": "4c8b9cfd3f0e57e6370f79f98b0161ac37e2b90ea10ecc54c9ebccb4508b0a13",
           "url": "https://splunkbase.splunk.com/api/v1/app/1724/release/"
         }
       },
       "splunkbase_id": "1724",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -330,6 +343,7 @@
       "app_name": "Splunk_TA_cisco-wsa",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -345,22 +359,23 @@
         "release_date": "December 13, 2024",
         "version": "5.0.0"
       },
-      "registry_package_facts_sha256": "9f2f497410d0833ae3771749b35ca0094cb4359dabf0a910db54bcb1d5b40ca0",
+      "registry_package_facts_sha256": "2fd742d5ebb416098aa762ac5fab7704cb6e4c37364699ce7228a436e86f7233",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "435c1690168f1d6ab79a7ccd742641c70303585d9b531d8021f7c6d880440ae0",
+          "sha256": "ef0ac6bcc1aeacf6e9b7251c2d9f0ddedf8d3fe200b210b072ee2441a6901108",
           "url": "https://splunkbase.splunk.com/app/1747"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "eadab4b58986055e73adbad3d240dde97de5a3d1188c8a48e9ad7c4b063e9add",
+          "sha256": "2414fc9873ef449c8f1648a332a36ed4e6ecc8d41fb8efcfd4496c56ae7bda8c",
           "url": "https://splunkbase.splunk.com/api/v1/app/1747/release/"
         }
       },
       "splunkbase_id": "1747",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -382,6 +397,7 @@
       "app_name": "Splunk_TA_cisco-esa",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -394,25 +410,26 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "June 30, 2026",
-        "version": "1.7.1"
+        "release_date": "October 12, 2026",
+        "version": "1.8.0"
       },
-      "registry_package_facts_sha256": "faed1baef506d630e423c15842c22b45dfc04d5b6b39e780e8bc32f6fe7ac288",
+      "registry_package_facts_sha256": "744528d423dd00f5ab4676667ed2643a3968d2bf3373505879c4151d3a06b66b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a44e2c69fc1ceab3785d93db55ace0f7e9e52be0f8a4afd38005f9a7dd6d551b",
+          "sha256": "b54bb5f3f25fe9bb59a93f9aa36469e05379011b70b980a2f723286096df376d",
           "url": "https://splunkbase.splunk.com/app/1761"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "585e174c20eec93bcc31629b45ff49acaa372b61a0678a905b89b2b568214ade",
+          "sha256": "d586ff9dc50dadacad95be6085a6d5ae65730e296fdda57217c1fbb640ebc108",
           "url": "https://splunkbase.splunk.com/api/v1/app/1761/release/"
         }
       },
       "splunkbase_id": "1761",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -425,15 +442,16 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "June 30, 2026",
+        "release_date": "October 12, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "1.7.1"
+        "version": "1.8.0"
       }
     },
     {
       "app_name": "splunk_app_stream",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -441,22 +459,21 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3"
+          "9.4"
         ],
-        "release_date": "March 3, 2026",
-        "version": "8.1.6"
+        "release_date": "October 12, 2026",
+        "version": "8.1.7"
       },
-      "registry_package_facts_sha256": "96a69483e551a4f0804f7b58d53c5cdf2ff188d34115f81a33923660b0501f64",
+      "registry_package_facts_sha256": "32990c12f1dd3b5f940e73e168c67a0d44fcfae5a92cace8fe37fb9295c5f2ab",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "37b4928f796508756ebbd7f64eb97c54ab2d3849be37452db6edef8eb782e20c",
+          "sha256": "e3921143ee817fe12cb51baafb5964283fcc9aa90ab4a702e455e1e99ae9bbaf",
           "url": "https://splunkbase.splunk.com/app/1809"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "d8a4fcc2da539f18f470497f42dd4ce0782c9f1a0e01aeb5d310ea5d3e644710",
+          "sha256": "1372d6ddaf5e59fc1bf5bf2034b5764a0ff05e3fb19396616bb383a9b58b25ab",
           "url": "https://splunkbase.splunk.com/api/v1/app/1809/release/"
         }
       },
@@ -482,31 +499,33 @@
       "app_name": "SA-ITOA",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "September 17, 2026",
-        "version": "5.0.2"
+        "release_date": "October 28, 2026",
+        "version": "5.0.3"
       },
-      "registry_package_facts_sha256": "ae14b0dc6d9109b788d029857f8eb7f122799a8d4fe0d03d2278499b0d793560",
+      "registry_package_facts_sha256": "75782e8a4814ef9b743b8881e1c30f1ac0133d6874aeedf4438c7c5de5f46f21",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "413008a20e8d950a85ebcc3446f1cf9c1dcd18aca551240f2b8670b131268b6a",
+          "sha256": "fa7f2f82f65e90ce42ff72a0865499511c0c0c960e132da84a454d5ca80aecab",
           "url": "https://splunkbase.splunk.com/app/1841"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e68a59cc0320c5831f3bc558dfa0e613d639ccbea4de1af81848eb65837bd3c9",
+          "sha256": "5a623fcd6967620314028747bd7c3bb70096ab9e8fc8753b0342142694754ac1",
           "url": "https://splunkbase.splunk.com/api/v1/app/1841/release/"
         }
       },
       "splunkbase_id": "1841",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -522,6 +541,7 @@
       "app_name": "Splunk_TA_aws",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -532,25 +552,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "August 19, 2026",
-        "version": "8.2.2"
+        "release_date": "October 21, 2026",
+        "version": "8.3.1"
       },
-      "registry_package_facts_sha256": "14f8eb3a6190867e8b4edd59e1c2f26d093500bed88080f8a122c90211888d9a",
+      "registry_package_facts_sha256": "e836828d0e41f498539d040830f5dd102b93e624c207e196a91cd8b68eeca422",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f4caf19455e7b318bcdc991f7a23792f86c4d63b11db8ff16408b25ca2f7049c",
+          "sha256": "c049f2105fdc4e76e46c6f24fe1542bb9b4fb656e3fcb1fdf06d0379ef74995c",
           "url": "https://splunkbase.splunk.com/app/1876"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "86b86288130489daa37388b991065d264173ae4ebbe9606118d1f36049aa8624",
+          "sha256": "8d603e184d9f727a5b93665acf05cf1e5113d278f316a0b3b48704c38c2634f5",
           "url": "https://splunkbase.splunk.com/api/v1/app/1876/release/"
         }
       },
       "splunkbase_id": "1876",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -570,6 +591,7 @@
       "app_name": "Splunk_TA_oracle",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -578,29 +600,28 @@
           "10.1",
           "10.0",
           "9.4",
-          "9.3",
-          "9.2",
-          "9.1"
+          "9.3"
         ],
-        "release_date": "August 27, 2025",
-        "version": "4.2.0"
+        "release_date": "October 22, 2026",
+        "version": "5.0.0"
       },
-      "registry_package_facts_sha256": "9a9fec6d7ed6c3ad26575d63e6b2722504acbbccf84fed08af236d84c48e3587",
+      "registry_package_facts_sha256": "7973fedfe3ba805cfafd17ad66c047cea80d8c4b3827ff0075e38b9030da387d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ac62c8c9f5f22e9566d6bcc4c618b802c728b0ac0e168a7e85946a883a6c2f3e",
+          "sha256": "e165c663aa8638b17ff55cef9bd0d1c7b79808a4c721ed57bce4d74327c6c621",
           "url": "https://splunkbase.splunk.com/app/1910"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "df520eef4d6a075017160ffaee8a13d0228621d7d83cc94b545e222e21ac46d0",
+          "sha256": "8f2a535a146638b62bb283d50c3d1d2d25424c5a4fe6f8e8a98e504c7fe89fc5",
           "url": "https://splunkbase.splunk.com/api/v1/app/1910/release/"
         }
       },
       "splunkbase_id": "1910",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -622,6 +643,7 @@
       "app_name": "Splunk_TA_snow",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -632,25 +654,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "September 21, 2026",
-        "version": "11.2.0"
+        "release_date": "October 30, 2026",
+        "version": "11.2.1"
       },
-      "registry_package_facts_sha256": "669b615eec406891b945f86ac7e6809129a1fa944dc1d53c62c32cfae7388102",
+      "registry_package_facts_sha256": "2e739f9f47091e4eb0878ccc7aec286683194b7702a8f8d1ccbd90d42f276f93",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "81390eed98c86719c44985712e870743544eeae457eea3dd73db37df167ff885",
+          "sha256": "1b446f641c14da4363be9b491f14771529d41e6d6b5d05cbf910e7075d458e8c",
           "url": "https://splunkbase.splunk.com/app/1928"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "729095126ed03b8c43e392d943a7abfe3c8de895d96101637aa551c1dc610464",
+          "sha256": "9bb83bf687d80cfbdf751e589e4e225fa4f5328f54a7b3afad594a879173bff2",
           "url": "https://splunkbase.splunk.com/api/v1/app/1928/release/"
         }
       },
       "splunkbase_id": "1928",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -685,11 +708,11 @@
         "release_date": "August 22, 2024",
         "version": "3.1.0"
       },
-      "registry_package_facts_sha256": "cdef3b8184616d098a6dd0fe5a73dc1bf6b877729d88f861745982bf775a2017",
+      "registry_package_facts_sha256": "b2f2349c2c57ab6837e4d815dd5a06c6e5f1fe393176e343d4a0bb2595657d1c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d8c7924b8e9dadbed6e383bdc2ecc573158bbe97dfa80818c7dd33c891c5722a",
+          "sha256": "520c9bdf9728bf4aae591ece5c4c12f2bc9164a1d6187e8fc60d0c85807cd12e",
           "url": "https://splunkbase.splunk.com/app/2648"
         },
         "release_api": {
@@ -722,6 +745,7 @@
       "app_name": "Splunk_TA_box",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -735,22 +759,23 @@
         "release_date": "September 24, 2026",
         "version": "5.0.1"
       },
-      "registry_package_facts_sha256": "24386269c175595c3542da566879eaf28e55757eaefb18861ddda56bea295180",
+      "registry_package_facts_sha256": "ec78ad6e84f4c9ca0cd0ef7b4b9e29681d6c52533f016db73bf60e35dbc62a2b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "22a48f2372f80cd8d2e196e204d104a51016d0fc98dcea9bbad643f53fb3c63d",
+          "sha256": "b1dedbf17c247dcafac8aefeacad6bacca6a6f30d918a141c44bf79d6c30e057",
           "url": "https://splunkbase.splunk.com/app/2679"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "dd8af854d28f704dfaa6a936b2c6c398c23c431414b421031ab31c15b7e552ba",
+          "sha256": "ac5eb33027424ded6217a22df0f55879a1b592bd86e4f6b30a33c56b6cb4d7e8",
           "url": "https://splunkbase.splunk.com/api/v1/app/2679/release/"
         }
       },
       "splunkbase_id": "2679",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -770,6 +795,8 @@
       "app_name": "Splunk_TA_f5-bigip",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -782,16 +809,16 @@
         "release_date": "September 2, 2026",
         "version": "7.0.1"
       },
-      "registry_package_facts_sha256": "d31180105f92c24806836645b6780f9defe00483e997ef1149ee5269d2004dfe",
+      "registry_package_facts_sha256": "5493e5bd62c96d229205c1c29775b9b8627d05df683024407ac9d660bb0cf385",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c4e4270f2f336ac94d419b945a22c2b909a9aa595af66aaaf0d2f94d7b0b8a5c",
+          "sha256": "6eb4e73d524597743223a7a302900524cac05f5f92f8464ea3a06713fb096fe6",
           "url": "https://splunkbase.splunk.com/app/2680"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "be9936ea9059747a59ae8d5f5404c780bf770a637af9172f42f3283eaf0866a1",
+          "sha256": "2217f87e54bfc831b8636ed1770865dcfeb515aa649bcb96e60b4295719db9e4",
           "url": "https://splunkbase.splunk.com/api/v1/app/2680/release/"
         }
       },
@@ -817,6 +844,7 @@
       "app_name": "splunk_app_db_connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -833,22 +861,23 @@
         "release_date": "May 11, 2026",
         "version": "4.3.0"
       },
-      "registry_package_facts_sha256": "d6ab5b252bce36e2d4b3d8d84e2668122547033c24adc5acab289b922dbcf8d9",
+      "registry_package_facts_sha256": "4a7d9ceacdebc8c64c9f389ae749f255fd87f4b709970f6feed69b149a4dd765",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "720f8eb34e384d0ed35b18b4ec503a65090b3dadf66b8cc93c9e906575677e5e",
+          "sha256": "cfcb0b8e9691b7d5a0acbd27207db04646f1f1faf23a0160ad75b529965be063",
           "url": "https://splunkbase.splunk.com/app/2686"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "668cea06ed6957011b533ce355e8a58154bca85145d22b4a8b1d0ce7a74874fb",
+          "sha256": "1694b6e380b232f9e35ca8a65a10451f3fe1691a6f0c46d42eeccbaa7115ec63",
           "url": "https://splunkbase.splunk.com/api/v1/app/2686/release/"
         }
       },
       "splunkbase_id": "2686",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -871,6 +900,7 @@
       "app_name": "Splunk_TA_microsoft-scom",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -884,22 +914,23 @@
         "release_date": "August 31, 2026",
         "version": "4.5.2"
       },
-      "registry_package_facts_sha256": "94da2fd9075a8a742a45aaa34f330c53627dbdfd0b62d281fb0988efdc529b20",
+      "registry_package_facts_sha256": "76805dd47bb918c7f3fdea6dbe020f6eb7be4a62a7d8454386b374f5adc80c5d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1f8e9c65544960839bd980d5e08643136f60de38cc5c066f6cbf80f027a4b2ab",
+          "sha256": "2aa51149c3f9c65ad0bc011a0a90c345dab4af6e0d3f0eabedd164d6f2610d2d",
           "url": "https://splunkbase.splunk.com/app/2729"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "a7835bedc74de420a4c93b589f4e462a9a1dfb00663c1672eb8622dc5e4db211",
+          "sha256": "16b863f6c9ad502af5c43e017162b6f3d6386f8bbd7f28b438bf2c8a7587fba6",
           "url": "https://splunkbase.splunk.com/api/v1/app/2729/release/"
         }
       },
       "splunkbase_id": "2729",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -919,6 +950,7 @@
       "app_name": "Splunk_TA_cisco-ucs",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -931,25 +963,26 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "September 10, 2026",
-        "version": "4.3.3"
+        "release_date": "October 21, 2026",
+        "version": "5.0.0"
       },
-      "registry_package_facts_sha256": "4c1c653a37cd5ca3152987486a32d1a2ce93636d71e10777e176bfa4d377c734",
+      "registry_package_facts_sha256": "27a3c890303bd6fd176ea2814f283b2310293037eb75b530433923a9e38e2db3",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "040eca7ae6d81db70437325c8ff4129d9b4fccbef9b132ec8d9b7f172a83f43d",
+          "sha256": "4ec28379ee0d3ae6d053d62bd52a2933a72b07e3baa4beeea8d0a0c969d07cc4",
           "url": "https://splunkbase.splunk.com/app/2731"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "13e93763841566fb5b44c4b5df91015ba8eb1477754430b0fa02eaaf5795455f",
+          "sha256": "cfa254e93bf09550607d4ccac9471603c31adaac8f332032c12b350ad33d0c43",
           "url": "https://splunkbase.splunk.com/api/v1/app/2731/release/"
         }
       },
       "splunkbase_id": "2731",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -962,15 +995,16 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "September 10, 2026",
+        "release_date": "October 21, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "4.3.3"
+        "version": "5.0.0"
       }
     },
     {
       "app_name": "Splunk_TA_bluecoat-proxysg",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -985,22 +1019,23 @@
         "release_date": "August 31, 2025",
         "version": "3.9.0"
       },
-      "registry_package_facts_sha256": "bfff9e0cc2c11d6c82bd36537fd530345bb15b8463d60f31d7bad8a5b0683574",
+      "registry_package_facts_sha256": "6b51fb8bc2368d34fe45788b53e3cca5a1722ef64d3ef32beb1cbe838f377e3a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "375e433cd7920a2a2c22a227aef3bf3dc63d8a1c1b82717acdff2ae67a689bf4",
+          "sha256": "cf38030f62402cf9de9b504429d3f1c3340f4779a06a616728ff67a8e07351e0",
           "url": "https://splunkbase.splunk.com/app/2758"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "4a7dcf28195fc1ec53d4202375d84421503c2c16240b675901826f2efccc0328",
+          "sha256": "635dba80e1ee70eece8d2974b1432a7622db6a11b96528328ac26b1432ce0d07",
           "url": "https://splunkbase.splunk.com/api/v1/app/2758/release/"
         }
       },
       "splunkbase_id": "2758",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1021,6 +1056,7 @@
       "app_name": "Splunk_TA_citrix-netscaler",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1034,22 +1070,23 @@
         "release_date": "September 24, 2026",
         "version": "8.2.5"
       },
-      "registry_package_facts_sha256": "526b1f63e4b99d8b36dc2204bd1d0ecc00dff45e4d2d935f3b02999425f5cc95",
+      "registry_package_facts_sha256": "57445eeb8310a4dcdd233af550f261faf621046e48ba329a9e6744d761291d4d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ff88c47e9ae62701e378d39d551daca0d3efea0fa6d62444b8ce0c904e4f9566",
+          "sha256": "1b6065285721e41a30ca29e0a73f04c2dd95191affd3313ab2e8104b5260376e",
           "url": "https://splunkbase.splunk.com/app/2770"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "b68e56f7d70665528e43992ae84d46731eb02ac34076454aa8caf57037a7293e",
+          "sha256": "d076013573896f17a619f91c95fc2ff4742d828fb023b4f7dccd0feff73fb395",
           "url": "https://splunkbase.splunk.com/api/v1/app/2770/release/"
         }
       },
       "splunkbase_id": "2770",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1069,6 +1106,7 @@
       "app_name": "Splunk_TA_symantec-ep",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1082,22 +1120,23 @@
         "release_date": "September 10, 2026",
         "version": "4.0.1"
       },
-      "registry_package_facts_sha256": "c72fa1c9ceaea1139fa9cfd74ee8ff9b8bc102ea0127d02428b1e0b6789b1bad",
+      "registry_package_facts_sha256": "0d4ae460cef942ba46c4c3224240c876f826996993e824741624e9491949a6de",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fe264d91b4621540efdef17dce4e90a89b11dd2bab7da125e1b33ba9a69636ca",
+          "sha256": "c804b5ea745f08662f3539f7ef866c105896e5dba205c0a4e94f365e9b488674",
           "url": "https://splunkbase.splunk.com/app/2772"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "87d5bd0ace345530037aa91e6688bfc150b40f1cefbe6af4143599aefd917f30",
+          "sha256": "742ccc7c74f179ecc74c8664e531f3ca433d277b32ce055192afeaad50da3135",
           "url": "https://splunkbase.splunk.com/api/v1/app/2772/release/"
         }
       },
       "splunkbase_id": "2772",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1117,6 +1156,7 @@
       "app_name": "Splunk_TA_bit9-carbonblack",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1125,28 +1165,28 @@
           "10.1",
           "10.0",
           "9.4",
-          "9.3",
-          "9.2"
+          "9.3"
         ],
-        "release_date": "August 27, 2025",
-        "version": "3.0.0"
+        "release_date": "October 19, 2026",
+        "version": "3.0.1"
       },
-      "registry_package_facts_sha256": "5c4b93fa1e52fc35c4b9061c3b3790806646d88d5dce9ecca96c0173c8600646",
+      "registry_package_facts_sha256": "cd638295bb883aab89650b979db11ac56850aac1f4183f73275e7e9f69cb9f43",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8e4729f93f78c9e9576673670b59134833958550b934848fa2aaa110e74a0688",
+          "sha256": "4bb9ac5636a89e15345400bb647f6d83780f5b5ef1c03eb6bfcdcda904645b91",
           "url": "https://splunkbase.splunk.com/app/2790"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "1df957f143e305fea117b8c3dfd2bec03f6fb9e3e1be56206417070fb54e04f1",
+          "sha256": "b86b71fa8c976ed5b9f5aa035de0e472e2373498703a16b92944fad4c7dbff70",
           "url": "https://splunkbase.splunk.com/api/v1/app/2790/release/"
         }
       },
       "splunkbase_id": "2790",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1167,6 +1207,7 @@
       "app_name": "Splunk_TA_mysql",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1182,22 +1223,23 @@
         "release_date": "April 18, 2025",
         "version": "3.2.0"
       },
-      "registry_package_facts_sha256": "0d1e549ebd595c1cb51e40e815d6ed67f69396792378f874f370bdc50119ed90",
+      "registry_package_facts_sha256": "5b974096ebfee239aa9df761d643b008654473c3d2cbb69e1ee1317c7483e5cb",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "108bb25f274364448fc1e71c1ba0fdb9b6992d6919352798822eb377afbd408e",
+          "sha256": "d31d5129d4f0a00d4eb703b99926628aa59edd36499a21f83ba4e1c604f324bf",
           "url": "https://splunkbase.splunk.com/app/2848"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ea1f2e1926e9c76663f665725bcd42af6678306d9c87e0d71cee9a92842525ed",
+          "sha256": "e1e1d715e98ddcca615afc2d564ad2008d3ad31945aebb7676829923026128e4",
           "url": "https://splunkbase.splunk.com/api/v1/app/2848/release/"
         }
       },
       "splunkbase_id": "2848",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1219,6 +1261,7 @@
       "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1232,22 +1275,23 @@
         "release_date": "July 22, 2026",
         "version": "4.3.4"
       },
-      "registry_package_facts_sha256": "9c43d9ffb924d43a39cd8a5a787b668292270a3cf7dd87c1efccca4a02dd9595",
+      "registry_package_facts_sha256": "882862e043e61fe3ebd6bfbdcd1fbd326068ef90a8c0209c83565c26ab332d7c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6e59188f96fc7880a7e58283a1340dcccef05febd3d16c95268adbdb79d3e5cf",
+          "sha256": "6c1b95295d993ac5766e8705db3ae83051642f5a31589b2a0d4cd6f203d10754",
           "url": "https://splunkbase.splunk.com/app/2881"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "208c23bdcd1781eb0039c21067722f28226a83fcc4ae26da30aa440f9a24f6ae",
+          "sha256": "2bcd3c7fa464023ee2c0029afa40286f222be7d9131502f52448f278e67bc669",
           "url": "https://splunkbase.splunk.com/api/v1/app/2881/release/"
         }
       },
       "splunkbase_id": "2881",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1267,6 +1311,7 @@
       "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1277,25 +1322,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "July 22, 2026",
-        "version": "4.3.4"
+        "release_date": "October 13, 2026",
+        "version": "4.3.5"
       },
-      "registry_package_facts_sha256": "2efade6fb3e159ae2cc3ee3c5086cef2681ce6b3192933ffddbc4f22f86d31e6",
+      "registry_package_facts_sha256": "a9e589be74a15dd650762b534eca6583eaa12c3ec7e4892ae03ae3e189e37893",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d904deeab48aa8515d1c4c7f17a46dae26e34188193d6c572824e302d091d376",
+          "sha256": "9c20fe4cb7e0e831d746126c657ec77ac361bdf324789cdd0c7e5e74cebec0a6",
           "url": "https://splunkbase.splunk.com/app/2882"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "14ac8d56f3dd83ce33d430ed7780828695817f22c4443233fadc5034fb6e7d20",
+          "sha256": "39468422864c32ebf2f177d813385b9d3102454ebe05b8bd0594969f39018a20",
           "url": "https://splunkbase.splunk.com/api/v1/app/2882/release/"
         }
       },
       "splunkbase_id": "2882",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1315,6 +1361,7 @@
       "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1325,25 +1372,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "July 22, 2026",
-        "version": "4.3.4"
+        "release_date": "October 13, 2026",
+        "version": "4.3.5"
       },
-      "registry_package_facts_sha256": "5d34e1984ddc5f3dd86200dc73d3a28d9e3cf0a074bf8966277c68e174eb6aa2",
+      "registry_package_facts_sha256": "425f571a6651be507805ee53cf76f427b1942e4234b74e0ffdc1446d6902d472",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "4e5e9e5f47beb18e31a55e7e683307e5e511728549cae4eac528df769cc2c259",
+          "sha256": "3dea10a35806b9ae9e14d271dd89872ae98c056298ffa539223c9ce4555cf956",
           "url": "https://splunkbase.splunk.com/app/2883"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "b5be733ac9b9ca99d0b5d270565a73be74a86a1b6e91e1c27891e64c5350e29a",
+          "sha256": "1ddd60171685681c57ee32b401831e58e51b84447ef9457f2e25fa2437269d1d",
           "url": "https://splunkbase.splunk.com/api/v1/app/2883/release/"
         }
       },
       "splunkbase_id": "2883",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1366,11 +1414,11 @@
         "release_date": "July 27, 2018",
         "version": "1.3"
       },
-      "registry_package_facts_sha256": "a6fec35816eec463b249064609bb39ddcbaec23bfcd4a13832d03c235934430f",
+      "registry_package_facts_sha256": "ed25f9ed3d3bf710abb350a64f66b0ed12ad270119e8de4674e58554869f6fd1",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fa64eee3bee65d33e5d6c7ffb6871ab157b9ae3cb0ff13333a569b30c7431a6d",
+          "sha256": "97190dde6c8f454ed284c7c4172c168e194aa6b99beaf44ae39ddcdd5b59f239",
           "url": "https://splunkbase.splunk.com/app/2884"
         },
         "release_api": {
@@ -1391,6 +1439,7 @@
       "app_name": "Splunk_ML_Toolkit",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1401,25 +1450,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "August 25, 2026",
-        "version": "6.1.0"
+        "release_date": "October 14, 2026",
+        "version": "6.2.0"
       },
-      "registry_package_facts_sha256": "1d59c12baf09fbfc200b2f5ee25c5eeb62f2d8a6ba1548b806c6aa1818dd966e",
+      "registry_package_facts_sha256": "254ed0fbc9d898f77b9f57259917aa671b06805de7c1a7c348bab874dbab29b4",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7401ba537e4988dd11a8f5e7713d90f876de4a7b3b67f90576c1c21674f43a75",
+          "sha256": "7680dd063d74ee80a15926692e7b598f54c0e1c3dcff112309beeb1d8b4aa22c",
           "url": "https://splunkbase.splunk.com/app/2890"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "9aeb10cb3465e8dbf049c3c98a7c7030834879a51dbca1f1ea5141c204587141",
+          "sha256": "e7431a18d7ec90b206f53425a3ac1097425761aeeebeb5811a48213bbf89c0e5",
           "url": "https://splunkbase.splunk.com/api/v1/app/2890/release/"
         }
       },
       "splunkbase_id": "2890",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1438,10 +1488,11 @@
     {
       "app_name": "Splunk_TA_cyberark",
       "latest_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
+        "cloud_compatible": true,
+        "install_method_distributed": "appmgmt_phase",
+        "install_method_single": "simple",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1450,32 +1501,26 @@
           "10.1",
           "10.0",
           "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.3"
         ],
-        "release_date": "December 2, 2021",
-        "version": "1.2.0"
+        "release_date": "October 2, 2026",
+        "version": "2.0.0"
       },
-      "registry_package_facts_sha256": "55cdbe8c1dda707b67ac2052795477cc772d6e947a5329265a4ab86a2b9d44c4",
+      "registry_package_facts_sha256": "513264c0502f1b066deef1aca65f1c6e0178fa1030cbcb2da9fe935874a075dc",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8d79ecae00833aecf68628aaaaf54a08fa16b8e16c49615fdc162d8a41669610",
+          "sha256": "a544e809a88560119e35b8ab227053566b62afafa64510e48df0e972fb48180e",
           "url": "https://splunkbase.splunk.com/app/2891"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "f34f3dbdc4871185f691516af59929bef5b09e78b553733ee5401607eb7ba62e",
+          "sha256": "c2cdf96130ae000dc089d9c0604fd253ed2f46800dd9e65170748015246f2798",
           "url": "https://splunkbase.splunk.com/api/v1/app/2891/release/"
         }
       },
       "splunkbase_id": "2891",
       "verified_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
         "platform_versions": [
           "10.6",
           "10.5",
@@ -1499,31 +1544,33 @@
       "app_name": "SplunkPCIComplianceSuite_ES",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "October 1, 2026",
-        "version": "8.7.1"
+        "release_date": "November 4, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "302850a1ebc07c06376fa1aea72444db5aace06165c4aa45d924058c07e98fdb",
+      "registry_package_facts_sha256": "3edcadddc0ceccc9e1f425c395af08b554c17626fb3e94cca194382fc571a3d6",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "97c579b5bec3fdeb00707be5b6101f6917f9846951f33710cb0c6a17f8b8f4b9",
+          "sha256": "3a1ea546d690a11af9815e94671ac8576f900918e3ab272d0fafce158eca0e55",
           "url": "https://splunkbase.splunk.com/app/2897"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "22f1de9759d0486a33e3fd86b359fb7dce68fbfc7c4974550ef2eca45aa1a2fb",
+          "sha256": "3179d8df64307993c73697fc3b109e5f2ef17c5ea5afe471d7400297230ce274",
           "url": "https://splunkbase.splunk.com/api/v1/app/2897/release/"
         }
       },
       "splunkbase_id": "2897",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1541,6 +1588,7 @@
       "app_name": "Splunk_TA_tomcat",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1554,22 +1602,23 @@
         "release_date": "September 10, 2026",
         "version": "4.0.4"
       },
-      "registry_package_facts_sha256": "539c3778326ddf6eef95206e87af5a2142ee234528e14726b26524c61a4fb4b9",
+      "registry_package_facts_sha256": "f7ed9b6c1b9e628412b89c7582aa62f64cbc47207434a7689804e8a127c52718",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a2f8c98940880185a35c363bd7408a36e8989abe32da2083e2bad0e98afaee75",
+          "sha256": "8e8fe3f41074f4a7c7c7dcd7c3736a4a4befe5c53e0195e0412753ebd41c5899",
           "url": "https://splunkbase.splunk.com/app/2911"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "5e7ecedd45a32903fa2a03c179def3c99a8a1ab4a648e65bbf7ea7c462893756",
+          "sha256": "9c3e07eb3621041ef6b1b742898202ba1b412e10a03cefb9c17f238f603aa544",
           "url": "https://splunkbase.splunk.com/api/v1/app/2911/release/"
         }
       },
       "splunkbase_id": "2911",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1588,10 +1637,11 @@
     {
       "app_name": "Splunk_TA_infoblox",
       "latest_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
+        "cloud_compatible": true,
+        "install_method_distributed": "appmgmt_phase",
+        "install_method_single": "simple",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1599,49 +1649,29 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.4"
         ],
-        "release_date": "October 6, 2022",
-        "version": "2.2.0"
+        "release_date": "October 29, 2026",
+        "version": "2.2.1"
       },
-      "registry_package_facts_sha256": "62ba995f81d806d1de9765ab69eab324e2f443e48ada07851b4b79279c918793",
+      "registry_package_facts_sha256": "9df6522860429fd0ffa48e807f682e242a831454e4fd5dd039b0ed4c7af8e647",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "493cb09435436d3805bce8c99d338d227d0f8617fd5797986b1d73fdec73b130",
+          "sha256": "704ba790f1635ee297d28671f1fd272cb2d6bf1d44c1506a124877164391296e",
           "url": "https://splunkbase.splunk.com/app/2934"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "9e352231bace50a576d0c566da814033f4e44f06e4c32bc4987c8f41fc8d7c6b",
+          "sha256": "c3875b8c9d0cf5facfbdede2cb7f54ccad7ee08f51f88dc35dcb05659f022544",
           "url": "https://splunkbase.splunk.com/api/v1/app/2934/release/"
         }
       },
       "splunkbase_id": "2934",
       "verified_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
-        "platform_versions": [
-          "10.6",
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
-        ],
+        "platform_versions": [],
         "release_date": "October 6, 2022",
-        "source_status": "source-verified-current-release-api",
+        "source_status": "historical-review-only-not-currently-reproducible",
         "version": "2.2.0"
       }
     },
@@ -1649,6 +1679,7 @@
       "app_name": "Splunk_TA_rsa-securid",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1663,22 +1694,23 @@
         "release_date": "November 6, 2025",
         "version": "1.5.0"
       },
-      "registry_package_facts_sha256": "dd44419f2c027e52857282d5993c872c60837f9fc2f15a989a659e6b23288b45",
+      "registry_package_facts_sha256": "a6158a3b2d592d44812226c820419cb481a4a99d99daaf2ef5333fafe0a7d0f3",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e5af7478069a2483853298d693c4a5d15f0e49e117c549397dcca7f10802b39a",
+          "sha256": "6ff891c60e0f70f843be1bebf25ed7b29af8cb5cbc00eb3d01e90f8ce9146f5d",
           "url": "https://splunkbase.splunk.com/app/2958"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "72599ba02e70c00be91e8957e058ca16ee33d2122e0f2d298ddd59389d72c729",
+          "sha256": "04163cefca2989c7de70b81614030d4b25e9713018f1ce16b3f0f2357ff7fc56",
           "url": "https://splunkbase.splunk.com/api/v1/app/2958/release/"
         }
       },
       "splunkbase_id": "2958",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1718,11 +1750,11 @@
         "release_date": "December 1, 2023",
         "version": "2.1.0"
       },
-      "registry_package_facts_sha256": "704d003361e112343f0d14769b702a4fa494eadf2b18690342001d7ac189b6d3",
+      "registry_package_facts_sha256": "3533a9dd2e1c6bd81760ab5a3916bf2ab0fe5cca99a2bd24b25cd935e4381c84",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "01cfbfc5c1c704564c06e730aa04217e5ecfc050b8cd1383cd0e586fdd3c882b",
+          "sha256": "01335d949fcaea14c74a9756e56c60d5b167d36193cf67719d3154e95a23be0d",
           "url": "https://splunkbase.splunk.com/app/2965"
         },
         "release_api": {
@@ -1778,11 +1810,11 @@
         "release_date": "December 11, 2018",
         "version": "1.1.0"
       },
-      "registry_package_facts_sha256": "82ee10538652067ad2813c5690f36c3bea71f4b233b3756ae10f0fe96c87dde0",
+      "registry_package_facts_sha256": "fcba86d1fc49b3937b5afd7b7c0129dba0d8a36c86303f45facdcbe6e86c5896",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "70b9bc223c20862f226547ba4c047fe67792b1790c710101a0ec584b4271d0ed",
+          "sha256": "a7b9e5d84336b85760a3d21a0ec6ec610363daef4b8cf069f6e0eb7630bce0a2",
           "url": "https://splunkbase.splunk.com/app/2966"
         },
         "release_api": {
@@ -1819,6 +1851,8 @@
       "app_name": "Splunk_TA_google-cloudplatform",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -1830,31 +1864,22 @@
         "release_date": "September 23, 2026",
         "version": "5.2.0"
       },
-      "registry_package_facts_sha256": "534634ea8639e81bfc69f40d7c23a45ba7e4c9cddaf496dde5822f3ebb28d3be",
+      "registry_package_facts_sha256": "fa0c3678a5a72f44fff901a2b1756da11548dc94e6ccd008437a3a4fee9ad86d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e1eb0bd5730b720236ca93d292734cb3a1d5e131ac9bf57bff70c110b562219c",
+          "sha256": "01ef7a2e2b8e2d4299ab2c40d5a953d6926216bfe97c21f35a20dc0f95f5c465",
           "url": "https://splunkbase.splunk.com/app/3088"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "d053ea08a5ce1454687d8fdaa1d50037271de32c0e34e0653178108b34a034d3",
+          "sha256": "0ea92c4622a174fa7168d871114ff9ec2a95a2ae6bb0a8666090790fa554a861",
           "url": "https://splunkbase.splunk.com/api/v1/app/3088/release/"
         }
       },
       "splunkbase_id": "3088",
       "verified_release": {
-        "platform_versions": [
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3"
-        ],
+        "platform_versions": [],
         "release_date": "August 13, 2026",
         "source_status": "historical-review-only-not-currently-reproducible",
         "version": "5.1.1"
@@ -1864,6 +1889,7 @@
       "app_name": "Splunk_TA_microsoft-cloudservices",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1877,22 +1903,23 @@
         "release_date": "September 10, 2026",
         "version": "6.3.3"
       },
-      "registry_package_facts_sha256": "5647ceef447a0fe39e2a65c691d26bfc991f34ca784790189fad331876639792",
+      "registry_package_facts_sha256": "d9a57fd6889723cd8533b67922d8bf47d38e199149567ceec5a33d6d88d8f6e1",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "93693695e95fb2c26fbf46a045c115500c098cd9aa1fed5192890438bbff3538",
+          "sha256": "1986bbea27814c201530b6331135619991027b8fd8efed5b49000b73dd6e0b03",
           "url": "https://splunkbase.splunk.com/app/3110"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "f87301f724ead4fdede6cdcf8e1842eaf50546c0a8b8d3a467119a434ba005f9",
+          "sha256": "12413b41c68862ad579a43f43ce8264a451d6f764bfe4d78d0fef70012bd32bb",
           "url": "https://splunkbase.splunk.com/api/v1/app/3110/release/"
         }
       },
       "splunkbase_id": "3110",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -1931,11 +1958,11 @@
         "release_date": "November 23, 2020",
         "version": "2.0.0"
       },
-      "registry_package_facts_sha256": "e541781031d2def74567d0a8597a42ef9293cfb8837d431d5f480edceb5eee61",
+      "registry_package_facts_sha256": "c79e4e3974f2a777cc0b04f0ac74d6302190fe3c58d797caef0ee5f87d90c6b9",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "49fdb8ec1603b0c1b8000bd6dacec93fa4e1b023846ce6b5b439a5130e01ee31",
+          "sha256": "c51c3dd9cb67661c7243c23000fc3b2e7d59acfec84bc0833e2d4b6be5c21e8b",
           "url": "https://splunkbase.splunk.com/app/3135"
         },
         "release_api": {
@@ -1981,11 +2008,11 @@
         "release_date": "November 27, 2023",
         "version": "4.2.0"
       },
-      "registry_package_facts_sha256": "b1719af82cb8f5564ad6b1197bf5a38615c9ec22d964d7130f32ae401a936feb",
+      "registry_package_facts_sha256": "3e06124e24c1da08a0a06684cb5c74aece51cbd6710f54c87c65aace5cb16b9f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9bea10506381841c13d899802c1467db4d8f9c0566fc5ff7c1f1fbf0da139af4",
+          "sha256": "381b674f2d6981f60a0ad51d666b568701e94b28412695455e0d0502fb766f96",
           "url": "https://splunkbase.splunk.com/app/3172"
         },
         "release_api": {
@@ -2012,6 +2039,7 @@
       "app_name": "Splunk_TA_microsoft-iis",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2027,22 +2055,23 @@
         "release_date": "April 9, 2025",
         "version": "2.0.0"
       },
-      "registry_package_facts_sha256": "4a88309c2dcb57ee48bc37b91b8eb54e0653dde2283bcb0b3525e9bef8f5f5f4",
+      "registry_package_facts_sha256": "98d20e038fc8f26765aa0db98c6c4f3704c39b63d59a8437866b89fa3fb58510",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7c512c5b996aa69c9775ae2e24beb862cebce3e9cfb2bf56bba0311a9e98c030",
+          "sha256": "3236ca14bf37f6425e1cf2aaf0abfdcdbcfa03fe43e8a76c4c7811f4227eb992",
           "url": "https://splunkbase.splunk.com/app/3185"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "354e3bcffa53ca1fb59613dd78227e8b3943ab041071d65ee71e332736f7798b",
+          "sha256": "b878081a9ca2a50e56d45a05a28b3b37eda16a89bdb5ccf86b5f283a3953c533",
           "url": "https://splunkbase.splunk.com/api/v1/app/3185/release/"
         }
       },
       "splunkbase_id": "3185",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2064,6 +2093,7 @@
       "app_name": "Splunk_TA_apache",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2077,22 +2107,23 @@
         "release_date": "April 9, 2026",
         "version": "3.0.0"
       },
-      "registry_package_facts_sha256": "52bc96b71b281e4ec0446bb7b222f77845cf13b1958462542fe422c245d82536",
+      "registry_package_facts_sha256": "96e7671c00ab91525987ff5e571e7d56a2ac1c0469c63aced8a478dda3778554",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f5fa0fe4c52b2c3fd13a3732911a72b87f3eda8bb8c4a1de58733281d40e7bbc",
+          "sha256": "cf9f0620438c2f6cd9fb1ab636bf53eeb1a242c074a30749bd547e26c0ad92c6",
           "url": "https://splunkbase.splunk.com/app/3186"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "75e25e1bfef120da04201e8d4df07dc38f665e5b8fd4a1a2fb5124e621f573f1",
+          "sha256": "eeae940e3d8a3261773ce3de7e9cce4aabdd13f0f7cf1d79feaf17016cbbd620",
           "url": "https://splunkbase.splunk.com/api/v1/app/3186/release/"
         }
       },
       "splunkbase_id": "3186",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2121,11 +2152,11 @@
         "release_date": "July 14, 2026",
         "version": "4.2.1"
       },
-      "registry_package_facts_sha256": "75eeb6f78d16f7069594255353dc89c8378e131337c7eb1720338f4b821c1012",
+      "registry_package_facts_sha256": "713012927f39d0ce9963058ae31c25bbac8695206399c22e9ced11f75b00466a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d563624b5174c4c96ac96f565beb8be3a8456963a41de923ad96ec6d46838764",
+          "sha256": "e9fdf2e3c59f9c18587014c30f25fe76a489f8ef1edc272e64acabc7c71307d1",
           "url": "https://splunkbase.splunk.com/app/3215"
         },
         "release_api": {
@@ -2152,6 +2183,7 @@
       "app_name": "TA-Exchange-ClientAccess",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2163,22 +2195,23 @@
         "release_date": "July 31, 2026",
         "version": "4.1.1"
       },
-      "registry_package_facts_sha256": "19c9898872399087534701f6c467e39ce8b7a4e51edd07d75f9301529ec5c883",
+      "registry_package_facts_sha256": "0e129a3ccf8094ca07b6b535f7ec4be1b67b8738ab09ffe0f59a45142f19d189",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "384dee8d54e522052035d25715671296822258b80551375df805c0ea4fc8e38a",
+          "sha256": "eefa4d836ea298fd8a12e8bf382fa73aa62dc399594617fbed24d961c6b3d175",
           "url": "https://splunkbase.splunk.com/app/3225"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "89c21a5eeae2b1caa90801eeceb63ee8815d8af8392156c04f3445226c295d5e",
+          "sha256": "0ef30a4aeb96f9b7e52427c2713595cbe93d505c7d99bbcb3ffeaff13424a91b",
           "url": "https://splunkbase.splunk.com/api/v1/app/3225/release/"
         }
       },
       "splunkbase_id": "3225",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2196,6 +2229,7 @@
       "app_name": "Splunk_TA_nginx",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2208,22 +2242,23 @@
         "release_date": "September 10, 2026",
         "version": "3.3.2"
       },
-      "registry_package_facts_sha256": "e333904fe7b8739af67544917ae591c25278cb1a54884ef5512bb59a93a39eda",
+      "registry_package_facts_sha256": "85dcfc20b400550d07b9b270084a7dd9dc0e249863b4f91e3206aa86ab239922",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e33ea16b59f97c6f61099d268d86fa173a57b2856ad5a1d7876b175fb921eda9",
+          "sha256": "ba96e2aa39bbdcc04f3a3e70568266c32bc0810bf01640f24ef02c7874bf23bf",
           "url": "https://splunkbase.splunk.com/app/3258"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "b7c615d43416447d0706492ebf779d417b5ccef3bca3464104125deae260384c",
+          "sha256": "8982d124b9415a0b446a17983ec4aba5d5b4995656d577e1b8f0c7094cbfb34a",
           "url": "https://splunkbase.splunk.com/api/v1/app/3258/release/"
         }
       },
       "splunkbase_id": "3258",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2242,31 +2277,33 @@
       "app_name": "phantom",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "September 2, 2026",
-        "version": "8.7.0"
+        "release_date": "November 3, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "6c51262fbf169bf3ff307e5047c372c64237dda5ce2708ae9112cd4fb1d72cce",
+      "registry_package_facts_sha256": "da00095ac6d5e329cc0f095271633655e87b7cbca4e2e8ea2e2a9b0f08c0f8e1",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6eb82eccf5544e31f6ae7033830dd54d5697c9e36e1aefee45620f72ad98ceff",
+          "sha256": "39fb63b91bb8165cb728fbf2659d9e3d23b17faa11020cd2b5d85ad38b674939",
           "url": "https://splunkbase.splunk.com/app/3411"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "c0cf1fc441e5c36dbc6f7506da3444043a1aa00acbeae240b028c7a0d6818165",
+          "sha256": "8d36169462b89cd2931682ade735e731664f6061e38bd239ed836205eaac1b4c",
           "url": "https://splunkbase.splunk.com/api/v1/app/3411/release/"
         }
       },
       "splunkbase_id": "3411",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2282,6 +2319,7 @@
       "app_name": "Splunk_TA_Linux",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2295,22 +2333,23 @@
         "release_date": "March 30, 2026",
         "version": "2.1.1"
       },
-      "registry_package_facts_sha256": "cbf39e3223157c35679752f290ad91a6de35669eb00524371802d23187a562ba",
+      "registry_package_facts_sha256": "35b609de1e2e9e012d9ff556befb004a5b38257cf19921304d43264ecbde892b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "179e45795baf09a5121748d01cf75287791f498f10342c7f2eaaba582ff4ba99",
+          "sha256": "c48dbb51bdb4feb4b382e50a33649db3dfa691281ca0319184b0f9d888c22238",
           "url": "https://splunkbase.splunk.com/app/3412"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "3b05b30a3e125205ef82f86423af7c3f5aa2b28a099b59875ad65ad49b249eef",
+          "sha256": "b5809611bd4bead0f72959b21019dfc24e28de5e7327fe53a19f94feb9760871",
           "url": "https://splunkbase.splunk.com/api/v1/app/3412/release/"
         }
       },
       "splunkbase_id": "3412",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2330,6 +2369,7 @@
       "app_name": "Splunk_TA_ontap",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2339,22 +2379,23 @@
         "release_date": "July 14, 2026",
         "version": "3.2.1"
       },
-      "registry_package_facts_sha256": "05ccb362fce59bb3d7ec0ced83f38c0350255562c80a041da32da7e9a7fee8dd",
+      "registry_package_facts_sha256": "0c7c95bc74c59d2294618f953f93de83cb300edf073fa2363b23cb7dafa54dba",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6df9e94728e22105f99db67c34da31f1a15306661be044fbd27d47ceabda8759",
+          "sha256": "95590aba09f1966089c00d906f966aeb8b8f5c29f1dabe548fa4e1cdff9e32f2",
           "url": "https://splunkbase.splunk.com/app/3418"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "1ef07ad60f32b2030aefa137e1a693b2c8fd52dfe4e37d7059af804e9ae14a8a",
+          "sha256": "7c5e3bca5e383924b48ff0c1ad96b0c2ce34a61eaaed7d7d63f92e3d831c3f21",
           "url": "https://splunkbase.splunk.com/api/v1/app/3418/release/"
         }
       },
       "splunkbase_id": "3418",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2370,6 +2411,7 @@
       "app_name": "Splunk_Security_Essentials",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2377,25 +2419,21 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.4"
         ],
-        "release_date": "January 21, 2026",
-        "version": "3.8.3"
+        "release_date": "October 28, 2026",
+        "version": "3.8.4"
       },
-      "registry_package_facts_sha256": "bb83c92b88bbf8fb392aa4cdc8878a9f50f149c4b44e1b3eebc7139928e3ed13",
+      "registry_package_facts_sha256": "fe99a2232176db586dc018c1859c69f7857825f7f2a6ebb997b6e068b0c5655e",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "a0ba7f596369e70258b2323365197d1eda7aa3a9ca9653e89ce3e1103fda9b18",
+          "sha256": "423fac4a4a41c4a736d71822fe293a2a39373137a7f2e0224d4800675f76d4bd",
           "url": "https://splunkbase.splunk.com/app/3435"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ef5d8d062c27bf0da3b327ae3890e489c1727bdc3ad7deb0ef55393d50590831",
+          "sha256": "48d5e2294e6f2b4c197ee1974079416deaf398379c06d272f3f0b42180bd7231",
           "url": "https://splunkbase.splunk.com/api/v1/app/3435/release/"
         }
       },
@@ -2424,6 +2462,7 @@
       "app_name": "DA-ESS-ContentUpdate",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2437,40 +2476,27 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "September 23, 2026",
-        "version": "6.7.0"
+        "release_date": "November 4, 2026",
+        "version": "6.10.0"
       },
-      "registry_package_facts_sha256": "2fadf9d481e88e347bb3906eb0ace1a59611586d858c0df93482ca0a137a8434",
+      "registry_package_facts_sha256": "0b1138164fc52536786abaae0e647c71a1b95470dad907ef4fc7ccb26a7f8a1f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "849f0dae479cab310365f554521bfb706dbf138982c9d57794e4d63b047029a1",
+          "sha256": "9fe3a26f5c7e96b9e00f9d1114f67032017791babe694289f4d6ef10b825c6d3",
           "url": "https://splunkbase.splunk.com/app/3449"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "0efb89522bb983baf0e2c9909dc7d65b5cf1a4579ebf97933f3548fc9b29ac4b",
+          "sha256": "42179af992364803e2edfab38f4cd32c17c57c8a6d5075203a96a62d6602b067",
           "url": "https://splunkbase.splunk.com/api/v1/app/3449/release/"
         }
       },
       "splunkbase_id": "3449",
       "verified_release": {
-        "platform_versions": [
-          "10.6",
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
-        ],
+        "platform_versions": [],
         "release_date": "August 12, 2026",
-        "source_status": "source-verified-current-release-api",
+        "source_status": "historical-review-only-not-currently-reproducible",
         "version": "6.4.0"
       }
     },
@@ -2478,60 +2504,53 @@
       "app_name": "Splunk_TA_AppDynamics",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2",
           "10.1",
-          "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "10.0"
         ],
-        "release_date": "May 1, 2026",
-        "version": "3.2.1"
+        "release_date": "October 22, 2026",
+        "version": "3.3.0"
       },
-      "registry_package_facts_sha256": "89e182c909b5e3b78005635cdab07df6bb1f3351931953ff7d5fac862cfe7295",
+      "registry_package_facts_sha256": "c3b696e33975ecaec814b87de40a957f284401ccae4f304156648e11c78c93cc",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "1eaeea8e3d777c1ad76486ab788ded88c41e0e6dbb4a7a37ee8be9e8675955d0",
+          "sha256": "d53c280870b56be6fa9de8282916a10087f5981866675b43d096e26702bd3e68",
           "url": "https://splunkbase.splunk.com/app/3471"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "287318fb272c22323410c3a265d2a2d1bce3aab93aeb555e22cd5806ec38823b",
+          "sha256": "fc0c279e90320e874af57095658fed260a387d2b4bc8139f5ea5a7a4bc76c97f",
           "url": "https://splunkbase.splunk.com/api/v1/app/3471/release/"
         }
       },
       "splunkbase_id": "3471",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2",
           "10.1",
-          "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "10.0"
         ],
-        "release_date": "May 1, 2026",
+        "release_date": "October 22, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "3.2.1"
+        "version": "3.3.0"
       }
     },
     {
       "app_name": "victorops_app",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2545,25 +2564,26 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "July 21, 2026",
-        "version": "1.0.43"
+        "release_date": "November 16, 2026",
+        "version": "1.0.44"
       },
-      "registry_package_facts_sha256": "318a7343049b3ebe8cb9cecac0b4d86542f7742ca68954a263a93f1ed2bfafc0",
+      "registry_package_facts_sha256": "75097a3c6a3af4d154d30d3534059a816f8d33297e64ac9db415ce06e9e77b4f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8d426a1b1d43467b280f30e7e8c15d05af8c53263e8a248b44b9014292b22169",
+          "sha256": "e3a233cb526c8b9e812164779fba8b8324603e66b16ef72539ace825a31df215",
           "url": "https://splunkbase.splunk.com/app/3546"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "886b4df5369fafcdad038a4ecbbb9944dc99b576509ce2225349d2681cb4cb5d",
+          "sha256": "9e98a266a30609097ecae2864526edd49d7e32511aed37454c3295b7fe5d0631",
           "url": "https://splunkbase.splunk.com/api/v1/app/3546/release/"
         }
       },
       "splunkbase_id": "3546",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2586,6 +2606,7 @@
       "app_name": "Splunk_TA_salesforce",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2596,25 +2617,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "September 3, 2026",
-        "version": "7.0.1"
+        "release_date": "October 21, 2026",
+        "version": "7.0.2"
       },
-      "registry_package_facts_sha256": "39a529348eea124619098592fd6ce5ed8c1c7f88ce1fccab8d31fc6c4089f900",
+      "registry_package_facts_sha256": "b9cb0d024375518668de4593eadbb3eecac9ffaf2aa077e5c3d5ae81871454d8",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c7bf24e3e99850c9ec0e0dbe20e388354829f1d511e267595fab9980fe922d3f",
+          "sha256": "2cd0c9a04ab2ea0411379ba629a27bc85357542984e3c1e033e51200b0640386",
           "url": "https://splunkbase.splunk.com/app/3549"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "58ad6a965ee7879ce4cc0c6b7c94f9ab3782a0fc4a7d96b0268db5b2c5908490",
+          "sha256": "fb04021c47d8a4ac500782ae17f931771b19c9aaaaded58a28bccbbc3ceb1852",
           "url": "https://splunkbase.splunk.com/api/v1/app/3549/release/"
         }
       },
       "splunkbase_id": "3549",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2634,6 +2656,7 @@
       "app_name": "splunk_ta_o365",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2647,22 +2670,23 @@
         "release_date": "September 30, 2026",
         "version": "6.1.1"
       },
-      "registry_package_facts_sha256": "901c8c1a335a73d505844d0d479b422577de949d4d6c672b09d0e7db225e8119",
+      "registry_package_facts_sha256": "1220b0c0867acf6cdc6b334eb257020b12705fc92cd015fcb8f6f6ca78f61fee",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "32829ed340b1e802899288cb1f54263bc582ccc5c861a132c64349a627d626a1",
+          "sha256": "192e4dc6506514800afebe65fdfda2773bb4eeabda7ab18e9c3685c67fa5d13a",
           "url": "https://splunkbase.splunk.com/app/4055"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "fdfafceb4bc73c315114f809a3e50e0aebf6d630426c34591fa1208d6148394f",
+          "sha256": "6407c38f83fefb03f7f342ae5461f75a273f734702bc7f37b171803044751a7c",
           "url": "https://splunkbase.splunk.com/api/v1/app/4055/release/"
         }
       },
       "splunkbase_id": "4055",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2682,6 +2706,8 @@
       "app_name": "Splunk-UBA-SA-Kafka",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -2695,16 +2721,16 @@
         "release_date": "September 16, 2026",
         "version": "1.4.7"
       },
-      "registry_package_facts_sha256": "f4935c63f845b90ab69a9b18178d8fdd6a6639f24286c3cc0d7a48a4c91200b7",
+      "registry_package_facts_sha256": "5214283a3014704c53153565fc9e8526e1e5885d453d4de0bd214f923b7606a8",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "26a41f313d3ecb2ba347c34f37406033b04f5a55e2daa947eed1156b030ef625",
+          "sha256": "0230a6369e39c26868bc66e85f8f6b8b5245576718c9f097fec84bfa52f917d1",
           "url": "https://splunkbase.splunk.com/app/4147"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "28826b94a430fc0f3433deaaf4ffaff03c8cedd7f8c189109bbbdeabc4622baf",
+          "sha256": "23daf3269608e75d56a4e6df6d2faae96ab5860e4416911f973154320d519f56",
           "url": "https://splunkbase.splunk.com/api/v1/app/4147/release/"
         }
       },
@@ -2727,6 +2753,7 @@
       "app_name": "infosec_app_for_splunk",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2740,22 +2767,23 @@
         "release_date": "June 26, 2026",
         "version": "1.7.2"
       },
-      "registry_package_facts_sha256": "6bf6fe6b17ee383dcf44495cf755ae92c5b1c19b8b737a3e1414dfd0708ade4c",
+      "registry_package_facts_sha256": "1e58c8130ad4730b8ef7e7cd52c640eb758896f9927877cb193ce3815055c73b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c03ecf8e5169435597d8802b25e96f9f377dd3c0d028199e74d5532090aa910d",
+          "sha256": "48e8e0ae69f2400e031f3dbac6969c119fcc8c9b364b030072c862b7bde9bfd0",
           "url": "https://splunkbase.splunk.com/app/4240"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "9c4420276d16cf381ff7b6845a1aee4d93699f3c1c6ae13a87229a498bd7b41a",
+          "sha256": "8d6c48e19d892c10d977907491739982455441c7ede4c5f6842b35af2c9d61ba",
           "url": "https://splunkbase.splunk.com/api/v1/app/4240/release/"
         }
       },
       "splunkbase_id": "4240",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2778,6 +2806,7 @@
         "install_method_distributed": "rejected",
         "install_method_single": "rejected",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2787,27 +2816,24 @@
           "10.0",
           "9.4"
         ],
-        "release_date": "May 21, 2026",
-        "version": "2026.5.23"
+        "release_date": "November 2, 2026",
+        "version": "2026.11.2"
       },
-      "registry_package_facts_sha256": "8e55adfe22fe2012aa95a8a3025a74ab81a4b2835e36ef42b156d4e1b954943a",
+      "registry_package_facts_sha256": "b8a5ec131347c18b331534bf5b6f8a1576b0d2e48349e4f3a6b0a1ded7c4476c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b91f06b943ad60b30c0a4e5460ac71d4fffdc3583ede451a296d73fe8e1dfb8b",
+          "sha256": "6730ddd78aee45194c2e1836cf82ee59ef38d860e899d99fc2aaa94f5cd7ce6b",
           "url": "https://splunkbase.splunk.com/app/4603"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "df120e6e77b1d47cd512ba7ce51478c6acc14856f7aeeaff5751c08573f518cf",
+          "sha256": "862ec25fdd0ffc08a5b7dda0134f0d64d7965f700234995a59f322fb3fe71c0e",
           "url": "https://splunkbase.splunk.com/api/v1/app/4603/release/"
         }
       },
       "splunkbase_id": "4603",
       "verified_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
         "platform_versions": [
           "10.6",
           "10.5",
@@ -2827,6 +2853,7 @@
       "app_name": "mltk-container",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2843,22 +2870,23 @@
         "release_date": "May 22, 2026",
         "version": "5.2.4"
       },
-      "registry_package_facts_sha256": "e862b1200f2863ff24da0dbff2e34391c8432d406d5f2cdc78571d9e10679819",
+      "registry_package_facts_sha256": "52193e408606a19b0e02de57a91920679c961cfb19b19d658531aa0dc5240826",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "bc935bf32d3765404a2911a2f5262c62fc25f4a7784ba57a06c7a78fa3cb08ee",
+          "sha256": "00b23f18e6584e45dd44d09dc2558762bd7390dd8aebb9513ce75212efc893fe",
           "url": "https://splunkbase.splunk.com/app/4607"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "4d080a935658fc167a84e15c754206059d22254a5ff0206b22e19df90166fe5e",
+          "sha256": "6e63adde741388ece0beb1a96a31a5ed87f1d22682b28ab3eb04a3adbfb4a8bb",
           "url": "https://splunkbase.splunk.com/api/v1/app/4607/release/"
         }
       },
       "splunkbase_id": "4607",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2881,6 +2909,7 @@
       "app_name": "microsoft_azure_app",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2896,22 +2925,23 @@
         "release_date": "December 11, 2024",
         "version": "2.1.1"
       },
-      "registry_package_facts_sha256": "029cca4a41bcb5ce4c7b8868261b33da773150c6264b97f04ba324a11dff5fed",
+      "registry_package_facts_sha256": "c7cbbbdc9b5c43e2f33f5db1a919f37cce2d5dbbf6e1f4fe0143976521a0e33d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "684a25fe5ea0172a6f4899162256cb9a37de399692d21e513117eaf9c3ebc8b6",
+          "sha256": "0ab1ae608208afbc38d1daeb89b4c5b0b5cd86af4db4844ee063b7612f72eca1",
           "url": "https://splunkbase.splunk.com/app/4882"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "c6555de76f70ee484cdc80f3ef78ca46333080562b9305033a91178bf4e30df6",
+          "sha256": "6dfc083702187026e575463016ad8ccc8e0056bfa781899374da4c9df2b8ee60",
           "url": "https://splunkbase.splunk.com/api/v1/app/4882/release/"
         }
       },
       "splunkbase_id": "4882",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2933,6 +2963,7 @@
       "app_name": "TA-splunk-add-on-for-victorops",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2949,22 +2980,23 @@
         "release_date": "June 30, 2026",
         "version": "2.1.0"
       },
-      "registry_package_facts_sha256": "02a46b346dddf62afc0dd30527de45c282655785a44bf442e717b570e3f6af26",
+      "registry_package_facts_sha256": "5e0b8499e269fb13b030e971d71681ae8b28be8bf2984d32928cfdf36337ab0e",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5d7bc745a8f2c4dc526ec42d74fe507c7e240db385e22aa10ce9957abfcc3933",
+          "sha256": "9b363e694921e993c26b061ce3c7c70a4ddb9418bfa6bba765fd4ed55d51a04d",
           "url": "https://splunkbase.splunk.com/app/4886"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "c9dda4fc5b70c1f5e6a77043b620db88dc4cd964a975f2fd5d1f28c0e4a3adfe",
+          "sha256": "c3178c1406652cc249fae36ca775d0651273aa459dd64577fa91a27b34162d55",
           "url": "https://splunkbase.splunk.com/api/v1/app/4886/release/"
         }
       },
       "splunkbase_id": "4886",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -2987,6 +3019,7 @@
       "app_name": "cisco_webex_meetings_app_for_splunk",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3003,22 +3036,23 @@
         "release_date": "April 30, 2026",
         "version": "2.0.0"
       },
-      "registry_package_facts_sha256": "c026fab4264b9912a0d81365419b0f3062427c83aac6f5e0ed3d2ae9b00e9aaa",
+      "registry_package_facts_sha256": "9113abca92cc6c272ebacc00adc153ae30ce6e75359996f1a067487b1debac99",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "13c84d11a98432909cc8af35a2a7bacf84b460c2e7c07a5e109a6011ca8852bd",
+          "sha256": "ca9b94c677fdf5ab044859dc6df7f1f304a2fb4d437c893ef8ea4f89c8757b7d",
           "url": "https://splunkbase.splunk.com/app/4992"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "8d125dd32f42c844665761e31dce61096d8eeea514928f6cdb72ef5787475960",
+          "sha256": "746b9a39361b5b8d3aeaa023d4f62867c4b881bf7bf477f33e1b494da39f869e",
           "url": "https://splunkbase.splunk.com/api/v1/app/4992/release/"
         }
       },
       "splunkbase_id": "4992",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3041,6 +3075,7 @@
       "app_name": "Splunk_TA_vmware_inframon",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3050,22 +3085,23 @@
         "release_date": "July 14, 2026",
         "version": "5.0.1"
       },
-      "registry_package_facts_sha256": "91be89597075e56768f842a29d00ea64c4ccc26542bbaae4058fe40ecaed630d",
+      "registry_package_facts_sha256": "65dec2d1e1fc3c9f47733b6e71413b1a99c1e738bc4612c562cec6e39eb6d441",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8776f0a0192741c9dc76ea5fcdc86841171ed58f1204e817f141cfb04442340c",
+          "sha256": "c517a7fc2e558d15408be8967cf08258e04cb2017127c2e80441a534566864c1",
           "url": "https://splunkbase.splunk.com/app/5089"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "468de95442245a29286dc874852c6b5fdce7c43de4895eceabb2c3586af283c2",
+          "sha256": "050bf2e1aaef1799226ded5190d6cea7de47f7ee0da97c2aa1b324cdbd21a5fe",
           "url": "https://splunkbase.splunk.com/api/v1/app/5089/release/"
         }
       },
       "splunkbase_id": "5089",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3081,6 +3117,8 @@
       "app_name": "Splunk_TA_cyberark_epm",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -3093,34 +3131,22 @@
         "release_date": "September 7, 2026",
         "version": "5.0.1"
       },
-      "registry_package_facts_sha256": "d015db699e4509b3b28dd710f7206439acb13e09a5a8df2ff917196834e0ab3a",
+      "registry_package_facts_sha256": "d36904d856699e6923e56faf14e53fab6a4c86ac8bb2b7ff4240b6c3014e9e78",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f45ca9cc6974e163c9b61cd21761b617af9a60987fe8bdfc228fde26ea6b75da",
+          "sha256": "fe8598a96c6b84c258825d5684a2567dcbec8ad22cbd1e196054c5b7a6abb995",
           "url": "https://splunkbase.splunk.com/app/5160"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e3db1a9b9e313c6a9816d8fc6f6d980c232991f5d4f3972f66107047c564a30a",
+          "sha256": "750efdcea76dc60d7f5daf9d73c0e2553f29c2a6ccc71d475255e967ba7b4173",
           "url": "https://splunkbase.splunk.com/api/v1/app/5160/release/"
         }
       },
       "splunkbase_id": "5160",
       "verified_release": {
-        "platform_versions": [
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
-        ],
+        "platform_versions": [],
         "release_date": "July 3, 2026",
         "source_status": "historical-review-only-not-currently-reproducible",
         "version": "5.0.0"
@@ -3130,6 +3156,7 @@
       "app_name": "Splunk_TA_rsa_securid_cas",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3143,22 +3170,23 @@
         "release_date": "August 12, 2026",
         "version": "1.2.3"
       },
-      "registry_package_facts_sha256": "d4f7680646ae063a331747bf446e8542d7366e2c37a7f3fc67b9551c0f2d798d",
+      "registry_package_facts_sha256": "2fe8537d168dd3ed2e48f85b9d2a1258e27ba767b96b7570f255031f4d614224",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f8153dcd9d955205a255a86f9cff931864b5e450f7d0e419cca16e535ccbe89e",
+          "sha256": "651c8f4b2c28dfbbc88dc6a426ac6ae0442cc07b0bdf7af13d32a52a1f58d1f9",
           "url": "https://splunkbase.splunk.com/app/5210"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "cc8f38a124dd699105b1e60faba9c934065956280935a97aa45585964a59f4ca",
+          "sha256": "2a172c1c81bc1427e217d8830bf6d0ee62b76082a0d8a4425dbcb16fecd8e679",
           "url": "https://splunkbase.splunk.com/api/v1/app/5210/release/"
         }
       },
       "splunkbase_id": "5210",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3178,6 +3206,7 @@
       "app_name": "Splunk_TA_stream_wire_data",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3185,31 +3214,28 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.4"
         ],
-        "release_date": "March 3, 2026",
-        "version": "8.1.6"
+        "release_date": "October 12, 2026",
+        "version": "8.1.7"
       },
-      "registry_package_facts_sha256": "7aa044d66bcb1442319f98246f67be3241619ea9556a2a183863508d27dbcdff",
+      "registry_package_facts_sha256": "25fd2c6a472008b5e4ac842a41dfdd5c239a8d835feed141c0cdf74978a5a149",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e571c38f5c165a78c7f3e56b40c835fc00622c0f5db4fd06c7926cfe8a1d1966",
+          "sha256": "23daab5e06a72f2000f332d69ac6e8671493afa19c8ba13240d8f04968542e87",
           "url": "https://splunkbase.splunk.com/app/5234"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ca006af0672b50c1055b66d21cb361fdf74cefa44844205c6523281b026f1215",
+          "sha256": "9e8ada414d56b1357f58b4c4bdfce65c7f3cbd8e859831d7db718870c20f3779",
           "url": "https://splunkbase.splunk.com/api/v1/app/5234/release/"
         }
       },
       "splunkbase_id": "5234",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3242,30 +3268,26 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3"
+          "9.4"
         ],
-        "release_date": "March 3, 2026",
-        "version": "8.1.6"
+        "release_date": "October 12, 2026",
+        "version": "8.1.7"
       },
-      "registry_package_facts_sha256": "1357004031b494ac7a08fdec41f2cfd024875354125acd9c4086df5eef431208",
+      "registry_package_facts_sha256": "16e62baa52959125fec805ef97385aa6efc38bd61c42aab2b7148f829e0f38ce",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d06786d9d5000746883daac85ab05660100491b8f0e8d8c08e8eb3f4c262ea39",
+          "sha256": "bf7ac1446103953c9e4f4a1f9dd33336e030c0f661db92da99e18c1c3d5a96fd",
           "url": "https://splunkbase.splunk.com/app/5238"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "1e7dec1068a440779ffa7d286e60ac83794db107a66dc8ed77073d4ad563178c",
+          "sha256": "846da0f0a7ae9bee8fd8328147756bc12688a797fe3a1ce09c22563bddb6214d",
           "url": "https://splunkbase.splunk.com/api/v1/app/5238/release/"
         }
       },
       "splunkbase_id": "5238",
       "verified_release": {
-        "cloud_compatible": false,
-        "install_method_distributed": "rejected",
-        "install_method_single": "rejected",
         "platform_versions": [
           "10.6",
           "10.5",
@@ -3286,6 +3308,7 @@
       "app_name": "Splunk_TA_sim",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3295,22 +3318,23 @@
         "release_date": "July 13, 2026",
         "version": "1.3.1"
       },
-      "registry_package_facts_sha256": "bf1e7d856b40e50acca363dde7b71dff14cd5edb9144e876d84074a4919b0666",
+      "registry_package_facts_sha256": "4b76dfbfc9e041b2179f2dba2fc78f46c959214387a02c6316d0d922b1dd6062",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ef2054a661bfa2073aa554004860f53b8c979c37d7b578730f289054e148bf8b",
+          "sha256": "9a93d201bad1e2ae34817401beda0010c8a28ab2de50152a3b332a6dbee084ad",
           "url": "https://splunkbase.splunk.com/app/5247"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "1c5dd3bcab08edee0a74c5e12349843f20a6a4c60021fdbff77ff5e083343940",
+          "sha256": "1fe93f9aafaaade1b64ed2146c86d5fba42dc65dd65a15b0d722e0e333db3948",
           "url": "https://splunkbase.splunk.com/api/v1/app/5247/release/"
         }
       },
       "splunkbase_id": "5247",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3329,6 +3353,7 @@
         "install_method_distributed": "assisted",
         "install_method_single": "assisted",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3338,16 +3363,16 @@
         "release_date": "July 2, 2026",
         "version": "2.5.1"
       },
-      "registry_package_facts_sha256": "37790d1f0fe3b029a89b4887ff8f8036e2870071a2a07f6f7c3aae8530c9e5f6",
+      "registry_package_facts_sha256": "5365498b64265fdab82c4417f96b82944fd89977a08b396cf99c9903327f1193",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5d33bbce39dd98859f994f6480dd9a9723002b0f9de1d6e02a37629f63ca3f4c",
+          "sha256": "7e63422c5df6396c7da0446c12cacc24e1cba4416bb9a0dfa7e5c91d389ba56d",
           "url": "https://splunkbase.splunk.com/app/5391"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "f2fbb9a4b02c6f4cd59531d071283ad49d41816bca9423661fead156db317117",
+          "sha256": "aeb07f87a75b3805834a77f7300387b81ee910de26e5fc3a667b4235e6f927d6",
           "url": "https://splunkbase.splunk.com/api/v1/app/5391/release/"
         }
       },
@@ -3357,6 +3382,7 @@
         "install_method_distributed": "assisted",
         "install_method_single": "assisted",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3390,11 +3416,11 @@
         "release_date": "February 15, 2024",
         "version": "1.2.0"
       },
-      "registry_package_facts_sha256": "2f6bdab41f6ec8651c3f75231f33ffbd7a39016ae01e8f5a5b4cdf71e6280351",
+      "registry_package_facts_sha256": "10ffd8121bba021c5cf6a5483a92ee862b90585aea91246df4c91123c0e48e1b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7369fa4198fe8e6daca9d2dc65eb1c5d4b3bad1b7cf412f94f22b037d0584a77",
+          "sha256": "5b8476d086e99876086477f0bf35945deca80de13595984e6dbed35dcaa1ee07",
           "url": "https://splunkbase.splunk.com/app/5478"
         },
         "release_api": {
@@ -3430,6 +3456,8 @@
       "app_name": "Splunk_TA_Google_Workspace",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -3437,24 +3465,21 @@
           "10.1",
           "10.0",
           "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.3"
         ],
-        "release_date": "August 28, 2026",
-        "version": "5.0.1"
+        "release_date": "November 2, 2026",
+        "version": "5.1.0"
       },
-      "registry_package_facts_sha256": "51e603803974cf56d2744ca2f34fb210aabeb0ceb7ed7efee6bd190444490b15",
+      "registry_package_facts_sha256": "85bc1b3ba4b4401ab8dea1833ef656c6b5609170b94486e6478a95b98fb33a3f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "66b2120a6bd2f9dbbd4c679aacdcddcf49cc3c349319504679c85d43b082d255",
+          "sha256": "664fe0db2269a74da4eddf9cb163803b8d2b6772f566c981b5b6457d8700bf0f",
           "url": "https://splunkbase.splunk.com/app/5556"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "c8d6bffd2ac289b0fb048f804702648ace7986ee0a8118083eab01052edc3a0a",
+          "sha256": "cae69e8d77ee932d3aab25cd304e763c865a3f3d6f98f71d228107c3534a5437",
           "url": "https://splunkbase.splunk.com/api/v1/app/5556/release/"
         }
       },
@@ -3490,19 +3515,19 @@
           "10.0",
           "9.4"
         ],
-        "release_date": "July 13, 2026",
-        "version": "1.0.57"
+        "release_date": "October 21, 2026",
+        "version": "1.0.60"
       },
-      "registry_package_facts_sha256": "11635cfa8f2f218a7a4dd7a53f7226b7e2fa374381137290b3217ff4a4b945b3",
+      "registry_package_facts_sha256": "5d6fc329411a422c5ffa232ca15753776992913ab4f8e8127168e3839cce3673",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "356f637920aeb14e4e09efc1ccd546a9ee542c9728b7af35249cd71ef1f84f53",
+          "sha256": "7b64abd02dd0b3d7881406da7e34aa8797dfb0696d222536535c55848c8a5fef",
           "url": "https://splunkbase.splunk.com/app/5558"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "c65af14e888dd1068175d223623fa88ee45a7385b839734d375c623a9638124d",
+          "sha256": "0a0ce3fcb0fb8a5f8d36fa4b9991f7b565416abcb018ca3e90eae7b381bb4817",
           "url": "https://splunkbase.splunk.com/api/v1/app/5558/release/"
         }
       },
@@ -3518,15 +3543,17 @@
           "10.0",
           "9.4"
         ],
-        "release_date": "July 13, 2026",
+        "release_date": "October 21, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "1.0.57"
+        "version": "1.0.60"
       }
     },
     {
       "app_name": "Splunk_TA_cisco_meraki",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -3535,31 +3562,32 @@
         "release_date": "September 24, 2026",
         "version": "3.5.0"
       },
-      "registry_package_facts_sha256": "306c61ba261eb455ccf7be01710a87b4839ed3cc68086a828958c7f4616c8f07",
+      "registry_package_facts_sha256": "fe96369c65eb19d0aeb4f2d4f510e9f625818fc9edf912645fd6fabca4ec5138",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "fbeec39655ac1a1c6d63b37f745b396bd5932d0b161c1874f446fa6f53b1937b",
+          "sha256": "b4e4c0d15fa7270e3d8d29a398e6a51b78793c049c6f7977fba0ffc01da342ed",
           "url": "https://splunkbase.splunk.com/app/5580"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "3c78c4f7dceb26a79bdc6f8cd3e35bb4c5bd80f983bab330f01ae00f5a2f3e03",
+          "sha256": "de45da58f71f063e1b72da9f71b7b6718c621aedcb6f96e6ab9af6d05ccb334c",
           "url": "https://splunkbase.splunk.com/api/v1/app/5580/release/"
         }
       },
       "splunkbase_id": "5580",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "August 14, 2026",
+        "release_date": "September 24, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "3.4.0"
+        "version": "3.5.0"
       }
     },
     {
@@ -3575,11 +3603,11 @@
         "release_date": "May 18, 2022",
         "version": "1.1.0"
       },
-      "registry_package_facts_sha256": "f7990687a2cc5d35536c39e28cbd94cddf7c94259a36ada3c5869b88051da0c2",
+      "registry_package_facts_sha256": "68f9205dfe93fcdcbe0e4e0ba1e2950d7847cb08f7a71a11d35785a14a59f88a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "56f4d7729dc5b9f0fe315e027f9317f47884530e1c483fa0cbf0885ebb9ac179",
+          "sha256": "eb90384703606e4e7588a3685d56f3422ca4a4a1b60f54b073b6f7cf9e044f8b",
           "url": "https://splunkbase.splunk.com/app/5608"
         },
         "release_api": {
@@ -3606,6 +3634,7 @@
       "app_name": "TA-ONTAP-FieldExtractions",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3622,22 +3651,23 @@
         "release_date": "August 8, 2025",
         "version": "3.0.3"
       },
-      "registry_package_facts_sha256": "19e9c8209c722db47c4bd279c1cf6f9e3bba3f385dd5644fb975e9d801e410ff",
+      "registry_package_facts_sha256": "db6dcf8f0b059ad725771a054b513aa62898d7adcf6d8f51eca35cbe0bb5b946",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b9f5d0ffed55718893f7329d5413a689fcbd63ea0aebf04b67f9a39c5afe4382",
+          "sha256": "9dc3b69c5853bd135516a575f294af9dad76366c510073af294548b5e001e3f4",
           "url": "https://splunkbase.splunk.com/app/5615"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "cfe5977b3a7b513298bb33747f8e09e358b0f627d40a5cdcf848de63b4b839ab",
+          "sha256": "805d3b31507ced4df9ef93d7272f6939a2ab49ba136374508ac0971837fe6206",
           "url": "https://splunkbase.splunk.com/api/v1/app/5615/release/"
         }
       },
       "splunkbase_id": "5615",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3660,6 +3690,7 @@
       "app_name": "SA-ONTAPIndex",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3676,22 +3707,23 @@
         "release_date": "August 8, 2025",
         "version": "3.0.3"
       },
-      "registry_package_facts_sha256": "094e140d7129e326f4096a690a74cf4ec606f9ef0b5f4e2f9c47388d0794fc2a",
+      "registry_package_facts_sha256": "7afb58a372232ff6da1355d69f79651a642b7f4e711108e94451e9c94c601137",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d6b649e46f3e5cf14d4e4f224fab9df34f893b0b1f2d58c821b0c7fd67c77d97",
+          "sha256": "26eadffd551df9fe29d56b744ef1908b3c196b73feea277de0b8ab77e8ac5cb4",
           "url": "https://splunkbase.splunk.com/app/5616"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "af45c213d7a4f6308b99c94ec6a19e77566599d33de28896f3f28b402d1329d9",
+          "sha256": "40d43c19746dd385a4b3402d528e79a5ac84e1899c44ac2265d51586c08cccd1",
           "url": "https://splunkbase.splunk.com/api/v1/app/5616/release/"
         }
       },
       "splunkbase_id": "5616",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3714,6 +3746,7 @@
       "app_name": "SA-ExchangeIndex",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3730,22 +3763,23 @@
         "release_date": "August 8, 2025",
         "version": "4.0.4"
       },
-      "registry_package_facts_sha256": "4a3277cb2255d67465e496861c14037ed2352e0d517acc759c80bbc647f54ce3",
+      "registry_package_facts_sha256": "5cef8595c98654548abd7c1d47fa6b31b3d4e92a69d49ee78c5127691c40218b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b34d34d5f3fa73d07ba780a2425fa363fd2e66ce1f56abff0aea5aa2d843cda7",
+          "sha256": "b2ebe8f1229249c5f084fe8dedc5c44b1202b7b572021a1e8b0d17afbf83aca4",
           "url": "https://splunkbase.splunk.com/app/5663"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "8b6780f54dfef2dc8b612ccec0ac5052ca4ab7dd8d54390cd479440a67140ab3",
+          "sha256": "79407cdaeabf8714dcb387e654f8305deb0f5eb62cc40b23ab1c259208b8ccca",
           "url": "https://splunkbase.splunk.com/api/v1/app/5663/release/"
         }
       },
       "splunkbase_id": "5663",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3768,6 +3802,7 @@
       "app_name": "Splunk_TA_microsoft_sysmon",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3782,22 +3817,23 @@
         "release_date": "July 6, 2026",
         "version": "5.0.1"
       },
-      "registry_package_facts_sha256": "6adab5cbea2fd41de77312c26277cb1c09a1301228902f68dca7eb6425986a8b",
+      "registry_package_facts_sha256": "13424e12dcd6a4c3cee3c527303cbdd6b2b479c7519fbbf0e077398ce4a0106a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "aec8d22ddab6656dd075f2d43f2781089c1543a3921d5279d87265ee7c78c48d",
+          "sha256": "3e0a3fe2de9b94cd7a63ac2dbfb500dc986477618eaa3126254a602de259aa65",
           "url": "https://splunkbase.splunk.com/app/5709"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "578cd36e071beb133f79ec31c3b4ff30f30bf6e25ce695c2fc83d8e9eaba7869",
+          "sha256": "d34ee7c78089b8df23a4bb498040faa73a52f12c71c4c4571e0bac0d507b2b68",
           "url": "https://splunkbase.splunk.com/api/v1/app/5709/release/"
         }
       },
       "splunkbase_id": "5709",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3818,6 +3854,7 @@
       "app_name": "splunkoncall",
       "latest_release": {
         "platform_versions": [
+          "8.8",
           "8.7",
           "8.6",
           "8.5",
@@ -3840,22 +3877,23 @@
         "release_date": "August 7, 2026",
         "version": "3.0.0"
       },
-      "registry_package_facts_sha256": "909be8f7fd43bb34a532158813afdae0e46f0b91f36a69f305440e977960bfda",
+      "registry_package_facts_sha256": "0ae140c6c81b3a01563f9f38e699ea3cbbc9d12545d450a53bdde88adecf65ca",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "65e1acd4ac10ddc61dc4700846f907f39ca730e2aa9168b03bb6cb9be0666f49",
+          "sha256": "971b231f9fe6e3bf999f510cfd2e1f88552c78c74ff23b311b64d1a014dda940",
           "url": "https://splunkbase.splunk.com/app/5863"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ac67ef467d0ba492a49ce896e52a9a2f3ace78886c467d3274b7c1e929c6d16c",
+          "sha256": "e4bce58ece64e4747538802e81d3b396ec3f7c0610aa8805aaedbeee12a8cb80",
           "url": "https://splunkbase.splunk.com/api/v1/app/5863/release/"
         }
       },
       "splunkbase_id": "5863",
       "verified_release": {
         "platform_versions": [
+          "8.8",
           "8.7",
           "8.6",
           "8.5",
@@ -3884,6 +3922,7 @@
       "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3894,25 +3933,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "September 3, 2025",
-        "version": "1.2.2"
+        "release_date": "September 16, 2026",
+        "version": "1.2.3"
       },
-      "registry_package_facts_sha256": "dce8ac808a1a00528770e93b317d4804076eaeede09fd496e2530a13dbc56262",
+      "registry_package_facts_sha256": "74f61577cb39d7c417e7a5d3ce73a2293d1f3444b819ed1892de17946280aff5",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "47a99356c9869d83f9a9e3b6446eb3759726e3e5f025ebf2d612d69da3741e58",
+          "sha256": "4860712e3ac526f1e5ef4fc2a2009090396233ddbc6782ffb01af7f201557dee",
           "url": "https://splunkbase.splunk.com/app/6149"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e164632fc8057d8a11e882046d0fae61dfc7d8be49bec92a3782dee19721df21",
+          "sha256": "85b562eb738aee7d06c74b80ac47988225b44db84f6e47701c97d06e1e44506f",
           "url": "https://splunkbase.splunk.com/api/v1/app/6149/release/"
         }
       },
       "splunkbase_id": "6149",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3932,6 +3972,7 @@
       "app_name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3948,22 +3989,23 @@
         "release_date": "August 8, 2025",
         "version": "1.3.2"
       },
-      "registry_package_facts_sha256": "28eba21a150fcb4bcd7b1ee56dce8fe92a37a64902481d02258ed40348852e0b",
+      "registry_package_facts_sha256": "fe2757437ee3c6a571a4f3ca19827e47d3298b6f2abb94e52e6aa411a970cac7",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "29b3882949114a640ea6a7d2a20053269201707f835ed72ebe2bae718fe96441",
+          "sha256": "b94ec1f648142097404582bb2b32790828a132f20b95c0f2c76c2ce86b5b3e6e",
           "url": "https://splunkbase.splunk.com/app/6150"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "2567916babc5cce8359fde27b56c3ee8500f2602b80b103219653cb54f897ff9",
+          "sha256": "eaafbcc231b8e3e43ad880d382f7ee6ffc0f316098179dfc7414e1ac9f80db14",
           "url": "https://splunkbase.splunk.com/api/v1/app/6150/release/"
         }
       },
       "splunkbase_id": "6150",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -3986,6 +4028,7 @@
       "app_name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4002,22 +4045,23 @@
         "release_date": "September 3, 2025",
         "version": "2.2.2"
       },
-      "registry_package_facts_sha256": "d0540823768cf67298c9019f238f88a7c2c86429e4be05cb90ca1d147c13ae02",
+      "registry_package_facts_sha256": "0da69b1799f49fa47f853928ba3b455051053a6c3a8f3098ef0b97c9a291070d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "dfa19b507701b00db0eee70d094259b932e3ac7c752ed83e0394ab8411226646",
+          "sha256": "b5ee184d0b876e0fdccae8d6e6d5de8dc9add34c268d23992e940eb1f1c8ac5b",
           "url": "https://splunkbase.splunk.com/app/6151"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ef036f508fd6b07374f9a7d1b0e9dd016f43471ba1bbbd2cab066fa8bfeb40ea",
+          "sha256": "6d9060fcedda48c0155bfec88a47fd23020ce00252c038d2f6ab33490e43233f",
           "url": "https://splunkbase.splunk.com/api/v1/app/6151/release/"
         }
       },
       "splunkbase_id": "6151",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4040,6 +4084,7 @@
       "app_name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4053,22 +4098,23 @@
         "release_date": "September 3, 2025",
         "version": "1.2.2"
       },
-      "registry_package_facts_sha256": "4be221c572714cca1226bb645113219e9639c83c159b2f4ca362769578b4185d",
+      "registry_package_facts_sha256": "be42d6846ae8af3d2f7be3e5452bde177b06ce4c78de310ffe3f41a78abffad8",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "86271755247b91e052f566e54d517e85fe0da7ffea207bb3191312a0bc4e3cbb",
+          "sha256": "5a931328f3594430508160dd5cd8c5fd1611f67dc1bb7fd2fc48d747b70674f1",
           "url": "https://splunkbase.splunk.com/app/6152"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "ebc18c0efa42f1fbfbdb7c81b1b4c0f2c302642ebde789ea090b155ab876afbd",
+          "sha256": "ea0d639ec22afa76a943df2e5e5208655a6e32c6bea63982eb44b9b499de77b8",
           "url": "https://splunkbase.splunk.com/api/v1/app/6152/release/"
         }
       },
       "splunkbase_id": "6152",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4088,6 +4134,7 @@
       "app_name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4104,22 +4151,23 @@
         "release_date": "March 19, 2026",
         "version": "1.2.4"
       },
-      "registry_package_facts_sha256": "9159eb59baf5ea191c36b110532ce904b733be0bcf5638c59c709e0bb7541a08",
+      "registry_package_facts_sha256": "70e9ab0cf9654ebc84666e74c8fcdae659eed75451edd10e8a57b483117c3137",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "e0b305ac34f109decf2e02c25efc9786157f92f601c8d4bec631ea973d99dca6",
+          "sha256": "154f7d970b9790cbcc1f18f95df8c7945e6f5f8e942433894e7837cd0b267c04",
           "url": "https://splunkbase.splunk.com/app/6153"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "bf5db036758002df930f991563fab40e02741115609e9b8a7073dc81c7658e3a",
+          "sha256": "a870fc8884293c5e6536231af590701d6a5ae9e0797edfcc33f79dd974e5d463",
           "url": "https://splunkbase.splunk.com/api/v1/app/6153/release/"
         }
       },
       "splunkbase_id": "6153",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4142,6 +4190,7 @@
       "app_name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4157,22 +4206,23 @@
         "release_date": "September 3, 2025",
         "version": "1.1.3"
       },
-      "registry_package_facts_sha256": "7fbf193c37a99462738cd7edd2497aa6405469f65b0babb639857a00cce60180",
+      "registry_package_facts_sha256": "b88024bf444b901a8661c873cd144306bad1058aa8f0a79953051c03370ac7c4",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "90f7c56b47703f5c70119631abfdbfbff50592d03756bb030ee74b22647da048",
+          "sha256": "b1721b8898e859e5c4988f77ae307f0ecc8c27864cd7a9afb238bdbbace43583",
           "url": "https://splunkbase.splunk.com/app/6154"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "65422b5cd2ec1824d3216a29b138d8a63b3de72b741c37a355fd58ba6b916a7d",
+          "sha256": "292cc5c75f296cced8c056d1b4771b7431b8bc0c821387808b112e73115c8c9d",
           "url": "https://splunkbase.splunk.com/api/v1/app/6154/release/"
         }
       },
       "splunkbase_id": "6154",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4194,6 +4244,7 @@
       "app_name": "Splunk_TA_MS_Security",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4202,28 +4253,28 @@
           "10.1",
           "10.0",
           "9.4",
-          "9.3",
-          "9.2"
+          "9.3"
         ],
-        "release_date": "July 21, 2026",
-        "version": "4.0.0"
+        "release_date": "November 5, 2026",
+        "version": "5.0.0"
       },
-      "registry_package_facts_sha256": "687c406f31f376c2d85ad5867ddde4fa9b10ee955cbff251f839a53f0b3af8dc",
+      "registry_package_facts_sha256": "ef255370162c86190a1e178e835e097a7b1eb7f6ac018e7edd99cf2541d6378f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3334fdcdc622b97b633492de39f2c3387d9d906748eb2deb5eff364a33366f8c",
+          "sha256": "a3e0aeb9535c601c7e199ad9ef731bd287caf491c35c8b6d5cc370cabb3cea09",
           "url": "https://splunkbase.splunk.com/app/6207"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "59890096e3cf39090fe4eef606f9628a4cc793eb711535301348314c695b262e",
+          "sha256": "5d9a0cc9895c6ba84d6883e12cc140d3ed82d46c82e408b98b1283c12c47e1ca",
           "url": "https://splunkbase.splunk.com/api/v1/app/6207/release/"
         }
       },
       "splunkbase_id": "6207",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4244,6 +4295,8 @@
       "app_name": "Splunk_TA_github",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -4256,31 +4309,22 @@
         "release_date": "September 10, 2026",
         "version": "4.0.1"
       },
-      "registry_package_facts_sha256": "8a258014fa896fb7c179fba12fcf3262ff61a3004592f0ce8cf086af6df365a8",
+      "registry_package_facts_sha256": "2c55811febee7d40661cf019987f71a977806d03c31603e1a9ea1c9ef76e504b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7dc1928a61e6919bdf5691e02ce2c028d3e6fa5c6f9af4bb5ef79c90b798cb73",
+          "sha256": "401d1731cb1b7efca27e850bab4b775db89f7c0c1c30d0591d213c458febf90b",
           "url": "https://splunkbase.splunk.com/app/6254"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "3605f1da112ac5a6e891f875e0e285cc2680f874cabe3ae8d2e5851a44597d7e",
+          "sha256": "b94cec27e1233085b23ca3efb13bc0f7d06d6ae9391c2ddd483c12e8f412de41",
           "url": "https://splunkbase.splunk.com/api/v1/app/6254/release/"
         }
       },
       "splunkbase_id": "6254",
       "verified_release": {
-        "platform_versions": [
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3"
-        ],
+        "platform_versions": [],
         "release_date": "August 11, 2026",
         "source_status": "historical-review-only-not-currently-reproducible",
         "version": "4.0.0"
@@ -4290,6 +4334,7 @@
       "app_name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4303,22 +4348,23 @@
         "release_date": "September 22, 2025",
         "version": "1.1.1"
       },
-      "registry_package_facts_sha256": "5e59f32f501905e552daac3c1c61f77f5bf4c4b83e02df606fd5c8af2a1c9218",
+      "registry_package_facts_sha256": "aaa1e5d3f0c2dfbceab1a975f58941c1abe462ad2e87fc8a694f33cfdd2899bf",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "be247a5f269b6bc2e1ec1c431f3b4697022825ee35ecb0a3e0e50b7e559b53c6",
+          "sha256": "170d54998a5a11cb2b4b0c86871da462f06023c892765d063105f2615a855d9d",
           "url": "https://splunkbase.splunk.com/app/6332"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "a3b9977dd9542c14ce6d650e2d4378c0374ac0f72bda2d2e6594df3f086cfc11",
+          "sha256": "c0647f871a0d9836abb2e6513afeae2c81a3294d948618bcb946be65dfb601d5",
           "url": "https://splunkbase.splunk.com/api/v1/app/6332/release/"
         }
       },
       "splunkbase_id": "6332",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4338,31 +4384,33 @@
       "app_name": "splunk_app_soar",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "September 2, 2026",
-        "version": "8.7.0"
+        "release_date": "November 3, 2026",
+        "version": "8.8.0"
       },
-      "registry_package_facts_sha256": "718721d176e6756160571cdaf403d6d8564fd856fabcb76dcdb4e7025811424e",
+      "registry_package_facts_sha256": "3254aab8449f94727cdf1dd9786284a43c906bb2db29b5ba30fbcd19108b3687",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "18c9c4f37cf04d8a4ff81cd801ee5ffda50962c51ae85bbd604b95a4c40e78bc",
+          "sha256": "c1a301e0a154b86b56d233936ea7b8e4450071e5f2dac05000cfbceb5be830fc",
           "url": "https://splunkbase.splunk.com/app/6361"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "f283c1e9c1b1cce0711921db876a7ffe2ac6bb69908a08e23fe352682e2694d5",
+          "sha256": "25ef1682eb3af0c1fa2148eb918727e8e278e18e34fc9873dcbc4b7b9a638704",
           "url": "https://splunkbase.splunk.com/api/v1/app/6361/release/"
         }
       },
       "splunkbase_id": "6361",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4387,11 +4435,11 @@
         "release_date": "June 14, 2022",
         "version": "0.1.20"
       },
-      "registry_package_facts_sha256": "8f8d9f6d913a9fc45085a547a0aaa31c21abb342f150726b16a7630b2c95bb6f",
+      "registry_package_facts_sha256": "5b59037be29ab31f311ed72f0b72752e646b808e1bd1be70c17b06e6033c398c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "f504230218314f26e93ac69317395043d4451442eeb1fcb38e97ebf1c31b6b68",
+          "sha256": "3789387ff548e7fbcb733999dc8cef10d1f97e98a38e68874b2fcbb3b797e569",
           "url": "https://splunkbase.splunk.com/app/6415"
         },
         "release_api": {
@@ -4418,6 +4466,7 @@
       "app_name": "Splunk_TA_okta_identity_cloud",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4431,22 +4480,23 @@
         "release_date": "July 30, 2026",
         "version": "5.1.0"
       },
-      "registry_package_facts_sha256": "1a8331e6cc5c3d3a491bb4c6e6814edc69ace0646a64ac590971f6d57fa5c5b9",
+      "registry_package_facts_sha256": "ad67eec566bb414dffbc46182d137540a17820409d3014c1dee9e210c107786d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6e679b6366ec9f95acf6eeeda384b673b7a4f5e081e5a19b64704e68fed9f465",
+          "sha256": "ec153f108a7d039211d4c636ec899acc11bec5d0eeb734d791de8c0de12d1959",
           "url": "https://splunkbase.splunk.com/app/6553"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e8121d57f7de316a034ace630fc22cdf0890f104b63b9cb2acd26df9faa1fdcb",
+          "sha256": "021c1018731849f068f92b54940403baecc7d72b87e72eaa9a3f22e963f37f8f",
           "url": "https://splunkbase.splunk.com/api/v1/app/6553/release/"
         }
       },
       "splunkbase_id": "6553",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4466,6 +4516,7 @@
       "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4476,25 +4527,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "July 22, 2026",
-        "version": "4.3.4"
+        "release_date": "October 13, 2026",
+        "version": "4.3.5"
       },
-      "registry_package_facts_sha256": "a10113efd2bccb6fff55741af15a3a7c79fcaae5c1f7824c6081ccc8faf8a932",
+      "registry_package_facts_sha256": "a0d3cad318e238d4eed24e75c1eb315303d6542590410d35e530f9c119849e4c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "af4615ef03a38d7ee43f63c9b9900ac757fe3da39f2cc17d8e88dcf54b70c6e9",
+          "sha256": "b37fc210d123d1feb13ae61550cc275e1cd536f37f05fc0170117a39fb02300c",
           "url": "https://splunkbase.splunk.com/app/6785"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "247c958c0d8ecdd1375e1fdb23525062a228caacdd134b1d3dd5fd42b744a2fc",
+          "sha256": "a0a1cd5c787daaa465e7ffc2c620371bc9d6263e5a212e6f3225a51a31593fe9",
           "url": "https://splunkbase.splunk.com/api/v1/app/6785/release/"
         }
       },
       "splunkbase_id": "6785",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4514,6 +4566,7 @@
       "app_name": "ocsf_cim_addon_for_splunk",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4529,22 +4582,23 @@
         "release_date": "July 30, 2026",
         "version": "1.1.0"
       },
-      "registry_package_facts_sha256": "a902ec5009d2677048839f0bdc1df2f17109e54bfe4c531138510fc696b28249",
+      "registry_package_facts_sha256": "d6c76c2c42d633229836d55851a6bba4225d8ab2f166b73a287872b9291fa42a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "3ff1a6cd22d8d3c63eb21b2eb99ef53d25e5c99f41f54acf91ef9e9ec8b588e4",
+          "sha256": "d449fb6f27a87b1bc33bec798ff5594e43b5bb95c21ccd48f29ebda53932fbe1",
           "url": "https://splunkbase.splunk.com/app/6841"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "48a00bc9ac23430a1a927dc4de9ed515c2d9927d9fbed231a1cc7cb4b3c64fb1",
+          "sha256": "766edafc358d185650fb28ac81fece96a54f90dae4d9734dee14262503b9b8ef",
           "url": "https://splunkbase.splunk.com/api/v1/app/6841/release/"
         }
       },
       "splunkbase_id": "6841",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4575,11 +4629,11 @@
         "release_date": "November 15, 2023",
         "version": "1.1.2"
       },
-      "registry_package_facts_sha256": "0fd84576d7941f7b546ccd800c92373de76067b8251a58d590605c5f0282aea0",
+      "registry_package_facts_sha256": "e6410c619c8e5c96f4769ddc7fa324729da22f169fed5cb9e1c8c92a2a06286b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "9aacc38a922c07507405bc4b261fc5e134072100fbed7b85449f82afe9db6f8b",
+          "sha256": "4d1802673b5a843349074f3404b9b5dbcc57c6401f31d20bf28ae2303e8516d1",
           "url": "https://splunkbase.splunk.com/app/6843"
         },
         "release_api": {
@@ -4606,6 +4660,8 @@
       "app_name": "splunk_app_stream_ipfix_cisco_hsl",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -4614,22 +4670,23 @@
         "release_date": "August 26, 2026",
         "version": "4.0.0"
       },
-      "registry_package_facts_sha256": "40790e5ace89eb9beea473d59235574d34452eb69f1b6c546114437f55538659",
+      "registry_package_facts_sha256": "109497e0fb424b5a71743928444276d4a4e4848b0c4d9df20aa7123724e1e576",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "036ac9f44f90947d53370b19de300b3dcd5d08bc8ab9061cd1083ab49f1bbaef",
+          "sha256": "46357a62c33696c86675cae9e34aaa7d8e016628fd4cff5e7ea09f19c7461202",
           "url": "https://splunkbase.splunk.com/app/6872"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "f5770cd6933df955c7a61251f434b3a3416ffb1bab48c1aeb1c7bd9975cd4abb",
+          "sha256": "e9019fcb9d1e244b8629fc3468e0fe3eb286126cc09c5241a8cb8b750e126ec9",
           "url": "https://splunkbase.splunk.com/api/v1/app/6872/release/"
         }
       },
       "splunkbase_id": "6872",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4650,6 +4707,8 @@
       "app_name": "Splunk_TA_SAA",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -4658,25 +4717,26 @@
           "10.0",
           "9.4"
         ],
-        "release_date": "September 14, 2026",
-        "version": "1.3.1"
+        "release_date": "November 5, 2026",
+        "version": "1.3.2"
       },
-      "registry_package_facts_sha256": "badde20371529b1817da248eae233f9a89c9c9095f63b77f49ef5b592b34e322",
+      "registry_package_facts_sha256": "61700b48cdf026a2116ba26b7600fcfc49e92072d2401b9be556348b787092b4",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6ada3caeccd0883a3129fbf83004e9bef09246c96f6d1c9d547c1f82bfab96a3",
+          "sha256": "b4a1eedc73501a10b25bd713304a80386dbd5386f41ff0df95b7ab0c4faa9a33",
           "url": "https://splunkbase.splunk.com/app/6999"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "a02adb2ca5fd30af6edeb6fa632d35231e555d829b6b4dc5edfbc644a73190c8",
+          "sha256": "6d721c5012199af2fde1497531e9f5c0afc7a0a4eee4336259fb0d59751943d1",
           "url": "https://splunkbase.splunk.com/api/v1/app/6999/release/"
         }
       },
       "splunkbase_id": "6999",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4695,6 +4755,7 @@
       "app_name": "Splunk_App_SAA",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4707,22 +4768,23 @@
         "release_date": "July 3, 2026",
         "version": "1.3.0"
       },
-      "registry_package_facts_sha256": "85a4893d1def4487b1e1e7879008855e8cf9d6f896701f1f57d6d06e2966989a",
+      "registry_package_facts_sha256": "cfa53c459407795d8d460e80cddb95deb294b4beb5b291be18a9f7f5475e3d4c",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8bbf71ae9c2b11773b3aefcca1d6f1a11a6fab10497a43cc34d66f64a10bc5af",
+          "sha256": "f23ec7e0a72d4080d084b2c1b6ccefd81bfdb8b6131004396177d74937b45c88",
           "url": "https://splunkbase.splunk.com/app/7000"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e82283fe9f9067bb2b924504174295782398308e325d713f6e3fbfeb5fac5255",
+          "sha256": "b53c7ce2069f2758b56f7466b3ee779165d28edbf27d85a45dc9e45c26cc4eb1",
           "url": "https://splunkbase.splunk.com/api/v1/app/7000/release/"
         }
       },
       "splunkbase_id": "7000",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4741,6 +4803,7 @@
       "app_name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4757,22 +4820,23 @@
         "release_date": "September 3, 2025",
         "version": "1.3.0"
       },
-      "registry_package_facts_sha256": "3b8ed2e9f3031eabae107474b747d059f601935b0c04d23ed866aca3e1039322",
+      "registry_package_facts_sha256": "276bfc4c3ea78707b8c4604be03ad82fe250051cacaa66969f33b8933c8684cc",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b746d511038995f920f62fe3a4797b736efe1bb883dbda7531b088ab5ed79146",
+          "sha256": "51f8c21605750adbd7ea460db80de7b8e3213e93587883061e4b2eccbb9b6096",
           "url": "https://splunkbase.splunk.com/app/7095"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "b1e9d3fe9dac3cf25eec11eaae6495d51504e81b4600fc66e68f2c6343233316",
+          "sha256": "d1e6c312928321cd13911308fdd8424a605a7301cb50cec1c693a53af5c2ccc9",
           "url": "https://splunkbase.splunk.com/api/v1/app/7095/release/"
         }
       },
       "splunkbase_id": "7095",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4795,6 +4859,8 @@
       "app_name": "Splunk_TA_otel",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -4807,25 +4873,26 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "September 18, 2026",
-        "version": "0.161.0"
+        "release_date": "October 30, 2026",
+        "version": "0.164.0"
       },
-      "registry_package_facts_sha256": "25e0b15da44006a6e87be2e85e5cd4ac2d419ff9d31df1ea908a7c93067c4494",
+      "registry_package_facts_sha256": "267e62debbcdec793e113e09c41aabfeb12cd6e77bc1d2687241ebcf12b45a4e",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "91f64d6bc8d0b984b6b540addec19af552091b8ba1ea90c3124f521522e1d719",
+          "sha256": "47f29881d8e833fd666c2cc9b42e488bba6d0f7dd3c1046cd332fb3f6e77758d",
           "url": "https://splunkbase.splunk.com/app/7125"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "0cdae83849b9732cf83880f3ae71acdbf9a974b72c9cbf76b8ee07fdebd01c9b",
+          "sha256": "a41b58740ad72f8f8d1815b7a4578a58b86a012c913c2b4f9f301133f1d01d1f",
           "url": "https://splunkbase.splunk.com/api/v1/app/7125/release/"
         }
       },
       "splunkbase_id": "7125",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4848,47 +4915,34 @@
       "app_name": "SplunkAssetRiskIntelligence",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3"
+          "10.2"
         ],
-        "release_date": "June 10, 2026",
-        "version": "1.2.2"
+        "release_date": "November 11, 2026",
+        "version": "1.2.3"
       },
-      "registry_package_facts_sha256": "103550ddb6bae8ca47756397c771140c3e2a541e2727e235704284780ba37e13",
+      "registry_package_facts_sha256": "c24fdaed17be0fbae68b0b9ea8bb95361d8e7096bf3da98d24dd26a3bb7d8279",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "16a9042b1de526c646477fc09093bea868fec92ac05822710c3197eef59bf377",
+          "sha256": "cfa261f48dc2c4b3d6edb85f67e8bdb343adfaeeb92e3b051d1fe6ef08376a58",
           "url": "https://splunkbase.splunk.com/app/7180"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "a47915040fb9bfe47b3e339a5ff2a9ef96779988a9690972c49d56d1f2171be5",
+          "sha256": "75e73519e52d35ea9e586aac041b052157383ba92ef65663e019026b8a7ee4e6",
           "url": "https://splunkbase.splunk.com/api/v1/app/7180/release/"
         }
       },
       "splunkbase_id": "7180",
       "verified_release": {
-        "platform_versions": [
-          "10.6",
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4",
-          "9.3"
-        ],
+        "platform_versions": [],
         "release_date": "June 10, 2026",
-        "source_status": "source-verified-current-release-api",
+        "source_status": "historical-review-only-not-currently-reproducible",
         "version": "1.2.2"
       }
     },
@@ -4896,6 +4950,7 @@
       "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4912,22 +4967,23 @@
         "release_date": "September 17, 2025",
         "version": "1.2.0"
       },
-      "registry_package_facts_sha256": "8ad54b9d1d94037b622d661c4d1d75feb67320b89047b2295f45bd89c6c9ba8a",
+      "registry_package_facts_sha256": "3e4476814ebcc689920a07a540fdb127ae556f825373033fea43db938ee95aeb",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "dc87c4026874dc3c7a18c4e5d5cab38617dd82398e231e78b2c34a340d6e7c76",
+          "sha256": "a96b788824a2451f909455e5f7503de36c9abc28aa11bd5ed1ba3f6720b1cbb0",
           "url": "https://splunkbase.splunk.com/app/7214"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "9582aa66c1211ac5d70b6aff3b0431403e5b7863ca00bad99252d8e113217549",
+          "sha256": "0f697d6ccc4e0556a85c0e8f8734039edfddbe08336a402ff1c357a90afe25ab",
           "url": "https://splunkbase.splunk.com/api/v1/app/7214/release/"
         }
       },
       "splunkbase_id": "7214",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4950,6 +5006,7 @@
       "app_name": "Splunk_AI_Assistant_Cloud",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4960,25 +5017,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "September 22, 2026",
-        "version": "2.3.3"
+        "release_date": "October 16, 2026",
+        "version": "2.3.6"
       },
-      "registry_package_facts_sha256": "98bb24064ca3177def6faa73dfed889a3e247bc40272e1016fc4729309160561",
+      "registry_package_facts_sha256": "d53bc5ac2dfa5ab5678c124bdc9a794f313095e489020330b9a86f2ab4dfbeea",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "392fd03a3990687e528b35f502e42008ab52caed95d103288be4cedf145f2c65",
+          "sha256": "984e82e62c32f36c7989752fb862f162c9319f8c768ff17e669f98dadf2c5504",
           "url": "https://splunkbase.splunk.com/app/7245"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "931881eaf4a5c132125532a1f2e5a1c510e5830b30cad0fdddb16295125562f0",
+          "sha256": "4c76c39afec7e37b01a372ba27877922fafa40d2ec59bc3995bb1759f7839514",
           "url": "https://splunkbase.splunk.com/api/v1/app/7245/release/"
         }
       },
       "splunkbase_id": "7245",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -4998,6 +5056,8 @@
       "app_name": "CiscoSecurityCloud",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
@@ -5009,25 +5069,26 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "September 17, 2026",
-        "version": "3.7.2"
+        "release_date": "October 26, 2026",
+        "version": "4.1.3"
       },
-      "registry_package_facts_sha256": "cbafc696d91103149acdac9cad146beede954a6ea486aa6baa909f41f5f18fb8",
+      "registry_package_facts_sha256": "ab4d63f69d478f56576c0b23426b6f1a77f08921e0653211d0405773b07e704e",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ff75f492f8dda2f7f01c418bbe9d0dfcb5f3d4842c5a1db97f56cb4e73805978",
+          "sha256": "66b2701cc0ef21b5f10bf3b56f1aaf62e7c4f55c9471365e0a8e07242acd9c4c",
           "url": "https://splunkbase.splunk.com/app/7404"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "4d95cbc3fbd6d39acc6e2308e65c1de38d56c84a95ba38efc9b520e2f0ffd164",
+          "sha256": "f2fb2174273386e1f0df76ee8fe91209a5d9a11efdd7a64c2bd592dfd3b944a1",
           "url": "https://splunkbase.splunk.com/api/v1/app/7404/release/"
         }
       },
       "splunkbase_id": "7404",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5049,6 +5110,7 @@
       "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5065,22 +5127,23 @@
         "release_date": "September 17, 2025",
         "version": "1.2.0"
       },
-      "registry_package_facts_sha256": "aaab901238b2b73a587529d7ba2e7ac055af66edead69776a175906f841b1dc4",
+      "registry_package_facts_sha256": "b57ec279ff0d5ccc524012a14e046dd535ec0578cf92a551b6d319035696597f",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "8ed917717b6e474ca01662c7a5f16c1309896f512a5f048fd426f78576f3ee6c",
+          "sha256": "7a9fb683ee716f34d00a0e593554b99e01f70509afac5ae8e94fac17a5815080",
           "url": "https://splunkbase.splunk.com/app/7416"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "6e82014d97323719a2840b8da94448f90104ee0bd211fe7798997889ba527a59",
+          "sha256": "20a2a1c70fe149966c252c7bfc4caccfc92ac2d832c579e9729c9998c8c3854c",
           "url": "https://splunkbase.splunk.com/api/v1/app/7416/release/"
         }
       },
       "splunkbase_id": "7416",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5103,6 +5166,7 @@
       "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5119,22 +5183,23 @@
         "release_date": "September 17, 2025",
         "version": "1.2.0"
       },
-      "registry_package_facts_sha256": "fb88dbe7b3cd3e6c78572c58591019ca9d018878dbe53171f833a9c7c0430c77",
+      "registry_package_facts_sha256": "b8d95228a593d0206d446e4029c4b130f0224f4fdaa7cd9ab6f72eb346e8e2a7",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "b1f4423d213cf812e23a9e82974579765c827bc5b45c92a4e8ef5c71a68ee3ec",
+          "sha256": "05657deb166720630f29a0a86aabafbc40b13d6786e9e4193d614926e31c4dc7",
           "url": "https://splunkbase.splunk.com/app/7417"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e696b91fb5b40506accb085ba95a45b6dcb3d47d5510af8a8f9f37531a00f3d9",
+          "sha256": "b2687040d958f8e06e4aa2a7abc838136cb9a796734665a23bc869b3a14ab6b9",
           "url": "https://splunkbase.splunk.com/api/v1/app/7417/release/"
         }
       },
       "splunkbase_id": "7417",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5157,30 +5222,33 @@
       "app_name": "TA_cisco_catalyst",
       "latest_release": {
         "platform_versions": [
+          "10.7",
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "September 8, 2026",
-        "version": "4.0.35"
+        "release_date": "October 20, 2026",
+        "version": "4.0.60"
       },
-      "registry_package_facts_sha256": "e053575b0350048dda822805ef80d2030659c131a415a9515f7a1e4ea6b1e688",
+      "registry_package_facts_sha256": "b2149d116983582837736751d364ee2e0917e166746ac3bf754b4c22e981b605",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7534333dfbd8b6b03d2db2e9e2c8428f973b8268d77d2e99b7ab56ee376a213b",
+          "sha256": "378b6d50627edc47b2e8901d3f051fb01d3bcd588240d9b2055386aad7e2ac51",
           "url": "https://splunkbase.splunk.com/app/7538"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "1fd93d3908e28844624a96ce9112dd998c6daa68048e4d5b90eed445fa7c2adf",
+          "sha256": "63a778f604232964eb3ea3a5b9e025599a2ff57c58b17dbc2886bb71549b1999",
           "url": "https://splunkbase.splunk.com/api/v1/app/7538/release/"
         }
       },
       "splunkbase_id": "7538",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5196,31 +5264,33 @@
       "app_name": "cisco-catalyst-app",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "September 4, 2026",
-        "version": "4.0.10"
+        "release_date": "October 8, 2026",
+        "version": "4.0.20"
       },
-      "registry_package_facts_sha256": "29b4e514a97e4e01ac4ad12155d883cc27555552859115dc2ae34e77c31982cc",
+      "registry_package_facts_sha256": "0e34da224b94e071ec5287e0551576cc9ba4eec68eb6c157b93f9f28ff50671b",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "6b10dd10e522f3f41e6c671cd5f34cf667370cbdcedde4d707a84bbeec6d44cf",
+          "sha256": "8297cf77562bc53b5de1fc77a21c1f1fe64192bc6d3d3f74e3033a0f7d967913",
           "url": "https://splunkbase.splunk.com/app/7539"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "679b23b226c148b9307155ce919a860ef6a36ebd5d82a7fe8c2945f55dffe7bc",
+          "sha256": "bca978c53ae7bed6f744da7c3d9dc05d1f7624fe2057270a1284570bd8873add",
           "url": "https://splunkbase.splunk.com/api/v1/app/7539/release/"
         }
       },
       "splunkbase_id": "7539",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5247,16 +5317,16 @@
         "release_date": "June 18, 2026",
         "version": "1.0.3"
       },
-      "registry_package_facts_sha256": "bceb7d94736c90c9e9a85d4b1a876c22eea83e2aafba6e594974abccc40a0adb",
+      "registry_package_facts_sha256": "9fe572edb4bdeca556abfc707199e686fcdca3763adae0f46bcd5fc156a2ef08",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "53f2f092c4fde91eb04f77a0456447220d59a126c77bbab5aae4d930ab0ebe85",
+          "sha256": "1cbc9d22ef2d78afd74529571f8c7e264e403d83d3817e84e84ab5db3e93ba55",
           "url": "https://splunkbase.splunk.com/app/7557"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "263d1865a51415f8613481de9a34a46a02aa1c111ee8a23e20271a59f2f6d1f8",
+          "sha256": "7a7abfd1bad8f3faad208d9454849795ca07ba9fbd9a20d8ad7dff4b7629a781",
           "url": "https://splunkbase.splunk.com/api/v1/app/7557/release/"
         }
       },
@@ -5280,41 +5350,53 @@
       "app_name": "TA-cisco-cloud-security-addon",
       "latest_release": {
         "platform_versions": [
+          "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2",
           "10.1",
-          "10.0"
+          "10.0",
+          "9.4"
         ],
-        "release_date": "September 10, 2026",
-        "version": "1.0.55"
+        "release_date": "October 21, 2026",
+        "version": "1.0.57"
       },
-      "registry_package_facts_sha256": "69270f34b6117a1697596b03b4da94327da66c7e2c15ae82ea3ebc42038f9aa9",
+      "registry_package_facts_sha256": "47efca1ed4b0672651da6da17645f88b29afe8001ff77d5b8e2feba50eb73e65",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ab5daf52ee5de08d16135b23c5fba99cc7d298d6bd0bda9717047ce10be2f999",
+          "sha256": "4497fd344942b363d3e752cbee3cf6dd56d92ee2056115f6869b453d42280b06",
           "url": "https://splunkbase.splunk.com/app/7569"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "45493f09fd44fec5b95e3589e99b96935d8abd108874254be14f2e16980c326d",
+          "sha256": "91349ef87cb99520f5a8e465df0cf0b066211f729841c83bfa0e4eb80e8f6bbc",
           "url": "https://splunkbase.splunk.com/api/v1/app/7569/release/"
         }
       },
       "splunkbase_id": "7569",
       "verified_release": {
-        "platform_versions": [],
-        "release_date": "July 20, 2026",
-        "source_status": "historical-review-only-not-currently-reproducible",
-        "version": "1.0.53"
+        "platform_versions": [
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2",
+          "10.1",
+          "10.0",
+          "9.4"
+        ],
+        "release_date": "October 21, 2026",
+        "source_status": "source-verified-current-release-api",
+        "version": "1.0.57"
       }
     },
     {
       "app_name": "ta_cisco_thousandeyes",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5330,22 +5412,23 @@
         "release_date": "August 24, 2026",
         "version": "0.9.0"
       },
-      "registry_package_facts_sha256": "020c4ae05ffac0ed939dc81ee51ea65cee26e01e33b3979a73d63c7c046b564b",
+      "registry_package_facts_sha256": "f88bd78f58c756702863e73414ae47ef151bb218539dd955d57a4cf2f8d68c3e",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d8ac068556ec4dcf0f03247c28055627d399b74871fd7e47c02e6c1cf167b152",
+          "sha256": "2e8f65de351f639172c73be2569d488b665179f4496ff01c3b17b91053665afe",
           "url": "https://splunkbase.splunk.com/app/7719"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "8849897f86313b190052a2ed94cb1a269b74737a69343fea90dc40685c8c0e94",
+          "sha256": "caae2c42c7e9be3e40fe3d58d6cebb42b28a09f01cd23e39d900732e7a3f9305",
           "url": "https://splunkbase.splunk.com/api/v1/app/7719/release/"
         }
       },
       "splunkbase_id": "7719",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5358,15 +5441,16 @@
           "9.2",
           "9.1"
         ],
-        "release_date": "June 9, 2026",
+        "release_date": "August 24, 2026",
         "source_status": "source-verified-current-release-api",
-        "version": "0.8.0"
+        "version": "0.9.0"
       }
     },
     {
       "app_name": "cisco_dc_networking_app_for_splunk",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5374,25 +5458,21 @@
           "10.2",
           "10.1",
           "10.0",
-          "9.4",
-          "9.3",
-          "9.2",
-          "9.1",
-          "9.0"
+          "9.4"
         ],
-        "release_date": "July 24, 2026",
-        "version": "1.2.2"
+        "release_date": "November 3, 2026",
+        "version": "2.0.0"
       },
-      "registry_package_facts_sha256": "9988f3f3decc1dc94c784278648ef90f2304211713624ef91570224ee9817d52",
+      "registry_package_facts_sha256": "af13e92a924a76fee3e06c7812e03075bd885deff539b15cb7ad658a17c72f85",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "18e5df2e42276cd6cfbe1430ad69e9cdf16d51c83918e9a1cbe7900dba8971bb",
+          "sha256": "a50090647f4f1033755a83d18122393d0eddee19fd814aaf499f0b3a9e353693",
           "url": "https://splunkbase.splunk.com/app/7777"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "b39c3b2a39a4e3295fd3f546ff10ea764f90c344f6a1caff79e019a1067a9b9a",
+          "sha256": "9634263b4701d482e96d3928ce74099f411af5e3b78d5017f94793dfda062072",
           "url": "https://splunkbase.splunk.com/api/v1/app/7777/release/"
         }
       },
@@ -5433,16 +5513,16 @@
         "release_date": "September 23, 2026",
         "version": "3.2.2"
       },
-      "registry_package_facts_sha256": "640e102b4881a39ad8e216b0db7e4f12bade27141a57b47163350f9ce2b4b39a",
+      "registry_package_facts_sha256": "7a9453ebdfd1a6fff2d2bec04d20e759bf92cbb7f4dba8f627a9742a504a1c57",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "0f4b628d30346e82cd74022c2d6c4b04e3123dbedff696d050bd5d99f835b55e",
+          "sha256": "a547a912ad98f9e2537b6e925cd2f14dd7d6ce9935f77cbb9d91842fe8b4b2e7",
           "url": "https://splunkbase.splunk.com/app/7828"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "82e47ac9324e7bd83e2c049b062eeb7c0c72bbda336fc6353457bcaca730d154",
+          "sha256": "74494cda03289471ccb2eb71bf2f7c1b8c1fbf9d12eb1d7dca42515946f7e6d4",
           "url": "https://splunkbase.splunk.com/api/v1/app/7828/release/"
         }
       },
@@ -5471,6 +5551,7 @@
         "install_method_distributed": "appmgmt_phase",
         "install_method_single": "simple",
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5481,25 +5562,26 @@
           "9.4",
           "9.3"
         ],
-        "release_date": "September 3, 2026",
-        "version": "2.0.0"
+        "release_date": "October 24, 2026",
+        "version": "2.1.0"
       },
-      "registry_package_facts_sha256": "45d2db0941dd272ba04400315484b64ebdd47be393363458a2bd9a632dfc1cd3",
+      "registry_package_facts_sha256": "4e17a4ca4ba85d236347f666d36855d3aa38ccca69af0d2c3af7f9ebdcc4a434",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "d82c371dd6930a00f43e2f3cde0f79400268ce5c05d2aabb9843710bebe6e25e",
+          "sha256": "7535b4ed5c9a5d9ca560332f3ba6e5b231db7da6084b85cd9099b2c69ed2a0b4",
           "url": "https://splunkbase.splunk.com/app/7931"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "d2d089f1d1d77821240245f76a1d9964487959c6a452a06a517450e0ec0a7d16",
+          "sha256": "49c15315bb7dd5f63c26eefaf15b5e41c15ac9772db431c505ae6960cf4b10c1",
           "url": "https://splunkbase.splunk.com/api/v1/app/7931/release/"
         }
       },
       "splunkbase_id": "7931",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5519,6 +5601,7 @@
       "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5532,25 +5615,26 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "December 16, 2025",
-        "version": "1.0.1"
+        "release_date": "September 23, 2026",
+        "version": "1.0.2"
       },
-      "registry_package_facts_sha256": "436bf6b557879e38c065a6d4c88d4dceb7c4605a05b64e988090f13ab44b660d",
+      "registry_package_facts_sha256": "e92d889c1f7de26c9eca17f574f6d7e145629357a845252b829427b9a95e3029",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "7e34f0bbe64c9027c63354aeb6c2b9ac964b28d9877f71f25bb2767c2fbf0d57",
+          "sha256": "4e7726d3a95ed53986fa566d7d95fa6478f8c0148b43da52a4f9a25c313ebfb9",
           "url": "https://splunkbase.splunk.com/app/8133"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "e4d87eefd66955e1039c17fcae4b690adcb2ba0b1abf7f723c630d9ec5d1ccca",
+          "sha256": "fe7e988bcf27dead08180fcf191bf07046753385ae4672b52c8b978b4e81bc34",
           "url": "https://splunkbase.splunk.com/api/v1/app/8133/release/"
         }
       },
       "splunkbase_id": "8133",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5586,16 +5670,16 @@
         "release_date": "July 15, 2026",
         "version": "1.4.3"
       },
-      "registry_package_facts_sha256": "59e83ede258ca1b3e49491599fa379e734a0cd4aaf6bd06aab3a8802ccae4adc",
+      "registry_package_facts_sha256": "6df7009723b94ad46a2a7a529b79c933518254659186593c889a7d16882bf750",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "5d237d689934e57d53d9445c1d33eb27e163376d84ffb827eff9c7be52a068f1",
+          "sha256": "c11fdb9a81eb6f8250a3deb966cee2d43ed7ca001cb452eb93c878b47c6ce097",
           "url": "https://splunkbase.splunk.com/app/8365"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "33078a680106d93624e4606357c1419e17910a3265bcf7bc9411fa4fea7648e8",
+          "sha256": "3aba961a58e8d722c12839e4114e7e02113a6804708fb882d7e35a6ae4b2d7a8",
           "url": "https://splunkbase.splunk.com/api/v1/app/8365/release/"
         }
       },
@@ -5621,6 +5705,7 @@
       "app_name": "ta_cisco_spaces",
       "latest_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5630,65 +5715,65 @@
         "release_date": "September 21, 2026",
         "version": "2.0.20"
       },
-      "registry_package_facts_sha256": "1e4720971dad661d473411dc1923fdb062d36a6278807e310589f92d4262373a",
+      "registry_package_facts_sha256": "ca8de1b3b10fd9de79722b1d44090b5b1e6987e7061ffe52231aaa2c0fe1c92a",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "c3f695f9216da1d4e5695e53590f2115eb631013e83f87bab8e870e2666ff5fe",
+          "sha256": "80338423da3d1f9f09ddfc8ae160855ef95aaf7f4d9ac1cfac1c556b2de4e7e3",
           "url": "https://splunkbase.splunk.com/app/8485"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "6b711b95f8cb1c9d9ebceea418eb70cd981232238a837f9bc42ae5a453bf0179",
+          "sha256": "8d4454bc6d4044245aabd31a84c322d7bfb561a2e1df8614b7ca79020f6d4fa2",
           "url": "https://splunkbase.splunk.com/api/v1/app/8485/release/"
         }
       },
       "splunkbase_id": "8485",
       "verified_release": {
         "platform_versions": [
-          "10.6",
-          "10.5",
-          "10.4",
-          "10.3",
-          "10.2",
-          "10.1",
-          "10.0",
-          "9.4"
-        ],
-        "release_date": "July 31, 2026",
-        "source_status": "source-verified-current-release-api",
-        "version": "2.0.1"
-      }
-    },
-    {
-      "app_name": "splunk-cisco-app-navigator",
-      "latest_release": {
-        "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
           "10.3",
           "10.2"
         ],
-        "release_date": "August 31, 2026",
-        "version": "1.0.31"
+        "release_date": "September 21, 2026",
+        "source_status": "source-verified-current-release-api",
+        "version": "2.0.20"
+      }
+    },
+    {
+      "app_name": "splunk-cisco-app-navigator",
+      "latest_release": {
+        "platform_versions": [
+          "10.7",
+          "10.6",
+          "10.5",
+          "10.4",
+          "10.3",
+          "10.2"
+        ],
+        "release_date": "November 9, 2026",
+        "version": "1.0.50"
       },
-      "registry_package_facts_sha256": "756822e55ae9f4aceb384d0d73983bac486bd3c26179e91cf3ac22b046f602ad",
+      "registry_package_facts_sha256": "d1c6508725a20d406b3472185fd02c6059285b652f6c496a5357d68c9ac081fc",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "ef218f491a19214471336324543b30ff8a0b8c8eb0d2ab73ed574bd392e2f898",
+          "sha256": "7605b4db033082c5b77f8a7fdd1bd9a7eeb9e736b5c8b0fa275ad2014852ef39",
           "url": "https://splunkbase.splunk.com/app/8566"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "796c589f37966a9d93bc65e0c563c8bc63a43b23ad01f40b3a37c7adbe3ce854",
+          "sha256": "6f8eeb29b590e59fa625f51d7d4498e1648a1ceb7c23a760514891ba39be2bef",
           "url": "https://splunkbase.splunk.com/api/v1/app/8566/release/"
         }
       },
       "splunkbase_id": "8566",
       "verified_release": {
         "platform_versions": [
+          "10.7",
           "10.6",
           "10.5",
           "10.4",
@@ -5719,19 +5804,19 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "September 18, 2026",
-        "version": "0.161.0"
+        "release_date": "October 30, 2026",
+        "version": "0.164.0"
       },
-      "registry_package_facts_sha256": "256c572cb1324e6592f4e39ae2614415ccccc5319fc2af4abbe62931f0f2fb87",
+      "registry_package_facts_sha256": "3961139b7713c7b44c9a079f4226e6c9b350139aa7d7ee527f29a5311757c8f3",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "24055c2422a89b78e925d252a6e1791fb563306ab205a18e7fc83d98bbef5200",
+          "sha256": "221309d672c823766a73af154904f271d813edc0e83dda35225ea726937876e0",
           "url": "https://splunkbase.splunk.com/app/8698"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "5f5ce2860ceb690501a92797bfa8f1becfc310a0276ef2fec0103c5aa5b13ecf",
+          "sha256": "3ab4e0bca197232dae6bee3c0af0547dd0acca77e2a292bddd4f6dac50284d8a",
           "url": "https://splunkbase.splunk.com/api/v1/app/8698/release/"
         }
       },
@@ -5772,19 +5857,19 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "September 18, 2026",
-        "version": "0.161.0"
+        "release_date": "October 30, 2026",
+        "version": "0.164.0"
       },
-      "registry_package_facts_sha256": "bf69610a9dbdcd803f15b709182fd5f3af80bf0447838290145a35f503bf213e",
+      "registry_package_facts_sha256": "7c2743668a4672a73b3f25e271dee24dea09fb117055e6efc82f8b37a8a175d3",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "14f05e3736198b78c9936808695ddac35c251661fcdc70b88386041aa2fa2f7d",
+          "sha256": "2946bca59740192d3e86dd4d528229214fdc6e2991e9b59ee6280724804853fa",
           "url": "https://splunkbase.splunk.com/app/8699"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "10169efaa4d8adafb65676c3e0eb9c57937ab0976182680a38da52eb4f02424a",
+          "sha256": "f0934a924cf03842ad19ade83d181ef4968e638d3300720d4aae8e8c96451e41",
           "url": "https://splunkbase.splunk.com/api/v1/app/8699/release/"
         }
       },
@@ -5828,19 +5913,19 @@
           "9.1",
           "9.0"
         ],
-        "release_date": "September 18, 2026",
-        "version": "0.161.0"
+        "release_date": "October 30, 2026",
+        "version": "0.164.0"
       },
-      "registry_package_facts_sha256": "5af5d14a378780bbdf6115773e6ee48daa7b6104cdb64e84504c8803b474da92",
+      "registry_package_facts_sha256": "2ee8af3dccbab3f4c7b6bf2f3318c76f5d053c74d594bdc2c036ddf3dd06429d",
       "sources": {
         "listing": {
           "hash_input": "canonical-json-of-fetched-next-data-with-recursively-sorted-arrays",
-          "sha256": "4c2086dfe189352aec2841ef0b5e668229652d89fde339e5a259337e40442620",
+          "sha256": "77e688a2f4ba2a634c8320eae2528291b0c46b7a7a089b3df87e5e1885b2df39",
           "url": "https://splunkbase.splunk.com/app/8704"
         },
         "release_api": {
           "hash_input": "raw-fetched-payload",
-          "sha256": "a523c870bec0bd82538ad162628c18cd21721c30e4033d6b4f5be423929cb77a",
+          "sha256": "8df49f429079fe5bead54033b0ab605375a28f814c69c1e322f6372217b61ae0",
           "url": "https://splunkbase.splunk.com/api/v1/app/8704/release/"
         }
       },
@@ -5855,7 +5940,7 @@
   ],
   "compatibility_target": "10.5",
   "evidence_type": "splunkbase-public-metadata-release-provenance",
-  "generated_date": "2026-10-06",
+  "generated_date": "2026-11-16",
   "max_evidence_age_days": 90,
   "registry_package_fact_fields": [
     "skill",
@@ -5884,7 +5969,7 @@
     "install_method_single",
     "install_method_distributed"
   ],
-  "registry_package_facts_sha256": "753d16b99a1491fa124c68070b2c07eb759f649c0884d19c3adbf2af2d7508ed",
+  "registry_package_facts_sha256": "27e63e69e9f03c8fc36f2eb7823325676f5e1716a17ff110d2cdeb8b8358d4a7",
   "schema_version": 1,
   "scope": "Public Splunkbase listing and release API metadata/release provenance only; does not verify downloadable package binaries or package checksums."
 }

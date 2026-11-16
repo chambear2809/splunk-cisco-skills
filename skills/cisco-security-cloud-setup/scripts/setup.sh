@@ -22,6 +22,7 @@ SK=""
 APP_VERSION="${SPLUNK_APP_VERSION:-}"
 TARGET_SPLUNK_VERSION="${SPLUNK_TARGET_VERSION:-}"
 ACCEPT_UNSUPPORTED_PLATFORM="${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}"
+CONTRACT_CHECK=false
 
 resolve_configuration_target_version() {
     local raw="${TARGET_SPLUNK_VERSION:-}"
@@ -45,9 +46,8 @@ require_configuration_version_compatible() {
     local selected_version="${1:-}"
     local version_source="${2:-selected package}"
 
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     if [[ "${selected_version}" == "${VERIFIED_APP_VERSION}" ]]; then
-        log "Compatibility preflight passed: ${version_source} ${APP_NAME} ${VERIFIED_APP_VERSION} is repo-verified for Splunk 10.5."
+        log "Package-contract preflight passed: ${version_source} ${APP_NAME} ${VERIFIED_APP_VERSION} is repo-verified for the documented Cisco Security Cloud workflow."
         return 0
     fi
     if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
@@ -55,29 +55,26 @@ require_configuration_version_compatible() {
         return 0
     fi
 
-    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-reviewed package contract (${VERIFIED_APP_VERSION})."
     log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
     return 1
 }
 
 preflight_configuration_platform() {
     resolve_configuration_target_version || return 1
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && -n "${APP_VERSION}" ]]; then
+    if [[ -n "${APP_VERSION}" ]]; then
         require_configuration_version_compatible "${APP_VERSION}" "selected"
         return $?
     fi
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
-        if $INSTALL_APP; then
-            log "INFO: No --app-version supplied; the shared installer will select repo-verified ${VERIFIED_APP_VERSION}, and the installed version will be read before any post-install REST mutation."
-        else
-            log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
-        fi
+    if $INSTALL_APP; then
+        log "INFO: No --app-version supplied; the shared installer will select repo-verified ${VERIFIED_APP_VERSION}, and the installed version will be read before any post-install REST mutation."
+    else
+        log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
     fi
 }
 
 verify_installed_package_before_mutation() {
     local installed_version
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
         log "ERROR: ${APP_LABEL} is not installed; cannot verify a package version before mutation."
         return 1
@@ -102,6 +99,7 @@ Options:
   --accept-unsupported-platform
                              Allow an unverified package/version combination only
                              with documented vendor approval
+  --contract-check           Check the package contract and exit without REST calls
   --help                     Show this help
 
 With no flags, reports installation status and current logging settings.
@@ -117,6 +115,7 @@ while [[ $# -gt 0 ]]; do
         --app-version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
         --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
         --accept-unsupported-platform) ACCEPT_UNSUPPORTED_PLATFORM=true; shift ;;
+        --contract-check) CONTRACT_CHECK=true; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -220,8 +219,8 @@ report_status() {
     current_level=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "${SETTINGS_CONF}" "logging" "loglevel" 2>/dev/null || true)
 
     log "Installed app: ${APP_NAME} (version: ${version})"
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && "${version}" != "${VERIFIED_APP_VERSION}" ]]; then
-        log "WARNING: Installed ${APP_NAME} ${version} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    if [[ "${version}" != "${VERIFIED_APP_VERSION}" ]]; then
+        log "WARNING: Installed ${APP_NAME} ${version} is not the repo-reviewed package contract (${VERIFIED_APP_VERSION})."
         log "Status reporting is read-only; any later mutation requires a supported version or a documented vendor-approved --accept-unsupported-platform override."
     fi
     if [[ -n "${current_level}" ]]; then
@@ -240,6 +239,12 @@ main() {
         resolve_configuration_target_version || exit 1
     fi
     warn_if_current_skill_role_unsupported
+
+    if $CONTRACT_CHECK; then
+        [[ -n "${APP_VERSION}" ]] || APP_VERSION="${VERIFIED_APP_VERSION}"
+        require_configuration_version_compatible "${APP_VERSION}" "selected"
+        exit $?
+    fi
 
     validate_log_level "${SET_LOG_LEVEL}"
 

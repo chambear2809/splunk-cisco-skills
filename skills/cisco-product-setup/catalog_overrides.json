@@ -171,7 +171,8 @@
     },
     "cisco_nvm": {
       "route_type": "security_cloud_product",
-      "product_key": "secure_client_nvm"
+      "product_key": "secure_client_nvm",
+      "notes": "This route uses the reviewed Cisco Security Cloud secure_client_nvm workflow. It does not install CESA 4221/2992, which are Cisco-published but listed as not supported. CESA collector and historical-dashboard migration, licensing, and sourcetype equivalence require separate review; publisher identity does not establish support."
     },
     "cisco_secure_endpoint": {
       "route_type": "security_cloud_product",
@@ -414,7 +415,8 @@
     },
     "cisco_cyber_vision": {
       "route_type": "catalyst_stack",
-      "account_type": "cybervision"
+      "account_type": "cybervision",
+      "notes": "This route configures the Cyber Vision input in reviewed TA 7538 with companion 7539. It does not install or configure separately published Cyber Vision packages 5748/5747 (Cisco Systems publisher, developer-supported). Those require an independent package/placement/license review; their add-on and app advertise different Splunk version ranges. Do not enable both collectors against the same source without deduplication and sourcetype review."
     },
     "cisco_catalyst_center": {
       "route_type": "catalyst_stack",
@@ -422,7 +424,8 @@
     },
     "cisco_ise": {
       "route_type": "catalyst_stack",
-      "account_type": "ise"
+      "account_type": "ise",
+      "notes": "This route owns Cisco Enterprise Networking TA 7538 ISE API/syslog onboarding, not the separately Splunk-developed Cisco ISE TA 1915. Package 1915 needs its own input/parser and CIM review before installation; do not run overlapping parsers or duplicate collection without a migration plan."
     },
     "cisco_catalyst_sdwan": {
       "route_type": "catalyst_stack",

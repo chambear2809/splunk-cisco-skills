@@ -42,7 +42,7 @@ def test_release_specific_registry_entries_explain_their_product_boundary() -> N
 
 def test_release_specific_skill_docs_match_the_fail_closed_contract() -> None:
     version_pairs = {
-        "cisco-intersight-setup": ("3.1.1", "3.2.0"),
+        "cisco-intersight-setup": ("3.1.1", "3.2.2"),
     }
     for skill, (verified, public) in version_pairs.items():
         text = (REPO_ROOT / "skills" / skill / "reference.md").read_text(
@@ -62,7 +62,7 @@ def test_release_specific_skill_docs_match_the_fail_closed_contract() -> None:
     )
     normalized_gws = " ".join(gws.split())
     assert "4.0.0" in normalized_gws
-    assert "5.0.0" in normalized_gws
+    assert "5.1.0" in normalized_gws
     assert "10.5" in normalized_gws
 
     uba = (REPO_ROOT / "skills/splunk-uba-setup/SKILL.md").read_text(
@@ -80,21 +80,21 @@ WRAPPER_CASES = (
         "skills/cisco-enterprise-networking-setup/scripts/setup.sh",
         "cisco-catalyst-app",
         "3.2.20",
-        "3.2.0",
+        "4.0.20",
         (),
     ),
     (
         "skills/cisco-security-cloud-setup/scripts/setup.sh",
         "CiscoSecurityCloud",
         "3.6.10",
-        "3.6.7",
+        "4.1.3",
         ("--set-log-level", "INFO"),
     ),
     (
         "skills/cisco-intersight-setup/scripts/setup.sh",
         "Splunk_TA_Cisco_Intersight",
         "3.1.1",
-        "3.2.0",
+        "3.2.2",
         (),
     ),
 )
@@ -193,7 +193,7 @@ def test_cisco_wrappers_reject_explicit_public_release_before_authentication(
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, app_name
-        assert "not the repo-verified Splunk 10.5 package" in output, app_name
+        assert ("not the repo-reviewed package contract" in output or "not the repo-verified Splunk 10.5 package" in output), app_name
         assert "before any REST mutation" in output, app_name
         assert not curl_log.exists(), app_name
 

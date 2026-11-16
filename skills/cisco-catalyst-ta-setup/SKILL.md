@@ -102,7 +102,9 @@ review-only.
 ### Package Verification Boundary
 
 The source-contract baseline and the Splunkbase package-evidence baseline are
-now the same release, `3.2.44`, which is also the current public release. The
+both `3.2.44`. Splunkbase lists `4.0.60` as the default as of November 16,
+2026. The 4.0.60 package was downloaded and inspected, but its 43-input
+contract and new runtime/report handlers are not yet modeled by this skill. The reviewed
 package was downloaded, unpacked, and inspected here: 29 modular input types,
 per-input polling defaults, generic endpoint catalogs, scheduled reports, SD-WAN
 audit and energy collection, and the TA's Data Collection Health dashboard. The

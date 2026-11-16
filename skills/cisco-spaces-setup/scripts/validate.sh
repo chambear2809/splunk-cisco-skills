@@ -145,7 +145,7 @@ health_count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
 if [[ "${health_count}" =~ ^[0-9]+$ ]] && [[ "${health_count}" -gt 0 ]]; then
     pass "Health sourcetype '${HEALTH_SOURCETYPE}' has ${health_count} events"
 else
-    warn "No '${HEALTH_SOURCETYPE}' events found; 2.0.1 ships this sourcetype, so check collector health and firehose connectivity"
+    warn "No '${HEALTH_SOURCETYPE}' events found; 2.0.20 ships this sourcetype, so check collector health and firehose connectivity"
 fi
 
 log ""

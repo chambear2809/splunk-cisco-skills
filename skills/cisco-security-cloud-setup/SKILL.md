@@ -92,16 +92,21 @@ Use the setup script with `--install` to install app ID `7404`. The script uses
 the shared installer, which defaults to the verified package, and falls back
 to the local package `cisco-security-cloud_*.tar.gz` when needed.
 
-The repo-verified `3.6.10` release is also the current public release, advertises
+The repo-verified `3.6.10` release advertises
 `10.5`, and is Cloud-compatible, so the default install path needs no review
-override. Do not select `3.6.7` on a `10.5` stack: that release advertises
+override. Splunkbase lists `4.1.3` as the default as of November 16, 2026.
+The 4.x FTD sourcetype changes require a package and custom-content review
+before adopting that line. Do not select `3.6.7` on a `10.5` stack: that release advertises
 versions only through `10.4`, and the `3.6.x` line re-advertises `10.5` from
 `3.6.8` onward. Before any
 post-install REST mutation it reads the actual installed version and refuses
 an unverified selection unless `--accept-unsupported-platform` is backed by
 documented vendor approval for the exact package and stack; the override is
-not compatibility certification. Status-only runs remain read-only and report
-the compatibility warning without refusing.
+not compatibility certification. This package-contract guard applies on every
+Splunk Enterprise and Cloud target, including 10.6: the public 4.x line changes
+FTD sourcetypes and therefore requires review even when its listing advertises
+the target platform. Status-only runs remain read-only and report the
+compatibility warning without refusing.
 
 This package is a multi-input Cisco Security app. It supports many product
 integrations through app-managed custom REST handlers rather than simple flat

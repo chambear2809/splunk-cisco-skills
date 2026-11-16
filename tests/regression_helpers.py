@@ -578,7 +578,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 handle.write(" ".join(args) + "\\n")
 
             mapping = {
-                "7404": ("CiscoSecurityCloud", "3.6.6"),
+                "7404": ("CiscoSecurityCloud", "3.6.10"),
                 "5558": ("cisco-cloud-security", "1.0.53"),
                 "7569": ("TA-cisco-cloud-security-addon", "1.0.50"),
             }
@@ -596,7 +596,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             if app_id in mapping:
                 app_name, default_version = mapping[app_id]
             elif "cisco-security-cloud" in file_path:
-                app_name, default_version = ("CiscoSecurityCloud", "3.6.6")
+                app_name, default_version = ("CiscoSecurityCloud", "3.6.10")
             elif "cisco-secure-access-app-for-splunk" in file_path:
                 app_name, default_version = ("cisco-cloud-security", "1.0.53")
             elif "cisco-secure-access-add-on-for-splunk" in file_path:

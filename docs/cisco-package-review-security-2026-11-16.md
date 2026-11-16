@@ -1,0 +1,89 @@
+# Cisco Splunkbase security/access package review (2026-11-16)
+
+This review queried the live Splunkbase listing pages at `https://splunkbase.splunk.com/app/<id>` and parsed each page's structured `__NEXT_DATA__` `pageProps.appDetails.release` object. The listing-default release was cross-checked against the release path and metadata exposed by the same page. The review used direct numeric-ID lookups plus the repository registry and product-name searches for Cisco Security Cloud, Secure Access, Meraki, Spaces, ThousandEyes, CESA, Cyber Vision, ASA, ISE, ESA, WSA, Webex, AppDynamics, and Talos. All current releases in this partition were attempted through the authenticated repository helper; archives that resolved successfully were safely extracted and inspected below. Unauthenticated direct URLs for some packages returned HTTP 401, which is separate from helper results.
+
+The table below records the package-review stage before coordinator integration;
+[final selected pins and adoption decisions](cisco-splunkbase-audit-results-2026-11-16.md)
+and the joined coverage inventory are authoritative for the resulting state.
+
+## Inventory
+
+| Splunkbase ID | Listing / publisher | Support | Type / package identity | Listing-default release (published UTC) | Advertised compatibility | Repository skill / pre-audit reviewed pin | Disposition |
+|---:|---|---|---|---|---|---|---|
+| [7404](https://splunkbase.splunk.com/app/7404) | Cisco Security Cloud / Cisco Systems, Inc. | Cisco | add-on, `CiscoSecurityCloud` | 4.1.3 (2026-10-26) | 9.1–10.7; Cloud-compatible | `cisco-security-cloud-setup`, 3.6.10 | Current archive inspected locally: SHA-256 `54345d6220e288942ec245a0cfa2f1f9433b4b9f9e82c1426f9c4689505104a6`; 26 shipped views and FTD granular mappings confirmed. Keep 3.6.10 as default until 4.x custom-content migration is approved. |
+| [7569](https://splunkbase.splunk.com/app/7569) | Cisco Secure Access Add-on / Cisco Systems, Inc. | Cisco | add-on, `TA-cisco-cloud-security-addon` | 1.0.57 (2026-10-21) | 9.4–10.6; Cloud-compatible | `cisco-secure-access-setup`, historical 1.0.53 | Candidate to advance to inspected 1.0.57; companion 5558 is required. |
+| [5558](https://splunkbase.splunk.com/app/5558) | Cisco Secure Access App / Cisco Systems, Inc. | Cisco | app, `cisco-cloud-security` | 1.0.60 (2026-10-21) | 9.4–10.6; Cloud-compatible | `cisco-secure-access-setup`, registry pin 1.0.57 | Candidate to advance to inspected 1.0.60. |
+| [5580](https://splunkbase.splunk.com/app/5580) | Cisco Meraki Add-on / Cisco Systems, Inc. | Cisco | add-on, `Splunk_TA_cisco_meraki` | 3.5.0 (2026-09-24) | 10.2–10.7; Cloud-compatible | `cisco-meraki-ta-setup`, 3.4.0 | Candidate to advance to inspected 3.5.0. |
+| [8485](https://splunkbase.splunk.com/app/8485) | Spaces Add-on / Cisco Systems, Inc. | Cisco | add-on, `ta_cisco_spaces` | 2.0.20 (2026-09-21) | 10.2–10.7; Cloud-compatible | `cisco-spaces-setup`, 2.0.1 | Candidate to advance to inspected 2.0.20. |
+| [7719](https://splunkbase.splunk.com/app/7719) | ThousandEyes App / Cisco Systems, Inc. | Cisco | app, `ta_cisco_thousandeyes` | 0.9.0 (2026-08-24) | 9.1–10.7; Cloud-compatible | `cisco-thousandeyes-setup`, 0.8.0 | Candidate to advance to inspected 0.9.0. |
+| [1620](https://splunkbase.splunk.com/app/1620) | Splunk Add-on for Cisco ASA / Splunk LLC | Splunk | add-on, `Splunk_TA_cisco-asa` | 6.1.2 (2026-07-29) | 9.3–10.7; Cloud-compatible | `cisco-asa-ta-setup`, 6.1.2 | Current reviewed pin; syslog/FTD flow remains separate from Cisco Security Cloud API inputs. |
+| [1915](https://splunkbase.splunk.com/app/1915) | Splunk Add-on for Cisco ISE / Splunk LLC | Splunk | add-on, `Splunk_TA_cisco-ise` | 5.0.1 (2026-11-03) | 9.0–10.7; Cloud-compatible | `cisco-catalyst-ta-setup` owns Cisco ISE collection through `TA_cisco_catalyst` | Existing Catalyst workflow is the supported repository path; this separate Splunk TA is not silently substituted. |
+| [1761](https://splunkbase.splunk.com/app/1761) | Splunk Add-on for Cisco ESA / Splunk LLC | Splunk | add-on, `Splunk_TA_cisco-esa` | 1.8.0 (2026-10-12) | 9.1–10.7; Cloud-compatible | `cisco-secure-email-web-gateway-setup`, 1.7.1 | Candidate to advance to inspected 1.8.0. |
+| [1747](https://splunkbase.splunk.com/app/1747) | Splunk Add-on for Cisco WSA / Splunk LLC | Splunk | add-on, `Splunk_TA_cisco-wsa` | 5.0.0 (2024-12-13) | 9.1–10.7; Cloud-compatible | `cisco-secure-email-web-gateway-setup`, 5.0.0 | Current reviewed pin; no newer listing-default release observed. |
+| [4221](https://splunkbase.splunk.com/app/4221) | Cisco Endpoint Security Analytics Add-on / Cisco Systems | Not supported | add-on, `TA-Cisco-NVM` | 4.0.7 (2025-06-25) | 9.2–10.7; Cloud-compatible | No dedicated CESA skill | Explicit limitation: listing is marked `not_supported`; do not classify as Cisco-supported repository coverage. Evaluate only as an unowned legacy NVM flow. |
+| [2992](https://splunkbase.splunk.com/app/2992) | Cisco Endpoint Security Analytics app / Cisco Systems | Not supported | app, `CiscoNVM` | 4.0.8 (2025-06-25) | 9.2–10.7; Cloud-compatible | No dedicated CESA skill | Companion to 4221 but also `not_supported`; no new skill justified without support/licensing and package evidence. |
+| [5748](https://splunkbase.splunk.com/app/5748) | Cisco Cyber Vision Splunk Add On / Cyber Vision | Developer | add-on, `TA-cisco_cybervision` | 2.2.2 (2026-08-31) | 9.3–10.4; Cloud-compatible; no advertised 10.5 | `cisco-catalyst-ta-setup` has a separate Cyber Vision API flow | Cisco-developed package with Splunkbase `developer` support. Companion 5747; do not promote as a 10.5-compatible default. |
+| [5747](https://splunkbase.splunk.com/app/5747) | Cisco Cyber Vision Splunk App / Cyber Vision (Cisco) | Developer | app, `cisco_cybervision_app_for_splunk` | 2.2.2 (2026-10-06) | 9.4–10.7; Cloud-compatible | `cisco-catalyst-ta-setup` covers Cyber Vision collection; app companion is not registry-selected | Cisco-developed visualization companion with `developer` support; keep distinct from Cisco-supported listings. |
+| [8365](https://splunkbase.splunk.com/app/8365) | Webex Add-on / Splunk Field Solutions (Cisco) | Developer | add-on, `ta_cisco_webex_add_on_for_splunk` | 1.4.3 (2026-07-15) | 9.3–10.6; Cloud not advertised | `cisco-webex-setup`, 1.4.3 | Existing workflow; current pin matches listing, Cloud compatibility remains false. |
+| [4992](https://splunkbase.splunk.com/app/4992) | Webex App / Splunk Field Solutions (Cisco) | Developer | app, `cisco_webex_meetings_app_for_splunk` | 2.0.0 (2026-04-30) | 9.0–10.7; Cloud-compatible | `cisco-webex-setup`, 2.0.0 | Existing companion visualization workflow; current pin matches listing. |
+| [3471](https://splunkbase.splunk.com/app/3471) | Cisco Splunk Add-on for AppDynamics / Splunk Works | Developer | add-on, `Splunk_TA_AppDynamics` | 3.3.0 (2026-10-22) | 10.0–10.7; Cloud-compatible | `cisco-appdynamics-setup`, 3.2.1 | Newer listing release requires package inspection before advancing. |
+| [7557](https://splunkbase.splunk.com/app/7557) | Cisco Talos Intelligence for Enterprise Security Cloud / Splunk LLC | Splunk | app, `Splunk_TA_Talos_Intelligence` | 1.0.3 (2026-06-18) | 10.0–10.6; Cloud-compatible | `cisco-talos-intelligence-setup`, 1.0.3 | Current pin matches listing; verify ES entitlement and completion gate separately. |
+
+Splunkbase's release `sha256` is a publisher-supplied digest for the release artifact; it matches the downloaded bytes for the archives inspected here and is independently checked only after download. Binary SHA-256 values for every successfully downloaded archive are recorded in the inspection table below.
+
+## Archive inspection evidence
+
+The authenticated helper successfully downloaded and safely extracted the following current releases on 2026-11-16. The hashes below are SHA-256 values of the downloaded archive bytes. Archive identity and basic contract checks were read from the extracted roots; view counts are files under `default/data/ui/views`, including documentation
+and UCC administration views; a file count is not proof of data dashboards.
+ASA, ESA, WSA, and ISE ship a README view rather than a product-data dashboard;
+their parser/ingest completion uses the downstream consuming app or readiness
+workflow. Talos configuration views are separate from its consuming ES content.
+
+| ID / version | Extracted identity | Archive SHA-256 | Inspection result |
+|---|---|---|---|
+| 5580 / 3.5.0 | `Splunk_TA_cisco_meraki` | `edd12274203a367e73c8f3ae2115ad18008b6f20f46614602b724fc7758ac8e8` | 45 views; modular inputs include organization security interval 360 seconds. |
+| 7569 / 1.0.57 | `TA-cisco-cloud-security-addon` | `1c7811dd49976f4a923321f3c02a0dfd04dca1411d66f4c846750f5dffdf13f9` | 4 views; account and AWS account handlers; event inputs remain add-on owned. |
+| 5558 / 1.0.60 | `cisco-cloud-security` | `45c6e683f41659552f70f3d49692d67b978a71b362a6ed9374d805a71052d803` | 18 views; dashboard app companion; index-setting stanzas present. |
+| 8485 / 2.0.20 | `ta_cisco_spaces` | `b98bb349568eeae3df9b27ccedbaca06374386b99dcfcb87e8a2f6456a7fd07e` | 4 views; `cisco_spaces_firehose` input with 300-second interval and checkpoint/health settings. |
+| 7719 / 0.9.0 | `ta_cisco_thousandeyes` | `2206fe9a288060a0a8d4e780cbba8c56ecd1c18cf53c965b60b505c3524cf6af` | 10 views; path-vis, trace, event, activity, and refresh-token inputs. |
+| 1761 / 1.8.0 | `Splunk_TA_cisco-esa` | `486010da6765b8eb63b616912b38a0186c80c95ef7dc3f74e19592346bdb1a5a` | 1 view; search-time `props.conf`; no modular inputs. |
+| 1620 / 6.1.2 | `Splunk_TA_cisco-asa` | `dbe93977b84b05c609665d3ec5db3297aae80f3b2d67b6645c3a763a7257d7fa` | 1 view; search-time `props.conf`; no modular inputs. |
+| 1747 / 5.0.0 | `Splunk_TA_cisco-wsa` | `7656262355aac65d1e5cf4dac3499ca3864b7e90258a82207265db404465454d` | 1 view; search-time `props.conf`; no modular inputs. |
+| 1915 / 5.0.1 | `Splunk_TA_cisco-ise` | `4ece73ae658a76d2141b562c3e30a1a9dbbfbbdd2f30091fc8ce716f5c28865b` | 1 view; search-time `props.conf`; this is separate from the repository's Catalyst ISE workflow. |
+| 8365 / 1.4.3 | `ta_cisco_webex_add_on_for_splunk` | `08dc03e3d0422935e0e0e0d985eafca558198d24ff74fe8194d525edc2baed35` | 3 views; modular inputs and Webex collection handlers. |
+| 4992 / 2.0.0 | `cisco_webex_meetings_app_for_splunk` | `baed5c01c8cd5dba99f76962cb81e6f161ee677be800b01065efe1553a2974df` | 8 views; visualization companion, no inputs. |
+| 3471 / 3.3.0 | `Splunk_TA_AppDynamics` | `ee7f6de3160a1a4cdf5c1193484dd23e8d4f2fb6e91c9990456259e82068a7e6` | 10 views; modular inputs and `props.conf`; current package is newer than repository pin. |
+| 7557 / 1.0.3 | `Splunk_TA_Talos_Intelligence` | `da519b725dc5c4041835946cad0476790bafaf0066125297d66668396af5c180` | 2 views; service/input configuration; current pin matches listing. |
+| 4221 / 4.0.7 | `TA-Cisco-NVM` | `55d26467bfea9ca4225eb0c789a05cfddfc2d4fbb74c7a7b4f206786e7111e42` | 0 views; legacy NVM add-on, listing support `not_supported`; no repository skill advancement. |
+| 2992 / 4.0.8 | `CiscoNVM` | `81bb9b505071fbcf037844ea2aef6261a90c2f2839d268186bd2be2e1b7b6843` | 42 views; legacy NVM app, listing support `not_supported`; companion to 4221. |
+| 5748 / 2.2.2 | `TA-cisco_cybervision` | `fefa28669835e2eaf76f85352a5e4cbb47767d0bff516eb98ce42744da28a5bd` | 2 views; account/input handlers; Cisco-developed but listing support `developer`. |
+| 5747 / 2.2.2 | `cisco_cybervision_app_for_splunk` | `0ab98df8414076436ee7087f7aba4507e65fe85f0d344ab68bee711892cd6c8d` | 11 views; visualization companion; listing support `developer`. |
+
+## Contract and migration notes
+
+Cisco Security Cloud 4.1.3 is newer than the reviewed 3.6.10 pin. The 4.x Secure Firewall FTD route uses granular `cisco:ftd:*` families; custom searches, alerts, dashboards, and accelerated data models that expect the 3.x aggregate `cisco:ftd:syslog` contract need migration testing before an advance. Secure Access requires both 7569 and 5558 and its completion gate includes configured event inputs plus visible dashboard searches. Spaces, Meraki, and ThousandEyes listing upgrades are unreviewed until their exact archives can be downloaded and extracted.
+
+CESA (4221/2992) and Cyber Vision (5748/5747) are intentionally separated from Cisco-supported packages. Their publisher name alone is not a support claim: Splunkbase reports CESA as `not_supported` and Cyber Vision as `developer`. Cyber Vision is Cisco-developed and already has a separate Cyber Vision API path in `cisco-catalyst-ta-setup`; the repository should not silently present the developer-supported Splunkbase companion as Cisco-supported.
+
+CESA licensing is explicit in both live listing descriptions: use and Cisco TAC support from version 2.1.4 require a purchased CESA endpoint license, with stated exceptions for one 90-day trial and ongoing deployments of at most 50 AnyConnect clients. The listings link the [Cisco Supplemental EULA](https://www.cisco.com/c/dam/en_us/about/doing_business/legal/seula/anyconnect-SEULA-v4x.pdf). This historical TAC/license language does not override the current `not_supported` badge; obtain vendor confirmation of current eligibility before adoption. Download access is not proof of entitlement.
+
+Package 4221 ships no `default/inputs.conf` or dashboards. Its `appserver/addon/` contains `acnvmcollector-5.1.8.105.zip` and `collector_plugin_sdk.zip`; these embedded collectors were identified but not executed or approved for deployment. Its parsers/eventtypes use `cisco:nvm:flowdata`, `sysdata`, `ifdata`, `processinfodata`, `osquery`, and `eve`. App 2992 supplies 42 views. A complete CESA workflow needs a separately reviewed external IPFIX/nvzFlow collector deployment, transport to Splunk, endpoint entitlement, and dashboard/CIM validation. The existing Security Cloud NVM route overlaps the product use case but does not prove CESA collector, field, or dashboard equivalence. This is a concrete workflow limitation rather than a new automated skill.
+
+Cyber Vision 5748 advertises only Splunk 9.3–10.4, so it is not a default candidate for Splunk 10.5 or Enterprise 10.6 despite the companion app advertising newer platforms. Both Cyber Vision listings link the third-party-content EULA; developer support and this license are separate from publisher identity. Its add-on declares Python 3.13, which also needs target-runtime qualification when considering the advertised older platforms.
+
+## Wrapper-to-package contract comparison
+
+The inspected specs were compared with the repository wrappers before making pin recommendations:
+
+- Meraki 3.5.0 retains the wrapper's core account and input names (`accesspoints`, `airmarshal`, `audit`, `cameras`, `organizationsecurity`, `securityappliances`, `switches`). The package defaults organization-security and security-appliance polling to 360 seconds; the existing wrapper now supplies those intervals and the audit/airmarshal seven-day start window. The package exposes additional specialized inputs that the wrapper intentionally does not auto-enable. Recommend advancing the reviewed pin to 3.5.0 after shared registry refresh.
+- Secure Access 1.0.57/1.0.60 retain the account, AWS account, private-app, app-discovery, and health input families used by `configure_account.sh` and `configure_settings.sh`; the app ships 18 views and the add-on 4. Required API fields remain `org_id`, `base_url`, `storage_region`, `apiKey`, and `apiSecret`, with separate private-app/app-discovery indexes. Recommend advancing both companion pins after registry evidence refresh.
+- Spaces 2.0.20 retains `cisco_spaces_firehose`, `stream`, `index`, encrypted `activation_token`, and optional `location_updates_status`; the wrapper supplies all required account/input fields and leaves location updates off by default. The new package adds reconnect/backpressure/health controls but no wrapper-required field. Recommend advancing to 2.0.20.
+- ThousandEyes 0.9.0 retains OAuth device-code account fields and the wrapper's `all`, `metrics`, `traces`, `events`, `activity`, and `alerts` groups. The package still requires HEC target/token fields for stream inputs and seven-day refresh-token maintenance. Recommend advancing to 0.9.0 after registry refresh.
+- ESA 1.8.0, ASA 6.1.2, and WSA 5.0.0 remain search-time add-ons with `props.conf` and no modular inputs; the existing syslog/file ingestion runbooks remain applicable. ASA and WSA current pins are already reviewed; ESA can advance from 1.7.1 to 1.8.0 after registry refresh.
+- AppDynamics 3.3.0 retains the account fields (`appd_client_name`, `appd_client_secret`, `appd_controller_url`, `authentication`, optional Analytics fields) and the wrapper's controller/analytics input creation paths. It adds no required field missing from the wrapper. Recommend advancing from 3.2.1 to 3.3.0 after registry refresh.
+- Webex 1.4.3/2.0.0 and Talos 1.0.3 inspected identities and input/view layouts match their existing skills and current registry pins; no wrapper delta was found. Webex add-on remains Enterprise-only (`cloudCompatible=false`) while the Webex app is Cloud-compatible.
+- CESA 4.0.7/4.0.8 and Cyber Vision 2.2.2 packages were extracted successfully, but CESA remains explicitly `not_supported` and Cyber Vision `developer` supported. They are not auto-enabled or promoted to Cisco-supported default pins; use the existing Catalyst Cyber Vision workflow where applicable and document the separate Splunkbase companion requirement.
+
+## Download and evidence limits
+
+The repository helper was run serially for every current release listed in this partition. All listed archives resolved and were safely extracted; two initial extraction collisions (3471 and 5748) were rerun with `--force` and completed successfully. Unauthenticated direct URLs returning HTTP 401 are retained only as a separate access observation and do not override the helper evidence.

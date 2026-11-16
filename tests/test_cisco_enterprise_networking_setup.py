@@ -106,6 +106,8 @@ if "/services/apps/local/" in decoded_path:
         missing = os.environ.get("MOCK_MISSING_TA") == "1" and app == "TA_cisco_catalyst"
         respond(code=404 if missing else 200)
     version = "3.2.20" if app == "cisco-catalyst-app" else "3.2.44"
+    if app == "TA_cisco_catalyst":
+        version = os.environ.get("MOCK_TA_VERSION", version)
     respond(json.dumps({"entry": [{"content": {"version": version}}]}))
 
 if method == "POST" and "/configs/conf-" in decoded_path:
@@ -350,6 +352,18 @@ def test_setup_refuses_to_mutate_when_required_ta_is_missing(tmp_path: Path) -> 
     assert "Cisco Catalyst Add-on (TA_cisco_catalyst) not found" in (
         result.stdout + result.stderr
     )
+    assert not any("/configs/conf-" in call["url"] for call in _calls(curl_log))
+
+
+def test_setup_refuses_unreviewed_ta_app_pair_on_enterprise_10_6(tmp_path: Path) -> None:
+    env, curl_log = _mock_env(tmp_path)
+    env["MOCK_TA_VERSION"] = "4.0.60"
+    result = _run(
+        SETUP, env, "--macros-only", "--app-version", "3.2.20",
+        "--target-splunk-version", "10.6",
+    )
+    assert result.returncode == 1
+    assert "not the reviewed 3.2.44 pair" in result.stdout
     assert not any("/configs/conf-" in call["url"] for call in _calls(curl_log))
 
 
